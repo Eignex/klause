@@ -19,20 +19,20 @@ internal fun prepareCoupledSupport(
     var changed = false
     while (true) {
         coupledEqualities(current, arithmetic)?.let {
-            current = it;
+            current = it
             changed = true
         }
         val equations = current.filter {
-            arithmetic.step();
+            arithmetic.step()
             it.atom.relation == PolynomialRelation.EQ
         }
         val graph = equationalSection(
             equations.map {
-                arithmetic.step();
+                arithmetic.step()
                 it.atom.polynomial
             },
             current.map {
-                arithmetic.step();
+                arithmetic.step()
                 it.atom.polynomial
             },
             arithmetic,
@@ -90,15 +90,17 @@ private fun coupledEqualities(
         }
         if (entries.size < 2 || signs != ZERO_SIGN) {
             for (entry in entries) {
-                arithmetic.step();
+                arithmetic.step()
                 result.add(entry)
             }
             continue
         }
         val premises = LinkedHashSet<Int>()
-        for (entry in entries) for (premise in entry.premises) {
-            arithmetic.step();
+        for (entry in entries) {
+            for (premise in entry.premises) {
+            arithmetic.step()
             premises.add(premise)
+        }
         }
         result.add(PolynomialCoupledSupport(PolynomialAtom(polynomial, PolynomialRelation.EQ), premises))
         changed = true

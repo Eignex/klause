@@ -96,7 +96,7 @@ private fun checkQuadraticIrWitness(
     val discrete = Sample(point.bools, point.ints)
     when (
         val checked = model.finitePointCheck(plan.finiteFactorProjections, cancellation)
-        .check(Candidate(discrete, Unit), cancellation)
+            .check(Candidate(discrete, Unit), cancellation)
     ) {
         is Verification.Rejected -> return SourceEvidenceCheck.Rejected(checked.reason)
         is Verification.Indeterminate -> return SourceEvidenceCheck.Unavailable(checked.reason)

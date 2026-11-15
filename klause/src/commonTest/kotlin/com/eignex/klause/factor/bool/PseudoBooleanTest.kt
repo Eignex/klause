@@ -70,11 +70,11 @@ class PseudoBooleanTest {
         assertNotEquals(
             factor.structuralKey(),
             PseudoBoolean(
-            arrayOf(wide, bigIntOf(-2)),
-            factor.literals,
-            PbOp.GE,
-            bigIntOf(0),
-        ).structuralKey()
+                arrayOf(wide, bigIntOf(-2)),
+                factor.literals,
+                PbOp.GE,
+                bigIntOf(0),
+            ).structuralKey(),
         )
     }
 

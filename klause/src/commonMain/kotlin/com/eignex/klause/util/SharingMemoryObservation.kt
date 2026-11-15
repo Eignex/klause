@@ -89,7 +89,7 @@ internal class SharingMemoryObservation(
             if (owner.identity === identity && (owner.slots == 0L) == (slots == 0L)) {
                 if (pool) require(owner.bytes == bytes && owner.slots == slots)
                 if (shared && !owner.shared) {
-                    owner.shared = true;
+                    owner.shared = true
                     sharedBytes += owner.bytes
                 }
                 val retained = minOf(protectedAmount, if (slots == 0L) owner.bytes else owner.slots)
@@ -109,7 +109,9 @@ internal class SharingMemoryObservation(
         step()
         scratchEntries++
         val added = Owner(identity, if (slots == 0L) bytes else slots, slots != 0L, protectedAmount, shared)
-        if (parent == null) owners = added else if (right) {
+        if (parent == null) {
+            owners = added
+        } else if (right) {
             parent.right = added
         } else {
             parent.left = added
@@ -153,7 +155,9 @@ internal class SharingMemoryObservation(
         step()
         scratchEntries++
         val added = Entry(value)
-        if (parent == null) seen.head = added else if (right) {
+        if (parent == null) {
+            seen.head = added
+        } else if (right) {
             parent.right = added
         } else {
             parent.left = added
@@ -204,13 +208,13 @@ internal class SharingMemoryObservation(
         if (status == SharingMemoryStatus.COMPLETE) {
             record(
                 mapOf(
-            "ownedPrimitiveBytes" to ownedBytes,
-            "sharedPrimitiveBytes" to sharedBytes,
-            "privatePrimitiveBytes" to ownedBytes - sharedBytes,
-            "protectedPrimitiveBytes" to protectedBytes,
-            "ownedReferenceSlots" to ownedSlots,
-            "protectedReferenceSlots" to protectedSlots,
-        )
+                    "ownedPrimitiveBytes" to ownedBytes,
+                    "sharedPrimitiveBytes" to sharedBytes,
+                    "privatePrimitiveBytes" to ownedBytes - sharedBytes,
+                    "protectedPrimitiveBytes" to protectedBytes,
+                    "ownedReferenceSlots" to ownedSlots,
+                    "protectedReferenceSlots" to protectedSlots,
+                ),
             )
         }
         return SharingMemorySnapshot(status, values.toMap(), work, scratchEntries)

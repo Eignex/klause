@@ -37,10 +37,10 @@ class NumericalFrontierSnapshotTest {
         mapOf(
             "half" to SourcePremise(
                 SourceInequality(
-            mapOf(integer to BigFraction.ofLong(-2)),
-            BigFraction.MINUS_ONE,
-        )
-            )
+                    mapOf(integer to BigFraction.ofLong(-2)),
+                    BigFraction.MINUS_ONE,
+                ),
+            ),
         ),
         mapOf(integer to BigFraction.ONE),
     )
@@ -136,10 +136,12 @@ class NumericalFrontierSnapshotTest {
         val current = SourceProofContext(
             context.scope.copy(
                 condition = SourceCondition(
-            lower = mapOf(integer to BigFraction.ONE),
-        )
+                    lower = mapOf(integer to BigFraction.ONE),
+                ),
             ),
-            context.coordinates, context.premises, context.objective
+            context.coordinates,
+            context.premises,
+            context.objective,
         )
         val sibling = evidence.copy(derivation = LinearPinnedObjective(evidence.derivation))
 

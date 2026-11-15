@@ -54,23 +54,25 @@ class PortfolioWorkAccountingTest {
             Verification.Accepted(candidate)
         })
         val worker = trackingWorker(
-            "buffered", 0,
+            "buffered",
+            0,
             TrackingResumableSearch(null, onRun = {
-            clock += 2.milliseconds
-            exchange.offerFromWorker(point, 3.0) { it() }
-            exchange.offerFromWorker(point, 1.0) { it() }
-            assertEquals(null, exchange.current())
-        })
+                clock += 2.milliseconds
+                exchange.offerFromWorker(point, 3.0) { it() }
+                exchange.offerFromWorker(point, 1.0) { it() }
+                assertEquals(null, exchange.current())
+            }),
         ).also {
             it.publicationExchange = exchange
             it.sharingMeter = SharingMeter()
         }
         val sibling = trackingWorker(
-            "sibling", 1,
+            "sibling",
+            1,
             TrackingResumableSearch(null, onRun = {
-            assertEquals(1.0, exchange.current()?.objective)
-            finished = true
-        })
+                assertEquals(1.0, exchange.current()?.objective)
+                finished = true
+            }),
         )
 
         val result = Portfolio.thompson(listOf(worker, sibling)).apply { runTimeSource = clock }.use {
@@ -82,13 +84,13 @@ class PortfolioWorkAccountingTest {
         assertEquals(9_000_000L, arm.lifecycle.activeNanos)
         assertEquals(
             mapOf(
-            "segments" to 1L,
-            "offered" to 2L,
-            "coalesced" to 1L,
-            "checked" to 1L,
-            "installed" to 1L,
-        ),
-            arm.sharing.incumbents.filterValues { it > 0L }
+                "segments" to 1L,
+                "offered" to 2L,
+                "coalesced" to 1L,
+                "checked" to 1L,
+                "installed" to 1L,
+            ),
+            arm.sharing.incumbents.filterValues { it > 0L },
         )
     }
 

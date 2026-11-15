@@ -58,6 +58,8 @@ direction.
 `QuadraticCandidates` uses floating penalty-gradient iterations only to propose
 active rows. Owned primitive buffers retain the Hessian, rows, point and gradient.
 Preparation builds the floating model before separate iteration and row-selection routines use it.
+Conversion, copying and norm scans advance the operation's polling cursor by their vector lengths;
+the operation observes cancellation before publishing its selected rows.
 Koblas ASUM computes Hessian row magnitudes and DOT computes squared constraint-row
 magnitudes for the numerical step size.
 Koblas dot and AXPY calls process complete vectors, admitting one work unit per

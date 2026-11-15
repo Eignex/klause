@@ -19,13 +19,14 @@ class AllDifferentInvariantTest {
     @Test
     fun `sparse matching should seed domains spanning the signed word range`() {
         val problem = Problem(
-            0, 3,
+            0,
+            3,
             arrayOf(
-            IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
-            IntDomain(Long.MIN_VALUE, Long.MIN_VALUE),
-            IntDomain(Long.MIN_VALUE + 1, Long.MAX_VALUE),
-        ),
-            arrayOf(AllDifferent(intArrayOf(0, 1, 2)))
+                IntDomain(Long.MIN_VALUE, Long.MAX_VALUE),
+                IntDomain(Long.MIN_VALUE, Long.MIN_VALUE),
+                IntDomain(Long.MIN_VALUE + 1, Long.MAX_VALUE),
+            ),
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2))),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
 

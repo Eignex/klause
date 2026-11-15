@@ -85,9 +85,9 @@ internal class LagrangianBound(
         var blocks: List<IntArray> = emptyList()
         if (objective != null) {
             for (next in chooseBlocks(problem)) {
-            if (next != null) blocks = next
-            yield(Unit)
-        }
+                if (next != null) blocks = next
+                yield(Unit)
+            }
         }
         if (blocks.isEmpty()) {
             vars = emptyIntArray()

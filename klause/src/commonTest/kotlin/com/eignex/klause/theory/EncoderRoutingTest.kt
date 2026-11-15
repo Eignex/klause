@@ -390,9 +390,9 @@ class EncoderRoutingTest {
         val input = assertIs<Problem>(
             (
                 SmtLib.parse(
-                "(declare-const x Real) (assert (> x 0))",
-            )
-            ).source.originalSource
+                    "(declare-const x Real) (assert (> x 0))",
+                )
+                ).source.originalSource,
         )
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { _, _ ->
@@ -443,10 +443,10 @@ class EncoderRoutingTest {
         val input = assertIs<Problem>(
             (
                 SmtLib.parse(
-                "(declare-const x Int) (declare-const y Int) " +
-                    "(assert (<= (- x y) 0)) (assert (<= (- y x) (- 1)))",
-            )
-            ).source.originalSource
+                    "(declare-const x Int) (declare-const y Int) " +
+                        "(assert (<= (- x y) 0)) (assert (<= (- y x) (- 1)))",
+                )
+                ).source.originalSource,
         )
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
@@ -708,7 +708,7 @@ class EncoderRoutingTest {
                 SmtLib.parse(
                     "(declare-const x Real) (assert (= x 1))",
                 )
-            ).model
+                ).model
             var cancelled = false
             var installations = 0
             var charged = 0L

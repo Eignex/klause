@@ -57,8 +57,8 @@ internal fun extremumDefinitions(
                     known[it]
                 }
             ) {
-                    continue
-                }
+                continue
+            }
             definitions.add(ExtremumDefinition(f.vars[j], f, j))
             used[i] = true
             known[f.vars[j]] = true

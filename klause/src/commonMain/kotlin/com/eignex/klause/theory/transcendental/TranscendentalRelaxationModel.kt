@@ -166,9 +166,9 @@ internal class TranscendentalRelaxationModel(
                     null
                 } else {
                     RationalEnclosure(
-                    if (left.lower <= right.lower) left.lower else right.lower,
-                    if (left.upper >= right.upper) left.upper else right.upper,
-                )
+                        if (left.lower <= right.lower) left.lower else right.lower,
+                        if (left.upper >= right.upper) left.upper else right.upper,
+                    )
                 }
                 value to enclosure
             }

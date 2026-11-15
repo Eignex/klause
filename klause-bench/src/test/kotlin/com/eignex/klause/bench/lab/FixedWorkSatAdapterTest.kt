@@ -22,9 +22,9 @@ class FixedWorkSatAdapterTest {
         assertEquals(listOf("1", "3", "1", "3"), cases.map { it.parameters.getValue("seed") })
         assertTrue(
             cases.all {
-            it.inputs.single().sha256 == it.parameters["sha256"] &&
-                it.inputs.single().path == it.parameters["source-path"]
-        }
+                it.inputs.single().sha256 == it.parameters["sha256"] &&
+                    it.inputs.single().path == it.parameters["source-path"]
+            },
         )
         assertTrue(cases.all { it.resources.cpus == 1 && it.resources.timeoutSeconds == 30L + 60L + 60L })
         assertEquals(4, cases.map { it.attributes.getValue("comparisonKey") }.distinct().size)
@@ -85,9 +85,9 @@ class FixedWorkSatAdapterTest {
         put(
             "trajectory",
             buildJsonObject {
-            put("rowsTruncated", false)
-            put("prefix", buildJsonObject { put("digest", "d") })
-        }
+                put("rowsTruncated", false)
+                put("prefix", buildJsonObject { put("digest", "d") })
+            },
         )
         put("measured", buildJsonObject { put("elapsedNs", 2_000_000) })
         put("preparation", buildJsonObject { put("elapsedNs", 1_000_000) })

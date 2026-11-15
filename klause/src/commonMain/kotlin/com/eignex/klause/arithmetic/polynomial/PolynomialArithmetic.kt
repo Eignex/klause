@@ -43,11 +43,11 @@ internal class PolynomialArithmetic(
         step()
         return@operation Polynomial.of(
             buildList {
-            for (term in left.terms + right.terms) {
-                step()
-                add(term)
-            }
-        }
+                for (term in left.terms + right.terms) {
+                    step()
+                    add(term)
+                }
+            },
         )
     }
 
@@ -59,9 +59,9 @@ internal class PolynomialArithmetic(
         step()
         return@operation Polynomial.of(
             value.terms.map {
-            step(it.coefficient, coefficient)
-            PolynomialTerm(it.monomial, it.coefficient * coefficient)
-        }
+                step(it.coefficient, coefficient)
+                PolynomialTerm(it.monomial, it.coefficient * coefficient)
+            },
         )
     }
 
@@ -69,16 +69,16 @@ internal class PolynomialArithmetic(
         step()
         return@operation Polynomial.of(
             buildList {
-            val leftTerms = left.terms
-            if (leftTerms.isNotEmpty()) {
-                val rightTerms = right.terms
-                for (a in leftTerms) {
-                    for (b in rightTerms) {
-                    add(product(a, b))
+                val leftTerms = left.terms
+                if (leftTerms.isNotEmpty()) {
+                    val rightTerms = right.terms
+                    for (a in leftTerms) {
+                        for (b in rightTerms) {
+                            add(product(a, b))
+                        }
+                    }
                 }
-                }
-            }
-        }
+            },
         )
     }
 
@@ -94,28 +94,27 @@ internal class PolynomialArithmetic(
 
     fun prepareMultiply(left: Polynomial, right: Polynomial): Iterator<Polynomial?> = execution.iterator(
         sequence {
-        step()
-        val leftTerms = left.terms
-        val rightTerms = right.terms
-        val merged = mutableMapOf<Monomial, BigFraction>()
-        var batch = 0
-        for (a in leftTerms) {
-            for (b in rightTerms) {
-            val term = product(a, b)
-            merged[term.monomial] = (merged[term.monomial] ?: BigFraction.ZERO) + term.coefficient
-            if (++batch == PREPARATION_BATCH) {
-                batch = 0
-                yield(null)
+            step()
+            val leftTerms = left.terms
+            val rightTerms = right.terms
+            val merged = mutableMapOf<Monomial, BigFraction>()
+            var batch = 0
+            for (a in leftTerms) {
+                for (b in rightTerms) {
+                    val term = product(a, b)
+                    merged[term.monomial] = (merged[term.monomial] ?: BigFraction.ZERO) + term.coefficient
+                    if (++batch == PREPARATION_BATCH) {
+                        batch = 0
+                        yield(null)
+                    }
+                }
             }
-        }
-        }
-        yield(Polynomial.of(merged.map { (monomial, coefficient) -> PolynomialTerm(monomial, coefficient) }))
-    }.iterator()
+            yield(Polynomial.of(merged.map { (monomial, coefficient) -> PolynomialTerm(monomial, coefficient) }))
+        }.iterator(),
     )
 
-    private fun prepareDivision(dividend: Polynomial, divisor: Polynomial): Iterator<Polynomial?> =
-        execution.iterator(
-            sequence {
+    private fun prepareDivision(dividend: Polynomial, divisor: Polynomial): Iterator<Polynomial?> = execution.iterator(
+        sequence {
             require(!divisor.isZero)
             divisionObserver?.let { observer -> execution.handoff { observer(dividend, divisor) } }
             val terms = divisor.terms
@@ -145,8 +144,8 @@ internal class PolynomialArithmetic(
                 yield(null)
             }
             yield(quotient)
-        }.iterator()
-        )
+        }.iterator(),
+    )
 
     private fun scalarQuotient(dividend: Polynomial, divisor: PolynomialTerm?): Polynomial? {
         if (divisor == null || divisor.monomial != Monomial.ONE) return null
@@ -183,14 +182,14 @@ internal class PolynomialArithmetic(
         step()
         return@operation Polynomial.of(
             buildList {
-            for ((monomial, coefficient) in value.terms) {
-                step(coefficient)
-                val degree = monomial.exponent(variable)
-                if (degree == 0) continue
-                val quotient = checkNotNull(monomial.quotient(Monomial.of(mapOf(variable to 1))))
-                add(PolynomialTerm(quotient, coefficient * BigFraction.ofLong(degree.toLong())))
-            }
-        }
+                for ((monomial, coefficient) in value.terms) {
+                    step(coefficient)
+                    val degree = monomial.exponent(variable)
+                    if (degree == 0) continue
+                    val quotient = checkNotNull(monomial.quotient(Monomial.of(mapOf(variable to 1))))
+                    add(PolynomialTerm(quotient, coefficient * BigFraction.ofLong(degree.toLong())))
+                }
+            },
         )
     }
 
@@ -247,15 +246,15 @@ internal class PolynomialArithmetic(
         val matrix = matrix(m.toLong() + n)
         for (row in 0 until n) {
             for (column in a.indices) {
-            step()
-            matrix[row][row + column] = a[m - column]
-        }
+                step()
+                matrix[row][row + column] = a[m - column]
+            }
         }
         for (row in 0 until m) {
             for (column in b.indices) {
-            step()
-            matrix[n + row][row + column] = b[n - column]
-        }
+                step()
+                matrix[n + row][row + column] = b[n - column]
+            }
         }
         return@operation determinant(matrix)
     }
@@ -298,63 +297,62 @@ internal class PolynomialArithmetic(
         variable: Int,
     ): Iterator<List<Polynomial>?> = execution.iterator(
         sequence {
-        subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, null) } }
-        step()
-        val a = coefficients(left, variable)
-        val b = coefficients(right, variable)
-        val m = a.lastIndex
-        val n = b.lastIndex
-        if (m == 1 && n == 1) {
-            subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, 0) } }
-            val first = prepareMultiply(a[1], b[0])
-            var ad: Polynomial? = null
-            while (ad == null) {
-                ad = first.next()
-                if (ad == null) yield(null)
-            }
-            val second = prepareMultiply(a[0], b[1])
-            var bc: Polynomial? = null
-            while (bc == null) {
-                bc = second.next()
-                if (bc == null) yield(null)
-            }
-            yield(listOf(subtract(ad, bc)))
-            return@sequence
-        }
-        val result = ArrayList<Polynomial>()
-        for (index in 0 until minOf(m, n)) {
-            subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, index) } }
-            val matrix = matrix(m.toLong() + n - 2L * index)
-            val size = matrix.size
-            for (row in 0 until n - index) {
-                for (column in a.indices) {
-                    step()
-                    if (row + column < size) matrix[row][row + column] = a[m - column]
+            subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, null) } }
+            step()
+            val a = coefficients(left, variable)
+            val b = coefficients(right, variable)
+            val m = a.lastIndex
+            val n = b.lastIndex
+            if (m == 1 && n == 1) {
+                subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, 0) } }
+                val first = prepareMultiply(a[1], b[0])
+                var ad: Polynomial? = null
+                while (ad == null) {
+                    ad = first.next()
+                    if (ad == null) yield(null)
                 }
-                yield(null)
-            }
-            for (row in 0 until m - index) {
-                for (column in b.indices) {
-                    step()
-                    if (row + column < size) matrix[n - index + row][row + column] = b[n - column]
+                val second = prepareMultiply(a[0], b[1])
+                var bc: Polynomial? = null
+                while (bc == null) {
+                    bc = second.next()
+                    if (bc == null) yield(null)
                 }
-                yield(null)
+                yield(listOf(subtract(ad, bc)))
+                return@sequence
             }
-            val pending = prepareDeterminant(matrix)
-            var determinant: Polynomial? = null
-            while (determinant == null) {
-                determinant = pending.next()
-                if (determinant == null) yield(null)
+            val result = ArrayList<Polynomial>()
+            for (index in 0 until minOf(m, n)) {
+                subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, index) } }
+                val matrix = matrix(m.toLong() + n - 2L * index)
+                val size = matrix.size
+                for (row in 0 until n - index) {
+                    for (column in a.indices) {
+                        step()
+                        if (row + column < size) matrix[row][row + column] = a[m - column]
+                    }
+                    yield(null)
+                }
+                for (row in 0 until m - index) {
+                    for (column in b.indices) {
+                        step()
+                        if (row + column < size) matrix[n - index + row][row + column] = b[n - column]
+                    }
+                    yield(null)
+                }
+                val pending = prepareDeterminant(matrix)
+                var determinant: Polynomial? = null
+                while (determinant == null) {
+                    determinant = pending.next()
+                    if (determinant == null) yield(null)
+                }
+                result += determinant
             }
-            result += determinant
-        }
-        yield(result.toList())
-    }.iterator()
+            yield(result.toList())
+        }.iterator(),
     )
 
-    private fun prepareDeterminant(matrix: Array<Array<Polynomial>>): Iterator<Polynomial?> =
-        execution.iterator(
-            sequence {
+    private fun prepareDeterminant(matrix: Array<Array<Polynomial>>): Iterator<Polynomial?> = execution.iterator(
+        sequence {
             var previous = Polynomial.ONE
             var negative = false
             for (column in 0 until matrix.lastIndex) {
@@ -400,8 +398,8 @@ internal class PolynomialArithmetic(
             }
             val result = matrix.last().last()
             yield(if (negative) negate(result) else result)
-        }.iterator()
-        )
+        }.iterator(),
+    )
 
     fun denseSize(degree: Int): Int = execution.operation {
         execution.boundary()

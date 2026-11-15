@@ -26,8 +26,8 @@ internal class LinearRepairGuidance : AutoCloseable {
         if (closed || hint != null || point.isEmpty() || point.size > MAX_COLUMNS ||
             source.coordinateCount > MAX_COLUMNS || token()
         ) {
-                return false
-            }
+            return false
+        }
         val funding = budget.funding ?: return false
         val work = 1L + 2L * point.size + source.coordinateCount
         val bytes = 256L + 128L * point.size + 64L * source.coordinateCount

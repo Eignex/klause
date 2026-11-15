@@ -12,9 +12,9 @@ internal class QuadraticCertification(private val control: QuadraticControl = Qu
         var value = model.constant + dot(model.linear, point)
         for (i in point.indices) {
             for (j in point.indices) {
-            control.exactStep(point[i], hessian[i][j], point[j])
-            value += half * point[i] * hessian[i][j] * point[j]
-        }
+                control.exactStep(point[i], hessian[i][j], point[j])
+                value += half * point[i] * hessian[i][j] * point[j]
+            }
         }
         return@operation value
     }
@@ -83,7 +83,7 @@ internal class QuadraticCertification(private val control: QuadraticControl = Qu
         if (evaluate(model, anchor) != bound.value) return@operation null
         if (feasible(model, anchor)) return@operation null
         val point = anchor.indices.map {
-            control.step();
+            control.step()
             anchor[it] + step * direction[it]
         }
         if (!feasible(model, point)) return@operation null
@@ -98,8 +98,8 @@ internal class QuadraticCertification(private val control: QuadraticControl = Qu
                 model.rows[it].relation == QuadraticRowRelation.LT && bound.certificate.multipliers[it].signum() > 0
             }
         ) {
-                return@operation null
-            }
+            return@operation null
+        }
         control.poll()
         return@operation CheckedQuadraticInfimum(bound, direction, step)
     }
@@ -145,11 +145,11 @@ internal class QuadraticCertification(private val control: QuadraticControl = Qu
             } else {
                 for (j in i + 1 until matrix.size) {
                     for (k in j until matrix.size) {
-                    control.exactStep(matrix[j][k], matrix[j][i], matrix[i][k], pivot)
-                    val entry = matrix[j][k] - matrix[j][i] * matrix[i][k] * pivot.reciprocal()
-                    matrix[j][k] = entry
-                    matrix[k][j] = entry
-                }
+                        control.exactStep(matrix[j][k], matrix[j][i], matrix[i][k], pivot)
+                        val entry = matrix[j][k] - matrix[j][i] * matrix[i][k] * pivot.reciprocal()
+                        matrix[j][k] = entry
+                        matrix[k][j] = entry
+                    }
                 }
             }
         }

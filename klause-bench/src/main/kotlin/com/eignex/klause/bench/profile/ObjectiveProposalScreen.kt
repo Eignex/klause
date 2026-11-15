@@ -57,48 +57,48 @@ internal fun captureObjectiveProposals(
         if (agreement != true || !sourceAgreement) disagreements++
         if (probes.size < 32) {
             probes += buildJsonObject {
-            put("move", move.toString())
-            put("source", trajectorySource(point))
-            put("canonicalValue", canonicalValue.toString())
-            put("sourceExpressionValue", sourceValue.toString())
-            put("completeCandidateValueAgreement", agreement == true && sourceAgreement)
-            put("netDelta", inspection.netDelta)
-            put("objectiveDelta", inspection.objectiveDelta)
-            put("nativeSourceAccepted", FiniteConflictSelection.checkSource(sourceModel, point, stop))
-            put("independentWitnessCheck", false)
-        }
+                put("move", move.toString())
+                put("source", trajectorySource(point))
+                put("canonicalValue", canonicalValue.toString())
+                put("sourceExpressionValue", sourceValue.toString())
+                put("completeCandidateValueAgreement", agreement == true && sourceAgreement)
+                put("netDelta", inspection.netDelta)
+                put("objectiveDelta", inspection.objectiveDelta)
+                put("nativeSourceAccepted", FiniteConflictSelection.checkSource(sourceModel, point, stop))
+                put("independentWitnessCheck", false)
+            }
         }
     }
     val complete = visited == candidates.size && disagreements == 0 && functional != null
     check(boundary == trajectoryRandomBoundary(state))
     out.writeText(
         buildJsonObject {
-        put("source", trajectorySource(source))
-        put("unfilteredTemplates", raw.list.size)
-        put("ordinarySinkMoves", sink.list.size)
-        put("distinctOrdinarySinkMoves", sink.list.distinct().size)
-        put("completeCandidateValuesChecked", visited)
-        put("candidateValueDisagreements", disagreements)
-        put("candidateValueQualification", complete)
-        if (!complete) {
-            put(
-            "decline",
-            when {
-                functional == null -> "no-functional-objective"
-                disagreements > 0 -> "candidate-value-disagreement"
-                else -> "incomplete-candidate-value-scan"
-            },
-        )
-        }
-        put("filterAccounting", "templates precede pins, definitions and owners; channel expansion can add moves")
-        put("candidates", JsonArray(probes))
-        put("candidateLimit", 32)
-        put("cancelled", stop())
-        put("diagnosticNanos", System.nanoTime() - started)
-        put("diagnosticAllocatedBytes", trajectoryThreadBytes() - bytes)
-        put("proposalEquivalenceClaim", false)
-        put("globalEquivalenceFromSamples", false)
-    }.toString()
+            put("source", trajectorySource(source))
+            put("unfilteredTemplates", raw.list.size)
+            put("ordinarySinkMoves", sink.list.size)
+            put("distinctOrdinarySinkMoves", sink.list.distinct().size)
+            put("completeCandidateValuesChecked", visited)
+            put("candidateValueDisagreements", disagreements)
+            put("candidateValueQualification", complete)
+            if (!complete) {
+                put(
+                    "decline",
+                    when {
+                        functional == null -> "no-functional-objective"
+                        disagreements > 0 -> "candidate-value-disagreement"
+                        else -> "incomplete-candidate-value-scan"
+                    },
+                )
+            }
+            put("filterAccounting", "templates precede pins, definitions and owners; channel expansion can add moves")
+            put("candidates", JsonArray(probes))
+            put("candidateLimit", 32)
+            put("cancelled", stop())
+            put("diagnosticNanos", System.nanoTime() - started)
+            put("diagnosticAllocatedBytes", trajectoryThreadBytes() - bytes)
+            put("proposalEquivalenceClaim", false)
+            put("globalEquivalenceFromSamples", false)
+        }.toString(),
     )
     return complete
 }

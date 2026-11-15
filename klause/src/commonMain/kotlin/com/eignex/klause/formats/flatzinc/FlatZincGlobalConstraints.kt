@@ -320,12 +320,12 @@ internal fun FlatZincCompiler.emitDisjunctive(c: FznConstraint, strict: Boolean)
         val zero = resolveIntVar(FznExpr.IntLit(0))
         factors.add(
             Diffn(
-            starts,
-            IntArray(starts.size) { zero },
-            durations,
-            LongArray(starts.size) { 1L },
-            widthVars = durationVars.takeIf { it.isNotEmpty() },
-        )
+                starts,
+                IntArray(starts.size) { zero },
+                durations,
+                LongArray(starts.size) { 1L },
+                widthVars = durationVars.takeIf { it.isNotEmpty() },
+            ),
         )
     }
 }

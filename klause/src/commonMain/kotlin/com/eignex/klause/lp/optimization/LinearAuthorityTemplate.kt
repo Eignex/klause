@@ -33,10 +33,10 @@ internal class LinearAuthorityTemplate private constructor(
         onCost(
             directed.rows.size.toLong(),
             128L + directed.rows.sumOf {
-            128L + it.owners.size * 32L + (it.inequality.coefficients.values + it.inequality.rhs).sumOf { value ->
-                64L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L
-            }
-        }
+                128L + it.owners.size * 32L + (it.inequality.coefficients.values + it.inequality.rhs).sumOf { value ->
+                    64L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L
+                }
+            },
         )
         if (cancellation()) return null
         return LinearAuthorityTemplate(source, numeric, coordinates, indices, rows, directed)

@@ -21,12 +21,12 @@ internal class ContinuousProductInvariant(private val factor: ContinuousProduct)
         var degree = product.toLong() + membership
         if (choices.hasGuards) {
             for (index in 0 until choices.size) {
-            val literal = choices.literalAt(index)
-            val variable = Lit.variable(literal)
-            val boolean = state.assignment.boolValue(variable) xor (variable == flipped)
-            val selected = choices.valueAt(index) == selectedValue
-            if (Lit.evaluate(literal, boolean) != selected) degree++
-        }
+                val literal = choices.literalAt(index)
+                val variable = Lit.variable(literal)
+                val boolean = state.assignment.boolValue(variable) xor (variable == flipped)
+                val selected = choices.valueAt(index) == selectedValue
+                if (Lit.evaluate(literal, boolean) != selected) degree++
+            }
         }
         return degree.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }

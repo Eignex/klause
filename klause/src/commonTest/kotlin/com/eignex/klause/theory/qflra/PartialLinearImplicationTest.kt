@@ -109,8 +109,8 @@ class PartialLinearImplicationTest {
         session.push(SearchDecision.Bool(Lit.make(0, true)))
         val implication = assertNotNull(
             partialLinearImplication(unary(LinearOp.LE), { _, upper ->
-            if (upper) ExplainedLinearBound(BigFraction.ZERO, false, premise(0)) else null
-        }, ExecutionControl.Never)
+                if (upper) ExplainedLinearBound(BigFraction.ZERO, false, premise(0)) else null
+            }, ExecutionControl.Never),
         )
         assertNotNull(session.explainAtoms(implication.premise))
 

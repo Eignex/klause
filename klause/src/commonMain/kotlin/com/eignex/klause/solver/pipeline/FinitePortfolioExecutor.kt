@@ -117,18 +117,18 @@ internal fun FinitePipeline.portfolioExecutor(
         pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
     }
     if (bufferedPublications && (
-        !curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
-            cancellation.deadline() == null || problem.numRealVars != 0
-    )
+            !curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
+                cancellation.deadline() == null || problem.numRealVars != 0
+            )
     ) {
         pipelineConfigError(
             "portfolio-publications requires curated elapsed single-core mixed finite integer optimization",
         )
     }
     if (probePolicy != InitialProbePolicy.ORDINARY && (
-        !supportedProbeSource || scenario.diagnosticWorkLimit != null ||
-            cancellation.deadline() == null
-    )
+            !supportedProbeSource || scenario.diagnosticWorkLimit != null ||
+                cancellation.deadline() == null
+            )
     ) {
         pipelineConfigError(
             "portfolio-probes requires curated elapsed single-core mixed finite optimization " +
@@ -211,12 +211,12 @@ internal fun FinitePipeline.portfolioExecutor(
             onEvent?.invoke(
                 "portfolio",
                 SearchEvent.WorkerAdmission(
-                label,
-                declines.isEmpty(),
-                requirements.toString(),
-                declines,
-                selected = declines.isEmpty(),
-            )
+                    label,
+                    declines.isEmpty(),
+                    requirements.toString(),
+                    declines,
+                    selected = declines.isEmpty(),
+                ),
             )
         }
     }

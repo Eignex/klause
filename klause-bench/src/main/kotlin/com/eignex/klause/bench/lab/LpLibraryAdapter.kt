@@ -111,8 +111,8 @@ internal object LpLibrarySuite : BenchSuite {
         }
         val sources = SolveEvidence.fileHashes(
             listOf("LpLibraryCaller.kt", "LpLifecycleProfile.kt").associateWith {
-            root.resolve("klause-bench/src/lpProfileMain/kotlin/com/eignex/klause/bench/profile/$it")
-        }
+                root.resolve("klause-bench/src/lpProfileMain/kotlin/com/eignex/klause/bench/profile/$it")
+            },
         )
         val identities = ComparisonProvenance.Identities(
             adapter.harness.mapKeys { "adapter/${it.key}" } + caller.harness.mapKeys { "caller/${it.key}" } +
@@ -122,10 +122,10 @@ internal object LpLibrarySuite : BenchSuite {
         val provenance = captured.copy(harness = captured.harness + identities.retained)
         val runtimeBuild = provenance.copy(
             distribution = if (runtime == "jvm") {
-            stagedFiles.filterKeys { it.startsWith("lib/") && it.endsWith(".jar") }
-        } else {
-            emptyMap()
-        }
+                stagedFiles.filterKeys { it.startsWith("lib/") && it.endsWith(".jar") }
+            } else {
+                emptyMap()
+            },
         )
         val record = SolveMetric.solve(
             Runners.resolve(ref, true),
@@ -163,25 +163,25 @@ internal object LpLibrarySuite : BenchSuite {
         ).first
         val retained = record.copy(
             stats = record.stats + mapOf(
-            "libraryAdapterElapsedNs" to (System.nanoTime() - started).toString(),
-            "callerRuntime" to runtime,
-            "callerHarnessScope" to if (runtime == "jvm") {
-                "compiled classes and source"
-            } else {
-                "source compiled into the reported Native executable"
-            },
-        ),
+                "libraryAdapterElapsedNs" to (System.nanoTime() - started).toString(),
+                "callerRuntime" to runtime,
+                "callerHarnessScope" to if (runtime == "jvm") {
+                    "compiled classes and source"
+                } else {
+                    "source compiled into the reported Native executable"
+                },
+            ),
             comparisonControls = KlauseLabSuite.comparisonControls(case) + mapOf(
-            "series" to "lp-public-library-v1-$runtime", "caller" to "baked-backtrack", "runtime" to runtime,
-            "libraryPreset" to "satOptimized", "maxInstructions" to "1000",
-            "sourceLowering" to "toProblem-exact-tolerance",
-            "deadlinePolicy" to "public-library-inclusive-v1",
-            "runtimeFingerprint" to ComparisonProvenance.runtimeFingerprint(runtimeBuild),
-            "harnessFingerprint" to identities.harnessFingerprint,
-            "libraryFingerprint" to identities.libraryFingerprint,
-            "heap-mib" to if (runtime == "native") "not-applicable-native" else p.getValue("heap-mib"),
-            "gc" to if (runtime == "native") "compiled-default" else p.getValue("gc"),
-        )
+                "series" to "lp-public-library-v1-$runtime", "caller" to "baked-backtrack", "runtime" to runtime,
+                "libraryPreset" to "satOptimized", "maxInstructions" to "1000",
+                "sourceLowering" to "toProblem-exact-tolerance",
+                "deadlinePolicy" to "public-library-inclusive-v1",
+                "runtimeFingerprint" to ComparisonProvenance.runtimeFingerprint(runtimeBuild),
+                "harnessFingerprint" to identities.harnessFingerprint,
+                "libraryFingerprint" to identities.libraryFingerprint,
+                "heap-mib" to if (runtime == "native") "not-applicable-native" else p.getValue("heap-mib"),
+                "gc" to if (runtime == "native") "compiled-default" else p.getValue("gc"),
+            ),
         )
         Files.writeString(
             report.resolve("solve-record.json"),
@@ -207,11 +207,11 @@ internal fun invokeLibrarySource(
 ): SolverInvocation.Result = SolverInvocation.withSourceInput(input, budget) { plain, remaining ->
     launch(
         listOf(
-        "mode=library",
-        "source64=${Base64.getEncoder().encodeToString(plain.readBytes())}",
-        "seed=$seed",
-        "timeout-ms=${remaining.timeoutMillis}",
-    ),
-        remaining
+            "mode=library",
+            "source64=${Base64.getEncoder().encodeToString(plain.readBytes())}",
+            "seed=$seed",
+            "timeout-ms=${remaining.timeoutMillis}",
+        ),
+        remaining,
     )
 }

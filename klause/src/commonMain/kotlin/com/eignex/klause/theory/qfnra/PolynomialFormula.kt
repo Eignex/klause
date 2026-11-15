@@ -85,20 +85,20 @@ internal class PolynomialFormula private constructor(
             val atom = atoms[node.atom]
             result.add(
                 if (value == TRUE) {
-                atom
-            } else {
-                PolynomialAtom(
-                atom.polynomial,
-                when (atom.relation) {
-                    PolynomialRelation.EQ -> PolynomialRelation.NE
-                    PolynomialRelation.NE -> PolynomialRelation.EQ
-                    PolynomialRelation.LT -> PolynomialRelation.GE
-                    PolynomialRelation.LE -> PolynomialRelation.GT
-                    PolynomialRelation.GT -> PolynomialRelation.LE
-                    PolynomialRelation.GE -> PolynomialRelation.LT
+                    atom
+                } else {
+                    PolynomialAtom(
+                        atom.polynomial,
+                        when (atom.relation) {
+                            PolynomialRelation.EQ -> PolynomialRelation.NE
+                            PolynomialRelation.NE -> PolynomialRelation.EQ
+                            PolynomialRelation.LT -> PolynomialRelation.GE
+                            PolynomialRelation.LE -> PolynomialRelation.GT
+                            PolynomialRelation.GT -> PolynomialRelation.LE
+                            PolynomialRelation.GE -> PolynomialRelation.LT
+                        },
+                    )
                 },
-            )
-            }
             )
         }
         return result
@@ -148,16 +148,16 @@ internal class PolynomialFormula private constructor(
                     }
                     result.add(
                         PolynomialAtom(
-                        atom.polynomial,
-                        when (atom.relation) {
-                            PolynomialRelation.EQ -> PolynomialRelation.NE
-                            PolynomialRelation.NE -> PolynomialRelation.EQ
-                            PolynomialRelation.LT -> PolynomialRelation.GE
-                            PolynomialRelation.LE -> PolynomialRelation.GT
-                            PolynomialRelation.GT -> PolynomialRelation.LE
-                            PolynomialRelation.GE -> PolynomialRelation.LT
-                        },
-                    )
+                            atom.polynomial,
+                            when (atom.relation) {
+                                PolynomialRelation.EQ -> PolynomialRelation.NE
+                                PolynomialRelation.NE -> PolynomialRelation.EQ
+                                PolynomialRelation.LT -> PolynomialRelation.GE
+                                PolynomialRelation.LE -> PolynomialRelation.GT
+                                PolynomialRelation.GT -> PolynomialRelation.LE
+                                PolynomialRelation.GE -> PolynomialRelation.LT
+                            },
+                        ),
                     )
                 }
 
@@ -199,16 +199,16 @@ internal class PolynomialFormula private constructor(
                     val atom = atoms[child.atom]
                     result.add(
                         PolynomialAtom(
-                        atom.polynomial,
-                        when (atom.relation) {
-                            PolynomialRelation.EQ -> PolynomialRelation.NE
-                            PolynomialRelation.NE -> PolynomialRelation.EQ
-                            PolynomialRelation.LT -> PolynomialRelation.GE
-                            PolynomialRelation.LE -> PolynomialRelation.GT
-                            PolynomialRelation.GT -> PolynomialRelation.LE
-                            PolynomialRelation.GE -> PolynomialRelation.LT
-                        },
-                    )
+                            atom.polynomial,
+                            when (atom.relation) {
+                                PolynomialRelation.EQ -> PolynomialRelation.NE
+                                PolynomialRelation.NE -> PolynomialRelation.EQ
+                                PolynomialRelation.LT -> PolynomialRelation.GE
+                                PolynomialRelation.LE -> PolynomialRelation.GT
+                                PolynomialRelation.GT -> PolynomialRelation.LE
+                                PolynomialRelation.GE -> PolynomialRelation.LT
+                            },
+                        ),
                     )
                 }
 
@@ -305,14 +305,14 @@ internal class PolynomialFormula private constructor(
 
                     is PolynomialDistinct -> listOf(
                         expansions.getOrPut(node) {
-                        polynomialDistinctEncoding(node, arithmetic::step)
-                    }
+                            polynomialDistinctEncoding(node, arithmetic::step)
+                        },
                     )
 
                     is PolynomialSelection -> listOf(
                         expansions.getOrPut(node) {
-                        polynomialSelectionEncoding(node, arithmetic::step)
-                    }
+                            polynomialSelectionEncoding(node, arithmetic::step)
+                        },
                     )
 
                     else -> emptyList()
@@ -367,9 +367,9 @@ internal class PolynomialFormula private constructor(
             }
             val variables = booleans.sortedWith(
                 Comparator { left, right ->
-                arithmetic.step()
-                left.compareTo(right)
-            }
+                    arithmetic.step()
+                    left.compareTo(right)
+                },
             )
             return PolynomialFormula(nodes, indices.getValue(formula), atoms, variables).sharePredicates(arithmetic)
         }

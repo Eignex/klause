@@ -29,21 +29,22 @@ class SelectedElementIntegerSourceTest {
     fun `an unavailable shared selection premise should withhold native row admission`() {
         val native = PropagationSession(
             Problem(
-                0, 6,
+                0,
+                6,
                 arrayOf(
-            IntDomain(0, 6),
-            IntDomain(0, 12),
-            IntDomain(0, 12),
-            IntDomain(0, 12),
-            IntDomain(0, 24),
-            IntDomain(0, 1),
-        ),
-            arrayOf(
-            Element(5, 3, longArrayOf(1, 2), true, 0),
-            Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
-            Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
-        )
-            )
+                    IntDomain(0, 6),
+                    IntDomain(0, 12),
+                    IntDomain(0, 12),
+                    IntDomain(0, 12),
+                    IntDomain(0, 24),
+                    IntDomain(0, 1),
+                ),
+                arrayOf(
+                    Element(5, 3, longArrayOf(1, 2), true, 0),
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
+                ),
+            ),
         ).apply { enableIntegerRowLearning() }
         val peer = object : SearchComponent {
             override fun initialize(context: SearchContext): ComponentResult =
@@ -66,22 +67,23 @@ class SelectedElementIntegerSourceTest {
         for (offset in listOf(-2, 0, 1)) {
             val native = PropagationSession(
                 Problem(
-                    1, 6,
+                    1,
+                    6,
                     arrayOf(
-                IntDomain(0, 6),
-                IntDomain(0, 12),
-                IntDomain(0, 12),
-                IntDomain(0, 12),
-                IntDomain(0, 24),
-                IntDomain(offset.toLong(), offset + 1L),
-            ),
-                arrayOf(
-                Element(5, 3, longArrayOf(1, 2), true, offset),
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
-            )
+                        IntDomain(0, 6),
+                        IntDomain(0, 12),
+                        IntDomain(0, 12),
+                        IntDomain(0, 12),
+                        IntDomain(0, 24),
+                        IntDomain(offset.toLong(), offset + 1L),
+                    ),
+                    arrayOf(
+                        Element(5, 3, longArrayOf(1, 2), true, offset),
+                        Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
+                        Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
+                    ),
                 ),
-                pbLearning = false
+                pbLearning = false,
             ).apply { enableIntegerRowLearning() }
             native.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false))), lbd = 3)
             val cp = CpSearchComponent(native, intArrayOf(4, 7, 9, 11, 13, 15))
@@ -130,12 +132,12 @@ class SelectedElementIntegerSourceTest {
     fun `a selected cell cannot supply an equality before its historical selection`() {
         val state = PropagationState(
             Problem(
-            0,
-            4,
-            Array(3) { IntDomain(0, 6) } + IntDomain(0, 1),
-            arrayOf(Element(3, 2, longArrayOf(0, 1), true, 0)),
-        ),
-            Assumptions.None
+                0,
+                4,
+                Array(3) { IntDomain(0, 6) } + IntDomain(0, 1),
+                arrayOf(Element(3, 2, longArrayOf(0, 1), true, 0)),
+            ),
+            Assumptions.None,
         )
         state.undoLogging = true
         val before = state.undo.size
@@ -151,11 +153,11 @@ class SelectedElementIntegerSourceTest {
     fun `a repeated cell should retain the exact selected index identity`() {
         val native = PropagationSession(
             Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 6), IntDomain(0, 1)),
-            arrayOf(Element(2, 1, longArrayOf(0, 0), true, 0)),
-        )
+                0,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 6), IntDomain(0, 1)),
+                arrayOf(Element(2, 1, longArrayOf(0, 0), true, 0)),
+            ),
         )
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 0))
         val state = native.explanationState
@@ -175,11 +177,11 @@ class SelectedElementIntegerSourceTest {
     fun `a selected result alias should withhold a vacuous arithmetic row`() {
         val native = PropagationSession(
             Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 6), IntDomain(0, 1)),
-            arrayOf(Element(2, 1, longArrayOf(1, 0), true, 0)),
-        )
+                0,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 6), IntDomain(0, 1)),
+                arrayOf(Element(2, 1, longArrayOf(1, 0), true, 0)),
+            ),
         )
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 0))
 
@@ -193,11 +195,11 @@ class SelectedElementIntegerSourceTest {
     fun `a selected support reason should withhold numerical endpoint admission`() {
         val native = PropagationSession(
             Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 6), IntDomain(0, 1)),
-            arrayOf(Element(2, 1, longArrayOf(0, 0), true, 0)),
-        )
+                0,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 6), IntDomain(0, 1)),
+                arrayOf(Element(2, 1, longArrayOf(0, 0), true, 0)),
+            ),
         )
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 0))
 
@@ -210,16 +212,16 @@ class SelectedElementIntegerSourceTest {
     fun `selected support failures caused by a hole should retain clause fallback`() {
         val native = PropagationSession(
             Problem(
-            0,
-            4,
-            arrayOf(
-                IntDomain(0, 6).excludeValue(4),
-                IntDomain(0, 6),
-                IntDomain(0, 6),
-                IntDomain(0, 1),
+                0,
+                4,
+                arrayOf(
+                    IntDomain(0, 6).excludeValue(4),
+                    IntDomain(0, 6),
+                    IntDomain(0, 6),
+                    IntDomain(0, 1),
+                ),
+                arrayOf(Element(3, 2, longArrayOf(0, 1), true, 0)),
             ),
-            arrayOf(Element(3, 2, longArrayOf(0, 1), true, 0)),
-        )
         ).apply { enableIntegerRowLearning() }
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(3, 0))
 

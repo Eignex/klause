@@ -301,11 +301,11 @@ internal class ResumableMinimize(
         resources.own(it)
         resources.own(
             AutoCloseable {
-            val pending = pendingRealLeaf
-            pendingRealLeaf = null
-            pendingRealResult = null
-            pending?.close()
-        }
+                val pending = pendingRealLeaf
+                pendingRealLeaf = null
+                pendingRealResult = null
+                pending?.close()
+            },
         )
         leafSolver = it
     }
@@ -432,18 +432,18 @@ internal class ResumableMinimize(
         cp = CpSearchComponent(
             (
                 preparedSession ?: PropagationSession(
-                solver.propagationProjection(params.nativeSat ?: true, problem),
-                runEndToken(),
-                params.propagationCancelFloor,
-                nativeSat = params.nativeSat ?: true,
-                pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
-                attribution = params.propagationAttribution,
-                historicalTables = params.historicalTableReasons,
-                costAware = params.costAwarePropagation,
-                reasonPreflight = params.reasonPreflight,
-                cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
-            )
-            ).also {
+                    solver.propagationProjection(params.nativeSat ?: true, problem),
+                    runEndToken(),
+                    params.propagationCancelFloor,
+                    nativeSat = params.nativeSat ?: true,
+                    pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
+                    attribution = params.propagationAttribution,
+                    historicalTables = params.historicalTableReasons,
+                    costAware = params.costAwarePropagation,
+                    reasonPreflight = params.reasonPreflight,
+                    cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
+                )
+                ).also {
                 if (params.integerRowLearning) it.enableIntegerRowLearning()
                 it.configureAttribution(
                     params.propagationAttribution,
@@ -457,21 +457,21 @@ internal class ResumableMinimize(
             it.conflictStats = sink.ca
             resources.own(
                 AutoCloseable {
-                if (this@ResumableMinimize::run.isInitialized) run.releasePendingPropagation()
-                inprocessing?.reset()
-                if (::searchSession.isInitialized) searchSession.releaseLearning()
-                it.releaseRetainedState()
-            }
+                    if (this@ResumableMinimize::run.isInitialized) run.releasePendingPropagation()
+                    inprocessing?.reset()
+                    if (::searchSession.isInitialized) searchSession.releaseLearning()
+                    it.releaseRetainedState()
+                },
             )
             resources.own(
                 AutoCloseable {
-                try {
-                    params.clauseExchange?.onSearchClose(it.session)
-                } finally {
-                    it.session.sharedLearningMemory = null
-                    it.session.sharedLearningPosition = null
-                }
-            }
+                    try {
+                        params.clauseExchange?.onSearchClose(it.session)
+                    } finally {
+                        it.session.sharedLearningMemory = null
+                        it.session.sharedLearningPosition = null
+                    }
+                },
             )
             sink.search.propagationWork = { it.session.work }
             sink.search.learning = { it.session.learnedLifecycle() + it.session.preparationStatistics() }
@@ -519,12 +519,12 @@ internal class ResumableMinimize(
                 add(cp)
                 addAll(
                     params.componentFactory?.invoke().orEmpty().also { components ->
-                    components.forEach(resources::ownComponent)
-                    cp.useEnforcingPeers(
-                        components.filterIsInstance<FiniteFactorEnforcer>()
-                        .flatMap { it.enforcingFiniteFactors(problem) }.toSet()
-                    )
-                }
+                        components.forEach(resources::ownComponent)
+                        cp.useEnforcingPeers(
+                            components.filterIsInstance<FiniteFactorEnforcer>()
+                                .flatMap { it.enforcingFiniteFactors(problem) }.toSet(),
+                        )
+                    },
                 )
                 if (lpEngine.lpRelaxer != null) {
                     lpEngine.cpAdapter.attach(session, feasibility = false)
@@ -1301,8 +1301,8 @@ internal class ResumableMinimize(
 
             !(
                 plan.rootBudgetFraction <= 0.0 ||
-                !lpEngine.workSpentExceeds(plan.rootMaxWork, sink.lp.standaloneWork)
-            ) -> "ROOT_WORK_SPENT"
+                    !lpEngine.workSpentExceeds(plan.rootMaxWork, sink.lp.standaloneWork)
+                ) -> "ROOT_WORK_SPENT"
 
             lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) -> "LP_WORK_SPENT"
 

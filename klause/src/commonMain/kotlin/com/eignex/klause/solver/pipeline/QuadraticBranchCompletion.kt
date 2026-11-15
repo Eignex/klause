@@ -138,11 +138,12 @@ internal class QuadraticBranchCompletion(
                 val point = capture(convex.assignment, finite)
                 arithmetic.step()
                 QuadraticBranchResult.Optimal(
-                    point, point.value,
+                    point,
+                    point.value,
                     QuadraticEngineDerivation.Both(
-                    QuadraticEngineDerivation.Condition(condition),
-                    QuadraticEngineDerivation.Convex(convex),
-                )
+                        QuadraticEngineDerivation.Condition(condition),
+                        QuadraticEngineDerivation.Convex(convex),
+                    ),
                 )
             } else {
                 val result = solvePolynomialObjectiveImage(

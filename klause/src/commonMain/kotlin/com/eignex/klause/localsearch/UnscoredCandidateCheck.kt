@@ -23,8 +23,8 @@ internal class UnscoredCandidateCheck(
         it !in enforcingPeers &&
             (
                 (selection?.capabilities(it) ?: problem.factors[it].executionCapabilities()).assignmentCheck ==
-                AssignmentCheckCapability.UNSUPPORTED || selection?.requiresOriginalScoringCheck(it) == true
-            )
+                    AssignmentCheckCapability.UNSUPPORTED || selection?.requiresOriginalScoringCheck(it) == true
+                )
     }.toIntArray()
     private val unchecked = if (factorIds.isEmpty()) {
         null
@@ -65,8 +65,8 @@ internal class UnscoredCandidateCheck(
             // the declared domains to the factors alone.
             val point = source.withIntDomains(
                 Array(source.numIntVars) {
-                IntDomain(candidate.intValue(it), candidate.intValue(it))
-            }
+                    IntDomain(candidate.intValue(it), candidate.intValue(it))
+                },
             )
             FinitePointCheck(uncheckedSelection?.let { point.bake(it.forEngineView(point), cancellation) } ?: point)
         }

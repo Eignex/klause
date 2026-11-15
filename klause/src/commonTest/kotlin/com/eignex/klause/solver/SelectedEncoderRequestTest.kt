@@ -32,21 +32,23 @@ class SelectedEncoderRequestTest {
     @Test
     fun `editing returned conditions should not change installed relations`() {
         val source = Problem(
-            2, 2, Array(2) { IntDomain(0, 2) },
+            2,
+            2,
+            Array(2) { IntDomain(0, 2) },
             arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-            Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
-        )
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
+            ),
         )
         val integers = mapOf(SourceIntId(0) to bigIntOf(1), SourceIntId(1) to bigIntOf(2))
         val booleans = mapOf(SourceBoolId(0) to true, SourceBoolId(1) to false)
         val selected = FactorProjectionProviders.Default.prepare(source)
         val model = assertNotNull(
             selected.linearTheoryModel(
-            EncodingTarget.LINEAR,
-            fixedIntegers = integers,
-            fixedBooleans = booleans,
-        )
+                EncodingTarget.LINEAR,
+                fixedIntegers = integers,
+                fixedBooleans = booleans,
+            ),
         )
         val first = assertIs<EncodedTheoryFactor>(model.factors.first()).attribution
 
@@ -72,16 +74,16 @@ class SelectedEncoderRequestTest {
                 var decline: EncoderDecline? = null
                 val selected = FactorProjectionProviders(
                     encoder = EncoderProvider { factor, target ->
-                    if (factor === excluded) {
-                        Encoder(support)
-                    } else {
-                        val builtin = BuiltInEncoderProvider.select(factor, target)
-                        Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                            installed++
-                            builtin.install(view, encoding)
+                        if (factor === excluded) {
+                            Encoder(support)
+                        } else {
+                            val builtin = BuiltInEncoderProvider.select(factor, target)
+                            Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                                installed++
+                                builtin.install(view, encoding)
+                            }
                         }
-                    }
-                }
+                    },
                 ).prepare(source)
 
                 val model = selected.linearTheoryModel(EncodingTarget.LINEAR, onDecline = { decline = it })
@@ -100,12 +102,12 @@ class SelectedEncoderRequestTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(excluded, row))
         val selected = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            if (factor === excluded) {
-                Encoder(EncoderSupport.UNSUPPORTED)
-            } else {
-                BuiltInEncoderProvider.select(factor, target)
-            }
-        }
+                if (factor === excluded) {
+                    Encoder(EncoderSupport.UNSUPPORTED)
+                } else {
+                    BuiltInEncoderProvider.select(factor, target)
+                }
+            },
         ).prepare(source)
 
         val model = assertNotNull(selected.linearTheoryModel(EncodingTarget.LINEAR, listOf(1)))
@@ -123,22 +125,22 @@ class SelectedEncoderRequestTest {
         var installed = 0
         val selected = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val builtin = BuiltInEncoderProvider.select(factor, target)
-            if (factor === conditioned) {
-                Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0)), mapOf(SourceBoolId(0) to true)) {
-                        view,
-                        encoding,
-                    ->
-                    installed++
-                    builtin.install(view, encoding)
+                val builtin = BuiltInEncoderProvider.select(factor, target)
+                if (factor === conditioned) {
+                    Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0)), mapOf(SourceBoolId(0) to true)) {
+                            view,
+                            encoding,
+                        ->
+                        installed++
+                        builtin.install(view, encoding)
+                    }
+                } else {
+                    Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                        installed++
+                        builtin.install(view, encoding)
+                    }
                 }
-            } else {
-                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                installed++
-                builtin.install(view, encoding)
-            }
-            }
-        }
+            },
         ).prepare(source)
         for ((integers, booleans) in listOf(
             emptyMap<SourceIntId, BigInt>() to emptyMap(),
@@ -170,14 +172,14 @@ class SelectedEncoderRequestTest {
         val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(prefix, row))
         val selected = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val builtin = BuiltInEncoderProvider.select(factor, target)
-            Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0)), mapOf(SourceBoolId(0) to true)) {
-                    view,
-                    encoding,
-                ->
-                builtin.install(view, encoding)
-            }
-        }
+                val builtin = BuiltInEncoderProvider.select(factor, target)
+                Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0)), mapOf(SourceBoolId(0) to true)) {
+                        view,
+                        encoding,
+                    ->
+                    builtin.install(view, encoding)
+                }
+            },
         ).prepare(source)
         val indices = mutableListOf(1)
         val integers = mutableMapOf(SourceIntId(0) to bigIntOf(1))
@@ -222,12 +224,12 @@ class SelectedEncoderRequestTest {
         var installed = 0
         val selected = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val builtin = BuiltInEncoderProvider.select(factor, target)
-            Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                installed++
-                builtin.install(view, encoding)
-            }
-        }
+                val builtin = BuiltInEncoderProvider.select(factor, target)
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    installed++
+                    builtin.install(view, encoding)
+                }
+            },
         ).prepare(source)
 
         for (indices in listOf(listOf(0, 1), listOf(0, 0))) {
@@ -249,19 +251,19 @@ class SelectedEncoderRequestTest {
         var installed = 0
         val selected = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val builtin = BuiltInEncoderProvider.select(factor, target)
-            Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                installed++
-                builtin.install(view, encoding)
-            }
-        }
+                val builtin = BuiltInEncoderProvider.select(factor, target)
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    installed++
+                    builtin.install(view, encoding)
+                }
+            },
         ).prepare(source)
         val request = assertNotNull(
             selected.requestEncoders(
-            EncodingTarget.LINEAR,
-            listOf(0),
-            cancellation = ExecutionControl { stopped },
-        )
+                EncodingTarget.LINEAR,
+                listOf(0),
+                cancellation = ExecutionControl { stopped },
+            ),
         )
         var decline: EncoderDecline? = null
         stopped = true
@@ -312,10 +314,10 @@ class SelectedEncoderRequestTest {
         val selected = FactorProjectionProviders.Default.prepare(source)
         val request = assertNotNull(
             selected.requestEncoders(
-            EncodingTarget.LINEAR,
-            listOf(0),
-            fixedIntegers = mapOf(SourceIntId(0) to bigIntOf(7)),
-        )
+                EncodingTarget.LINEAR,
+                listOf(0),
+                fixedIntegers = mapOf(SourceIntId(0) to bigIntOf(7)),
+            ),
         )
 
         val model = assertNotNull(selected.linearTheoryModel(request))
@@ -341,12 +343,12 @@ class SelectedEncoderRequestTest {
         }
         val selected = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val builtin = BuiltInEncoderProvider.select(factor, target)
-            Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                installed++
-                builtin.install(view, encoding)
-            }
-        }
+                val builtin = BuiltInEncoderProvider.select(factor, target)
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    installed++
+                    builtin.install(view, encoding)
+                }
+            },
         ).prepare(source)
 
         val cancelled = selected.linearTheoryModel(

@@ -123,14 +123,14 @@ class LpHintsTest {
         hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
         hints.recordObjective(
             LpRelaxation(
-            model,
-            intArrayOf(0, 1),
-            booleanArrayOf(false, false),
-            0L,
-            intArrayOf(0, 1),
-            IntArray(0),
-        ),
-            10.0
+                model,
+                intArrayOf(0, 1),
+                booleanArrayOf(false, false),
+                0L,
+                intArrayOf(0, 1),
+                IntArray(0),
+            ),
+            10.0,
         )
 
         val selected = hints.selectVariable(proposal, VarRef.IntVar(0))
@@ -314,14 +314,14 @@ class LpHintsTest {
             when (change) {
                 "cut" -> assertTrue(
                     trail.append(
-                    LpScopedRow(
-                        1L,
-                        listOf(0 to ExactLpNumber.of(1L)),
-                        ExactLpNumber.of(2L),
-                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L)))),
+                        LpScopedRow(
+                            1L,
+                            listOf(0 to ExactLpNumber.of(1L)),
+                            ExactLpNumber.of(2L),
+                            ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L)))),
+                        ),
+                        scoped = true,
                     ),
-                    scoped = true,
-                )
                 )
 
                 "scale", "objective" -> {
@@ -329,11 +329,11 @@ class LpHintsTest {
                     assertTrue(
                         trail.replaceObjective(
                             ExactLpObjective(
-                        List(old.size) { old.cost(it) },
-                        scale = ExactLpNumber.of(if (change == "scale") 2L else 1L),
-                        externalConstant = ExactLpNumber.of(if (change == "objective") 1L else 0L),
-                    )
-                        )
+                                List(old.size) { old.cost(it) },
+                                scale = ExactLpNumber.of(if (change == "scale") 2L else 1L),
+                                externalConstant = ExactLpNumber.of(if (change == "objective") 1L else 0L),
+                            ),
+                        ),
                     )
                 }
             }
@@ -416,14 +416,14 @@ class LpHintsTest {
                 hints.recordObjective(relaxation, 10.0)
                 assertTrue(
                     trail.append(
-                    LpScopedRow(
-                        0L,
-                        listOf(0 to ExactLpNumber.of(1L)),
-                        ExactLpNumber.of(8L),
-                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L)))),
+                        LpScopedRow(
+                            0L,
+                            listOf(0 to ExactLpNumber.of(1L)),
+                            ExactLpNumber.of(8L),
+                            ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L)))),
+                        ),
+                        scoped = false,
                     ),
-                    scoped = false,
-                )
                 )
                 hints.finishNode(trail.state)
             } else {

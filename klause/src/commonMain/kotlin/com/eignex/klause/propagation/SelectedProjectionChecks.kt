@@ -29,9 +29,9 @@ internal class SelectedProjectionChecks(selection: PreparedFactorProjections, en
         if (cancellation()) return ComponentCheck.Indeterminate
         val point = model.withIntDomains(
             Array(model.numIntVars) {
-            val value = session.intDomain(it).min
-            IntDomain(value, value)
-        }
+                val value = session.intDomain(it).min
+                IntDomain(value, value)
+            },
         )
         val checker = PropagationSession(point, cancellation)
         val result = try {

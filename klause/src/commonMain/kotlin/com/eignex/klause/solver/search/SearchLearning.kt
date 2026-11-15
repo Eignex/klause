@@ -87,14 +87,14 @@ internal class SearchLearning(
                 budget.pay(learned.readWork, learned.scratchBytes)
                 val row = learned.next(capCursor, ranked = true)
                 if (row == null) {
-                    capActive = false;
+                    capActive = false
                     return
                 }
                 budget.pay(16L, learned.scratchBytes)
                 if (row.index <= capBoundary && !protected(row) && row.usedEpoch < capUseEpoch) {
                     retire(row, budget)
                     if (!capDropped) {
-                        reductions++;
+                        reductions++
                         capDropped = true
                     }
                     capRemaining--
@@ -157,9 +157,8 @@ internal class SearchLearning(
         memoryActive = false
     }
 
-    private fun protected(row: SharedLearnedStore.Row): Boolean =
-        !row.retired && (
-            row.literals?.size == 1 || row.lbd <= learnedDb.glueLbd ||
+    private fun protected(row: SharedLearnedStore.Row): Boolean = !row.retired && (
+        row.literals?.size == 1 || row.lbd <= learnedDb.glueLbd ||
             row.reasonCount > 0 || row.stages and 4 != 0
         )
 
@@ -169,10 +168,10 @@ internal class SearchLearning(
         sample.ownedReferences(this, 6L, protected || pendingCount > 0)
         sample.record(
             mapOf(
-            "sharedLearnedStageCapacityBytes" to (learned.ownedRows.toLong() * Int.SIZE_BYTES),
-            "sharedLearnedReasonIndexBytes" to reasons.size * 12L,
-            "sharedLearnedPendingEntries" to (pendingCount + recheckCount).toLong(),
-        )
+                "sharedLearnedStageCapacityBytes" to (learned.ownedRows.toLong() * Int.SIZE_BYTES),
+                "sharedLearnedReasonIndexBytes" to reasons.size * 12L,
+                "sharedLearnedPendingEntries" to (pendingCount + recheckCount).toLong(),
+            ),
         )
     }
 
@@ -240,7 +239,7 @@ internal class SearchLearning(
                     if (!protected(row)) {
                         retire(row, budget)
                         if (!memoryDropped) {
-                            reductions++;
+                            reductions++
                             memoryDropped = true
                         }
                     }
@@ -281,13 +280,13 @@ internal class SearchLearning(
         if (literals.isEmpty()) return
         val levels = IntHashSet(literals.size)
         for (literal in literals) {
-            chargeOrdinary(1L);
+            chargeOrdinary(1L)
             levels.add(host.levelOf(literal))
         }
         chargeOrdinary(literals.size.toLong() + 32L)
         val row = learned.add(literals.copyOf(), levels.size)
         if (row == null) {
-            relearnedClauses++;
+            relearnedClauses++
             return
         }
         row.stages = row.stages or 4
@@ -338,14 +337,14 @@ internal class SearchLearning(
             unitsPending = false
             val result = learned.propagateUnits(host)
             if (result !is ComponentResult.Consistent) {
-                unitsPending = true;
+                unitsPending = true
                 return result
             }
         }
         while (propagatedTrail < boolTrail.size) {
             val result = learned.propagate(boolTrail[propagatedTrail++] xor 1, host)
             if (result !is ComponentResult.Consistent) {
-                propagatedTrail--;
+                propagatedTrail--
                 return result
             }
         }

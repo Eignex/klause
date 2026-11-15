@@ -176,11 +176,11 @@ class SmtLibPolynomialTest {
 
         assertEquals(
             listOf(
-            PolynomialExpression.Variable(SourceRealId(0)),
-            PolynomialExpression.Variable(SourceRealId(1)),
-            PolynomialExpression.Constant.of(bigIntOf(0)),
-        ),
-            operands
+                PolynomialExpression.Variable(SourceRealId(0)),
+                PolynomialExpression.Variable(SourceRealId(1)),
+                PolynomialExpression.Constant.of(bigIntOf(0)),
+            ),
+            operands,
         )
     }
 

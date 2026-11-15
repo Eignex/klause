@@ -107,11 +107,11 @@ object PortfolioBuilder {
             onEvent?.invoke(
                 "portfolio",
                 SearchEvent.WorkerAdmission(
-                recipe,
-                eligibility.admitted,
-                eligibility.requirements.toString(),
-                eligibility.declines,
-            )
+                    recipe,
+                    eligibility.admitted,
+                    eligibility.requirements.toString(),
+                    eligibility.declines,
+                ),
             )
         }
         val plan = PortfolioComposition.plan(scenario, facts)
@@ -119,8 +119,8 @@ object PortfolioBuilder {
         val timed = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
         val configs = if (bufferedPublications) {
             timed.map {
-            if (it is LocalSearchWorkerConfig) it.withBufferedPublications() else it
-        }
+                if (it is LocalSearchWorkerConfig) it.withBufferedPublications() else it
+            }
         } else {
             timed
         }
@@ -156,11 +156,11 @@ object PortfolioBuilder {
             FinitePortfolioFactory(armId, family) { index, seed, budget ->
                 val observed = if (config is AlnsWorkerConfig) {
                     config.withSharingMemory(
-                    scenario.sharingMemory,
-                    scenario.sharingMemoryWork,
-                    scenario.sharingMemoryScratch,
-                    scenario.sharingMemoryBytes,
-                )
+                        scenario.sharingMemory,
+                        scenario.sharingMemoryWork,
+                        scenario.sharingMemoryScratch,
+                        scenario.sharingMemoryBytes,
+                    )
                 } else {
                     config
                 }
@@ -247,13 +247,13 @@ object PortfolioBuilder {
                     observe(
                         "portfolio",
                         SearchEvent.WorkerAdmission(
-                        config.label,
-                        true,
-                        requirements.toString(),
-                        emptyList(),
-                        selected = true,
-                        role = plan.seats[armId],
-                    )
+                            config.label,
+                            true,
+                            requirements.toString(),
+                            emptyList(),
+                            selected = true,
+                            role = plan.seats[armId],
+                        ),
                     )
                 }
                 worker

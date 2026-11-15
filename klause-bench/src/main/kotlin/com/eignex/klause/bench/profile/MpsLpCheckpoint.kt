@@ -66,10 +66,10 @@ internal object MpsLpCheckpoint {
         }.newInstance(routeType.enumConstants.single { it.toString() == "STANDALONE" })
         val observer = requireNotNull(
             call(
-            sink,
-            "certificationObserver",
-            routeType.enumConstants.single { it.toString() == "STANDALONE" },
-        )
+                sink,
+                "certificationObserver",
+                routeType.enumConstants.single { it.toString() == "STANDALONE" },
+            ),
         )
         val claim = Class.forName(ENGINE + "LpClaim").enumConstants.single {
             it.toString() == "ATTAINED_OPTIMUM"
@@ -139,56 +139,56 @@ internal object MpsLpCheckpoint {
                 out.resolve(filename).writeText(JsonArray(headings.map(::JsonPrimitive)).toString())
                 emit(
                     buildJsonObject {
-                    put("scope", "immutable-full-prepared-root-continuation")
-                    put("sourceVerdictClaim", false)
-                    put("round", round)
-                    put("warmup", round == 0)
-                    put("mode", mode)
-                    put("iteration", iteration)
-                    put("offeredWork", quantum)
-                    put("cumulativeWorkLimit", TOTAL_WORK)
-                    put("floatingWorkDelta", deltaWork)
-                    put("floatingWork", floatingWork)
-                    put("preparationWork", preparationWork)
-                    put("observerNumericalWork", call(sink, "getStandaloneWork") as Long)
-                    put("pivotsDelta", deltaPivots)
-                    put("pivots", pivots)
-                    put("refactorizations", refactors)
-                    put("completed", completed)
-                    put("cancelled", stop())
-                    put("solveNs", elapsed)
-                    put("solveThreadBytes", bytes)
-                    put("headings", filename)
-                    put("headingsSha256", sha256(headingBytes))
-                    put("artificialBounds", field(solver, "artificialLower") != null)
-                    put(
-                        "phaseContinuation",
-                        field(solver, "activeSolve")?.let {
-                        field(it, "continuation")?.toString()
-                    }
-                    )
-                    put("numericalMetrics", NumericalResidualProfile.json(call(solver, "getLastNumericalMetrics")))
-                    put("floatTermination", call(solver, "getLastTermination")?.toString())
-                    put("verdict", result?.let { call(it, "getVerdict").toString() })
-                    put("checkedNativeBound", result?.let { call(it, "getLowerBound")?.toString() })
-                    put(
-                        "exactPoint",
-                        result?.let {
-                        NumericalResidualProfile.json(call(it, "getExactPrimal"))
-                    } ?: JsonNull
-                    )
-                    put("observerCounters", NumericalResidualProfile.json(call(sink, "snapshot")))
-                }
+                        put("scope", "immutable-full-prepared-root-continuation")
+                        put("sourceVerdictClaim", false)
+                        put("round", round)
+                        put("warmup", round == 0)
+                        put("mode", mode)
+                        put("iteration", iteration)
+                        put("offeredWork", quantum)
+                        put("cumulativeWorkLimit", TOTAL_WORK)
+                        put("floatingWorkDelta", deltaWork)
+                        put("floatingWork", floatingWork)
+                        put("preparationWork", preparationWork)
+                        put("observerNumericalWork", call(sink, "getStandaloneWork") as Long)
+                        put("pivotsDelta", deltaPivots)
+                        put("pivots", pivots)
+                        put("refactorizations", refactors)
+                        put("completed", completed)
+                        put("cancelled", stop())
+                        put("solveNs", elapsed)
+                        put("solveThreadBytes", bytes)
+                        put("headings", filename)
+                        put("headingsSha256", sha256(headingBytes))
+                        put("artificialBounds", field(solver, "artificialLower") != null)
+                        put(
+                            "phaseContinuation",
+                            field(solver, "activeSolve")?.let {
+                                field(it, "continuation")?.toString()
+                            },
+                        )
+                        put("numericalMetrics", NumericalResidualProfile.json(call(solver, "getLastNumericalMetrics")))
+                        put("floatTermination", call(solver, "getLastTermination")?.toString())
+                        put("verdict", result?.let { call(it, "getVerdict").toString() })
+                        put("checkedNativeBound", result?.let { call(it, "getLowerBound")?.toString() })
+                        put(
+                            "exactPoint",
+                            result?.let {
+                                NumericalResidualProfile.json(call(it, "getExactPrimal"))
+                            } ?: JsonNull,
+                        )
+                        put("observerCounters", NumericalResidualProfile.json(call(sink, "snapshot")))
+                    },
                 )
                 iteration++
                 if (completed && (
-                    cursor != null || mode == "uninterrupted" || result?.let {
-                        call(it, "getVerdict").toString() in setOf("ATTAINED_OPTIMUM", "INFEASIBLE", "UNBOUNDED")
-                    } == true
-                )
+                        cursor != null || mode == "uninterrupted" || result?.let {
+                            call(it, "getVerdict").toString() in setOf("ATTAINED_OPTIMUM", "INFEASIBLE", "UNBOUNDED")
+                        } == true
+                        )
                 ) {
-                        break
-                    }
+                    break
+                }
                 check(iteration <= 256) { "root continuation made no bounded progress" }
             }
         } finally {

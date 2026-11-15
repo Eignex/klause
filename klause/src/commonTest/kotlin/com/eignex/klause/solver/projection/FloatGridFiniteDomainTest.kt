@@ -54,11 +54,11 @@ class FloatGridFiniteDomainTest {
         val prepared = assertIs<FloatGridPreparation.Prepared>(
             prepareFloatGrid(
                 FloatGridRequest(
-            source,
-            listOf(FloatGridVariable(SourceRealId(0), buckets = 3, preserveBuckets = true)),
-        ),
-            ExecutionControl.Never
-            )
+                    source,
+                    listOf(FloatGridVariable(SourceRealId(0), buckets = 3, preserveBuckets = true)),
+                ),
+                ExecutionControl.Never,
+            ),
         )
 
         val point = BacktrackSolver(prepared.problem.bake()).enumerate().first()
@@ -86,11 +86,11 @@ class FloatGridFiniteDomainTest {
         val prepared = assertIs<FloatGridPreparation.Prepared>(
             prepareFloatGrid(
                 FloatGridRequest(
-            source,
-            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1))),
-        ),
-            ExecutionControl.Never
-            )
+                    source,
+                    listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1))),
+                ),
+                ExecutionControl.Never,
+            ),
         )
 
         val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { point ->
@@ -118,9 +118,9 @@ class FloatGridFiniteDomainTest {
         )
         val prepared = assertIs<FloatGridPreparation.Prepared>(
             prepareFloatGrid(
-            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))),
-            ExecutionControl.Never,
-        )
+                FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))),
+                ExecutionControl.Never,
+            ),
         )
 
         val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { point ->
@@ -150,9 +150,9 @@ class FloatGridFiniteDomainTest {
         )
         val prepared = assertIs<FloatGridPreparation.Prepared>(
             prepareFloatGrid(
-            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))),
-            ExecutionControl.Never,
-        )
+                FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))),
+                ExecutionControl.Never,
+            ),
         )
 
         val privateResult = prepared.problem.baked

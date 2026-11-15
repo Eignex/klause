@@ -27,11 +27,13 @@ class CoreRefinementTest {
     @Test
     fun `refinement retains transitive premises of propagated assumptions`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-            Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+            ),
         ).bake()
         val literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true))
 
@@ -43,10 +45,12 @@ class CoreRefinementTest {
     @Test
     fun `refinement checks every trial under caller conditions`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            ),
         ).bake()
         val literals = intArrayOf(Lit.make(1, true), Lit.make(2, true))
 
@@ -76,10 +80,12 @@ class CoreRefinementTest {
     @Test
     fun `oll consumes a smaller weighted core`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-        )
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            ),
         ).bake()
         val search = CoreGuidedSearch(
             problem,
@@ -98,17 +104,19 @@ class CoreRefinementTest {
     @Test
     fun `tree refutations retain their certified core`() {
         val problem = Problem(
-            5, 0, emptyArray(),
+            5,
+            0,
+            emptyArray(),
             Array(4) { signs ->
-            Clause(
-                intArrayOf(
-                Lit.make(1, true),
-                Lit.make(2, true),
-                Lit.make(3, signs and 1 == 0),
-                Lit.make(4, signs and 2 == 0),
-            )
-            )
-        }
+                Clause(
+                    intArrayOf(
+                        Lit.make(1, true),
+                        Lit.make(2, true),
+                        Lit.make(3, signs and 1 == 0),
+                        Lit.make(4, signs and 2 == 0),
+                    ),
+                )
+            },
         ).bake()
         val search = CoreGuidedSearch(
             problem,
@@ -125,10 +133,12 @@ class CoreRefinementTest {
     @Test
     fun `caller pins remain attached to projected cores`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            ),
         ).bake()
         val search = CoreGuidedSearch(
             problem,

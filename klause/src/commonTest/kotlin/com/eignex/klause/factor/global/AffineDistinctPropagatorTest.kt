@@ -170,8 +170,8 @@ class AffineDistinctPropagatorTest {
     fun `Hall explanations should lift earlier bounds across other occupied values`() {
         val factor = Distinct(
             listOf(0L, 1L, 0L, 0L).mapIndexed { i, offset ->
-            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
-        }
+                Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
+            },
         )
         val domains = arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 4), IntDomain(-1, 4))
         val problem = Problem(0, 4, domains, arrayOf(factor))
@@ -197,8 +197,8 @@ class AffineDistinctPropagatorTest {
     fun `a Hall conflict should be implied by its source bounds and holes`() {
         val factor = Distinct(
             listOf(0L, 1L, -1L, 10L).mapIndexed { i, offset ->
-            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
-        }
+                Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(offset))
+            },
         )
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 3) }, arrayOf(factor))
 

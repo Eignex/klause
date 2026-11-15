@@ -74,13 +74,13 @@ internal object FrozenSourceSuite : BenchSuite {
             result
         } else {
             result.copy(
-            status = BenchStatus.FAILED,
-            message = listOfNotNull(
-                result.message,
-                "Plain source identity missing or different from frozen input; original result retained",
+                status = BenchStatus.FAILED,
+                message = listOfNotNull(
+                    result.message,
+                    "Plain source identity missing or different from frozen input; original result retained",
+                )
+                    .joinToString("; "),
             )
-                .joinToString("; "),
-        )
         }
     }
 }

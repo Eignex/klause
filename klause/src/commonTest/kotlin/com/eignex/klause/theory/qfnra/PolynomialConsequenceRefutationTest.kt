@@ -134,11 +134,11 @@ class PolynomialConsequenceRefutationTest {
         )
         val completed = assertIs<QfNraResult.Unsatisfiable>(
             solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(maximumWork = 100_000),
-        )
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 100_000),
+            ),
         )
 
         val result = solveQfNra(
@@ -203,11 +203,11 @@ class PolynomialConsequenceRefutationTest {
         assertTrue(refuted)
         assertIs<QfNraResult.Unsatisfiable>(
             solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(maximumWork = 16_384),
-        )
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 16_384),
+            ),
         )
     }
 
@@ -450,11 +450,11 @@ class PolynomialConsequenceRefutationTest {
         )
         val completed = assertIs<QfNraResult.Unsatisfiable>(
             solveQfNra(
-            source.formula,
-            0,
-            5,
-            QfNraParams(maximumWork = 16_384),
-        )
+                source.formula,
+                0,
+                5,
+                QfNraParams(maximumWork = 16_384),
+            ),
         )
 
         val result = solveQfNra(

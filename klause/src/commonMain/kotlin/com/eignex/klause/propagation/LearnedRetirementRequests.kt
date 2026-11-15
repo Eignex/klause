@@ -109,8 +109,8 @@ internal class LearnedRetirementRequests {
             val requiredRetained = ownedBytes + 55L + nodes * 36L
             if (requiredRetained > maxRetainedBytes) {
                 return result(LearnedRetirementStatus.Deferred, budget).copy(
-                minimumRetainedBytes = requiredRetained,
-            )
+                    minimumRetainedBytes = requiredRetained,
+                )
             }
             requiredWork = budget.work + 48L
             requiredScratch = 256L
@@ -213,11 +213,12 @@ internal class LearnedRetirementRequests {
             if (handle.storedStatus != LearnedRetirementStatus.Pending) {
                 return result(
                     if (handle.storedStatus == LearnedRetirementStatus.Captured) {
-                    LearnedRetirementStatus.Deferred
-                } else {
-                    handle.storedStatus
-                },
-                    budget, handle
+                        LearnedRetirementStatus.Deferred
+                    } else {
+                        handle.storedStatus
+                    },
+                    budget,
+                    handle,
                 )
             }
             val retired = if (request.index < 0) {
@@ -335,11 +336,11 @@ internal class LearnedRetirementRequests {
         indexMemory(indexRoot, sample)
         sample.record(
             mapOf(
-            "selectedRetirementRequests" to count.toLong(),
-            "selectedRetirementPending" to pending.toLong(),
-            "selectedRetirementTerminalOwners" to terminalOwners.toLong(),
-            "selectedRetirementOwnedBytes" to ownedBytes,
-        )
+                "selectedRetirementRequests" to count.toLong(),
+                "selectedRetirementPending" to pending.toLong(),
+                "selectedRetirementTerminalOwners" to terminalOwners.toLong(),
+                "selectedRetirementOwnedBytes" to ownedBytes,
+            ),
         )
     }
 

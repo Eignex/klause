@@ -145,14 +145,14 @@ class MixedExactLinearScoreTest {
         )
         val model = LocalSearchModel.open(
             Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(row),
-            numRealVars = 5,
-            realLower = DoubleArray(5) { -1e16 },
-            realUpper = DoubleArray(5) { 1e16 },
-        )
+                0,
+                0,
+                emptyArray(),
+                arrayOf(row),
+                numRealVars = 5,
+                realLower = DoubleArray(5) { -1e16 },
+                realUpper = DoubleArray(5) { 1e16 },
+            ),
         )
         val state = LocalSearchState(model, Random(3))
         state.assignment.setReal(0, 1e16)
@@ -165,10 +165,10 @@ class MixedExactLinearScoreTest {
         repeat(64) { step ->
             val move = Move.Compound(
                 listOf(
-                Move.RealSet(0, 0.0),
-                Move.RealSet(2, step / 8.0),
-                Move.RealSet(0, 1e16),
-            )
+                    Move.RealSet(0, 0.0),
+                    Move.RealSet(2, step / 8.0),
+                    Move.RealSet(0, 1e16),
+                ),
             )
             state.assignment.copyInto(fresh.assignment)
             fresh.recompute()
@@ -198,14 +198,14 @@ class MixedExactLinearScoreTest {
         )
         val model = LocalSearchModel.open(
             Problem(
-            0,
-            1,
-            arrayOf(IntDomain(-2, 2)),
-            arrayOf(row),
-            numRealVars = 1,
-            realLower = doubleArrayOf(-2.0),
-            realUpper = doubleArrayOf(2.0),
-        )
+                0,
+                1,
+                arrayOf(IntDomain(-2, 2)),
+                arrayOf(row),
+                numRealVars = 1,
+                realLower = doubleArrayOf(-2.0),
+                realUpper = doubleArrayOf(2.0),
+            ),
         )
         val state = LocalSearchState(model, Random(3))
         val sibling = LocalSearchState(model, Random(3), projection = state.projection)
@@ -236,16 +236,16 @@ class MixedExactLinearScoreTest {
         val state = LocalSearchState(
             LocalSearchModel.open(
                 Problem(
-            1,
-            1,
-            arrayOf(IntDomain(0, 1)),
-            arrayOf(row),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(2.0),
-        )
+                    1,
+                    1,
+                    arrayOf(IntDomain(0, 1)),
+                    arrayOf(row),
+                    numRealVars = 1,
+                    realLower = doubleArrayOf(0.0),
+                    realUpper = doubleArrayOf(2.0),
+                ),
             ),
-            Random(3)
+            Random(3),
         )
         state.invariants = InvariantNetwork(listOf(DefinitionalSweep.SweepNode.Bool2Int(0, 0)), 1, 1)
         state.recompute()
@@ -280,16 +280,16 @@ class MixedExactLinearScoreTest {
         val state = LocalSearchState(
             LocalSearchModel.open(
                 Problem(
-            0,
-            1,
-            arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
-            arrayOf(row),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
-        )
+                    0,
+                    1,
+                    arrayOf(IntDomain(Long.MIN_VALUE, Long.MAX_VALUE)),
+                    arrayOf(row),
+                    numRealVars = 1,
+                    realLower = doubleArrayOf(0.0),
+                    realUpper = doubleArrayOf(1.0),
+                ),
             ),
-            Random(3)
+            Random(3),
         )
         state.assignment.setInt(0, Long.MAX_VALUE)
         state.recompute()
@@ -319,16 +319,16 @@ class MixedExactLinearScoreTest {
             val state = LocalSearchState(
                 LocalSearchModel.open(
                     Problem(
-                1,
-                0,
-                emptyArray(),
-                arrayOf(row),
-                numRealVars = 3,
-                realLower = DoubleArray(3) { -Double.MAX_VALUE },
-                realUpper = DoubleArray(3) { Double.MAX_VALUE },
-            )
+                        1,
+                        0,
+                        emptyArray(),
+                        arrayOf(row),
+                        numRealVars = 3,
+                        realLower = DoubleArray(3) { -Double.MAX_VALUE },
+                        realUpper = DoubleArray(3) { Double.MAX_VALUE },
+                    ),
                 ),
-                Random(3)
+                Random(3),
             )
             for (truth in listOf(false, true)) {
                 state.assignment.setBool(0, truth)

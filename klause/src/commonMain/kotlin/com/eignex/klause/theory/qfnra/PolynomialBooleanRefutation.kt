@@ -23,8 +23,8 @@ internal fun refutePolynomialBooleans(
             if (term.coefficient.num.magnitudeBitLength() > maximumBits ||
                 term.coefficient.den.magnitudeBitLength() > maximumBits
             ) {
-                    return false
-                }
+                return false
+            }
         }
     }
     var references = 0

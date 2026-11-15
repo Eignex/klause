@@ -28,20 +28,20 @@ internal fun reportQuadraticOptimization(
         if (publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN
     } else {
         when (result) {
-        is QuadraticOptimizationResult.Optimal -> Verdict.OPTIMAL
+            is QuadraticOptimizationResult.Optimal -> Verdict.OPTIMAL
 
-        is QuadraticOptimizationResult.UnattainedLimit -> Verdict.BEST_FOUND
+            is QuadraticOptimizationResult.UnattainedLimit -> Verdict.BEST_FOUND
 
-        is QuadraticOptimizationResult.Unbounded -> Verdict.UNBOUNDED
+            is QuadraticOptimizationResult.Unbounded -> Verdict.UNBOUNDED
 
-        is QuadraticOptimizationResult.Infeasible -> Verdict.UNSATISFIABLE
+            is QuadraticOptimizationResult.Infeasible -> Verdict.UNSATISFIABLE
 
-        is QuadraticOptimizationResult.BestFound -> Verdict.BEST_FOUND
+            is QuadraticOptimizationResult.BestFound -> Verdict.BEST_FOUND
 
-        is QuadraticOptimizationResult.Unknown -> {
-            if (publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN
+            is QuadraticOptimizationResult.Unknown -> {
+                if (publication.solutions > 0L) Verdict.BEST_FOUND else Verdict.UNKNOWN
+            }
         }
-    }
     }
     output.onComplete(verdict)
     if (statistics) {
@@ -49,19 +49,19 @@ internal fun reportQuadraticOptimization(
         output.onStatistics(result.stats, result.stats.run.wallMs + routingElapsedMs, solutions)
         output.onAllowanceStatistics(
             listOf(
-            "nraWork" to execution.polynomialStats.workSpent.toString(),
-            "nraProjectedPolynomials" to execution.polynomialStats.projectedPolynomials.toString(),
-            "nraLiftedCells" to execution.polynomialStats.liftedCells.toString(),
-            "quadraticNumericalWork" to execution.numericalWork.toString(),
-            "quadraticNativeWork" to execution.nativeWork.toString(),
-        ) + listOfNotNull(
-            execution.polynomialStats.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
-            execution.polynomialStats.dyadicBases?.let { "nraDyadicBases" to it.toString() },
-            execution.polynomialStats.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
-            execution.polynomialStats.dyadicPreExtractionDeclines?.let {
-                "nraDyadicPreExtractionDeclines" to it.toString()
-            },
-        ) + execution.resource?.let { listOf("quadraticResource" to it.name) }.orEmpty()
+                "nraWork" to execution.polynomialStats.workSpent.toString(),
+                "nraProjectedPolynomials" to execution.polynomialStats.projectedPolynomials.toString(),
+                "nraLiftedCells" to execution.polynomialStats.liftedCells.toString(),
+                "quadraticNumericalWork" to execution.numericalWork.toString(),
+                "quadraticNativeWork" to execution.nativeWork.toString(),
+            ) + listOfNotNull(
+                execution.polynomialStats.dyadicAttempts?.let { "nraDyadicAttempts" to it.toString() },
+                execution.polynomialStats.dyadicBases?.let { "nraDyadicBases" to it.toString() },
+                execution.polynomialStats.coupledWorkDeclines?.let { "nraCoupledWorkDeclines" to it.toString() },
+                execution.polynomialStats.dyadicPreExtractionDeclines?.let {
+                    "nraDyadicPreExtractionDeclines" to it.toString()
+                },
+            ) + execution.resource?.let { listOf("quadraticResource" to it.name) }.orEmpty(),
         )
     }
 }

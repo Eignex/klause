@@ -23,11 +23,11 @@ class CorpusZipCollectionTest {
             ZipOutputStream(out).use { zip ->
                 zip.putNextEntry(
                     ZipEntry(name).apply {
-                    method = ZipEntry.STORED
-                    size = original.size.toLong()
-                    compressedSize = size
-                    crc = CRC32().also { it.update(original) }.value
-                }
+                        method = ZipEntry.STORED
+                        size = original.size.toLong()
+                        compressedSize = size
+                        crc = CRC32().also { it.update(original) }.value
+                    },
                 )
                 zip.write(original)
                 zip.closeEntry()
@@ -76,11 +76,11 @@ class CorpusZipCollectionTest {
                 val unrelated = ByteArray(524288)
                 zip.putNextEntry(
                     ZipEntry("unrelated").apply {
-                    method = ZipEntry.STORED
-                    size = unrelated.size.toLong()
-                    compressedSize = size
-                    crc = CRC32().also { it.update(unrelated) }.value
-                }
+                        method = ZipEntry.STORED
+                        size = unrelated.size.toLong()
+                        compressedSize = size
+                        crc = CRC32().also { it.update(unrelated) }.value
+                    },
                 )
                 zip.write(unrelated)
                 zip.closeEntry()

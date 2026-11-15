@@ -17,14 +17,14 @@ internal fun wideDivModEncoder(target: EncodingTarget): Encoder = when (target) 
         encoding.polynomial(
             PolynomialRealFormula.And(
                 wideDivModRows(view as WideDivMod).map { row ->
-            polynomialRow(
-                row,
-                { encoding.integer(SourceIntId(it)) },
-                { encoding.real(SourceRealId(it)) },
-                encoding::conditional,
-            )
-        }
-            )
+                    polynomialRow(
+                        row,
+                        { encoding.integer(SourceIntId(it)) },
+                        { encoding.real(SourceRealId(it)) },
+                        encoding::conditional,
+                    )
+                },
+            ),
         )
         null
     }

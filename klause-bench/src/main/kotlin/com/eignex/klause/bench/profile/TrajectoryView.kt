@@ -103,25 +103,25 @@ internal class TrajectoryView(
             "workingBooleans",
             JsonArray(
                 (0 until state.problem.numBoolVars).map {
-            JsonPrimitive(state.assignment.boolValue(it))
-        }
-            )
+                    JsonPrimitive(state.assignment.boolValue(it))
+                },
+            ),
         )
         put(
             "workingIntegers",
             JsonArray(
                 (0 until state.problem.numIntVars).map {
-            JsonPrimitive(state.assignment.intValue(it))
-        }
-            )
+                    JsonPrimitive(state.assignment.intValue(it))
+                },
+            ),
         )
         put(
             "sourceBooleanSlots",
             JsonArray(
                 (0 until coordinates.boolCount).map {
-            JsonPrimitive(coordinates.bool(it))
-        }
-            )
+                    JsonPrimitive(coordinates.bool(it))
+                },
+            ),
         )
         put("sourceIntegerSlots", JsonArray((0 until coordinates.intCount).map { JsonPrimitive(coordinates.int(it)) }))
         put("cost", state.cost)
@@ -163,20 +163,20 @@ internal fun trajectoryPair(
                 "candidates",
                 JsonArray(
                     candidates.map { move ->
-                val a = left.probe(move)
-                val b = right.probe(move)
-                buildJsonObject {
-                    put("move", move.toString())
-                    put("left", a)
-                    put("right", b)
-                    put(
-                        "pairedDestination",
-                        a["decline"] == null && b["decline"] == null &&
-                        a["source"] != null && a["source"] == b["source"]
-                    )
-                }
-            }
-                )
+                        val a = left.probe(move)
+                        val b = right.probe(move)
+                        buildJsonObject {
+                            put("move", move.toString())
+                            put("left", a)
+                            put("right", b)
+                            put(
+                                "pairedDestination",
+                                a["decline"] == null && b["decline"] == null &&
+                                    a["source"] != null && a["source"] == b["source"],
+                            )
+                        }
+                    },
+                ),
             )
             check(leftBefore == left.snapshot() && rightBefore == right.snapshot())
         }
@@ -193,8 +193,8 @@ internal fun trajectoryCandidates(
     val candidates = ArrayList<Move>()
     val integers = (
         priorityInts.asList() + listOf(focus - source.numBoolVars) +
-        (0 until source.numIntVars)
-    ).filter { it in 0 until source.numIntVars }.distinct()
+            (0 until source.numIntVars)
+        ).filter { it in 0 until source.numIntVars }.distinct()
     fun integer(variable: Int) {
         val current = source.intValue(variable)
         val values = views.flatMap { view ->

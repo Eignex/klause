@@ -393,7 +393,7 @@ class ProbingTest {
         val meter = WorkMeter { work += it }
         val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean {
-                polls++;
+                polls++
                 return work >= 451L
             }
             override val accounting: WorkMeter get() = meter

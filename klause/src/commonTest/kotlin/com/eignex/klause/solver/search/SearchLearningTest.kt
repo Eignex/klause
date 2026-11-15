@@ -16,10 +16,10 @@ class SearchLearningTest {
         val grant = 512L
         val learning = SearchLearning(
             SearchLearnedDbParams(
-            maxClauses = cap,
-            glueLbd = 0,
-            reclamationWork = grant,
-        )
+                maxClauses = cap,
+                glueLbd = 0,
+                reclamationWork = grant,
+            ),
         )
         val host = SearchSession(emptyList())
         host.push(SearchDecision.Bool(0))
@@ -43,10 +43,10 @@ class SearchLearningTest {
         val grant = 65_536L
         val learning = SearchLearning(
             SearchLearnedDbParams(
-            maxClauses = cap,
-            glueLbd = 0,
-            reclamationWork = grant,
-        )
+                maxClauses = cap,
+                glueLbd = 0,
+                reclamationWork = grant,
+            ),
         )
         val host = SearchSession(emptyList())
         host.push(SearchDecision.Bool(0))
@@ -68,10 +68,10 @@ class SearchLearningTest {
     fun `count windows should preserve retirement progress across appended clauses`() {
         val learning = SearchLearning(
             SearchLearnedDbParams(
-            maxClauses = 4,
-            glueLbd = 0,
-            reclamationWork = 512L,
-        )
+                maxClauses = 4,
+                glueLbd = 0,
+                reclamationWork = 512L,
+            ),
         )
         val host = SearchSession(emptyList())
         repeat(10) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
@@ -94,10 +94,10 @@ class SearchLearningTest {
         val session = SearchSession(
             emptyList(),
             learnedDb = SearchLearnedDbParams(
-            glueLbd = 0,
-            softLimitBytes = 0L,
-            reclamationWork = 512L,
-        )
+                glueLbd = 0,
+                softLimitBytes = 0L,
+                reclamationWork = 512L,
+            ),
         )
         repeat(8) { session.learn(SearchExplanation(intArrayOf(it * 4, it * 4 + 2))) }
         assertIs<ComponentResult.Consistent>(session.propagate())
@@ -124,10 +124,10 @@ class SearchLearningTest {
         val session = SearchSession(
             emptyList(),
             learnedDb = SearchLearnedDbParams(
-            maxClauses = 0,
-            glueLbd = 0,
-            reclamationWork = 512L,
-        )
+                maxClauses = 0,
+                glueLbd = 0,
+                reclamationWork = 512L,
+            ),
         )
         session.learn(SearchExplanation(intArrayOf(0, 2)))
         session.propagate()
@@ -145,10 +145,10 @@ class SearchLearningTest {
     fun `cancellation after retirement should retain owners until resumed physical release`() {
         val learning = SearchLearning(
             SearchLearnedDbParams(
-            maxClauses = 0,
-            glueLbd = 0,
-            reclamationWork = 512L,
-        )
+                maxClauses = 0,
+                glueLbd = 0,
+                reclamationWork = 512L,
+            ),
         )
         val host = SearchSession(emptyList())
         repeat(8) { learning.learn(intArrayOf(it * 4, it * 4 + 2), host) }
@@ -202,8 +202,8 @@ class SearchLearningTest {
         val run = session.openRun(
             1,
             lifecycle = object : SearchRunLifecycle {
-            override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
-        }
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            },
         )
         limited = true
         var event: SearchRunEvent = SearchRunEvent.Paused
@@ -299,11 +299,11 @@ class SearchLearningTest {
             val session = SearchSession(
                 emptyList(),
                 learnedDb = SearchLearnedDbParams(
-                glueLbd = 0,
-                softLimitBytes = 0L,
-                reclamationWork = work,
-                reclamationScratchBytes = scratch,
-            )
+                    glueLbd = 0,
+                    softLimitBytes = 0L,
+                    reclamationWork = work,
+                    reclamationScratchBytes = scratch,
+                ),
             )
             session.learn(SearchExplanation(intArrayOf(0)))
 
@@ -403,8 +403,8 @@ class SearchLearningTest {
         val run = session.openRun(
             1,
             lifecycle = object : SearchRunLifecycle {
-            override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
-        }
+                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
+            },
         )
         session.learn(SearchExplanation(intArrayOf(0)))
         cancelled = true
@@ -592,12 +592,12 @@ class SearchLearningTest {
         assertEquals(true, session.boolValue(1))
         assertEquals(
             mapOf(
-            "learningClauseConstructed" to 2L,
-            "learningClauseAdmitted" to 1L,
-            "learningClauseAsserted" to 1L,
-            "learningClauseConsumed" to 1L,
-        ),
-            session.learnedLifecycle()
+                "learningClauseConstructed" to 2L,
+                "learningClauseAdmitted" to 1L,
+                "learningClauseAsserted" to 1L,
+                "learningClauseConsumed" to 1L,
+            ),
+            session.learnedLifecycle(),
         )
     }
 

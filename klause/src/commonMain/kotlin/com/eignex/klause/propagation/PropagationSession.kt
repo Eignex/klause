@@ -532,9 +532,9 @@ class PropagationSession private constructor(
             }
             yield(
                 PropagationSession(
-                state.problem, cancellation, state.cancelFloor, state.nativeSat, state.pbLearning,
-                state.projection, state, conflict, checkNotNull(buffers), mark,
-            )
+                    state.problem, cancellation, state.cancelFloor, state.nativeSat, state.pbLearning,
+                    state.projection, state, conflict, checkNotNull(buffers), mark,
+                ),
             )
         }.iterator()
 
@@ -782,8 +782,8 @@ class PropagationSession private constructor(
             val variable = restrictions.intSetKeys[i]
             yield(
                 pushRestriction(variable) {
-                state.restrictIntToSurvivors(variable, restrictions.intSetSurvivorsAt(i))
-            }
+                    state.restrictIntToSurvivors(variable, restrictions.intSetSurvivorsAt(i))
+                },
             )
         }
     }
@@ -1532,10 +1532,10 @@ class PropagationSession private constructor(
             }
             sample.record(
                 mapOf(
-                "sharedLearningObserved" to if (sharedLearningMemory == null) 0L else 1L,
-                "rootRetiredSourceReferenceSlots" to (simplifiedRootSources?.size?.toLong() ?: 0L),
-                "rootPendingSourceReferenceSlots" to if (pendingRootSourceRetirement == null) 0L else 1L,
-            )
+                    "sharedLearningObserved" to if (sharedLearningMemory == null) 0L else 1L,
+                    "rootRetiredSourceReferenceSlots" to (simplifiedRootSources?.size?.toLong() ?: 0L),
+                    "rootPendingSourceReferenceSlots" to if (pendingRootSourceRetirement == null) 0L else 1L,
+                ),
             )
         }
     }

@@ -445,10 +445,10 @@ class RealDifferenceFragmentsTest {
 
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-            problem,
-            FiniteEngine.BACKTRACK,
-            presolveConfig = PresolveConfig.NONE,
-        )
+                problem,
+                FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.NONE,
+            ),
         )
         val prepared = preparation.executableProblem()
 

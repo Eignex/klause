@@ -48,14 +48,14 @@ internal class ExactRealArithmetic(val transcendental: TranscendentalArithmetic,
                     }
                     val value = if (function == ExactRealFunction.SIN) {
                         when (quadrant) {
-                            1 -> 1L;
-                            3 -> -1L;
+                            1 -> 1L
+                            3 -> -1L
                             else -> 0L
                         }
                     } else {
                         when (quadrant) {
-                            0 -> 1L;
-                            2 -> -1L;
+                            0 -> 1L
+                            2 -> -1L
                             else -> 0L
                         }
                     }
@@ -102,9 +102,9 @@ internal class ExactRealArithmetic(val transcendental: TranscendentalArithmetic,
                 null
             } else {
                 (index + 1 until operands.size).firstOrNull { other ->
-                val second = trigSquare(operands[other])
-                second != null && first.function != second.function && same(first.argument, second.argument)
-            }
+                    val second = trigSquare(operands[other])
+                    second != null && first.function != second.function && same(first.argument, second.argument)
+                }
             }
             if (mate != null) {
                 operands.removeAt(mate)

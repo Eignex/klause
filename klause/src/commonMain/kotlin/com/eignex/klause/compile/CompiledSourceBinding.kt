@@ -57,11 +57,11 @@ internal class CompiledSourceBinding(
         val selected = selectedVariables(invocation.cancellation) ?: return
         if (selected.isNotEmpty()) {
             SourceSetup.prepareSelectedFloatGrid(
-            invocation,
-            selected,
-            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
-            truncatedRows,
-        )
+                invocation,
+                selected,
+                FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
+                truncatedRows,
+            )
         }
     }
 

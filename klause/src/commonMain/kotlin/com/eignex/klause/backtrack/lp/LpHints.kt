@@ -200,18 +200,18 @@ internal class LpHints(
         Double.NaN
     } else {
         when (variable) {
-        is VarRef.IntVar -> if (intStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
-            intVal.getOrElse(variable.varId) { Double.NaN }
-        } else {
-            Double.NaN
-        }
+            is VarRef.IntVar -> if (intStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
+                intVal.getOrElse(variable.varId) { Double.NaN }
+            } else {
+                Double.NaN
+            }
 
-        is VarRef.Bool -> if (boolStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
-            boolVal.getOrElse(variable.varId) { Double.NaN }
-        } else {
-            Double.NaN
+            is VarRef.Bool -> if (boolStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
+                boolVal.getOrElse(variable.varId) { Double.NaN }
+            } else {
+                Double.NaN
+            }
         }
-    }
     }
 
     private val intVal by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numIntVars) { Double.NaN } }

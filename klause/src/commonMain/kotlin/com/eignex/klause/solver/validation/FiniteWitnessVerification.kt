@@ -61,8 +61,8 @@ private fun verifyFiniteWitness(
     if (sample.numRealVars != problem.numRealVars ||
         (
             sample.exactReals == null &&
-            (0 until sample.numRealVars).any { !sample.approximateRealValue(it).isFinite() }
-        )
+                (0 until sample.numRealVars).any { !sample.approximateRealValue(it).isFinite() }
+            )
     ) {
         return Verification.Rejected("assignment does not cover finite real coordinates")
     }

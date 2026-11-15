@@ -52,11 +52,11 @@ class MddInvariantTest {
                 for (symbol in 0..1) {
                     records.addAll(
                         listOf(
-                        from.toLong(),
-                        symbol.toLong(),
-                        (from xor symbol).toLong(),
-                        2L + from + symbol,
-                    )
+                            from.toLong(),
+                            symbol.toLong(),
+                            (from xor symbol).toLong(),
+                            2L + from + symbol,
+                        ),
                     )
                 }
             }
@@ -93,9 +93,9 @@ class MddInvariantTest {
         repeat(40) {
             val move = Move.Compound(
                 listOf(
-                Move.IntSet(random.nextInt(3), random.nextLong(3)),
-                Move.IntSet(3, random.nextLong(21)),
-            )
+                    Move.IntSet(random.nextInt(3), random.nextLong(3)),
+                    Move.IntSet(3, random.nextLong(21)),
+                ),
             )
             val before = state.assignment.snapshot()
             val cost = state.cost

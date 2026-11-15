@@ -47,14 +47,14 @@ internal class PrivateRebuildClauseProjection private constructor(
                 if (!visit(current.size * 4L + 1L)) return Result.Stopped
                 val replaced = Clause(
                     IntArray(current.size) { index ->
-                    if (Lit.variable(current[index]) != stage.variable) {
-                        current[index]
-                    } else if (Lit.isPositive(current[index])) {
-                        stage.replacement
-                    } else {
-                        Lit.negate(stage.replacement)
-                    }
-                }
+                        if (Lit.variable(current[index]) != stage.variable) {
+                            current[index]
+                        } else if (Lit.isPositive(current[index])) {
+                            stage.replacement
+                        } else {
+                            Lit.negate(stage.replacement)
+                        }
+                    },
                 )
                 if (replaced.tautological) return Result.Skipped
                 current = replaced.literals
@@ -76,8 +76,8 @@ internal class PrivateRebuildClauseProjection private constructor(
             var used = 0
             for (row in listOf(current, parent)) {
                 for (literal in row) {
-                if (Lit.variable(literal) != stage.variable) merged[used++] = literal
-            }
+                    if (Lit.variable(literal) != stage.variable) merged[used++] = literal
+                }
             }
             if (merged.isEmpty()) return Result.Refuted
             // One source resolvent remains entailed after projection without expanding the learned database.
@@ -111,8 +111,8 @@ internal class PrivateRebuildClauseProjection private constructor(
                     if (Lit.variable(step.source) !in 0 until columns ||
                         Lit.variable(step.source) == variable
                     ) {
-                            return null
-                        }
+                        return null
+                    }
                     stages.add(Stage(variable, null, null, step.source))
                     continue
                 }

@@ -83,17 +83,17 @@ internal class QuadraticIntegerComponent(
             if (integer != null) addBound(integer.variable, integer.exactThreshold(), integer.upper, context)
         } else {
             when (decision) {
-            is SearchDecision.IntAtMost -> addBound(decision.variable, bigIntOf(decision.upper), true, context)
+                is SearchDecision.IntAtMost -> addBound(decision.variable, bigIntOf(decision.upper), true, context)
 
-            is SearchDecision.IntAtLeast -> addBound(decision.variable, bigIntOf(decision.lower), false, context)
+                is SearchDecision.IntAtLeast -> addBound(decision.variable, bigIntOf(decision.lower), false, context)
 
-            is SearchDecision.IntEqual -> {
-                addBound(decision.variable, bigIntOf(decision.value), true, context)
-                addBound(decision.variable, bigIntOf(decision.value), false, context)
+                is SearchDecision.IntEqual -> {
+                    addBound(decision.variable, bigIntOf(decision.value), true, context)
+                    addBound(decision.variable, bigIntOf(decision.value), false, context)
+                }
+
+                else -> Unit
             }
-
-            else -> Unit
-        }
         }
         return ComponentResult.Consistent
     }
@@ -143,16 +143,16 @@ internal class QuadraticIntegerComponent(
             }
             (
                 if (contradictory || boolConflict) {
-                QuadraticIntegerNode.Empty(
-                    QuadraticEngineDerivation.Both(
-                QuadraticEngineDerivation.Condition(root),
-                QuadraticEngineDerivation.Condition(condition),
-            )
-                )
-            } else {
-                complete(condition, context)
-            }
-            ).also {
+                    QuadraticIntegerNode.Empty(
+                        QuadraticEngineDerivation.Both(
+                            QuadraticEngineDerivation.Condition(root),
+                            QuadraticEngineDerivation.Condition(condition),
+                        ),
+                    )
+                } else {
+                    complete(condition, context)
+                }
+                ).also {
                 current = it
             }
         }

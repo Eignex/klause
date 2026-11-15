@@ -63,20 +63,20 @@ internal class WatchedClauseStore {
         }
         var payload = 0L
         for (clause in clauses) {
-            sample.step();
+            sample.step()
             payload += clause.size.toLong() * Int.SIZE_BYTES
         }
         sample.record(
             mapOf(
-            "sharedLearnedObjects" to clauses.size.toLong(),
-            "sharedLearnedPayloadBytes" to payload,
-            "sharedLearnedIndexCapacityBytes" to watchBytes + signatureBytes + watchers.primitiveCapacityBytes +
-                signatures.primitiveCapacityBytes + lbds.backingData.size.toLong() * Int.SIZE_BYTES +
-                unitClauses.backingData.size.toLong() * Int.SIZE_BYTES +
-                (used.backingData.size.toLong() + attached.backingData.size) * Int.SIZE_BYTES,
-            "sharedLearnedReferenceSlots" to clauses.capacity.toLong() + watchers.referenceCapacity +
-                signatures.referenceCapacity,
-        )
+                "sharedLearnedObjects" to clauses.size.toLong(),
+                "sharedLearnedPayloadBytes" to payload,
+                "sharedLearnedIndexCapacityBytes" to watchBytes + signatureBytes + watchers.primitiveCapacityBytes +
+                    signatures.primitiveCapacityBytes + lbds.backingData.size.toLong() * Int.SIZE_BYTES +
+                    unitClauses.backingData.size.toLong() * Int.SIZE_BYTES +
+                    (used.backingData.size.toLong() + attached.backingData.size) * Int.SIZE_BYTES,
+                "sharedLearnedReferenceSlots" to clauses.capacity.toLong() + watchers.referenceCapacity +
+                    signatures.referenceCapacity,
+            ),
         )
         val protectedIds = sample.seenIds()
         for (index in 0 until size) {

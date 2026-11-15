@@ -30,8 +30,8 @@ internal class PrivateRebuildSatisfaction(private val solver: BacktrackSolver, p
     private val lifetime = params.cancellation.lifetimeCancellation()
     private val sharedParams = params.copy(
         nodeBudget = params.nodeBudget ?: NodeBudget(
-        minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE),
-    )
+            minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE),
+        ),
     )
     private var root: PropagationSession? = null
     private var rootMark = -1
@@ -211,9 +211,9 @@ internal class PrivateRebuildSatisfaction(private val solver: BacktrackSolver, p
         note("ParityAffineColumns", captured.affine?.rank?.toLong() ?: 0L)
         note("ParityAffineFreeColumns", captured.affine?.freeColumns?.toLong() ?: 0L)
         if (automatic && (
-            (captured.basis?.rank ?: 0) < MIN_AUTOMATIC_RANK ||
-                captured.coveredClauses * 2L < solver.problem.numFactors
-        )
+                (captured.basis?.rank ?: 0) < MIN_AUTOMATIC_RANK ||
+                    captured.coveredClauses * 2L < solver.problem.numFactors
+                )
         ) {
             note("AutomaticDeclinedStructure")
             return false
@@ -265,9 +265,10 @@ internal class PrivateRebuildSatisfaction(private val solver: BacktrackSolver, p
                 val result = try {
                     search.runSlice(
                         lifetime or global or ExecutionControl {
-                        trialSpent() >= privateWorkLimit
-                    },
-                        millis(), nodes()
+                            trialSpent() >= privateWorkLimit
+                        },
+                        millis(),
+                        nodes(),
                     )
                 } finally {
                     note("TrialNanos", trialStart.elapsedNow().inWholeNanoseconds)
@@ -537,10 +538,10 @@ internal class PrivateRebuildSatisfaction(private val solver: BacktrackSolver, p
             (
                 params.privateRebuildWork > 0L || (
                     problem.numBoolVars >= MIN_AUTOMATIC_RANK &&
-                problem.numBoolVars * 2L <= PROPAGATION_WORK_PER_NODE &&
-                problem.numFactors in MIN_AUTOMATIC_FACTORS..MAX_AUTOMATIC_FACTORS
-                )
-            ) &&
+                        problem.numBoolVars * 2L <= PROPAGATION_WORK_PER_NODE &&
+                        problem.numFactors in MIN_AUTOMATIC_FACTORS..MAX_AUTOMATIC_FACTORS
+                    )
+                ) &&
             problem.numIntVars == 0 && problem.numRealVars == 0 &&
             problem.rootDeductions is PropagationResult.Implied &&
             params.assumptions.isEmpty && params.assumptions.deductions.isEmpty &&

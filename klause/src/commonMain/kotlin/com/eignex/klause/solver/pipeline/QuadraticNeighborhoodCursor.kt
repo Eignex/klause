@@ -108,8 +108,10 @@ internal class QuadraticNeighborhoodCursor(
                 result is ExactNeighborhoodResult.Refuted,
                 result is ExactNeighborhoodResult.Undecided,
             )
-            if (improved) radius = BigFraction.ONE else {
-                radius += radius;
+            if (improved) {
+                radius = BigFraction.ONE
+            } else {
+                radius += radius
                 stalls++
             }
             if (adaptive) weights[operator] = weights[operator] * 0.8 + if (improved) 1.0 else 0.2

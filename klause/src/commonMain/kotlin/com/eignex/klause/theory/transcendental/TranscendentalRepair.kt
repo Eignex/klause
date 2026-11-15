@@ -106,11 +106,11 @@ private fun inverse(
             }
         } else {
             when (rational) {
-            zero -> one * BigFraction.ofLong(2).reciprocal()
-            one -> zero
-            minusOne -> one
-            else -> null
-        }
+                zero -> one * BigFraction.ofLong(2).reciprocal()
+                one -> zero
+                minusOne -> one
+                else -> null
+            }
         }
         multiple?.let { arithmetic.multiply(listOf(arithmetic.rational(it), arithmetic.pi())) }
     }

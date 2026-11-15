@@ -78,8 +78,8 @@ internal class ArithmeticLearningTrace(private val maxEvents: Int = 128, private
         if (!kind.startsWith("integer.decline.") && !kind.startsWith("integer.source-decline.") &&
             !kind.startsWith("integer.endpoint-decline.")
         ) {
-                return
-            }
+            return
+        }
         val existing = if (kind.length <= DECLINE_CENSUS_NAME_LENGTH) declineIndices[kind] else null
         val index = existing ?: if (kind.length <= DECLINE_CENSUS_NAME_LENGTH &&
             declineNames.size < DECLINE_CENSUS_KINDS - 1
@@ -131,30 +131,30 @@ internal class ArithmeticLearningTrace(private val maxEvents: Int = 128, private
         record(
             kind,
             *LongArray(literals.size * 5) { index ->
-            val literal = literals[index / 5]
-            val variable = Lit.variable(literal)
-            val atom = variable - state.problem.numBoolVars
-            val knownAtom = atom in 0 until state.atoms.intVar.size
-            when (index % 5) {
-                0 -> literal.toLong()
+                val literal = literals[index / 5]
+                val variable = Lit.variable(literal)
+                val atom = variable - state.problem.numBoolVars
+                val knownAtom = atom in 0 until state.atoms.intVar.size
+                when (index % 5) {
+                    0 -> literal.toLong()
 
-                1 -> when {
-                    atom < 0 -> state.boolLevel[variable].toLong()
-                    knownAtom -> state.atoms.lvl[atom].toLong()
-                    else -> -1L
+                    1 -> when {
+                        atom < 0 -> state.boolLevel[variable].toLong()
+                        knownAtom -> state.atoms.lvl[atom].toLong()
+                        else -> -1L
+                    }
+
+                    2 -> if (knownAtom) state.atoms.intVar[atom].toLong() else -1L
+
+                    3 -> if (knownAtom) state.atoms.kind[atom].ordinal.toLong() else -1L
+
+                    else -> when {
+                        atom < 0 -> state.boolReason[variable].toLong()
+                        knownAtom -> state.atoms.threshold[atom]
+                        else -> -1L
+                    }
                 }
-
-                2 -> if (knownAtom) state.atoms.intVar[atom].toLong() else -1L
-
-                3 -> if (knownAtom) state.atoms.kind[atom].ordinal.toLong() else -1L
-
-                else -> when {
-                    atom < 0 -> state.boolReason[variable].toLong()
-                    knownAtom -> state.atoms.threshold[atom]
-                    else -> -1L
-                }
-            }
-        }
+            },
         )
     }
 

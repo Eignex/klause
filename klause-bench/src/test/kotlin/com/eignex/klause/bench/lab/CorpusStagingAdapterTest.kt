@@ -26,10 +26,10 @@ class CorpusStagingAdapterTest {
         val case = CorpusStagingSuite.plan(
             BenchRequest(
                 mapOf(
-            "inputs" to BenchProtocol.json.encodeToString(listOf(input)),
-            "timeout-ms" to "10000",
-        )
-            )
+                    "inputs" to BenchProtocol.json.encodeToString(listOf(input)),
+                    "timeout-ms" to "10000",
+                ),
+            ),
         ).single()
 
         assertEquals(input.path, case.inputs.single().path)
@@ -47,10 +47,10 @@ class CorpusStagingAdapterTest {
             CorpusStagingSuite.plan(
                 BenchRequest(
                     mapOf(
-                "inputs" to BenchProtocol.json.encodeToString(listOf(input)),
-                "timeout-ms" to "10000",
-            )
-                )
+                        "inputs" to BenchProtocol.json.encodeToString(listOf(input)),
+                        "timeout-ms" to "10000",
+                    ),
+                ),
             )
         }
     }
@@ -75,9 +75,9 @@ class CorpusStagingAdapterTest {
         val baseline = CorpusStagingSuite.plan(BenchRequest(parameters)).single()
         val control = CorpusStagingSuite.plan(
             BenchRequest(
-            parameters +
-                mapOf("order" to order, "staging-target" to target, "staging-buffer-kib" to bufferKiB.toString()),
-        )
+                parameters +
+                    mapOf("order" to order, "staging-target" to target, "staging-buffer-kib" to bufferKiB.toString()),
+            ),
         ).single()
 
         assertEquals(baseline.inputs, control.inputs)

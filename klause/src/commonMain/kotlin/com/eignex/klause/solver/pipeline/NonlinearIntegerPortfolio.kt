@@ -19,9 +19,9 @@ internal class NonlinearIntegerPortfolio(
         val plan = request.preparedPlan
         if (!plan.capabilities.admission(engine).runnable) {
             return PolynomialTheoryExecution(
-            OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
-            PolynomialTheoryStats(),
-        )
+                OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
+                PolynomialTheoryStats(),
+            )
         }
         val polynomial = params.polynomial
         val scope = QuadraticNativeScope(polynomial, concurrent = cores > 1)
@@ -36,8 +36,8 @@ internal class NonlinearIntegerPortfolio(
                 ExecutionStrategy.MIXED -> error("admission supplies participating arms")
             }
             val family = when (arm) {
-                0 -> ArmFamily.Backtrack;
-                1 -> ArmFamily.LocalSearch;
+                0 -> ArmFamily.Backtrack
+                1 -> ArmFamily.LocalSearch
                 else -> ArmFamily.Lns
             }
             PortfolioArmFactory(plan, arm, family, binding = {
@@ -104,8 +104,8 @@ internal class NonlinearIntegerPortfolio(
             val complete = materialized.indices.filter { materialized[it].family == ArmFamily.Backtrack }
             PortfolioInvocationPolicy(
                 shares = DoubleArray(materialized.size) {
-                if (it in complete) 0.75 / complete.size else 0.0
-            }
+                    if (it in complete) 0.75 / complete.size else 0.0
+                },
             )
         }
         val result = invocation.use { it.solve(scope.polynomial) }

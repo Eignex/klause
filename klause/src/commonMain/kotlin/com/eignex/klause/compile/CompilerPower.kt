@@ -16,9 +16,9 @@ internal fun Lowering.liftPower(base: IntExpr, exponent: Int): IntExpr {
     val upper = maxOf(first, last)
     val name = newAuxIntVar(
         IntDomain(
-        checkedInt(lower) { "Power domain min" }.toLong(),
-        checkedInt(upper) { "Power domain max" }.toLong(),
-    )
+            checkedInt(lower) { "Power domain min" }.toLong(),
+            checkedInt(upper) { "Power domain max" }.toLong(),
+        ),
     )
     factors += Power(operand, exponent, intVarOf(name))
     return IntRef(name)

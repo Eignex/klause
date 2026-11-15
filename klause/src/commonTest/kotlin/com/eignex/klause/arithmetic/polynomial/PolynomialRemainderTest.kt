@@ -68,10 +68,10 @@ class PolynomialRemainderTest {
         val large = Polynomial.of(
             listOf(
                 PolynomialTerm(
-            Monomial.of(mapOf(0 to Int.MAX_VALUE)),
-            BigFraction.ONE,
-        )
-            )
+                    Monomial.of(mapOf(0 to Int.MAX_VALUE)),
+                    BigFraction.ONE,
+                ),
+            ),
         )
         val divisor = arithmetic.subtract(y, large)
         val polynomial = arithmetic.power(y, 2)
@@ -141,10 +141,10 @@ class PolynomialRemainderTest {
         val squareY = arithmetic.power(y, 2)
         val remainders = PolynomialRemainder(
             listOf(
-            arithmetic.subtract(squareX, Polynomial.ONE),
-            arithmetic.subtract(squareY, Polynomial.constant(BigFraction.ofLong(2))),
-        ),
-            arithmetic
+                arithmetic.subtract(squareX, Polynomial.ONE),
+                arithmetic.subtract(squareY, Polynomial.constant(BigFraction.ofLong(2))),
+            ),
+            arithmetic,
         )
         val first = remainders.prepare(arithmetic.add(squareX, y))
         val second = remainders.prepare(arithmetic.add(x, squareY))

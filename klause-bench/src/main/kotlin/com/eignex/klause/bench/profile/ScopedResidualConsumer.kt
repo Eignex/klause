@@ -170,27 +170,27 @@ object ScopedResidualConsumer {
         }
         if (admission["decline"] != null) {
             return buildJsonObject {
-            put("opening", if (fromRoot) "prepared-root" else "retained-node")
-            put("admission", admission)
-            put("sourceVerdictClaim", false)
-            put("witnessChecks", JsonArray(study.receipts))
-        }
+                put("opening", if (fromRoot) "prepared-root" else "retained-node")
+                put("admission", admission)
+                put("sourceVerdictClaim", false)
+                put("witnessChecks", JsonArray(study.receipts))
+            }
         }
         val natural = if (admission["components"] == JsonPrimitive(1)) {
             decline("one-component-falls-back-to-ordinary")
         } else {
             funded(study) { invocation ->
-            val admitted = admit(invocation)
-            val residual = admitted.residual ?: return@funded decline(checkNotNull(admitted.reason))
-            ScopedComponentProfile.composition(
-                residual,
-                cutoff,
-                millis,
-                seed,
-                invocation.allowance,
-                sourceCheck = invocation.check,
-            )
-        }
+                val admitted = admit(invocation)
+                val residual = admitted.residual ?: return@funded decline(checkNotNull(admitted.reason))
+                ScopedComponentProfile.composition(
+                    residual,
+                    cutoff,
+                    millis,
+                    seed,
+                    invocation.allowance,
+                    sourceCheck = invocation.check,
+                )
+            }
         }
         val separator = funded(study) { invocation ->
             val admitted = admit(invocation)
@@ -213,9 +213,9 @@ object ScopedResidualConsumer {
             put(
                 "ordinaryStrong",
                 ordinary(
-                study,
-                OrdinaryControl(lp = LpEmphasis.AGGRESSIVE, pbCutoff = true, objectiveOrder = true),
-            )
+                    study,
+                    OrdinaryControl(lp = LpEmphasis.AGGRESSIVE, pbCutoff = true, objectiveOrder = true),
+                ),
             )
             put("naturalDecomposition", natural)
             put("separatorDecomposition", separator)
@@ -385,9 +385,9 @@ object ScopedResidualConsumer {
         }
         val metadata = JsonObject(
             parent.snapshot.preparationIdentity + buildJsonObject {
-            put("opening", "prepared-root-after-cutoff-propagation")
-            put("incumbentParentCondition", parent.snapshot.conditionIdentity)
-        }
+                put("opening", "prepared-root-after-cutoff-propagation")
+                put("incumbentParentCondition", parent.snapshot.conditionIdentity)
+            },
         )
         val capture = ResidualSnapshots.capture(
             source, objective, values, LearnedResidualInspection(emptyList(), 0, null),
@@ -423,15 +423,15 @@ object ScopedResidualConsumer {
         if (context == null) {
             return JsonObject(
                 decline(checkNotNull(opening.reason)) + buildJsonObject {
-            put("cutoffClosed", opening.closed && !allowance.stop())
-            put("snapshotFile", opening.file)
-            put("totalIncludingInputMs", (System.nanoTime() - start) / 1_000_000.0)
-            put("decisions", allowance.nodes.spent)
-            put("visits", allowance.visits)
-            put("cumulativeModeledBytes", allowance.bytes)
-            put("originalSourceIncumbentChecked", opening.closed)
-            put("stopped", allowance.stop())
-        }
+                    put("cutoffClosed", opening.closed && !allowance.stop())
+                    put("snapshotFile", opening.file)
+                    put("totalIncludingInputMs", (System.nanoTime() - start) / 1_000_000.0)
+                    put("decisions", allowance.nodes.spent)
+                    put("visits", allowance.visits)
+                    put("cumulativeModeledBytes", allowance.bytes)
+                    put("originalSourceIncumbentChecked", opening.closed)
+                    put("stopped", allowance.stop())
+                },
             )
         }
         val snapshot = context.snapshot
@@ -451,19 +451,19 @@ object ScopedResidualConsumer {
         }
         return JsonObject(
             result + buildJsonObject {
-            put("conditionIdentity", snapshot.conditionIdentity)
-            put("snapshotFile", opening.file)
-            put("loadVerifyMs", (verified - start) / 1_000_000.0)
-            put("originalSourceIncumbentChecked", checked)
-            put("osName", System.getProperty("os.name"))
-            put("osArch", System.getProperty("os.arch"))
-            put("javaVersion", System.getProperty("java.version"))
-            put("totalIncludingInputMs", (System.nanoTime() - start) / 1_000_000.0)
-            put("decisions", allowance.nodes.spent)
-            put("visits", allowance.visits)
-            put("cumulativeModeledBytes", allowance.bytes)
-            put("stopped", allowance.stop())
-        }
+                put("conditionIdentity", snapshot.conditionIdentity)
+                put("snapshotFile", opening.file)
+                put("loadVerifyMs", (verified - start) / 1_000_000.0)
+                put("originalSourceIncumbentChecked", checked)
+                put("osName", System.getProperty("os.name"))
+                put("osArch", System.getProperty("os.arch"))
+                put("javaVersion", System.getProperty("java.version"))
+                put("totalIncludingInputMs", (System.nanoTime() - start) / 1_000_000.0)
+                put("decisions", allowance.nodes.spent)
+                put("visits", allowance.visits)
+                put("cumulativeModeledBytes", allowance.bytes)
+                put("stopped", allowance.stop())
+            },
         )
     }
 

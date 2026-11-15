@@ -51,7 +51,7 @@ internal class WideDivModInvariant(private val relation: WideDivMod) : Invariant
         var residual = BIG_ZERO - constants.exactBound
         for (i in identity.vars.indices) {
             residual += constants.exactCoeff(i) *
-            bigIntOf(state.assignment.intValue(identity.vars[i]))
+                bigIntOf(state.assignment.intValue(identity.vars[i]))
         }
         for (i in 0 until minOf(identity.vars.size, MAX_REPAIRS)) {
             val coefficient = constants.exactCoeff(i)

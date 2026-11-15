@@ -206,8 +206,8 @@ private fun preflightFloatFactor(
         is ContinuousProduct -> factor.finiteChoices?.let { choices ->
             !choices.hasGuards || (
                 choices.size == 1 && source.realLower[choices.operand] == choices.valueAt(0) &&
-                source.realUpper[choices.operand] == choices.valueAt(0)
-            )
+                    source.realUpper[choices.operand] == choices.valueAt(0)
+                )
         } ?: true
 
         is Power -> factor.base is Power.Coordinate.Real
@@ -238,16 +238,16 @@ internal fun floatGridColumn(
         } else {
             policy.unrangedBounds.lower?.let { BigFraction.of(it.numerator, it.denominator) }
         }
-    ) ?: return null
+        ) ?: return null
     val upper = (
         if (source.realUpper[id].isFinite()) {
-        BigFraction.ofDouble(source.realUpper[id])
-    } else if (image != null) {
-        BigFraction.ofDouble(image.hi)
-    } else {
-        policy.unrangedBounds.upper?.let { BigFraction.of(it.numerator, it.denominator) }
-    }
-    ) ?: return null
+            BigFraction.ofDouble(source.realUpper[id])
+        } else if (image != null) {
+            BigFraction.ofDouble(image.hi)
+        } else {
+            policy.unrangedBounds.upper?.let { BigFraction.of(it.numerator, it.denominator) }
+        }
+        ) ?: return null
     if (origin > upper) return null
     val buckets = if (origin == upper && !variable.preserveBuckets) {
         1
@@ -295,8 +295,8 @@ private fun lowerFloatGridFactor(
             listOf(
                 GridAbs(
                     input.variable, output.variable, input.lower, input.upper, input.buckets,
-                output.lower, output.upper, output.buckets, image,
-                )
+                    output.lower, output.upper, output.buckets, image,
+                ),
             )
         }
 
@@ -318,10 +318,10 @@ private fun lowerFloatGridFactor(
 
         is Power -> listOf(
             GridPower(
-            coordinate((factor.base as Power.Coordinate.Real).id.index),
-            factor.exponent,
-            coordinate((factor.result as Power.Coordinate.Real).id.index),
-        )
+                coordinate((factor.base as Power.Coordinate.Real).id.index),
+                factor.exponent,
+                coordinate((factor.result as Power.Coordinate.Real).id.index),
+            ),
         )
 
         is RealArrayMinMax -> listOf(lowerGridMinMax(factor, columns, policy.linearScale, cancellation) ?: return null)

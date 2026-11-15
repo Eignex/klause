@@ -91,9 +91,9 @@ internal class AllDifferentSeparator : CutSeparator {
             if (lpSum > maxSum + tol) {
                 cuts.add(
                     ctx.withIntervalPremises(
-                    Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, maxSum, global),
-                    vars,
-                )
+                        Cut(cols.copyOf(), LongArray(cols.size) { 1L }, Relation.LE, maxSum, global),
+                        vars,
+                    ),
                 )
             }
         }

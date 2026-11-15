@@ -28,12 +28,12 @@ internal class PolynomialPredicateSharing(
             null
         } else {
             IntArray(originalAtoms.size) { index ->
-            arithmetic.step()
-            val atom = originalAtoms[index]
-            val nodeIndex = predicate(atom)
-            if (atom !in definitionPredicates) definitionPredicates[atom] = nodeIndex
-            nodeIndex
-        }
+                arithmetic.step()
+                val atom = originalAtoms[index]
+                val nodeIndex = predicate(atom)
+                if (atom !in definitionPredicates) definitionPredicates[atom] = nodeIndex
+                nodeIndex
+            }
         }
         val indices = IntArray(originalNodes.size)
         for ((index, node) in originalNodes.withIndex()) {
@@ -129,10 +129,10 @@ internal class PolynomialPredicateSharing(
 
                     is FormulaNode.Junction -> FormulaNode.Junction(
                         IntArray(node.children.size) {
-                        arithmetic.step()
-                        indices[node.children[it]]
-                    },
-                        node.conjunction
+                            arithmetic.step()
+                            indices[node.children[it]]
+                        },
+                        node.conjunction,
                     )
 
                     else -> node
@@ -155,9 +155,9 @@ internal class PolynomialPredicateSharing(
         }
         return variables.sortedWith(
             Comparator { left, right ->
-            arithmetic.step();
-            left.compareTo(right)
-        }
+                arithmetic.step()
+                left.compareTo(right)
+            },
         )
     }
 

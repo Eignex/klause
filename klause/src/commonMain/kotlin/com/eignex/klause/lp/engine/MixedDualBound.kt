@@ -200,9 +200,9 @@ private fun integralObjectiveAfterRow(
     var constant = meter.add(
         model.exactConstant(),
         meter.multiply(
-        multiplier,
-        meter.add(model.exactRhs(row), fixed.negated()),
-    )
+            multiplier,
+            meter.add(model.exactRhs(row), fixed.negated()),
+        ),
     )
     for (column in 0 until model.n) {
         var cost = costs[column]

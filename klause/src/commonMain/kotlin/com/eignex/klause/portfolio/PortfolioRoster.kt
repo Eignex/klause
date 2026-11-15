@@ -23,7 +23,7 @@ internal class SeatedArm(val config: WorkerConfig, val role: ArmRole?, val neede
         checkNotNull(role).label
     } else {
         listOfNotNull("rank", role?.label)
-        .joinToString("/")
+            .joinToString("/")
     }
 }
 

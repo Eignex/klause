@@ -75,8 +75,8 @@ class NativeLearnedMetadataTest {
 
         val observed = assertNotNull(
             sample.snapshot {
-            metadata.sharingMemory(sample, true) { it == 0 }
-        }.completeValues
+                metadata.sharingMemory(sample, true) { it == 0 }
+            }.completeValues,
         )
 
         assertEquals(metadata.primitiveBytes, observed.getValue("ownedPrimitiveBytes"))
@@ -92,14 +92,14 @@ class NativeLearnedMetadataTest {
         repeat(32) { metadata.add(9, false, it, it.toLong()) }
         val before = assertNotNull(
             sample.snapshot {
-            metadata.sharingMemory(sample, false) { false }
-        }.completeValues
+                metadata.sharingMemory(sample, false) { false }
+            }.completeValues,
         )
 
         val protected = assertNotNull(
             sample.snapshot {
-            metadata.sharingMemory(sample, true) { true }
-        }.completeValues
+                metadata.sharingMemory(sample, true) { true }
+            }.completeValues,
         )
 
         assertEquals(before.getValue("ownedPrimitiveBytes"), protected.getValue("ownedPrimitiveBytes"))

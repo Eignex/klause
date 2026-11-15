@@ -57,7 +57,7 @@ internal fun tryConvexPolynomialOptimum(
         val optimum = checker.optimum(bound) ?: continue
         val assignment = QfNraAssignment(
             BooleanArray(boolCount) {
-                arithmetic.step();
+                arithmetic.step()
                 bools[it] ?: false
             },
             optimum.point.map(algebraic::rational),
@@ -80,17 +80,17 @@ internal fun tryConvexPolynomialOptimum(
         check(source.truth(truth, atoms, arithmetic) == PolynomialFormula.TRUE)
         val originalObjective = PolynomialFormula.normalize(
             PolynomialRealFormula.Atom(
-            objective,
-            PolynomialRelation.EQ,
-            PolynomialExpression.Constant.of(BigFraction.ZERO.num),
-        ),
-            arithmetic
+                objective,
+                PolynomialRelation.EQ,
+                PolynomialExpression.Constant.of(BigFraction.ZERO.num),
+            ),
+            arithmetic,
         ).atoms.single().polynomial
         check(
             algebraic.compare(
-            algebraic.evaluate(originalObjective, coordinates),
-            algebraic.rational(bound.value),
-        ) == 0
+                algebraic.evaluate(originalObjective, coordinates),
+                algebraic.rational(bound.value),
+            ) == 0,
         )
         arithmetic.step()
         return ConvexPolynomialOptimum(formula, objective, assignment, optimum, bools)
@@ -110,11 +110,11 @@ internal fun polynomialQuadraticModel(
     val rows = affineRows(formula, dimension, bools, arithmetic) ?: return null
     val polynomial = PolynomialFormula.normalize(
         PolynomialRealFormula.Atom(
-        objective,
-        PolynomialRelation.EQ,
-        PolynomialExpression.Constant.of(BigFraction.ZERO.num),
-    ),
-        arithmetic
+            objective,
+            PolynomialRelation.EQ,
+            PolynomialExpression.Constant.of(BigFraction.ZERO.num),
+        ),
+        arithmetic,
     ).atoms.single().polynomial
     val linear = MutableList(dimension) { BigFraction.ZERO }
     val hessian = List(dimension) { MutableList(dimension) { BigFraction.ZERO } }

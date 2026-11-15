@@ -121,8 +121,8 @@ internal fun rowLatticeBounds(
             completed.add(
                 LpRowBound(
                     state, row, term.column, false, BigFraction.ofLong(lo),
-                false, true, terms, lattice = true,
-                )
+                    false, true, terms, lattice = true,
+                ),
             )
         }
         if (hi != null && hi < interval.last) {
@@ -130,8 +130,8 @@ internal fun rowLatticeBounds(
             completed.add(
                 LpRowBound(
                     state, row, term.column, true, BigFraction.ofLong(hi),
-                false, false, terms, lattice = true,
-                )
+                    false, false, terms, lattice = true,
+                ),
             )
         }
     }

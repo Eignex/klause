@@ -226,7 +226,7 @@ internal class SharedClausePool(
     private fun compact(budget: Budget) {
         budget.reserve(store.size * 2L)
         val order = IntArray(store.size) {
-            budget.step();
+            budget.step()
             it
         }
         sort(order, budget)
@@ -562,10 +562,10 @@ internal class PoolClauseExchange(
             pool.drainSince(cursor)
         } else {
             pool.drainSinceFunded(
-            cursor,
-            { session.cancelRequested },
-            { session.chargeSharingWork(1L) },
-        )
+                cursor,
+                { session.cancelRequested },
+                { session.chargeSharingWork(1L) },
+            )
         }
         if (drained == null) {
             meter?.clauseCount("drainPreparationDeclined", 1L)
@@ -594,9 +594,9 @@ internal class PoolClauseExchange(
         meter?.clauseCount("importWork", session.work - before)
         meter?.clauseMemory(
             mapOf(
-            "drainReferenceSlots" to drained.clauses.size.toLong(),
-            "drainOriginBytes" to drained.origins.size.toLong() * Int.SIZE_BYTES,
-        )
+                "drainReferenceSlots" to drained.clauses.size.toLong(),
+                "drainOriginBytes" to drained.origins.size.toLong() * Int.SIZE_BYTES,
+            ),
         )
         meter?.imported(SharingChannel.Clauses, imported, drained.cursor)
         meter?.duplicates(SharingChannel.Clauses, duplicates)
@@ -639,8 +639,8 @@ internal class PoolClauseExchange(
         }
         if (pool.measureMemory) {
             meter?.clauseMemorySample(
-            ownedMemory() + SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
-        )
+                ownedMemory() + SharingMemorySnapshot(SharingMemoryStatus.STALE, emptyMap(), 0L, 0).telemetry(),
+            )
         }
         if (sessionIdentity == null || sessionIdentity === session.sharingIdentity) {
             session.retainedSharingMemory = null
@@ -699,11 +699,11 @@ internal class PoolClauseExchange(
             0
         } else {
             pool.publish(
-            fresh,
-            origin,
-            cancelled = { session.cancelRequested },
-            charge = { session.chargeSharingWork(1L) },
-        )
+                fresh,
+                origin,
+                cancelled = { session.cancelRequested },
+                charge = { session.chargeSharingWork(1L) },
+            )
         }
         meter?.exported(SharingChannel.Clauses, published)
     }
@@ -716,14 +716,14 @@ internal class PoolClauseExchange(
                 key in seen
             } else {
                 seen.containsBounded(
-                key,
-                lookupWork,
-                cancelled = { session.cancelRequested },
-                charge = {
-                    lookupWork--;
-                    session.chargeSharingWork(1L)
-                },
-            )
+                    key,
+                    lookupWork,
+                    cancelled = { session.cancelRequested },
+                    charge = {
+                        lookupWork--
+                        session.chargeSharingWork(1L)
+                    },
+                )
             }
             if (known == true) meter?.clauseCount("exportDuplicates", 1L)
             known
@@ -734,12 +734,12 @@ internal class PoolClauseExchange(
         val alreadyShared = exportLookup(session)
         if (pool.softLimitBytes == null) {
             return session.exportGlueClausesBounded(
-            maxLbd,
-            maxLen,
-            skipPermanent,
-            alreadyShared = alreadyShared,
-            cancelled = { false },
-        )
+                maxLbd,
+                maxLen,
+                skipPermanent,
+                alreadyShared = alreadyShared,
+                cancelled = { false },
+            )
         }
         val count = session.learnedClauseCount.toLong()
         val width = maxLen.coerceAtLeast(0).toLong() + 1L

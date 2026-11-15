@@ -276,10 +276,10 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         stage = if (insertPending) Stage.Admit else afterMark
                     } else {
                         stage = if (classified) {
-                        if (insertPending) Stage.Admit else afterMark
-                    } else {
-                        Stage.Classify
-                    }
+                            if (insertPending) Stage.Admit else afterMark
+                        } else {
+                            Stage.Classify
+                        }
                     }
                     changed()
                 }
@@ -479,8 +479,8 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
             if (stage != Stage.Finalize && stage != Stage.TrimPool &&
                 stage != Stage.Retire && stage != Stage.Remove
             ) {
-                    stage = Stage.Restore
-                }
+                stage = Stage.Restore
+            }
             changed()
         }
         return advance(Int.MAX_VALUE, NativeCapConfiguration(tiered, glue, mid), budget, policy)

@@ -122,16 +122,16 @@ internal fun solveLinearSource(
     qualified.nativeObjectiveBound?.let { bound ->
         output.onAllowanceStatistics(
             listOf(
-            "nativeNominalObjectiveBound" to bound.value.toString(),
-            "nativeNominalObjectiveBoundDirection" to if (bound.sense == ObjectiveSense.MINIMIZE) {
-                "lower"
-            } else {
-                "upper"
-            },
-            "nativeNominalObjectiveBoundStrict" to bound.strict.toString(),
-            "nativeNominalObjectiveBoundScope" to "nominal-source",
-            "nativeNominalObjectiveBoundCoversTolerance" to qualified.claimsCoverTolerance.toString(),
-        )
+                "nativeNominalObjectiveBound" to bound.value.toString(),
+                "nativeNominalObjectiveBoundDirection" to if (bound.sense == ObjectiveSense.MINIMIZE) {
+                    "lower"
+                } else {
+                    "upper"
+                },
+                "nativeNominalObjectiveBoundStrict" to bound.strict.toString(),
+                "nativeNominalObjectiveBoundScope" to "nominal-source",
+                "nativeNominalObjectiveBoundCoversTolerance" to qualified.claimsCoverTolerance.toString(),
+            ),
         )
     }
     output.onAllowanceStatistics(

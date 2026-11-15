@@ -32,11 +32,12 @@ class LinearAuthorityCaptureTest {
         objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
     )
     private val source = SourceProofContext(
-        scope, setOf(x),
+        scope,
+        setOf(x),
         mapOf(
-        "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE)),
-    ),
-        mapOf(x to BigFraction.ONE)
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE)),
+        ),
+        mapOf(x to BigFraction.ONE),
     )
     private val installed = LinearAuthorityFeedbackRequest(
         point = true,
@@ -138,23 +139,23 @@ class LinearAuthorityCaptureTest {
             mapOf(
                 "strict" to SourcePremise(
                     SourceInequality(
-                mapOf(x to BigFraction.ofLong(-2)),
-                BigFraction.MINUS_ONE,
-                strict = true,
-            ),
-                mapOf(0 to true)
-                )
+                        mapOf(x to BigFraction.ofLong(-2)),
+                        BigFraction.MINUS_ONE,
+                        strict = true,
+                    ),
+                    mapOf(0 to true),
+                ),
             ),
             mapOf(x to BigFraction.ONE),
         )
         val template = assertNotNull(LinearAuthorityTemplate.prepare(guarded, ExecutionControl.Never, cuts = true))
         val query = assertNotNull(
             LinearAuthorityQuery.prepare(
-            guarded,
-            template,
-            ExecutionControl.Never,
-            cutMask = emptySet(),
-        )
+                guarded,
+                template,
+                ExecutionControl.Never,
+                cutMask = emptySet(),
+            ),
         )
         val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         capture.record(
@@ -235,37 +236,39 @@ class LinearAuthorityCaptureTest {
     fun `guarded strict records should preserve activation across sibling retraction`() {
         val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         val guarded = SourceProofContext(
-            scope, setOf(x, y),
+            scope,
+            setOf(x, y),
             mapOf(
-            "upper" to SourcePremise(
-                SourceInequality(
-                mapOf(x to BigFraction.ofLong(2)),
-                BigFraction.ofLong(3),
-                strict = true,
+                "upper" to SourcePremise(
+                    SourceInequality(
+                        mapOf(x to BigFraction.ofLong(2)),
+                        BigFraction.ofLong(3),
+                        strict = true,
+                    ),
+                    emptyMap(),
+                    mapOf(y to BigFraction.ONE),
+                ),
             ),
-                emptyMap(), mapOf(y to BigFraction.ONE)
-            ),
-        ),
-            mapOf(x to BigFraction.MINUS_ONE)
+            mapOf(x to BigFraction.MINUS_ONE),
         )
         val enabled = guarded.atScope(
             scope.copy(
                 condition = SourceCondition(
-            lower = mapOf(y to BigFraction.ONE),
-            upper = mapOf(y to BigFraction.ONE),
-        )
-            )
+                    lower = mapOf(y to BigFraction.ONE),
+                    upper = mapOf(y to BigFraction.ONE),
+                ),
+            ),
         )
         val template = assertNotNull(LinearAuthorityTemplate.prepare(guarded, ExecutionControl.Never, cuts = true))
         val capture = LinearAuthorityCapture(3, 10_000L, 1_000_000L, ExecutionControl.Never)
         for (current in listOf(enabled, guarded, enabled)) {
             val query = assertNotNull(
                 LinearAuthorityQuery.prepare(
-                current,
-                template,
-                ExecutionControl.Never,
-                cutMask = emptySet(),
-            )
+                    current,
+                    template,
+                    ExecutionControl.Never,
+                    cutMask = emptySet(),
+                ),
             )
             capture.record(
                 current,
@@ -284,11 +287,11 @@ class LinearAuthorityCaptureTest {
             SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(enabled).verify(
                 SourceEvidence(
-            enabled.scope,
-            SourceClaim.Consequence(cut.inequality),
-            cut.derivation,
-        )
-            )
+                    enabled.scope,
+                    SourceClaim.Consequence(cut.inequality),
+                    cut.derivation,
+                ),
+            ),
         )
         assertEquals(listOf(false, false, false), capture.records.map { it.cuts.single().installed })
     }
@@ -369,16 +372,17 @@ class LinearAuthorityCaptureTest {
     fun `open Boolean capture should not substitute an unknown pin`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val guarded = SourceProofContext(
-            scope, setOf(x, bool),
+            scope,
+            setOf(x, bool),
             mapOf(
-            "row" to SourcePremise(
-                SourceInequality(
-                mapOf(x to BigFraction.ONE, bool to BigFraction.ONE),
-                BigFraction.ONE,
-            )
+                "row" to SourcePremise(
+                    SourceInequality(
+                        mapOf(x to BigFraction.ONE, bool to BigFraction.ONE),
+                        BigFraction.ONE,
+                    ),
+                ),
             ),
-        ),
-            mapOf(x to BigFraction.ONE)
+            mapOf(x to BigFraction.ONE),
         )
         val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
 
@@ -455,10 +459,10 @@ class LinearAuthorityCaptureTest {
         val bounded = source.atScope(
             scope.copy(
                 condition = SourceCondition(
-            lower = mapOf(x to BigFraction.ZERO),
-            upper = mapOf(x to BigFraction.ONE),
-        )
-            )
+                    lower = mapOf(x to BigFraction.ZERO),
+                    upper = mapOf(x to BigFraction.ONE),
+                ),
+            ),
         )
         fun charged(request: LinearAuthorityFeedbackRequest, context: SourceProofContext): Long {
             val capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
@@ -480,10 +484,10 @@ class LinearAuthorityCaptureTest {
         val bounded = source.atScope(
             scope.copy(
                 condition = SourceCondition(
-            lower = mapOf(x to BigFraction.ZERO),
-            upper = mapOf(x to BigFraction.ONE),
-        )
-            )
+                    lower = mapOf(x to BigFraction.ZERO),
+                    upper = mapOf(x to BigFraction.ONE),
+                ),
+            ),
         )
         val single = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never).apply {
             record(source, null, null, null, LinearAuthorityResult())

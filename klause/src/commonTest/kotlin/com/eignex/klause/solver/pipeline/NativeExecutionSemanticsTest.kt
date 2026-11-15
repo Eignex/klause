@@ -25,23 +25,23 @@ class NativeExecutionSemanticsTest {
             "(declare-const x Real) (assert (= (* x x) 1))",
             semanticOverrides = SemanticOverrides(
                 undeclaredReals = BoundsOverride(
-                upper = BoundOverride.Value(SemanticRational.ONE),
-            )
+                    upper = BoundOverride.Value(SemanticRational.ONE),
+                ),
             ),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            source.source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                source.source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
 
         val completed = SourceSetup.execute(
             SourceExecutionRequest(
-            invocation,
-            polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true }),
-        )
+                invocation,
+                polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true }),
+            ),
         )
         val result = assertIs<SourceExecutionResult.Polynomial>(completed).result.result
 
@@ -54,22 +54,22 @@ class NativeExecutionSemanticsTest {
         val source = assertIs<NonlinearIntegerProblem>(
             (
                 SmtLib.parse(
-            "(declare-const x Int) (assert (= (* x x) 1))",
-            semanticOverrides = SemanticOverrides(
-                undeclaredIntegers = BoundsOverride(
-                upper = BoundOverride.Value(1L),
-            )
-            ),
-        )
-            ).source.originalSource
+                    "(declare-const x Int) (assert (= (* x x) 1))",
+                    semanticOverrides = SemanticOverrides(
+                        undeclaredIntegers = BoundsOverride(
+                            upper = BoundOverride.Value(1L),
+                        ),
+                    ),
+                )
+                ).source.originalSource,
         )
 
         val result = OpenTheoryPipeline.execute(
             source.pipelineRequest(),
             NonlinearIntegerTheoryParams(
-            polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true }),
-        ),
-            FiniteEngine.BACKTRACK
+                polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true }),
+            ),
+            FiniteEngine.BACKTRACK,
         ).result
 
         assertIs<OpenTheoryResult.Unknown>(result)
@@ -81,14 +81,14 @@ class NativeExecutionSemanticsTest {
         val source = assertIs<TranscendentalProblem>(
             (
                 SmtLib.parse(
-            "(declare-const x Real) (assert (= (exp 0) 1)) (assert (> x 0))",
-            semanticOverrides = SemanticOverrides(
-                undeclaredReals = BoundsOverride(
-                upper = BoundOverride.Value(SemanticRational.ONE),
-            )
-            ),
-        )
-            ).source.originalSource
+                    "(declare-const x Real) (assert (= (exp 0) 1)) (assert (> x 0))",
+                    semanticOverrides = SemanticOverrides(
+                        undeclaredReals = BoundsOverride(
+                            upper = BoundOverride.Value(SemanticRational.ONE),
+                        ),
+                    ),
+                )
+                ).source.originalSource,
         )
 
         val result = OpenTheoryPipeline.execute(

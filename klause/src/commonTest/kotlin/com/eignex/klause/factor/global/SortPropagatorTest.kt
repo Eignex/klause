@@ -35,11 +35,11 @@ class SortPropagatorTest {
     fun `sort preserves feasible tuples with the minimum signed lower bound`() {
         val problem = sortProblem(
             arrayOf(
-            IntDomain(Long.MIN_VALUE, 1),
-            IntDomain(1, 1),
-            IntDomain(Long.MIN_VALUE, 0),
-            IntDomain(0, 1),
-        )
+                IntDomain(Long.MIN_VALUE, 1),
+                IntDomain(1, 1),
+                IntDomain(Long.MIN_VALUE, 0),
+                IntDomain(0, 1),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.currentFactor = 0

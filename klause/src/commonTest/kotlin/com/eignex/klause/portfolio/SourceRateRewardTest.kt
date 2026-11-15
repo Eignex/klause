@@ -136,10 +136,11 @@ class SourceRateRewardTest {
             var stop = false
             val workers = listOf(
                 trackingWorker(
-                    "failed", 0,
+                    "failed",
+                    0,
                     ScriptedSearch({ refuted }, start = 2_000.0) {
-                    if (!refuted) error("fixture failure")
-                }
+                        if (!refuted) error("fixture failure")
+                    },
                 ).also { it.constructionNanos = 30_000_000 },
                 trackingWorker("finder", 1, ScriptedSearch({ true }, perSlice = 10) {})
                     .also { it.restartingSearch = true },
@@ -185,8 +186,8 @@ class SourceRateRewardTest {
             configured.reward(
                 PortfolioProgress(
                     1, PortfolioPhase.IMPROVEMENT, 1, 1, 0, true, false,
-                mapOf("Improvement" to 1_000_000.0), 0.0,
-                )
+                    mapOf("Improvement" to 1_000_000.0), 0.0,
+                ),
             )
             configured.recordAcceptedGain(0, 1.0)
 
@@ -326,11 +327,11 @@ class SourceRateRewardTest {
                 1.0 / 11,
                 reward.reward(
                     progress.copy(
-                arm = 0,
-                credit = mapOf("Improvement" to scale / 10),
-            )
+                        arm = 0,
+                        credit = mapOf("Improvement" to scale / 10),
+                    ),
                 ),
-                1e-12
+                1e-12,
             )
         }
     }
@@ -349,11 +350,11 @@ class SourceRateRewardTest {
                 10.0 / 11,
                 reward.reward(
                     progress.copy(
-                arm = 0,
-                credit = mapOf("Improvement" to 1e308),
-            )
+                        arm = 0,
+                        credit = mapOf("Improvement" to 1e308),
+                    ),
                 ),
-                1e-12
+                1e-12,
             )
             if (priceFamilies) assertEquals(10.0 / 11, assertNotNull(reward.familyReward), 1e-12)
         }

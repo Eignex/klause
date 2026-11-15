@@ -27,11 +27,11 @@ class ExtensionalCycleProjectionTest {
         val source = Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 1))
         val projection = assertNotNull(
             ExtensionalCycleProjection.project(
-            source,
-            listOf(0, 1),
-            arrayOf(null, null),
-            { true },
-        )
+                source,
+                listOf(0, 1),
+                arrayOf(null, null),
+                { true },
+            ),
         )
         var remaining = 2
 

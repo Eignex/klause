@@ -37,7 +37,7 @@ internal class PolynomialWitnessSupports(
             point[variable] = value
         }
         val owners = IntArray(realCount) {
-            arithmetic.step();
+            arithmetic.step()
             -1
         }
         val supports = ArrayList<Support>()
@@ -45,7 +45,7 @@ internal class PolynomialWitnessSupports(
             arithmetic.step()
             if (row.atom.relation != PolynomialRelation.EQ) continue
             val variables = row.variables.filter {
-                arithmetic.step();
+                arithmetic.step()
                 it !in fixed
             }
             if (variables.isEmpty()) continue
@@ -58,7 +58,7 @@ internal class PolynomialWitnessSupports(
         }
         if (supports.size < 2) return null
         val closing = List(supports.size) {
-            arithmetic.step();
+            arithmetic.step()
             ArrayList<Row>()
         }
         for (row in rows) {

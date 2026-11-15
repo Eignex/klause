@@ -132,13 +132,13 @@ internal class BacktrackRepair(val label: String = "standard", val maxDecisions:
             record?.invoke(it.stats.search.nodes.sum.toLong() - before, 0L)
             context.recordRepairResult?.invoke(
                 step.sample?.let { sample ->
-                MinimizeResult.BestFound(
-                    sample,
-                    context.objective.evaluate(sample),
-                    checkNotNull(step.reason),
-                    it.stats,
-                )
-            } ?: MinimizeResult.Unknown(checkNotNull(step.reason), it.stats)
+                    MinimizeResult.BestFound(
+                        sample,
+                        context.objective.evaluate(sample),
+                        checkNotNull(step.reason),
+                        it.stats,
+                    )
+                } ?: MinimizeResult.Unknown(checkNotNull(step.reason), it.stats),
             )
             return step.sample
         }

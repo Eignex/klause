@@ -74,9 +74,9 @@ internal fun Compiler.Builder.hasOpenProductOperand(): Boolean {
         when (node) {
             is SExpr.Atom -> operands.addLast(
                 ProductOperand(
-                constant = node.text.firstOrNull()?.isDigit() == true,
-                open = intNames[node.text]?.let { intDomains[it] is PresolveDomain.Open } == true,
-            )
+                    constant = node.text.firstOrNull()?.isDigit() == true,
+                    open = intNames[node.text]?.let { intDomains[it] is PresolveDomain.Open } == true,
+                ),
             )
 
             is SExpr.SList -> {
@@ -96,9 +96,9 @@ internal fun Compiler.Builder.hasOpenProductOperand(): Boolean {
                 if (nonlinear && open) return true
                 operands.addLast(
                     ProductOperand(
-                    constant = head in setOf("+", "-", "*", "/", "^") && children.all { it.constant },
-                    open = open,
-                )
+                        constant = head in setOf("+", "-", "*", "/", "^") && children.all { it.constant },
+                        open = open,
+                    ),
                 )
             }
         }

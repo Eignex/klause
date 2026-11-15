@@ -35,21 +35,23 @@ class FactorAttributionTest {
     @Test
     fun `ordinary table conflicts carry family attribution into consumed learning`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 1) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             arrayOf(
-            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
-            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+            ),
         ).bake()
         for (refinement in listOf(false, true)) {
             val result = BacktrackSolver(problem).solve(
                 BacktrackParams(
-                randomSeed = 1L,
-                maxDecisions = 8L,
-                lpConfig = LpConfig.OFF,
-                propagationAttribution = true,
-                historicalTableReasons = refinement,
-            )
+                    randomSeed = 1L,
+                    maxDecisions = 8L,
+                    lpConfig = LpConfig.OFF,
+                    propagationAttribution = true,
+                    historicalTableReasons = refinement,
+                ),
             )
 
             assertIs<SolveResult.Unsat>(result)
@@ -98,12 +100,14 @@ class FactorAttributionTest {
     fun `attribution preserves native and general first uip learning`() {
         for (nativeSat in listOf(false, true)) {
             val problem = Problem(
-                3, 0, emptyArray(),
+                3,
+                0,
+                emptyArray(),
                 arrayOf(
-                Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(3, 4)),
-                Clause(intArrayOf(1, 3, 5)),
-            )
+                    Clause(intArrayOf(1, 2)),
+                    Clause(intArrayOf(3, 4)),
+                    Clause(intArrayOf(1, 3, 5)),
+                ),
             )
             val session = PropagationSession(PropagationProblem(problem), nativeSat = nativeSat, attribution = true)
 

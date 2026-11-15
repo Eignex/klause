@@ -542,10 +542,10 @@ internal class LocalSearchEngine(
             .filterNotNull().map { it.withSourceSemantics(problem.semantics) }.asSearchStream(
                 release = {
                     try {
-                    if (!finished) sink.stop()
-                } finally {
-                    ownership.release()
-                }
+                        if (!finished) sink.stop()
+                    } finally {
+                        ownership.release()
+                    }
                 },
                 terminal = { finished },
             )
@@ -1198,8 +1198,8 @@ internal class LocalSearchEngine(
                         if (!state.boardCoverage.requested ||
                             (
                                 !state.boardCoverage.pending && feasibleStrategy.gradesAllBoardImprovements &&
-                                moveEvaluation == null && state.booleanRepairs == null
-                            )
+                                    moveEvaluation == null && state.booleanRepairs == null
+                                )
                         ) {
                             restarts.onLocalOptimum(state, state.assignment.snapshot(), obj)
                             traceEnd(RepairEndpoint.PolicyLocalOptimum, state)
@@ -1391,8 +1391,8 @@ internal class LocalSearchEngine(
         val compatible = if (real is Completion.Witness &&
             (
                 real.sample.numBoolVars != candidate.numBoolVars || real.sample.numIntVars != candidate.numIntVars ||
-                (problem.numRealVars > 0 && real.sample.numRealVars != candidate.numRealVars) ||
-                candidate.hammingDistanceTo(real.sample) != 0
+                    (problem.numRealVars > 0 && real.sample.numRealVars != candidate.numRealVars) ||
+                    candidate.hammingDistanceTo(real.sample) != 0
                 )
         ) {
             Completion.Undecided(real.work)
@@ -1631,8 +1631,8 @@ internal fun localSearchSupports(model: LocalSearchModel, completes: Boolean = f
             capabilities.scoring == com.eignex.klause.solver.ScoringCapability.UNSUPPORTED ||
                 (
                     capabilities.assignmentCheck == AssignmentCheckCapability.UNSUPPORTED &&
-                    problem.factors[id].variables.reals.isNotEmpty()
-                )
+                        problem.factors[id].variables.reals.isNotEmpty()
+                    )
         }
     ) {
         return false

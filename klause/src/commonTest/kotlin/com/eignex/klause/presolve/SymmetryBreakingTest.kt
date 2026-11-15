@@ -140,8 +140,8 @@ class SymmetryBreakingTest {
         assertTrue(delta.addedFactors.any { it is Clause })
         assertTrue(
             delta.addedFactors.all { factor ->
-            factor.intVars.all { it == 1 || it == 3 } && factor.boolVars.all { it == 1 || it == 3 }
-        }
+                factor.intVars.all { it == 1 || it == 3 } && factor.boolVars.all { it == 1 || it == 3 }
+            },
         )
     }
 
@@ -205,7 +205,7 @@ class SymmetryBreakingTest {
         val point = longArrayOf(0, 1, 2, 3, 2, 3, 0, 1, 1, 2, 3, 0, 3, 0, 1, 2)
         val image = LongArray(16) { point[transpose[it]] }
         val singlePair = point.copyOf().apply {
-            this[1] = point[4];
+            this[1] = point[4]
             this[4] = point[1]
         }
         assertFalse(isFeasible(problem, BooleanArray(0), singlePair))
@@ -264,9 +264,9 @@ class SymmetryBreakingTest {
         assertFalse(PresolveConfig.parse("default,+objective-symmetry").forLocalSearch().resolved(pass, exact))
         assertFalse(
             PresolveConfig.parse("off,+objective-symmetry").resolved(
-            pass,
-            exact.copy(solutionSetSensitive = true),
-        )
+                pass,
+                exact.copy(solutionSetSensitive = true),
+            ),
         )
     }
 

@@ -112,13 +112,13 @@ internal fun PropagationState.prepareMark(): Iterator<PropagationState.LevelMark
     }
     yield(
         PropagationState.LevelMark(
-        undoSize = undo.size,
-        ltdvSize = levelToDecisionVar.size,
-        pinOrderSize = boolPinOrder.size,
-        snapshottablePayloads = payloads ?: emptyPayloads,
-        revSize = undo.revTrail.size,
-        atomUndoSize = atoms.undoAtomId.size,
-    )
+            undoSize = undo.size,
+            ltdvSize = levelToDecisionVar.size,
+            pinOrderSize = boolPinOrder.size,
+            snapshottablePayloads = payloads ?: emptyPayloads,
+            revSize = undo.revTrail.size,
+            atomUndoSize = atoms.undoAtomId.size,
+        ),
     )
 }.iterator()
 

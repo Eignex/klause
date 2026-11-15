@@ -82,12 +82,12 @@ internal class LeafRealCompletion(
             toleranceCheck
         } else {
             FiniteSourceAcceptance(
-            { sample ->
-                observeFloat?.invoke(sample)
-                toleranceCheck?.invoke(sample) == true
-            },
-            toleranceCheck.permitsToleranceOptimum(),
-        )
+                { sample ->
+                    observeFloat?.invoke(sample)
+                    toleranceCheck?.invoke(sample) == true
+                },
+                toleranceCheck.permitsToleranceOptimum(),
+            )
         }
         val real = leafRealFeasibility(
             problem, objective, candidate, cancellation, sink = sink,

@@ -641,8 +641,8 @@ internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): Str
 
         is SearchEvent.WorkerAdmission ->
             "admission ${e.recipe} admitted=${e.admitted} " +
-            "selected=${e.selected}${e.role?.let { role -> " role=$role" }.orEmpty()} " +
-            "${e.requirements} declines=${e.declines}"
+                "selected=${e.selected}${e.role?.let { role -> " role=$role" }.orEmpty()} " +
+                "${e.requirements} declines=${e.declines}"
 
         is SearchEvent.PortfolioDiagnostic -> "portfolio ${e.event}"
 

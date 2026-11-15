@@ -32,11 +32,13 @@ class LpHarvestTest {
     @Test
     fun `a no op harvest should retain finite templates for the engine bake`() {
         val source = Problem(
-            0, 4, Array(4) { IntDomain(0, 10) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 10) },
             arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
+            ),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
         val selection = FactorProjectionProviders.Default.prepare(source)
@@ -58,11 +60,13 @@ class LpHarvestTest {
     @Test
     fun `a consuming LP should reuse templates across incremental presolve preparation`() {
         val source = Problem(
-            0, 4, Array(4) { IntDomain(0, 10) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 10) },
             arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
+            ),
         )
         val problem = source.bake(FactorProjectionProviders.Default.prepare(source))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
@@ -72,12 +76,12 @@ class LpHarvestTest {
         session.apply(
             PresolveDelta(
                 domains = arrayOf(
-            IntDomain(1, 10),
-            IntDomain(0, 10),
-            IntDomain(0, 10),
-            IntDomain(0, 10),
-        )
-            )
+                    IntDomain(1, 10),
+                    IntDomain(0, 10),
+                    IntDomain(0, 10),
+                    IntDomain(0, 10),
+                ),
+            ),
         )
         val prepared = session.materialize()
         val second = lpHarvestReporting(prepared, objective, plan)
@@ -90,19 +94,19 @@ class LpHarvestTest {
         assertTrue(pruned)
         assertTrue(
             second.stats.phases.filterKeys { it.startsWith("TEMPLATE_PREPARATION_") }.values
-            .sumOf { it.outcomes["FACTORS_REUSED"] ?: 0L } > 0L
+                .sumOf { it.outcomes["FACTORS_REUSED"] ?: 0L } > 0L,
         )
         assertTrue(
             sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_PREPARATION_") }.values
-            .sumOf { it.outcomes["FACTORS_REUSED"] ?: 0L } > 0L
+                .sumOf { it.outcomes["FACTORS_REUSED"] ?: 0L } > 0L,
         )
         assertTrue(
             sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
-            .sumOf { it.outcomes["ROWS"] ?: 0L } > 0L
+                .sumOf { it.outcomes["ROWS"] ?: 0L } > 0L,
         )
         assertTrue(
             sink.snapshot().lp.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
-            .sumOf { it.outcomes["EXACT_BOUND_OBJECTS"] ?: 0L } > 0L
+                .sumOf { it.outcomes["EXACT_BOUND_OBJECTS"] ?: 0L } > 0L,
         )
     }
 

@@ -167,8 +167,8 @@ class OpenTheoryMinimizer internal constructor(
         val planning = source.boundedForPlanning()
         (
             projections?.forEngineView(planning)?.let { planning.componentPlan(it) }
-            ?: planning.componentPlan()
-        ).theoryPipeline
+                ?: planning.componentPlan()
+            ).theoryPipeline
     }
 
     private val route: ProblemPipeline by lazy {

@@ -48,18 +48,22 @@ class BuiltInEncoderProviderTest {
             intArrayOf(0, 1),
         )) {
             val source = Problem(
-                3, 0, emptyArray(),
+                3,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.GE,
-                    BigFraction.ZERO,
-                    activator = 0,
+                    ExactLinear.of(
+                        intArrayOf(Term.ofRealVar(0)),
+                        listOf(BigFraction.ONE),
+                        LinearOp.GE,
+                        BigFraction.ZERO,
+                        activator = 0,
+                    ),
+                    Clause(literals),
                 ),
-                Clause(literals),
-            ),
-                numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0)
+                numRealVars = 1,
+                realLower = doubleArrayOf(-1.0),
+                realUpper = doubleArrayOf(1.0),
             )
             val model = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
             for (mask in 0 until 8) {
@@ -81,18 +85,22 @@ class BuiltInEncoderProviderTest {
     @Test
     fun `polynomial clauses retain Boolean source ownership without numeric auxiliaries`() {
         val source = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf<Factor>(
-            ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0)),
-                listOf(BigFraction.ONE),
-                LinearOp.GE,
-                BigFraction.ZERO,
-                activator = 0,
+                ExactLinear.of(
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE),
+                    LinearOp.GE,
+                    BigFraction.ZERO,
+                    activator = 0,
+                ),
+                Clause(intArrayOf(0, 3, 4)),
             ),
-            Clause(intArrayOf(0, 3, 4)),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0)
+            numRealVars = 1,
+            realLower = doubleArrayOf(-1.0),
+            realUpper = doubleArrayOf(1.0),
         )
 
         val model = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)

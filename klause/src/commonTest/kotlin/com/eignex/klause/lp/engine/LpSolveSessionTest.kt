@@ -70,9 +70,9 @@ class LpSolveSessionTest {
         val model = assertNotNull(
             LpExactState(
                 assertNotNull(
-            builder.build(Sense.MINIMIZE).authoritativeModel(),
-        )
-            ).ownerWorkingModel()
+                    builder.build(Sense.MINIMIZE).authoritativeModel(),
+                ),
+            ).ownerWorkingModel(),
         )
         var observations = 0
         val context = LpSolveContext(onQuery = { observations++ })
@@ -102,9 +102,9 @@ class LpSolveSessionTest {
         val model = assertNotNull(
             LpExactState(
                 assertNotNull(
-            builder.build(Sense.MINIMIZE).authoritativeModel(),
-        )
-            ).ownerWorkingModel()
+                    builder.build(Sense.MINIMIZE).authoritativeModel(),
+                ),
+            ).ownerWorkingModel(),
         )
         val primary = IllegalArgumentException("capture stopped")
         val factory = RecordingLpEngineFactory()

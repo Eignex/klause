@@ -453,15 +453,15 @@ internal fun portfolioStatPairs(stats: SolveStats): List<Pair<String, String>> {
         emptyList()
     } else {
         listOf(
-        "alnsBootstrapCpNodes" to "${alns.bootstrapCpNodes}",
-        "alnsBootstrapLsMoves" to "${alns.bootstrapLsMoves}",
-        "alnsRepairCpNodes" to "${alns.repairCpNodes}",
-        "alnsRepairLsMoves" to "${alns.repairLsMoves}",
-        "alnsOuterAllowance" to "${alns.outerAllowance}",
-        "alnsBootstrapCpMillis" to "${alns.bootstrapCpMillis}",
-        "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
-        "alnsRepairMillis" to "${alns.repairMillis}",
-    )
+            "alnsBootstrapCpNodes" to "${alns.bootstrapCpNodes}",
+            "alnsBootstrapLsMoves" to "${alns.bootstrapLsMoves}",
+            "alnsRepairCpNodes" to "${alns.repairCpNodes}",
+            "alnsRepairLsMoves" to "${alns.repairLsMoves}",
+            "alnsOuterAllowance" to "${alns.outerAllowance}",
+            "alnsBootstrapCpMillis" to "${alns.bootstrapCpMillis}",
+            "alnsBootstrapLsMillis" to "${alns.bootstrapLsMillis}",
+            "alnsRepairMillis" to "${alns.repairMillis}",
+        )
     }
     return listOfNotNull(profile, reseeding) + slices + proofs + starts + schedule + phases + lifecycle +
         failures + inner

@@ -41,10 +41,10 @@ class FiniteNumericalRemovalTest {
     private val center = Sample(booleanArrayOf(), longArrayOf(1, 0, 0, 0))
     private val source = requireNotNull(
         problem.linearAuthorityContext(
-        objective,
-        ObjectiveSense.MINIMIZE,
-        ExecutionControl.Never,
-    )
+            objective,
+            ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never,
+        ),
     )
 
     @Test
@@ -152,10 +152,10 @@ class FiniteNumericalRemovalTest {
         ).bake()
         val original = requireNotNull(
             model.linearAuthorityContext(
-            objective,
-            ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never,
-        )
+                objective,
+                ObjectiveSense.MINIMIZE,
+                ExecutionControl.Never,
+            ),
         )
         val incumbent = Sample(booleanArrayOf(false), longArrayOf(1, 0, 0, 0))
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
@@ -200,7 +200,7 @@ class FiniteNumericalRemovalTest {
         assertEquals(
             removal.request,
             assertIs<SourceNumericalFeedbackResult.Available>(acquisition.feedback)
-            .query.projection
+                .query.projection,
         )
         assertEquals(FiniteNumericalRemoval.Status.Supported, removal.status)
         assertEquals(setOf(0, 3), freed.ints.toSet())
@@ -267,10 +267,10 @@ class FiniteNumericalRemovalTest {
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val original = requireNotNull(
             problem.linearAuthorityContext(
-            objective.negated(),
-            ObjectiveSense.MAXIMIZE,
-            ExecutionControl.Never,
-        )
+                objective.negated(),
+                ObjectiveSense.MAXIMIZE,
+                ExecutionControl.Never,
+            ),
         )
         val pins = Assumptions.None.withInt(3, 0)
         val pinned = original.atScope(original.scope.copy(condition = pins.sourceCondition()))
@@ -363,11 +363,12 @@ class FiniteNumericalRemovalTest {
         val network = InvariantNetwork(
             listOf(
                 DefinitionalSweep.SweepNode.IntDef(
-            FunctionalObjective.Lin(3, 1, longArrayOf(1), arrayOf(FunctionalObjective.Operand.v(0)), 1),
-            intArrayOf(0),
-        )
+                    FunctionalObjective.Lin(3, 1, longArrayOf(1), arrayOf(FunctionalObjective.Operand.v(0)), 1),
+                    intArrayOf(0),
+                ),
             ),
-            4, 0
+            4,
+            0,
         )
         val removal = FiniteNumericalRemoval(
             problem,
@@ -397,10 +398,10 @@ class FiniteNumericalRemovalTest {
         val pins = Assumptions.None.withInt(2, 1)
         val original = requireNotNull(
             model.linearAuthorityContext(
-            objective,
-            ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never,
-        )
+                objective,
+                ObjectiveSense.MINIMIZE,
+                ExecutionControl.Never,
+            ),
         ).let { it.atScope(it.scope.copy(condition = pins.sourceCondition())) }
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val publisher = SourceNumericalFeedback(funding, ExecutionControl.Never)
@@ -411,14 +412,15 @@ class FiniteNumericalRemovalTest {
             listOf(
                 DefinitionalSweep.SweepNode.IntDef(
                     FunctionalObjective.Plus(
-            2,
-            FunctionalObjective.Operand.v(0),
-            FunctionalObjective.Operand.v(1),
-        ),
-            intArrayOf(0, 1)
-                )
+                        2,
+                        FunctionalObjective.Operand.v(0),
+                        FunctionalObjective.Operand.v(1),
+                    ),
+                    intArrayOf(0, 1),
+                ),
             ),
-            4, 0
+            4,
+            0,
         )
         val removal = FiniteNumericalRemoval(
             model,

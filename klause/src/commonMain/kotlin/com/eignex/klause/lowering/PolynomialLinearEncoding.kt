@@ -37,12 +37,12 @@ internal fun polynomialRow(
 
             is RealConstants -> requireNotNull(
                 BigFraction.ofDouble(
-                if (index < constants.intCoefficients.size) {
-                    constants.intCoefficients.at(index)
-                } else {
-                    constants.realCoefficients.at(index - constants.intCoefficients.size)
-                },
-            )
+                    if (index < constants.intCoefficients.size) {
+                        constants.intCoefficients.at(index)
+                    } else {
+                        constants.realCoefficients.at(index - constants.intCoefficients.size)
+                    },
+                ),
             )
         }
         if (coefficient == BigFraction.ONE) {
@@ -67,9 +67,9 @@ internal fun polynomialRow(
         atom
     } else {
         PolynomialRealLowering.equivalent(
-        PolynomialRealFormula.BooleanVariable(SourceBoolId(row.activator)),
-        atom,
-    )
+            PolynomialRealFormula.BooleanVariable(SourceBoolId(row.activator)),
+            atom,
+        )
     }
 }
 

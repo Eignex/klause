@@ -46,11 +46,11 @@ internal class PolynomialExactNeighborhood(
         return when (
             val result = invocation.check(
                 PolynomialCondition(
-            (0 until model.source.numBoolVars).associateWith(fixed::boolValue),
-            remap(condition.lower),
-            remap(condition.upper),
-        ),
-            cancellation
+                    (0 until model.source.numBoolVars).associateWith(fixed::boolValue),
+                    remap(condition.lower),
+                    remap(condition.upper),
+                ),
+                cancellation,
             )
         ) {
             is QfNraResult.Satisfiable -> {

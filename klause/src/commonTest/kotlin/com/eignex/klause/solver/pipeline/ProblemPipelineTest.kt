@@ -42,10 +42,10 @@ class ProblemPipelineTest {
         )
         val expected = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.MIXED,
+            ),
         )
 
         for (real in listOf(false, true)) {
@@ -92,11 +92,11 @@ class ProblemPipelineTest {
             for (linear in listOf(false, true)) {
                 val selected = assertIs<SourceProblemRoute.OpenTheory>(
                     source.pipelineRoute(
-                    objective,
-                    maximize = true,
-                    routePureRealToTheory = real,
-                    routeLinearToTheory = linear,
-                )
+                        objective,
+                        maximize = true,
+                        routePureRealToTheory = real,
+                        routeLinearToTheory = linear,
+                    ),
                 )
 
                 assertEquals(ProblemPipeline.EXACT_LIRA, selected.request.route)
@@ -119,10 +119,10 @@ class ProblemPipelineTest {
 
         val selected = assertIs<SourceProblemRoute.Finite>(
             source.pipelineRoute(
-            objective,
-            routePureRealToTheory = true,
-            routeLinearToTheory = true,
-        )
+                objective,
+                routePureRealToTheory = true,
+                routeLinearToTheory = true,
+            ),
         )
 
         assertSame(source, selected.preparedPlan.originalSource)
@@ -236,7 +236,7 @@ class ProblemPipelineTest {
     @Test
     fun `optional bound work exhaustion should retain complete linear admission`() {
         val open = Bits(2).also {
-            it.set(0);
+            it.set(0)
             it.set(1)
         }
         val model = Problem(
@@ -249,9 +249,9 @@ class ProblemPipelineTest {
 
         val route = assertIs<SourceProblemRoute.OpenTheory>(
             model.pipelineRoute(
-            boundCancellation = optional,
-            preparationCancellation = ExecutionControl.Never,
-        )
+                boundCancellation = optional,
+                preparationCancellation = ExecutionControl.Never,
+            ),
         )
 
         assertTrue(optional())
@@ -265,7 +265,7 @@ class ProblemPipelineTest {
     @Test
     fun `containing cancellation after optional work should decline complete admission`() {
         val open = Bits(2).also {
-            it.set(0);
+            it.set(0)
             it.set(1)
         }
         val model = Problem(
@@ -278,9 +278,9 @@ class ProblemPipelineTest {
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(
             model.pipelineRoute(
-            boundCancellation = budget.orSpent(containing),
-            preparationCancellation = containing,
-        )
+                boundCancellation = budget.orSpent(containing),
+                preparationCancellation = containing,
+            ),
         )
 
         assertTrue(containing())
@@ -295,9 +295,9 @@ class ProblemPipelineTest {
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(
             model.pipelineRoute(
-            boundCancellation = budget.orSpent(ExecutionControl.Never),
-            preparationCancellation = ExecutionControl.Never,
-        )
+                boundCancellation = budget.orSpent(ExecutionControl.Never),
+                preparationCancellation = ExecutionControl.Never,
+            ),
         )
 
         assertEquals(1, assertNotNull(route.unplaceable).column)
@@ -319,10 +319,10 @@ class ProblemPipelineTest {
 
         val route = assertIs<SourceProblemRoute.Finite>(
             model.pipelineRoute(
-            boundCancellation = optional,
-            preparationCancellation = ExecutionControl.Never,
-            onLpStats = { budget.charge(budget.remaining()) },
-        )
+                boundCancellation = optional,
+                preparationCancellation = ExecutionControl.Never,
+                onLpStats = { budget.charge(budget.remaining()) },
+            ),
         )
 
         assertTrue(optional())
@@ -333,7 +333,7 @@ class ProblemPipelineTest {
     @Test
     fun `optional stop should retain proved partial bounds for complete admission`() {
         val open = Bits(3).also {
-            it.set(1);
+            it.set(1)
             it.set(2)
         }
         val model = Problem(
@@ -349,10 +349,10 @@ class ProblemPipelineTest {
 
         val route = assertIs<SourceProblemRoute.OpenTheory>(
             model.pipelineRoute(
-            boundCancellation = optional,
-            preparationCancellation = ExecutionControl.Never,
-            onLpStats = { budget.charge(budget.remaining()) },
-        )
+                boundCancellation = optional,
+                preparationCancellation = ExecutionControl.Never,
+                onLpStats = { budget.charge(budget.remaining()) },
+            ),
         )
 
         assertTrue(optional())

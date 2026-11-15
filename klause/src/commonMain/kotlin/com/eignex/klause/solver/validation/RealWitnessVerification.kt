@@ -241,7 +241,7 @@ private fun rationalPowerEquals(
 
         value == BigFraction.MINUS_ONE ->
             expected ==
-            if (exponent and 1 == 0) BigFraction.ONE else BigFraction.MINUS_ONE
+                if (exponent and 1 == 0) BigFraction.ONE else BigFraction.MINUS_ONE
 
         expected.isZero || (expected.signum() < 0) != (value.signum() < 0 && exponent and 1 != 0) -> false
 

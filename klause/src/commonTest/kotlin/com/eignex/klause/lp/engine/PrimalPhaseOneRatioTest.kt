@@ -94,9 +94,9 @@ class PrimalPhaseOneRatioTest {
         val step = assertNotNull(
             PrimalPhaseOneRatio(2).choose(
                 model,
-            LpScalingView.create(model, LpScalingOptions(enabled = false)), intArrayOf(1, 2),
-            doubleArrayOf(-1.0, -3.0), doubleArrayOf(-1.0, -1.0), 1.0, 2.0, 1e-7, LpWork(),
-            )
+                LpScalingView.create(model, LpScalingOptions(enabled = false)), intArrayOf(1, 2),
+                doubleArrayOf(-1.0, -3.0), doubleArrayOf(-1.0, -1.0), 1.0, 2.0, 1e-7, LpWork(),
+            ),
         )
 
         assertEquals(2.0, step.length)

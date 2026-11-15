@@ -113,12 +113,12 @@ fun parseFlatZincExecution(
     val maximize = original.solve is SolveDirective.Maximize
     val invocation = program.prepareFiniteCompatibility(
         SourceSetupRequest(
-        program.sourceAttachment(),
-        if (normalized == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
-        FiniteEngine.LOCAL_SEARCH,
-        if (maximize) normalized?.negated() else normalized,
-        maximize,
-    )
+            program.sourceAttachment(),
+            if (normalized == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE,
+            FiniteEngine.LOCAL_SEARCH,
+            if (maximize) normalized?.negated() else normalized,
+            maximize,
+        ),
     )
     val selected = program.retainedSource?.executionProgram(invocation) ?: original
     val finite = invocation.engineRoute as? SourceProblemRoute.Finite

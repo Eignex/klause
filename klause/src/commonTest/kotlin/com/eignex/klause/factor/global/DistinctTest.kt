@@ -29,28 +29,28 @@ class DistinctTest {
         val first = Distinct(
             listOf(
                 Distinct.Operand(
-            intArrayOf(
-                Term.ofIntVar(0),
-                Term.ofLit(Lit.make(0, true)),
-                Term.ofRealVar(0),
+                    intArrayOf(
+                        Term.ofIntVar(0),
+                        Term.ofLit(Lit.make(0, true)),
+                        Term.ofRealVar(0),
+                    ),
+                    listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ONE),
+                ),
             ),
-            listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ONE),
-        )
-            ),
-            activator = 1
+            activator = 1,
         )
         val second = Distinct(
             listOf(
                 Distinct.Operand(
-            intArrayOf(
-                Term.ofIntVar(1),
-                Term.ofLit(Lit.make(1, true)),
-                Term.ofRealVar(1),
+                    intArrayOf(
+                        Term.ofIntVar(1),
+                        Term.ofLit(Lit.make(1, true)),
+                        Term.ofRealVar(1),
+                    ),
+                    listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ONE),
+                ),
             ),
-            listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.ONE),
-        )
-            ),
-            activator = 0
+            activator = 0,
         )
 
         val firstHash = first.remapStructuralHash(VarRemap(intArrayOf(-1, 2), intArrayOf(-1, 3), intArrayOf(-1, 3)))
@@ -65,10 +65,10 @@ class DistinctTest {
         val source = Distinct(
             listOf(
                 Distinct.Operand(
-            intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
-            listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
-        )
-            )
+                    intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+                    listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                ),
+            ),
         )
         val mapping = VarRemap(intArrayOf(), intArrayOf(0, 0))
 
@@ -83,9 +83,9 @@ class DistinctTest {
         val third = BigFraction.of(BIG_ONE, bigIntOf(3))
         val relation = Distinct(
             listOf(
-            Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(coefficient), third),
-            Distinct.Operand(intArrayOf(Term.ofIntVar(1)), listOf(coefficient), third),
-        )
+                Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(coefficient), third),
+                Distinct.Operand(intArrayOf(Term.ofIntVar(1)), listOf(coefficient), third),
+            ),
         )
         val source = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(relation))
 
@@ -98,10 +98,10 @@ class DistinctTest {
     fun `reified finite distinct should preserve both truth directions`() {
         val relation = Distinct(
             listOf(
-            Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
-            Distinct.Operand(intArrayOf(Term.ofIntVar(1)), listOf(BigFraction.ONE)),
-        ),
-            activator = 0
+                Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
+                Distinct.Operand(intArrayOf(Term.ofIntVar(1)), listOf(BigFraction.ONE)),
+            ),
+            activator = 0,
         )
         val source = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1)), arrayOf(relation))
 
@@ -111,12 +111,12 @@ class DistinctTest {
 
         assertEquals(
             setOf(
-            Triple(0L, 0L, false),
-            Triple(0L, 1L, true),
-            Triple(1L, 0L, true),
-            Triple(1L, 1L, false),
-        ),
-            points
+                Triple(0L, 0L, false),
+                Triple(0L, 1L, true),
+                Triple(1L, 0L, true),
+                Triple(1L, 1L, false),
+            ),
+            points,
         )
     }
 
@@ -124,9 +124,9 @@ class DistinctTest {
     fun `complemented Boolean operands should retain their original truth values`() {
         val relation = Distinct(
             listOf(
-            Distinct.Operand(intArrayOf(Term.ofLit(Lit.make(0, true))), listOf(BigFraction.ONE)),
-            Distinct.Operand(intArrayOf(Term.ofLit(Lit.make(1, false))), listOf(BigFraction.ONE)),
-        )
+                Distinct.Operand(intArrayOf(Term.ofLit(Lit.make(0, true))), listOf(BigFraction.ONE)),
+                Distinct.Operand(intArrayOf(Term.ofLit(Lit.make(1, false))), listOf(BigFraction.ONE)),
+            ),
         )
         val source = Problem(2, 0, emptyArray(), arrayOf(relation))
 
@@ -157,9 +157,9 @@ class DistinctTest {
     fun `remapping distinct operands onto one coordinate should retain the collision`() {
         val relation = Distinct(
             listOf(
-            Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
-            Distinct.Operand(intArrayOf(Term.ofIntVar(1)), listOf(BigFraction.ONE)),
-        )
+                Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
+                Distinct.Operand(intArrayOf(Term.ofIntVar(1)), listOf(BigFraction.ONE)),
+            ),
         )
         val image = relation.remap(VarRemap(intArrayOf(), intArrayOf(0, 0)))
         val source = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(image))
@@ -174,8 +174,8 @@ class DistinctTest {
         val coefficient = BigFraction.of(parseBigInt("100000000000000000001"), BIG_ONE)
         val relation = Distinct(
             (0..2).map {
-            Distinct.Operand(intArrayOf(Term.ofIntVar(it)), listOf(coefficient))
-        }
+                Distinct.Operand(intArrayOf(Term.ofIntVar(it)), listOf(coefficient))
+            },
         )
         val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf(relation))
         val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
@@ -197,9 +197,9 @@ class DistinctTest {
         val coefficient = parseBigInt("100000000000000000000000000000000000000000000000001")
         val relation = Distinct(
             listOf(
-            Distinct.Operand(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.of(coefficient, BIG_ONE))),
-            Distinct.Operand(intArrayOf(), emptyList(), BigFraction.ONE),
-        )
+                Distinct.Operand(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.of(coefficient, BIG_ONE))),
+                Distinct.Operand(intArrayOf(), emptyList(), BigFraction.ONE),
+            ),
         )
         val source = Problem(
             0,
@@ -228,9 +228,9 @@ class DistinctTest {
         val coefficient = parseBigInt("100000000000000000000000000000000000000000000000001")
         val relation = Distinct(
             listOf(
-            Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
-            Distinct.Operand(intArrayOf(), emptyList(), BigFraction.of(coefficient, BIG_ONE)),
-        )
+                Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
+                Distinct.Operand(intArrayOf(), emptyList(), BigFraction.of(coefficient, BIG_ONE)),
+            ),
         )
         val source = Problem(
             0,
@@ -251,9 +251,9 @@ class DistinctTest {
     fun `original distinct checking should reject missing Boolean coordinates`() {
         val relation = Distinct(
             listOf(
-            Distinct.Operand(intArrayOf(Term.ofLit(Lit.make(0, true))), listOf(BigFraction.ONE)),
-            Distinct.Operand(intArrayOf(), emptyList(), BigFraction.ONE),
-        )
+                Distinct.Operand(intArrayOf(Term.ofLit(Lit.make(0, true))), listOf(BigFraction.ONE)),
+                Distinct.Operand(intArrayOf(), emptyList(), BigFraction.ONE),
+            ),
         )
         val source = Problem(1, 0, emptyArray(), arrayOf(relation))
         val point = Sample(booleanArrayOf(), longArrayOf())

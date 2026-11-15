@@ -89,14 +89,16 @@ internal class LinearActiveRows(
             val consequences = if (composeBranches) {
                 val funded = ExecutionControl { cancellation() || budget.funding?.paused == true }
                 val prepared = LinearBooleanCutPreparation.prepare(
-                    branch, funded, { work, allocation ->
-                    budget.observe(preparation = work)
-                    budget.funding?.charge(0L, allocation)
-                },
+                    branch,
+                    funded,
+                    { work, allocation ->
+                        budget.observe(preparation = work)
+                        budget.funding?.charge(0L, allocation)
+                    },
                     LinearBooleanCutLimits(
-                    work = minOf(65_536L, budget.funding?.availableWork ?: 65_536L),
-                    allocation = minOf(1_048_576L, budget.funding?.remainingAllocation ?: 1_048_576L),
-                )
+                        work = minOf(65_536L, budget.funding?.availableWork ?: 65_536L),
+                        allocation = minOf(1_048_576L, budget.funding?.remainingAllocation ?: 1_048_576L),
+                    ),
                 )
                 val status = if (prepared.complete) "numericalBooleanCutComplete" else "numericalBooleanCutLimited"
                 compositionObservations[status] = (compositionObservations[status] ?: 0L) + 1L
@@ -163,8 +165,8 @@ internal class LinearActiveRows(
             }
             val proof = SourceDerivation.Combination(
                 weights.mapIndexedNotNull { id, weight ->
-                if (weight.isZero) null else SourceDerivation.Combination.Term(weight, query.cited[id].second)
-            }
+                    if (weight.isZero) null else SourceDerivation.Combination.Term(weight, query.cited[id].second)
+                },
             )
             val evidence = SourceEvidence(
                 branch.scope,
@@ -203,13 +205,13 @@ internal class LinearActiveRows(
         ) {
             evidence = checked(
                 lp.solve(
-                query.rows,
-                costs,
-                zero,
-                cancellation,
-                query.inactive,
-                claim = LpClaim.CONTRADICTION,
-            )?.conflictWeights
+                    query.rows,
+                    costs,
+                    zero,
+                    cancellation,
+                    query.inactive,
+                    claim = LpClaim.CONTRADICTION,
+                )?.conflictWeights,
             )
         }
         if (cancellation()) {

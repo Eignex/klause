@@ -21,8 +21,8 @@ class PolynomialPhaseProfileTest {
         val prefix = if (compressed) "requestz64=" else "request64="
         val bytes = if (compressed) {
             ByteArrayOutputStream().also { out ->
-            GZIPOutputStream(out).use { it.write(json) }
-        }.toByteArray()
+                GZIPOutputStream(out).use { it.write(json) }
+            }.toByteArray()
         } else {
             json
         }

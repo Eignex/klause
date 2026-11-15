@@ -100,9 +100,9 @@ internal class PolynomialProjection private constructor(
             val inputs = HashSet<Polynomial>()
             if (requiredZeroes.isNotEmpty() || nonzeroPolynomials.isNotEmpty()) {
                 for (polynomial in polynomials) {
-                arithmetic.step()
-                inputs.add(polynomial)
-            }
+                    arithmetic.step()
+                    inputs.add(polynomial)
+                }
             }
             for (equation in requiredZeroes) {
                 arithmetic.step()
@@ -122,14 +122,14 @@ internal class PolynomialProjection private constructor(
                 if (exclusions == null || inconsistentEquations(equations, arithmetic)) {
                     yield(
                         PolynomialProjection(
-                        Array(variableCount) { emptyList() },
-                        IntArray(variableCount) { it },
-                        arrayOfNulls(variableCount),
-                        arrayOfNulls(variableCount),
-                        arithmetic,
-                        true,
-                        sectionCount,
-                    )
+                            Array(variableCount) { emptyList() },
+                            IntArray(variableCount) { it },
+                            arrayOfNulls(variableCount),
+                            arrayOfNulls(variableCount),
+                            arithmetic,
+                            true,
+                            sectionCount,
+                        ),
                     )
                     return@sequence
                 }
@@ -138,14 +138,14 @@ internal class PolynomialProjection private constructor(
                 if (section != null && section.variable in nonzero && section.replacement.isZero) {
                     yield(
                         PolynomialProjection(
-                        Array(variableCount) { emptyList() },
-                        IntArray(variableCount) { it },
-                        arrayOfNulls(variableCount),
-                        arrayOfNulls(variableCount),
-                        arithmetic,
-                        true,
-                        sectionCount,
-                    )
+                            Array(variableCount) { emptyList() },
+                            IntArray(variableCount) { it },
+                            arrayOfNulls(variableCount),
+                            arrayOfNulls(variableCount),
+                            arithmetic,
+                            true,
+                            sectionCount,
+                        ),
                     )
                     return@sequence
                 }
@@ -215,9 +215,9 @@ internal class PolynomialProjection private constructor(
                     var independent = true
                     for (polynomial in top) {
                         for (coordinate in polynomial.variables) {
-                        arithmetic.step()
-                        if (coordinate != variable) independent = false
-                    }
+                            arithmetic.step()
+                            if (coordinate != variable) independent = false
+                        }
                     }
                     if (independent) {
                         // Rational univariate boundaries contribute no lower-coordinate projection.
@@ -245,25 +245,25 @@ internal class PolynomialProjection private constructor(
             if (exclusions == null || inconsistentEquations(equations, arithmetic)) {
                 yield(
                     PolynomialProjection(
-                    Array(variableCount) { emptyList() },
-                    IntArray(variableCount) { it },
-                    arrayOfNulls(variableCount),
-                    arrayOfNulls(variableCount),
-                    arithmetic,
-                    true,
-                    sectionCount,
-                )
+                        Array(variableCount) { emptyList() },
+                        IntArray(variableCount) { it },
+                        arrayOfNulls(variableCount),
+                        arrayOfNulls(variableCount),
+                        arithmetic,
+                        true,
+                        sectionCount,
+                    ),
                 )
             } else {
                 yield(
                     PolynomialProjection(
-                levels,
-                variables,
-                sections,
-                roots,
-                arithmetic,
-                equationalSections = sectionCount,
-            )
+                        levels,
+                        variables,
+                        sections,
+                        roots,
+                        arithmetic,
+                        equationalSections = sectionCount,
+                    ),
                 )
             }
         }.iterator()
@@ -381,9 +381,9 @@ private fun boundaryFamily(
         }
         val primitive = Polynomial.of(
             terms.map { term ->
-            arithmetic.step()
-            PolynomialTerm(checkNotNull(term.monomial.quotient(factor)), term.coefficient)
-        }
+                arithmetic.step()
+                PolynomialTerm(checkNotNull(term.monomial.quotient(factor)), term.coefficient)
+            },
         )
         if (primitive.mainVariable != null) distinct.add(primitive)
     }

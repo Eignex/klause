@@ -155,7 +155,7 @@ private class SubsumptionSlice(session: PropagationSession, start: Int, batch: I
             val list = occurrences[key]
             if (list == null || occurrence >= list.size) {
                 if (polarity++ == 1) {
-                    literal++;
+                    literal++
                     polarity = 0
                 }
                 occurrence = 0
@@ -167,7 +167,7 @@ private class SubsumptionSlice(session: PropagationSession, start: Int, batch: I
             val d = literals[other] ?: continue
             if (d.size > c.size || (signatures[other] and signatures[target].inv()) != 0L) continue
             if (!budget.visit(d.size * (1 + ceilLog2(c.size)))) {
-                occurrence--;
+                occurrence--
                 return false
             }
             val flipped = subsetWithOneFlip(d, c) ?: continue
@@ -220,7 +220,7 @@ private fun subsetWithOneFlip(d: IntArray, c: IntArray): Int? {
         if (c.binarySearchInt(lit) >= 0) continue
         val neg = Lit.negate(lit)
         if (flipped == NO_FLIP && c.binarySearchInt(neg) >= 0) {
-            flipped = neg;
+            flipped = neg
             continue
         }
         return null

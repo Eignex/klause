@@ -42,10 +42,10 @@ class SmtLibPowersTest {
         val source = assertIs<NonlinearIntegerProblem>(
             (
                 SmtLib.parse(
-                "(declare-const x Int) (assert (= x 100000000000000000000)) " +
-                    "(assert (= (^ x 2) 10000000000000000000000000000000000000000))",
-            )
-            ).source.originalSource
+                    "(declare-const x Int) (assert (= x 100000000000000000000)) " +
+                        "(assert (= (^ x 2) 10000000000000000000000000000000000000000))",
+                )
+                ).source.originalSource,
         )
 
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)

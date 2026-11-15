@@ -50,16 +50,19 @@ internal fun lowerGridRow(
     val constants = factor.realConstants ?: return null
     return lowerGridRow(
         FloatGridRow(
-        factor.vars,
-        DoubleArray(factor.vars.size) { constants.intCoefficients.at(it) },
-        factor.realVars,
-        DoubleArray(factor.realVars.size) { constants.realCoefficients.at(it) },
-        factor.op,
-        constants.bound,
-        constants.strict,
-        null,
-    ),
-        columns, scale, cancellation, truncate
+            factor.vars,
+            DoubleArray(factor.vars.size) { constants.intCoefficients.at(it) },
+            factor.realVars,
+            DoubleArray(factor.realVars.size) { constants.realCoefficients.at(it) },
+            factor.op,
+            constants.bound,
+            constants.strict,
+            null,
+        ),
+        columns,
+        scale,
+        cancellation,
+        truncate,
     )
 }
 
@@ -71,16 +74,19 @@ internal fun lowerGridRow(
     truncate: Boolean = false,
 ): List<Factor>? = lowerGridRow(
     FloatGridRow(
-    factor.vars,
-    factor.intCoeffs,
-    factor.realVars,
-    factor.realCoeffs,
-    factor.op,
-    factor.bound,
-    factor.strict,
-    factor.aux,
-),
-    columns, scale, cancellation, truncate
+        factor.vars,
+        factor.intCoeffs,
+        factor.realVars,
+        factor.realCoeffs,
+        factor.op,
+        factor.bound,
+        factor.strict,
+        factor.aux,
+    ),
+    columns,
+    scale,
+    cancellation,
+    truncate,
 )
 
 private fun lowerGridRow(

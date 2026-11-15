@@ -52,9 +52,9 @@ class PresolvePassTest {
             var polls = 0
             val context = PresolveContext(
                 cancellation = ExecutionControl {
-                polls++;
-                true
-            }
+                    polls++
+                    true
+                },
             )
 
             val delta = pass.applyFinite(problem, context)
@@ -165,8 +165,8 @@ class PresolvePassTest {
                     rebuild.rebuildInto(lifted)
                     assertTrue(
                         source.factors.filterIsInstance<Clause>().all { clause ->
-                        clause.literals.any { Lit.evaluate(it, lifted[Lit.variable(it)]) }
-                    }
+                            clause.literals.any { Lit.evaluate(it, lifted[Lit.variable(it)]) }
+                        },
                     )
                 }
             }
@@ -225,8 +225,8 @@ class PresolvePassTest {
             assertEquals(listOf(PresolvePass.PROBE_OPEN_RANGES), prepared.passesFired)
             assertTrue(
                 prepared.problem.factors.filterIsInstance<Clause>().any {
-                it.literals.contentEquals(intArrayOf(Lit.make(0, true)))
-            }
+                    it.literals.contentEquals(intArrayOf(Lit.make(0, true)))
+                },
             )
         }
     }
@@ -259,8 +259,8 @@ class PresolvePassTest {
             assertEquals(listOf(PresolvePass.BREAK_SYMMETRIES), prepared.passesFired)
             assertTrue(
                 prepared.problem.factors.filterIsInstance<Clause>().any {
-                it.literals.contentEquals(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
-            }
+                    it.literals.contentEquals(intArrayOf(Lit.make(0, false), Lit.make(1, true)))
+                },
             )
 
             val sensitive = Presolver.runSource(

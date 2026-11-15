@@ -18,22 +18,22 @@ internal object PrivateRebuildAlias {
             problem.factors[problem.numFactors - 2] !== premises[0] ||
             problem.factors[problem.numFactors - 1] !== premises[1]
         ) {
-                return SourceDelta()
-            }
+            return SourceDelta()
+        }
         val first = premises[0].literals
         val second = premises[1].literals
         if (first.size != 2 || second.size != 2 || second[0] != Lit.negate(first[0]) ||
             second[1] != Lit.negate(first[1])
         ) {
-                return SourceDelta()
-            }
+            return SourceDelta()
+        }
         val retained = Lit.variable(first[0])
         val eliminated = Lit.variable(first[1])
         if (retained !in 0 until problem.numBoolVars || eliminated !in 0 until problem.numBoolVars ||
             retained >= eliminated
         ) {
-                return SourceDelta()
-            }
+            return SourceDelta()
+        }
         val replacement = Lit.make(retained, Lit.isPositive(first[0]) != Lit.isPositive(first[1]))
         cancellation.charge(problem.numFactors.toLong())
         if (cancellation()) return SourceDelta()
@@ -48,15 +48,15 @@ internal object PrivateRebuildAlias {
             if (cancellation()) return SourceDelta()
             val rewritten = Clause(
                 IntArray(clause.literals.size) {
-                val literal = clause.literals[it]
-                if (Lit.variable(literal) != eliminated) {
-                    literal
-                } else if (Lit.isPositive(literal)) {
-                    replacement
-                } else {
-                    Lit.negate(replacement)
-                }
-            }
+                    val literal = clause.literals[it]
+                    if (Lit.variable(literal) != eliminated) {
+                        literal
+                    } else if (Lit.isPositive(literal)) {
+                        replacement
+                    } else {
+                        Lit.negate(replacement)
+                    }
+                },
             )
             dropped.add(index)
             if (!rewritten.tautological) added.add(rewritten)

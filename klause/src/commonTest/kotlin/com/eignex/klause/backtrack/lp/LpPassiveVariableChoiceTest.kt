@@ -80,7 +80,7 @@ class LpPassiveVariableChoiceTest {
             val choice = LpPassiveVariableChoice(true, events::add, { if (!duringRead) fresh = false })
 
             val selected = choice.select(proposal, baseline, 1, { fresh }, {
-                fresh = false;
+                fresh = false
                 true
             })
 

@@ -46,11 +46,11 @@ internal class IntEventOverflow {
                     factor
                 } else {
                     remap.getOrNull(factor - base)?.let {
-                    if (it < 0) null else base + it
-                }
+                        if (it < 0) null else base + it
+                    }
                 }
                 if (next != null) {
-                    posting[write++] = next;
+                    posting[write++] = next
                     work += 2L
                 }
             }
@@ -123,7 +123,7 @@ internal class IntEventOverflow {
                 budget.visit(if (record) 8L else 4L)
                 budget.visit(0L)
                 if (record) {
-                    deferredWork = work;
+                    deferredWork = work
                     deferredScratch = scratch
                 }
             }

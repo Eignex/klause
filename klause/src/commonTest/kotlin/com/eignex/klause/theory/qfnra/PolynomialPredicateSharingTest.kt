@@ -81,10 +81,10 @@ class PolynomialPredicateSharingTest {
 
         val rewritten = formula.withAtoms(
             listOf(
-            original[0],
-            PolynomialAtom(original[0].polynomial, PolynomialRelation.GE),
-        ),
-            arithmetic
+                original[0],
+                PolynomialAtom(original[0].polynomial, PolynomialRelation.GE),
+            ),
+            arithmetic,
         )
 
         assertTrue(rewritten.atoms.isEmpty())

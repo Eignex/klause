@@ -26,16 +26,16 @@ internal data class GridCoordinate(val variable: Int, val lower: Double, val upp
         if (!value.isFinite() || value < lower - step * ROUNDING_TOLERANCE ||
             value > upper + step * ROUNDING_TOLERANCE
         ) {
-                return null
-            }
+            return null
+        }
         if (step == 0.0) return 0L.takeIf { value == lower }
         val position = (value - lower) / step
         val rounded = round(position)
         if (!rounded.isFinite() || abs(position - rounded) > ROUNDING_TOLERANCE ||
             rounded < 0.0 || rounded >= buckets
         ) {
-                return null
-            }
+            return null
+        }
         return rounded.toLong()
     }
 
@@ -87,10 +87,10 @@ internal class GridProduct(val a: GridCoordinate, val b: GridCoordinate, overrid
                 { it.buckets },
             ) <= 0
         ) {
-                listOf(a, b)
-            } else {
-                listOf(b, a)
-            }
+            listOf(a, b)
+        } else {
+            listOf(b, a)
+        }
         ordered.forEach { it.key(sink) }
         output.key(sink)
     }

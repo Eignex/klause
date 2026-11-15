@@ -110,8 +110,8 @@ internal class PolynomialStrategyAdapters(
                 ExecutionStrategy.MIXED -> error("admission supplies participating arms")
             }
             val family = when (arm) {
-                0 -> ArmFamily.Backtrack;
-                1 -> ArmFamily.LocalSearch;
+                0 -> ArmFamily.Backtrack
+                1 -> ArmFamily.LocalSearch
                 else -> ArmFamily.Lns
             }
             val executionAssumptions = if (arm == 0) {

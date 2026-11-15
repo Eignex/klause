@@ -58,17 +58,18 @@ class SourceExecutionTest {
     fun `mixed observer attachment should preserve the quiet joint observer`() {
         val source = LinearSourceProblem(
             listOf(
-            LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
-            LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
-        ),
-            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE)))
+                LinearSourceVariable("i", true, SemanticRational.ZERO, SemanticRational.ONE),
+                LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
+            ),
+            emptyList(),
+            LinearSourceObjective(listOf(LinearSourceTerm(1, SemanticRational.ONE))),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED,
+            ),
         )
         val observer: (String, Long, JointRepairObservation) -> Unit = { _, _, _ -> }
         val request = SourceExecutionRequest(invocation).withPortfolioJointRepairObserver(observer)
@@ -89,23 +90,23 @@ class SourceExecutionTest {
             ),
             listOf(
                 LinearSourceRow(
-                List(3) { LinearSourceTerm(it, SemanticRational.ONE) },
-                lower = SemanticRational.ONE,
-            )
+                    List(3) { LinearSourceTerm(it, SemanticRational.ONE) },
+                    lower = SemanticRational.ONE,
+                ),
             ),
             LinearSourceObjective(
                 listOf(
-                LinearSourceTerm(1, SemanticRational.ONE),
-                LinearSourceTerm(2, SemanticRational.ONE),
-            )
+                    LinearSourceTerm(1, SemanticRational.ONE),
+                    LinearSourceTerm(2, SemanticRational.ONE),
+                ),
             ),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED,
+            ),
         )
         val workers = mutableListOf<String>()
         val captures = mutableListOf<Pair<Long, ByteArray>>()
@@ -121,12 +122,12 @@ class SourceExecutionTest {
             workers += worker
             captures += query.pricing.tieSeed to assertNotNull(
                 query.captureExactWithin(
-                "source-query",
-                4096,
-                65_536,
-                4096,
-                ExecutionControl.Never,
-            )
+                    "source-query",
+                    4096,
+                    65_536,
+                    4096,
+                    ExecutionControl.Never,
+                ),
             )
         }.withPortfolioGuidanceObserver { worker, observation ->
             guidanceWorkers += worker
@@ -153,13 +154,17 @@ class SourceExecutionTest {
     @Test
     fun `polynomial source encoder rebuilding should retain its containing work`() {
         val source = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-            ContinuousProduct(0, 0, 1),
-        ),
-            numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0)
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                ContinuousProduct(0, 0, 1),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
         )
         val original = source.pipelineRequest()
         val budget = PresolveBudget(1_000_000)
@@ -183,31 +188,35 @@ class SourceExecutionTest {
     @Test
     fun `polynomial source probing should reduce Booleans beside a nonlinear real factor`() {
         val source = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-            ContinuousProduct(0, 0, 1),
-        ),
-            numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0)
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                ContinuousProduct(0, 0, 1),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
         val budget = PresolveBudget(1_000_000)
 
         val result = assertIs<SourceExecutionResult.Polynomial>(
             SourceSetup.execute(
                 SourceExecutionRequest(
-            invocation,
-            presolveConfig = PresolveConfig.parse("off,+probe-open"),
-            presolveBudget = budget,
-        )
-            )
+                    invocation,
+                    presolveConfig = PresolveConfig.parse("off,+probe-open"),
+                    presolveBudget = budget,
+                ),
+            ),
         )
 
         assertTrue(assertIs<OpenTheoryResult.Sat>(result.result.result).assignment.boolValue(0))
@@ -222,29 +231,33 @@ class SourceExecutionTest {
     @Test
     fun `polynomial source rewrites should reconstruct the original Boolean assignment`() {
         val source = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-            ContinuousProduct(0, 0, 1),
-        ),
-            numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0)
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                ContinuousProduct(0, 0, 1),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
 
         val result = assertIs<SourceExecutionResult.Polynomial>(
             SourceSetup.execute(
                 SourceExecutionRequest(
-            invocation,
-            presolveConfig = PresolveConfig.parse("off,+bve"),
-        )
-            )
+                    invocation,
+                    presolveConfig = PresolveConfig.parse("off,+bve"),
+                ),
+            ),
         )
 
         val point = assertIs<OpenTheoryResult.Sat>(result.result.result).assignment
@@ -256,33 +269,37 @@ class SourceExecutionTest {
     @Test
     fun `polynomial optimization should publish reconstructed source incumbents`() {
         val source = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-            ContinuousProduct(0, 0, 1),
-        ),
-            numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0)
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                ContinuousProduct(0, 0, 1),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective = LinearObjective(boolWeights = longArrayOf(0, 1)),
-            maximize = true,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective = LinearObjective(boolWeights = longArrayOf(0, 1)),
+                maximize = true,
+            ),
         )
         val points = mutableListOf<Sample>()
 
         val result = assertIs<SourceExecutionResult.Quadratic>(
             SourceSetup.execute(
                 SourceExecutionRequest(
-            invocation,
-            presolveConfig = PresolveConfig.parse("off,+bve"),
-        ),
-            SourceExecutionCallbacks(onQuadraticIncumbent = { points += it.incumbent.sample })
-            )
+                    invocation,
+                    presolveConfig = PresolveConfig.parse("off,+bve"),
+                ),
+                SourceExecutionCallbacks(onQuadraticIncumbent = { points += it.incumbent.sample }),
+            ),
         )
 
         val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result.result.result)
@@ -295,13 +312,17 @@ class SourceExecutionTest {
     @Test
     fun `reconstructed polynomial witness checking should spend the containing native allowance`() {
         val source = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-            ContinuousProduct(0, 0, 1),
-        ),
-            numRealVars = 2, realLower = doubleArrayOf(1.0, 1.0), realUpper = doubleArrayOf(1.0, 1.0)
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                ContinuousProduct(0, 0, 1),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 1.0),
+            realUpper = doubleArrayOf(1.0, 1.0),
         )
         val original = source.pipelineRequest()
         val preparation = original.prepareSource(
@@ -344,19 +365,19 @@ class SourceExecutionTest {
         for (engine in engines) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SmtLib.parse(text).source,
-                ExecutionOperation.SATISFY,
-                engine,
-            )
+                    SmtLib.parse(text).source,
+                    ExecutionOperation.SATISFY,
+                    engine,
+                ),
             )
 
             val result = assertIs<SourceExecutionResult.Linear>(
                 SourceSetup.execute(
                     SourceExecutionRequest(
-                invocation,
-                theory = TheoryParams(timeout = ExecutionControl.after(30.seconds)),
-            )
-                )
+                        invocation,
+                        theory = TheoryParams(timeout = ExecutionControl.after(30.seconds)),
+                    ),
+                ),
             )
 
             val satisfy = assertIs<OpenTheoryExecution.Satisfy>(result.result)
@@ -369,20 +390,20 @@ class SourceExecutionTest {
     fun `open source execution should retain an exhausted preparation allowance`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
         val budget = PresolveBudget(3).apply { charge(3) }
 
         val result = assertIs<SourceExecutionResult.Linear>(
             SourceSetup.execute(
                 SourceExecutionRequest(
-            invocation,
-            presolveBudget = budget,
-        )
-            )
+                    invocation,
+                    presolveBudget = budget,
+                ),
+            ),
         )
 
         val outcome = assertIs<OpenTheoryExecution.Satisfy>(result.result).result
@@ -405,17 +426,17 @@ class SourceExecutionTest {
         ).map { (kind, text) -> kind to SmtLib.parse(text).source } +
             (
                 SourceExecutionKind.LINEAR to SourceAttachment(
-                LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
-                ProblemSettings(),
-            )
-            )
+                    LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
+                    ProblemSettings(),
+                )
+                )
         for ((kind, source) in sources) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                source,
-                ExecutionOperation.SATISFY,
-                FiniteEngine.FIXED,
-            )
+                    source,
+                    ExecutionOperation.SATISFY,
+                    FiniteEngine.FIXED,
+                ),
             )
             assertEquals(kind, SourceSetup.executionKind(invocation))
 
@@ -430,61 +451,63 @@ class SourceExecutionTest {
     @Test
     fun `finite optimization should retain native interruption after another invocation completes`() {
         val source = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
                 Clause(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-        )
-            )
+                    intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+                ),
+            ),
         )
         val attachment = SourceAttachment(source)
         val objective = LinearObjective(boolWeights = longArrayOf(1, 2), constant = 7)
         val stopped = SourceSetup.prepare(
             SourceSetupRequest(
-            attachment,
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-        )
+                attachment,
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+            ),
         )
         val completed = SourceSetup.prepare(
             SourceSetupRequest(
-            attachment,
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-        )
+                attachment,
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+            ),
         )
 
         val first = assertIs<SourceExecutionResult.Finite>(
             SourceSetup.execute(
                 SourceExecutionRequest(
-            stopped,
-            finiteRequest = { shape ->
-                FiniteSolveRequest(
-                    shape,
-                    SourceFiniteControls.Backtrack(
-                    BacktrackParams(maxDecisions = 2L, nativeSat = false),
-                )
-                )
-            },
-        )
-            )
+                    stopped,
+                    finiteRequest = { shape ->
+                        FiniteSolveRequest(
+                            shape,
+                            SourceFiniteControls.Backtrack(
+                                BacktrackParams(maxDecisions = 2L, nativeSat = false),
+                            ),
+                        )
+                    },
+                ),
+            ),
         )
         val second = assertIs<SourceExecutionResult.Finite>(
             SourceSetup.execute(
                 SourceExecutionRequest(
-            completed,
-            finiteRequest = { shape ->
-                FiniteSolveRequest(
-                    shape,
-                    SourceFiniteControls.Backtrack(
-                    BacktrackParams(),
-                )
-                )
-            },
-        )
-            )
+                    completed,
+                    finiteRequest = { shape ->
+                        FiniteSolveRequest(
+                            shape,
+                            SourceFiniteControls.Backtrack(
+                                BacktrackParams(),
+                            ),
+                        )
+                    },
+                ),
+            ),
         )
 
         val retained = assertIs<MinimizeResult.BestFound>(first.result.nativeSourceMinimum)
@@ -758,12 +781,12 @@ class SourceExecutionTest {
                 FiniteEngine.LOCAL_SEARCH,
                 providers = FactorProjectionProviders(
                     encoder = EncoderProvider { factor, target ->
-                    if (factor is AllDifferent) {
-                        Encoder(EncoderSupport.UNSUPPORTED)
-                    } else {
-                        BuiltInEncoderProvider.select(factor, target)
-                    }
-                }
+                        if (factor is AllDifferent) {
+                            Encoder(EncoderSupport.UNSUPPORTED)
+                        } else {
+                            BuiltInEncoderProvider.select(factor, target)
+                        }
+                    },
                 ),
             ),
         )

@@ -144,12 +144,12 @@ class MpsSemanticsTest {
         assertTrue(compiled.sourceExact)
         assertTrue(
             compiled.model.factors.flatMap { it.linearRows }.all { row ->
-            val constants = row.constants as IntegralConstants
-            val activity = (0 until row.size).fold(BigFraction.ZERO) { sum, index ->
-                sum + BigFraction.of(constants.exactCoeff(index), BIG_ONE) * value
-            }
-            activity == BigFraction.of(constants.exactBound, BIG_ONE)
-        }
+                val constants = row.constants as IntegralConstants
+                val activity = (0 until row.size).fold(BigFraction.ZERO) { sum, index ->
+                    sum + BigFraction.of(constants.exactCoeff(index), BIG_ONE) * value
+                }
+                activity == BigFraction.of(constants.exactBound, BIG_ONE)
+            },
         )
         assertNull(linear.checkMpsWitness(listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3)))))
     }
@@ -211,8 +211,8 @@ class MpsSemanticsTest {
 
         val linear = assertNotNull(
             source.toLinearSourceProblem(
-            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-        )
+                SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+            ),
         )
 
         val endpoint = checkNotNull(BigFraction.ofDouble(1e21))
@@ -414,8 +414,8 @@ class MpsSemanticsTest {
             Mps.parse("ROWS\n N COST\nCOLUMNS\n X COST 0\nBOUNDS\n BV B X\nENDATA")
                 .toLinearSourceProblem(
                     SemanticOverrides(
-                    feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE),
-                )
+                        feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE),
+                    ),
                 ),
         )
 
@@ -426,9 +426,9 @@ class MpsSemanticsTest {
     fun `float checking should preserve wide integer coordinates`() {
         val source = assertNotNull(
             Mps.parse(
-            "ROWS\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 9007199254740993\n" +
-                "BOUNDS\n LI B X 0\n UI B X 9007199254740994\nENDATA",
-        ).toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+                "ROWS\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 9007199254740993\n" +
+                    "BOUNDS\n LI B X 0\n UI B X 9007199254740994\nENDATA",
+            ).toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance())),
         )
 
         assertNotNull(source.checkMpsWitness(listOf(BigFraction.ofLong(9_007_199_254_740_993L))))
@@ -465,8 +465,8 @@ class MpsSemanticsTest {
     fun `cancellation in row activity should use original decimal coefficients`() {
         val source = assertNotNull(
             Mps.parse(
-            "ROWS\n E R\nCOLUMNS\n X R 10000000000000001\n Y R -10000000000000000\nRHS\n RHS R 0\nENDATA",
-        ).toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
+                "ROWS\n E R\nCOLUMNS\n X R 10000000000000001\n Y R -10000000000000000\nRHS\n RHS R 0\nENDATA",
+            ).toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance())),
         )
 
         assertNull(source.checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ONE)))

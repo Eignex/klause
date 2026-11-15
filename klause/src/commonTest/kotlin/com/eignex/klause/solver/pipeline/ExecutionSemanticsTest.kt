@@ -101,12 +101,12 @@ class ExecutionSemanticsTest {
 
         val execution = assertIs<OpenTheoryExecution.Optimize>(
             OpenTheoryPipeline.execute(
-            request,
-            TheoryParams(openWorkLimit = 1000),
-            FiniteEngine.BACKTRACK,
-            1,
-            observed::add,
-        )
+                request,
+                TheoryParams(openWorkLimit = 1000),
+                FiniteEngine.BACKTRACK,
+                1,
+                observed::add,
+            ),
         )
         val qualified = assertIs<OpenTheoryExecution.Optimize>(execution.withSourceSemantics(source.semantics))
 
@@ -178,8 +178,8 @@ class ExecutionSemanticsTest {
             "(declare-const x Int) (declare-const y Int) (assert (> x y))",
             semanticOverrides = SemanticOverrides(
                 undeclaredIntegers = BoundsOverride(
-                lower = BoundOverride.Value(2L),
-            )
+                    lower = BoundOverride.Value(2L),
+                ),
             ),
         ).model
         val engine = OpenTheoryEngine(source, source.componentPlan().theoryPipeline)
@@ -196,8 +196,8 @@ class ExecutionSemanticsTest {
             "(declare-const x Int) (declare-const y Int) (assert (> x y))",
             semanticOverrides = SemanticOverrides(
                 undeclaredIntegers = BoundsOverride(
-                lower = BoundOverride.Value(2L),
-            )
+                    lower = BoundOverride.Value(2L),
+                ),
             ),
         ).model
         val minimizer = OpenTheoryMinimizer(source, LinearObjective(intCoefficients = longArrayOf(1, 0)))
@@ -214,8 +214,8 @@ class ExecutionSemanticsTest {
             "(declare-const x Int) (declare-const y Int) (assert (> x y))",
             semanticOverrides = SemanticOverrides(
                 undeclaredIntegers = BoundsOverride(
-                lower = BoundOverride.Value(2L),
-            )
+                    lower = BoundOverride.Value(2L),
+                ),
             ),
         ).model
         val scope = SourceScope(
@@ -224,9 +224,9 @@ class ExecutionSemanticsTest {
         )
         val context = assertNotNull(
             source.sourceProofContext(
-            scope,
-            LinearObjective(intCoefficients = longArrayOf(1, 0)),
-        )
+                scope,
+                LinearObjective(intCoefficients = longArrayOf(1, 0)),
+            ),
         )
 
         val contexts = listOf(
@@ -245,8 +245,8 @@ class ExecutionSemanticsTest {
             "(declare-const x Int) (declare-const y Int) (assert (> x y))",
             semanticOverrides = SemanticOverrides(
                 undeclaredIntegers = BoundsOverride(
-                lower = BoundOverride.Value(2L),
-            )
+                    lower = BoundOverride.Value(2L),
+                ),
             ),
         ).model
         val scope = SourceScope(
@@ -255,9 +255,9 @@ class ExecutionSemanticsTest {
         )
         val context = assertNotNull(
             source.sourceProofContext(
-            scope,
-            LinearObjective(intCoefficients = longArrayOf(1, 0)),
-        )
+                scope,
+                LinearObjective(intCoefficients = longArrayOf(1, 0)),
+            ),
         ).withLinearAuthority()
 
         val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = ExecutionControl { true }))

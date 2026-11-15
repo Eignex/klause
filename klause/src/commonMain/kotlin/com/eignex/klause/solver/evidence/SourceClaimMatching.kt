@@ -33,25 +33,25 @@ internal fun matchSourceClaims(
 
         is SourceClaim.Bound ->
             second is SourceClaim.Bound && first.strict == second.strict &&
-            matchValue(first.value, second.value, algebraic)
+                matchValue(first.value, second.value, algebraic)
 
         is SourceClaim.Optimal ->
             second is SourceClaim.Optimal &&
-            matchSample(first.sample, second.sample, algebraic) &&
-            matchValue(first.value, second.value, algebraic)
+                matchSample(first.sample, second.sample, algebraic) &&
+                matchValue(first.value, second.value, algebraic)
 
         is SourceClaim.Limit -> second is SourceClaim.Limit && matchSample(first.sample, second.sample, algebraic) &&
             matchValue(first.value, second.value, algebraic)
 
         is SourceClaim.Unbounded ->
             second is SourceClaim.Unbounded &&
-            matchSample(first.sample, second.sample, algebraic)
+                matchSample(first.sample, second.sample, algebraic)
 
         is SourceClaim.Clause -> second is SourceClaim.Clause && first.literals == second.literals
 
         is SourceClaim.Ray ->
             second is SourceClaim.Ray && first.direction == second.direction &&
-            matchSample(first.sample, second.sample, algebraic)
+                matchSample(first.sample, second.sample, algebraic)
 
         is SourceClaim.Consequence -> second is SourceClaim.Consequence && first.inequality == second.inequality
 

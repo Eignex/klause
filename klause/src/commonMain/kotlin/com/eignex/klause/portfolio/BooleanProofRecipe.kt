@@ -39,11 +39,11 @@ internal class BooleanProofRecipe(
         )
         return query == firstFail || (
             !nativeOnly && query == BacktrackParams(
-            variableSelector = InputOrder,
-            valueSelector = IndomainMin,
-            nativeSat = false,
-        )
-        )
+                variableSelector = InputOrder,
+                valueSelector = IndomainMin,
+                nativeSat = false,
+            )
+            )
     }
 
     fun matches(other: BooleanProofRecipe): Boolean = normalized() == other.normalized()

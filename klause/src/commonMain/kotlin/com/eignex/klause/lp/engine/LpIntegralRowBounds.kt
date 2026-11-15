@@ -20,8 +20,8 @@ internal fun integralRowBounds(
         if (state.model.column(term.column).integral &&
             state.model.column(term.column).origin.exactLong() == null
         ) {
-                return null
-            }
+            return null
+        }
     }
     val minimum = integralEndpointSum(state, terms, true, meter) ?: return null
     val maximum = integralEndpointSum(state, terms, false, meter) ?: return null
@@ -39,15 +39,15 @@ internal fun integralRowBounds(
             meter.reserve(80L)
             completed.add(
                 LpRowBound(
-                state,
-                row,
-                term.column,
-                projection.upper,
-                value,
-                projection.strict,
-                minimizing,
-                terms,
-            )
+                    state,
+                    row,
+                    term.column,
+                    projection.upper,
+                    value,
+                    projection.strict,
+                    minimizing,
+                    terms,
+                ),
             )
         }
     }
@@ -139,9 +139,9 @@ private fun integralRowProjection(
     meter.reserve(128L)
     val exactResidual = meter.read(
         BigFraction.of(
-        (bigIntOf(residual.hi) shl 64) + bigIntOf(residual.lo.toULong()),
-        bigIntOf(1L),
-    )
+            (bigIntOf(residual.hi) shl 64) + bigIntOf(residual.lo.toULong()),
+            bigIntOf(1L),
+        ),
     )
     val value = meter.read(
         meter.read(exactResidual * meter.read(term.coefficient.reciprocal())) +

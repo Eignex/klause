@@ -65,14 +65,14 @@ class TrajectoryViewTest {
             DefinitionalSweep.fromSource(
                 view.state.problem,
                 listOf(
-            DefinitionHint.Linear(
-                1,
-                longArrayOf(1, -1),
-                arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)),
-                0,
+                    DefinitionHint.Linear(
+                        1,
+                        longArrayOf(1, -1),
+                        arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)),
+                        0,
+                    ),
+                ),
             ),
-        )
-            )
         )
         view.state.invariants = sweep.network(2, 0)
         val maintained = TrajectoryView(
@@ -98,16 +98,17 @@ class TrajectoryViewTest {
                 DefinitionalSweep.fromSource(
                     original.state.problem,
                     listOf(
-                DefinitionHint.Linear(
-                    1, longArrayOf(1, -1),
-                    arrayOf(
-                    DefinitionHint.Operand.Variable(0),
-                    DefinitionHint.Operand.Variable(1),
+                        DefinitionHint.Linear(
+                            1,
+                            longArrayOf(1, -1),
+                            arrayOf(
+                                DefinitionHint.Operand.Variable(0),
+                                DefinitionHint.Operand.Variable(1),
+                            ),
+                            0,
+                        ),
+                    ),
                 ),
-                    0
-                ),
-            )
-                )
             )
             original.state.invariants = sweep.network(2, 0)
             TrajectoryView(
@@ -167,10 +168,12 @@ class TrajectoryViewTest {
 
     private fun view(scale: Long, seed: Long): TrajectoryView {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 4) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 4) },
             arrayOf(
-            Linear(longArrayOf(scale, -scale), intArrayOf(0, 1), LinearOp.EQ, 0),
-        )
+                Linear(longArrayOf(scale, -scale), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(seed))
         return TrajectoryView("scale-$scale", state, VarRemap(intArrayOf(), intArrayOf(0, 1)))

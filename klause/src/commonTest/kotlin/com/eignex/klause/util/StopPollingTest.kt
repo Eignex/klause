@@ -11,7 +11,7 @@ class StopPollingTest {
     fun `nested polls share one worker countdown`() {
         var polls = 0
         val worker = ExecutionControl {
-            polls++;
+            polls++
             false
         }.bindStopControl()
         val nested = worker.withAccounting(ExecutionControl.Never) or ExecutionControl.Never
@@ -48,7 +48,7 @@ class StopPollingTest {
     fun `dynamic adapters follow the current worker countdown`() {
         var polls = 0
         var current = ExecutionControl {
-            polls++;
+            polls++
             false
         }.bindStopControl()
         val adapted = cancelledWhen({ current.deadline() }, pollingOf = { current.stopPolling }) { current() }
@@ -58,7 +58,7 @@ class StopPollingTest {
         assertEquals(1, polls)
 
         current = ExecutionControl {
-            polls++;
+            polls++
             false
         }.bindStopControl()
         assertFalse(adapted.pollStop())
@@ -69,7 +69,7 @@ class StopPollingTest {
     fun `workers created from the same control have independent countdowns`() {
         var polls = 0
         val control = ExecutionControl {
-            polls++;
+            polls++
             false
         }
         val first = control.bindStopControl()

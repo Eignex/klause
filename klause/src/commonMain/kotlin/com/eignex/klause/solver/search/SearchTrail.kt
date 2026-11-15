@@ -46,10 +46,10 @@ internal class SearchTrail {
         }
         sample.record(
             mapOf(
-            "sharedReasonPayloadBytes" to payload,
-            "sharedReasonIndexCapacityBytes" to boolReasons.primitiveCapacityBytes,
-            "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
-        )
+                "sharedReasonPayloadBytes" to payload,
+                "sharedReasonIndexCapacityBytes" to boolReasons.primitiveCapacityBytes,
+                "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
+            ),
         )
         sample.owned(boolReasons, boolReasons.primitiveCapacityBytes, protected = true)
         sample.ownedReferences(

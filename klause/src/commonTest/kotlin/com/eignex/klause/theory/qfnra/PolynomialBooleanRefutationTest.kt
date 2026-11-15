@@ -177,11 +177,11 @@ class PolynomialBooleanRefutationTest {
 
         assertIs<QfNraResult.Unsatisfiable>(
             solveQfNra(
-            source.formula,
-            2,
-            0,
-            condition = PolynomialCondition(bools = mapOf(0 to true, 1 to false)),
-        )
+                source.formula,
+                2,
+                0,
+                condition = PolynomialCondition(bools = mapOf(0 to true, 1 to false)),
+            ),
         )
         assertIs<QfNraResult.Satisfiable>(solveQfNra(source.formula, 2, 0))
     }

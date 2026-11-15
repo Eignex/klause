@@ -91,8 +91,8 @@ internal object MiniZincMode : CliMode {
                 val text = applier?.render(original, sample) ?: writeFlatZincSolution(original, sample, outputObjective)
                 if (completeAssignment) {
                     withCompleteAssignment(original, text) {
-                    writeFlatZincSolution(original.copy(outputItems = null), sample, true)
-                }
+                        writeFlatZincSolution(original.copy(outputItems = null), sample, true)
+                    }
                 } else {
                     text
                 }
@@ -146,8 +146,8 @@ internal object MiniZincMode : CliMode {
                     ?: writeFlatZincSolution(original, assignment, outputObjective)
                 if (completeAssignment) {
                     withCompleteAssignment(original, text) {
-                    writeFlatZincSolution(original.copy(outputItems = null), assignment, true)
-                }
+                        writeFlatZincSolution(original.copy(outputItems = null), assignment, true)
+                    }
                 } else {
                     text
                 }

@@ -174,9 +174,9 @@ internal class TranscendentalWorkerAdapter(
                     source.boolCount,
                     SearchSolveParams(
                         minOf(
-                        params.strategy.backtrack.maxDecisions,
-                        params.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE,
-                    )
+                            params.strategy.backtrack.maxDecisions,
+                            params.strategy.backtrack.maxInstructions ?: Long.MAX_VALUE,
+                        ),
                     ),
                     decisionBudget = SearchDecisionBudget {
                         if (nodeBudget?.allowance?.exhausted() == true) {
@@ -225,9 +225,9 @@ internal class TranscendentalWorkerAdapter(
                             when (checked) {
                                 is TranscendentalCheckResult.Witness -> return finish(
                                     SolveResult.Sat(
-                                    capture(checked.value),
-                                    stats,
-                                )
+                                        capture(checked.value),
+                                        stats,
+                                    ),
                                 )
 
                                 TranscendentalCheckResult.Refuted -> return finish(SolveResult.Unsat(stats = stats))
@@ -244,9 +244,9 @@ internal class TranscendentalWorkerAdapter(
                     when (val event = requireNotNull(run).next()) {
                         is SearchRunEvent.Satisfied -> finish(
                             SolveResult.Sat(
-                            capture(requireNotNull(event.model.valueOf(requireNotNull(component).witnessKey))),
-                            stats,
-                        )
+                                capture(requireNotNull(event.model.valueOf(requireNotNull(component).witnessKey))),
+                                stats,
+                            ),
                         )
 
                         SearchRunEvent.Exhausted -> finish(SolveResult.Unsat(stats = stats))

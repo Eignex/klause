@@ -32,11 +32,11 @@ class ResumableMinimizeDirectionalTest {
             repeat(3) { edge ->
                 factors.add(
                     Linear(
-                    longArrayOf(1L, 1L),
-                    intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3),
-                    LinearOp.GE,
-                    1L,
-                )
+                        longArrayOf(1L, 1L),
+                        intArrayOf(block * 3 + edge, block * 3 + (edge + 1) % 3),
+                        LinearOp.GE,
+                        1L,
+                    ),
                 )
             }
         }
@@ -80,10 +80,12 @@ class ResumableMinimizeDirectionalTest {
     @Test
     fun `assumption reseeding clears the finite lp history scope`() {
         val problem = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf<Factor>(
-            Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true)), min = 1, max = 2),
-        )
+                Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true)), min = 1, max = 2),
+            ),
         ).bake()
         val params = BacktrackParams(
             randomSeed = 3L,

@@ -33,18 +33,18 @@ class PolynomialFormulaTest {
         )
         for ((left, reversed) in relations) {
             for ((right, scalar) in listOf(left to "3", reversed to "(- 3)")) {
-            val source = SmtLibPolynomial.parse(
-                "(declare-const x Real) (declare-const y Real) (declare-const b Bool) (declare-const c Bool) " +
-                    "(assert (and (= b ($left (- x y) 0)) (= c ($right (* $scalar (- x y)) 0)) " +
-                    "(not (= b c))))",
-            )
-            val arithmetic = PolynomialArithmetic()
-            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+                val source = SmtLibPolynomial.parse(
+                    "(declare-const x Real) (declare-const y Real) (declare-const b Bool) (declare-const c Bool) " +
+                        "(assert (and (= b ($left (- x y) 0)) (= c ($right (* $scalar (- x y)) 0)) " +
+                        "(not (= b c))))",
+                )
+                val arithmetic = PolynomialArithmetic()
+                val formula = PolynomialFormula.normalize(source.formula, arithmetic)
 
-            val refuted = formula.refuteBooleans(arithmetic, 128, 2048, 4096)
+                val refuted = formula.refuteBooleans(arithmetic, 128, 2048, 4096)
 
-            assertTrue(refuted)
-        }
+                assertTrue(refuted)
+            }
         }
     }
 
@@ -124,10 +124,10 @@ class PolynomialFormulaTest {
             for (other in listOf(true, false, true)) {
                 val result = invocation.check(
                     PolynomialCondition(
-                    bools = mapOf(0 to true, 1 to other),
-                    lower = fixed,
-                    upper = fixed,
-                )
+                        bools = mapOf(0 to true, 1 to other),
+                        lower = fixed,
+                        upper = fixed,
+                    ),
                 )
 
                 if (other) {

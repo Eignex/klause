@@ -24,10 +24,12 @@ class LpEmissionTest {
     @Test
     fun `interrupted emission should charge materialized construction`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 10) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 10) },
             arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 5),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 5),
+            ),
         )
         var cancelled = false
         val projections = FactorProjectionProviders(
@@ -52,10 +54,12 @@ class LpEmissionTest {
     @Test
     fun `restored cached emissions should add no construction charge`() {
         val problem = Problem(
-            1, 1, arrayOf(IntDomain(0, 10)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8),
-        )
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.GE, 8),
+            ),
         )
         val root = problem.finiteIntDomain(0)
         var live = root

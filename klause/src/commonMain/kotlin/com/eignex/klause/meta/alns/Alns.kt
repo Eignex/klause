@@ -545,8 +545,8 @@ internal class Alns(
             get() = neighborhood == null && !closed &&
                 (
                     cpBootstrap?.preparationPending == true || !lsAttempted ||
-                    (lsBootstrap?.isDone == false && lsBootstrap?.stats?.ls?.moves?.sum == 0.0)
-                )
+                        (lsBootstrap?.isDone == false && lsBootstrap?.stats?.ls?.moves?.sum == 0.0)
+                    )
 
         override val stats: SolveStats
             get() {

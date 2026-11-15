@@ -201,9 +201,9 @@ class NativeCapIndexTest {
         repeat(4) { rows.add(9 - it) }
         rows.keepHook = { id ->
             if (id == 0) {
-            rows.use(0);
-            rows.cancelled = true
-        }
+                rows.use(0)
+                rows.cancelled = true
+            }
         }
         rows.attempt(1)
         assertEquals(1, rows.calls[0])
@@ -363,8 +363,8 @@ class NativeCapIndexTest {
         val occupied = SharingMemoryObservation(10_000L, 1024, { false }, {})
         val occupiedValues = assertNotNull(
             occupied.snapshot {
-            rows.index.sharingMemory(occupied, false)
-        }.completeValues
+                rows.index.sharingMemory(occupied, false)
+            }.completeValues,
         )
         assertEquals(rows.index.primitiveBytes, occupiedValues.getValue("ownedPrimitiveBytes"))
         assertEquals(
@@ -550,7 +550,7 @@ class NativeCapIndexTest {
             override fun alive(index: Int): Boolean = alive[index]
             override fun lbd(index: Int): Int = keys[index]
             override fun prepare(index: Int): Boolean {
-                budget.visit(36L);
+                budget.visit(36L)
                 return true
             }
             override fun visited() = Unit
@@ -573,12 +573,12 @@ class NativeCapIndexTest {
             }
             override fun retire(index: Int): Boolean {
                 if (kept[index] || protected[index] || (
-                    configuration.tiered &&
-                        (used[index] || tiers[index] != ClauseTier.LOCAL)
-                )
+                        configuration.tiered &&
+                            (used[index] || tiers[index] != ClauseTier.LOCAL)
+                        )
                 ) {
-                            return false
-                        }
+                    return false
+                }
                 budget.visit(24L)
                 budget.visit(0L)
                 alive[index] = false

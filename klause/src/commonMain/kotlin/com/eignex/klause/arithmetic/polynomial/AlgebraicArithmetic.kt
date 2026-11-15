@@ -27,10 +27,12 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val defining = univariate.squareFree(polynomial)
         val intervals = univariate.isolate(defining)
         if (intervals.any {
-            arithmetic.step();
-            !it.isPoint
+                arithmetic.step()
+                !it.isPoint
+            }
+        ) {
+            rememberRootCount(defining, intervals.size)
         }
-        ) rememberRootCount(defining, intervals.size)
         return@operation intervals.mapIndexed { index, interval ->
             AlgebraicReal(defining, index + 1, interval)
         }
@@ -270,8 +272,8 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val degree = right.definingPolynomial.degree
         val second = Polynomial.of(
             right.definingPolynomial.coefficients.mapIndexed { index, coefficient ->
-            PolynomialTerm(Monomial.of(mapOf(0 to degree - index, 1 to index)), coefficient)
-        }
+                PolynomialTerm(Monomial.of(mapOf(0 to degree - index, 1 to index)), coefficient)
+            },
         )
         val annihilator = extract(arithmetic.resultant(first, second, 0), 1)
         var a = left
@@ -345,10 +347,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
                 univariate.add(
                     image.left,
                     if (subtract) {
-                univariate.scale(image.right, BigFraction.MINUS_ONE)
-            } else {
-                image.right
-            }
+                        univariate.scale(image.right, BigFraction.MINUS_ONE)
+                    } else {
+                        image.right
+                    },
                 )
             }
             evaluate(polynomial, image.base)
@@ -372,10 +374,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             arithmetic.step()
             result = univariate.divide(
                 univariate.add(
-                univariate.multiply(result, image.polynomial),
-                RationalPolynomial(listOf(coefficient)),
-            ),
-                image.base.definingPolynomial
+                    univariate.multiply(result, image.polynomial),
+                    RationalPolynomial(listOf(coefficient)),
+                ),
+                image.base.definingPolynomial,
             ).second
         }
         return result
@@ -481,7 +483,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
                 base.add(value)
             }
             val direction = List(base.size) {
-                arithmetic.step();
+                arithmetic.step()
                 BigFraction.ZERO
             }
             val completed = AffineLineEvaluation(base, direction, this@AlgebraicArithmetic)
@@ -534,11 +536,11 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         var baseId: Int? = null
         for (coefficient in coefficients) {
             for (id in coefficient.variables) {
-            arithmetic.step()
-            if (requireNotNull(coordinates[id]).rational != null) continue
-            if (baseId != null && baseId != id) return captureSharedSpecialization(coefficients, coordinates)
-            baseId = id
-        }
+                arithmetic.step()
+                if (requireNotNull(coordinates[id]).rational != null) continue
+                if (baseId != null && baseId != id) return captureSharedSpecialization(coefficients, coordinates)
+                baseId = id
+            }
         }
         val id = baseId ?: return null
         val base = coordinates.getValue(id)
@@ -567,13 +569,13 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
             var base: AlgebraicReal? = null
             for (coefficient in coefficients) {
                 for (id in coefficient.variables) {
-                arithmetic.step()
-                val value = coordinates.getValue(id)
-                if (value.rational != null) continue
-                val origin = value.image?.base ?: value
-                if (base != null && !sameIndexedRoot(base, origin)) return null
-                base = origin
-            }
+                    arithmetic.step()
+                    val value = coordinates.getValue(id)
+                    if (value.rational != null) continue
+                    val origin = value.image?.base ?: value
+                    if (base != null && !sameIndexedRoot(base, origin)) return null
+                    base = origin
+                }
             }
             val root = base ?: return null
             arithmetic.denseSize(root.definingPolynomial.degree)

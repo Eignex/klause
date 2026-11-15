@@ -35,21 +35,22 @@ class CumulativePropagatorTest {
     @Test
     fun `a high demand subset should conflict without compulsory parts`() {
         val problem = Problem(
-            0, 4,
+            0,
+            4,
             arrayOf(
-            IntDomain(0, 2),
-            IntDomain(0, 2),
-            IntDomain(0, 2),
-            IntDomain(100, 100),
-        ),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(100, 100),
+            ),
             arrayOf<Factor>(
                 Cumulative(
-            intArrayOf(0, 1, 2, 3),
-            longArrayOf(2, 2, 2, 1),
-            longArrayOf(2, 2, 2, 1),
-            3,
-        )
-            )
+                    intArrayOf(0, 1, 2, 3),
+                    longArrayOf(2, 2, 2, 1),
+                    longArrayOf(2, 2, 2, 1),
+                    3,
+                ),
+            ),
         )
 
         val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
@@ -60,19 +61,20 @@ class CumulativePropagatorTest {
     @Test
     fun `a subset start bound should reach a linked row`() {
         val problem = Problem(
-            0, 6,
+            0,
+            6,
             arrayOf(
-            IntDomain(0, 5),
-            IntDomain(0, 4),
-            IntDomain(0, 3),
-            IntDomain(0, 6),
-            IntDomain(100, 100),
-            IntDomain(0, 10),
-        ),
+                IntDomain(0, 5),
+                IntDomain(0, 4),
+                IntDomain(0, 3),
+                IntDomain(0, 6),
+                IntDomain(100, 100),
+                IntDomain(0, 10),
+            ),
             arrayOf(
-            Cumulative(intArrayOf(4, 0, 1, 2, 3), longArrayOf(1, 1, 2, 3, 2), longArrayOf(1, 2, 2, 2, 2), 3),
-            Linear(intArrayOf(1, 1), intArrayOf(3, 5), LinearOp.LE, 10),
-        )
+                Cumulative(intArrayOf(4, 0, 1, 2, 3), longArrayOf(1, 1, 2, 3, 2), longArrayOf(1, 2, 2, 2, 2), 3),
+                Linear(intArrayOf(1, 1), intArrayOf(3, 5), LinearOp.LE, 10),
+            ),
         )
 
         val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
@@ -83,22 +85,23 @@ class CumulativePropagatorTest {
     @Test
     fun `the general capacity should still enforce low demand tasks`() {
         val problem = Problem(
-            0, 5,
+            0,
+            5,
             arrayOf(
-            IntDomain(0, 0),
-            IntDomain(0, 4),
-            IntDomain(0, 4),
-            IntDomain(0, 0),
-            IntDomain(0, 0),
-        ),
+                IntDomain(0, 0),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 0),
+                IntDomain(0, 0),
+            ),
             arrayOf<Factor>(
                 Cumulative(
-            intArrayOf(0, 1, 2, 3, 4),
-            longArrayOf(2, 2, 2, 2, 2),
-            longArrayOf(2, 2, 2, 1, 1),
-            3,
-        )
-            )
+                    intArrayOf(0, 1, 2, 3, 4),
+                    longArrayOf(2, 2, 2, 2, 2),
+                    longArrayOf(2, 2, 2, 1, 1),
+                    3,
+                ),
+            ),
         )
 
         val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
@@ -109,23 +112,24 @@ class CumulativePropagatorTest {
     @Test
     fun `subset deductions should exclude zero load tasks`() {
         val problem = Problem(
-            0, 6,
+            0,
+            6,
             arrayOf(
-            IntDomain(0, 4),
-            IntDomain(0, 4),
-            IntDomain(0, 4),
-            IntDomain(1, 1),
-            IntDomain(1, 1),
-            IntDomain(100, 100),
-        ),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(0, 4),
+                IntDomain(1, 1),
+                IntDomain(1, 1),
+                IntDomain(100, 100),
+            ),
             arrayOf<Factor>(
                 Cumulative(
-            intArrayOf(0, 1, 2, 3, 4, 5),
-            longArrayOf(2, 2, 2, 0, 2, 1),
-            longArrayOf(2, 2, 2, 2, 0, 1),
-            3,
-        )
-            )
+                    intArrayOf(0, 1, 2, 3, 4, 5),
+                    longArrayOf(2, 2, 2, 0, 2, 1),
+                    longArrayOf(2, 2, 2, 2, 0, 1),
+                    3,
+                ),
+            ),
         )
 
         val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
@@ -157,22 +161,23 @@ class CumulativePropagatorTest {
     fun `subset filtering should decline wide and unsafe time windows`() {
         for ((offset, upper) in listOf(0L to 10000L, (1L shl 40) + 1 to 6L)) {
             val problem = Problem(
-                0, 5,
+                0,
+                5,
                 arrayOf(
-                IntDomain(offset, offset + 4),
-                IntDomain(offset, offset + 4),
-                IntDomain(offset, offset + 4),
-                IntDomain(offset, offset + upper),
-                IntDomain(100, 100),
-            ),
+                    IntDomain(offset, offset + 4),
+                    IntDomain(offset, offset + 4),
+                    IntDomain(offset, offset + 4),
+                    IntDomain(offset, offset + upper),
+                    IntDomain(100, 100),
+                ),
                 arrayOf<Factor>(
                     Cumulative(
-                intArrayOf(0, 1, 2, 3, 4),
-                longArrayOf(2, 2, 2, 2, 1),
-                longArrayOf(2, 2, 2, 2, 1),
-                3,
-            )
-                )
+                        intArrayOf(0, 1, 2, 3, 4),
+                        longArrayOf(2, 2, 2, 2, 1),
+                        longArrayOf(2, 2, 2, 2, 1),
+                        3,
+                    ),
+                ),
             )
 
             val session = PropagationSession(PropagationProblem(problem), cumulativeUnarySubsets = true)
@@ -190,22 +195,23 @@ class CumulativePropagatorTest {
                     val highMax = offset + if (lower) 3 else 4
                     val candidateMax = offset + if (lower) 4 else 3
                     val problem = Problem(
-                        0, 5,
+                        0,
+                        5,
                         arrayOf(
-                        IntDomain(offset, highMax),
-                        IntDomain(offset, highMax),
-                        IntDomain(offset, highMax),
-                        IntDomain(offset, candidateMax),
-                        IntDomain(offset + 20, offset + 20),
-                    ),
+                            IntDomain(offset, highMax),
+                            IntDomain(offset, highMax),
+                            IntDomain(offset, highMax),
+                            IntDomain(offset, candidateMax),
+                            IntDomain(offset + 20, offset + 20),
+                        ),
                         arrayOf<Factor>(
                             Cumulative(
-                        intArrayOf(if (alias) 0 else 4, 2, 0, 1, 3),
-                        LongArray(5) { 1 },
-                        longArrayOf(1, 2, 2, 2, 2),
-                        3,
-                    )
-                        )
+                                intArrayOf(if (alias) 0 else 4, 2, 0, 1, 3),
+                                LongArray(5) { 1 },
+                                longArrayOf(1, 2, 2, 2, 2),
+                                3,
+                            ),
+                        ),
                     )
 
                     PropagationReasonOracle.assertReasonsImply(problem, "subset $lower $offset $alias") { state ->
@@ -222,22 +228,23 @@ class CumulativePropagatorTest {
     @Test
     fun `subset reasons should retain historical start bounds`() {
         val problem = Problem(
-            0, 5,
+            0,
+            5,
             arrayOf(
-            IntDomain(0, 9),
-            IntDomain(0, 9),
-            IntDomain(0, 9),
-            IntDomain(0, 8),
-            IntDomain(100, 100),
-        ),
+                IntDomain(0, 9),
+                IntDomain(0, 9),
+                IntDomain(0, 9),
+                IntDomain(0, 8),
+                IntDomain(100, 100),
+            ),
             arrayOf<Factor>(
                 Cumulative(
-            intArrayOf(4, 0, 1, 2, 3),
-            longArrayOf(1, 2, 2, 2, 2),
-            longArrayOf(1, 2, 2, 2, 2),
-            3,
-        )
-            )
+                    intArrayOf(4, 0, 1, 2, 3),
+                    longArrayOf(1, 2, 2, 2, 2),
+                    longArrayOf(1, 2, 2, 2, 2),
+                    3,
+                ),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.cumulativeUnarySubsets = true
@@ -264,22 +271,23 @@ class CumulativePropagatorTest {
     @Test
     fun `undo should discard interrupted subset deductions and filter a sibling`() {
         val problem = Problem(
-            0, 5,
+            0,
+            5,
             arrayOf(
-            IntDomain(0, 9),
-            IntDomain(0, 9),
-            IntDomain(0, 9),
-            IntDomain(0, 8),
-            IntDomain(100, 100),
-        ),
+                IntDomain(0, 9),
+                IntDomain(0, 9),
+                IntDomain(0, 9),
+                IntDomain(0, 8),
+                IntDomain(100, 100),
+            ),
             arrayOf<Factor>(
                 Cumulative(
-            intArrayOf(4, 0, 1, 2, 3),
-            longArrayOf(1, 2, 2, 2, 2),
-            longArrayOf(1, 2, 2, 2, 2),
-            3,
-        )
-            )
+                    intArrayOf(4, 0, 1, 2, 3),
+                    longArrayOf(1, 2, 2, 2, 2),
+                    longArrayOf(1, 2, 2, 2, 2),
+                    3,
+                ),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.cumulativeUnarySubsets = true
@@ -316,12 +324,12 @@ class CumulativePropagatorTest {
                 arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 1)),
                 arrayOf<Factor>(
                     Cumulative(
-                    intArrayOf(0, 1),
-                    longArrayOf(duration, duration),
-                    longArrayOf(1, 1),
-                    capacity,
-                    resourceVars = intArrayOf(2, 2),
-                )
+                        intArrayOf(0, 1),
+                        longArrayOf(duration, duration),
+                        longArrayOf(1, 1),
+                        capacity,
+                        resourceVars = intArrayOf(2, 2),
+                    ),
                 ),
             )
             val state = PropagationState(problem, Assumptions.None)
@@ -335,21 +343,22 @@ class CumulativePropagatorTest {
     @Test
     fun `capacity ceilings should not overflow when the prefix surface fits its window`() {
         val problem = Problem(
-            0, 3,
+            0,
+            3,
             arrayOf(
-            IntDomain(0, 0),
-            IntDomain(Long.MAX_VALUE - 1L, Long.MAX_VALUE - 1L),
-            IntDomain(0, 1),
-        ),
+                IntDomain(0, 0),
+                IntDomain(Long.MAX_VALUE - 1L, Long.MAX_VALUE - 1L),
+                IntDomain(0, 1),
+            ),
             arrayOf<Factor>(
                 Cumulative(
-            intArrayOf(0, 1),
-            longArrayOf(Long.MAX_VALUE, 1),
-            longArrayOf(1, 0),
-            1,
-            capacityVar = 2,
-        )
-            )
+                    intArrayOf(0, 1),
+                    longArrayOf(Long.MAX_VALUE, 1),
+                    longArrayOf(1, 0),
+                    1,
+                    capacityVar = 2,
+                ),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
 
@@ -363,10 +372,12 @@ class CumulativePropagatorTest {
         for (limit in listOf(4, 10, 30)) {
             val n = 48
             val problem = Problem(
-                0, n, Array(n) { IntDomain(0, 100L + it) },
+                0,
+                n,
+                Array(n) { IntDomain(0, 100L + it) },
                 arrayOf<Factor>(
-                Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
-            )
+                    Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
+                ),
             )
             val state = PropagationState(problem, Assumptions.None)
             state.beginRootFixpoint().forEach { }
@@ -385,10 +396,12 @@ class CumulativePropagatorTest {
     @Test
     fun `undo should discard an interrupted cumulative bound and preserve sibling filtering`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 4) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 4) },
             arrayOf<Factor>(
-            Cumulative(intArrayOf(0, 1, 2), longArrayOf(2, 2, 2), longArrayOf(1, 1, 1), 2),
-        )
+                Cumulative(intArrayOf(0, 1, 2), longArrayOf(2, 2, 2), longArrayOf(1, 1, 1), 2),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.beginRootFixpoint().forEach { }

@@ -42,9 +42,9 @@ class DuplicateColumnMergeTest {
         val aggregate = IntDomain(keep.min + first.min, keep.max + first.max)
         val merges = DuplicateColumnMerges(
             listOf(
-            listOf(ColumnMerge(0, 1, keep, first)),
-            listOf(ColumnMerge(0, 2, aggregate, second)),
-        )
+                listOf(ColumnMerge(0, 1, keep, first)),
+                listOf(ColumnMerge(0, 2, aggregate, second)),
+            ),
         )
         for (z in (aggregate.min + second.min)..(aggregate.max + second.max)) {
             val result = merges.reconstruct(Sample(BooleanArray(0), longArrayOf(z, 0, 0))).ints

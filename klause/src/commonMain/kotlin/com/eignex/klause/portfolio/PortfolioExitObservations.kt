@@ -29,10 +29,10 @@ internal class PortfolioExitObservations(size: Int) {
             null
         } else {
             when (result) {
-            is MinimizeResult.BestFound -> result.reason
-            is MinimizeResult.Unknown -> result.reason
-            else -> null
-        }
+                is MinimizeResult.BestFound -> result.reason
+                is MinimizeResult.Unknown -> result.reason
+                else -> null
+            }
         }
     }
 

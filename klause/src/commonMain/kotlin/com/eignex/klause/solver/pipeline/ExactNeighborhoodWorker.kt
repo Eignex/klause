@@ -115,11 +115,11 @@ internal fun exactNeighborhoodWorker(
                     ) { sample, value ->
                         onIncumbent(
                             MinimizeResult.BestFound(
-                            sample,
-                            requireNotNull(value).toDouble(),
-                            TerminationReason.BudgetExhausted,
-                            search.stats,
-                        )
+                                sample,
+                                requireNotNull(value).toDouble(),
+                                TerminationReason.BudgetExhausted,
+                                search.stats,
+                            ),
                         )
                     }
                     if (done || stop(global)()) result = search.minimizeResult(reason(global))

@@ -47,15 +47,15 @@ class IntegerConflictLearnerTest {
         for (sign in listOf(-1, 1)) {
             val native = PropagationSession(
                 Problem(
-                0,
-                3,
-                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 8)),
-                arrayOf(
-                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-                    Linear(intArrayOf(2 * sign, sign, -sign), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                    0,
+                    3,
+                    arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 8)),
+                    arrayOf(
+                        Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                        Linear(intArrayOf(2 * sign, sign, -sign), intArrayOf(0, 1, 2), LinearOp.EQ, 0),
+                    ),
                 ),
-            ),
-                pbLearning = false
+                pbLearning = false,
             ).apply { enableIntegerRowLearning() }
             assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
 
@@ -73,15 +73,15 @@ class IntegerConflictLearnerTest {
     fun `a learned row should preserve the fallback backjump target`() {
         val native = PropagationSession(
             Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 8)),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                0,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 8)),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        ),
-            pbLearning = false
+            pbLearning = false,
         ).apply { enableIntegerRowLearning() }
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
 
@@ -96,25 +96,25 @@ class IntegerConflictLearnerTest {
     fun `a cascaded row with an unavailable shared premise should retain clause fallback`() {
         val native = PropagationSession(
             Problem(
-            0,
-            6,
-            arrayOf(
-                IntDomain(0, 6),
-                IntDomain(0, 12),
-                IntDomain(0, 24),
-                IntDomain(0, 6),
-                IntDomain(0, 12),
-                IntDomain(0, 24),
+                0,
+                6,
+                arrayOf(
+                    IntDomain(0, 6),
+                    IntDomain(0, 12),
+                    IntDomain(0, 24),
+                    IntDomain(0, 6),
+                    IntDomain(0, 12),
+                    IntDomain(0, 24),
+                ),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(3, 4, 5), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(3, 4), LinearOp.LE, 0),
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 3), LinearOp.GE, 3),
+                ),
             ),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-                Linear(intArrayOf(2, 1, -1), intArrayOf(3, 4, 5), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(3, 4), LinearOp.LE, 0),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 3), LinearOp.GE, 3),
-            ),
-        ),
-            pbLearning = false
+            pbLearning = false,
         ).apply { enableIntegerRowLearning() }
         val peer = object : SearchComponent {
             override fun initialize(context: SearchContext): ComponentResult =
@@ -140,31 +140,31 @@ class IntegerConflictLearnerTest {
     fun `a paired arithmetic assertion should publish both row and clause deductions`() {
         val native = PropagationSession(
             Problem(
-            2,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                2,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+                ),
             ),
-        ),
-            pbLearning = false
+            pbLearning = false,
         ).apply { enableIntegerRowLearning() }
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
         val row = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0, 2),
-            longArrayOf(4, -1),
-            intArrayOf(0, 2),
-            LinearOp.LE,
-            0,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0, 2),
+                    longArrayOf(4, -1),
+                    intArrayOf(0, 2),
+                    LinearOp.LE,
+                    0,
+                ),
+                useLo = true,
+            ),
         )
         val fallback = ConflictAnalyzer.AnalysisResult.Learned(
             intArrayOf(Lit.make(0, true)),
@@ -308,24 +308,24 @@ class IntegerConflictLearnerTest {
             assertNotNull(
                 retained,
                 "prepared=" + ProblemJson().encodeToString(prepared.problem) +
-                "; learning=" + session.learnedLifecycle() + "; uses=" + uses.values +
-                "; declines=" + trace.events.filter { "decline" in it.kind }.groupingBy { it.kind }.eachCount() +
-                "; tail=" + trace.events.takeLast(20).map { it.kind }
+                    "; learning=" + session.learnedLifecycle() + "; uses=" + uses.values +
+                    "; declines=" + trace.events.filter { "decline" in it.kind }.groupingBy { it.kind }.eachCount() +
+                    "; tail=" + trace.events.takeLast(20).map { it.kind },
             )
             assertTrue(retained.row.guard != Lit.NONE)
             session.popToLevel(0)
             assertIs<PropagationResult.Implied>(
                 session.pinBool(
-                Lit.variable(retained.row.guard),
-                !Lit.isPositive(retained.row.guard),
-            )
+                    Lit.variable(retained.row.guard),
+                    !Lit.isPositive(retained.row.guard),
+                ),
             )
             assertTrue(
                 session.explanationState.forgetLearnedClauses(
-                maxWork = 16_000_000L,
-                maxScratchBytes = 16_000_000L,
-                cancelled = { session.cancelRequested },
-            ) { _, _ -> false }
+                    maxWork = 16_000_000L,
+                    maxScratchBytes = 16_000_000L,
+                    cancelled = { session.cancelRequested },
+                ) { _, _ -> false },
             )
             assertFalse(session.explanationState.learned.integerRows?.contains(retained) == true)
             assertTrue((session.learnedLifecycle()["learningIntegerRetired"] ?: 0L) > 0L)
@@ -336,15 +336,15 @@ class IntegerConflictLearnerTest {
     fun `a consumed guarded row should retire after its historical reason retracts`() {
         val native = PropagationSession(
             Problem(
-            2,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-            arrayOf(
-                ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                2,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                arrayOf(
+                    ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        ),
-            pbLearning = false
+            pbLearning = false,
         ).apply { enableIntegerRowLearning() }
         assertIs<PropagationResult.Implied>(native.pinBool(0, true))
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
@@ -374,14 +374,14 @@ class IntegerConflictLearnerTest {
     fun `an incidental hole should preserve a learned row guard`() {
         val native = PropagationSession(
             Problem(
-            1,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(2), IntDomain(0, 24)),
-            arrayOf(
-                ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                1,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(2), IntDomain(0, 24)),
+                arrayOf(
+                    ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        )
         ).apply { enableIntegerRowLearning() }
         assertIs<PropagationResult.Implied>(native.pinBool(0, true))
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
@@ -414,14 +414,15 @@ class IntegerConflictLearnerTest {
                 )
                 val native = PropagationSession(
                     Problem(
-                        0, 4,
+                        0,
+                        4,
                         arrayOf(
-                        IntDomain(0, scale.toLong()),
-                        IntDomain(0, scale.toLong()),
-                        IntDomain(0, scale.toLong() * (scale + 1)),
-                        IntDomain(0, scale.toLong() * (scale + 1)),
-                    ),
-                        order.map { factors[it] }.toTypedArray()
+                            IntDomain(0, scale.toLong()),
+                            IntDomain(0, scale.toLong()),
+                            IntDomain(0, scale.toLong() * (scale + 1)),
+                            IntDomain(0, scale.toLong() * (scale + 1)),
+                        ),
+                        order.map { factors[it] }.toTypedArray(),
                     ),
                     pbLearning = false,
                 ).apply { enableIntegerRowLearning() }
@@ -445,18 +446,19 @@ class IntegerConflictLearnerTest {
         for (sign in listOf(1, -1)) {
             val native = PropagationSession(
                 Problem(
-                    0, 3,
+                    0,
+                    3,
                     arrayOf(
-                IntDomain(if (sign > 0) 0L else -6L, if (sign > 0) 6L else 0L),
-                IntDomain(if (sign > 0) 0L else -12L, if (sign > 0) 12L else 0L).excludeValue(2L * sign),
-                IntDomain(if (sign > 0) 0L else -24L, if (sign > 0) 24L else 0L),
-            ),
-                arrayOf(
-                Linear(intArrayOf(2 * sign, sign, -sign), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2 * sign, -sign), intArrayOf(0, 1), LinearOp.LE, 0),
-            )
+                        IntDomain(if (sign > 0) 0L else -6L, if (sign > 0) 6L else 0L),
+                        IntDomain(if (sign > 0) 0L else -12L, if (sign > 0) 12L else 0L).excludeValue(2L * sign),
+                        IntDomain(if (sign > 0) 0L else -24L, if (sign > 0) 24L else 0L),
+                    ),
+                    arrayOf(
+                        Linear(intArrayOf(2 * sign, sign, -sign), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                        Linear(intArrayOf(2 * sign, -sign), intArrayOf(0, 1), LinearOp.LE, 0),
+                    ),
                 ),
-                pbLearning = false
+                pbLearning = false,
             ).apply { enableIntegerRowLearning() }
             val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))
             val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
@@ -521,14 +523,14 @@ class IntegerConflictLearnerTest {
     fun `a retained row reason should keep its historical premises after factor ids move`() {
         val native = PropagationSession(
             Problem(
-            1,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                1,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        )
         ).apply { enableIntegerRowLearning() }
         assertIs<PropagationResult.Implied>(native.seed(Assumptions.None.withInt(2, 7)))
         val dummy = native.learnedClauseCount
@@ -559,28 +561,28 @@ class IntegerConflictLearnerTest {
     fun `a full row store should fall back until forgetting releases capacity`() {
         val native = PropagationSession(
             Problem(
-            0,
-            4,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 6)),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                0,
+                4,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 6)),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        )
         ).apply { enableIntegerRowLearning() }
         repeat(INTEGER_LEARNING_ROWS) { index ->
             val row = requireNotNull(
                 IntegerConflictRow.source(
                     LinearPropagator(
-                intArrayOf(),
-                intArrayOf(3),
-                longArrayOf(1),
-                intArrayOf(3),
-                LinearOp.LE,
-                6L + index,
-            ),
-                useLo = true
-                )
+                        intArrayOf(),
+                        intArrayOf(3),
+                        longArrayOf(1),
+                        intArrayOf(3),
+                        LinearOp.LE,
+                        6L + index,
+                    ),
+                    useLo = true,
+                ),
             )
             native.addLearnedIntegerRow(row, lbd = 3)
         }
@@ -601,14 +603,14 @@ class IntegerConflictLearnerTest {
     fun `an unavailable shared bound premise should decline native row admission`() {
         val native = PropagationSession(
             Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                0,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        )
         ).apply { enableIntegerRowLearning() }
         val peer = object : SearchComponent {
             override fun initialize(context: SearchContext): ComponentResult =
@@ -632,15 +634,15 @@ class IntegerConflictLearnerTest {
     fun `cancellation before row analysis should publish no learned result`() {
         val state = PropagationState(
             Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                0,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        ),
-            Assumptions.None
+            Assumptions.None,
         )
         state.undoLogging = true
         state.integerRowLearning = true
@@ -660,15 +662,15 @@ class IntegerConflictLearnerTest {
     fun `a stored row should wake beside a delta consumer after compaction and late atoms`() {
         val native = PropagationSession(
             Problem(
-            1,
-            4,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 6)),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-                Table(intArrayOf(0, 3), LongArray(14) { (it / 2).toLong() }),
+                1,
+                4,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 6)),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    Table(intArrayOf(0, 3), LongArray(14) { (it / 2).toLong() }),
+                ),
             ),
-        )
         ).apply { enableIntegerRowLearning() }
         assertIs<PropagationResult.Implied>(native.seed(Assumptions.None.withBool(0, true)))
         native.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false))), lbd = 3)
@@ -706,23 +708,24 @@ class IntegerConflictLearnerTest {
             for ((op, orientation) in listOf(LinearOp.LE to 1, LinearOp.EQ to 1, LinearOp.EQ to -1)) {
                 val native = PropagationSession(
                     Problem(
-                        0, 3,
-                        arrayOf(
-                    IntDomain(if (sign > 0) 0L else -6L, if (sign > 0) 6L else 0L),
-                    IntDomain(if (sign > 0) 0L else -12L, if (sign > 0) 12L else 0L),
-                    IntDomain(if (sign > 0) 0L else -24L, if (sign > 0) 24L else 0L),
-                ),
-                    arrayOf(
-                    Linear(
-                        intArrayOf(2 * sign * orientation, sign * orientation, -sign * orientation),
-                        intArrayOf(0, 1, 2),
-                        op,
                         0,
+                        3,
+                        arrayOf(
+                            IntDomain(if (sign > 0) 0L else -6L, if (sign > 0) 6L else 0L),
+                            IntDomain(if (sign > 0) 0L else -12L, if (sign > 0) 12L else 0L),
+                            IntDomain(if (sign > 0) 0L else -24L, if (sign > 0) 24L else 0L),
+                        ),
+                        arrayOf(
+                            Linear(
+                                intArrayOf(2 * sign * orientation, sign * orientation, -sign * orientation),
+                                intArrayOf(0, 1, 2),
+                                op,
+                                0,
+                            ),
+                            Linear(intArrayOf(2 * sign, -sign), intArrayOf(0, 1), LinearOp.LE, 0),
+                        ),
                     ),
-                    Linear(intArrayOf(2 * sign, -sign), intArrayOf(0, 1), LinearOp.LE, 0),
-                )
-                    ),
-                    pbLearning = false
+                    pbLearning = false,
                 ).apply { enableIntegerRowLearning() }
                 val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))
                 val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
@@ -790,15 +793,15 @@ class IntegerConflictLearnerTest {
     fun `the production traversal should consume an integer row with PB disabled`() {
         val native = PropagationSession(
             Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                0,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        ),
-            pbLearning = false
+            pbLearning = false,
         ).apply { enableIntegerRowLearning() }
         var consumed = false
         val branching = CpBranching { session, source ->
@@ -830,14 +833,14 @@ class IntegerConflictLearnerTest {
     fun `a root asserting row should retain a feasible parent`() {
         val native = PropagationSession(
             Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 7)),
-            arrayOf(
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                0,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 7)),
+                arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        )
         ).apply { enableIntegerRowLearning() }
         val cp = CpSearchComponent(native)
         val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
@@ -856,12 +859,14 @@ class IntegerConflictLearnerTest {
     fun `integer rounding that loses conflict should retain clause fallback`() {
         val native = PropagationSession(
             Problem(
-                0, 2, arrayOf(IntDomain(0, 3), IntDomain(0, 2)),
+                0,
+                2,
+                arrayOf(IntDomain(0, 3), IntDomain(0, 2)),
                 arrayOf(
-            Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3),
-            Linear(intArrayOf(-1, -2), intArrayOf(0, 1), LinearOp.LE, -3),
-        )
-            )
+                    Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.LE, 3),
+                    Linear(intArrayOf(-1, -2), intArrayOf(0, 1), LinearOp.LE, -3),
+                ),
+            ),
         ).apply { enableIntegerRowLearning() }
 
         val conflict = assertIs<PropagationResult.Unsat>(native.pinInt(0, 2))
@@ -879,11 +884,11 @@ class IntegerConflictLearnerTest {
             )
             val native = PropagationSession(
                 Problem(
-                0,
-                3,
-                arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(4), IntDomain(0, 24)),
-                (if (reverse) rows.reversed() else rows).toTypedArray(),
-            )
+                    0,
+                    3,
+                    arrayOf(IntDomain(0, 6), IntDomain(0, 12).excludeValue(4), IntDomain(0, 24)),
+                    (if (reverse) rows.reversed() else rows).toTypedArray(),
+                ),
             ).apply { enableIntegerRowLearning() }
             assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))
 
@@ -897,14 +902,14 @@ class IntegerConflictLearnerTest {
     fun `a reified source reason should retain its Boolean condition in the row and fallback`() {
         val native = PropagationSession(
             Problem(
-            1,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-            arrayOf(
-                ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                1,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                arrayOf(
+                    ReifiedLinear(0, intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-        )
         ).apply { enableIntegerRowLearning() }
         assertIs<PropagationResult.Implied>(native.pinBool(0, true))
         assertIs<PropagationResult.Implied>(native.pinIntAtMost(2, 7))

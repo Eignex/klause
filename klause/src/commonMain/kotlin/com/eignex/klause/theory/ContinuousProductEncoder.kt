@@ -24,15 +24,15 @@ private val polynomialProduct = Encoder(EncoderSupport.DIRECT) { view, encoding 
     view as ContinuousProduct
     encoding.polynomial(
         PolynomialRealFormula.Atom(
-        PolynomialExpression.Product(
-            listOf(
-            encoding.real(SourceRealId(view.a)),
-            encoding.real(SourceRealId(view.b)),
-        )
+            PolynomialExpression.Product(
+                listOf(
+                    encoding.real(SourceRealId(view.a)),
+                    encoding.real(SourceRealId(view.b)),
+                ),
+            ),
+            PolynomialRelation.EQ,
+            encoding.real(SourceRealId(view.result)),
         ),
-        PolynomialRelation.EQ,
-        encoding.real(SourceRealId(view.result)),
-    )
     )
     view.finiteChoices?.let { choices ->
         val alternatives = ArrayList<PolynomialRealFormula>()
@@ -53,10 +53,10 @@ private val polynomialProduct = Encoder(EncoderSupport.DIRECT) { view, encoding 
                 encoding.polynomial(
                     PolynomialRealFormula.And(
                         listOf(
-                    PolynomialRealFormula.Or(listOf(PolynomialRealFormula.Not(guard), member)),
-                    PolynomialRealFormula.Or(listOf(guard, PolynomialRealFormula.Not(member))),
-                )
-                    )
+                            PolynomialRealFormula.Or(listOf(PolynomialRealFormula.Not(guard), member)),
+                            PolynomialRealFormula.Or(listOf(guard, PolynomialRealFormula.Not(member))),
+                        ),
+                    ),
                 )
             }
         }

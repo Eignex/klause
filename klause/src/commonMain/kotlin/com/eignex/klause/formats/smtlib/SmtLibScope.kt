@@ -177,8 +177,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
                                 !accepts(signature.parameters[it], args[it])
                             }
                         ) {
-                                return null
-                            }
+                            return null
+                        }
                         signature.result
                     }
                     values.addLast(result ?: return null)
@@ -218,10 +218,10 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
         "=", "distinct" -> if (args.size >= 2 &&
             (args.all { it == Sort.BOOL } || args.all(::numeric))
         ) {
-                Sort.BOOL
-            } else {
-                null
-            }
+            Sort.BOOL
+        } else {
+            null
+        }
 
         "<", "<=", ">", ">=" -> if (args.size >= 2 && args.all(::numeric)) Sort.BOOL else null
 

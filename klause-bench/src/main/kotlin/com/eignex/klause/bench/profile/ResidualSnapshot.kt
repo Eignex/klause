@@ -204,17 +204,17 @@ internal object ResidualSnapshots {
         }
         require(
             snapshot.fixedObjective == fixedObjective(
-            snapshot.boolWeights,
-            snapshot.objectiveConstant,
-            snapshot.values,
-        ).toString()
+                snapshot.boolWeights,
+                snapshot.objectiveConstant,
+                snapshot.values,
+            ).toString(),
         ) { "fixed objective mismatch" }
         require(
             snapshot.isolatedObjective == isolatedObjective(
-            snapshot.boolWeights,
-            snapshot.values,
-            clauses,
-        ).toString()
+                snapshot.boolWeights,
+                snapshot.values,
+                clauses,
+            ).toString(),
         ) { "isolated objective mismatch" }
         val all = enforcing(
             prepared,
@@ -298,10 +298,10 @@ internal object ResidualSnapshots {
             require(upper == objective(weights, constant, cutoff.witness)) { "cutoff objective mismatch" }
             require(
                 prepared.factors.all { f ->
-                (f as Clause).literals.any {
-                    cutoff.witness[Lit.variable(it)] == Lit.isPositive(it)
-                }
-            }
+                    (f as Clause).literals.any {
+                        cutoff.witness[Lit.variable(it)] == Lit.isPositive(it)
+                    }
+                },
             ) { "cutoff witness violates prepared source" }
             val nonzero = weights.indices.filter { weights[it] != 0L }
             val positive = weights.filter { it > 0 }.fold(BigInteger.ZERO) { a, b -> a + BigInteger.valueOf(b) }

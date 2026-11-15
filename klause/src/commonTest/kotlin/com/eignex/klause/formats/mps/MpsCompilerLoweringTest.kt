@@ -299,8 +299,8 @@ class MpsCompilerLoweringTest {
 
         val linear = assertNotNull(
             source.toLinearSourceProblem(
-            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-        )
+                SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+            ),
         )
 
         val numbers = source.sourceNumbers()

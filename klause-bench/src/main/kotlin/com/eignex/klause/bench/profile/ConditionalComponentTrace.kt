@@ -126,20 +126,20 @@ object ConditionalComponentTrace {
         )
         out.resolve("request.json").writeText(
             buildJsonObject {
-            put("sources", sources.joinToString(","))
-            put("searchMillis", settings.searchMillis)
-            put("traceMillis", settings.traceMillis)
-            put("prepareMillis", settings.prepareMillis)
-            put("seed", settings.seed)
-            put("probes", settings.probes)
-            put("probeMillis", settings.probeMillis)
-            put("snapshotBytes", settings.snapshotBytes)
-            put("javaVersion", System.getProperty("java.version"))
-            put("osArch", System.getProperty("os.arch"))
-            put("processors", Runtime.getRuntime().availableProcessors())
-            put("maxMemory", Runtime.getRuntime().maxMemory())
-            put("provenance", runCatching { InstalledBuild.current.fingerprint }.getOrElse { "unavailable: $it" })
-        }.toString()
+                put("sources", sources.joinToString(","))
+                put("searchMillis", settings.searchMillis)
+                put("traceMillis", settings.traceMillis)
+                put("prepareMillis", settings.prepareMillis)
+                put("seed", settings.seed)
+                put("probes", settings.probes)
+                put("probeMillis", settings.probeMillis)
+                put("snapshotBytes", settings.snapshotBytes)
+                put("javaVersion", System.getProperty("java.version"))
+                put("osArch", System.getProperty("os.arch"))
+                put("processors", Runtime.getRuntime().availableProcessors())
+                put("maxMemory", Runtime.getRuntime().maxMemory())
+                put("provenance", runCatching { InstalledBuild.current.fingerprint }.getOrElse { "unavailable: $it" })
+            }.toString(),
         )
         val inputs = listOf<() -> Input>({ control(conditioned = false) }, { control(conditioned = true) }) +
             sources.map { spec -> { catalogSource(spec) } }
@@ -171,12 +171,14 @@ object ConditionalComponentTrace {
         val wcnf = Dimacs.parseWcnf(text).toProblem()
         val label = if (conditioned) "control-two-five-cycle-s-true" else "control-two-five-cycle"
         return Input(
-            label, wcnf.problem, wcnf.objective.toLinearObjective(),
+            label,
+            wcnf.problem,
+            wcnf.objective.toLinearObjective(),
             buildJsonObject {
-            put("kind", "self-authored")
-            put("sha256", hex(MessageDigest.getInstance("SHA-256").digest(text.toByteArray())))
-            put("expectedOptimum", if (conditioned) 7 else 6)
-        }
+                put("kind", "self-authored")
+                put("sha256", hex(MessageDigest.getInstance("SHA-256").digest(text.toByteArray())))
+                put("expectedOptimum", if (conditioned) 7 else 6)
+            },
         )
     }
 
@@ -200,14 +202,16 @@ object ConditionalComponentTrace {
         require(actual == expected) { "$suite/$name: sha256 $actual, expected $expected" }
         val entry = Runners.resolve(ref)
         return Input(
-            "$suite-$name", entry.problem, requireNotNull(entry.objective),
+            "$suite-$name",
+            entry.problem,
+            requireNotNull(entry.objective),
             buildJsonObject {
-            put("kind", "catalog")
-            put("suite", suite)
-            put("problem", name)
-            put("sha256", actual)
-            put("bytes", bytes)
-        }
+                put("kind", "catalog")
+                put("suite", suite)
+                put("problem", name)
+                put("sha256", actual)
+                put("bytes", bytes)
+            },
         )
     }
 
@@ -235,14 +239,14 @@ object ConditionalComponentTrace {
         val stop = ExecutionControl.after(settings.prepareMillis.milliseconds)
         val prepared = FinitePipeline.prepare(
             FinitePipelineRequest(
-            input.problem,
-            FiniteEngine.BACKTRACK,
-            input.objective,
-            cancellation = stop,
-            solveCancellation = stop,
-            presolveBudget = PresolveBudget(PRESOLVE_ALLOWANCE),
-            randomSeed = settings.seed,
-        )
+                input.problem,
+                FiniteEngine.BACKTRACK,
+                input.objective,
+                cancellation = stop,
+                solveCancellation = stop,
+                presolveBudget = PresolveBudget(PRESOLVE_ALLOWANCE),
+                randomSeed = settings.seed,
+            ),
         )
         val prepareNanos = System.nanoTime() - prepareStart
         val baked = prepared.problem as? BakedProblem
@@ -265,15 +269,16 @@ object ConditionalComponentTrace {
             return JsonObject(header + ("decline" to JsonPrimitive("preparation-terminal")))
         }
         val context = ResidualCaptureContext(
-            objective, input.identity,
+            objective,
+            input.identity,
             buildJsonObject {
-            put("preparation", header.getValue("preparation"))
-            put("revision", Reports.readGitSha())
-            put("seed", settings.seed)
-            put("presolveAllowance", PRESOLVE_ALLOWANCE)
-            put("provenance", runCatching { InstalledBuild.current.fingerprint }.getOrElse { "unavailable: $it" })
-        },
-            ResidualSnapshotBudget(settings.probes, settings.snapshotBytes)
+                put("preparation", header.getValue("preparation"))
+                put("revision", Reports.readGitSha())
+                put("seed", settings.seed)
+                put("presolveAllowance", PRESOLVE_ALLOWANCE)
+                put("provenance", runCatching { InstalledBuild.current.fingerprint }.getOrElse { "unavailable: $it" })
+            },
+            ResidualSnapshotBudget(settings.probes, settings.snapshotBytes),
         )
         val recorder = Recorder(baked, settings.traceMillis * 1_000_000, settings.probes, context)
         val start = System.nanoTime()
@@ -291,95 +296,95 @@ object ConditionalComponentTrace {
         val sourceSample = result.assignment?.let(prepared.reconstruct)
         return JsonObject(
             header + buildJsonObject {
-            put("preparedBoolVars", baked.numBoolVars)
-            put("preparedIntVars", baked.numIntVars)
-            put("preparedFactors", baked.factors.size)
-            put(
-                "preparedFactorKinds",
-                baked.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()
-                .entries.joinToString(",") { "${it.key}=${it.value}" }
-            )
-            putJsonObject("solve") {
-                put("preset", "satOptimized")
-                put("result", result::class.simpleName)
-                put("proven", result is MinimizeResult.Optimal || result is MinimizeResult.Infeasible)
-                put("preparedObjective", result.objectiveValue)
-                sourceSample?.let { put("sourceObjective", sourceObjective(input.objective, it)) }
-                sourceSample?.let { put("sourceClauseViolations", clauseViolations(input.problem, it)) }
-                put("sourceNonClauseFactorsUnchecked", input.problem.factors.count { it !is Clause })
-                put("nodes", result.stats.search.nodes.sum)
-                put("fails", result.stats.search.fails.sum)
-                put("restarts", result.stats.search.restarts.sum)
-                put("wallMs", wallNanos / 1_000_000)
-                put("searchMs", (wallNanos - recorder.traceNanos) / 1_000_000)
-            }
-            put("trace", recorder.summary())
-            put(
-                "probes",
-                JsonArray(
-                    recorder.probes.map { probe ->
-                val composition = runCatching {
-                    if (probe.declined) {
-                        buildJsonObject {
-                        put("decline", probe.snapshot.decline ?: "unsupported-source-factor")
-                    }
-                    } else {
-                        compose(probe, objective, prepared.reconstruct, input, settings)
-                    }
+                put("preparedBoolVars", baked.numBoolVars)
+                put("preparedIntVars", baked.numIntVars)
+                put("preparedFactors", baked.factors.size)
+                put(
+                    "preparedFactorKinds",
+                    baked.factors.groupingBy { it::class.simpleName ?: "?" }.eachCount()
+                        .entries.joinToString(",") { "${it.key}=${it.value}" },
+                )
+                putJsonObject("solve") {
+                    put("preset", "satOptimized")
+                    put("result", result::class.simpleName)
+                    put("proven", result is MinimizeResult.Optimal || result is MinimizeResult.Infeasible)
+                    put("preparedObjective", result.objectiveValue)
+                    sourceSample?.let { put("sourceObjective", sourceObjective(input.objective, it)) }
+                    sourceSample?.let { put("sourceClauseViolations", clauseViolations(input.problem, it)) }
+                    put("sourceNonClauseFactorsUnchecked", input.problem.factors.count { it !is Clause })
+                    put("nodes", result.stats.search.nodes.sum)
+                    put("fails", result.stats.search.fails.sum)
+                    put("restarts", result.stats.search.restarts.sum)
+                    put("wallMs", wallNanos / 1_000_000)
+                    put("searchMs", (wallNanos - recorder.traceNanos) / 1_000_000)
                 }
-                    .getOrElse { buildJsonObject { put("failure", it.toString()) } }
-                val later = recorder.laterSightings(probe)
-                JsonObject(
-                    composition + buildJsonObject {
-                    put("captureMs", probe.captureNanos / 1_000_000.0)
-                    put("laterSightings", later.sumOf { it.first })
-                    put("laterReencounters", later.sumOf { it.second })
-                    put("componentsReencounteredLater", later.count { it.second > 0 })
-                    put("snapshotDecline", probe.snapshot.decline)
-                    probe.snapshot.bytes?.let { bytes ->
-                        val stored = System.nanoTime()
-                        snapshots.mkdirs()
-                        val file = snapshots.resolve("${probe.sample}.residual.json")
-                        val temporary = File.createTempFile(".capture-", ".tmp", snapshots)
-                        try {
-                            temporary.writeBytes(bytes)
-                            Files.move(
-                                temporary.toPath(),
-                                file.toPath(),
-                                StandardCopyOption.ATOMIC_MOVE,
-                                StandardCopyOption.REPLACE_EXISTING,
+                put("trace", recorder.summary())
+                put(
+                    "probes",
+                    JsonArray(
+                        recorder.probes.map { probe ->
+                            val composition = runCatching {
+                                if (probe.declined) {
+                                    buildJsonObject {
+                                        put("decline", probe.snapshot.decline ?: "unsupported-source-factor")
+                                    }
+                                } else {
+                                    compose(probe, objective, prepared.reconstruct, input, settings)
+                                }
+                            }
+                                .getOrElse { buildJsonObject { put("failure", it.toString()) } }
+                            val later = recorder.laterSightings(probe)
+                            JsonObject(
+                                composition + buildJsonObject {
+                                    put("captureMs", probe.captureNanos / 1_000_000.0)
+                                    put("laterSightings", later.sumOf { it.first })
+                                    put("laterReencounters", later.sumOf { it.second })
+                                    put("componentsReencounteredLater", later.count { it.second > 0 })
+                                    put("snapshotDecline", probe.snapshot.decline)
+                                    probe.snapshot.bytes?.let { bytes ->
+                                        val stored = System.nanoTime()
+                                        snapshots.mkdirs()
+                                        val file = snapshots.resolve("${probe.sample}.residual.json")
+                                        val temporary = File.createTempFile(".capture-", ".tmp", snapshots)
+                                        try {
+                                            temporary.writeBytes(bytes)
+                                            Files.move(
+                                                temporary.toPath(),
+                                                file.toPath(),
+                                                StandardCopyOption.ATOMIC_MOVE,
+                                                StandardCopyOption.REPLACE_EXISTING,
+                                            )
+                                        } finally {
+                                            temporary.delete()
+                                        }
+                                        put("snapshotFile", "${snapshots.name}/${file.name}")
+                                        put("snapshotBytes", bytes.size)
+                                        put("snapshotSha256", hex(MessageDigest.getInstance("SHA-256").digest(bytes)))
+                                        put("snapshotStorageNs", System.nanoTime() - stored)
+                                        if (consumer != null) {
+                                            val consuming = System.nanoTime()
+                                            val consumed = runCatching {
+                                                consumer(
+                                                    ResidualProbeContext(
+                                                        ResidualSnapshots.load(bytes.decodeToString()),
+                                                        prepared.reconstruct,
+                                                        input.problem,
+                                                        input.objective,
+                                                        baked,
+                                                        objective,
+                                                    ),
+                                                )
+                                            }.getOrElse { buildJsonObject { put("failure", it.toString()) } }
+                                            put("consumer", consumed)
+                                            put("consumerNs", System.nanoTime() - consuming)
+                                        }
+                                    }
+                                },
                             )
-                        } finally {
-                            temporary.delete()
-                        }
-                        put("snapshotFile", "${snapshots.name}/${file.name}")
-                        put("snapshotBytes", bytes.size)
-                        put("snapshotSha256", hex(MessageDigest.getInstance("SHA-256").digest(bytes)))
-                        put("snapshotStorageNs", System.nanoTime() - stored)
-                        if (consumer != null) {
-                            val consuming = System.nanoTime()
-                            val consumed = runCatching {
-                                consumer(
-                                    ResidualProbeContext(
-                                    ResidualSnapshots.load(bytes.decodeToString()),
-                                    prepared.reconstruct,
-                                    input.problem,
-                                    input.objective,
-                                    baked,
-                                    objective,
-                                )
-                                )
-                            }.getOrElse { buildJsonObject { put("failure", it.toString()) } }
-                            put("consumer", consumed)
-                            put("consumerNs", System.nanoTime() - consuming)
-                        }
-                    }
-                }
+                        },
+                    ),
                 )
-            }
-                )
-            )
-        }
+            },
         )
     }
 
@@ -461,7 +466,7 @@ object ConditionalComponentTrace {
             put(
                 "childVerdicts",
                 children.groupingBy { it.result?.let { r -> r::class.simpleName } ?: "NotRun" }
-                .eachCount().entries.joinToString(",") { "${it.key}=${it.value}" }
+                    .eachCount().entries.joinToString(",") { "${it.key}=${it.value}" },
             )
             put("childNodes", children.sumOf { it.result?.stats?.search?.nodes?.sum ?: 0.0 })
             put("childSolveMs", children.sumOf { it.solveNanos } / 1_000_000.0)
@@ -476,8 +481,8 @@ object ConditionalComponentTrace {
             put(
                 "jointLpOptimum",
                 (jointLp.result as? MinimizeResult.Optimal)?.objectiveValue?.toLong()?.let {
-                fixed + isolated + it
-            }
+                    fixed + isolated + it
+                },
             )
             put("jointOrderedVerdict", jointOrdered.result?.let { it::class.simpleName } ?: "NotRun")
             put("jointOrderedNodes", jointOrdered.result?.stats?.search?.nodes?.sum ?: 0.0)
@@ -485,8 +490,8 @@ object ConditionalComponentTrace {
             put(
                 "jointOrderedOptimum",
                 (jointOrdered.result as? MinimizeResult.Optimal)?.objectiveValue?.toLong()?.let {
-                fixed + isolated + it
-            }
+                    fixed + isolated + it
+                },
             )
             put("nodeFixedObjective", fixed)
             put("nodeIsolatedObjective", isolated)
@@ -803,13 +808,13 @@ object ConditionalComponentTrace {
             val sizes = components.values.map { it.live }.sortedDescending()
             if (root == null) {
                 root = buildJsonObject {
-                put("level", level)
-                put("freeVars", freeVars)
-                put("liveFactors", live)
-                put("components", components.size)
-                put("largestLive", sizes.firstOrNull() ?: 0)
-                put("secondLive", sizes.getOrNull(1) ?: 0)
-            }
+                    put("level", level)
+                    put("freeVars", freeVars)
+                    put("liveFactors", live)
+                    put("components", components.size)
+                    put("largestLive", sizes.firstOrNull() ?: 0)
+                    put("secondLive", sizes.getOrNull(1) ?: 0)
+                }
             }
             if (live > 0) {
                 liveSamples++
@@ -932,8 +937,8 @@ object ConditionalComponentTrace {
             val inspection = LearnedResidualRestrictions.inspect(
                 session,
                 ExecutionControl {
-                System.nanoTime() >= observationDeadline
-            }
+                    System.nanoTime() >= observationDeadline
+                },
             )
             permanentRetentionEntries += inspection.entries.count { it.permanentRetention }
             learnedPbEntries += inspection.entries.count { it.kind == "PseudoBooleanPropagator" }

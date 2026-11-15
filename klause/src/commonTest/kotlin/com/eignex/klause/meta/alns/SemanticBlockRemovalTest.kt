@@ -48,14 +48,15 @@ class SemanticBlockRemovalTest {
         )
         for ((kind, factor) in cases) {
             val problem = Problem(
-                0, 4,
+                0,
+                4,
                 arrayOf(
-                IntDomain(0, 1),
-                IntDomain(1, 2),
-                IntDomain(0, 2).excludeValue(1),
-                IntDomain(0, 0),
-            ),
-                arrayOf(factor)
+                    IntDomain(0, 1),
+                    IntDomain(1, 2),
+                    IntDomain(0, 2).excludeValue(1),
+                    IntDomain(0, 0),
+                ),
+                arrayOf(factor),
             ).bake()
             val selector = SemanticBlockRemoval(kind)
 
@@ -63,9 +64,9 @@ class SemanticBlockRemovalTest {
             val result = BacktrackSolver(problem).minimize(
                 objective,
                 BacktrackParams(
-                assumptions = RepairScope.pins(problem, center, freed),
-                maxDecisions = 100,
-            )
+                    assumptions = RepairScope.pins(problem, center, freed),
+                    maxDecisions = 100,
+                ),
             )
 
             assertContentEquals(intArrayOf(0, 1, 2), freed.ints)
@@ -187,45 +188,48 @@ class SemanticBlockRemovalTest {
         val problem = Problem(3, 7, Array(7) { IntDomain(0, 4) }, arrayOf(factor)).bake()
         val network = InvariantNetwork(
             listOf(
-            DefinitionalSweep.SweepNode.IntDef(
-                FunctionalObjective.Plus(
-                3,
-                FunctionalObjective.Operand.v(6),
-                FunctionalObjective.Operand.c(1),
+                DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(
+                        3,
+                        FunctionalObjective.Operand.v(6),
+                        FunctionalObjective.Operand.c(1),
+                    ),
+                    intArrayOf(6),
+                ),
+                DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(
+                        4,
+                        FunctionalObjective.Operand.v(6),
+                        FunctionalObjective.Operand.c(1),
+                    ),
+                    intArrayOf(6),
+                ),
+                DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(
+                        5,
+                        FunctionalObjective.Operand.v(6),
+                        FunctionalObjective.Operand.c(1),
+                    ),
+                    intArrayOf(6),
+                ),
+                EqualityPredicateDefinition(0, 6, 0),
+                EqualityPredicateDefinition(1, 6, 1),
+                EqualityPredicateDefinition(2, 6, 0),
             ),
-                intArrayOf(6)
-            ),
-            DefinitionalSweep.SweepNode.IntDef(
-                FunctionalObjective.Plus(
-                4,
-                FunctionalObjective.Operand.v(6),
-                FunctionalObjective.Operand.c(1),
-            ),
-                intArrayOf(6)
-            ),
-            DefinitionalSweep.SweepNode.IntDef(
-                FunctionalObjective.Plus(
-                5,
-                FunctionalObjective.Operand.v(6),
-                FunctionalObjective.Operand.c(1),
-            ),
-                intArrayOf(6)
-            ),
-            EqualityPredicateDefinition(0, 6, 0),
-            EqualityPredicateDefinition(1, 6, 1),
-            EqualityPredicateDefinition(2, 6, 0),
-        ),
-            7, 3
+            7,
+            3,
         )
         val selector = SemanticBlockRemoval(SemanticBlockRemoval.Kind.Resource, network)
 
         val freed = selector.destroy(
-            Random(7), problem,
+            Random(7),
+            problem,
             Sample(
-            booleanArrayOf(true, false, true),
-            longArrayOf(0, 2, 4, 1, 1, 1, 0),
-        ),
-            LinearObjective(), 0.1
+                booleanArrayOf(true, false, true),
+                longArrayOf(0, 2, 4, 1, 1, 1, 0),
+            ),
+            LinearObjective(),
+            0.1,
         )
 
         assertContentEquals(intArrayOf(0, 1, 2), freed.bools)

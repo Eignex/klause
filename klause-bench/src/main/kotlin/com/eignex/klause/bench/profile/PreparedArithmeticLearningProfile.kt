@@ -128,12 +128,12 @@ internal object PreparedArithmeticLearningProfile {
         } else {
             FinitePipeline.prepare(
                 FinitePipelineRequest(
-            original,
-            FiniteEngine.BACKTRACK,
-            cancellation = stop,
-            solveCancellation = stop,
-            randomSeed = 3L,
-        )
+                    original,
+                    FiniteEngine.BACKTRACK,
+                    cancellation = stop,
+                    solveCancellation = stop,
+                    randomSeed = 3L,
+                ),
             )
         }
         val problem = prepared?.problem ?: original
@@ -151,13 +151,13 @@ internal object PreparedArithmeticLearningProfile {
         if (route == 2) {
             val result = BacktrackSolver(problem as BakedProblem).solve(
                 BacktrackParams(
-                pbLearning = source == 0 && learning,
-                integerRowLearning = source == 1 && learning,
-                lpConfig = LpConfig.AUTO,
-                randomSeed = 3L,
-                maxDecisions = 1024,
-                cancellation = stop,
-            )
+                    pbLearning = source == 0 && learning,
+                    integerRowLearning = source == 1 && learning,
+                    lpConfig = LpConfig.AUTO,
+                    randomSeed = 3L,
+                    maxDecisions = 1024,
+                    cancellation = stop,
+                ),
             )
             val sample = (result as? SolveResult.Sat)?.assignment?.let { requireNotNull(prepared).reconstruct(it) }
             val checked = sample?.let { checkPoint(original, it, stop) } ?: false
@@ -262,10 +262,10 @@ internal object PreparedArithmeticLearningProfile {
     internal fun checkPoint(problem: Problem, sample: Sample, stop: ExecutionControl): Boolean {
         val pinned = problem.withIntDomains(
             Array(problem.numIntVars) {
-            val value = sample.intValue(it)
-            check(value in requireNotNull(problem.intDomainOrNull(it)))
-            IntDomain(value, value)
-        }
+                val value = sample.intValue(it)
+                check(value in requireNotNull(problem.intDomainOrNull(it)))
+                IntDomain(value, value)
+            },
         )
         val checker = PropagationSession(pinned, cancellation = stop)
         if (checker.isUnsatAtRoot) return false
@@ -321,22 +321,22 @@ internal object PreparedArithmeticLearningProfile {
             put(
                 "events",
                 buildJsonArray {
-                for (event in trace.javaClass.getMethod("getEvents").invoke(trace) as List<*>) {
-                    requireNotNull(event)
-                    add(
-                        buildJsonObject {
-                        put("kind", event.javaClass.getMethod("getKind").invoke(event) as String)
-                        put(
-                            "data",
-                            JsonArray(
-                            (event.javaClass.getMethod("getData").invoke(event) as LongArray)
-                                .map(::JsonPrimitive),
-                        )
+                    for (event in trace.javaClass.getMethod("getEvents").invoke(trace) as List<*>) {
+                        requireNotNull(event)
+                        add(
+                            buildJsonObject {
+                                put("kind", event.javaClass.getMethod("getKind").invoke(event) as String)
+                                put(
+                                    "data",
+                                    JsonArray(
+                                        (event.javaClass.getMethod("getData").invoke(event) as LongArray)
+                                            .map(::JsonPrimitive),
+                                    ),
+                                )
+                            },
                         )
                     }
-                    )
-                }
-            }
+                },
             )
         }
 

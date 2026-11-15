@@ -369,11 +369,11 @@ class PolynomialFormulaReductionTest {
         )
         val completed = assertIs<QfNraResult.Unsatisfiable>(
             solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(maximumWork = 500_000),
-        )
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 500_000),
+            ),
         )
 
         val result = solveQfNra(

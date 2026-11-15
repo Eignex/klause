@@ -230,27 +230,27 @@ internal fun verifyExactBasis(
             null
         } else {
             cached ?: run {
-            val matrix = authority.basisMatrix()
-            meter.phase = ExactBasisPhase.FACTOR
-            val proposed = cache.proposedOrder(authority)
-            val allowance = meter.factorLimits()
-            meter.factoryCalls++
-            val build = RationalBasisFactors.factor(matrix, proposed, allowance, meter.token)
-            meter.record(build.stats)
-            when (build) {
-                is RationalBasisBuild.Ready -> build.factors.also { cache.install(authority, it) }
+                val matrix = authority.basisMatrix()
+                meter.phase = ExactBasisPhase.FACTOR
+                val proposed = cache.proposedOrder(authority)
+                val allowance = meter.factorLimits()
+                meter.factoryCalls++
+                val build = RationalBasisFactors.factor(matrix, proposed, allowance, meter.token)
+                meter.record(build.stats)
+                when (build) {
+                    is RationalBasisBuild.Ready -> build.factors.also { cache.install(authority, it) }
 
-                is RationalBasisBuild.Singular -> {
-                    singularRank = build.rank
-                    meter.stop(ExactBasisDecline.SINGULAR)
-                }
+                    is RationalBasisBuild.Singular -> {
+                        singularRank = build.rank
+                        meter.stop(ExactBasisDecline.SINGULAR)
+                    }
 
-                is RationalBasisBuild.Declined -> {
-                    if (build.reason.name == "CANCELLED") meter.poll()
-                    meter.stop(ExactBasisDecline.valueOf(build.reason.name))
+                    is RationalBasisBuild.Declined -> {
+                        if (build.reason.name == "CANCELLED") meter.poll()
+                        meter.stop(ExactBasisDecline.valueOf(build.reason.name))
+                    }
                 }
             }
-        }
         }
         if (rayRow == null) {
             meter.phase = ExactBasisPhase.ASSEMBLY

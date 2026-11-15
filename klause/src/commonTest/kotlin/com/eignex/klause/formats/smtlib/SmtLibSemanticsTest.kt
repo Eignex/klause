@@ -46,9 +46,9 @@ class SmtLibSemanticsTest {
     fun `finite Long extrema should remain distinct from open integer bounds`() {
         val overrides = SemanticOverrides(
             undeclaredIntegers = BoundsOverride(
-            BoundOverride.Value(Long.MIN_VALUE),
-            BoundOverride.Value(Long.MAX_VALUE),
-        )
+                BoundOverride.Value(Long.MIN_VALUE),
+                BoundOverride.Value(Long.MAX_VALUE),
+            ),
         )
 
         val source = SmtLib.parse("(declare-const x Int)", semanticOverrides = overrides)
@@ -85,9 +85,9 @@ class SmtLibSemanticsTest {
         val third = SemanticRational.of(bigIntOf(1), bigIntOf(3))
         val overrides = SemanticOverrides(
             undeclaredReals = BoundsOverride(
-            BoundOverride.Value(third),
-            BoundOverride.Value(third),
-        )
+                BoundOverride.Value(third),
+                BoundOverride.Value(third),
+            ),
         )
         val source = SmtLib.parse("(declare-const x Real) (assert (< x (/ 1 3)))", semanticOverrides = overrides)
 
@@ -101,8 +101,8 @@ class SmtLibSemanticsTest {
     fun `polynomial fallback should enforce caller bounds beside original nonlinear constraints`() {
         val overrides = SemanticOverrides(
             undeclaredReals = BoundsOverride(
-            upper = BoundOverride.Value(SemanticRational.ZERO),
-        )
+                upper = BoundOverride.Value(SemanticRational.ZERO),
+            ),
         )
         val input = SmtLib.parse(
             "(declare-const x Real) (assert (= (* x x) 1)) (assert (> x 0))",
@@ -157,7 +157,7 @@ class SmtLibSemanticsTest {
             var opened = false
             assertFailsWith<IllegalArgumentException> {
                 SmtLib.parse({
-                    opened = true;
+                    opened = true
                     StringCharSource("")
                 }, semanticOverrides = replacement)
             }

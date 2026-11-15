@@ -44,12 +44,12 @@ class LinearSourceBoundTest {
                 ),
                 listOf(
                     LinearSourceRow(
-                    listOf(
-                        LinearSourceTerm(0, SemanticRational.ONE),
-                        LinearSourceTerm(1, SemanticRational.ONE),
+                        listOf(
+                            LinearSourceTerm(0, SemanticRational.ONE),
+                            LinearSourceTerm(1, SemanticRational.ONE),
+                        ),
+                        lower = SemanticRational.of(BIG_ONE, bigIntOf(2)),
                     ),
-                    lower = SemanticRational.of(BIG_ONE, bigIntOf(2)),
-                )
                 ),
                 LinearSourceObjective(
                     listOf(LinearSourceTerm(0, third), LinearSourceTerm(1, third)),
@@ -59,21 +59,21 @@ class LinearSourceBoundTest {
             )
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.MIXED,
-                maximize = sense == ObjectiveSense.MAXIMIZE,
-            )
+                    SourceAttachment(source, ProblemSettings()),
+                    ExecutionOperation.OPTIMIZE,
+                    FiniteEngine.MIXED,
+                    maximize = sense == ObjectiveSense.MAXIMIZE,
+                ),
             )
 
             val result = assertIs<SourceExecutionResult.Finite>(
                 SourceSetup.execute(
                     SourceExecutionRequest(
-                invocation,
-                ExecutionOptions(),
-                presolveConfig = PresolveConfig.NONE,
-            )
-                )
+                        invocation,
+                        ExecutionOptions(),
+                        presolveConfig = PresolveConfig.NONE,
+                    ),
+                ),
             )
 
             val bound = assertNotNull(result.linearSource?.nativeObjectiveBound)
@@ -142,10 +142,10 @@ class LinearSourceBoundTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.FIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.FIXED,
+            ),
         )
         val prepared = assertNotNull(invocation.linearSource)
         val scope = SourceScope(
@@ -161,9 +161,9 @@ class LinearSourceBoundTest {
             scope.copy(
                 condition = SourceCondition(
                     lower = mapOf(
-                SourceCoordinate(SourceCoordinate.Kind.Real, 0) to BigFraction.ONE,
-            )
-                )
+                        SourceCoordinate(SourceCoordinate.Kind.Real, 0) to BigFraction.ONE,
+                    ),
+                ),
             ),
             evidence.claim,
             evidence.derivation,

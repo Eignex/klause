@@ -29,11 +29,11 @@ internal class SimplexBasisLifecycle(m: Int, numVars: Int) {
         cancelled: () -> Boolean,
     ): BasisSolver = current ?: (
         factory?.invoke(matrix) ?: KotlinBasisSolver(
-        matrix,
-        policy = LuPivotPolicy(maxEntries = entryLimit, maxWork = workLimit, cancelled = cancelled),
-        initialOrder = initialOrder,
-    )
-    ).also { current = it }
+            matrix,
+            policy = LuPivotPolicy(maxEntries = entryLimit, maxWork = workLimit, cancelled = cancelled),
+            initialOrder = initialOrder,
+        )
+        ).also { current = it }
 
     fun installCopy(solver: BasisSolver, columns: IntArray, unitRows: IntArray) {
         check(current == null)

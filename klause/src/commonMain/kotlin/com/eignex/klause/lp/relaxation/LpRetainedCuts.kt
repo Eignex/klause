@@ -94,16 +94,17 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
                 previous
             } else {
                 Binding(
-                    previous.id, previous.source,
+                    previous.id,
+                    previous.source,
                     Cut(
-                    columns,
-                    cut.coeffs,
-                    cut.rel,
-                    cut.rhs,
-                    cut.global,
-                    previous.proof,
-                    family = cut.family,
-                )
+                        columns,
+                        cut.coeffs,
+                        cut.rel,
+                        cut.rhs,
+                        cut.global,
+                        previous.proof,
+                        family = cut.family,
+                    ),
                 )
             }
         }
@@ -172,10 +173,10 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
                 val proof = requireNotNull(priorCut.provenance)
                 next.add(
                     if (previous.proof.auxiliaryDefinitions == proof.auxiliaryDefinitions) {
-                    previous
-                } else {
-                    Binding(previous.id, previous.source, priorCut)
-                }
+                        previous
+                    } else {
+                        Binding(previous.id, previous.source, priorCut)
+                    },
                 )
                 continue
             }
@@ -197,8 +198,8 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
             val priorIds = bindings.mapTo(HashSet()) { it.id }
             for (binding in next) {
                 if (binding.id !in priorIds) {
-                observe(binding.numeric.family, "INSTALLED")
-            }
+                    observe(binding.numeric.family, "INSTALLED")
+                }
             }
             bindings = next.toList()
             depth = state.depth

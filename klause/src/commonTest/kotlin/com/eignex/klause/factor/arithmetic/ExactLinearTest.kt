@@ -81,12 +81,12 @@ class ExactLinearTest {
                 )
                 val state = PropagationState(
                     Problem(
-                    0,
-                    4,
-                    Array(4) { IntDomain(value, value) },
-                    arrayOf(row),
-                ),
-                    Assumptions.None
+                        0,
+                        4,
+                        Array(4) { IntDomain(value, value) },
+                        arrayOf(row),
+                    ),
+                    Assumptions.None,
                 )
 
                 val consistent = state.factorAt(0).propagate(state, 0)
@@ -118,12 +118,12 @@ class ExactLinearTest {
                     )
                     val state = PropagationState(
                         Problem(
-                        1,
-                        2,
-                        Array(2) { IntDomain(value, value) },
-                        arrayOf(row),
-                    ),
-                        Assumptions.None
+                            1,
+                            2,
+                            Array(2) { IntDomain(value, value) },
+                            arrayOf(row),
+                        ),
+                        Assumptions.None,
                     )
                     state.pinBool(0, indicator)
                     val holds = (relation == LinearOp.GE) == (value == Long.MAX_VALUE)
@@ -244,11 +244,11 @@ class ExactLinearTest {
         )
         val session = PropagationSession(
             Problem(
-            0,
-            2,
-            Array(2) { IntDomain(-(1L shl 62), 1L shl 62) },
-            arrayOf(row),
-        )
+                0,
+                2,
+                Array(2) { IntDomain(-(1L shl 62), 1L shl 62) },
+                arrayOf(row),
+            ),
         )
 
         session.pinInt(0, 1L shl 33)
@@ -499,12 +499,12 @@ class ExactLinearTest {
         assertNotEquals(
             row.structuralKey(),
             ExactLinear.of(
-            intArrayOf(Term.ofRealVar(0)),
-            listOf(BigFraction.ONE),
-            LinearOp.LE,
-            BigFraction.ONE,
-            activator = 0,
-        ).structuralKey()
+                intArrayOf(Term.ofRealVar(0)),
+                listOf(BigFraction.ONE),
+                LinearOp.LE,
+                BigFraction.ONE,
+                activator = 0,
+            ).structuralKey(),
         )
     }
 }

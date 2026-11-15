@@ -19,7 +19,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         val matrix = Array(size) { Array(size + 1) { BigFraction.ZERO } }
         for (i in 0 until model.dimension) {
             for (j in 0 until model.dimension) {
-                control.step();
+                control.step()
                 matrix[i][j] = hessian[i][j]
             }
             for ((j, row) in selected.withIndex()) {
@@ -30,13 +30,13 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             matrix[i][size] = linear[i].negated()
         }
         for ((j, row) in selected.withIndex()) {
-            control.step();
+            control.step()
             matrix[model.dimension + j][size] = rows[row].rhs
         }
         val solution = eliminate(matrix) ?: return@operation null
         val multipliers = MutableList(rows.size) { BigFraction.ZERO }
         for ((j, row) in selected.withIndex()) {
-            control.step();
+            control.step()
             multipliers[row] = solution[model.dimension + j]
         }
         control.poll()
@@ -48,23 +48,25 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             control.step()
             require(start.size == model.dimension && iterations >= 0)
             val numeric = prepare(model, start) ?: return@operation null
-            control.execution.boundary()
+            control.execution.pollingCost(start.size)
             val point = start.toDoubleArray()
             if (!improve(numeric, point, iterations)) return@operation null
             return@operation activeRows(numeric, point)
         }
 
     private fun prepare(model: QuadraticModel, start: List<Double>): NumericalProposal? {
-        control.execution.boundary()
+        control.execution.pollingCost(model.dimension)
         val hessian = model.hessian.map { row ->
-            control.execution.boundary()
+            control.execution.pollingCost(row.size)
             DoubleArray(row.size) { row[it].toDouble() }
         }
         val linear = model.linear.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
         val rows = model.rows
         val coefficients = rows.map { row ->
-            control.execution.boundary()
-            row.coefficients.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
+            row.coefficients.let { values ->
+                control.execution.pollingCost(values.size)
+                DoubleArray(values.size) { values[it].toDouble() }
+            }
         }
         val rhs = DoubleArray(rows.size) { rows[it].rhs.toDouble() }
         if (hessian.any { row -> row.any { !it.isFinite() } } || linear.any { !it.isFinite() } ||
@@ -74,7 +76,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             return null
         }
         var norm = hessian.maxOfOrNull { row ->
-            control.execution.boundary()
+            control.execution.pollingCost(row.size)
             koblas.asum(row, 0, row.size)
         } ?: 0.0
         for (row in coefficients) norm += 16.0 * dot(0.0, row, row)
@@ -84,7 +86,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
     }
 
     private fun improve(numeric: NumericalProposal, point: DoubleArray, iterations: Int): Boolean {
-        control.execution.boundary()
+        control.execution.pollingCost(point.size)
         val gradient = DoubleArray(point.size)
         repeat(iterations) {
             for (i in point.indices) gradient[i] = dot(numeric.linear[i], numeric.hessian[i], point)
@@ -116,7 +118,6 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             if (!residual.isFinite()) return null
             if (numeric.rows[j].relation == QuadraticRowRelation.EQ || residual >= -1e-6) active += j
         }
-        control.poll()
         return active
     }
 
@@ -148,7 +149,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         for (column in 0 until size) {
             control.step()
             val pivot = (row until size).firstOrNull {
-                control.step();
+                control.step()
                 !matrix[it][column].isZero
             } ?: continue
             val swap = matrix[row]
@@ -171,12 +172,12 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             row++
         }
         for (i in row until size) {
-            control.step();
+            control.step()
             if (!matrix[i][size].isZero) return null
         }
         val solution = MutableList(size) { BigFraction.ZERO }
         for ((i, column) in pivots.withIndex()) {
-            control.step();
+            control.step()
             solution[column] = matrix[i][size]
         }
         return solution

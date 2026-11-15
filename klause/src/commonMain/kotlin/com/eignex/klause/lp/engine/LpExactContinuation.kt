@@ -337,14 +337,14 @@ private fun selectContinuation(
             combineContinuationMetrics(
                 exported,
                 ExactContinuationMetrics(
-                work = budget.work,
-                allocation = budget.allocation,
-                elapsedNs = budget.elapsedNs,
-                phase = budget.phase,
-                decline = decline,
-                workByPhase = budget.workByPhase.toMap(),
-                allocationByPhase = budget.allocationByPhase.toMap(),
-            )
+                    work = budget.work,
+                    allocation = budget.allocation,
+                    elapsedNs = budget.elapsedNs,
+                    phase = budget.phase,
+                    decline = decline,
+                    workByPhase = budget.workByPhase.toMap(),
+                    allocationByPhase = budget.allocationByPhase.toMap(),
+                ),
             ),
         )
     }

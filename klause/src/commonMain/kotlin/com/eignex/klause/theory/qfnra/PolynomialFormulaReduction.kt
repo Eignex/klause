@@ -125,7 +125,7 @@ internal class PolynomialFormulaReduction private constructor(
                     if (inconsistent) break
                     if (replacements.isEmpty()) {
                         val family = current.atoms.map {
-                            arithmetic.step();
+                            arithmetic.step()
                             it.polynomial
                         }
                         val graph = equationalSection(equations, family, arithmetic)
@@ -165,7 +165,7 @@ internal class PolynomialFormulaReduction private constructor(
                     current = rewrittenFormula
                     fibres = rewrittenFibres
                     repeat(replacements.size) {
-                        arithmetic.step();
+                        arithmetic.step()
                         onGraph?.invoke()
                     }
                     yield(PolynomialFormulaReduction(current, fibres, false, booleansReduced, false))

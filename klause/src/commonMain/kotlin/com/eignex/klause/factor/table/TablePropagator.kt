@@ -170,12 +170,16 @@ internal class TablePropagator(
 
     private fun visitRemovedRows(state: PropagationState, col: Int, kind: Int, value: Long, visit: (Int) -> Unit) {
         if ((kind == LOWER && value == Long.MIN_VALUE) || (kind == UPPER && value == Long.MAX_VALUE)) return
-        val lower = if (kind == LOWER) Long.MIN_VALUE else if (kind == UPPER) {
+        val lower = if (kind == LOWER) {
+            Long.MIN_VALUE
+        } else if (kind == UPPER) {
             value + 1
         } else {
             value
         }
-        val upper = if (kind == UPPER) Long.MAX_VALUE else if (kind == LOWER) {
+        val upper = if (kind == UPPER) {
+            Long.MAX_VALUE
+        } else if (kind == LOWER) {
             value - 1
         } else {
             value
@@ -216,11 +220,13 @@ internal class TablePropagator(
             state.checkFiniteWork()
             val target = cellLo(row, col)
             if (when (kind) {
-                LOWER -> target >= value;
-                UPPER -> target <= value;
-                else -> target != value
+                    LOWER -> target >= value
+                    UPPER -> target <= value
+                    else -> target != value
+                }
+            ) {
+                continue
             }
-            ) continue
             if (kind != VALUE && cellAt(state, row, col, snapshot, null) == Cell.KILLED) continue
             var chosen = Lit.NONE
             var killed = false
@@ -359,7 +365,7 @@ internal class TablePropagator(
         val b = minOf(hiC, d.max)
         var holes = 0L
         d.forEachHoleInRange(a, b) {
-            state.checkFiniteWork();
+            state.checkFiniteWork()
             holes++
         }
         if (b - a >= holes) return Cell.LIVE
@@ -410,7 +416,7 @@ internal class TablePropagator(
         val atTrail: Int,
     ) {
         val domains = Array(xs.size) {
-            state.checkFiniteWork();
+            state.checkFiniteWork()
             state.domainAt(xs[it], atTrail)
         }
         private val carves = Array(xs.size) { MutableLongIntMap() }
@@ -551,7 +557,7 @@ internal class TablePropagator(
         val index = if (hi == null && numTuples >= 128) supportCache.supports { state.checkFiniteWork() } else null
         val fresh = TableStr2State(
             IntArray(numTuples) {
-                state.checkFiniteWork();
+                state.checkFiniteWork()
                 it
             },
             numTuples,
@@ -912,7 +918,7 @@ internal class TablePropagator(
             if (d.holeCount == 0L) return true
             var holes = 0L
             d.forEachHoleInRange(a, b) {
-                state.checkFiniteWork();
+                state.checkFiniteWork()
                 holes++
             }
             return b - a + 1 > holes

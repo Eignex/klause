@@ -149,20 +149,20 @@ internal class PolynomialBooleanRegions(
             val atom = atoms[node.atom]
             required.add(
                 if (value == TRUE) {
-                atom
-            } else {
-                PolynomialAtom(
-                atom.polynomial,
-                when (atom.relation) {
-                    PolynomialRelation.EQ -> PolynomialRelation.NE
-                    PolynomialRelation.NE -> PolynomialRelation.EQ
-                    PolynomialRelation.LT -> PolynomialRelation.GE
-                    PolynomialRelation.LE -> PolynomialRelation.GT
-                    PolynomialRelation.GT -> PolynomialRelation.LE
-                    PolynomialRelation.GE -> PolynomialRelation.LT
+                    atom
+                } else {
+                    PolynomialAtom(
+                        atom.polynomial,
+                        when (atom.relation) {
+                            PolynomialRelation.EQ -> PolynomialRelation.NE
+                            PolynomialRelation.NE -> PolynomialRelation.EQ
+                            PolynomialRelation.LT -> PolynomialRelation.GE
+                            PolynomialRelation.LE -> PolynomialRelation.GT
+                            PolynomialRelation.GT -> PolynomialRelation.LE
+                            PolynomialRelation.GE -> PolynomialRelation.LT
+                        },
+                    )
                 },
-            )
-            }
             )
             premises.add(Literal(index, value))
         }
@@ -185,11 +185,11 @@ internal class PolynomialBooleanRegions(
         exclusions.add(
             Exclusion(
                 support.map {
-            arithmetic.step();
-            premises[it]
-        },
-            ExclusionKind.Coupled
-            )
+                    arithmetic.step()
+                    premises[it]
+                },
+                ExclusionKind.Coupled,
+            ),
         )
         progress?.let {
             it.coupledConflicts++
@@ -300,9 +300,9 @@ internal class PolynomialBooleanRegions(
                         pending.addLast(selected)
                     } else {
                         for (child in node.children) {
-                        arithmetic.step()
-                        pending.addLast(child)
-                    }
+                            arithmetic.step()
+                            pending.addLast(child)
+                        }
                     }
                 }
 

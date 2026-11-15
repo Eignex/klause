@@ -28,7 +28,7 @@ class ReportsTest {
             assertEquals(
                 problem,
                 Reports.json.parseToJsonElement(Files.readString(record))
-                .jsonObject.getValue("problem").jsonPrimitive.content
+                    .jsonObject.getValue("problem").jsonPrimitive.content,
             )
         } finally {
             root.toFile().deleteRecursively()

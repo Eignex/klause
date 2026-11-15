@@ -100,7 +100,7 @@ class IndexedPlanningTest {
         val materialized = File(cache, "materialized")
         val tree = File(materialized, collection.id)
         val plain = File(tree, "set/model.cnf").apply {
-            parentFile.mkdirs();
+            parentFile.mkdirs()
             writeText("original source")
         }
         CorpusFiles.compress(plain)

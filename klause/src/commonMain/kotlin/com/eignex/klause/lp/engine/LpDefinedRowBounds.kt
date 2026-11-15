@@ -19,8 +19,8 @@ private fun expandDefinedRowSupports(
                 continuousCounts[it.row] > 1 && selected[it.row] && state.rows.row(it.row).active
             }
         ) {
-                continue
-            }
+            continue
+        }
         for (entry in entries) {
             meter.step()
             if (continuousCounts[entry.row] == 1 && fixedLogicalRow(state, entry.row) &&
@@ -47,8 +47,8 @@ private fun selectDefinedRowConsumers(
                 continuousCounts[it.row] == 1 && selected[it.row] && fixedLogicalRow(state, it.row)
             }
         ) {
-                continue
-            }
+            continue
+        }
         for (entry in entries) {
             meter.step()
             if (continuousCounts[entry.row] > 1 && state.rows.row(entry.row).active) selected[entry.row] = true
@@ -69,8 +69,8 @@ internal fun definedRowBounds(
             it > 1
         }
     ) {
-            return
-        }
+        return
+    }
     prepareDefinedRows(state, rows, continuousCounts, selected, meter)
     meter.reserve(state.model.n.toLong() * 4L + 32L)
     val definitions = IntArray(state.model.n) { -1 }
@@ -112,8 +112,8 @@ private fun prepareDefinedRows(
             it
         }
     ) {
-            return
-        }
+        return
+    }
     for (column in 0 until state.model.n) {
         meter.step()
         for (entry in state.model.columnEntries(column)) {

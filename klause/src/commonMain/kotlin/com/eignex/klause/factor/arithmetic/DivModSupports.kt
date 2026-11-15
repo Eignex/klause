@@ -60,8 +60,8 @@ internal class DivModSupports(relation: DivMod, state: PropagationState, availab
                         }
                     }
                 ) {
-                        continue
-                    }
+                    continue
+                }
                 for (value in values) rows.add(value)
             }
         }
@@ -105,8 +105,8 @@ internal class DivModSupports(relation: DivMod, state: PropagationState, availab
             if (!state.tightenIntMin(variable, minima[column], reason) ||
                 !state.tightenIntMax(variable, maxima[column], reason)
             ) {
-                    return false
-                }
+                return false
+            }
             val domain = state.intDomains[variable].spanOrNull(limit.toLong()) ?: continue
             for (i in 0 until domain.size) {
                 val value = domain.valueAt(i)

@@ -93,20 +93,20 @@ internal fun solvePolynomialObjectiveImage(
         conditioned.requireVariableCounts(boolCount, realCount, arithmetic::step)
         val originalObjective = PolynomialFormula.normalize(
             PolynomialRealFormula.Atom(
-            objective,
-            PolynomialRelation.EQ,
-            PolynomialExpression.Constant.of(BigFraction.ZERO.num),
-        ),
-            arithmetic
+                objective,
+                PolynomialRelation.EQ,
+                PolynomialExpression.Constant.of(BigFraction.ZERO.num),
+            ),
+            arithmetic,
         ).atoms.single().polynomial
         val remap = VarRemap(
             IntArray(boolCount) {
-                arithmetic.step();
+                arithmetic.step()
                 it
             },
             intArrayOf(),
             IntArray(realCount) {
-                arithmetic.step();
+                arithmetic.step()
                 it + 1
             },
         )
@@ -114,9 +114,9 @@ internal fun solvePolynomialObjectiveImage(
         val shiftedObjective = objective.remap(remap)
         val image = PolynomialRealFormula.And(
             listOf(
-            conditioned.remap(remap),
-            PolynomialRealFormula.Atom(imageVariable, PolynomialRelation.EQ, shiftedObjective),
-        )
+                conditioned.remap(remap),
+                PolynomialRealFormula.Atom(imageVariable, PolynomialRelation.EQ, shiftedObjective),
+            ),
         )
         arithmetic.step()
         val normalized = PolynomialFormula.normalize(image, arithmetic, fixed)
@@ -144,12 +144,14 @@ internal fun solvePolynomialObjectiveImage(
                 PolynomialCondition(lower = fixed + (0 to it), upper = fixed + (0 to it))
             } ?: PolynomialCondition(lower = fixed, upper = fixed)
             val checked = solveQfNra(
-                query, boolCount, realCount + 1,
+                query,
+                boolCount,
+                realCount + 1,
                 params.copy(
-                cancellation = work,
-                maximumWork = null,
-            ),
-                fixing
+                    cancellation = work,
+                    maximumWork = null,
+                ),
+                fixing,
             )
             work.projected = sum(work.projected, checked.stats.projectedPolynomials)
             when (checked) {
@@ -266,16 +268,16 @@ internal fun algebraicFixing(
     value.rational?.let { return atom(PolynomialRelation.EQ, it) }
     val polynomial = PolynomialExpression.Sum(
         value.definingCoefficients.mapIndexed { index, coefficient ->
-        checkpoint()
-        PolynomialExpression.Product(listOf(constant(coefficient), PolynomialExpression.Power(variable, index)))
-    }
+            checkpoint()
+            PolynomialExpression.Product(listOf(constant(coefficient), PolynomialExpression.Power(variable, index)))
+        },
     )
     return PolynomialRealFormula.And(
         listOf(
-        PolynomialRealFormula.Atom(polynomial, PolynomialRelation.EQ, constant(BigFraction.ZERO)),
-        atom(PolynomialRelation.GT, value.lowerBound),
-        atom(PolynomialRelation.LT, value.upperBound),
-    )
+            PolynomialRealFormula.Atom(polynomial, PolynomialRelation.EQ, constant(BigFraction.ZERO)),
+            atom(PolynomialRelation.GT, value.lowerBound),
+            atom(PolynomialRelation.LT, value.upperBound),
+        ),
     )
 }
 

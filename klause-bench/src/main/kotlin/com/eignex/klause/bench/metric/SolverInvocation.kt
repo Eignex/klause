@@ -191,26 +191,26 @@ internal object SolverInvocation {
             emptyMap()
         } else {
             observed + mapOf(
-            "sourceHarnessObservationKind" to if (observation == null) "unavailable" else "jvm-mxbeans",
-            "sourceObservationSetupMs" to (observationSetup / NANOS_PER_MILLI).toString(),
-            "sourceObservationFinishMs" to (observationFinish / NANOS_PER_MILLI).toString(),
-        )
+                "sourceHarnessObservationKind" to if (observation == null) "unavailable" else "jvm-mxbeans",
+                "sourceObservationSetupMs" to (observationSetup / NANOS_PER_MILLI).toString(),
+                "sourceObservationFinishMs" to (observationFinish / NANOS_PER_MILLI).toString(),
+            )
         }
         result = result.copy(
             stats = (result.stats - "sourceDecodeMs") + decoder + decoding + observationStats + mapOf(
-            "sourceStaging" to if (CorpusFiles.isCompressed(file)) staging.key else "plain",
-            "sourceStagingDirectory" to
-                if (CorpusFiles.isCompressed(file)) stagingDirectory?.absolutePath.orEmpty() else "",
-            "sourcePreparationMs" to preparationMillis.toString(),
-            "sourceDecodeLocation" to when {
-                cliDecodesInput -> "cli-frontend"
-                CorpusFiles.isCompressed(file) -> "harness"
-                else -> "none"
-            },
-            "sourceCleanupMs" to (cleanupNanos / NANOS_PER_MILLI).toString(),
-            "sourceCliMs" to (cliNanos / NANOS_PER_MILLI).toString(),
-            "sourceInvocationMs" to (totalNanos / NANOS_PER_MILLI).toString(),
-        )
+                "sourceStaging" to if (CorpusFiles.isCompressed(file)) staging.key else "plain",
+                "sourceStagingDirectory" to
+                    if (CorpusFiles.isCompressed(file)) stagingDirectory?.absolutePath.orEmpty() else "",
+                "sourcePreparationMs" to preparationMillis.toString(),
+                "sourceDecodeLocation" to when {
+                    cliDecodesInput -> "cli-frontend"
+                    CorpusFiles.isCompressed(file) -> "harness"
+                    else -> "none"
+                },
+                "sourceCleanupMs" to (cleanupNanos / NANOS_PER_MILLI).toString(),
+                "sourceCliMs" to (cliNanos / NANOS_PER_MILLI).toString(),
+                "sourceInvocationMs" to (totalNanos / NANOS_PER_MILLI).toString(),
+            ),
         )
         if (failure != null && (failure !is SourcePreparationTimeout || failure.suppressed.isNotEmpty())) {
             throw Failure(result, failure.message.orEmpty(), failure)

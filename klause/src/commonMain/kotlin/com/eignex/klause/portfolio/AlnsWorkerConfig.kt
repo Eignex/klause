@@ -107,8 +107,8 @@ internal class AlnsWorkerConfig private constructor(
     ): PortfolioWorker {
         if (!numericalCompletion && problem.numRealVars > 0) {
             problem.fixedDiscreteSample()?.let { fixed ->
-            return finiteExactNeighborhoodWorker(problem, fixed, objective, nodeBudget, true, seed + index, armId)
-        }
+                return finiteExactNeighborhoodWorker(problem, fixed, objective, nodeBudget, true, seed + index, armId)
+            }
         }
         val evidenceModel = ModelIdentity.of(problem, objective)
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }

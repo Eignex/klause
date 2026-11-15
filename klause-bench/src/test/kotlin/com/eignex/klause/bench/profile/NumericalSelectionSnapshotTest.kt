@@ -43,7 +43,7 @@ class NumericalSelectionSnapshotTest {
         assertEquals(
             "1",
             captured.getValue("coefficients").jsonArray.single().jsonObject
-            .getValue("value").jsonPrimitive.content
+                .getValue("value").jsonPrimitive.content,
         )
         assertEquals("row", captured.getValue("derivation").jsonObject.getValue("id").jsonPrimitive.content)
     }
@@ -54,11 +54,11 @@ class NumericalSelectionSnapshotTest {
             SourceEvidence(
                 generation,
                 SourceClaim.Bound(
-            BigFraction.ONE,
-            strict = true,
-        ),
-            premise
-            )
+                    BigFraction.ONE,
+                    strict = true,
+                ),
+                premise,
+            ),
         )
 
         val captured = NumericalSelectionSnapshot(ExecutionControl.Never).proof(imported)

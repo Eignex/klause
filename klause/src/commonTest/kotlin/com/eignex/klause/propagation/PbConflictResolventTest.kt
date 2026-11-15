@@ -51,13 +51,14 @@ class PbConflictResolventTest {
                 add(
                     Cardinality(
                         intArrayOf(
-                    Lit.make(0, false),
-                    Lit.make(2, true),
-                    Lit.make(3, true),
-                    Lit.make(4, true),
-                ),
-                    min = 2, max = 4
-                    )
+                            Lit.make(0, false),
+                            Lit.make(2, true),
+                            Lit.make(3, true),
+                            Lit.make(4, true),
+                        ),
+                        min = 2,
+                        max = 4,
+                    ),
                 )
                 add(Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))))
                 add(Clause(intArrayOf(Lit.make(1, true), Lit.make(3, false))))
@@ -110,11 +111,11 @@ class PbConflictResolventTest {
             }
             assertIs<SearchResult.Satisfied>(
                 shared.solve(
-                booleanCount,
-                SearchSolveParams(restart = restart),
-                booleanBranching = brancher,
-                observer = observer,
-            )
+                    booleanCount,
+                    SearchSolveParams(restart = restart),
+                    booleanBranching = brancher,
+                    observer = observer,
+                ),
             )
 
             assertTrue(native.explanationState.learned.store.any { it is PseudoBooleanPropagator }, "mode=$mode")
@@ -160,13 +161,15 @@ class PbConflictResolventTest {
     fun `a mixed feasible witness should satisfy the connected source relation`() {
         val native = PropagationSession(
             Problem(
-                2, 1, arrayOf(IntDomain(0, 10)),
+                2,
+                1,
+                arrayOf(IntDomain(0, 10)),
                 arrayOf(
-            Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
-        )
+                    Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
+                ),
             ),
-            pbLearning = true
+            pbLearning = true,
         )
         val shared = SearchSession(listOf(CpSearchComponent(native)), atoms = SearchAtomRegistry(2))
 
@@ -181,12 +184,14 @@ class PbConflictResolventTest {
     fun `a seed atom should not enter Boolean assertion indexing`() {
         val native = PropagationSession(
             Problem(
-                1, 1, arrayOf(IntDomain(0, 10)),
+                1,
+                1,
+                arrayOf(IntDomain(0, 10)),
                 arrayOf(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
-        )
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
+                ),
             ),
-            pbLearning = true
+            pbLearning = true,
         )
         assertIs<PropagationResult.Implied>(native.pinIntAtLeast(0, 6))
 

@@ -18,10 +18,11 @@ class KotlinBasisSolverTest {
     fun `quality checks should retain short sparse column products in both directions`() {
         for (size in listOf(3, 4, 8)) {
             val source = SparseMatrix.ofColumns(
-                size, size,
+                size,
+                size,
                 List(size) { column ->
-                (column until size).map { row -> row to if (row == column) 2.0 else 1.0 }
-            }
+                    (column until size).map { row -> row to if (row == column) 2.0 else 1.0 }
+                },
             )
             val values = DoubleArray(size) { if (it % 2 == 0) 1.0 else -2.0 }
             val solution = IndexedVector(size).also { it.scatter(values) }
@@ -262,11 +263,11 @@ class KotlinBasisSolverTest {
             assertNull(offer.create(headings, units, LuPivotPolicy(), offer.additionalWork - 1L))
             assertNull(
                 offer.create(
-                headings,
-                units,
-                LuPivotPolicy(maxEntries = offer.entries - 1L),
-                offer.additionalWork,
-            )
+                    headings,
+                    units,
+                    LuPivotPolicy(maxEntries = offer.entries - 1L),
+                    offer.additionalWork,
+                ),
             )
             assertNull(offer.create(intArrayOf(0, 4, 2), units, LuPivotPolicy(), offer.additionalWork))
             assertNull(offer.create(headings, intArrayOf(0, -1, -1), LuPivotPolicy(), offer.additionalWork))
@@ -313,14 +314,14 @@ class KotlinBasisSolverTest {
             var totalPolls = 0
             assertNotNull(
                 offer.create(
-                headings,
-                units,
-                LuPivotPolicy(cancelled = {
-                    totalPolls++;
-                    false
-                }),
-                offer.additionalWork,
-            )
+                    headings,
+                    units,
+                    LuPivotPolicy(cancelled = {
+                        totalPolls++
+                        false
+                    }),
+                    offer.additionalWork,
+                ),
             ).close()
             for (stopAt in listOf(1, maxOf(1, totalPolls / 2), totalPolls).distinct()) {
                 val before = parent.basisOperationWork
@@ -367,10 +368,10 @@ class KotlinBasisSolverTest {
                     val expected = IndexedVector(3).also { it.scatter(doubleArrayOf(1.0, 2.0, 3.0)) }
                     val actual = IndexedVector(3).also { it.scatter(doubleArrayOf(1.0, 2.0, 3.0)) }
                     if (transpose) {
-                        parent.btran(expected);
+                        parent.btran(expected)
                         child.btran(actual)
                     } else {
-                        parent.ftran(expected);
+                        parent.ftran(expected)
                         child.ftran(actual)
                     }
                     assertContentEquals(expected.toDoubleArray(), actual.toDoubleArray())
@@ -406,10 +407,10 @@ class KotlinBasisSolverTest {
                         val expected = IndexedVector(n).also { it.scatter(rhs) }
                         val actual = IndexedVector(n).also { it.scatter(rhs) }
                         if (transpose) {
-                            cold.btran(expected);
+                            cold.btran(expected)
                             seeded.btran(actual)
                         } else {
-                            cold.ftran(expected);
+                            cold.ftran(expected)
                             seeded.ftran(actual)
                         }
                         for (i in 0 until n) assertEquals(expected[i], actual[i], 1e-10)
@@ -461,13 +462,14 @@ class KotlinBasisSolverTest {
     @Test
     fun `a deficient imported hint falls back with its failed work retained`() {
         val source = SparseMatrix.ofColumns(
-            2, 4,
+            2,
+            4,
             listOf(
-            listOf(0 to 1.0),
-            listOf(1 to 1.0),
-            listOf(1 to 1.0),
-            listOf(0 to 1.0, 1 to 1.0),
-        )
+                listOf(0 to 1.0),
+                listOf(1 to 1.0),
+                listOf(1 to 1.0),
+                listOf(0 to 1.0, 1 to 1.0),
+            ),
         )
         val coldWork = KotlinBasisSolver(source, denseDimensionLimit = 0).use { cold ->
             assertTrue(cold.refactorize(intArrayOf(2, 3)))

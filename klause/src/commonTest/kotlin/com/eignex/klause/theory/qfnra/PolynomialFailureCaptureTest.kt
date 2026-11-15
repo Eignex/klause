@@ -90,7 +90,7 @@ class PolynomialFailureCaptureTest {
         assertEquals(
             mapOf("GT" to 2, "LT" to 1),
             (0..2)
-            .map { conflict.getValue("signedPremises.$it.relation") }.groupingBy { it }.eachCount()
+                .map { conflict.getValue("signedPremises.$it.relation") }.groupingBy { it }.eachCount(),
         )
         assertEquals("true", conflict["complete"])
     }
@@ -118,8 +118,8 @@ class PolynomialFailureCaptureTest {
     fun `wide operands mark the capture incomplete`() {
         val polynomial = Polynomial.of(
             (0..128).map {
-            PolynomialTerm(Monomial.of(mapOf(0 to it)), BigFraction.ONE)
-        }
+                PolynomialTerm(Monomial.of(mapOf(0 to it)), BigFraction.ONE)
+            },
         )
         val capture = PolynomialFailureCapture()
 

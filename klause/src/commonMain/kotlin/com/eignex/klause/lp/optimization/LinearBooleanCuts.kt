@@ -24,7 +24,7 @@ internal data class LinearBooleanCutLimits(
     init {
         require(
             rows in 1..256 && booleans in 1..16 && support in 1..128 && scalarBits in 1..4096 &&
-            candidates in 1..64 && branchRows in 1..1024 && work >= 0L && allocation >= 0L
+                candidates in 1..64 && branchRows in 1..1024 && work >= 0L && allocation >= 0L,
         )
     }
 }
@@ -94,8 +94,8 @@ internal object LinearBooleanCutPreparation {
             )
             val proof = SourceDerivation.Combination(
                 terms.map { (entry, weight) ->
-                SourceDerivation.Combination.Term(number(weight * scale), SourceDerivation.Premise(entry.id))
-            }
+                    SourceDerivation.Combination.Term(number(weight * scale), SourceDerivation.Premise(entry.id))
+                },
             )
             return Derived(row, proof)
         }

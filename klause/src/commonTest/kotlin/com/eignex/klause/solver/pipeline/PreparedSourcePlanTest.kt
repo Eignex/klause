@@ -79,12 +79,12 @@ class PreparedSourcePlanTest {
 
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            if (factor is AllDifferent && target == EncodingTarget.POLYNOMIAL) {
-                Encoder(EncoderSupport.UNSUPPORTED)
-            } else {
-                BuiltInEncoderProvider.select(factor, target)
-            }
-        }
+                if (factor is AllDifferent && target == EncodingTarget.POLYNOMIAL) {
+                    Encoder(EncoderSupport.UNSUPPORTED)
+                } else {
+                    BuiltInEncoderProvider.select(factor, target)
+                }
+            },
         )
         val plan = source.prepareExecutionPlan(providers)
 
@@ -338,11 +338,11 @@ class PreparedSourcePlanTest {
             arrayOf(IntDomain(0, 2)),
             arrayOf(
                 ExactLinear.of(
-                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE),
-                LinearOp.GE,
-                BigFraction.ONE,
-            )
+                    intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE, BigFraction.ONE),
+                    LinearOp.GE,
+                    BigFraction.ONE,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
@@ -982,9 +982,9 @@ class PreparedSourcePlanTest {
         val source = assertIs<NonlinearIntegerProblem>(
             (
                 SmtLib.parse(
-                "(declare-const x Int) (declare-const r Real) (declare-const z Int) (assert (= (* x z) r))",
-            )
-            ).source.originalSource
+                    "(declare-const x Int) (declare-const r Real) (declare-const z Int) (assert (= (* x z) r))",
+                )
+                ).source.originalSource,
         )
 
         val plan = source.prepareExecutionPlan()

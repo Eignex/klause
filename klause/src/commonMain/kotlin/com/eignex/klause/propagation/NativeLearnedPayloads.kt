@@ -161,7 +161,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
 
     operator fun get(index: Int): IntArray = checkNotNull(
         checkNotNull(pageAt(index ushr PAGE_SHIFT))
-        .rows[index and PAGE_MASK]
+            .rows[index and PAGE_MASK],
     )
 
     fun length(index: Int): Int = pageAt(index ushr PAGE_SHIFT)?.rows?.getOrNull(index and PAGE_MASK)?.size ?: 0
@@ -212,7 +212,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         val slot = page.slot
         val cacheSlot = slot?.let { it.key and CACHE_MASK } ?: -1
         if (slot == null) {
-            check(primary === page);
+            check(primary === page)
             primary = null
         } else {
             check(directory.remove(slot, {}, {}))

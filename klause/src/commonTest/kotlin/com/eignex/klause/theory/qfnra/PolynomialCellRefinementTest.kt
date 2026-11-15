@@ -26,12 +26,12 @@ class PolynomialCellRefinementTest {
 
         val cell = assertNotNull(
             CheckedPolynomialCell.rejected(
-            scope.predicates.single(),
-            scope,
-            algebraic.rational(BigFraction.ZERO),
-            arithmetic,
-            algebraic,
-        )
+                scope.predicates.single(),
+                scope,
+                algebraic.rational(BigFraction.ZERO),
+                arithmetic,
+                algebraic,
+            ),
         )
 
         assertFalse(cell.lowerClosed)
@@ -52,12 +52,12 @@ class PolynomialCellRefinementTest {
 
             val cell = assertNotNull(
                 CheckedPolynomialCell.rejected(
-                scope.predicates.single(),
-                scope,
-                algebraic.rational(BigFraction.ZERO),
-                arithmetic,
-                algebraic,
-            )
+                    scope.predicates.single(),
+                    scope,
+                    algebraic.rational(BigFraction.ZERO),
+                    arithmetic,
+                    algebraic,
+                ),
             )
 
             assertTrue(cell.lowerClosed)
@@ -122,9 +122,9 @@ class PolynomialCellRefinementTest {
             0,
             algebraic.signAt(
                 PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-            .atoms.first().polynomial,
-                mapOf(0 to witness)
-            )
+                    .atoms.first().polynomial,
+                mapOf(0 to witness),
+            ),
         )
         assertTrue(query.checkedCells.isNotEmpty())
         assertTrue(query.checkedCells.size <= 8)

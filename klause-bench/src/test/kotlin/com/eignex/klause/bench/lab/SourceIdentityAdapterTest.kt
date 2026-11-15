@@ -40,9 +40,9 @@ class SourceIdentityAdapterTest {
             val case = SourceIdentitySuite.plan(
                 BenchRequest(
                     mapOf(
-                "cases" to BenchProtocol.json.encodeToString(listOf(template)),
-            )
-                )
+                        "cases" to BenchProtocol.json.encodeToString(listOf(template)),
+                    ),
+                ),
             ).single()
 
             val result = SourceIdentitySuite.run(case, BenchContext(out, corpusDirectory = corpus))

@@ -28,9 +28,9 @@ internal fun linearNeighborhoodInvocation(
     val prepared = preparedSource ?: model.prepareExecutionPlan(objective, cancellation = stop)
     if (stop() || prepared.decline == PreparedPlanDecline.RESOURCE) {
         return incompleteOpenExecution(
-        objective,
-        if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
-    )
+            objective,
+            if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
+        )
     }
     val source = prepared.originalSource as? Problem ?: model
     val identity = ModelIdentity.of(source, objective)
@@ -60,12 +60,12 @@ internal fun linearNeighborhoodInvocation(
             lateinit var worker: PortfolioWorker
             val adapter = slot.own(
                 OpenExactNeighborhood(
-                source,
-                local,
-                objective,
-                prepared,
-                invocation = { worker.evidenceInvocation },
-            )
+                    source,
+                    local,
+                    objective,
+                    prepared,
+                    invocation = { worker.evidenceInvocation },
+                ),
             )
             worker = exactNeighborhoodWorker(
                 if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",

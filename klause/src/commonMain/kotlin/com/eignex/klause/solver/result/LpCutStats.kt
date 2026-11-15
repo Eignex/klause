@@ -32,10 +32,10 @@ internal class LpCutStats(private val record: (String, LpPhaseStats) -> Unit) {
             record(
                 key(family, stage),
                 LpPhaseStats(
-                calls = 1L,
-                nanos = started.elapsedNow().inWholeNanoseconds,
-                outcomes = mapOf(outcome to 1L),
-            )
+                    calls = 1L,
+                    nanos = started.elapsedNow().inWholeNanoseconds,
+                    outcomes = mapOf(outcome to 1L),
+                ),
             )
         }
     }
@@ -49,10 +49,10 @@ internal class LpCutStats(private val record: (String, LpPhaseStats) -> Unit) {
             shared(
                 stage,
                 LpPhaseStats(
-                calls = 1L,
-                nanos = started.elapsedNow().inWholeNanoseconds,
-                outcomes = mapOf(outcome to 1L),
-            )
+                    calls = 1L,
+                    nanos = started.elapsedNow().inWholeNanoseconds,
+                    outcomes = mapOf(outcome to 1L),
+                ),
             )
         }
     }

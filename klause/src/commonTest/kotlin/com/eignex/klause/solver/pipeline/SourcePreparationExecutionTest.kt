@@ -16,10 +16,10 @@ class SourcePreparationExecutionTest {
     fun `finite diagnostic requests should stop before publishing a witness`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const b Bool) (assert b)").source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SmtLib.parse("(declare-const b Bool) (assert b)").source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
         val request = SourceExecutionRequest(invocation, ExecutionOptions(ExecutionOption.dryRunPresolve(true)))
         var points = 0
@@ -38,10 +38,10 @@ class SourcePreparationExecutionTest {
     fun `linear diagnostics should retain preparation without consuming the node allowance`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
         val original = (invocation.engineRoute as SourceProblemRoute.OpenTheory).request.model
         val budget = NodeBudget(0)
@@ -54,9 +54,9 @@ class SourcePreparationExecutionTest {
 
         val result = assertIs<SourceExecutionResult.Prepared>(
             SourceSetup.execute(
-            request,
-            SourceExecutionCallbacks(onLinearIncumbent = { points++ }),
-        )
+                request,
+                SourceExecutionCallbacks(onLinearIncumbent = { points++ }),
+            ),
         )
 
         assertSame(invocation, result.invocation)
@@ -71,10 +71,10 @@ class SourcePreparationExecutionTest {
     fun `linear diagnostics should retain the spent phase allowance`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
         val budget = PresolveBudget(7).apply { charge(7) }
         val request = SourceExecutionRequest(
@@ -94,10 +94,10 @@ class SourcePreparationExecutionTest {
     fun `an application finite factory should retain the diagnostic stop`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const b Bool) (assert b)").source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SmtLib.parse("(declare-const b Bool) (assert b)").source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
         val request = SourceExecutionRequest(
             invocation,
@@ -121,10 +121,10 @@ class SourcePreparationExecutionTest {
     fun `linear enumeration should decline before publishing a witness`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.ENUMERATE,
-            FiniteEngine.BACKTRACK,
-        )
+                SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
+                ExecutionOperation.ENUMERATE,
+                FiniteEngine.BACKTRACK,
+            ),
         )
         var points = 0
 
@@ -142,10 +142,10 @@ class SourcePreparationExecutionTest {
     fun `finite enumeration should retain both original Boolean assignments`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const b Bool)").source,
-            ExecutionOperation.ENUMERATE,
-            FiniteEngine.FIXED,
-        )
+                SmtLib.parse("(declare-const b Bool)").source,
+                ExecutionOperation.ENUMERATE,
+                FiniteEngine.FIXED,
+            ),
         )
         val values = mutableSetOf<Boolean>()
 

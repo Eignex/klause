@@ -118,10 +118,10 @@ internal class PolynomialAffineReduction private constructor(
                 val graph = equationalSection(
                     equations,
                     current.map {
-                    arithmetic.step();
-                    it.polynomial
-                },
-                    arithmetic
+                        arithmetic.step()
+                        it.polynomial
+                    },
+                    arithmetic,
                 )
                 if (graph == null) {
                     if (!graphChanges) break
@@ -210,15 +210,15 @@ internal class PolynomialAffineReduction private constructor(
                 // Pairwise bounds characterize the fibre, including strict or coincident endpoints.
                 for (a in lower) {
                     for (b in upper) {
-                    arithmetic.step()
-                    next.add(
-                        PolynomialAtom(
-                        arithmetic.subtract(b.polynomial, a.polynomial),
-                        if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE,
-                    )
-                    )
-                    yield(null)
-                }
+                        arithmetic.step()
+                        next.add(
+                            PolynomialAtom(
+                                arithmetic.subtract(b.polynomial, a.polynomial),
+                                if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE,
+                            ),
+                        )
+                        yield(null)
+                    }
                 }
                 arithmetic.step()
                 fibres.add(AffineFibre(variable, null, lower.toList(), upper.toList()))
@@ -237,11 +237,11 @@ internal class PolynomialAffineReduction private constructor(
             arithmetic.step()
             yield(
                 PolynomialAffineReduction(
-                current.toList(),
-                fibres.toList(),
-                inconsistent,
-                predicatesChanged || fibres.isNotEmpty(),
-            )
+                    current.toList(),
+                    fibres.toList(),
+                    inconsistent,
+                    predicatesChanged || fibres.isNotEmpty(),
+                ),
             )
         }.iterator()
     }
@@ -292,15 +292,15 @@ private fun endpoint(
 
 private fun affineCoordinate(atoms: List<PolynomialAtom>, realCount: Int, arithmetic: PolynomialArithmetic): Int {
     val blocked = BooleanArray(realCount) {
-        arithmetic.step();
+        arithmetic.step()
         false
     }
     val lower = IntArray(realCount) {
-        arithmetic.step();
+        arithmetic.step()
         0
     }
     val upper = IntArray(realCount) {
-        arithmetic.step();
+        arithmetic.step()
         0
     }
     for (atom in atoms) {

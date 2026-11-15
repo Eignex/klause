@@ -34,18 +34,18 @@ internal object JointRayInspection {
         }
         out.resolve("ray-inspection.json").writeText(
             buildJsonObject {
-            put("maximumCapturedRays", 4)
-            put("maximumCandidates", 8)
-            put("maximumProjectionWorkPerRay", WORK)
-            put("maximumProjectionAllocationPerRay", BYTES)
-            put("maximumVerificationWorkPerCandidate", WORK)
-            put("maximumVerificationAllocationPerCandidate", BYTES)
-            put("separateFromProducerGrant", true)
-            put("inspectionStopped", stop())
-            put("rays", rays)
-            put("sourceVerdictClaim", false)
-            put("independentProofClaim", false)
-        }.toString()
+                put("maximumCapturedRays", 4)
+                put("maximumCandidates", 8)
+                put("maximumProjectionWorkPerRay", WORK)
+                put("maximumProjectionAllocationPerRay", BYTES)
+                put("maximumVerificationWorkPerCandidate", WORK)
+                put("maximumVerificationAllocationPerCandidate", BYTES)
+                put("separateFromProducerGrant", true)
+                put("inspectionStopped", stop())
+                put("rays", rays)
+                put("sourceVerdictClaim", false)
+                put("independentProofClaim", false)
+            }.toString(),
         )
     }
 
@@ -80,10 +80,10 @@ internal object JointRayInspection {
         val ray = requireNotNull(
             decodeRay(
                 input.getValue("rayBits").jsonArray.map {
-            it.jsonPrimitive.content
-        },
-            rows
-            )
+                    it.jsonPrimitive.content
+                },
+                rows,
+            ),
         )
         val projection = create("LpProjectionMeter", WORK, BYTES, stop)
         val model = call(state, "ownerWorkingModel", projection)
@@ -150,10 +150,10 @@ internal object JointRayInspection {
                 put(
                     "dualRejection",
                     buildJsonObject {
-                    put("column", call(it, "getColumn") as Int)
-                    put("upper", call(it, "getUpper") as Boolean)
-                    put("reduced", call(it, "getReduced").toString())
-                }
+                        put("column", call(it, "getColumn") as Int)
+                        put("upper", call(it, "getUpper") as Boolean)
+                        put("reduced", call(it, "getReduced").toString())
+                    },
                 )
             }
             put("elapsedNs", System.nanoTime() - started)

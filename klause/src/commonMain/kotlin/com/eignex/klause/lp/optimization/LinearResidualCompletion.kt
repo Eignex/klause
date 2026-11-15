@@ -115,8 +115,8 @@ internal class LinearResidualCompletion(
                 if (funding?.paused == true) return@resumeSparse null
                 val profile = lifetime ?: (
                     lifetimeLimit ?: funding?.let { policy.funded(it.remainingWork) }
-                    ?: policy.floating
-                )
+                        ?: policy.floating
+                    )
                     .also { lifetime = it }
                 val quantum = minOf(policy.quantum, funding?.availableWork ?: policy.quantum)
                 if (quantum <= 0L) return@resumeSparse null

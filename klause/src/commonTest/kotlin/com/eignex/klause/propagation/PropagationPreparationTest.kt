@@ -19,11 +19,13 @@ class PropagationPreparationTest {
     @Test
     fun `a paused cost aware root should retain pending work until preparation completes`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 10), IntDomain(0, 10)),
             arrayOf(
-            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-            Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 3),
-        )
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 3),
+            ),
         )
         var cancelled = false
         val preparation = PropagationPreparation(problem, ExecutionControl { cancelled }, 0, false, costAware = true)
@@ -62,10 +64,12 @@ class PropagationPreparationTest {
     @Test
     fun `a prepared seed conflict should retain its certified named prefix`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-        )
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+            ),
         )
         val preparation = PropagationPreparation(problem, ExecutionControl.Never, 0, false)
         var session: PropagationSession? = null

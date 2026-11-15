@@ -92,9 +92,9 @@ class ImplicitSeeding(
                 for (out in from until end) {
                     val takeLeft = right == end || (
                         left < mid &&
-                        problem.factors[candidates[left]].intVars.size >=
-                        problem.factors[candidates[right]].intVars.size
-                    )
+                            problem.factors[candidates[left]].intVars.size >=
+                            problem.factors[candidates[right]].intVars.size
+                        )
                     sorted[out] = if (takeLeft) candidates[left++] else candidates[right++]
                     if (++visits % INITIALIZATION_BATCH == 0) yield(Unit)
                 }

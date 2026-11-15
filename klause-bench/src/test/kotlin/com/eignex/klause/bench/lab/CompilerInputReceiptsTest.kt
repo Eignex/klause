@@ -21,7 +21,7 @@ class CompilerInputReceiptsTest {
         var reads = 0
         repeat(2) {
             val receipts = CompilerInputReceipts(cache, hash = { path ->
-                reads++;
+                reads++
                 LabInputs.treeHash(path)
             })
             assertTrue(receipts.matches(compiler, expected))
@@ -64,7 +64,7 @@ class CompilerInputReceiptsTest {
         }
         var reads = 0
         val receipts = CompilerInputReceipts(cache, hash = { path ->
-            reads++;
+            reads++
             LabInputs.treeHash(path)
         })
         assertEquals(matches, receipts.matches(compiler, expected))
@@ -82,7 +82,7 @@ class CompilerInputReceiptsTest {
         Files.writeString(receipt, "broken")
         var reads = 0
         val receipts = CompilerInputReceipts(cache, hash = { path ->
-            reads++;
+            reads++
             LabInputs.treeHash(path)
         })
         assertTrue(receipts.matches(compiler, expected))
@@ -109,7 +109,7 @@ class CompilerInputReceiptsTest {
             val receipts = CompilerInputReceipts(
                 cache,
                 hash = { path ->
-                    reads++;
+                    reads++
                     LabInputs.treeHash(path)
                 },
                 reliable = { false },
@@ -129,12 +129,12 @@ class CompilerInputReceiptsTest {
         val cache = root.resolve("receipts")
         assertFalse(
             CompilerInputReceipts(cache, hash = { path ->
-            LabInputs.treeHash(path).also {
-                val modified = Files.getLastModifiedTime(file)
-                Files.writeString(file, "modified")
-                Files.setLastModifiedTime(file, modified)
-            }
-        }).matches(compiler, expected)
+                LabInputs.treeHash(path).also {
+                    val modified = Files.getLastModifiedTime(file)
+                    Files.writeString(file, "modified")
+                    Files.setLastModifiedTime(file, modified)
+                }
+            }).matches(compiler, expected),
         )
         assertFalse(Files.exists(cache))
     }

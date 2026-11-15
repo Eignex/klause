@@ -21,12 +21,12 @@ class CompiledObjectivePairingTest {
         val native = LinearObjective(intCoefficients = longArrayOf(1))
         val paired = native.paired(
             CompiledObjectivePairing.capture(
-            Any(),
-            emptyList(),
-            listOf(source),
-            emptyList(),
-            native,
-        )
+                Any(),
+                emptyList(),
+                listOf(source),
+                emptyList(),
+                native,
+            ),
         )
 
         val copied = paired.copy(intCoefficients = longArrayOf(9007199254740993L), constant = 7)
@@ -36,13 +36,13 @@ class CompiledObjectivePairingTest {
             QuadraticObjectiveSpec(
                 listOf(
                     QuadraticObjectiveTerm(
-            QuadraticCoefficient.ofLong(9007199254740993L),
-            source,
-        )
+                        QuadraticCoefficient.ofLong(9007199254740993L),
+                        source,
+                    ),
                 ),
-            QuadraticCoefficient.ofLong(7)
+                QuadraticCoefficient.ofLong(7),
             ),
-            original
+            original,
         )
     }
 
@@ -52,12 +52,12 @@ class CompiledObjectivePairingTest {
         val native = LinearObjective(intCoefficients = longArrayOf(Long.MIN_VALUE), constant = Long.MIN_VALUE)
         val paired = native.paired(
             CompiledObjectivePairing.capture(
-            Any(),
-            emptyList(),
-            listOf(source),
-            emptyList(),
-            native,
-        )
+                Any(),
+                emptyList(),
+                listOf(source),
+                emptyList(),
+                native,
+            ),
         )
 
         val negated = paired.negated()
@@ -73,12 +73,12 @@ class CompiledObjectivePairingTest {
         val native = LinearObjective(intCoefficients = longArrayOf(Long.MIN_VALUE))
         val paired = native.paired(
             CompiledObjectivePairing.capture(
-            Any(),
-            emptyList(),
-            listOf(source),
-            emptyList(),
-            native,
-        )
+                Any(),
+                emptyList(),
+                listOf(source),
+                emptyList(),
+                native,
+            ),
         ).negated()
 
         val copied = paired.copy()
@@ -95,12 +95,12 @@ class CompiledObjectivePairingTest {
         val native = LinearObjective(intCoefficients = longArrayOf(Long.MIN_VALUE))
         val paired = native.paired(
             CompiledObjectivePairing.capture(
-            Any(),
-            emptyList(),
-            listOf(source),
-            emptyList(),
-            native,
-        )
+                Any(),
+                emptyList(),
+                listOf(source),
+                emptyList(),
+                native,
+            ),
         ).negated()
 
         val copied = paired.copy(intCoefficients = longArrayOf(3))
@@ -117,12 +117,12 @@ class CompiledObjectivePairingTest {
         val native = LinearObjective(intCoefficients = longArrayOf(1))
         val paired = native.paired(
             CompiledObjectivePairing.capture(
-            Any(),
-            emptyList(),
-            listOf(QuadraticVariable.Real(SourceRealId(0))),
-            emptyList(),
-            native,
-        )
+                Any(),
+                emptyList(),
+                listOf(QuadraticVariable.Real(SourceRealId(0))),
+                emptyList(),
+                native,
+            ),
         )
 
         val copied = paired.copy(intCoefficients = longArrayOf(0, 1))
@@ -151,12 +151,12 @@ class CompiledObjectivePairingTest {
         val native = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
         val paired = native.paired(
             CompiledObjectivePairing.capture(
-            Any(),
-            emptyList(),
-            listOf(QuadraticVariable.Real(SourceRealId(0))),
-            emptyList(),
-            native,
-        )
+                Any(),
+                emptyList(),
+                listOf(QuadraticVariable.Real(SourceRealId(0))),
+                emptyList(),
+                native,
+            ),
         )
 
         val value = paired.evaluateLong(Sample(booleanArrayOf(), longArrayOf(2)))

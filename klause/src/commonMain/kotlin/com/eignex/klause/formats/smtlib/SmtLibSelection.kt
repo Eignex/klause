@@ -93,12 +93,12 @@ internal fun Compiler.Builder.wideIntegerSelection(
         for ((position, column) in columns.withIndex()) {
             factors.add(
                 Element(
-                index,
-                column,
-                longArrayOf(falseDigits[position], trueDigits[position]),
-                arrIsVars = false,
-                indexOffset = 0,
-            )
+                    index,
+                    column,
+                    longArrayOf(falseDigits[position], trueDigits[position]),
+                    arrIsVars = false,
+                    indexOffset = 0,
+                ),
             )
         }
         return
@@ -171,12 +171,12 @@ private fun Compiler.Builder.selectionIndex(conditions: List<Int>): Int {
         val relation = if (Lit.isPositive(condition)) LinearOp.EQ else LinearOp.NE
         factors.add(
             ReifiedLinear(
-            Lit.variable(condition),
-            longArrayOf(1),
-            intArrayOf(index),
-            relation,
-            position.toLong() + 1,
-        )
+                Lit.variable(condition),
+                longArrayOf(1),
+                intArrayOf(index),
+                relation,
+                position.toLong() + 1,
+            ),
         )
     }
     conditionalEqualities.define(
@@ -194,10 +194,10 @@ private fun Compiler.Builder.selectionColumn(term: LinComb): Int {
     term.asSimpleVar()?.let { return it }
     if (term.coeffs.isEmpty()) {
         return iteChains.fixedVar(term.constant) {
-        newInt(it, it).also { variable ->
-            conditionalEqualities.define(variable, emptyList(), emptyList(), term, emptyList(), emptyList())
+            newInt(it, it).also { variable ->
+                conditionalEqualities.define(variable, emptyList(), emptyList(), term, emptyList(), emptyList())
+            }
         }
-    }
     }
     val (lower, upper) = linCombRange(term)
     val result = newInt(lower, upper)

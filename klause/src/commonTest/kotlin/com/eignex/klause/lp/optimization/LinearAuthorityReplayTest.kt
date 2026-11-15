@@ -38,27 +38,27 @@ class LinearAuthorityReplayTest {
         mapOf(
             "x-plus" to SourcePremise(
                 SourceInequality(
-                mapOf(x to BigFraction.MINUS_ONE, r to BigFraction.ONE),
-                half.negated(),
-            )
+                    mapOf(x to BigFraction.MINUS_ONE, r to BigFraction.ONE),
+                    half.negated(),
+                ),
             ),
             "x-minus" to SourcePremise(
                 SourceInequality(
-                mapOf(x to BigFraction.MINUS_ONE, r to BigFraction.MINUS_ONE),
-                half.negated(),
-            )
+                    mapOf(x to BigFraction.MINUS_ONE, r to BigFraction.MINUS_ONE),
+                    half.negated(),
+                ),
             ),
             "y-plus" to SourcePremise(
                 SourceInequality(
-                mapOf(y to BigFraction.MINUS_ONE, s to BigFraction.ONE),
-                half.negated(),
-            )
+                    mapOf(y to BigFraction.MINUS_ONE, s to BigFraction.ONE),
+                    half.negated(),
+                ),
             ),
             "y-minus" to SourcePremise(
                 SourceInequality(
-                mapOf(y to BigFraction.MINUS_ONE, s to BigFraction.MINUS_ONE),
-                half.negated(),
-            )
+                    mapOf(y to BigFraction.MINUS_ONE, s to BigFraction.MINUS_ONE),
+                    half.negated(),
+                ),
             ),
         ),
         mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(2)),
@@ -70,10 +70,10 @@ class LinearAuthorityReplayTest {
             SourceDerivation.IntegerRounding(
                 SourceDerivation.Combination(
                     listOf(
-                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("x-plus")),
-                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("x-minus")),
-            )
-                )
+                        SourceDerivation.Combination.Term(half, SourceDerivation.Premise("x-plus")),
+                        SourceDerivation.Combination.Term(half, SourceDerivation.Premise("x-minus")),
+                    ),
+                ),
             ),
             owners = setOf(0, 1),
             family = CutFamily.SOURCE_AGGREGATION,
@@ -84,10 +84,10 @@ class LinearAuthorityReplayTest {
             SourceDerivation.IntegerRounding(
                 SourceDerivation.Combination(
                     listOf(
-                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("y-plus")),
-                SourceDerivation.Combination.Term(half, SourceDerivation.Premise("y-minus")),
-            )
-                )
+                        SourceDerivation.Combination.Term(half, SourceDerivation.Premise("y-plus")),
+                        SourceDerivation.Combination.Term(half, SourceDerivation.Premise("y-minus")),
+                    ),
+                ),
             ),
             owners = setOf(2, 3),
             family = CutFamily.SOURCE_AGGREGATION,
@@ -160,8 +160,8 @@ class LinearAuthorityReplayTest {
         for (incomplete in listOf(
             original.copy(
                 projection = LinearAuthorityFeedbackRequest(
-                cuts = LinearAuthorityFeedbackRequest.Cuts.Installed,
-            )
+                    cuts = LinearAuthorityFeedbackRequest.Cuts.Installed,
+                ),
             ),
             original.copy(cuts = original.cuts.map { it.copy(family = null) }),
         )) {
@@ -213,8 +213,8 @@ class LinearAuthorityReplayTest {
         val original = capture.records.single()
         val invalid = original.copy(
             cuts = original.cuts.map {
-            if (it.id == 0) it.copy(derivation = SourceDerivation.Premise("missing"), checked = true) else it
-        }
+                if (it.id == 0) it.copy(derivation = SourceDerivation.Premise("missing"), checked = true) else it
+            },
         )
 
         val replay = LinearAuthorityReplay.run(invalid, setOf(0), 1_000_000L, 4_000_000L, ExecutionControl.Never)

@@ -83,12 +83,12 @@ class ExecutionCapabilitiesTest {
 
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            if (factor is Linear && target == EncodingTarget.POLYNOMIAL) {
-                Encoder(EncoderSupport.UNSUPPORTED)
-            } else {
-                BuiltInEncoderProvider.select(factor, target)
-            }
-        }
+                if (factor is Linear && target == EncodingTarget.POLYNOMIAL) {
+                    Encoder(EncoderSupport.UNSUPPORTED)
+                } else {
+                    BuiltInEncoderProvider.select(factor, target)
+                }
+            },
         )
         val unsupported = source.prepareExecutionPlan(providers).capabilities.admission(FiniteEngine.BACKTRACK)
         val exhausted = OpenTheoryPipeline.execute(

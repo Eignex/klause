@@ -103,17 +103,17 @@ object BooleanProofSchedulerProfile {
                     emptyList()
                 } else {
                     List(2) { worker ->
-                    val params = if (recipe == "input-order") {
-                        BacktrackParams(
-                        randomSeed = seed + worker,
-                        variableSelector = InputOrder,
-                        valueSelector = IndomainMin,
-                    )
-                    } else {
-                        BacktrackCatalog.byLabel(recipe).build(seed + worker, null)
+                        val params = if (recipe == "input-order") {
+                            BacktrackParams(
+                                randomSeed = seed + worker,
+                                variableSelector = InputOrder,
+                                valueSelector = IndomainMin,
+                            )
+                        } else {
+                            BacktrackCatalog.byLabel(recipe).build(seed + worker, null)
+                        }
+                        params.copy(cancellation = stop, nodeBudget = budget, nativeSat = native)
                     }
-                    params.copy(cancellation = stop, nodeBudget = budget, nativeSat = native)
-                }
                 }
                 var completedTasks = 0
                 var totalTasks = 0
@@ -127,20 +127,20 @@ object BooleanProofSchedulerProfile {
                     val recipeFactory = BacktrackRecipe(recipe) { workerSeed, event ->
                         val params = if (recipe == "input-order") {
                             BacktrackParams(
-                            randomSeed = workerSeed,
-                            onEvent = event,
-                            variableSelector = InputOrder,
-                            valueSelector = IndomainMin,
-                        )
+                                randomSeed = workerSeed,
+                                onEvent = event,
+                                variableSelector = InputOrder,
+                                valueSelector = IndomainMin,
+                            )
                         } else {
                             BacktrackCatalog.byLabel(recipe).build(workerSeed, event)
                         }
                         params.copy(
                             nativeSat = native,
                             branchObserver = capture?.observer(
-                            (workerSeed - seed - 1000L).toInt(),
-                            problem.numBoolVars,
-                        ) ?: params.branchObserver
+                                (workerSeed - seed - 1000L).toInt(),
+                                problem.numBoolVars,
+                            ) ?: params.branchObserver,
                         )
                     }
                     val scenario = PortfolioScenario(
@@ -217,63 +217,63 @@ object BooleanProofSchedulerProfile {
                 val cpuElapsed = process.processCpuTime - cpu
                 report.appendText(
                     buildJsonObject {
-                    put("mode", mode)
-                    put("controlPolicy", control)
-                    put("warmupCount", warmups)
-                    put("firstControlInProcess", controlsStarted++ == 0)
-                    put("processCpuAtControlStartNs", cpu)
-                    put("recipe", recipe)
-                    put("taskDriver", driver)
-                    put("nativeSat", native)
-                    put("taskRouteAdmitted", admitted)
-                    put("taskRouteDecline", decline)
-                    put("sharing", portfolioDriver)
-                    put("regionCapture", captureMode)
-                    put("observedRegionEntries", capture?.entries)
-                    put("duplicateRegionEntries", capture?.duplicateEntries)
-                    put("repeatedRegionEntries", capture?.repeatedEntries)
-                    put("declinedRegionEntries", capture?.declinedEntries)
-                    put("retainedRegions", capturedRegions)
-                    put("retainedRegionLiteralBytes", capturedLiteralBytes)
-                    put("presolve", false)
-                    put("iteration", iteration)
-                    put("warmup", iteration < 0)
-                    put("sourceSha256", sha256(bytes))
-                    put("seed", seed)
-                    put(
-                        "workerSeeds",
-                        (
-                            if (portfolioDriver) {
-                        listOf(seed + 1000, seed + 1001)
-                    } else {
-                        listOf(seed, seed + 1)
-                    }
-                        ).joinToString(",")
-                    )
-                    put("result", result::class.simpleName)
-                    put("nativeCoverageComplete", result is SolveResult.Unsat)
-                    put("independentlyCheckedCoverageComplete", false)
-                    put("completedTasks", completedTasks)
-                    put("totalTasks", totalTasks)
-                    put("schedulerWork", schedulerWork)
-                    put("sourceProbeWork", probeWork)
-                    put("sourceProbeSegments", probeSegments)
-                    put("partitionLiteral", partitionLiteral)
-                    put("decisions", result.stats.search.nodes.sum)
-                    put("restarts", result.stats.search.restarts.sum)
-                    put("nodeBudgetSpent", budget.spent)
-                    put("propagationWork", result.stats.search.propagationWork.sum)
-                    put("rootPropagationWork", result.stats.search.rootPropagationWork.sum)
-                    put("inclusiveControlElapsedNs", elapsed)
-                    put("inclusiveControlProcessCpuNs", cpuElapsed)
-                    put("threadAllocatedBytes", bytesAllocated)
-                    processPeakRssBytes()?.let { put("wholeProcessPeakRssBytes", it) }
-                    put("processPeakRssSamplePhase", "control-end-before-record-and-process-exit")
-                    put("heapUsedBytes", ManagementFactory.getMemoryMXBean().heapMemoryUsage.used)
-                    put("processors", Runtime.getRuntime().availableProcessors())
-                    put("maxHeapBytes", Runtime.getRuntime().maxMemory())
-                    put("emergencyStopped", stop())
-                }.toString() + "\n"
+                        put("mode", mode)
+                        put("controlPolicy", control)
+                        put("warmupCount", warmups)
+                        put("firstControlInProcess", controlsStarted++ == 0)
+                        put("processCpuAtControlStartNs", cpu)
+                        put("recipe", recipe)
+                        put("taskDriver", driver)
+                        put("nativeSat", native)
+                        put("taskRouteAdmitted", admitted)
+                        put("taskRouteDecline", decline)
+                        put("sharing", portfolioDriver)
+                        put("regionCapture", captureMode)
+                        put("observedRegionEntries", capture?.entries)
+                        put("duplicateRegionEntries", capture?.duplicateEntries)
+                        put("repeatedRegionEntries", capture?.repeatedEntries)
+                        put("declinedRegionEntries", capture?.declinedEntries)
+                        put("retainedRegions", capturedRegions)
+                        put("retainedRegionLiteralBytes", capturedLiteralBytes)
+                        put("presolve", false)
+                        put("iteration", iteration)
+                        put("warmup", iteration < 0)
+                        put("sourceSha256", sha256(bytes))
+                        put("seed", seed)
+                        put(
+                            "workerSeeds",
+                            (
+                                if (portfolioDriver) {
+                                    listOf(seed + 1000, seed + 1001)
+                                } else {
+                                    listOf(seed, seed + 1)
+                                }
+                                ).joinToString(","),
+                        )
+                        put("result", result::class.simpleName)
+                        put("nativeCoverageComplete", result is SolveResult.Unsat)
+                        put("independentlyCheckedCoverageComplete", false)
+                        put("completedTasks", completedTasks)
+                        put("totalTasks", totalTasks)
+                        put("schedulerWork", schedulerWork)
+                        put("sourceProbeWork", probeWork)
+                        put("sourceProbeSegments", probeSegments)
+                        put("partitionLiteral", partitionLiteral)
+                        put("decisions", result.stats.search.nodes.sum)
+                        put("restarts", result.stats.search.restarts.sum)
+                        put("nodeBudgetSpent", budget.spent)
+                        put("propagationWork", result.stats.search.propagationWork.sum)
+                        put("rootPropagationWork", result.stats.search.rootPropagationWork.sum)
+                        put("inclusiveControlElapsedNs", elapsed)
+                        put("inclusiveControlProcessCpuNs", cpuElapsed)
+                        put("threadAllocatedBytes", bytesAllocated)
+                        processPeakRssBytes()?.let { put("wholeProcessPeakRssBytes", it) }
+                        put("processPeakRssSamplePhase", "control-end-before-record-and-process-exit")
+                        put("heapUsedBytes", ManagementFactory.getMemoryMXBean().heapMemoryUsage.used)
+                        put("processors", Runtime.getRuntime().availableProcessors())
+                        put("maxHeapBytes", Runtime.getRuntime().maxMemory())
+                        put("emergencyStopped", stop())
+                    }.toString() + "\n",
                 )
             }
         }

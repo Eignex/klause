@@ -30,10 +30,10 @@ class CorpusIndexTest {
             val selection = File(root, "selection.jsonl").apply {
                 writeText(
                     buildJsonObject {
-                    put("collection", "fixture")
-                    put("problem", "model")
-                    put("model", model.absolutePath)
-                }.toString() + "\n"
+                        put("collection", "fixture")
+                        put("problem", "model")
+                        put("model", model.absolutePath)
+                    }.toString() + "\n",
                 )
             }
             val output = File(root, "output")
@@ -65,10 +65,10 @@ class CorpusIndexTest {
             val selection = File(root, "selection.jsonl").apply {
                 writeText(
                     buildJsonObject {
-                    put("collection", "fixture")
-                    put("problem", "model")
-                    put("model", outside.absolutePath)
-                }.toString() + "\n"
+                        put("collection", "fixture")
+                        put("problem", "model")
+                        put("model", outside.absolutePath)
+                    }.toString() + "\n",
                 )
             }
 
@@ -96,10 +96,10 @@ class CorpusIndexTest {
             assertEquals(
                 listOf(
                     CorpusIndex.Entry(
-                    "model.cnf",
-                    HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
-                    bytes.size.toLong(),
-                )
+                        "model.cnf",
+                        HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
+                        bytes.size.toLong(),
+                    ),
                 ),
                 index.files,
             )

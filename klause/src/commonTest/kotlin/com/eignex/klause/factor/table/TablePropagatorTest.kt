@@ -38,10 +38,12 @@ class TablePropagatorTest {
     @Test
     fun `historical alternative should ignore a preferred hole carved after the deduction`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 2) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 2) },
             arrayOf<Factor>(
-            Table(intArrayOf(0, 1, 2), longArrayOf(0, 0, 0, 1, 1, 1)),
-        )
+                Table(intArrayOf(0, 1, 2), longArrayOf(0, 0, 0, 1, 1, 1)),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -53,11 +55,11 @@ class TablePropagatorTest {
 
         val reason = assertNotNull(
             (state.factorAt(0) as TablePropagator).historicalAlternative(
-            state,
-            intArrayOf(0, 2, 0, 1),
-            atTrail,
-            preferred,
-        )
+                state,
+                intArrayOf(0, 2, 0, 1),
+                atTrail,
+                preferred,
+            ),
         )
 
         assertEquals(listOf(Lit.make(state.atomVarEq(1, 1), true)), reason.toList())
@@ -67,10 +69,12 @@ class TablePropagatorTest {
     fun `historical alternative should decline tables outside its row cell and column limits`() {
         for ((rows, columns) in listOf(257 to 2, 128 to 33, 1 to 65)) {
             val problem = Problem(
-                0, columns, Array(columns) { IntDomain(0, 1) },
+                0,
+                columns,
+                Array(columns) { IntDomain(0, 1) },
                 arrayOf<Factor>(
-                Table(IntArray(columns) { it }, LongArray(rows * columns)),
-            )
+                    Table(IntArray(columns) { it }, LongArray(rows * columns)),
+                ),
             )
             val state = PropagationState(problem, Assumptions.None)
 
@@ -89,10 +93,12 @@ class TablePropagatorTest {
     fun `historical alternative should decline more than sixty four retained premises`() {
         val tuples = (1..65).flatMap { listOf(1L, it.toLong()) }.toLongArray()
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 66)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 66)),
             arrayOf<Factor>(
-            Table(intArrayOf(0, 1), tuples),
-        )
+                Table(intArrayOf(0, 1), tuples),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -112,10 +118,12 @@ class TablePropagatorTest {
     @Test
     fun `historical alternative should decline a target scope exceeding its hole allowance`() {
         val problem = Problem(
-            0, 2, arrayOf(IntDomain(0, 65), IntDomain(0, 1)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 65), IntDomain(0, 1)),
             arrayOf<Factor>(
-            Table(intArrayOf(0, 1), longArrayOf(0, 0, 65, 1)),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 0, 65, 1)),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -283,18 +291,18 @@ class TablePropagatorTest {
                 Table(
                     intArrayOf(0, 1),
                     LongArray(256) { cell ->
-                val row = cell / 2
-                if (cell % 2 == 0) {
-                    row.toLong()
-                } else {
-                    when (row) {
-                    0 -> 0L
-                    127 -> 2L
-                    else -> 1L
-                }
-                }
-            }
-                )
+                        val row = cell / 2
+                        if (cell % 2 == 0) {
+                            row.toLong()
+                        } else {
+                            when (row) {
+                                0 -> 0L
+                                127 -> 2L
+                                else -> 1L
+                            }
+                        }
+                    },
+                ),
             ),
         )
         val state = PropagationState(problem, Assumptions.None).also { it.factorAttribution = FactorAttribution() }

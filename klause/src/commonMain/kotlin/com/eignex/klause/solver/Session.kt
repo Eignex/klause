@@ -199,10 +199,10 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
             pull = { if (source.hasNext()) transform(source.next()) else null },
             release = {
                 try {
-                source.close()
-            } finally {
-                active = null
-            }
+                    source.close()
+                } finally {
+                    active = null
+                }
             },
             terminal = { source.isDone },
         )
@@ -276,12 +276,11 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     override fun minimize(objective: LinearObjective, params: P): MinimizeResult =
         minimizeScoped(objective, applyStack(params)).withSourceSemantics(solver.problem.semantics)
 
-    override fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> =
-        guarded(
-            improvementsScoped(objective, applyStack(params)).map {
+    override fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> = guarded(
+        improvementsScoped(objective, applyStack(params)).map {
             it.withSourceSemantics(solver.problem.semantics)
-        }
-        )
+        },
+    )
 
     override fun openSamples(params: P): SearchStream<Sample> = own(openSamplesScoped(applyStack(params))) {
         it.withSourceSemantics(solver.problem.semantics)

@@ -34,11 +34,11 @@ class PreparedSourceTest {
             emptyArray(),
             arrayOf(
                 ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0)),
-                listOf(BigFraction.ONE),
-                LinearOp.LE,
-                BigFraction.ONE,
-            )
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE),
+                    LinearOp.LE,
+                    BigFraction.ONE,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),

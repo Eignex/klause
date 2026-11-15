@@ -27,8 +27,8 @@ class ComponentLpSolverTest {
             owner.openSolve().use { cursor ->
                 assertIs<LpSolveStep.Paused>(
                     cursor.advance(shouldPause = {
-                    owner.lastMetrics.componentSolves >= 2 && ++polls >= 2
-                })
+                        owner.lastMetrics.componentSolves >= 2 && ++polls >= 2
+                    }),
                 )
                 val paid = owner.lastMetrics
 
@@ -51,9 +51,9 @@ class ComponentLpSolverTest {
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         assertIs<ComponentLpSolver>(
             newRetainedLpSolver(
-            assertNotNull(state.ownerWorkingModel()),
-            factory = RecordingLpEngineFactory(),
-        )
+                assertNotNull(state.ownerWorkingModel()),
+                factory = RecordingLpEngineFactory(),
+            ),
         ).use { owner ->
             var observed = false
             owner.openSolve().use { cursor ->
@@ -84,9 +84,9 @@ class ComponentLpSolverTest {
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         assertIs<ComponentLpSolver>(
             newRetainedLpSolver(
-            assertNotNull(state.ownerWorkingModel()),
-            factory = RecordingLpEngineFactory(),
-        )
+                assertNotNull(state.ownerWorkingModel()),
+                factory = RecordingLpEngineFactory(),
+            ),
         ).use { owner ->
             owner.openSolve().use { cursor ->
                 assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = { owner.lastMetrics.componentSolves >= 2 }))
@@ -116,9 +116,9 @@ class ComponentLpSolverTest {
         val factory = RecordingLpEngineFactory()
         assertIs<ComponentLpSolver>(
             newRetainedLpSolver(
-            assertNotNull(state.ownerWorkingModel()),
-            factory = factory,
-        )
+                assertNotNull(state.ownerWorkingModel()),
+                factory = factory,
+            ),
         ).use { owner ->
             val point = assertNotNull(owner.resolveBounds())
             val queries = factory.floatAllowances.size
@@ -206,10 +206,10 @@ class ComponentLpSolverTest {
             }
             assertIs<ComponentLpSolver>(
                 newRetainedLpSolver(
-                assertNotNull(state.ownerWorkingModel()),
-                ExecutionControl { queryCancelled },
-                factory = factory,
-            )
+                    assertNotNull(state.ownerWorkingModel()),
+                    ExecutionControl { queryCancelled },
+                    factory = factory,
+                ),
             ).use { owner ->
                 assertNull(owner.resolveBounds())
                 assertEquals(LpFloatTermination.CANCELLED, owner.lastTermination)
@@ -281,10 +281,10 @@ class ComponentLpSolverTest {
         }
         assertIs<ComponentLpSolver>(
             newRetainedLpSolver(
-            assertNotNull(state.ownerWorkingModel()),
-            ExecutionControl { queryCancelled },
-            factory = factory,
-        )
+                assertNotNull(state.ownerWorkingModel()),
+                ExecutionControl { queryCancelled },
+                factory = factory,
+            ),
         ).use { owner ->
             assertNull(owner.resolveBounds())
             assertEquals(LpFloatTermination.CANCELLED, owner.lastTermination)
@@ -589,8 +589,8 @@ class ComponentLpSolverTest {
             assertEquals(
                 BigFraction.ofLong(4L),
                 assertNotNull(
-                (owner as ComponentLpSolverCapability).exactBound(),
-            ).value
+                    (owner as ComponentLpSolverCapability).exactBound(),
+                ).value,
             )
             assertEquals(listOf(3.0, 1.0), raw.primal.toList())
         }

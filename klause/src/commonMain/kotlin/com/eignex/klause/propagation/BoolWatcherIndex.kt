@@ -70,11 +70,11 @@ internal class BoolWatcherIndex(
             @Suppress("UNCHECKED_CAST")
             yield(
                 BoolWatcherIndex(
-                numBoolVars,
-                watches as Array<IntArrayList>,
-                blockers as Array<IntArrayList>,
-                positions,
-            )
+                    numBoolVars,
+                    watches as Array<IntArrayList>,
+                    blockers as Array<IntArrayList>,
+                    positions,
+                ),
             )
         }
     }

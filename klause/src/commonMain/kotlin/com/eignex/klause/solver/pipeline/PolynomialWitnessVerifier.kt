@@ -21,11 +21,11 @@ internal fun polynomialWitnessVerifier(
         }
         when (
             val checked = verifier.verify(
-            ModelEvidence.Witness(binding.model, candidate, certificate),
-            binding.scope,
-            binding,
-            cancellation,
-        )
+                ModelEvidence.Witness(binding.model, candidate, certificate),
+                binding.scope,
+                binding,
+                cancellation,
+            )
         ) {
             is Verification.Accepted -> Verification.Accepted(candidate)
             is Verification.Rejected -> checked

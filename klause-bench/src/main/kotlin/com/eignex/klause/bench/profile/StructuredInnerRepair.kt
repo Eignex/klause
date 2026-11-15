@@ -53,13 +53,13 @@ internal class StructuredInner private constructor(
         val activeNetwork = network?.takeIf { maintained }
         if (activeNetwork != null) {
             for (index in 0 until activeNetwork.size) {
-            val node = activeNetwork.node(index)
-            val outputFree = if (node.outIsBool) node.out in bools else node.out in ints
-            val inputFree = node.intInputs.any { it in ints } || node.boolInputs.any { it in bools }
-            if (outputFree) freedOutputs++
-            if (!outputFree && inputFree) pinnedOutputs++
-            if (outputFree && !inputFree) fixedOutputs++
-        }
+                val node = activeNetwork.node(index)
+                val outputFree = if (node.outIsBool) node.out in bools else node.out in ints
+                val inputFree = node.intInputs.any { it in ints } || node.boolInputs.any { it in bools }
+                if (outputFree) freedOutputs++
+                if (!outputFree && inputFree) pinnedOutputs++
+                if (outputFree && !inputFree) fixedOutputs++
+            }
         }
         put("maintainedDefinitions", activeNetwork?.size ?: 0)
         put("freedDefinedOutputs", freedOutputs)
@@ -70,21 +70,21 @@ internal class StructuredInner private constructor(
         put(
             "implicitSeedScopes",
             buildJsonArray {
-            if (seeded) {
-                for (scope in implicitSeeds) {
-                val free = scope.count { it in ints }
-                if (free == 0) continue
-                add(
-                    buildJsonObject {
-                    put("size", scope.size)
-                    put("freed", free)
-                    put("partial", free < scope.size)
-                    put("singleFreed", free == 1)
+                if (seeded) {
+                    for (scope in implicitSeeds) {
+                        val free = scope.count { it in ints }
+                        if (free == 0) continue
+                        add(
+                            buildJsonObject {
+                                put("size", scope.size)
+                                put("freed", free)
+                                put("partial", free < scope.size)
+                                put("singleFreed", free == 1)
+                            },
+                        )
+                    }
                 }
-                )
-            }
-            }
-        }
+            },
         )
     }
 
@@ -168,35 +168,38 @@ internal class StructuredInner private constructor(
         }
         val sample = result?.assignment ?: best
         return Run(
-            sample, reason, stats, preparation,
+            sample,
+            reason,
+            stats,
+            preparation,
             buildJsonObject {
-            put("recipe", recipe)
-            put("catalogLabel", selected.label)
-            put("initialization", "captured center; caller pins re-applied; definitions reconciled under pins")
-            put("randomSeed", seed)
-            put("costShaping", "linear 1")
-            put("gradientView", gradient != null)
-            put("normalizeWeightsByClass", true)
-            put("perMoveInvariants", maintained)
-            put("slices", slices)
-            put("closed", true)
-            put("restarts", stats.search.restarts.sum)
-            put("moves", stats.ls.moves.sum)
-            put(
-                "compounds",
-                buildJsonObject {
-                for (name in listOf("Offered", "PinRejected", "Trimmed", "Collapsed", "Admitted", "Applied")) {
-                    put(
-                        name.replaceFirstChar(Char::lowercase),
-                        tally.javaClass.getMethod("get$name")
-                        .invoke(tally) as Long
-                    )
-                }
-                put("scope", "strategy candidate sinks before Boolean closure, and committed moves")
-            }
-            )
-            put("mismatches", mismatches(freedBools, freedInts, maintained, selected.seedImplicitOnRestart))
-        }
+                put("recipe", recipe)
+                put("catalogLabel", selected.label)
+                put("initialization", "captured center; caller pins re-applied; definitions reconciled under pins")
+                put("randomSeed", seed)
+                put("costShaping", "linear 1")
+                put("gradientView", gradient != null)
+                put("normalizeWeightsByClass", true)
+                put("perMoveInvariants", maintained)
+                put("slices", slices)
+                put("closed", true)
+                put("restarts", stats.search.restarts.sum)
+                put("moves", stats.ls.moves.sum)
+                put(
+                    "compounds",
+                    buildJsonObject {
+                        for (name in listOf("Offered", "PinRejected", "Trimmed", "Collapsed", "Admitted", "Applied")) {
+                            put(
+                                name.replaceFirstChar(Char::lowercase),
+                                tally.javaClass.getMethod("get$name")
+                                    .invoke(tally) as Long,
+                            )
+                        }
+                        put("scope", "strategy candidate sinks before Boolean closure, and committed moves")
+                    },
+                )
+                put("mismatches", mismatches(freedBools, freedInts, maintained, selected.seedImplicitOnRestart))
+            },
         )
     }
 
@@ -220,17 +223,22 @@ internal class StructuredInner private constructor(
             val seeding = ImplicitSeeding(problem)
             val seeds = seeding.implicitSeedFactors.map { problem.factors[it].intVars.copyOf() }
             return StructuredInner(
-                recipe, build, sweep, gradient, network, seeds,
+                recipe,
+                build,
+                sweep,
+                gradient,
+                network,
+                seeds,
                 buildJsonObject {
-                put("recipe", recipe)
-                put("sharedAcquisitionPreparation", sharedPreparation)
-                put("analysisElapsedNs", System.nanoTime() - started)
-                put("analysisThreadBytes", bean.getThreadAllocatedBytes(thread) - allocation)
-                put("maintainedDefinitions", network?.size ?: 0)
-                put("electedImplicitGlobals", seeding.electedImplicit.size)
-                put("implicitSeedGlobals", seeds.size)
-                put("chargedToOwnerAllowance", false)
-            }
+                    put("recipe", recipe)
+                    put("sharedAcquisitionPreparation", sharedPreparation)
+                    put("analysisElapsedNs", System.nanoTime() - started)
+                    put("analysisThreadBytes", bean.getThreadAllocatedBytes(thread) - allocation)
+                    put("maintainedDefinitions", network?.size ?: 0)
+                    put("electedImplicitGlobals", seeding.electedImplicit.size)
+                    put("implicitSeedGlobals", seeds.size)
+                    put("chargedToOwnerAllowance", false)
+                },
             )
         }
     }
@@ -288,8 +296,8 @@ internal class RepairDescent(val sweep: DefinitionalSweep?, val directory: File)
             put(
                 "changedWorkingCoordinates",
                 (0 until repaired.numIntVars).count {
-                repaired.exactIntValue(it) != descent.sample.exactIntValue(it)
-            } + (0 until repaired.numBoolVars).count { repaired.boolValue(it) != descent.sample.boolValue(it) }
+                    repaired.exactIntValue(it) != descent.sample.exactIntValue(it)
+                } + (0 until repaired.numBoolVars).count { repaired.boolValue(it) != descent.sample.boolValue(it) },
             )
             put("elapsedNs", elapsed)
             put("threadBytes", bytes)

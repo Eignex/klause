@@ -37,10 +37,10 @@ class OpenPortfolioTest {
 
         val result = optimum(
             OpenTheoryPipeline.execute(
-            request,
-            TheoryParams(maxInstructions = 1000, randomSeed = 17),
-            FiniteEngine.MIXED,
-        )
+                request,
+                TheoryParams(maxInstructions = 1000, randomSeed = 17),
+                FiniteEngine.MIXED,
+            ),
         )
 
         val point = when (result) {

@@ -81,11 +81,11 @@ internal class EvidenceCertificate private constructor(
                     SourceClaim.Witness(result.sample)
                 } else {
                     SourceClaim.Ray(
-                    result.sample,
-                    result.direction.withIndex().associate { (id, step) ->
-                        SourceCoordinate(SourceCoordinate.Kind.Real, id) to step
-                    },
-                )
+                        result.sample,
+                        result.direction.withIndex().associate { (id, step) ->
+                            SourceCoordinate(SourceCoordinate.Kind.Real, id) to step
+                        },
+                    )
                 }
 
                 is MinimizeResult.BestFound -> if (kind == EvidenceKind.Bound) {
@@ -252,17 +252,17 @@ internal class ModelEvidenceVerifier<A, V>(
             val matches = when (publication) {
                 is CompletedEnginePublication.Witness ->
                     evidence is ModelEvidence.Witness &&
-                    publication.sample.equals(evidence.candidate.assignment) &&
-                    publication.value == evidence.candidate.objective
+                        publication.sample.equals(evidence.candidate.assignment) &&
+                        publication.value == evidence.candidate.objective
 
                 is CompletedEnginePublication.ObjectiveBound ->
                     evidence is ModelEvidence.Bound &&
-                    publication.value.equals(evidence.value)
+                        publication.value.equals(evidence.value)
 
                 is CompletedEnginePublication.IntegerWindow ->
                     evidence is ModelEvidence.IntegerWindow &&
-                    evidence.coordinate == publication.coordinate && evidence.lower == publication.lower &&
-                    evidence.upper == publication.upper
+                        evidence.coordinate == publication.coordinate && evidence.lower == publication.lower &&
+                        evidence.upper == publication.upper
             }
             if (!matches) return Verification.Rejected("published claim differs from the actual engine publication")
         }

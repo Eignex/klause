@@ -19,8 +19,8 @@ class RevisedSimplexSingletonStartTest {
             val bounded = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
             val exact = bounded.copy(
                 columns = List(bounded.numVars) { column ->
-                if (column == z) bounded.column(column).copy(bounds = ExactLpBounds()) else bounded.column(column)
-            }
+                    if (column == z) bounded.column(column).copy(bounds = ExactLpBounds()) else bounded.column(column)
+                },
             )
             val model = assertNotNull(LpExactState(exact).toWorkingModel())
             for (singleton in listOf(false, true)) {

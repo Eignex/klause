@@ -122,10 +122,10 @@ class ResumableMinimizeRealLeafTest {
                 val sourceValue = BigFraction.ofLong(5L * sign) + epsilon
                 val params = fixture.params.copy(
                     toleranceCheck = FiniteSourceAcceptance(
-                    { it.reals.single() == 0.5 },
-                    false,
-                    { sourceValue },
-                )
+                        { it.reals.single() == 0.5 },
+                        false,
+                        { sourceValue },
+                    ),
                 )
 
                 fixture.solver.openRepair(objective, params).use { repair ->
@@ -833,15 +833,15 @@ class ResumableMinimizeRealLeafTest {
                 assertEquals(
                     listOf(
                         SearchEvent.BacktrackComponentStop(
-                        SearchComponentStop(
-                            SearchComponentStop.Site.Coverage,
-                            cause,
-                            cancelled = false,
-                            unresolvedCoverage = true,
-                            decisionLevel = 0,
+                            SearchComponentStop(
+                                SearchComponentStop.Site.Coverage,
+                                cause,
+                                cancelled = false,
+                                unresolvedCoverage = true,
+                                decisionLevel = 0,
+                            ),
+                            replayed = false,
                         ),
-                        replayed = false,
-                    )
                     ),
                     events.filterIsInstance<SearchEvent.BacktrackComponentStop>(),
                 )
@@ -923,9 +923,9 @@ class ResumableMinimizeRealLeafTest {
                 val witness = assertNotNull(
                     linear.checkMpsWitness(
                         compiled.columns.map {
-                    if (it.real) reals[it.id] else BigFraction.ofLong(sample.ints[it.id])
-                }
-                    )
+                            if (it.real) reals[it.id] else BigFraction.ofLong(sample.ints[it.id])
+                        },
+                    ),
                 )
                 assertEquals(if (compiled.maximize) "13" else "9", witness.objective.toString())
                 assertEquals(

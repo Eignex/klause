@@ -91,7 +91,7 @@ internal fun PreparedSource.planned(
 ) { token, observation ->
     val selected = capturedPlan?.takeIf { it.reusableFor(model, projections) }
         ?.takeUnless {
-            token.charge(1L);
+            token.charge(1L)
             token()
         }
         ?: run {
@@ -138,8 +138,8 @@ internal fun PreparedSource.planned(
     require(
         (
             plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
-            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN
-        ) || token() ||
+                plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN
+            ) || token() ||
             plan.encodingDecline == EncoderDecline.RESOURCE,
     ) {
         "source preparation left the model without an open-theory route"

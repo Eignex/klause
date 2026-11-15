@@ -247,7 +247,7 @@ internal class LpSolveSession(
         if (cancellation()) return null
         return newRetainedLpSolver(model, cancellation, componentSplit, context.engineFactory, pricing, workLimit)
             .also {
-                it.deferUnscaledSourceDiagnostics();
+                it.deferUnscaledSourceDiagnostics()
                 solver = it
             }
     }

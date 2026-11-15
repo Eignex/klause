@@ -68,7 +68,7 @@ internal class ProblemFacts(
 
         ArmNeed.ExtensionalSupports ->
             extensionalSupports && !profile.optimizing &&
-            profile.problemClass == ProblemClass.FiniteCp
+                profile.problemClass == ProblemClass.FiniteCp
 
         is ArmNeed.Relaxation -> relaxations.getOrPut(need.emphasis) { relaxation(need.emphasis) }
     }

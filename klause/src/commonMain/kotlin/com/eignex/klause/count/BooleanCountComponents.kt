@@ -123,10 +123,10 @@ internal class BooleanCountComponents private constructor(
                 clauses[groupIds[Lit.variable(literals[0])]].add(
                     Clause(
                         IntArray(literals.size) {
-                    val literal = literals[it]
-                    Lit.make(localIds[Lit.variable(literal)], Lit.isPositive(literal))
-                }
-                    )
+                            val literal = literals[it]
+                            Lit.make(localIds[Lit.variable(literal)], Lit.isPositive(literal))
+                        },
+                    ),
                 )
             }
             val components = groups.indices.map { Component(groups[it].size, clauses[it], projections[it]) }

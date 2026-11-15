@@ -307,10 +307,12 @@ internal fun integerCertifyUnchecked(
             dot.addLong(mult[j - n]) // slack column j is the unit vector e_{j−n}
         } else {
             if (!integers.forEachCoefficient(j) { i, a ->
-                scan?.invoke();
-                dot.addProduct(mult[i], a)
+                    scan?.invoke()
+                    dot.addProduct(mult[i], a)
+                }
+            ) {
+                return null
             }
-            ) return null
         }
         dAcc.subtract(dot)
         if (!dAcc.fitsLong()) return null // reduced cost too large to evaluate ⇒ keep node (sound)
@@ -415,9 +417,9 @@ internal class IntegerLpView private constructor(private val model: LpModel) {
             val source = model.exactState?.model
             if (source == null && model.hasContinuous) return null
             if (requireObjectiveUnits && source != null && (
-                source.objective.scale.value != BigFraction.ONE ||
-                    !source.objective.externalConstant.value.isZero
-            )
+                    source.objective.scale.value != BigFraction.ONE ||
+                        !source.objective.externalConstant.value.isZero
+                    )
             ) {
                 return null
             }

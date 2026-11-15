@@ -40,7 +40,7 @@ class MddIncrementalStateTest {
         val payload = state.refPayload[0] as MddIncrementalState
 
         for (
-            (position, expected) in listOf(intArrayOf(2, 8), intArrayOf(6, 4), intArrayOf(6, 4), intArrayOf(5, 5))
+        (position, expected) in listOf(intArrayOf(2, 8), intArrayOf(6, 4), intArrayOf(6, 4), intArrayOf(5, 5))
             .withIndex()
         ) {
             val counts = assertNotNull(payload.supportCounts(position, longArrayOf(0, 1)) { true })

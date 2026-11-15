@@ -190,9 +190,10 @@ class NonlinearIntegerResiduesTest {
     fun `composite zero divisors should preserve a real integer witness`() {
         val residues = NonlinearIntegerResidues(
             source(
-            "(assert (= (* x y) 4)) (assert (= x 2)) (assert (= y 2))",
-        ),
-            PolynomialArithmetic(), PolynomialLimits()
+                "(assert (= (* x y) 4)) (assert (= x 2)) (assert (= y 2))",
+            ),
+            PolynomialArithmetic(),
+            PolynomialLimits(),
         )
 
         assertFalse(residues.refutes())
@@ -281,9 +282,10 @@ class NonlinearIntegerResiduesTest {
     fun `scaled disjoint images should preserve exact denominator edge factors`() {
         val residues = NonlinearIntegerResidues(
             source(
-            "(assert (= (+ (* (/ 1 2) (^ x 2)) (* (/ 1 2) (^ y 2))) (/ 3 2)))",
-        ),
-            PolynomialArithmetic(), PolynomialLimits()
+                "(assert (= (+ (* (/ 1 2) (^ x 2)) (* (/ 1 2) (^ y 2))) (/ 3 2)))",
+            ),
+            PolynomialArithmetic(),
+            PolynomialLimits(),
         )
 
         assertTrue(residues.refutes())
@@ -294,9 +296,10 @@ class NonlinearIntegerResiduesTest {
     fun `overlapping individual equations should retain shared tuple refutations`() {
         val residues = NonlinearIntegerResidues(
             source(
-            "(assert (= (* x y) 2)) (assert (= (+ x y) 4))",
-        ),
-            PolynomialArithmetic(), PolynomialLimits()
+                "(assert (= (* x y) 2)) (assert (= (+ x y) 4))",
+            ),
+            PolynomialArithmetic(),
+            PolynomialLimits(),
         )
 
         assertTrue(residues.refutes())

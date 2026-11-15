@@ -242,14 +242,13 @@ internal fun ExecutionControl.recordPresolveProbe() {
     presolveBudget()?.recordProbe()
 }
 
-private fun saturatedSum(total: Long, units: Long): Long =
-    if (units <= 0L) {
-        total
-    } else if (units > Long.MAX_VALUE - total) {
-        Long.MAX_VALUE
-    } else {
-        total + units
-    }
+private fun saturatedSum(total: Long, units: Long): Long = if (units <= 0L) {
+    total
+} else if (units > Long.MAX_VALUE - total) {
+    Long.MAX_VALUE
+} else {
+    total + units
+}
 
 private fun weighted(units: Long, weight: Long): Long =
     if (units > Long.MAX_VALUE / weight) Long.MAX_VALUE else units * weight

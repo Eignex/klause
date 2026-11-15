@@ -210,10 +210,10 @@ class SharingMemoryObservationTest {
 
         val values = assertNotNull(
             sample.snapshot {
-            sample.ownedReferencesPool(pool, 100L, 40L)
-            sample.ownedReferencesPool(pool, 100L, 70L)
-            sample.ownedReferencesPool(pool, 100L, 20L)
-        }.completeValues
+                sample.ownedReferencesPool(pool, 100L, 40L)
+                sample.ownedReferencesPool(pool, 100L, 70L)
+                sample.ownedReferencesPool(pool, 100L, 20L)
+            }.completeValues,
         )
 
         assertEquals(100L, values["ownedReferenceSlots"])

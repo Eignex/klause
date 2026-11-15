@@ -120,11 +120,15 @@ internal class LpDirectionalProbes(
             return null
         }
         return query(
-            columns, splits, allowance, token, observe,
+            columns,
+            splits,
+            allowance,
+            token,
+            observe,
             ResultMapping(
-            value = { objective -> (objective - reference).takeIf { it.isFinite() && it >= 0.0 } },
-            pair = ::LpDirectionalGain,
-        )
+                value = { objective -> (objective - reference).takeIf { it.isFinite() && it >= 0.0 } },
+                pair = ::LpDirectionalGain,
+            ),
         )
     }
 
@@ -247,8 +251,8 @@ internal class LpDirectionalProbes(
 
             existing == null && (
                 factorEntries > factorEntryLimit ||
-                factorEntries >= budget.remaining() - workspace - scaling
-            ) -> LpProbePreparationStop.FACTORS
+                    factorEntries >= budget.remaining() - workspace - scaling
+                ) -> LpProbePreparationStop.FACTORS
 
             else -> null
         }

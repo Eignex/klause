@@ -27,10 +27,11 @@ class LinearSourceIntegersTest {
             listOf(
                 LinearSourceRow(
                     listOf(
-                    LinearSourceTerm(2, SemanticRational.ONE),
-                    LinearSourceTerm(1, SemanticRational.ofLong(-2)),
-                ),
-                    SemanticRational.ONE, SemanticRational.ONE
+                        LinearSourceTerm(2, SemanticRational.ONE),
+                        LinearSourceTerm(1, SemanticRational.ofLong(-2)),
+                    ),
+                    SemanticRational.ONE,
+                    SemanticRational.ONE,
                 ),
                 LinearSourceRow(
                     listOf(
@@ -59,11 +60,12 @@ class LinearSourceIntegersTest {
             listOf(
                 LinearSourceRow(
                     listOf(
-                LinearSourceTerm(1, SemanticRational.ofLong(2)),
-                LinearSourceTerm(0, SemanticRational.ofLong(-1)),
-            ),
-                SemanticRational.ZERO, SemanticRational.ZERO
-                )
+                        LinearSourceTerm(1, SemanticRational.ofLong(2)),
+                        LinearSourceTerm(0, SemanticRational.ofLong(-1)),
+                    ),
+                    SemanticRational.ZERO,
+                    SemanticRational.ZERO,
+                ),
             ),
         )
 
@@ -81,14 +83,14 @@ class LinearSourceIntegersTest {
             ),
             listOf(
                 LinearSourceRow(
-                listOf(
-                    LinearSourceTerm(1, SemanticRational.ONE),
-                    LinearSourceTerm(0, SemanticRational.ofLong(-3)),
+                    listOf(
+                        LinearSourceTerm(1, SemanticRational.ONE),
+                        LinearSourceTerm(0, SemanticRational.ofLong(-3)),
+                    ),
+                    SemanticRational.ofLong(2),
+                    SemanticRational.ofLong(2),
+                    LinearSourceIndicator(0, true),
                 ),
-                SemanticRational.ofLong(2),
-                SemanticRational.ofLong(2),
-                LinearSourceIndicator(0, true),
-            )
             ),
         )
 
@@ -107,11 +109,12 @@ class LinearSourceIntegersTest {
             listOf(
                 LinearSourceRow(
                     listOf(
-                LinearSourceTerm(1, SemanticRational.ONE),
-                LinearSourceTerm(0, SemanticRational.ofLong(-2)),
-            ),
-                SemanticRational.ZERO, SemanticRational.ZERO
-                )
+                        LinearSourceTerm(1, SemanticRational.ONE),
+                        LinearSourceTerm(0, SemanticRational.ofLong(-2)),
+                    ),
+                    SemanticRational.ZERO,
+                    SemanticRational.ZERO,
+                ),
             ),
         )
 
@@ -131,11 +134,12 @@ class LinearSourceIntegersTest {
             listOf(
                 LinearSourceRow(
                     listOf(
-                LinearSourceTerm(1, SemanticRational.ONE),
-                LinearSourceTerm(0, SemanticRational.ofLong(-3)),
-            ),
-                wide, wide
-                )
+                        LinearSourceTerm(1, SemanticRational.ONE),
+                        LinearSourceTerm(0, SemanticRational.ofLong(-3)),
+                    ),
+                    wide,
+                    wide,
+                ),
             ),
         )
 

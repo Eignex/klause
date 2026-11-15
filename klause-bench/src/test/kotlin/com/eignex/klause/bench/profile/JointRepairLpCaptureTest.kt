@@ -16,13 +16,13 @@ class JointRepairLpCaptureTest {
 
         assertEquals(
             listOf(
-            "0000000000000000",
-            "8000000000000000",
-            "3ff8000000000000",
-            "0000000000000001",
-            "7fefffffffffffff",
-        ),
-            encoded
+                "0000000000000000",
+                "8000000000000000",
+                "3ff8000000000000",
+                "0000000000000001",
+                "7fefffffffffffff",
+            ),
+            encoded,
         )
     }
 

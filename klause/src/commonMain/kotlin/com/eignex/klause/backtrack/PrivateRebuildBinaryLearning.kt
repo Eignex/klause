@@ -41,8 +41,8 @@ internal class PrivateRebuildBinaryLearning private constructor(
                     session.learnedClauseOrigin(index) != OWN_ORIGIN ||
                     session.learnedClauseLiteralCount(index) != 2
                 ) {
-                        continue
-                    }
+                    continue
+                }
                 if (!visit(8L)) return null
                 val literals = session.learnedClauseLiterals(index)
                 val a = minOf(literals[0], literals[1])
@@ -51,8 +51,8 @@ internal class PrivateRebuildBinaryLearning private constructor(
                     Lit.variable(b) !in 0 until source.numBoolVars || Lit.variable(a) == Lit.variable(b) ||
                     session.boolValue(Lit.variable(a)) != null || session.boolValue(Lit.variable(b)) != null
                 ) {
-                        continue
-                    }
+                    continue
+                }
                 eligible++
                 val key = pair(a, b)
                 val opposite = key xor COMPLEMENT_PAIR
@@ -61,7 +61,7 @@ internal class PrivateRebuildBinaryLearning private constructor(
                 for (entry in 0 until attemptedCount) {
                     if (!visit(1L)) return null
                     if (attempted[entry] == relation) {
-                        claimed = true;
+                        claimed = true
                         break
                     }
                 }
@@ -96,8 +96,8 @@ internal class PrivateRebuildBinaryLearning private constructor(
         private fun slot(keys: LongArray, key: Long, visit: (Long) -> Boolean): Int? {
             var index = (
                 ((key xor (key ushr Int.SIZE_BITS)) * HASH_MULTIPLIER) ushr
-                (Long.SIZE_BITS - TABLE_BITS)
-            ).toInt()
+                    (Long.SIZE_BITS - TABLE_BITS)
+                ).toInt()
             while (true) {
                 if (!visit(1L)) return null
                 if (keys[index] == EMPTY_KEY || keys[index] == key) return index
@@ -109,11 +109,12 @@ internal class PrivateRebuildBinaryLearning private constructor(
             val a = (key ushr Int.SIZE_BITS).toInt()
             val b = key.toInt()
             return PrivateRebuildBinaryLearning(
-                source, minOf(key, key xor COMPLEMENT_PAIR),
+                source,
+                minOf(key, key xor COMPLEMENT_PAIR),
                 arrayOf(
-                Clause(intArrayOf(a, b)),
-                Clause(intArrayOf(Lit.negate(a), Lit.negate(b))),
-            )
+                    Clause(intArrayOf(a, b)),
+                    Clause(intArrayOf(Lit.negate(a), Lit.negate(b))),
+                ),
             )
         }
 

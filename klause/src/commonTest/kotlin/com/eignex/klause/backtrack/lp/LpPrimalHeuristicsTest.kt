@@ -93,11 +93,11 @@ class LpPrimalHeuristicsTest {
                 objective,
                 LpParams(
                     lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                )
+                        bounding = true,
+                        probe = true,
+                        componentOwnership = true,
+                        rootCutHarvest = false,
+                    ),
                 ),
                 SolveStatsSink("masked-component-admission"),
                 LpSolveContext(factory),
@@ -146,11 +146,13 @@ class LpPrimalHeuristicsTest {
     fun `component trial admission separates paid numerical work from its preparation limit`() {
         for (rootLimit in listOf(8_000_000L, 150_000_000L)) {
             val problem = Problem(
-                0, 4, Array(4) { IntDomain(0, 1) },
+                0,
+                4,
+                Array(4) { IntDomain(0, 1) },
                 listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-            )
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+                ),
             ).bake()
             val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
             var queries = 0
@@ -192,12 +194,12 @@ class LpPrimalHeuristicsTest {
                 objective,
                 LpParams(
                     lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                    rootMaxWork = rootLimit,
-                )
+                        bounding = true,
+                        probe = true,
+                        componentOwnership = true,
+                        rootCutHarvest = false,
+                        rootMaxWork = rootLimit,
+                    ),
                 ),
                 SolveStatsSink("separate-preparation-limit"),
                 LpSolveContext(factory),
@@ -240,11 +242,13 @@ class LpPrimalHeuristicsTest {
     @Test
     fun `handoff component trials wait for funding without constructing private pinning state`() {
         val problem = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+            ),
         )
         val objective = LinearObjective(intCoefficients = LongArray(4))
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
@@ -287,11 +291,13 @@ class LpPrimalHeuristicsTest {
     @Test
     fun `component rounding waits for funded progress without another numerical owner`() {
         val problem = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+            ),
         )
         val objective = LinearObjective(intCoefficients = LongArray(4))
         val session = PropagationSession(problem)
@@ -423,11 +429,11 @@ class LpPrimalHeuristicsTest {
                 objective,
                 LpParams(
                     lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                )
+                        bounding = true,
+                        probe = true,
+                        componentOwnership = true,
+                        rootCutHarvest = false,
+                    ),
                 ),
                 sink,
                 LpSolveContext(factory),
@@ -441,8 +447,8 @@ class LpPrimalHeuristicsTest {
                     val column = relaxation.intColOf[v]
                     known[column] = v % width == 0 || v % width == 4
                     primal[column] = when (v % width) {
-                        0 -> 1.0;
-                        4 -> 0.25;
+                        0 -> 1.0
+                        4 -> 0.25
                         else -> 123.75
                     }
                 }
@@ -496,8 +502,8 @@ class LpPrimalHeuristicsTest {
                 assertTrue(
                     (
                         sink.snapshot().lp.phases["PRIMAL_COMPONENT_REPAIR_RETREAT_ROOT"]
-                    ?.outcomes?.get("CONFLICT") ?: 0L
-                    ) >= 2L
+                            ?.outcomes?.get("CONFLICT") ?: 0L
+                        ) >= 2L,
                 )
                 assertEquals(constructed, factory.calls.size)
                 assertEquals(queries, factory.floatAllowances.size)
@@ -542,11 +548,11 @@ class LpPrimalHeuristicsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootMaxWork = 1_000_000L,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootMaxWork = 1_000_000L,
+                ),
             ),
             sink,
             LpSolveContext(factory),
@@ -561,7 +567,7 @@ class LpPrimalHeuristicsTest {
             assertEquals(
                 1L,
                 sink.snapshot().lp.phases["PRIMAL_COMPONENT_REPAIR_ROOT"]
-                ?.outcomes?.get("WORK_DECLINED")
+                    ?.outcomes?.get("WORK_DECLINED"),
             )
             assertTrue(factory.calls.isEmpty())
         }
@@ -590,11 +596,11 @@ class LpPrimalHeuristicsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("resumed-component-repair"),
             LpSolveContext(factory),
@@ -608,8 +614,8 @@ class LpPrimalHeuristicsTest {
                 val column = relaxation.intColOf[v]
                 known[column] = v % 4 < 2
                 primal[column] = when (v % 4) {
-                    0 -> 1.0;
-                    1 -> 0.5;
+                    0 -> 1.0
+                    1 -> 0.5
                     else -> 123.75
                 }
             }
@@ -678,11 +684,11 @@ class LpPrimalHeuristicsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("refreshed-component-repair"),
             LpSolveContext(factory),
@@ -696,8 +702,8 @@ class LpPrimalHeuristicsTest {
                 val column = relaxation.intColOf[v]
                 known[column] = v % 4 < 2
                 primal[column] = when (v % 4) {
-                    0 -> 1.0;
-                    1 -> 0.5;
+                    0 -> 1.0
+                    1 -> 0.5
                     else -> 123.75
                 }
             }
@@ -842,10 +848,12 @@ class LpPrimalHeuristicsTest {
         val objective = LinearObjective(intCoefficients = LongArray(8))
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
         val primal = DoubleArray(relaxation.model.n)
-        for (v in 0 until 8) primal[relaxation.intColOf[v]] = when (v) {
-            0 -> 0.25;
-            in 1..3 -> 0.4;
+        for (v in 0 until 8) {
+            primal[relaxation.intColOf[v]] = when (v) {
+            0 -> 0.25
+            in 1..3 -> 0.4
             else -> 0.5
+        }
         }
         val factory = RecordingLpEngineFactory()
         LpEngine(
@@ -994,9 +1002,9 @@ class LpPrimalHeuristicsTest {
             var expired = false
             assertNull(
                 engine.lpRoundingProbe(objective, ExecutionControl { expired }) {
-                expired = true
-                null
-            }
+                    expired = true
+                    null
+                },
             )
             val prefix = assertNotNull(guidance.pinning)
             assertEquals(IntDomain(0, 0), prefix.intDomain(0))
@@ -1202,10 +1210,12 @@ class LpPrimalHeuristicsTest {
     fun `completed rounding pins resume under a fresh slice without repeated propagation charges`() {
         val n = 4
         val problem = Problem(
-            0, n, Array(n) { IntDomain(0, 100L + it) },
+            0,
+            n,
+            Array(n) { IntDomain(0, 100L + it) },
             arrayOf<Factor>(
-            Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
-        )
+                Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
+            ),
         )
         val objective = LinearObjective(intCoefficients = LongArray(n) { 1L })
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
@@ -1246,10 +1256,12 @@ class LpPrimalHeuristicsTest {
         for (changedObjective in listOf(false, true)) {
             val n = 4
             val problem = Problem(
-                0, n, Array(n) { IntDomain(0, 100L + it) },
+                0,
+                n,
+                Array(n) { IntDomain(0, 100L + it) },
                 arrayOf<Factor>(
-                Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
-            )
+                    Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
+                ),
             )
             val objective = LinearObjective(intCoefficients = LongArray(n) { 1L })
             val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
@@ -1345,11 +1357,13 @@ class LpPrimalHeuristicsTest {
     @Test
     fun `unknown binary rounding columns try the other value after a conflicting zero pin`() {
         val problem = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
             listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.GE, 0),
+            ),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 1))
         val session = PropagationSession(problem)
@@ -1516,14 +1530,16 @@ class LpPrimalHeuristicsTest {
             true to true,
         )) {
             val problem = Problem(
-                0, 7, Array(7) { IntDomain(0, 1) },
+                0,
+                7,
+                Array(7) { IntDomain(0, 1) },
                 listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(3, 4), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(5, 6), LinearOp.GE, 1),
-            )
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, 1), intArrayOf(3, 4), LinearOp.GE, 1),
+                    Linear(intArrayOf(1, 1), intArrayOf(5, 6), LinearOp.GE, 1),
+                ),
             ).bake()
             val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1, 2, 1, 2))
             var expired = false
@@ -1562,11 +1578,11 @@ class LpPrimalHeuristicsTest {
                 objective,
                 LpParams(
                     lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                )
+                        bounding = true,
+                        probe = true,
+                        componentOwnership = true,
+                        rootCutHarvest = false,
+                    ),
                 ),
                 SolveStatsSink("deferred-child-guidance"),
                 LpSolveContext(factory),
@@ -1599,11 +1615,13 @@ class LpPrimalHeuristicsTest {
     @Test
     fun `rounding reuses prepared components after a cancelled root query`() {
         val problem = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 1),
+            ),
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 1, 2))
         val factory = RecordingLpEngineFactory()
@@ -1613,11 +1631,11 @@ class LpPrimalHeuristicsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("prepared-component-rounding"),
             LpSolveContext(factory),
@@ -1648,11 +1666,11 @@ class LpPrimalHeuristicsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("changed-prepared-rounding"),
         ).use { engine ->
@@ -1713,11 +1731,11 @@ class LpPrimalHeuristicsTest {
                 objective,
                 LpParams(
                     lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                )
+                        bounding = true,
+                        probe = true,
+                        componentOwnership = true,
+                        rootCutHarvest = false,
+                    ),
                 ),
                 SolveStatsSink("owned-rounding-guidance"),
                 LpSolveContext(factory),
@@ -1726,9 +1744,9 @@ class LpPrimalHeuristicsTest {
                 assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
                 assertNull(
                     engine.lpRoundingProbe(objective, token, accept = {
-                    stopped = true
-                    null
-                })
+                        stopped = true
+                        null
+                    }),
                 )
                 val prefix = engine.rootRoundingWarmStart?.pinning
                 if (stopDuringPinning) {
@@ -1830,10 +1848,12 @@ class LpPrimalHeuristicsTest {
     fun `LP pinning should withhold a proposal when one cumulative fire is interrupted`() {
         val n = 32
         val problem = Problem(
-            0, n, Array(n) { IntDomain(0, 100L + it) },
+            0,
+            n,
+            Array(n) { IntDomain(0, 100L + it) },
             arrayOf<Factor>(
-            Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
-        )
+                Cumulative(IntArray(n) { it }, LongArray(n) { 1L }, LongArray(n) { 1L }, n.toLong()),
+            ),
         )
         val objective = LinearObjective(intCoefficients = LongArray(n) { 1L })
         var armed = false
@@ -1866,8 +1886,8 @@ class LpPrimalHeuristicsTest {
         session = PropagationSession(
             problem,
             ExecutionControl {
-            armed && session.litTruth(session.boundGeLit(0, 16, true)) == true
-        }
+                armed && session.litTruth(session.boundGeLit(0, 16, true)) == true
+            },
         )
         repeat(128) { session.boundGeLit(0, it.toLong() + 1, true) }
         val relaxation = CpToLpRelaxation(problem, objective).build(session)
@@ -1891,10 +1911,12 @@ class LpPrimalHeuristicsTest {
     fun `interrupted rounding should resume only its original LP objective`() {
         for (sameObjective in listOf(true, false)) {
             val problem = Problem(
-                0, 2, Array(2) { IntDomain(0, 1) },
+                0,
+                2,
+                Array(2) { IntDomain(0, 1) },
                 arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            )
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                ),
             )
             val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
             var stopped = false
@@ -1964,11 +1986,13 @@ class LpPrimalHeuristicsTest {
     fun `admitted pump rounds should reuse root assembly with private objective owners`() {
         for (mode in LpSourcePreparation.entries) {
             val problem = Problem(
-                0, 4, Array(4) { IntDomain(0, 1) },
+                0,
+                4,
+                Array(4) { IntDomain(0, 1) },
                 arrayOf<Factor>(
-                Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.GE, 1),
-                Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.LE, 3),
-            )
+                    Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.GE, 1),
+                    Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.LE, 3),
+                ),
             ).bake()
             val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3, 4), constant = 17L)
             val models = ArrayList<LpModel>()
@@ -2025,11 +2049,13 @@ class LpPrimalHeuristicsTest {
     fun `changed shared root domains should retire pump preparation`() {
         for (hole in listOf(false, true)) {
             val problem = Problem(
-                0, 4, Array(4) { IntDomain(0, if (hole) 2 else 1) },
+                0,
+                4,
+                Array(4) { IntDomain(0, if (hole) 2 else 1) },
                 arrayOf<Factor>(
-                Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.GE, 1),
-                Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.LE, if (hole) 7 else 3),
-            )
+                    Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.GE, 1),
+                    Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.LE, if (hole) 7 else 3),
+                ),
             ).bake()
             val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3, 4))
             val sink = SolveStatsSink("changed-pump-root")
@@ -2066,10 +2092,12 @@ class LpPrimalHeuristicsTest {
     @Test
     fun `cancelled pump objective preparation should not open another numerical owner`() {
         val problem = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             arrayOf<Factor>(
-            Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.GE, 1),
-        )
+                Linear(IntArray(4) { 1 }, IntArray(4) { it }, LinearOp.GE, 1),
+            ),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3, 4))
         val factory = RecordingLpEngineFactory()

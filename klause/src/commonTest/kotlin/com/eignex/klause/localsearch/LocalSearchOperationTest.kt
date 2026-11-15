@@ -131,21 +131,23 @@ class LocalSearchOperationTest {
     @Test
     fun `stepped compound edits should reconcile definitions and retain one tabu step`() {
         val problem = Problem(
-            0, 4, Array(4) { IntDomain(0, 4) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 4) },
             arrayOf<Factor>(
-            Product(0, 1, 2),
-            Table(intArrayOf(0, 2, 0), longArrayOf(0, 0, 0, 1, 2, 1, 2, 4, 2)),
-            Mdd(
-                intArrayOf(2),
-                intArrayOf(1, 1),
-                intArrayOf(0, 12),
-                longArrayOf(0, 0, 0, 1, 0, 2, 0, 2, 0, 4, 0, 3),
-                0,
-                intArrayOf(0),
-                4,
-                3,
+                Product(0, 1, 2),
+                Table(intArrayOf(0, 2, 0), longArrayOf(0, 0, 0, 1, 2, 1, 2, 4, 2)),
+                Mdd(
+                    intArrayOf(2),
+                    intArrayOf(1, 1),
+                    intArrayOf(0, 12),
+                    longArrayOf(0, 0, 0, 1, 0, 2, 0, 2, 0, 4, 0, 3),
+                    0,
+                    intArrayOf(0),
+                    4,
+                    3,
+                ),
             ),
-        )
         )
         val ordinary = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         val stepped = LocalSearchState(LocalSearchModel.open(problem), Random(0))

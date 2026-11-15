@@ -25,8 +25,8 @@ internal fun polynomialSelectionEncoding(
     checkpoint()
     return PolynomialRealFormula.And(
         listOf(
-        PolynomialRealFormula.Or(listOf(PolynomialRealFormula.Not(selection.condition), whenTrue)),
-        PolynomialRealFormula.Or(listOf(selection.condition, whenFalse)),
-    )
+            PolynomialRealFormula.Or(listOf(PolynomialRealFormula.Not(selection.condition), whenTrue)),
+            PolynomialRealFormula.Or(listOf(selection.condition, whenFalse)),
+        ),
     )
 }

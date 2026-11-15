@@ -44,7 +44,7 @@ internal class FlatZincValues(
             val algebraic = assignment.algebraicRealValue(id)
             if (algebraic != null) {
                 algebraic.rational?.toDouble()
-                ?: (algebraic.lowerBound.toDouble() / 2 + algebraic.upperBound.toDouble() / 2)
+                    ?: (algebraic.lowerBound.toDouble() / 2 + algebraic.upperBound.toDouble() / 2)
             } else {
                 val parts = assignment.realValue(id).split('/')
                 BigFraction.of(

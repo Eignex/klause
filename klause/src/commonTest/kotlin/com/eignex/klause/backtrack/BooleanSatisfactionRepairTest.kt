@@ -25,22 +25,26 @@ import kotlin.test.assertTrue
 
 class BooleanSatisfactionRepairTest {
     private val problem = Problem(
-        2, 0, emptyArray(),
+        2,
+        0,
+        emptyArray(),
         arrayOf(
-        Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-    )
+            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+        ),
     ).bake()
 
     @Test
     fun `sibling queries should preserve their scope across restarts`() {
         val guarded = Problem(
-            5, 0, emptyArray(),
+            5,
+            0,
+            emptyArray(),
             Array(8) { mask ->
-            Clause(
-                intArrayOf(Lit.make(0, true)) +
-                    IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) },
-            )
-        }
+                Clause(
+                    intArrayOf(Lit.make(0, true)) +
+                        IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) },
+                )
+            },
         ).bake()
         for (native in listOf(false, true)) {
             val params = BacktrackParams(
@@ -81,13 +85,15 @@ class BooleanSatisfactionRepairTest {
     @Test
     fun `a retained task root should preserve a feasible sibling after scoped refutation`() {
         val guarded = Problem(
-            5, 0, emptyArray(),
+            5,
+            0,
+            emptyArray(),
             Array(8) { mask ->
-            Clause(
-                intArrayOf(Lit.make(0, true)) +
-                    IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) },
-            )
-        }
+                Clause(
+                    intArrayOf(Lit.make(0, true)) +
+                        IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) },
+                )
+            },
         ).bake()
         for (native in listOf(false, true)) {
             val params = BacktrackParams(
@@ -240,10 +246,12 @@ class BooleanSatisfactionRepairTest {
     @Test
     fun `an exhausted containing quota should not spend another decision after reseeding`() {
         val contradiction = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             Array(8) { mask ->
-            Clause(IntArray(3) { bit -> Lit.make(bit + 1, mask and (1 shl bit) != 0) })
-        }
+                Clause(IntArray(3) { bit -> Lit.make(bit + 1, mask and (1 shl bit) != 0) })
+            },
         ).bake()
         for (native in listOf(false, true)) {
             val budget = NodeBudget(1L)
@@ -306,10 +314,12 @@ class BooleanSatisfactionRepairTest {
     @Test
     fun `direct satisfaction tasks should recover lost coverage before reporting source exhaustion`() {
         val contradiction = Problem(
-            5, 0, emptyArray(),
+            5,
+            0,
+            emptyArray(),
             Array(8) { mask ->
-            Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
-        }
+                Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+            },
         ).bake()
         val context = BooleanProofContext(SourceScope(SourceRevision("fixture", "exact-cnf")), "identity:0")
         val params = List(2) { BacktrackParams(nativeSat = false) }
@@ -332,10 +342,10 @@ class BooleanSatisfactionRepairTest {
         val pins = mapOf(1 to false)
         val context = BooleanProofContext(
             SourceScope(
-            SourceRevision("fixture", "exact-cnf"),
-            SourceCondition(bools = pins),
-        ),
-            "identity:0"
+                SourceRevision("fixture", "exact-cnf"),
+                SourceCondition(bools = pins),
+            ),
+            "identity:0",
         )
         val params = BacktrackParams(assumptions = Assumptions(bools = pins))
         BooleanProofScheduler(problem, context, listOf(0), listOf(params), true).use { scheduler ->

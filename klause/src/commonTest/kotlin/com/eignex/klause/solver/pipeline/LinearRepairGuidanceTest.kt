@@ -39,11 +39,11 @@ class LinearRepairGuidanceTest {
         val guidance = LinearRepairGuidance()
         assertTrue(
             guidance.remember(
-            source,
-            mapOf(integer to 0.5),
-            SourceLpBudget(funding = funding),
-            ExecutionControl.Never,
-        )
+                source,
+                mapOf(integer to 0.5),
+                SourceLpBudget(funding = funding),
+                ExecutionControl.Never,
+            ),
         )
 
         assertNull(guidance.find(SourceProofContext(scope, setOf(integer), emptyMap())))
@@ -75,11 +75,11 @@ class LinearRepairGuidanceTest {
 
             assertFalse(
                 guidance.remember(
-                source,
-                point,
-                SourceLpBudget(funding = funding),
-                ExecutionControl { variant == "cancelled" },
-            )
+                    source,
+                    point,
+                    SourceLpBudget(funding = funding),
+                    ExecutionControl { variant == "cancelled" },
+                ),
             )
 
             assertNull(guidance.find(source))
@@ -94,11 +94,11 @@ class LinearRepairGuidanceTest {
 
             assertFalse(
                 guidance.remember(
-                source,
-                mapOf(integer to 0.5),
-                SourceLpBudget(funding = funding),
-                ExecutionControl.Never,
-            )
+                    source,
+                    mapOf(integer to 0.5),
+                    SourceLpBudget(funding = funding),
+                    ExecutionControl.Never,
+                ),
             )
 
             assertNull(guidance.find(source))

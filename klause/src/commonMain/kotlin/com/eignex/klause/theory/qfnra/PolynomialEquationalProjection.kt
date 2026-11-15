@@ -17,9 +17,9 @@ internal fun equationalSection(
     val occurrences = MutableIntIntMap()
     for (polynomial in family) {
         for (variable in polynomial.variables) {
-        arithmetic.step()
-        occurrences.addTo(variable, 1)
-    }
+            arithmetic.step()
+            occurrences.addTo(variable, 1)
+        }
     }
     var best: SectionPivot? = null
     for (polynomial in equations) {
@@ -28,9 +28,9 @@ internal fun equationalSection(
         val counts = MutableIntIntMap()
         for (term in terms) {
             for (variable in term.monomial.variables) {
-            arithmetic.step()
-            counts.addTo(variable, 1)
-        }
+                arithmetic.step()
+                counts.addTo(variable, 1)
+            }
         }
         for (term in terms) {
             arithmetic.step()

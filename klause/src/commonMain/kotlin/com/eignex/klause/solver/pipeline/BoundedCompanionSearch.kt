@@ -37,8 +37,8 @@ internal class BoundedCompanionSearch(
         )
         original.copy(
             smt = original.smt.copy(
-            completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages,
-        )
+                completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages,
+            ),
         )
     }
 
@@ -74,10 +74,10 @@ internal class BoundedCompanionSearch(
         try {
             terminal = run(
                 minOf(
-                sliceMillis,
-                sliceLimit.inWholeMilliseconds,
-                (activeLimit - active).inWholeMilliseconds.coerceAtLeast(1),
-            )
+                    sliceMillis,
+                    sliceLimit.inWholeMilliseconds,
+                    (activeLimit - active).inWholeMilliseconds.coerceAtLeast(1),
+                ),
             )
         } finally {
             active += mark.elapsedNow()

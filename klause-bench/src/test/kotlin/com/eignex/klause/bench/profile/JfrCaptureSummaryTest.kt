@@ -59,10 +59,10 @@ class JfrCaptureSummaryTest {
         val payload = "AAAA".repeat(100_000)
         val request = BenchRequest(
             mapOf(
-            "source" to "retained/capture.jfr",
-            "sha256" to "a".repeat(64),
-            codec to payload,
-        ) + if (events) mapOf("events" to "true") else emptyMap()
+                "source" to "retained/capture.jfr",
+                "sha256" to "a".repeat(64),
+                codec to payload,
+            ) + if (events) mapOf("events" to "true") else emptyMap(),
         )
 
         val planned = JfrCaptureSummary.plan(request).single()
@@ -77,11 +77,11 @@ class JfrCaptureSummaryTest {
     fun `invalid event selection fails before capture decoding`() {
         val request = BenchRequest(
             mapOf(
-            "source" to "retained/capture.jfr",
-            "sha256" to "a".repeat(64),
-            "gzip-base64" to "AAAA",
-            "events" to "yes",
-        )
+                "source" to "retained/capture.jfr",
+                "sha256" to "a".repeat(64),
+                "gzip-base64" to "AAAA",
+                "events" to "yes",
+            ),
         )
 
         assertFailsWith<IllegalArgumentException> { JfrCaptureSummary.plan(request) }
@@ -114,11 +114,11 @@ class JfrCaptureSummaryTest {
     fun `ambiguous capture codecs fail before decoding`() {
         val request = BenchRequest(
             mapOf(
-            "source" to "retained/capture.jfr",
-            "sha256" to "a".repeat(64),
-            "gzip-base64" to "AAAA",
-            "zstd-base64" to "AAAA",
-        )
+                "source" to "retained/capture.jfr",
+                "sha256" to "a".repeat(64),
+                "gzip-base64" to "AAAA",
+                "zstd-base64" to "AAAA",
+            ),
         )
 
         assertFailsWith<IllegalArgumentException> { JfrCaptureSummary.plan(request) }
@@ -129,10 +129,10 @@ class JfrCaptureSummaryTest {
     fun `oversized encoded captures fail before decoding`(codec: String) {
         val request = BenchRequest(
             mapOf(
-            "source" to "retained/capture.jfr",
-            "sha256" to "a".repeat(64),
-            codec to "A".repeat(2_097_153),
-        )
+                "source" to "retained/capture.jfr",
+                "sha256" to "a".repeat(64),
+                codec to "A".repeat(2_097_153),
+            ),
         )
 
         assertFailsWith<IllegalArgumentException> { JfrCaptureSummary.plan(request) }

@@ -108,11 +108,11 @@ class PropagationSessionTest {
     fun `glue export should match portable keys for wide signed integer atoms`() {
         val session = PropagationSession(
             Problem(
-            2,
-            1,
-            arrayOf(IntDomain(-10_000_000_000L, 10_000_000_000L)),
-            emptyList(),
-        )
+                2,
+                1,
+                arrayOf(IntDomain(-10_000_000_000L, 10_000_000_000L)),
+                emptyList(),
+            ),
         )
         val clauses = listOf(
             intArrayOf(
@@ -278,9 +278,9 @@ class PropagationSessionTest {
         for (positive in listOf(false, true)) {
             assertIs<PropagationResult.Implied>(
                 session.addLearnedClause(
-                Clause(intArrayOf(excluded, Lit.make(0, positive))),
-                2,
-            )
+                    Clause(intArrayOf(excluded, Lit.make(0, positive))),
+                    2,
+                ),
             )
         }
 

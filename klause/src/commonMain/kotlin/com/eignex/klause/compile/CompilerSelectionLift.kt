@@ -38,9 +38,9 @@ internal fun Lowering.liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE: IntE
     )
     val result = newAuxIntVar(
         IntDomain(
-        minOf(intDomains[thenId].min, intDomains[elseId].min),
-        maxOf(intDomains[thenId].max, intDomains[elseId].max),
-    )
+            minOf(intDomains[thenId].min, intDomains[elseId].min),
+            maxOf(intDomains[thenId].max, intDomains[elseId].max),
+        ),
     )
     factors += Element(
         index,

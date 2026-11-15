@@ -156,7 +156,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     work++
     work += learned.trackCapObject(learned.size - 1, false, LearnedKind.Integer)
     val rows = learned.integerRows ?: LearnedIntegerRows().also {
-        learned.integerRows = it;
+        learned.integerRows = it
         work++
     }
     work += rows.admissionWork
@@ -287,17 +287,17 @@ internal fun PropagationState.forgetLearnedClauses(
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
     for (i in 0 until n) {
         if (remap[i] < 0) {
-        work++
-        if (!learned.retiredOf(i)) {
-            learned.lifecycle.note(learnedKind(i), LearnedStage.Retired)
-            factorAttribution?.retire(learned.store[i])
+            work++
+            if (!learned.retiredOf(i)) {
+                learned.lifecycle.note(learnedKind(i), LearnedStage.Retired)
+                factorAttribution?.retire(learned.store[i])
+            }
         }
-    }
     }
 
     learned.units.clear()
     learned.integerRows?.let { rows ->
-        work += rows.size.toLong() + 2L;
+        work += rows.size.toLong() + 2L
         rows.reset()
     }
     work += learned.resetCapIndex()
@@ -421,10 +421,10 @@ internal fun PropagationState.forgetLearnedClauses(
     remapReasons(intMaxReason, remap, refBase)
     for (i in 0 until undo.size) {
         if (undo.tag[i] == 1) {
-        work++
-        undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
-        undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
-    }
+            work++
+            undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
+            undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
+        }
     }
     for (column in listOf(learned.units, learned.pendingAttach, learned.capCandidates)) {
         work += column.learnedTrimmingWork

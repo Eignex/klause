@@ -21,10 +21,10 @@ internal class PolynomialBooleanSigns(
     fun prepare(): Iterator<Boolean?> = sequence {
         for (atom in atoms) {
             for (variable in atom.polynomial.variables) {
-            arithmetic.step()
-            require(variable in 0 until Int.MAX_VALUE)
-            realCount = maxOf(realCount, variable + 1)
-        }
+                arithmetic.step()
+                require(variable in 0 until Int.MAX_VALUE)
+                realCount = maxOf(realCount, variable + 1)
+            }
         }
         while (true) {
             arithmetic.step()
@@ -95,20 +95,20 @@ internal class PolynomialBooleanSigns(
             val atom = atoms[node.atom]
             required.add(
                 if (value == TRUE) {
-                atom
-            } else {
-                PolynomialAtom(
-                atom.polynomial,
-                when (atom.relation) {
-                    PolynomialRelation.EQ -> PolynomialRelation.NE
-                    PolynomialRelation.NE -> PolynomialRelation.EQ
-                    PolynomialRelation.LT -> PolynomialRelation.GE
-                    PolynomialRelation.LE -> PolynomialRelation.GT
-                    PolynomialRelation.GT -> PolynomialRelation.LE
-                    PolynomialRelation.GE -> PolynomialRelation.LT
+                    atom
+                } else {
+                    PolynomialAtom(
+                        atom.polynomial,
+                        when (atom.relation) {
+                            PolynomialRelation.EQ -> PolynomialRelation.NE
+                            PolynomialRelation.NE -> PolynomialRelation.EQ
+                            PolynomialRelation.LT -> PolynomialRelation.GE
+                            PolynomialRelation.LE -> PolynomialRelation.GT
+                            PolynomialRelation.GT -> PolynomialRelation.LE
+                            PolynomialRelation.GE -> PolynomialRelation.LT
+                        },
+                    )
                 },
-            )
-            }
             )
         }
         return required

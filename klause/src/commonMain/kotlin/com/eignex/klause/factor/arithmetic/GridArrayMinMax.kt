@@ -65,7 +65,9 @@ internal class GridArrayMinMax(
                 longArrayOf(0),
                 intArrayOf(coordinates[0]),
                 operation,
-                if (holds) 0L else if (equality) {
+                if (holds) {
+                    0L
+                } else if (equality) {
                     1L
                 } else {
                     -1L

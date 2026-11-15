@@ -75,11 +75,11 @@ internal object CoreQueryProfile {
                     val ordinary = if (prepared) {
                         FinitePipeline.prepare(
                             FinitePipelineRequest(
-                        source,
-                        FiniteEngine.BACKTRACK,
-                        objective,
-                        cancellation = ExecutionControl.after(2.seconds),
-                    )
+                                source,
+                                FiniteEngine.BACKTRACK,
+                                objective,
+                                cancellation = ExecutionControl.after(2.seconds),
+                            ),
                         )
                     } else {
                         null

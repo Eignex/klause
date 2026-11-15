@@ -28,21 +28,21 @@ internal class CorrelatedAlgebraicRoots(private val algebraic: AlgebraicArithmet
         // A null polynomial at an unselected conjugate makes the resultant identically zero.
         if (common.degree > 0) modulus = rational.divideExact(modulus, common)
         val reduced = coefficients.map {
-            arithmetic.step();
+            arithmetic.step()
             rational.divide(it, modulus).second
         }
         if (reduced.all {
-            arithmetic.step();
-            it.degree <= 0
-        }
+                arithmetic.step()
+                it.degree <= 0
+            }
         ) {
             return algebraic.roots(
                 RationalPolynomial(
                     reduced.map {
-                arithmetic.step();
-                it[0]
-            }
-                )
+                        arithmetic.step()
+                        it[0]
+                    },
+                ),
             )
         }
         if (reduced.size == 2) {
@@ -55,27 +55,27 @@ internal class CorrelatedAlgebraicRoots(private val algebraic: AlgebraicArithmet
         }
         val relation = Polynomial.of(
             buildList {
-            for ((degree, coefficient) in reduced.withIndex()) {
-                for ((exponent, value) in coefficient.coefficients.withIndex()) {
-                    arithmetic.step()
-                    add(PolynomialTerm(Monomial.of(mapOf(0 to exponent, 1 to degree)), value))
+                for ((degree, coefficient) in reduced.withIndex()) {
+                    for ((exponent, value) in coefficient.coefficients.withIndex()) {
+                        arithmetic.step()
+                        add(PolynomialTerm(Monomial.of(mapOf(0 to exponent, 1 to degree)), value))
+                    }
                 }
-            }
-        }
+            },
         )
         val defining = Polynomial.of(
             modulus.coefficients.mapIndexed { exponent, coefficient ->
-            arithmetic.step()
-            PolynomialTerm(Monomial.of(mapOf(0 to exponent)), coefficient)
-        }
+                arithmetic.step()
+                PolynomialTerm(Monomial.of(mapOf(0 to exponent)), coefficient)
+            },
         )
         val resultant = arithmetic.resultant(defining, relation, 0)
         check(resultant.variables.all { it == 1 })
         val annihilator = RationalPolynomial(
             arithmetic.coefficients(resultant, 1).map {
-            arithmetic.step()
-            it.coefficient(Monomial.ONE)
-        }
+                arithmetic.step()
+                it.coefficient(Monomial.ONE)
+            },
         )
         val field = RootField(specialization.base, modulus)
         val sequence = field.sturm(reduced)
@@ -179,9 +179,9 @@ internal class CorrelatedAlgebraicRoots(private val algebraic: AlgebraicArithmet
                 if (next.isEmpty()) return sequence
                 sequence.add(
                     next.map {
-                    arithmetic.step();
-                    negate(it)
-                }
+                        arithmetic.step()
+                        negate(it)
+                    },
                 )
             }
         }

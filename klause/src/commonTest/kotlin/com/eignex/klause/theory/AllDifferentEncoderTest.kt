@@ -62,12 +62,14 @@ class AllDifferentEncoderTest {
                 exceptSet = longArrayOf(7),
             )
             val source = Problem(
-                2, 2, Array(2) { IntDomain(value, value) },
+                2,
+                2,
+                Array(2) { IntDomain(value, value) },
                 arrayOf<Factor>(
-                relation,
-                Clause(intArrayOf(Lit.make(0, present))),
-                Clause(intArrayOf(Lit.make(1, false))),
-            )
+                    relation,
+                    Clause(intArrayOf(Lit.make(0, present))),
+                    Clause(intArrayOf(Lit.make(1, false))),
+                ),
             )
             val installed = assertNotNull(
                 FactorProjectionProviders.Default.prepare(source)

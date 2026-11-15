@@ -27,42 +27,44 @@ class PreparedSourceHintsTest {
     fun `binary substitution should preserve an unrelated source definition and its objective gradient`() {
         val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(-2, 2), IntDomain(0, 2))
         val source = Problem(
-            0, 4, domains,
+            0,
+            4,
+            domains,
             listOf(
-            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Abs(2, 3),
-        )
+                Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Abs(2, 3),
+            ),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, listOf(DefinitionHint.Abs(3, DefinitionHint.Operand.Variable(2)))),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.LOCAL_SEARCH,
-            objective,
-        )
+                SourceAttachment(source, listOf(DefinitionHint.Abs(3, DefinitionHint.Operand.Variable(2)))),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.LOCAL_SEARCH,
+                objective,
+            ),
         )
         val shape = invocation.finiteShape()
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-            shape.problem,
-            FiniteEngine.LOCAL_SEARCH,
-            shape.linearObjective,
-            PresolveConfig.parse("binary-columns"),
-            explicitPresolveConfig = true,
-            preparedPlan = shape.preparedPlan,
-        )
+                shape.problem,
+                FiniteEngine.LOCAL_SEARCH,
+                shape.linearObjective,
+                PresolveConfig.parse("binary-columns"),
+                explicitPresolveConfig = true,
+                preparedPlan = shape.preparedPlan,
+            ),
         )
 
         val view = assertNotNull(
             invocation.heuristicHints(
-            preparation.problem,
-            preparation.objective,
-            preparation.sourceMapping,
-            ExecutionControl.Never,
-            setOf(ExecutionStrategy.LOCAL_SEARCH),
-            assertNotNull(preparation.executionPlan).capabilities,
-        )
+                preparation.problem,
+                preparation.objective,
+                preparation.sourceMapping,
+                ExecutionControl.Never,
+                setOf(ExecutionStrategy.LOCAL_SEARCH),
+                assertNotNull(preparation.executionPlan).capabilities,
+            ),
         )
         val assignment = Assignment(preparation.problem.numBoolVars, preparation.problem.numIntVars)
         assignment.setInt(2, -2)
@@ -77,13 +79,15 @@ class PreparedSourceHintsTest {
     fun `affine elimination should keep a hinted cone through the column presolve retains`() {
         val domains = arrayOf(IntDomain(0, 1), IntDomain(0, 2), IntDomain(-2, 0), IntDomain(0, 2), IntDomain(0, 1))
         val source = Problem(
-            0, domains.size, domains,
+            0,
+            domains.size,
+            domains,
             listOf(
-            Linear(longArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-            Linear(longArrayOf(1, -1), intArrayOf(2, 1), LinearOp.EQ, -2),
-            Abs(2, 3),
-            Abs(0, 4),
-        )
+                Linear(longArrayOf(2, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(longArrayOf(1, -1), intArrayOf(2, 1), LinearOp.EQ, -2),
+                Abs(2, 3),
+                Abs(0, 4),
+            ),
         )
         val variable = { id: Int -> DefinitionHint.Operand.Variable(id) }
         val hints = listOf(
@@ -94,34 +98,34 @@ class PreparedSourceHintsTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, hints),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.LOCAL_SEARCH,
-            objective,
-        )
+                SourceAttachment(source, hints),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.LOCAL_SEARCH,
+                objective,
+            ),
         )
         val shape = invocation.finiteShape()
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-            shape.problem,
-            FiniteEngine.LOCAL_SEARCH,
-            shape.linearObjective,
-            PresolveConfig.parse("affine"),
-            explicitPresolveConfig = true,
-            preparedPlan = shape.preparedPlan,
-        )
+                shape.problem,
+                FiniteEngine.LOCAL_SEARCH,
+                shape.linearObjective,
+                PresolveConfig.parse("affine"),
+                explicitPresolveConfig = true,
+                preparedPlan = shape.preparedPlan,
+            ),
         )
         assertEquals(-1, assertNotNull(assertNotNull(preparation.sourceMapping).retainedCoordinates()).int(1))
 
         val view = assertNotNull(
             invocation.heuristicHints(
-            preparation.problem,
-            preparation.objective,
-            preparation.sourceMapping,
-            ExecutionControl.Never,
-            setOf(ExecutionStrategy.LOCAL_SEARCH),
-            assertNotNull(preparation.executionPlan).capabilities,
-        )
+                preparation.problem,
+                preparation.objective,
+                preparation.sourceMapping,
+                ExecutionControl.Never,
+                setOf(ExecutionStrategy.LOCAL_SEARCH),
+                assertNotNull(preparation.executionPlan).capabilities,
+            ),
         )
         val assignment = Assignment(preparation.problem.numBoolVars, preparation.problem.numIntVars)
         assertNotNull(view.sweep).sweep(assignment, domains)
@@ -142,45 +146,47 @@ class PreparedSourceHintsTest {
                 IntDomain(0, 2),
             )
             val source = Problem(
-                0, domains.size, domains,
+                0,
+                domains.size,
+                domains,
                 arrayOf(
-                Abs(0, 1),
-                Product(1, 1, 2),
-                Power(2, 2, 3),
-                DivMod(3, bigIntOf(3), 4, 5),
-            )
+                    Abs(0, 1),
+                    Product(1, 1, 2),
+                    Power(2, 2, 3),
+                    DivMod(3, bigIntOf(3), 4, 5),
+                ),
             )
             val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1), constant = 7)
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.LOCAL_SEARCH,
-                objective,
-                maximize,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.OPTIMIZE,
+                    FiniteEngine.LOCAL_SEARCH,
+                    objective,
+                    maximize,
+                ),
             )
             val shape = invocation.finiteShape()
             val preparation = FinitePipeline.prepare(
                 FinitePipelineRequest(
-                shape.problem,
-                FiniteEngine.LOCAL_SEARCH,
-                shape.linearObjective,
-                PresolveConfig.NONE,
-                preparedPlan = shape.preparedPlan,
-            )
+                    shape.problem,
+                    FiniteEngine.LOCAL_SEARCH,
+                    shape.linearObjective,
+                    PresolveConfig.NONE,
+                    preparedPlan = shape.preparedPlan,
+                ),
             )
             assertTrue(invocation.source.definitionHints.isEmpty())
 
             val view = assertNotNull(
                 invocation.heuristicHints(
-                preparation.problem,
-                preparation.objective,
-                preparation.sourceMapping,
-                ExecutionControl.Never,
-                setOf(ExecutionStrategy.LOCAL_SEARCH),
-                assertNotNull(preparation.executionPlan).capabilities,
-            )
+                    preparation.problem,
+                    preparation.objective,
+                    preparation.sourceMapping,
+                    ExecutionControl.Never,
+                    setOf(ExecutionStrategy.LOCAL_SEARCH),
+                    assertNotNull(preparation.executionPlan).capabilities,
+                ),
             )
             val assignment = Assignment(0, domains.size)
             assignment.setInt(0, -3)

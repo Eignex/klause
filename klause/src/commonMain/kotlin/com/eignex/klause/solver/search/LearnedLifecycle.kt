@@ -14,9 +14,9 @@ internal class LearnedLifecycle {
     fun snapshot(): Map<String, Long> = buildMap {
         for (kind in LearnedKind.entries) {
             for (stage in LearnedStage.entries) {
-            val count = counts[kind.ordinal * LearnedStage.entries.size + stage.ordinal]
-            if (count != 0L) put("learning${kind.name}${stage.name}", count)
-        }
+                val count = counts[kind.ordinal * LearnedStage.entries.size + stage.ordinal]
+                if (count != 0L) put("learning${kind.name}${stage.name}", count)
+            }
         }
     }
 }

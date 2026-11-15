@@ -132,9 +132,9 @@ private fun polynomialRootCondition(
         arithmetic.step()
         polynomial = PolynomialExpression.Sum(
             listOf(
-            PolynomialExpression.Product(listOf(polynomial, variable)),
-            polynomialConstant(coefficients[index]),
-        )
+                PolynomialExpression.Product(listOf(polynomial, variable)),
+                polynomialConstant(coefficients[index]),
+            ),
         )
     }
     return listOf(

@@ -89,11 +89,11 @@ class LinearPrimalRefinementTest {
         val initial = listOf(BigFraction.ONE)
         val rows = listOf(
             ExactRationalInequality(
-            intArrayOf(0),
-            listOf(BigFraction.MINUS_ONE),
-            BigFraction.ZERO,
-            strict = true,
-        )
+                intArrayOf(0),
+                listOf(BigFraction.MINUS_ONE),
+                BigFraction.ZERO,
+                strict = true,
+            ),
         )
 
         val refined = refineLinearPrimal(

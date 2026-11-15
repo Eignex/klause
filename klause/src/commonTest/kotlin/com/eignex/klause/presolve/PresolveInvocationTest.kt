@@ -194,10 +194,10 @@ class PresolveInvocationTest {
                     budgets[0].orSpent(ExecutionControl.Never),
                     budgets[1].orSpent(
                         ExecutionControl {
-                    polls++
-                    false
-                }
-                    )
+                            polls++
+                            false
+                        },
+                    ),
                 )
 
                 val empty = tokens.map {
@@ -342,12 +342,13 @@ class PresolveInvocationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         Presolver.runSource(
-            problem, PresolveConfig.parse("off,+dual-fix"),
+            problem,
+            PresolveConfig.parse("off,+dual-fix"),
             PresolveContext(
-            objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L),
-            presolveBudget = budget,
-        ),
-            budget.orSpent(ExecutionControl.Never)
+                objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L),
+                presolveBudget = budget,
+            ),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertEquals(0, budget.invocations.sumOf { it.fixedColumns })
@@ -373,22 +374,25 @@ class PresolveInvocationTest {
     @Test
     fun `finite root fixings should receive no credit when a pass emits their unit again`() {
         val problem = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             listOf(
-            Cardinality(intArrayOf(0), min = 1, max = 1),
-            Clause(intArrayOf(2, 4)),
-        )
+                Cardinality(intArrayOf(0), min = 1, max = 1),
+                Clause(intArrayOf(2, 4)),
+            ),
         ).bake()
         for (config in listOf("off,+dual-fix", "off,+dual-fix,+bce")) {
             val budget = PresolveBudget(Long.MAX_VALUE)
 
             Presolver.run(
-                problem, PresolveConfig.parse(config),
+                problem,
+                PresolveConfig.parse(config),
                 PresolveContext(
-                objectiveBoolCoeffs = mapOf(1 to 2L, 2 to 1L),
-                presolveBudget = budget,
-            ),
-                budget.orSpent(ExecutionControl.Never)
+                    objectiveBoolCoeffs = mapOf(1 to 2L, 2 to 1L),
+                    presolveBudget = budget,
+                ),
+                budget.orSpent(ExecutionControl.Never),
             )
 
             val call = budget.invocations.first { it.pass == "dual-fix" }
@@ -580,10 +584,12 @@ class PresolveInvocationTest {
     @Test
     fun `probing without integer columns should retain constant row refutation`() {
         val problem = Problem(
-            0, 0, emptyArray(),
+            0,
+            0,
+            emptyArray(),
             listOf(
-            ExactLinear.of(intArrayOf(), emptyList(), LinearOp.LE, BigFraction.ONE.negated()),
-        )
+                ExactLinear.of(intArrayOf(), emptyList(), LinearOp.LE, BigFraction.ONE.negated()),
+            ),
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
 
@@ -806,20 +812,20 @@ class PresolveInvocationTest {
         RootBaker.bake(
             problem,
             BakeConfig(
-            probeFailedLiterals = true,
-            probeIntBounds = true,
-            probeIntHoles = true,
-            probeTotalBudget = 0,
-        )
+                probeFailedLiterals = true,
+                probeIntBounds = true,
+                probeIntHoles = true,
+                probeTotalBudget = 0,
+            ),
         )
 
         assertEquals(
             listOf(
-            PresolveInvocationOutcome.ELIGIBILITY_SKIP,
-            PresolveInvocationOutcome.INTERRUPTED,
-            PresolveInvocationOutcome.INTERRUPTED,
-        ),
-            budget.invocations.map { it.outcome }
+                PresolveInvocationOutcome.ELIGIBILITY_SKIP,
+                PresolveInvocationOutcome.INTERRUPTED,
+                PresolveInvocationOutcome.INTERRUPTED,
+            ),
+            budget.invocations.map { it.outcome },
         )
         assertEquals(0L, budget.probeCalls)
     }
@@ -940,10 +946,10 @@ class PresolveInvocationTest {
         val calls = budget.invocations.filter { it.pass == "affine" }
         assertEquals(
             listOf(
-            PresolveInvocationOutcome.COMPLETE_MISS,
-            PresolveInvocationOutcome.ELIGIBILITY_SKIP,
-        ),
-            calls.map { it.outcome }
+                PresolveInvocationOutcome.COMPLETE_MISS,
+                PresolveInvocationOutcome.ELIGIBILITY_SKIP,
+            ),
+            calls.map { it.outcome },
         )
         assertEquals(2L, calls.last().work)
         assertEquals(null, calls.last().input.occurrences)

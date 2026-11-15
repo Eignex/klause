@@ -27,11 +27,13 @@ class RevisedSimplexPricingTest {
             assertNotNull(model.doubleView).colVal[2] = 0.0
             val duals = listOf(
                 DoubleArray(rows) { row ->
-                    if (row == 0) 1e16 else if (row == 1) {
-                    5e15
-                } else {
-                    1.0
-                }
+                    if (row == 0) {
+                        1e16
+                    } else if (row == 1) {
+                        5e15
+                    } else {
+                        1.0
+                    }
                 },
                 DoubleArray(rows) { row -> if (row == 2) Double.POSITIVE_INFINITY else 1.0 },
                 DoubleArray(rows) { row -> if (row == rows - 1) Double.NaN else -0.0 },
@@ -195,11 +197,11 @@ class RevisedSimplexPricingTest {
                 trail.replaceObjective(
                     ExactLpObjective(
                         listOf(
-                    ExactLpNumber.of(1L),
-                    ExactLpNumber.of(3L),
-                    ExactLpNumber.of(0L),
-                )
-                    )
+                            ExactLpNumber.of(1L),
+                            ExactLpNumber.of(3L),
+                            ExactLpNumber.of(0L),
+                        ),
+                    ),
                 ),
             )
 

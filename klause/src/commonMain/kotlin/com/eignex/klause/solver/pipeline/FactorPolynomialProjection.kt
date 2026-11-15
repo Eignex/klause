@@ -207,15 +207,15 @@ internal fun Problem.integerPolynomialProjection(
             }
         }
         val integers = (0 until numIntVars).associate {
-            checkpoint();
+            checkpoint()
             "i$it" to it
         }
         val reals = (0 until numRealVars).associate {
-            checkpoint();
+            checkpoint()
             "r$it" to (numIntVars + it)
         }
         val booleans = (0 until numBoolVars).associate {
-            checkpoint();
+            checkpoint()
             "b$it" to it
         }
         val formula = lowering.formula(formulas)
@@ -242,14 +242,14 @@ internal fun FactorPolynomialProjection.prepareExecutionPlan(): PreparedSourcePl
     PreparedExecution.NonlinearInteger(formula, this),
     listOf(
         ExecutionComponentDescriptor(
-        "polynomial-integer",
-        ComponentResponsibility.COMPLETION,
-        model.factors.indices.toList(),
-        (0 until model.numIntVars).toList(),
-        (model.numIntVars until formula.numericCount).toList(),
-        (0 until model.numBoolVars).toList(),
-        nonlinearIntegerExecutionContract(),
-    )
+            "polynomial-integer",
+            ComponentResponsibility.COMPLETION,
+            model.factors.indices.toList(),
+            (0 until model.numIntVars).toList(),
+            (model.numIntVars until formula.numericCount).toList(),
+            (0 until model.numBoolVars).toList(),
+            nonlinearIntegerExecutionContract(),
+        ),
     ),
     model.numBoolVars,
     model.numIntVars,

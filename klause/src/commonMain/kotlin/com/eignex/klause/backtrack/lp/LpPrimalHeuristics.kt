@@ -793,9 +793,9 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
         }
         observeResult?.invoke(result, termination)
         if (result?.optimal != true && (
-            propagator.floatPaused || termination == LpFloatTermination.WORK ||
-                termination == LpFloatTermination.PIVOTS || termination == LpFloatTermination.CANCELLED
-        )
+                propagator.floatPaused || termination == LpFloatTermination.WORK ||
+                    termination == LpFloatTermination.PIVOTS || termination == LpFloatTermination.CANCELLED
+                )
         ) {
             rootRoundingInterrupted = true
         }

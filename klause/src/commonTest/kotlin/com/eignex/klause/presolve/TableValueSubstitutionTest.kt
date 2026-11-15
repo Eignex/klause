@@ -156,9 +156,9 @@ class TableValueSubstitutionTest {
         assertEquals(17L, objective.evaluateLong(witness))
         assertFalse(
             source.propagate(
-            Assumptions.None.withInt(0, witness.intValue(0))
-                .withInt(1, witness.intValue(1)),
-        ) is PropagationResult.Unsat
+                Assumptions.None.withInt(0, witness.intValue(0))
+                    .withInt(1, witness.intValue(1)),
+            ) is PropagationResult.Unsat,
         )
     }
 
@@ -175,9 +175,9 @@ class TableValueSubstitutionTest {
         assertTrue(TableValueSubstitution.reduce(source, PresolveContext.EMPTY).isEmpty)
         assertFalse(
             PresolveConfig.DEFAULT.resolved(
-            PresolvePass.SUBSTITUTE_TABLE_VALUES,
-            PresolveContext.of(objective),
-        )
+                PresolvePass.SUBSTITUTE_TABLE_VALUES,
+                PresolveContext.of(objective),
+            ),
         )
     }
 

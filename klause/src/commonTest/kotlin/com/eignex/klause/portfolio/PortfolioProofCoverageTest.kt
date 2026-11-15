@@ -25,11 +25,12 @@ class PortfolioProofCoverageTest {
                 val elapsed = LongArray(3)
                 val workers = List(3) { arm ->
                     trackingWorker(
-                        "worker$arm", arm,
+                        "worker$arm",
+                        arm,
                         ScriptedSearch({ arm == 0 && it == 0 }) {
-                        elapsed[arm] += 100L
-                        clock += 100.milliseconds
-                    }
+                            elapsed[arm] += 100L
+                            clock += 100.milliseconds
+                        },
                     ).also { it.restartingSearch = true }
                 }
 
@@ -67,12 +68,13 @@ class PortfolioProofCoverageTest {
             val model = ModelIdentity.of(Any())
             val workers = List(2) { arm ->
                 trackingWorker(
-                    "worker$arm", arm,
+                    "worker$arm",
+                    arm,
                     ScriptedSearch({ arm == 0 && it == 0 }) {
-                    visits[arm]++
-                    elapsed += 500L
-                    clock += 500.milliseconds
-                }
+                        visits[arm]++
+                        elapsed += 500L
+                        clock += 500.milliseconds
+                    },
                 ).bindEvidence(model, provesResults = arm == 0 || role != "witness").also {
                     it.restartingSearch = true
                     if (arm == 1 && role == "improvement") it.improvementOnly = true
@@ -96,11 +98,12 @@ class PortfolioProofCoverageTest {
                 val elapsed = LongArray(3)
                 val workers = List(3) { arm ->
                     trackingWorker(
-                        "worker$arm", arm,
+                        "worker$arm",
+                        arm,
                         ScriptedSearch({ arm == 0 && it == 0 }) {
-                        elapsed[arm] += 100L
-                        clock += 100.milliseconds
-                    }
+                            elapsed[arm] += 100L
+                            clock += 100.milliseconds
+                        },
                     ).also { it.restartingSearch = arm == 0 }
                 }
 
@@ -184,11 +187,12 @@ class PortfolioProofCoverageTest {
         val costs = longArrayOf(250L, 10L, 40L)
         val workers = List(3) { arm ->
             trackingWorker(
-                "worker$arm", arm,
+                "worker$arm",
+                arm,
                 ScriptedSearch({ arm == 0 && it == 0 }) {
-                elapsed[arm] += costs[arm]
-                clock += costs[arm].milliseconds
-            }
+                    elapsed[arm] += costs[arm]
+                    clock += costs[arm].milliseconds
+                },
             ).also { it.restartingSearch = arm == 0 }
         }
 
@@ -209,12 +213,13 @@ class PortfolioProofCoverageTest {
         val elapsed = LongArray(2)
         val workers = List(2) { arm ->
             trackingWorker(
-                "worker$arm", arm,
+                "worker$arm",
+                arm,
                 ScriptedSearch({ arm == 0 }) {
-                visits[arm]++
-                elapsed[arm] += 500L
-                clock += 500.milliseconds
-            }
+                    visits[arm]++
+                    elapsed[arm] += 500L
+                    clock += 500.milliseconds
+                },
             ).also { it.restartingSearch = arm == 0 }
         }
 
@@ -232,12 +237,13 @@ class PortfolioProofCoverageTest {
         var elapsed = 0L
         val workers = List(3) { arm ->
             trackingWorker(
-                "worker$arm", arm,
+                "worker$arm",
+                arm,
                 ScriptedSearch({ arm == 0 && it == 0 }) {
-                visits += arm
-                elapsed += 100L
-                clock += 100.milliseconds
-            }
+                    visits += arm
+                    elapsed += 100L
+                    clock += 100.milliseconds
+                },
             ).also { it.restartingSearch = arm != 1 }
         }
 
@@ -258,12 +264,13 @@ class PortfolioProofCoverageTest {
             val model = ModelIdentity.of(Any())
             val workers = List(2) { arm ->
                 trackingWorker(
-                    "worker$arm", arm,
+                    "worker$arm",
+                    arm,
                     ScriptedSearch({ arm == 0 && it == 0 }) {
-                    visits[arm]++
-                    elapsed += 500L
-                    clock += 500.milliseconds
-                }
+                        visits[arm]++
+                        elapsed += 500L
+                        clock += 500.milliseconds
+                    },
                 ).bindEvidence(model, provesResults = arm == 0 || role != "witness").also {
                     it.restartingSearch = arm == 0 || role == "restarting"
                     if (arm == 1 && role == "improvement") it.improvementOnly = true
@@ -288,19 +295,21 @@ class PortfolioProofCoverageTest {
         })
         val workers = listOf(
             trackingWorker(
-                "finder", 0,
+                "finder",
+                0,
                 ScriptedSearch({ it == 0 }) {
-                elapsed[0] += 500L
-                clock += 500.milliseconds
-            }
+                    elapsed[0] += 500L
+                    clock += 500.milliseconds
+                },
             ).also { it.restartingSearch = true },
             trackingWorker("finished", 1, finished),
             trackingWorker(
-                "live", 2,
+                "live",
+                2,
                 ScriptedSearch({ false }) {
-                elapsed[2] += 100L
-                clock += 100.milliseconds
-            }
+                    elapsed[2] += 100L
+                    clock += 100.milliseconds
+                },
             ),
         )
 

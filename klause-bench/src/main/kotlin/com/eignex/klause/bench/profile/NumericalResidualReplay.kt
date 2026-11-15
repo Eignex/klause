@@ -138,8 +138,8 @@ internal object NumericalResidualReplay {
             null
         } else {
             ownerType.methods.single {
-            it.name == "prepare" && it.parameterCount == 1
-        }
+                it.name == "prepare" && it.parameterCount == 1
+            }
         }
         val claim = Class.forName(ENGINE + "LpClaim").enumConstants.single {
             it.toString() == "ATTAINED_OPTIMUM"
@@ -231,8 +231,8 @@ internal object NumericalResidualReplay {
                         "metrics",
                         NumericalResidualProfile.json(
                             metricsOwner?.let {
-                            NumericalResidualProfile.call(it, "getLastMetrics")
-                        }
+                                NumericalResidualProfile.call(it, "getLastMetrics")
+                            },
                         ),
                     )
                     put(
@@ -358,9 +358,9 @@ internal object NumericalResidualReplay {
                                 "metrics",
                                 NumericalResidualProfile.json(
                                     metricsOwner?.let {
-                                NumericalResidualProfile.call(it, "getLastMetrics")
-                            }
-                                )
+                                        NumericalResidualProfile.call(it, "getLastMetrics")
+                                    },
+                                ),
                             )
                         }
                     } else {

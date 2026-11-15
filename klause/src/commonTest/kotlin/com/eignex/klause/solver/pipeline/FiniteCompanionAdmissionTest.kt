@@ -27,7 +27,7 @@ class FiniteCompanionAdmissionTest {
             4_000,
             1_000,
             capture = {
-                calls++;
+                calls++
                 null
             },
             clock = clock,
@@ -49,7 +49,7 @@ class FiniteCompanionAdmissionTest {
                 4_000,
                 1_000,
                 capture = {
-                    calls++;
+                    calls++
                     null
                 },
                 clock = clock,
@@ -71,7 +71,7 @@ class FiniteCompanionAdmissionTest {
             4_000,
             1_000,
             capture = {
-                captured = true;
+                captured = true
                 null
             },
             clock = clock,
@@ -96,7 +96,7 @@ class FiniteCompanionAdmissionTest {
                 4_000,
                 1_000,
                 capture = {
-                    captured = true;
+                    captured = true
                     null
                 },
                 clock = clock,
@@ -116,10 +116,10 @@ class FiniteCompanionAdmissionTest {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
         val context = assertNotNull(
             model.linearAuthorityContext(
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never,
-        )
+                LinearObjective(intCoefficients = longArrayOf(1)),
+                ObjectiveSense.MINIMIZE,
+                ExecutionControl.Never,
+            ),
         )
         val clock = TestTimeSource()
         var calls = 0
@@ -128,8 +128,8 @@ class FiniteCompanionAdmissionTest {
             4_000,
             1_000,
             capture = {
-                calls++;
-                clock += 100.milliseconds;
+                calls++
+                clock += 100.milliseconds
                 context
             },
             clock = clock,
@@ -184,7 +184,7 @@ class FiniteCompanionAdmissionTest {
             4_000,
             1_000,
             capture = {
-                calls++;
+                calls++
                 null
             },
             clock = clock,

@@ -34,6 +34,7 @@ import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.QuadraticNativeScope
+import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.ExecutionControl
@@ -73,9 +74,51 @@ internal object ArithmeticCancellationProfile {
 
             "latency" -> latency()
 
-            else -> error("expected throughput or latency")
+            "overhead" -> overhead()
+
+            else -> error("expected throughput, latency or overhead")
         }
         println("sink\t$sink")
+    }
+
+    private fun overhead() {
+        for (name in workloads + listOf("linear64", "finite-search", "finite-local-search")) {
+            for (mode in listOf("owned", "nested", "opaque")) {
+                val deadline = ExecutionControl.after(86_400_000_000_000.nanoseconds)
+                val flag = AtomicBoolean()
+                val enabled = ExecutionControl { flag.get() || deadline() }
+                val accounts = listOf(Accounting(mode), Accounting(mode, enabled))
+                val runs = accounts.map { latencyKernel(name, it.token) }
+                val expected = runs.first()()
+                val count = if (name in workloads) repetitions(name) else 1
+                for (arm in runs.indices) {
+                    val until = cpu.currentThreadCpuTime + 500_000_000L
+                    do {
+                        repeat(count) { check(runs[arm]() == expected) }
+                    } while (cpu.currentThreadCpuTime < until)
+                }
+                repeat(12) { repetition ->
+                    var pairedWork: Long? = null
+                    for (arm in if (repetition % 2 == 0) listOf(0, 1) else listOf(1, 0)) {
+                        val beforeWork = accounts[arm].work
+                        val beforeCpu = cpu.currentThreadCpuTime
+                        val beforeWall = System.nanoTime()
+                        repeat(count) {
+                            val result = runs[arm]()
+                            check(result == expected)
+                            sink = sink xor result
+                        }
+                        val wall = System.nanoTime() - beforeWall
+                        val nanos = cpu.currentThreadCpuTime - beforeCpu
+                        val spent = accounts[arm].work - beforeWork
+                        accounts[arm].verify()
+                        check(pairedWork == null || pairedWork == spent)
+                        pairedWork = spent
+                        println("overhead\t$name\t$mode\t$repetition\t$arm\t$count\t$wall\t$nanos\t$spent\t$expected")
+                    }
+                }
+            }
+        }
     }
 
     private class Accounting(mode: String, cancellation: ExecutionControl = ExecutionControl.Never) {
@@ -410,7 +453,11 @@ internal object ArithmeticCancellationProfile {
                 session.solve(0)
             }
             if (token()) throw ProfileInterrupted()
-            result.hashCode()
+            when (result) {
+                is SearchResult.Satisfied -> 1
+                SearchResult.Exhausted -> 2
+                SearchResult.Indeterminate -> 3
+            }
         }
     }
 

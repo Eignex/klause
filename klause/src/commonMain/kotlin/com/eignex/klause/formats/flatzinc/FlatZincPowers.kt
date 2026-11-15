@@ -23,10 +23,10 @@ internal fun FlatZincCompiler.emitFloatPower(c: FznConstraint) {
     if (listOf(base, result).filterIsInstance<FloatRef.Var>().any { !it.bk.lpOnly }) {
         factors.add(
             GridPower(
-            gridArithmeticCoordinate(base, "__grid_power"),
-            value.value.toInt(),
-            gridArithmeticCoordinate(result, "__grid_power"),
-        )
+                gridArithmeticCoordinate(base, "__grid_power"),
+                value.value.toInt(),
+                gridArithmeticCoordinate(result, "__grid_power"),
+            ),
         )
         return
     }

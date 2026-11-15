@@ -76,10 +76,10 @@ class RealWitnessVerificationTest {
                 emptyArray<IntDomain>(),
                 arrayOf(
                     Power(
-                    Power.Coordinate.Real(SourceRealId(0)),
-                    exponent,
-                    Power.Coordinate.Real(SourceRealId(1)),
-                )
+                        Power.Coordinate.Real(SourceRealId(0)),
+                        exponent,
+                        Power.Coordinate.Real(SourceRealId(1)),
+                    ),
                 ),
                 numRealVars = 2,
                 realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
@@ -105,10 +105,10 @@ class RealWitnessVerificationTest {
                 emptyArray<IntDomain>(),
                 arrayOf(
                     Power(
-                    Power.Coordinate.Real(SourceRealId(0)),
-                    Int.MAX_VALUE,
-                    Power.Coordinate.Real(SourceRealId(1)),
-                )
+                        Power.Coordinate.Real(SourceRealId(0)),
+                        Int.MAX_VALUE,
+                        Power.Coordinate.Real(SourceRealId(1)),
+                    ),
                 ),
                 numRealVars = 2,
                 realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
@@ -133,10 +133,10 @@ class RealWitnessVerificationTest {
             emptyArray<IntDomain>(),
             arrayOf(
                 Power(
-                Power.Coordinate.Real(SourceRealId(0)),
-                3,
-                Power.Coordinate.Real(SourceRealId(1)),
-            )
+                    Power.Coordinate.Real(SourceRealId(0)),
+                    3,
+                    Power.Coordinate.Real(SourceRealId(1)),
+                ),
             ),
             numRealVars = 2,
             realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },

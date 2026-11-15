@@ -70,17 +70,17 @@ class PseudoBooleanPropagatorTest {
         val wide = parseBigInt("18446744073709551616")
         for (op in PbOp.entries) {
             for (indicator in listOf(false, true)) {
-            val bound = if (op == PbOp.LE) BIG_ZERO else wide
-            val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, true)), op, bound)
-            val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
-            val state = PropagationState(problem, Assumptions.None)
-            state.currentFactor = 0
-            assertTrue(state.pinBool(0, indicator))
+                val bound = if (op == PbOp.LE) BIG_ZERO else wide
+                val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, true)), op, bound)
+                val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
+                val state = PropagationState(problem, Assumptions.None)
+                state.currentFactor = 0
+                assertTrue(state.pinBool(0, indicator))
 
-            assertTrue(state.factorAt(0).propagate(state, 0))
+                assertTrue(state.factorAt(0).propagate(state, 0))
 
-            assertEquals(if (op == PbOp.LE) !indicator else indicator, state.boolValues[1], "$op $indicator")
-        }
+                assertEquals(if (op == PbOp.LE) !indicator else indicator, state.boolValues[1], "$op $indicator")
+            }
         }
     }
 

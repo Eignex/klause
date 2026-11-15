@@ -18,10 +18,10 @@ class LpLibraryAdapterTest {
     fun `library plans should reject SMT sources before selecting the MPS caller`() {
         val request = BenchRequest(
             parameters = mapOf(
-            "suite" to "smtlib-qfnra-core-v1",
-            "name" to "exact/wide-exact-rational",
-            "exact" to "true",
-        )
+                "suite" to "smtlib-qfnra-core-v1",
+                "name" to "exact/wide-exact-rational",
+                "exact" to "true",
+            ),
         )
 
         assertFailsWith<IllegalArgumentException> { LpLibrarySuite.plan(request) }

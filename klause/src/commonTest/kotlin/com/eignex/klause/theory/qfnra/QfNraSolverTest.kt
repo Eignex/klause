@@ -109,7 +109,7 @@ class QfNraSolverTest {
         var entered = false
 
         work.probe {
-            entered = true;
+            entered = true
             null
         }
 
@@ -151,15 +151,15 @@ class QfNraSolverTest {
         val sine = algebraic.evaluate(
             RationalPolynomial(
                 listOf(
-            BigFraction.ZERO,
-            BigFraction.ONE,
-            BigFraction.ZERO,
-            BigFraction.of(bigIntOf(-1), bigIntOf(6)),
-            BigFraction.ZERO,
-            BigFraction.of(bigIntOf(1), bigIntOf(120)),
-        )
+                    BigFraction.ZERO,
+                    BigFraction.ONE,
+                    BigFraction.ZERO,
+                    BigFraction.of(bigIntOf(-1), bigIntOf(6)),
+                    BigFraction.ZERO,
+                    BigFraction.of(bigIntOf(1), bigIntOf(120)),
+                ),
             ),
-            u
+            u,
         )
         val acceleration = algebraic.subtract(
             algebraic.multiply(algebraic.rational(BigFraction.of(bigIntOf(-1), bigIntOf(2))), v),
@@ -168,9 +168,9 @@ class QfNraSolverTest {
         assertEquals(
             0,
             algebraic.compare(
-            point.realValue(1),
-            algebraic.add(v, algebraic.multiply(hundredth, acceleration)),
-        )
+                point.realValue(1),
+                algebraic.add(v, algebraic.multiply(hundredth, acceleration)),
+            ),
         )
         val inside = ArrayList<Boolean>()
         for ((a, b) in listOf(u to v, point.realValue(0) to point.realValue(1))) {
@@ -221,15 +221,15 @@ class QfNraSolverTest {
             val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
             assertTrue(
                 algebraic.compare(
-                witness.realValue(0),
-                algebraic.rational(BigFraction.ofLong(4).reciprocal()),
-            ) > 0
+                    witness.realValue(0),
+                    algebraic.rational(BigFraction.ofLong(4).reciprocal()),
+                ) > 0,
             )
             assertTrue(
                 algebraic.compare(
-                witness.realValue(0),
-                algebraic.rational(BigFraction.ofLong(3).reciprocal()),
-            ) < 0
+                    witness.realValue(0),
+                    algebraic.rational(BigFraction.ofLong(3).reciprocal()),
+                ) < 0,
             )
             val norm = algebraic.add(
                 algebraic.power(witness.realValue(0), 2),
@@ -326,9 +326,9 @@ class QfNraSolverTest {
         assertEquals(
             0,
             algebraic.compare(
-            algebraic.power(point.realValue(0), 2),
-            algebraic.rational(BigFraction.ONE),
-        )
+                algebraic.power(point.realValue(0), 2),
+                algebraic.rational(BigFraction.ONE),
+            ),
         )
         assertTrue(algebraic.sign(algebraic.power(point.realValue(1), 2)) > 0)
     }
@@ -361,16 +361,16 @@ class QfNraSolverTest {
         assertEquals(
             0,
             algebraic.compare(
-            algebraic.power(point.realValue(0), 2),
-            algebraic.rational(BigFraction.ofLong(2)),
-        )
+                algebraic.power(point.realValue(0), 2),
+                algebraic.rational(BigFraction.ofLong(2)),
+            ),
         )
         assertEquals(
             0,
             algebraic.compare(
-            algebraic.multiply(point.realValue(0), point.realValue(1)),
-            algebraic.rational(BigFraction.ONE),
-        )
+                algebraic.multiply(point.realValue(0), point.realValue(1)),
+                algebraic.rational(BigFraction.ONE),
+            ),
         )
     }
 
@@ -404,10 +404,10 @@ class QfNraSolverTest {
         assertTrue(
             algebraic.sign(
                 algebraic.add(
-            algebraic.power(point.realValue(0), 4),
-            algebraic.power(point.realValue(1), 4),
-        )
-            ) > 0
+                    algebraic.power(point.realValue(0), 4),
+                    algebraic.power(point.realValue(1), 4),
+                ),
+            ) > 0,
         )
     }
 
@@ -495,23 +495,23 @@ class QfNraSolverTest {
         assertEquals(
             0,
             algebraic.compare(
-            witness.realValue(0),
-            algebraic.add(square, algebraic.rational(BigFraction.ONE)),
-        )
+                witness.realValue(0),
+                algebraic.add(square, algebraic.rational(BigFraction.ONE)),
+            ),
         )
         assertEquals(
             0,
             algebraic.compare(
-            witness.realValue(2),
-            algebraic.add(witness.realValue(0), witness.realValue(3)),
-        )
+                witness.realValue(2),
+                algebraic.add(witness.realValue(0), witness.realValue(3)),
+            ),
         )
         assertTrue(algebraic.compare(witness.realValue(3), witness.realValue(1)) >= 0)
         assertTrue(
             algebraic.compare(
-            witness.realValue(3),
-            algebraic.add(witness.realValue(1), algebraic.rational(BigFraction.ONE)),
-        ) <= 0
+                witness.realValue(3),
+                algebraic.add(witness.realValue(1), algebraic.rational(BigFraction.ONE)),
+            ) <= 0,
         )
         assertEquals(33, witness.realCount)
     }

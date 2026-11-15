@@ -69,10 +69,10 @@ class SmtLibScopeTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            source.source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                source.source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
 
         val result = BacktrackSolver.source(source.model).solve()

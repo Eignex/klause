@@ -212,11 +212,13 @@ internal class SourceCut(
         val canonical = ordered.withIndex().associate { it.value to CutSource(CutSourceKind.AUXILIARY, it.index) }
         val mapping = definitions.mapValues { requireNotNull(canonical[it.value]) }
         listOf(
-            key, provenance.model,
+            key,
+            provenance.model,
             provenance.facts.filter { !it.global }.mapTo(HashSet()) {
-            it.copy(premise = it.premise.remapSources(mapping))
-        },
-            provenance.assumptions, ordered
+                it.copy(premise = it.premise.remapSources(mapping))
+            },
+            provenance.assumptions,
+            ordered,
         )
     }
 
@@ -234,16 +236,16 @@ internal class SourceCut(
             provenance
         } else {
             provenance.retainReferencedDefinitions(expression)
-            ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
+                ?: return CutMapping.Declined(CutMappingDecline.MISSING_SOURCE)
         }
         if (original.model !== map.model || !map.assumptions.containsAll(original.assumptions)) {
             return CutMapping.Declined(CutMappingDecline.MODEL_SCOPE)
         }
         if (prepared == null && (
-            expression.terms.size > limits.terms || !limits.accepts(original) ||
-                !limits.accepts(rhs) || !limits.accepts(expression.constant) ||
-                expression.terms.values.any { !limits.accepts(it) }
-        )
+                expression.terms.size > limits.terms || !limits.accepts(original) ||
+                    !limits.accepts(rhs) || !limits.accepts(expression.constant) ||
+                    expression.terms.values.any { !limits.accepts(it) }
+                )
         ) {
             return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         }
@@ -318,15 +320,15 @@ internal class SourceCut(
             provenance
         } else {
             CutProvenance(
-            map.model,
-            provenance.epoch,
-            facts,
-            provenance.assumptions,
-            provenance.rules,
-            conclusion,
-            provenance.auxiliaryDefinitions,
-            family,
-        )
+                map.model,
+                provenance.epoch,
+                facts,
+                provenance.assumptions,
+                provenance.rules,
+                conclusion,
+                provenance.auxiliaryDefinitions,
+                family,
+            )
         }
         if (proof !== original && !limits.accepts(proof)) return CutMapping.Declined(CutMappingDecline.ARITHMETIC_LIMIT)
         val result = CutMapping.Mapped(
@@ -550,9 +552,9 @@ private class SourceCutMapper(
                     for (literal in premises.literalEntries()) {
                         facts.add(
                             CutProofFact(
-                        CutPremise.Literal(literal),
-                        false,
-                    )
+                                CutPremise.Literal(literal),
+                                false,
+                            ),
                         )
                     }
                 }

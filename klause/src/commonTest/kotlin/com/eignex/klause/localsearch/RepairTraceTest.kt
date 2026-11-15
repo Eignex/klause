@@ -127,7 +127,7 @@ class RepairTraceTest {
                 acceptance = AcceptanceRule.GreedyDescent,
                 feasibleDescent = FeasibleDescent.SelfOwned,
                 perturbation = {
-                    draws.add(it.rng.nextLong());
+                    draws.add(it.rng.nextLong())
                     null
                 },
             )
@@ -142,10 +142,10 @@ class RepairTraceTest {
             val result = engine.resumable(
                 LinearObjective(),
                 LocalSearchParams(
-                maxFlips = 4,
-                randomSeed = 7,
-                initialAssignment = Sample(booleanArrayOf(), longArrayOf(0, 1, 2)),
-            )
+                    maxFlips = 4,
+                    randomSeed = 7,
+                    initialAssignment = Sample(booleanArrayOf(), longArrayOf(0, 1, 2)),
+                ),
             ).use {
                 assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
             }
@@ -182,18 +182,18 @@ class RepairTraceTest {
         val handle = engine.resumable(
             LinearObjective(),
             LocalSearchParams(
-            maxFlips = 1,
-            randomSeed = 7,
-            initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L }),
-        )
+                maxFlips = 1,
+                randomSeed = 7,
+                initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L }),
+            ),
         )
 
         assertNull(
             handle.runSlice(
-            ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
-            Long.MAX_VALUE,
-            -1,
-        ) {}
+                ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
+                Long.MAX_VALUE,
+                -1,
+            ) {},
         )
         val pending = trace.attempts.last()
         assertNull(pending.endpoint)
@@ -226,17 +226,17 @@ class RepairTraceTest {
         engine.resumable(
             LinearObjective(),
             LocalSearchParams(
-            maxFlips = 1,
-            randomSeed = 7,
-            initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L }),
-        )
+                maxFlips = 1,
+                randomSeed = 7,
+                initialAssignment = Sample(booleanArrayOf(), LongArray(32) { if (it == 1) 1L else 0L }),
+            ),
         ).use { handle ->
             assertNull(
                 handle.runSlice(
-                ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
-                Long.MAX_VALUE,
-                -1,
-            ) {}
+                    ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
+                    Long.MAX_VALUE,
+                    -1,
+                ) {},
             )
             val pending = trace.attempts.last()
             val phases = pending.frames.toList()

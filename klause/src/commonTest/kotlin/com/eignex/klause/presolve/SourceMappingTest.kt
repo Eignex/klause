@@ -89,9 +89,9 @@ class SourceMappingTest {
         )) {
             val clauses = if (pass == PresolvePass.IMPLICATION_GRAPH) {
                 listOf(
-                Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true))),
-            )
+                    Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
+                    Clause(intArrayOf(Lit.make(1, false), Lit.make(0, true))),
+                )
             } else {
                 listOf(Clause(intArrayOf(Lit.make(1, true), Lit.make(0, true))))
             }
@@ -109,20 +109,20 @@ class SourceMappingTest {
                 SearchHints(
                     listOf(
                         SearchGroup(
-                intArrayOf(1, 2, 0),
-                intArrayOf(0),
-                VariableSelection.InputOrder,
-                ValueSelection.Maximum,
-            )
-                    )
-                ).remapped(coordinates, ExecutionControl.Never)
+                            intArrayOf(1, 2, 0),
+                            intArrayOf(0),
+                            VariableSelection.InputOrder,
+                            ValueSelection.Maximum,
+                        ),
+                    ),
+                ).remapped(coordinates, ExecutionControl.Never),
             )
             val point = mapping.reconstructFrom(
                 target,
                 Sample(
-                booleanArrayOf(pass == PresolvePass.IMPLICATION_GRAPH, false, false),
-                longArrayOf(2),
-            )
+                    booleanArrayOf(pass == PresolvePass.IMPLICATION_GRAPH, false, false),
+                    longArrayOf(2),
+                ),
             )
 
             assertEquals(listOf(2, 0), search.tiers.single().boolVars.toList(), pass.id)

@@ -44,16 +44,17 @@ class LinearOptimizationExecutionTest {
     @Test
     fun `a standalone linear result should include numerical owner retirement`() {
         val context = SourceProofContext(
-            scope, setOf(real),
+            scope,
+            setOf(real),
             mapOf(
-            "lower" to SourcePremise(
-                SourceInequality(
-                mapOf(real to BigFraction.MINUS_ONE),
-                BigFraction.MINUS_ONE,
-            )
+                "lower" to SourcePremise(
+                    SourceInequality(
+                        mapOf(real to BigFraction.MINUS_ONE),
+                        BigFraction.MINUS_ONE,
+                    ),
+                ),
             ),
-        ),
-            mapOf(real to BigFraction.ONE)
+            mapOf(real to BigFraction.ONE),
         )
 
         val result = OpenTheoryPipeline.optimizeLinear(context)
@@ -62,8 +63,8 @@ class LinearOptimizationExecutionTest {
         assertEquals(
             1L,
             assertNotNull(result.stats.smt.completeSearchStages)[
-            "numericalCutLifecycleRECIPE_RETIREMENT_OwnerClosed",
-            ]
+                "numericalCutLifecycleRECIPE_RETIREMENT_OwnerClosed",
+            ],
         )
     }
 

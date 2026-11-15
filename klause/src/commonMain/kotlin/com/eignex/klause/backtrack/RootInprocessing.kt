@@ -183,12 +183,12 @@ internal class RootSimplificationPass : InprocessingPass {
             if (!source && !retirement.hasCapture) {
                 when (
                     retirement.capture(
-                    session,
-                    factor - session.problem.numFactors,
-                    session.learnedRetirementGeneration,
-                    params,
-                    budget,
-                )
+                        session,
+                        factor - session.problem.numFactors,
+                        session.learnedRetirementGeneration,
+                        params,
+                        budget,
+                    )
                 ) {
                     LearnedRetirementStatus.Captured -> Unit
 
@@ -440,8 +440,8 @@ internal class RootProbingPass : InprocessingPass {
         if (!session.canSimplifyRoot || params.rootProbeWork <= 0L) return
         val opportunityClock = params.rootProbeBinaryGate || (
             params.rootProbeGeneralGate &&
-            !session.usesNativeSat && session.problem.numIntVars == 0
-        )
+                !session.usesNativeSat && session.problem.numIntVars == 0
+            )
         spending.run(session, params, stats, containingWork = containingWork) { budget ->
             if (implications.advance(session, params, budget) && !budget.stopped()) {
                 val before = session.work

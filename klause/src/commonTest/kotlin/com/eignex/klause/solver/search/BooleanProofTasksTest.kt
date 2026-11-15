@@ -28,13 +28,15 @@ class BooleanProofTasksTest {
     @Test
     fun `actual scoped finite refutations should close every leased cube without independent proof authority`() {
         val problem = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(0, 2)),
-            Clause(intArrayOf(0, 3)),
-            Clause(intArrayOf(1, 2)),
-            Clause(intArrayOf(1, 3)),
-        )
+                Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(0, 3)),
+                Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(1, 3)),
+            ),
         ).bake()
         val tasks = BooleanProofTasks(context, listOf(0))
 
@@ -42,20 +44,20 @@ class BooleanProofTasksTest {
             val lease = assertNotNull(tasks.acquire(worker))
             val assumptions = Assumptions(
                 bools = lease.cube.literals.associate {
-                Lit.variable(it) to Lit.isPositive(it)
-            }
+                    Lit.variable(it) to Lit.isPositive(it)
+                },
             )
             val result = BacktrackSolver(problem).solve(
                 BacktrackParams(
-                assumptions = assumptions,
-                nativeSat = false,
-                randomSeed = 17,
-            )
+                    assumptions = assumptions,
+                    nativeSat = false,
+                    randomSeed = 17,
+                ),
             )
             assertTrue(
                 tasks.complete(lease) {
-                if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation else BooleanTaskCheck.Unresolved
-            }
+                    if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation else BooleanTaskCheck.Unresolved
+                },
             )
         }
 
@@ -76,10 +78,10 @@ class BooleanProofTasksTest {
             }
             val result = BacktrackSolver(problem).solve(
                 BacktrackParams(
-                assumptions = Assumptions(bools = pins),
-                nativeSat = false,
-                randomSeed = 17,
-            )
+                    assumptions = Assumptions(bools = pins),
+                    nativeSat = false,
+                    randomSeed = 17,
+                ),
             )
             tasks.complete(lease) {
                 if (result is SolveResult.Unsat) BooleanTaskCheck.NativeRefutation else BooleanTaskCheck.Unresolved

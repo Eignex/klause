@@ -207,15 +207,15 @@ internal class FlatZincCompiler(
                 null
             } else {
                 BooleanArray(intDomains.size) {
-                it in openIntegerLower
-            }
+                    it in openIntegerLower
+                }
             },
             openIntHi = if (openIntegerUpper.isEmpty()) {
                 null
             } else {
                 BooleanArray(intDomains.size) {
-                it in openIntegerUpper
-            }
+                    it in openIntegerUpper
+                }
             },
         )
         return FlatZincProgram(
@@ -235,11 +235,11 @@ internal class FlatZincCompiler(
         ).also { program ->
             program.retainSource(
                 FlatZincSourceState(
-                program.suppliedCopy(),
-                declaredRealCount,
-                selectLegacy = { finiteRepresentations },
-                projectSearch = { compileSearchAnnotation(it) },
-            )
+                    program.suppliedCopy(),
+                    declaredRealCount,
+                    selectLegacy = { finiteRepresentations },
+                    projectSearch = { compileSearchAnnotation(it) },
+                ),
             )
         }
     }

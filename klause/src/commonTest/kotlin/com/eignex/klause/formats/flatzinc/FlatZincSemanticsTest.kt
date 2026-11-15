@@ -235,9 +235,9 @@ class FlatZincSemanticsTest {
             val program = parseFlatZinc(
                 "$declaration solve satisfy;",
                 semanticOverrides = SemanticOverrides(
-                floats = FloatSemantics.Continuous,
-                undeclaredReals = bounds,
-            )
+                    floats = FloatSemantics.Continuous,
+                    undeclaredReals = bounds,
+                ),
             )
 
             for (id in 0 until program.problem.numRealVars) {
@@ -255,9 +255,9 @@ class FlatZincSemanticsTest {
         val program = parseFlatZinc(
             "var float: x; solve satisfy;",
             semanticOverrides = SemanticOverrides(
-            floats = FloatSemantics.Continuous,
-            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
-        )
+                floats = FloatSemantics.Continuous,
+                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+            ),
         )
 
         assertEquals(2_000_000.0, program.problem.realLower[0])
@@ -269,8 +269,8 @@ class FlatZincSemanticsTest {
         val program = parseFlatZinc(
             "var float: x; solve satisfy;",
             semanticOverrides = SemanticOverrides(
-            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
-        )
+                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+            ),
         )
 
         assertTrue(program.floatVarsByName.getValue("x").lpOnly)
@@ -283,12 +283,12 @@ class FlatZincSemanticsTest {
         val program = parseFlatZinc(
             "var float: x; solve minimize x;",
             semanticOverrides = SemanticOverrides(
-            floats = FloatSemantics.Grid(4, 1_000_000),
-            undeclaredReals = BoundsOverride(
-                BoundOverride.Value(SemanticRational.ofLong(2_000_000)),
-                BoundOverride.Value(SemanticRational.ofLong(3_000_000)),
+                floats = FloatSemantics.Grid(4, 1_000_000),
+                undeclaredReals = BoundsOverride(
+                    BoundOverride.Value(SemanticRational.ofLong(2_000_000)),
+                    BoundOverride.Value(SemanticRational.ofLong(3_000_000)),
+                ),
             ),
-        )
         )
 
         val variable = program.floatVarsByName.getValue("x")
@@ -324,9 +324,9 @@ class FlatZincSemanticsTest {
             parseFlatZinc(
                 "var float: x; solve satisfy;",
                 semanticOverrides = SemanticOverrides(
-                floats = FloatSemantics.Continuous,
-                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(bound)),
-            )
+                    floats = FloatSemantics.Continuous,
+                    undeclaredReals = BoundsOverride(lower = BoundOverride.Value(bound)),
+                ),
             )
         }
 
@@ -338,9 +338,9 @@ class FlatZincSemanticsTest {
         val program = parseFlatZinc(
             "var float: x; solve minimize x;",
             semanticOverrides = SemanticOverrides(
-            floats = FloatSemantics.Grid(4, 1_000_000),
-            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
-        )
+                floats = FloatSemantics.Grid(4, 1_000_000),
+                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+            ),
         )
 
         assertEquals(2_000_000.0, program.sourceProgram.problem.realLower[0])

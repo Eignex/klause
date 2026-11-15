@@ -106,12 +106,12 @@ class FinitePortfolioLpCaptureTest {
         assertEquals(
             listOf(
                 "companion-integers=true", "companion-active-ms=4000",
-            "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",
-            "source-incumbent-completion=$handoff", "portfolio-progress=true", "portfolio-reward=ordinary",
-            "phase-retention=0.25", "reseed-stale-threshold=3", "portfolio-probes=ordinary",
-            "portfolio-proof-workers=retained", "portfolio-proof-share=0.5",
+                "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",
+                "source-incumbent-completion=$handoff", "portfolio-progress=true", "portfolio-reward=ordinary",
+                "phase-retention=0.25", "reseed-stale-threshold=3", "portfolio-probes=ordinary",
+                "portfolio-proof-workers=retained", "portfolio-proof-share=0.5",
             ),
-                parameters
+            parameters,
         )
     }
 

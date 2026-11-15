@@ -207,13 +207,13 @@ object FixedWorkSatMeasurement {
             put(
                 "engine",
                 buildJsonObject {
-                put("kind", "resumable-backtrack")
-                put("nativeSatRequested", true)
-                put("sliceMillis", Long.MAX_VALUE)
-                put("presolve", false)
-                put("localSearch", false)
-                put("portfolio", false)
-            }
+                    put("kind", "resumable-backtrack")
+                    put("nativeSatRequested", true)
+                    put("sliceMillis", Long.MAX_VALUE)
+                    put("presolve", false)
+                    put("localSearch", false)
+                    put("portfolio", false)
+                },
             )
             put("sourceSha256", request.sourceSha256)
             put("sourceBooleanVariables", model?.numBoolVars)
@@ -231,14 +231,14 @@ object FixedWorkSatMeasurement {
             put(
                 "counters",
                 buildJsonObject {
-                put("work", work)
-                put("initialWork", initialWork)
-                put("decisions", counters.nodes.sum.toLong())
-                put("failures", counters.fails.sum.toLong())
-                put("restarts", counters.restarts.sum.toLong())
-                put("propagationWork", counters.propagationWork.sum.toLong())
-                put("rootPropagationWork", counters.rootPropagationWork.sum.toLong())
-            }
+                    put("work", work)
+                    put("initialWork", initialWork)
+                    put("decisions", counters.nodes.sum.toLong())
+                    put("failures", counters.fails.sum.toLong())
+                    put("restarts", counters.restarts.sum.toLong())
+                    put("propagationWork", counters.propagationWork.sum.toLong())
+                    put("rootPropagationWork", counters.rootPropagationWork.sum.toLong())
+                },
             )
             put("trajectory", trajectory.json())
             put("nativeSatClaim", result is SolveResult.Sat)

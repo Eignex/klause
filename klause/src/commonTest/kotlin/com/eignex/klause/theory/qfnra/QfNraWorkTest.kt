@@ -18,10 +18,10 @@ class QfNraWorkTest {
         val work = QfNraWork(
             QfNraParams(
                 cancellation = object : ExecutionControl() {
-            override fun isCancelled(): Boolean = false
-            override val accounting: WorkMeter? get() = active
-        }
-            )
+                    override fun isCancelled(): Boolean = false
+                    override val accounting: WorkMeter? get() = active
+                },
+            ),
         )
         val arithmetic = PolynomialArithmetic(work)
         active = WorkMeter { charged += it }
@@ -38,11 +38,11 @@ class QfNraWorkTest {
         val work = QfNraWork(
             QfNraParams(
                 cancellation = ExecutionControl {
-            val observed = pulse
-            pulse = false
-            observed
-        }
-            )
+                    val observed = pulse
+                    pulse = false
+                    observed
+                },
+            ),
         )
         val arithmetic = PolynomialArithmetic(work)
 

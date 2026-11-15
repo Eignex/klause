@@ -59,11 +59,11 @@ internal object GuardedIntegerRowProfile {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("source.txt").writeText(
             if (element) {
-            "r=Element([a,b],i); 2*x+a<=z; 2*x-r<=0; i=0..1; x=0..6; a,b,r=0..12; z=0..24\n"
-        } else {
-            "r iff 2*x+y<=z (positive) or 2*x+y>=z+1 (negative); " +
-            "2*x-y<=0; x=0..6; y=0..12; z=0..24\n"
-        }
+                "r=Element([a,b],i); 2*x+a<=z; 2*x-r<=0; i=0..1; x=0..6; a,b,r=0..12; z=0..24\n"
+            } else {
+                "r iff 2*x+y<=z (positive) or 2*x+y>=z+1 (negative); " +
+                    "2*x-y<=0; x=0..6; y=0..12; z=0..24\n"
+            },
         )
         val records = out.resolve("guarded-rows.jsonl").apply { writeText("") }
         for (warmup in listOf(true, false)) {
@@ -76,37 +76,38 @@ internal object GuardedIntegerRowProfile {
 
     private fun source(truth: Boolean, element: Boolean): Problem = if (element) {
         Problem(
-            0, 6,
+            0,
+            6,
             arrayOf(
-            IntDomain(0, 6),
-            IntDomain(0, 12),
-            IntDomain(0, 12),
-            IntDomain(0, 12),
-            IntDomain(0, 24),
-            IntDomain(0, 1),
-        ),
+                IntDomain(0, 6),
+                IntDomain(0, 12),
+                IntDomain(0, 12),
+                IntDomain(0, 12),
+                IntDomain(0, 24),
+                IntDomain(0, 1),
+            ),
             arrayOf(
-            Element(5, 3, longArrayOf(1, 2), true, 0),
-            Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
-            Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
-        )
+                Element(5, 3, longArrayOf(1, 2), true, 0),
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
+            ),
         )
     } else {
         Problem(
-        1,
-        3,
-        arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-        arrayOf(
-            ReifiedLinear(
-                0,
-                intArrayOf(2, 1, -1),
-                intArrayOf(0, 1, 2),
-                if (truth) LinearOp.LE else LinearOp.GE,
-                if (truth) 0 else 1,
+            1,
+            3,
+            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+            arrayOf(
+                ReifiedLinear(
+                    0,
+                    intArrayOf(2, 1, -1),
+                    intArrayOf(0, 1, 2),
+                    if (truth) LinearOp.LE else LinearOp.GE,
+                    if (truth) 0 else 1,
+                ),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
             ),
-            Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-        ),
-    )
+        )
     }
 
     private fun lifecycle(truth: Boolean, learning: Boolean, warmup: Boolean, records: File, element: Boolean) {
@@ -150,7 +151,7 @@ internal object GuardedIntegerRowProfile {
             val assumptions = if (element) Assumptions.None else Assumptions.None.withBool(0, truth)
             check(
                 PropagationSession(problem.withIntDomains(Array(point.size) { IntDomain(point[it], point[it]) }))
-                .seed(assumptions) is PropagationResult.Implied
+                    .seed(assumptions) is PropagationResult.Implied,
             )
             val record = buildJsonObject {
                 put("revision", Reports.readGitSha())
@@ -179,12 +180,12 @@ internal object GuardedIntegerRowProfile {
         shared.popTo(0)
         check(
             shared.push(
-            if (element) {
-                SearchDecision.IntAtLeast(5, 1)
-            } else {
-                SearchDecision.Bool(Lit.make(0, !truth))
-            },
-        ) is ComponentResult.Consistent
+                if (element) {
+                    SearchDecision.IntAtLeast(5, 1)
+                } else {
+                    SearchDecision.Bool(Lit.make(0, !truth))
+                },
+            ) is ComponentResult.Consistent,
         )
         check(shared.push(SearchDecision.IntAtMost(z, if (element) 4 else 0)) is ComponentResult.Consistent)
         check(shared.push(SearchDecision.IntAtLeast(0, 2)) is ComponentResult.Consistent)
@@ -194,10 +195,10 @@ internal object GuardedIntegerRowProfile {
             PropagationSession(
                 problem.withIntDomains(
                     Array(oppositePoint.size) {
-            IntDomain(oppositePoint[it], oppositePoint[it])
-        }
-                )
-            ).seed(oppositeAssumptions) is PropagationResult.Implied
+                        IntDomain(oppositePoint[it], oppositePoint[it])
+                    },
+                ),
+            ).seed(oppositeAssumptions) is PropagationResult.Implied,
         )
         val disposal = Meter()
         shared.popTo(0)
@@ -231,23 +232,23 @@ internal object GuardedIntegerRowProfile {
         }
         val guarded = (
             if (element) {
-            source
-        } else {
-            source.withFactors(source.factors + Clause(intArrayOf(Lit.make(0, truth))))
-        }
-        ).withIntDomains(domains)
+                source
+            } else {
+                source.withFactors(source.factors + Clause(intArrayOf(Lit.make(0, truth))))
+            }
+            ).withIntDomains(domains)
         val stop = ExecutionControl.after(10.seconds)
         val budget = PresolveBudget(1_000_000L)
         val prepared = FinitePipeline.prepare(
             FinitePipelineRequest(
-            guarded,
-            FiniteEngine.BACKTRACK,
-            solutionSetSensitive = true,
-            cancellation = stop,
-            solveCancellation = stop,
-            presolveBudget = budget,
-            randomSeed = 3L,
-        )
+                guarded,
+                FiniteEngine.BACKTRACK,
+                solutionSetSensitive = true,
+                cancellation = stop,
+                solveCancellation = stop,
+                presolveBudget = budget,
+                randomSeed = 3L,
+            ),
         )
         check(!stop() && prepared.presolve?.infeasible != true)
         val preparationNs = total.elapsed()
@@ -256,10 +257,10 @@ internal object GuardedIntegerRowProfile {
         val aggressive = FinitePipeline.prepare(
             FinitePipelineRequest(
                 guarded, FiniteEngine.BACKTRACK,
-            presolveConfig = PresolveConfig.parse("aggressive"), explicitPresolveConfig = true,
-            solutionSetSensitive = true, cancellation = stop, solveCancellation = stop,
-            presolveBudget = aggressiveBudget, randomSeed = 3L,
-            )
+                presolveConfig = PresolveConfig.parse("aggressive"), explicitPresolveConfig = true,
+                solutionSetSensitive = true, cancellation = stop, solveCancellation = stop,
+                presolveBudget = aggressiveBudget, randomSeed = 3L,
+            ),
         )
         check(!stop() && aggressive.presolve?.infeasible != true)
         val aggressiveNs = total.elapsed() - aggressiveStart
@@ -291,9 +292,9 @@ internal object GuardedIntegerRowProfile {
                 "preparedDomains",
                 JsonArray(
                     (0 until prepared.problem.numIntVars).map {
-                JsonPrimitive(requireNotNull(prepared.problem.intDomainOrNull(it)).toString())
-            }
-                )
+                        JsonPrimitive(requireNotNull(prepared.problem.intDomainOrNull(it)).toString())
+                    },
+                ),
             )
             put("preparationWork", budget.spent())
             put("preparationNs", preparationNs)
@@ -301,17 +302,17 @@ internal object GuardedIntegerRowProfile {
                 "aggressivePreparedFactors",
                 JsonArray(
                     aggressive.problem.factors.map {
-                JsonPrimitive(it.javaClass.simpleName)
-            }
-                )
+                        JsonPrimitive(it.javaClass.simpleName)
+                    },
+                ),
             )
             put(
                 "aggressivePreparedDomains",
                 JsonArray(
                     (0 until aggressive.problem.numIntVars).map {
-                JsonPrimitive(requireNotNull(aggressive.problem.intDomainOrNull(it)).toString())
-            }
-                )
+                        JsonPrimitive(requireNotNull(aggressive.problem.intDomainOrNull(it)).toString())
+                    },
+                ),
             )
             put("aggressivePreparationWork", aggressiveBudget.spent())
             put("aggressivePreparationNs", aggressiveNs)

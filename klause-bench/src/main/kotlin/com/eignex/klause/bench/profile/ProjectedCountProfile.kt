@@ -30,19 +30,19 @@ internal object ProjectedCountProfile {
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         out.resolve("identity.json").writeText(
             buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("javaVersion", System.getProperty("java.version"))
-            put("os", System.getProperty("os.name"))
-            put("arch", System.getProperty("os.arch"))
-            put("processors", Runtime.getRuntime().availableProcessors())
-            put("maxHeapBytes", Runtime.getRuntime().maxMemory())
-            put(
-                "jvmOptions",
-                buildJsonArray {
-                ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-            }
-            )
-        }.toString()
+                put("revision", Reports.readGitSha())
+                put("javaVersion", System.getProperty("java.version"))
+                put("os", System.getProperty("os.name"))
+                put("arch", System.getProperty("os.arch"))
+                put("processors", Runtime.getRuntime().availableProcessors())
+                put("maxHeapBytes", Runtime.getRuntime().maxMemory())
+                put(
+                    "jvmOptions",
+                    buildJsonArray {
+                        ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
+                    },
+                )
+            }.toString(),
         )
         val counter = Class.forName("com.eignex.klause.count.AnytimeCounter")
         val instance = counter.getField("INSTANCE").get(null)

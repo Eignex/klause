@@ -213,8 +213,8 @@ class ComponentPlan internal constructor(
     private fun selectedTheoryFactorIndices(): List<Int> = factorOwners.indices.filter {
         encodingFactors[it] || (
             theoryPipeline != ProblemPipeline.FINITE_CP &&
-            theoryPipeline != ProblemPipeline.DIFFERENCE_THEORY && factorOwners[it] == FactorOwner.SHARED
-        )
+                theoryPipeline != ProblemPipeline.DIFFERENCE_THEORY && factorOwners[it] == FactorOwner.SHARED
+            )
     }
 
     internal fun encodedTheoryFragment(spec: Problem): Problem? {

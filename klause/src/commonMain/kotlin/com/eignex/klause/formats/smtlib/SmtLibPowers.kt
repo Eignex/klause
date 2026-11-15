@@ -67,10 +67,10 @@ internal fun Compiler.Builder.realPower(base: RealComb, power: IntComb): Res.R {
     val result = nextReal++
     factors.add(
         Power(
-        Power.Coordinate.Real(SourceRealId(productRealColumn(base))),
-        exponent,
-        Power.Coordinate.Real(SourceRealId(result)),
-    )
+            Power.Coordinate.Real(SourceRealId(productRealColumn(base))),
+            exponent,
+            Power.Coordinate.Real(SourceRealId(result)),
+        ),
     )
     return Res.R(RealComb(emptyMap(), mapOf(result to BigFraction.ONE), BigFraction.ZERO))
 }

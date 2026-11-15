@@ -57,13 +57,13 @@ internal object SourceStageProfile {
         require(hash == input.getValue("sha256").jsonPrimitive.content)
         out.resolve("identity.json").writeText(
             buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("sourceJob", job)
-            put("sourceCase", case)
-            put("recording", relative)
-            put("sha256", hash)
-            put("solverExecuted", false)
-        }.toString()
+                put("revision", Reports.readGitSha())
+                put("sourceJob", job)
+                put("sourceCase", case)
+                put("recording", relative)
+                put("sha256", hash)
+                put("solverExecuted", false)
+            }.toString(),
         )
         PrintStream(out.resolve("profile-summary.txt")).use {
             CliProfile.summarizeCli(recording, it, "retained profile $job")
@@ -101,11 +101,11 @@ internal object SourceStageProfile {
         require(nativeEvent.containsMatchIn(configuration))
         settings.writeText(
             nativeEvent.replace(configuration) { match ->
-            Regex("<setting name=\"enabled\"[^>]*>.*?</setting>").replace(
-                match.value,
-                "<setting name=\"enabled\">true</setting>",
-            )
-        }
+                Regex("<setting name=\"enabled\"[^>]*>.*?</setting>").replace(
+                    match.value,
+                    "<setting name=\"enabled\">true</setting>",
+                )
+            },
         )
         val options = "-Xmx3g -XX:+UseSerialGC -XX:ActiveProcessorCount=1 " +
             "-XX:StartFlightRecording=filename=$recording,settings=$settings," +
@@ -115,22 +115,22 @@ internal object SourceStageProfile {
             addAll(
                 listOf(
                     "--format", format, source.absolutePath, "-t", timeout.toString(), "-r", seed.toString(),
-                "-s", "-a", "--output-objective",
-                )
+                    "-s", "-a", "--output-objective",
+                ),
             )
             if (engine != "default") addAll(listOf("-e", engine))
             if (exact) add("--exact")
         }
         out.resolve("identity.json").writeText(
             buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("sourceSha256", sha256(bytes))
-            put("command", JsonArray(command.map(::JsonPrimitive)))
-            put("cliOptions", options)
-            put("debug", true)
-            put("sourceVerdictClaim", false)
-            put("purpose", "stage attribution under JFR; no throughput claim")
-        }.toString()
+                put("revision", Reports.readGitSha())
+                put("sourceSha256", sha256(bytes))
+                put("command", JsonArray(command.map(::JsonPrimitive)))
+                put("cliOptions", options)
+                put("debug", true)
+                put("sourceVerdictClaim", false)
+                put("purpose", "stage attribution under JFR; no throughput claim")
+            }.toString(),
         )
         val process = ProcessBuilder(command).redirectOutput(out.resolve("cli.stdout"))
             .redirectError(out.resolve("cli.stderr")).apply {

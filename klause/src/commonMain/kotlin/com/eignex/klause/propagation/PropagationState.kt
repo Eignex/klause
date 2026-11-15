@@ -462,8 +462,8 @@ class PropagationState private constructor(
     private val payloadOwner: PayloadOwner by lazy(LazyThreadSafetyMode.NONE) {
         PayloadOwner(
             prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
-            repeat(problem.numFactors) { add(null) }
-        }
+                repeat(problem.numFactors) { add(null) }
+            },
         )
     }
     internal var refPayloadStore: ArrayList<Any?>
@@ -950,7 +950,7 @@ class PropagationState private constructor(
         require(incremental) { "mid-life factors require an incremental PropagationState" }
         val prop = factor.propagatorProjection(
             provider =
-            projection.selection?.providers?.propagation ?: BuiltInPropagationProjectionProvider
+            projection.selection?.providers?.propagation ?: BuiltInPropagationProjectionProvider,
         )
         val fid = totalFactorCount
         midlife.store.add(prop)

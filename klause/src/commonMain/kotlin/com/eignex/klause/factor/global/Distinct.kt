@@ -103,8 +103,8 @@ class Distinct(
             boundInts = references.filter(Term::isInt).map(Term::intVar).distinct().toIntArray(),
             boolVars = (
                 references.filter(Term::isBool).map { Lit.variable(Term.lit(it)) } +
-                if (activator == LinearRow.ALWAYS) emptyList() else listOf(activator)
-            ).distinct().toIntArray(),
+                    if (activator == LinearRow.ALWAYS) emptyList() else listOf(activator)
+                ).distinct().toIntArray(),
             reals = references.filter(Term::isReal).map(Term::realVar).distinct().toIntArray(),
         )
     }
@@ -129,8 +129,8 @@ class Distinct(
             activator
         } else {
             mapping.bool(activator).also {
-            require(it >= 0) { "removed distinct activator" }
-        }
+                require(it >= 0) { "removed distinct activator" }
+            }
         },
     )
 

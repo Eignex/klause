@@ -123,10 +123,12 @@ internal class PolynomialCoupledSections(
             arithmetic.step()
             val variables = entry.atom.polynomial.variables
             if (variables.size < 2 || variables.any {
-                arithmetic.step();
-                it !in sections
+                    arithmetic.step()
+                    it !in sections
+                }
+            ) {
+                continue
             }
-            ) continue
             if (!fitsCellLimits(entry.atom.polynomial, arithmetic)) continue
             candidates.add(index)
             checkSupport(listOf(index), required, identities, checked, sections, equations, roots, prepared)
@@ -148,12 +150,12 @@ internal class PolynomialCoupledSections(
                     val index = iterator.next()
                     val dependencies = required[index].atom.polynomial.variables
                     if (dependencies.any {
-                        arithmetic.step();
-                        it in variables
-                    }
+                            arithmetic.step()
+                            it in variables
+                        }
                     ) {
                         for (variable in dependencies) {
-                            arithmetic.step();
+                            arithmetic.step()
                             variables.add(variable)
                         }
                         connected.add(index)
@@ -183,17 +185,17 @@ internal class PolynomialCoupledSections(
         val variables = LinkedHashSet<Int>()
         for (index in predicates) {
             for (variable in required[index].atom.polynomial.variables) {
-            arithmetic.step()
-            variables.add(variable)
-        }
+                arithmetic.step()
+                variables.add(variable)
+            }
         }
         val support = LinkedHashSet<Int>()
         for (index in variables.map {
-            arithmetic.step();
+            arithmetic.step()
             sections.getValue(it)
         } + predicates) {
             for (premise in required[index].premises) {
-                arithmetic.step();
+                arithmetic.step()
                 support.add(premise)
             }
         }
@@ -203,7 +205,7 @@ internal class PolynomialCoupledSections(
             add(if (prepared) -1L else -2L)
             add(if (predicates.size > 1) -1L else -2L)
             for (index in ordered) {
-                arithmetic.step();
+                arithmetic.step()
                 add(identities[index])
             }
         }
@@ -226,7 +228,7 @@ internal class PolynomialCoupledSections(
             }
         }
         val atoms = predicates.map {
-            arithmetic.step();
+            arithmetic.step()
             required[it].atom
         }
         if (satisfiable(atoms, variables.toList(), roots)) return null
@@ -244,10 +246,12 @@ internal class PolynomialCoupledSections(
             arithmetic.step()
             combinationCount++
             if (atoms.all {
-                arithmetic.step();
-                it.holds(sign(it, variables, choice, roots))
+                    arithmetic.step()
+                    it.holds(sign(it, variables, choice, roots))
+                }
+            ) {
+                return true
             }
-            ) return true
             var position = 0
             while (position < variables.size) {
                 arithmetic.step()

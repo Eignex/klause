@@ -25,10 +25,10 @@ internal class LinearAuthorityModel private constructor(
     val columns: List<ExactLpColumn> = lower.indices.map { id ->
         ExactLpColumn(
             ExactLpBounds(
-            lower[id]?.let { ExactLpSide(ExactLpNumber.of(it.value)) },
-            upper[id]?.let { ExactLpSide(ExactLpNumber.of(it.value)) },
-        ),
-            integral = false
+                lower[id]?.let { ExactLpSide(ExactLpNumber.of(it.value)) },
+                upper[id]?.let { ExactLpSide(ExactLpNumber.of(it.value)) },
+            ),
+            integral = false,
         )
     }
 

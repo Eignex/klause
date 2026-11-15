@@ -84,11 +84,11 @@ internal class MiniZincIdentityQuery(
                 outcome = "query-failed"
                 retain(
                     initial.copy(
-                    outcome = "process-started",
-                    elapsedNs = startupNs,
-                    startupNs = startupNs,
-                    pid = runCatching { child.pid() }.getOrNull(),
-                )
+                        outcome = "process-started",
+                        elapsedNs = startupNs,
+                        startupNs = startupNs,
+                        pid = runCatching { child.pid() }.getOrNull(),
+                    ),
                 )
                 val remaining = timeoutNs - (clock() - began)
                 val waitStart = clock()

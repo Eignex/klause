@@ -24,19 +24,21 @@ class SourceLpTest {
             "Dimension" to SourceLpInput(emptyList(), 129, emptyList()),
             "Entries" to SourceLpInput(
                 List(9) {
-                ExactRationalInequality(IntArray(64) { it }, List(64) { BigFraction.ONE }, BigFraction.ZERO)
-            },
-                64, emptyList()
+                    ExactRationalInequality(IntArray(64) { it }, List(64) { BigFraction.ONE }, BigFraction.ZERO)
+                },
+                64,
+                emptyList(),
             ),
             "InputBits" to SourceLpInput(
                 List(2) {
-                ExactRationalInequality(
-                    IntArray(65) { it },
-                    List(65) { BigFraction.ofLong(Long.MAX_VALUE) },
-                    BigFraction.ZERO,
-                )
-            },
-                65, emptyList()
+                    ExactRationalInequality(
+                        IntArray(65) { it },
+                        List(65) { BigFraction.ofLong(Long.MAX_VALUE) },
+                        BigFraction.ZERO,
+                    )
+                },
+                65,
+                emptyList(),
             ),
         )
         for ((reason, input) in cases) {

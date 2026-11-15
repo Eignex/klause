@@ -85,13 +85,13 @@ internal fun LpScopedSolver.advanceRootGuidance(
     )
     if (token()) {
         return LpRootGuidance(
-        null,
-        null,
-        LpRootGuidancePhase.CERTIFICATE,
-        false,
-        lastFloatTermination,
-        checked.metrics,
-    )
+            null,
+            null,
+            LpRootGuidancePhase.CERTIFICATE,
+            false,
+            lastFloatTermination,
+            checked.metrics,
+        )
     }
     val phase = when {
         !result.optimal -> LpRootGuidancePhase.FLOAT

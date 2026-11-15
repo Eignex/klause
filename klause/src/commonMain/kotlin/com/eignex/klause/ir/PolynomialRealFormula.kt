@@ -126,11 +126,11 @@ internal fun PolynomialRealFormula.remap(remap: VarRemap): PolynomialRealFormula
             is PolynomialSelection -> if (combine) {
                 values.addLast(
                     PolynomialSelection(
-                    requireNotNull(remap.real(node.result)) { "removed polynomial selection result" },
-                    values.removeLast(),
-                    node.whenTrue.remap(remap),
-                    node.whenFalse.remap(remap),
-                )
+                        requireNotNull(remap.real(node.result)) { "removed polynomial selection result" },
+                        values.removeLast(),
+                        node.whenTrue.remap(remap),
+                        node.whenFalse.remap(remap),
+                    ),
                 )
             } else {
                 work.addLast(node to true)

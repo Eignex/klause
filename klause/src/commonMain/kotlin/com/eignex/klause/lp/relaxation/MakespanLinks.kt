@@ -161,9 +161,9 @@ internal suspend fun SequenceScope<Unit>.prepareMakespanLinks(problem: Problem):
 
             is ArrayMinMax -> if (f.max) {
                 for (x in f.xs) {
-                links.addMax(f.result, x)
-                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
-            }
+                    links.addMax(f.result, x)
+                    if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+                }
             }
 
             else -> Unit

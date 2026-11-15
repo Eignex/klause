@@ -22,10 +22,10 @@ internal fun unhintedDefinitionSweep(problem: Problem, cancellation: ExecutionCo
             val node = when (factor) {
                 is Abs -> SweepNode.IntDef(
                     FunctionalObjective.Abs(
-                    factor.result,
-                    FunctionalObjective.Operand.v(factor.operand),
-                ),
-                    intArrayOf(factor.operand)
+                        factor.result,
+                        FunctionalObjective.Operand.v(factor.operand),
+                    ),
+                    intArrayOf(factor.operand),
                 )
 
                 is Product -> SweepNode.IntDef(
@@ -42,11 +42,11 @@ internal fun unhintedDefinitionSweep(problem: Problem, cancellation: ExecutionCo
                     val output = (factor.result as Power.Coordinate.Integer).id.index
                     SweepNode.IntDef(
                         FunctionalObjective.Power(
-                        output,
-                        FunctionalObjective.Operand.v(input),
-                        factor.exponent,
-                    ),
-                        intArrayOf(input)
+                            output,
+                            FunctionalObjective.Operand.v(input),
+                            factor.exponent,
+                        ),
+                        intArrayOf(input),
                     )
                 } else {
                     null

@@ -21,9 +21,9 @@ fun LinearObjective.toQuadraticObjectiveSpec(): QuadraticObjectiveSpec {
             if (weight != 0L) {
                 add(
                     QuadraticObjectiveTerm(
-                QuadraticCoefficient.ofLong(weight),
-                QuadraticVariable.Bool(SourceBoolId(id)),
-            )
+                        QuadraticCoefficient.ofLong(weight),
+                        QuadraticVariable.Bool(SourceBoolId(id)),
+                    ),
                 )
             }
         }
@@ -31,9 +31,9 @@ fun LinearObjective.toQuadraticObjectiveSpec(): QuadraticObjectiveSpec {
             if (coefficient != 0L) {
                 add(
                     QuadraticObjectiveTerm(
-                QuadraticCoefficient.ofLong(coefficient),
-                QuadraticVariable.Int(SourceIntId(id)),
-            )
+                        QuadraticCoefficient.ofLong(coefficient),
+                        QuadraticVariable.Int(SourceIntId(id)),
+                    ),
                 )
             }
         }
@@ -44,9 +44,9 @@ fun LinearObjective.toQuadraticObjectiveSpec(): QuadraticObjectiveSpec {
             if (exact != BigFraction.ZERO) {
                 add(
                     QuadraticObjectiveTerm(
-                QuadraticCoefficient.of(exact.num, exact.den),
-                QuadraticVariable.Real(SourceRealId(id)),
-            )
+                        QuadraticCoefficient.of(exact.num, exact.den),
+                        QuadraticVariable.Real(SourceRealId(id)),
+                    ),
                 )
             }
         }

@@ -49,9 +49,9 @@ internal object GlobalScoringViews {
                 BuiltInScoringProjectionProvider.select(factor)
             } else {
                 ScoringProjection(
-                ScoringCapability.GRADED,
-                AssignmentCheckCapability.EXACT,
-            ) { _, _ -> PairwiseDistinct(factor as AllDifferent, canonical.invariants[admission.factor]) }
+                    ScoringCapability.GRADED,
+                    AssignmentCheckCapability.EXACT,
+                ) { _, _ -> PairwiseDistinct(factor as AllDifferent, canonical.invariants[admission.factor]) }
             }
         }
         return Selection(provider, admissions)
@@ -95,15 +95,16 @@ internal object GlobalScoringViews {
         starts[table.arity] = records.size
         return Relation(
             Mdd(
-            table.xs,
-            counts,
-            starts,
-            records.toLongArray(),
-            0,
-            IntArray(counts.last()) { it },
-            3,
-        ),
-            null, work
+                table.xs,
+                counts,
+                starts,
+                records.toLongArray(),
+                0,
+                IntArray(counts.last()) { it },
+                3,
+            ),
+            null,
+            work,
         )
     }
 

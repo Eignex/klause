@@ -22,12 +22,12 @@ class PresolveBudgetTest {
         val budget = PresolveBudget(100)
         val visited = ArrayList<Int>()
         val first = ExecutionControl {
-            visited += 1;
-            budget.charge(10);
+            visited += 1
+            budget.charge(10)
             false
         }
         val last = ExecutionControl {
-            visited += 2;
+            visited += 2
             false
         }
         val stop = budget.orSpent(first or budget.slice(5) or last)
@@ -171,7 +171,7 @@ class PresolveBudgetTest {
             override fun deadline() = deadline
             override val accounting get() = meter
         } or ExecutionControl {
-            laterCalls++;
+            laterCalls++
             false
         }
         val observed = budget.observeStops(budget.observeStops(token))

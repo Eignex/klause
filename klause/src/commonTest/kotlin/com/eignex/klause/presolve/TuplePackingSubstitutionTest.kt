@@ -36,12 +36,14 @@ class TuplePackingSubstitutionTest {
     fun `mandatory occupied values should refute disjoint tables with scalar support`() {
         val rows = longArrayOf(0, 1, 1, 0, 0, 2, 2, 0, 0, 3, 3, 0)
         val source = Problem(
-            0, 4, Array(4) { IntDomain(0, 3) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
             listOf(
-            Table(intArrayOf(0, 1), rows),
-            Table(intArrayOf(2, 3), rows),
-            AllDifferent(intArrayOf(0, 1, 2, 3)),
-        )
+                Table(intArrayOf(0, 1), rows),
+                Table(intArrayOf(2, 3), rows),
+                AllDifferent(intArrayOf(0, 1, 2, 3)),
+            ),
         ).bake()
         assertFalse(source.baked is PropagationResult.Unsat)
 
@@ -74,12 +76,14 @@ class TuplePackingSubstitutionTest {
     @Test
     fun `a table with no internally distinct placement should refute the packing`() {
         val source = Problem(
-            0, 4, Array(4) { IntDomain(0, 3) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
             listOf(
-            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
-            Table(intArrayOf(2, 3), longArrayOf(2, 3, 3, 2)),
-            AllDifferent(intArrayOf(0, 1, 2, 3)),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+                Table(intArrayOf(2, 3), longArrayOf(2, 3, 3, 2)),
+                AllDifferent(intArrayOf(0, 1, 2, 3)),
+            ),
         ).bake()
         assertFalse(source.baked is PropagationResult.Unsat)
 
@@ -92,13 +96,15 @@ class TuplePackingSubstitutionTest {
     fun `placement branching should preserve each distinct source assignment once`() {
         val rows = longArrayOf(0, 1, 1, 0, 2, 3, 3, 2, 0, 1, 2, 2)
         val source = Problem(
-            1, 4, Array(4) { IntDomain(0, 3) },
+            1,
+            4,
+            Array(4) { IntDomain(0, 3) },
             listOf(
-            Table(intArrayOf(0, 1), rows),
-            Table(intArrayOf(2, 3), rows),
-            AllDifferent(intArrayOf(0, 1, 2, 3)),
-            Clause(intArrayOf(Lit.make(0, true))),
-        )
+                Table(intArrayOf(0, 1), rows),
+                Table(intArrayOf(2, 3), rows),
+                AllDifferent(intArrayOf(0, 1, 2, 3)),
+                Clause(intArrayOf(Lit.make(0, true))),
+            ),
         )
         val expected = BacktrackSolver(source.bake()).enumerate(BacktrackParams(randomSeed = 0L))
             .map { it.ints.toList() }.toList()
@@ -118,12 +124,14 @@ class TuplePackingSubstitutionTest {
     @Test
     fun `packing in a larger universe should retain unused values`() {
         val source = Problem(
-            0, 4, Array(4) { IntDomain(0, 5) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 5) },
             listOf(
-            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
-            Table(intArrayOf(2, 3), longArrayOf(2, 3, 4, 5)),
-            AllDifferent(intArrayOf(0, 1, 2, 3)),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+                Table(intArrayOf(2, 3), longArrayOf(2, 3, 4, 5)),
+                AllDifferent(intArrayOf(0, 1, 2, 3)),
+            ),
         ).bake()
         val result = assertNotNull(TuplePackingSubstitution.substitute(source, emptySet()))
         val reconstruct = assertNotNull(result.rebuild.asSampleLift())
@@ -138,12 +146,14 @@ class TuplePackingSubstitutionTest {
     @Test
     fun `placement capacity deductions should retract between sibling choices`() {
         val source = Problem(
-            0, 4, Array(4) { IntDomain(0, 3) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
             listOf(
-            Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
-            Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)),
-            AllDifferent(intArrayOf(0, 1, 2, 3)),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
+                Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)),
+                AllDifferent(intArrayOf(0, 1, 2, 3)),
+            ),
         ).bake()
         val result = assertNotNull(TuplePackingSubstitution.substitute(source, emptySet()))
         val selections = result.rebuild.steps.filterIsInstance<RebuildStep.TupleValue>()
@@ -181,12 +191,14 @@ class TuplePackingSubstitutionTest {
     fun `repeated coordinates and interval tables should decline substitution`() {
         val repeated = Problem(0, 1, arrayOf(IntDomain(0, 3)), listOf(AllDifferent(intArrayOf(0, 0)))).bake()
         val interval = Problem(
-            0, 4, Array(4) { IntDomain(0, 3) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 3) },
             listOf(
-            Table(intArrayOf(0, 1), longArrayOf(0, 1), longArrayOf(2, 3)),
-            Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)),
-            AllDifferent(intArrayOf(0, 1, 2, 3)),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 1), longArrayOf(2, 3)),
+                Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)),
+                AllDifferent(intArrayOf(0, 1, 2, 3)),
+            ),
         ).bake()
 
         assertNull(TuplePackingSubstitution.substitute(repeated, emptySet()))
@@ -266,11 +278,11 @@ class TuplePackingSubstitutionTest {
         val rebuild = SourceRebuilds(
             listOf(
                 RebuildStep.TupleValue(
-            0,
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-            longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE),
-        )
-            )
+                    0,
+                    intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+                    longArrayOf(Long.MIN_VALUE, Long.MAX_VALUE),
+                ),
+            ),
         )
         val ints = arrayOf(bigIntOf(0))
 
@@ -284,11 +296,11 @@ class TuplePackingSubstitutionTest {
         val rebuild = SourceRebuilds(
             listOf(
                 RebuildStep.TupleValue(
-            0,
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-            longArrayOf(1, 2),
-        )
-            )
+                    0,
+                    intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+                    longArrayOf(1, 2),
+                ),
+            ),
         )
 
         for (bools in listOf(booleanArrayOf(false, false), booleanArrayOf(true, true))) {
@@ -321,13 +333,15 @@ class TuplePackingSubstitutionTest {
     @Test
     fun `packing and binary substitution should compose their Boolean namespaces`() {
         val source = Problem(
-            0, 6, Array(6) { IntDomain(0, if (it < 4) 3L else 1L) },
+            0,
+            6,
+            Array(6) { IntDomain(0, if (it < 4) 3L else 1L) },
             listOf(
-            Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
-            Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)),
-            AllDifferent(intArrayOf(0, 1, 2, 3)),
-            Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 2, 3)),
+                Table(intArrayOf(2, 3), longArrayOf(0, 1, 2, 3)),
+                AllDifferent(intArrayOf(0, 1, 2, 3)),
+                Linear(intArrayOf(1, 1), intArrayOf(4, 5), LinearOp.GE, 1),
+            ),
         )
         val result = PresolvePipeline.run(
             source,

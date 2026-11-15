@@ -52,11 +52,12 @@ class ObjectiveCoordinateViewTest {
             Triple(Sample(booleanArrayOf(), longArrayOf(Long.MAX_VALUE, 0)), null, null),
             Triple(
                 Sample(
-                booleanArrayOf(),
-                longArrayOf(Long.MAX_VALUE, 0),
-                exactInts = listOf(bigIntOf(Long.MAX_VALUE), BIG_ZERO),
-            ),
-                null, null
+                    booleanArrayOf(),
+                    longArrayOf(Long.MAX_VALUE, 0),
+                    exactInts = listOf(bigIntOf(Long.MAX_VALUE), BIG_ZERO),
+                ),
+                null,
+                null,
             ),
         )
         for ((sample, expected, score) in cases) {

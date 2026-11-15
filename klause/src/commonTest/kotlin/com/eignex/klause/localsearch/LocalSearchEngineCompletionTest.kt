@@ -262,7 +262,7 @@ class LocalSearchEngineCompletionTest {
         assertNotNull(candidate)
         assertTrue(
             visits >= 2L * state.problem.numIntVars + state.problem.numBoolVars +
-            state.problem.numRealVars + state.violated.size
+                state.problem.numRealVars + state.violated.size,
         )
     }
 
@@ -340,11 +340,11 @@ class LocalSearchEngineCompletionTest {
             emptyArray(),
             arrayOf(
                 ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0)),
-                listOf(BigFraction.ofLong(3)),
-                LinearOp.EQ,
-                BigFraction.ONE,
-            )
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ofLong(3)),
+                    LinearOp.EQ,
+                    BigFraction.ONE,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
@@ -372,11 +372,11 @@ class LocalSearchEngineCompletionTest {
             emptyArray(),
             arrayOf(
                 ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0)),
-                listOf(BigFraction.ofLong(3)),
-                LinearOp.GE,
-                BigFraction.ONE,
-            )
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ofLong(3)),
+                    LinearOp.GE,
+                    BigFraction.ONE,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
@@ -411,11 +411,11 @@ class LocalSearchEngineCompletionTest {
             arrayOf(IntDomain(1, 1)),
             arrayOf(
                 ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
-                listOf(BigFraction.ofLong(3), BigFraction.MINUS_ONE),
-                LinearOp.EQ,
-                BigFraction.ZERO,
-            )
+                    intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
+                    listOf(BigFraction.ofLong(3), BigFraction.MINUS_ONE),
+                    LinearOp.EQ,
+                    BigFraction.ZERO,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
@@ -449,11 +449,11 @@ class LocalSearchEngineCompletionTest {
             emptyArray(),
             arrayOf(
                 ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0)),
-                listOf(BigFraction.ofLong(3)),
-                LinearOp.EQ,
-                BigFraction.ONE,
-            )
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ofLong(3)),
+                    LinearOp.EQ,
+                    BigFraction.ONE,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
@@ -485,8 +485,8 @@ class LocalSearchEngineCompletionTest {
             emptyArray()
         } else {
             arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, finiteMinimum),
-        )
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, finiteMinimum),
+            )
         },
         numRealVars = 1,
         realLower = doubleArrayOf(0.0),
@@ -650,9 +650,9 @@ class LocalSearchEngineCompletionTest {
             val checked = assertNotNull(
                 linear.checkMpsWitness(
                     source.columns.map {
-                if (it.real) reals[it.id] else BigFraction.ofLong(best.sample.ints[it.id])
-            }
-                )
+                        if (it.real) reals[it.id] else BigFraction.ofLong(best.sample.ints[it.id])
+                    },
+                ),
             )
             assertEquals(
                 BigFraction.ofLong(10),

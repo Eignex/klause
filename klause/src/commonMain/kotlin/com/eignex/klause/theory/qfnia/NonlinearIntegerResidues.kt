@@ -72,7 +72,7 @@ internal class NonlinearIntegerResidues(
     fun simplify(): PolynomialRealFormula = try {
         reserve(problem.integerCoordinates.size)
         val integers = problem.integerCoordinates.map {
-            step();
+            step()
             it
         }.toSet()
         val reduced = NonlinearIntegerResidueReduction(::step, ::reserve) { atom ->
@@ -97,10 +97,10 @@ internal class NonlinearIntegerResidues(
             refuted = stats.refuted + if (reduced.excluded > 0 &&
                 (reduced.formula as? PolynomialRealFormula.Constant)?.value == false
             ) {
-                    1
-                } else {
-                    0
-                },
+                1
+            } else {
+                0
+            },
         )
         reduced.formula
     } catch (_: ResidueDecline) {
@@ -157,7 +157,7 @@ internal class NonlinearIntegerResidues(
         pending.addLast(problem.formula)
         reserve(problem.integerCoordinates.size)
         val integers = problem.integerCoordinates.map {
-            step();
+            step()
             it
         }.toSet()
         while (pending.isNotEmpty()) {
@@ -238,13 +238,13 @@ internal class NonlinearIntegerResidues(
             indices[key] = nodes.size
             nodes.add(
                 ResidueNode(
-                expression,
-                denominator,
-                args,
-                variable,
-                if (variable >= 0) variable else args.minOfOrNull { nodes[it].firstVariable } ?: Int.MAX_VALUE,
-                if (variable >= 0) variable else args.maxOfOrNull { nodes[it].lastVariable } ?: -1,
-            )
+                    expression,
+                    denominator,
+                    args,
+                    variable,
+                    if (variable >= 0) variable else args.minOfOrNull { nodes[it].firstVariable } ?: Int.MAX_VALUE,
+                    if (variable >= 0) variable else args.maxOfOrNull { nodes[it].lastVariable } ?: -1,
+                ),
             )
         }
         return indices.getValue(ResidueExpressionKey(root))
@@ -294,8 +294,8 @@ internal class NonlinearIntegerResidues(
             if (expression is PolynomialExpression.Constant) constants[id] = residue(expression.numerator)
             if (expression is PolynomialExpression.Sum) {
                 node.args.map { child ->
-                residue(node.denominator / nodes[child].denominator)
-            }
+                    residue(node.denominator / nodes[child].denominator)
+                }
             } else {
                 emptyList()
             }

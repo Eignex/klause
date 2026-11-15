@@ -73,8 +73,8 @@ class SourceEvidenceVerifierTest {
         assertEquals(
             SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower")),
-        )
+                SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower")),
+            ),
         )
     }
 
@@ -118,12 +118,13 @@ class SourceEvidenceVerifierTest {
         )
         for ((rhs, strict, expected) in cases) {
             val source = SourceProofContext(
-                scope, setOf(integer),
+                scope,
+                setOf(integer),
                 mapOf(
                     "row" to SourcePremise(
-                SourceInequality(mapOf(integer to BigFraction.ONE), rhs, strict),
-            )
-                )
+                        SourceInequality(mapOf(integer to BigFraction.ONE), rhs, strict),
+                    ),
+                ),
             )
             val proof = SourceDerivation.IntegerRounding(SourceDerivation.Premise("row"))
             val claim = SourceClaim.Consequence(SourceInequality(mapOf(integer to BigFraction.ONE), expected))
@@ -143,23 +144,24 @@ class SourceEvidenceVerifierTest {
             integer to BigFraction.ofLong(2).reciprocal(),
         )) {
             val source = SourceProofContext(
-                scope, setOf(coordinate),
+                scope,
+                setOf(coordinate),
                 mapOf(
                     "row" to SourcePremise(
-                SourceInequality(mapOf(coordinate to coefficient), BigFraction.ofLong(2).reciprocal()),
-            )
-                )
+                        SourceInequality(mapOf(coordinate to coefficient), BigFraction.ofLong(2).reciprocal()),
+                    ),
+                ),
             )
             val claim = SourceClaim.Consequence(SourceInequality(mapOf(coordinate to coefficient), BigFraction.ZERO))
 
             assertIs<SourceEvidenceCheck.Rejected>(
                 SourceEvidenceVerifier(source).verify(
                     SourceEvidence(
-                scope,
-                claim,
-                SourceDerivation.IntegerRounding(SourceDerivation.Premise("row")),
-            )
-                )
+                        scope,
+                        claim,
+                        SourceDerivation.IntegerRounding(SourceDerivation.Premise("row")),
+                    ),
+                ),
             )
         }
     }
@@ -169,13 +171,14 @@ class SourceEvidenceVerifierTest {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val source = SourceProofContext(
-            scope, setOf(integer, bool),
+            scope,
+            setOf(integer, bool),
             mapOf(
                 "row" to SourcePremise(
-            SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ofLong(2).reciprocal()),
-            mapOf(0 to true),
-        )
-            )
+                    SourceInequality(mapOf(integer to BigFraction.ONE), BigFraction.ofLong(2).reciprocal()),
+                    mapOf(0 to true),
+                ),
+            ),
         )
         val evidence = SourceEvidence(
             scope,
@@ -562,9 +565,9 @@ class SourceEvidenceVerifierTest {
         val restricted = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO)))
         val proof = SourceDerivation.Combination(
             listOf(
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
-        )
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
+            ),
         )
         val imported = SourceEvidence(restricted, SourceClaim.Refutation, proof)
 
@@ -587,19 +590,20 @@ class SourceEvidenceVerifierTest {
     fun `an imported refutation should require an objective scope for a bound`() {
         val unscoped = scope.copy(objective = null)
         val source = SourceProofContext(
-            unscoped, setOf(x),
+            unscoped,
+            setOf(x),
             mapOf(
-            "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE)),
-        )
+                "conflict" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE)),
+            ),
         )
         val refutation = SourceEvidence(unscoped, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
 
         val checked = SourceEvidenceVerifier(source).verify(
             SourceEvidence(
-            unscoped,
-            SourceClaim.Bound(BigFraction.ONE),
-            SourceDerivation.Import(refutation),
-        )
+                unscoped,
+                SourceClaim.Bound(BigFraction.ONE),
+                SourceDerivation.Import(refutation),
+            ),
         )
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
@@ -645,10 +649,10 @@ class SourceEvidenceVerifierTest {
 
         val checked = SourceEvidenceVerifier(context).verify(
             SourceEvidence(
-            scope,
-            SourceClaim.Bound(BigFraction.ONE),
-            SourceDerivation.Import(refutation),
-        )
+                scope,
+                SourceClaim.Bound(BigFraction.ONE),
+                SourceDerivation.Import(refutation),
+            ),
         )
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
@@ -659,15 +663,15 @@ class SourceEvidenceVerifierTest {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
         val restricted = scope.copy(
             condition = SourceCondition(
-            lower = mapOf(other to BigFraction.ONE),
-            upper = mapOf(x to BigFraction.ZERO),
-        )
+                lower = mapOf(other to BigFraction.ONE),
+                upper = mapOf(x to BigFraction.ZERO),
+            ),
         )
         val proof = SourceDerivation.Combination(
             listOf(
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
-        )
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
+            ),
         )
         val reduced = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO)))
         val original = SourceProofContext(restricted, setOf(x, other), premises)
@@ -676,14 +680,14 @@ class SourceEvidenceVerifierTest {
         assertEquals(
             SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(original).verify(
-            SourceEvidence(restricted, SourceClaim.Refutation, proof),
-        )
+                SourceEvidence(restricted, SourceClaim.Refutation, proof),
+            ),
         )
         assertEquals(
             SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(consumer).verify(
-            SourceEvidence(reduced, SourceClaim.Refutation, proof),
-        )
+                SourceEvidence(reduced, SourceClaim.Refutation, proof),
+            ),
         )
     }
 
@@ -697,9 +701,9 @@ class SourceEvidenceVerifierTest {
         )
         val restricted = scope.copy(
             condition = SourceCondition(
-            lower = mapOf(integer to BigFraction.ZERO),
-            upper = mapOf(integer to BigFraction.ZERO),
-        )
+                lower = mapOf(integer to BigFraction.ZERO),
+                upper = mapOf(integer to BigFraction.ZERO),
+            ),
         )
         val proof = SourceDerivation.Premise("guarded")
         val original = SourceProofContext(restricted, setOf(integer), mapOf("guarded" to guarded))
@@ -708,13 +712,13 @@ class SourceEvidenceVerifierTest {
         assertEquals(
             SourceEvidenceCheck.Checked,
             SourceEvidenceVerifier(original).verify(
-            SourceEvidence(restricted, SourceClaim.Refutation, proof),
-        )
+                SourceEvidence(restricted, SourceClaim.Refutation, proof),
+            ),
         )
         assertIs<SourceEvidenceCheck.Rejected>(
             SourceEvidenceVerifier(consumer).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof),
-        )
+                SourceEvidence(scope, SourceClaim.Refutation, proof),
+            ),
         )
     }
 
@@ -723,9 +727,9 @@ class SourceEvidenceVerifierTest {
         val restricted = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO)))
         val proof = SourceDerivation.Combination(
             listOf(
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
-        )
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
+            ),
         )
         val imported = SourceEvidence(restricted, SourceClaim.Refutation, proof)
         val conditions = listOf(
@@ -798,9 +802,9 @@ class SourceEvidenceVerifierTest {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val restricted = scope.copy(
             condition = SourceCondition(
-            lower = mapOf(integer to BigFraction.ZERO),
-            upper = mapOf(integer to BigFraction.ZERO),
-        )
+                lower = mapOf(integer to BigFraction.ZERO),
+                upper = mapOf(integer to BigFraction.ZERO),
+            ),
         )
         val changed = SourcePremise(
             SourceInequality(emptyMap(), BigFraction.MINUS_ONE),

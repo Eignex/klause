@@ -182,12 +182,13 @@ class QfLiraSolverTest {
     @Test
     fun `incremental nested siblings should preserve the surviving source scope`() {
         val source = Problem(
-            3, intBounds = openBounds(),
+            3,
+            intBounds = openBounds(),
             factors = arrayOf(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
-            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, -2),
-            ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.LE, -4),
-        )
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, -2),
+                ReifiedLinear(2, intArrayOf(1), intArrayOf(0), LinearOp.LE, -4),
+            ),
         )
         ExactLiraSearchComponent(source).use { component ->
             component.useIncrementalLinearPropagation()
@@ -280,11 +281,12 @@ class QfLiraSolverTest {
     @Test
     fun `incremental prepared rows should reassert an opposite guard after backtracking`() {
         val source = Problem(
-            3, intBounds = openBounds(),
+            3,
+            intBounds = openBounds(),
             factors = arrayOf(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-        )
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+            ),
         )
         val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         prepared.open().use { component ->
@@ -494,11 +496,12 @@ class QfLiraSolverTest {
     @Test
     fun `automatic partial propagation should not retain a consequence in the opposite branch`() {
         val model = Problem(
-            2, intBounds = openBounds(),
+            2,
+            intBounds = openBounds(),
             factors = arrayOf(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-        )
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+            ),
         )
         for (cached in listOf(false, true)) {
             ExactLiraSearchComponent(model).use { component ->
@@ -576,11 +579,12 @@ class QfLiraSolverTest {
     @Test
     fun `partial interval propagation should decline after a required bound retracts`() {
         val model = Problem(
-            2, intBounds = openBounds(),
+            2,
+            intBounds = openBounds(),
             factors = arrayOf(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
-            ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
-        )
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
+            ),
         )
         ExactLiraSearchComponent(model).use { component ->
             val session = SearchSession(listOf(component))
@@ -794,7 +798,7 @@ class QfLiraSolverTest {
             assertEquals(
                 1L,
                 stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
-                .outcomes["FEASIBLE_COMPLETION"]
+                    .outcomes["FEASIBLE_COMPLETION"],
             )
         }
     }
@@ -1100,10 +1104,11 @@ class QfLiraSolverTest {
     @Test
     fun `a private operation stop should withhold a Boolean leaf until a live operation`() {
         val source = Problem(
-            2, intBounds = openBounds(),
+            2,
+            intBounds = openBounds(),
             factors = arrayOf(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
-        )
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            ),
         )
         for (incremental in listOf(false, true)) {
             var privateStopped = false

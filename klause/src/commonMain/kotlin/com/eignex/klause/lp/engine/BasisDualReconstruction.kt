@@ -61,7 +61,7 @@ private class BasisDualRun(
     private var factorWorkLeft = 0L
     private var factorAllocationLeft = 0L
     private val token = ExecutionControl {
-        meter.poll();
+        meter.poll()
         false
     }
 
@@ -107,11 +107,11 @@ private class BasisDualRun(
 
     fun run(): List<BigFraction>? = try {
         if (layout.retainedRows.any {
-            meter.step();
-            rowDegree[it] == 0
-        } ||
+                meter.step()
+                rowDegree[it] == 0
+            } ||
             equationDegree.any {
-                meter.step();
+                meter.step()
                 it == 0
             }
         ) {
@@ -145,7 +145,7 @@ private class BasisDualRun(
                 val equation = rows.removeFirst()
                 if (!activeEquation[equation] || equationDegree[equation] != 1) continue
                 val pivot = equations[equation].first {
-                    meter.step();
+                    meter.step()
                     activeRow[it.first]
                 }
                 val row = pivot.first
@@ -164,13 +164,13 @@ private class BasisDualRun(
                 val row = columns.removeFirst()
                 if (!activeRow[row] || rowDegree[row] != 1) continue
                 val pivot = byRow[row].first {
-                    meter.step();
+                    meter.step()
                     activeEquation[it.first]
                 }
                 val equation = pivot.first
                 meter.storage(equations[equation].size * 24L + 64L)
                 val others = equations[equation].filter {
-                    meter.step();
+                    meter.step()
                     activeRow[it.first] && it.first != row
                 }
                 deferred += Deferred(row, pivot.second, rhs[equation], others)
@@ -229,7 +229,7 @@ private class BasisDualRun(
             meter.step()
             if (!activeEquation[equation]) continue
             val row = equations[equation].first {
-                meter.step();
+                meter.step()
                 activeRow[it.first]
             }.first
             groupedEquations.getOrPut(root(row)) { ArrayList() }.add(equation)
@@ -353,14 +353,14 @@ private class BasisDualRun(
             var largest = 1e-10
             for (row in index until selected.size) {
                 for (column in group.indices) {
-                meter.step()
-                val magnitude = abs(projected[row][column])
-                if (!used[column] && magnitude > largest) {
-                    largest = magnitude
-                    pivotRow = row
-                    pivotColumn = column
+                    meter.step()
+                    val magnitude = abs(projected[row][column])
+                    if (!used[column] && magnitude > largest) {
+                        largest = magnitude
+                        pivotRow = row
+                        pivotColumn = column
+                    }
                 }
-            }
             }
             if (pivotRow < 0) return null
             val previous = projected[index]

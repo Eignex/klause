@@ -235,9 +235,9 @@ private fun LinearSourceProblem.canProjectToDouble(stop: ExecutionControl): Bool
         } &&
         (
             objective?.let { objective ->
-            supported(objective.constant) && objective.termValues.all { supported(it.coefficient) }
-        } != false
-        )
+                supported(objective.constant) && objective.termValues.all { supported(it.coefficient) }
+            } != false
+            )
 }
 
 private fun SemanticRational.fraction(): BigFraction = BigFraction.of(numerator, denominator)

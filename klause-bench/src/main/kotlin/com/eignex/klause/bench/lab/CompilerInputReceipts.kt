@@ -47,16 +47,16 @@ internal class CompilerInputReceipts(
                 null
             } else {
                 DataInputStream(ByteArrayInputStream(bytes)).use { input ->
-                if (input.readInt() != FORMAT) return null
-                val root = input.readUTF()
-                val digest = input.readUTF()
-                val count = input.readInt()
-                if (count !in 0..MAX_FILES) return null
-                val files = List(count) {
-                    Stamp(input.readUTF(), input.readLong(), input.readUTF(), input.readUTF(), input.readUTF())
+                    if (input.readInt() != FORMAT) return null
+                    val root = input.readUTF()
+                    val digest = input.readUTF()
+                    val count = input.readInt()
+                    if (count !in 0..MAX_FILES) return null
+                    val files = List(count) {
+                        Stamp(input.readUTF(), input.readLong(), input.readUTF(), input.readUTF(), input.readUTF())
+                    }
+                    if (input.read() != -1) null else Receipt(root, digest, files)
                 }
-                if (input.read() != -1) null else Receipt(root, digest, files)
-            }
             }
         } catch (_: IOException) {
             null
@@ -100,22 +100,22 @@ internal class CompilerInputReceipts(
                 null
             } else {
                 paths.map { path ->
-                val attrs = Files.readAttributes(
-                    path,
-                    "unix:size,lastModifiedTime,ctime,fileKey,isRegularFile,isDirectory",
-                    NOFOLLOW_LINKS,
-                )
-                if (attrs["isRegularFile"] != true && attrs["isDirectory"] != true) return null
-                val changed = attrs["ctime"]?.toString() ?: return null
-                val key = attrs["fileKey"]?.toString() ?: return null
-                Stamp(
-                    root.relativize(path).toString(),
-                    attrs["size"] as Long,
-                    attrs["lastModifiedTime"].toString(),
-                    changed,
-                    key,
-                )
-            }
+                    val attrs = Files.readAttributes(
+                        path,
+                        "unix:size,lastModifiedTime,ctime,fileKey,isRegularFile,isDirectory",
+                        NOFOLLOW_LINKS,
+                    )
+                    if (attrs["isRegularFile"] != true && attrs["isDirectory"] != true) return null
+                    val changed = attrs["ctime"]?.toString() ?: return null
+                    val key = attrs["fileKey"]?.toString() ?: return null
+                    Stamp(
+                        root.relativize(path).toString(),
+                        attrs["size"] as Long,
+                        attrs["lastModifiedTime"].toString(),
+                        changed,
+                        key,
+                    )
+                }
             }
         } catch (_: UnsupportedOperationException) {
             null

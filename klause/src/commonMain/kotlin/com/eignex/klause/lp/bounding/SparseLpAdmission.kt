@@ -59,9 +59,9 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     val preparationAllowance = minOf(SPARSE_LP_MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
     fun decline(reason: String) = SparseLpAdmission(
         mapOf(
-        "Decline$reason" to 1L,
-        "PreparationWork" to maxOf(inspected, assemblyWork),
-    )
+            "Decline$reason" to 1L,
+            "PreparationWork" to maxOf(inspected, assemblyWork),
+        ),
     )
     if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
     if (columns + rows > MAX_DIMENSION) {
@@ -83,10 +83,10 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
             is ExactLinear -> if (factor.constants is IntegerConstants && factor.activator == LinearRow.ALWAYS &&
                 factor.relation != LinearOp.NE
             ) {
-                    factor.size
-                } else {
-                    return decline("Source")
-                }
+                factor.size
+            } else {
+                return decline("Source")
+            }
 
             is SymmetryHandling -> 0
 
@@ -144,9 +144,9 @@ internal fun estimateSparseLpAdmission(
 ): SparseLpAdmission {
     fun decline(reason: String) = SparseLpAdmission(
         mapOf(
-        "Decline$reason" to 1L,
-        "PreparationWork" to preparationWork,
-    )
+            "Decline$reason" to 1L,
+            "PreparationWork" to preparationWork,
+        ),
     )
     val dimensions = model.n.toLong() + model.m
     if (dimensions > MAX_DIMENSION) return decline("Shape")
@@ -166,8 +166,8 @@ internal fun estimateSparseLpAdmission(
         var b = root(right)
         if (a == b) return
         if (rank[a] < rank[b]) {
-            val swap = a;
-            a = b;
+            val swap = a
+            a = b
             b = swap
         }
         parent[b] = a
@@ -226,23 +226,23 @@ internal fun estimateSparseLpAdmission(
     }
     return SparseLpAdmission(
         buildMap {
-        put("Rows", model.m.toLong())
-        put("Columns", model.n.toLong())
-        put("Nonzeros", entries)
-        put("Components", components)
-        put("LargestComponentRows", largestRows)
-        put("LargestComponentColumns", largestColumns)
-        put("ScalarBits", scalarBits.toLong())
-        put("RowIntersectionRisk", fillRisk)
-        put("FactorEntryLimit", SPARSE_LP_MAX_FACTOR_ENTRIES)
-        put("FactorWorkLimit", SPARSE_LP_MAX_FACTOR_WORK)
-        put("ReservedBytes", storage)
-        put("CheckingReservedBytes", SPARSE_LP_CHECKING_ALLOCATION)
-        put("PreparationWork", preparationWork)
-        put("WorkLimit", SPARSE_LP_MAX_WORK)
-        put("StorageLimit", SPARSE_LP_MAX_ALLOCATION)
-        put("Admitted", if (decline == null) 1L else 0L)
-        decline?.let { put("Decline$it", 1L) }
-    }
+            put("Rows", model.m.toLong())
+            put("Columns", model.n.toLong())
+            put("Nonzeros", entries)
+            put("Components", components)
+            put("LargestComponentRows", largestRows)
+            put("LargestComponentColumns", largestColumns)
+            put("ScalarBits", scalarBits.toLong())
+            put("RowIntersectionRisk", fillRisk)
+            put("FactorEntryLimit", SPARSE_LP_MAX_FACTOR_ENTRIES)
+            put("FactorWorkLimit", SPARSE_LP_MAX_FACTOR_WORK)
+            put("ReservedBytes", storage)
+            put("CheckingReservedBytes", SPARSE_LP_CHECKING_ALLOCATION)
+            put("PreparationWork", preparationWork)
+            put("WorkLimit", SPARSE_LP_MAX_WORK)
+            put("StorageLimit", SPARSE_LP_MAX_ALLOCATION)
+            put("Admitted", if (decline == null) 1L else 0L)
+            decline?.let { put("Decline$it", 1L) }
+        },
     )
 }

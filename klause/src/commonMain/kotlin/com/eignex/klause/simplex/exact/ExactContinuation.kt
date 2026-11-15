@@ -525,12 +525,12 @@ private class RationalContinuationLane<F>(
                 status
             } else {
                 when {
-                input.lower[j] != null && input.lower[j] == input.upper[j] -> ContinuationStatus.FIXED
-                status == ContinuationStatus.UPPER && input.upper[j] != null -> ContinuationStatus.UPPER
-                input.lower[j] != null -> ContinuationStatus.LOWER
-                input.upper[j] != null -> ContinuationStatus.UPPER
-                else -> ContinuationStatus.FREE
-            }
+                    input.lower[j] != null && input.lower[j] == input.upper[j] -> ContinuationStatus.FIXED
+                    status == ContinuationStatus.UPPER && input.upper[j] != null -> ContinuationStatus.UPPER
+                    input.lower[j] != null -> ContinuationStatus.LOWER
+                    input.upper[j] != null -> ContinuationStatus.UPPER
+                    else -> ContinuationStatus.FREE
+                }
             }
         }.toMutableList()
         val nextSeats = nextStatuses.mapIndexed { j, status ->

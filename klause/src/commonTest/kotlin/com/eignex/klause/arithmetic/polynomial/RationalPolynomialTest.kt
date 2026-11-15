@@ -16,17 +16,17 @@ class RationalPolynomialTest {
         val half = BigFraction.ofLong(2).reciprocal()
         val polynomial = RationalPolynomial(
             listOf(
-            half,
-            BigFraction.ofLong(3).reciprocal(),
-            BigFraction.ofLong(6).reciprocal(),
-        )
+                half,
+                BigFraction.ofLong(3).reciprocal(),
+                BigFraction.ofLong(6).reciprocal(),
+            ),
         )
         val sharedDenominators = RationalPolynomial(
             listOf(
-            BigFraction.ofLong(6).reciprocal(),
-            BigFraction.ofLong(-10).reciprocal(),
-            BigFraction.ofLong(15).reciprocal(),
-        )
+                BigFraction.ofLong(6).reciprocal(),
+                BigFraction.ofLong(-10).reciprocal(),
+                BigFraction.ofLong(15).reciprocal(),
+            ),
         )
         for ((source, point, expected) in listOf(
             Triple(polynomial, half, BigFraction.ofLong(17) * BigFraction.ofLong(24).reciprocal()),
@@ -43,10 +43,10 @@ class RationalPolynomialTest {
     fun `rational polynomial cancellation should return exact zero`() {
         val polynomial = RationalPolynomial(
             listOf(
-            BigFraction.ofLong(-6).reciprocal(),
-            BigFraction.ofLong(7) * BigFraction.ofLong(30).reciprocal(),
-            BigFraction.ofLong(5).reciprocal(),
-        )
+                BigFraction.ofLong(-6).reciprocal(),
+                BigFraction.ofLong(7) * BigFraction.ofLong(30).reciprocal(),
+                BigFraction.ofLong(5).reciprocal(),
+            ),
         )
 
         val result = arithmetic.evaluate(polynomial, BigFraction.ofLong(2).reciprocal())
@@ -74,10 +74,10 @@ class RationalPolynomialTest {
         val caller = RationalPolynomialArithmetic(
             PolynomialArithmetic(
                 limits = PolynomialLimits(
-            maxDenseCoefficients = 1,
-            maxMatrixCells = 0,
-        )
-            )
+                    maxDenseCoefficients = 1,
+                    maxMatrixCells = 0,
+                ),
+            ),
         )
 
         val result = caller.evaluate(polynomial, BigFraction.ofLong(2).reciprocal())
@@ -89,7 +89,7 @@ class RationalPolynomialTest {
     fun `rational images should observe caller cancellation for every polynomial shape`() {
         val caller = RationalPolynomialArithmetic(PolynomialArithmetic(ExecutionControl { true }))
         for (
-            polynomial in listOf(
+        polynomial in listOf(
             RationalPolynomial.ZERO,
             RationalPolynomial.ONE,
             RationalPolynomial.of(-1, 0, 1),

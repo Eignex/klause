@@ -86,14 +86,14 @@ fun OpenTheoryPipeline.minimize(
             val model = request.resolvedModel()
             for (term in objective.terms) {
                 for (variable in listOfNotNull(term.first, term.second)) {
-                require(
-                    when (variable) {
-                        is QuadraticVariable.Bool -> variable.id.index < request.problem.sourceBoolCount
-                        is QuadraticVariable.Int -> variable.id.index < model.source.numIntVars
-                        is QuadraticVariable.Real -> variable.id.index < request.problem.sourceRealCount
-                    },
-                ) { "quadratic objective coordinate out of source range" }
-            }
+                    require(
+                        when (variable) {
+                            is QuadraticVariable.Bool -> variable.id.index < request.problem.sourceBoolCount
+                            is QuadraticVariable.Int -> variable.id.index < model.source.numIntVars
+                            is QuadraticVariable.Real -> variable.id.index < request.problem.sourceRealCount
+                        },
+                    ) { "quadratic objective coordinate out of source range" }
+                }
             }
             result = try {
                 QuadraticStrategyAdapters(

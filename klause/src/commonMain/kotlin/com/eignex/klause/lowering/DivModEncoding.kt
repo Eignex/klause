@@ -24,10 +24,11 @@ internal fun divModLinearFormula(relation: DivMod, divisor: BigInt): LinearEncod
         LinearEncodingFormula.Comparison(
             EncodingAffineExpression(
                 terms.map { (v, coefficient) ->
-            EncodingLinearTerm.source(Term.ofIntVar(v), BigFraction.of(coefficient, BIG_ONE))
-        }
+                    EncodingLinearTerm.source(Term.ofIntVar(v), BigFraction.of(coefficient, BIG_ONE))
+                },
             ),
-            op, BigFraction.of(bound, BIG_ONE)
+            op,
+            BigFraction.of(bound, BIG_ONE),
         )
     fun unary(v: Int, op: LinearOp, bound: BigInt = bigIntOf(0)) = row(listOf(v to BIG_ONE), op, bound)
     if (divisor.isZero()) return row(emptyList(), LinearOp.EQ, BIG_ONE)
@@ -36,11 +37,11 @@ internal fun divModLinearFormula(relation: DivMod, divisor: BigInt): LinearEncod
     val rows = arrayListOf(
         row(
             listOf(
-            relation.dividend to BIG_ONE,
-            relation.quotient to divisor.negate(),
-            remainder to BIG_ONE.negate(),
-        ),
-            LinearOp.EQ
+                relation.dividend to BIG_ONE,
+                relation.quotient to divisor.negate(),
+                remainder to BIG_ONE.negate(),
+            ),
+            LinearOp.EQ,
         ),
         unary(remainder, LinearOp.LE, limit),
     )
@@ -51,9 +52,9 @@ internal fun divModLinearFormula(relation: DivMod, divisor: BigInt): LinearEncod
         rows += unary(remainder, LinearOp.GE, limit.negate())
         rows += LinearEncodingFormula.Or(
             listOf(
-            LinearEncodingFormula.And(listOf(unary(relation.dividend, LinearOp.GE), unary(remainder, LinearOp.GE))),
-            LinearEncodingFormula.And(listOf(unary(relation.dividend, LinearOp.LE), unary(remainder, LinearOp.LE))),
-        )
+                LinearEncodingFormula.And(listOf(unary(relation.dividend, LinearOp.GE), unary(remainder, LinearOp.GE))),
+                LinearEncodingFormula.And(listOf(unary(relation.dividend, LinearOp.LE), unary(remainder, LinearOp.LE))),
+            ),
         )
     }
     return LinearEncodingFormula.And(rows)
@@ -70,40 +71,41 @@ internal fun divModPolynomialFormula(relation: DivMod, integer: (Int) -> Polynom
     val r = integer(relation.remainder)
     val magnitude = PolynomialRealFormula.Or(
         listOf(
-        PolynomialRealFormula.And(
-            listOf(
-            atom(b, PolynomialRelation.GT),
-            atom(r, PolynomialRelation.LT, b),
-            atom(r, PolynomialRelation.GT, negate(b)),
-        )
+            PolynomialRealFormula.And(
+                listOf(
+                    atom(b, PolynomialRelation.GT),
+                    atom(r, PolynomialRelation.LT, b),
+                    atom(r, PolynomialRelation.GT, negate(b)),
+                ),
+            ),
+            PolynomialRealFormula.And(
+                listOf(
+                    atom(b, PolynomialRelation.LT),
+                    atom(r, PolynomialRelation.GT, b),
+                    atom(r, PolynomialRelation.LT, negate(b)),
+                ),
+            ),
         ),
-        PolynomialRealFormula.And(
-            listOf(
-            atom(b, PolynomialRelation.LT),
-            atom(r, PolynomialRelation.GT, b),
-            atom(r, PolynomialRelation.LT, negate(b)),
-        )
-        ),
-    )
     )
     val sign = if (relation.convention == DivisionConvention.EUCLIDEAN) {
         atom(r, PolynomialRelation.GE)
     } else {
         PolynomialRealFormula.Or(
             listOf(
-            PolynomialRealFormula.And(listOf(atom(a, PolynomialRelation.GE), atom(r, PolynomialRelation.GE))),
-            PolynomialRealFormula.And(listOf(atom(a, PolynomialRelation.LE), atom(r, PolynomialRelation.LE))),
-        )
+                PolynomialRealFormula.And(listOf(atom(a, PolynomialRelation.GE), atom(r, PolynomialRelation.GE))),
+                PolynomialRealFormula.And(listOf(atom(a, PolynomialRelation.LE), atom(r, PolynomialRelation.LE))),
+            ),
         )
     }
     return PolynomialRealFormula.And(
         listOf(
             atom(
-        a,
-        PolynomialRelation.EQ,
-        PolynomialExpression.Sum(listOf(PolynomialExpression.Product(listOf(b, q)), r)),
-    ),
-        magnitude, sign
-        )
+                a,
+                PolynomialRelation.EQ,
+                PolynomialExpression.Sum(listOf(PolynomialExpression.Product(listOf(b, q)), r)),
+            ),
+            magnitude,
+            sign,
+        ),
     )
 }

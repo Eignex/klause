@@ -414,9 +414,9 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             (
                 edit?.extent ?: (
                     before.model.layoutStorage.total +
-            cuts.storageUnits + before.trailStorageUnits
-                )
-            ) * LpNodeOverhead.BUILD
+                        cuts.storageUnits + before.trailStorageUnits
+                    )
+                ) * LpNodeOverhead.BUILD,
         )
         if (!core.compact(before, remap, cutEdit, edit)) return base
         val state = requireNotNull(core.state)

@@ -79,16 +79,18 @@ class RootInprocessingTest {
     fun `a fresh root fact should refresh a late source binary within a small grant`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                4, 0, emptyArray(),
+                4,
+                0,
+                emptyArray(),
                 Array<Factor>(130) { index ->
-                Clause(
-                    when (index) {
-                        0 -> intArrayOf(1)
-                        129 -> intArrayOf(0, 2, 4)
-                        else -> intArrayOf(4, 6)
-                    },
-                )
-            }
+                    Clause(
+                        when (index) {
+                            0 -> intArrayOf(1)
+                            129 -> intArrayOf(0, 2, 4)
+                            else -> intArrayOf(4, 6)
+                        },
+                    )
+                },
             ).bake()
             val projection = PropagationProblem.preparation(source).asSequence().filterNotNull().last()
             val session = PropagationSession(projection, nativeSat = native)
@@ -105,16 +107,18 @@ class RootInprocessingTest {
     fun `a complete source neighborhood should skip unaffected source clauses`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                4, 0, emptyArray(),
+                4,
+                0,
+                emptyArray(),
                 Array<Factor>(130) { index ->
-                Clause(
-                    when (index) {
-                        0 -> intArrayOf(1)
-                        129 -> intArrayOf(0, 2, 4)
-                        else -> intArrayOf(4, 6)
-                    },
-                )
-            }
+                    Clause(
+                        when (index) {
+                            0 -> intArrayOf(1)
+                            129 -> intArrayOf(0, 2, 4)
+                            else -> intArrayOf(4, 6)
+                        },
+                    )
+                },
             ).bake()
             val projection = PropagationProblem.preparation(source).asSequence().filterNotNull().last()
             val session = PropagationSession(projection, nativeSat = native)
@@ -243,16 +247,18 @@ class RootInprocessingTest {
     fun `new root facts should extend the source neighborhood after an earlier slice`() {
         for ((native, prepared) in listOf(false to false, false to true, true to true)) {
             val source = Problem(
-                6, 0, emptyArray(),
+                6,
+                0,
+                emptyArray(),
                 Array<Factor>(130) { index ->
-                Clause(
-                    when (index) {
-                        0 -> intArrayOf(10)
-                        129 -> intArrayOf(4, 0, 2)
-                        else -> intArrayOf(6, 8)
-                    },
-                )
-            }
+                    Clause(
+                        when (index) {
+                            0 -> intArrayOf(10)
+                            129 -> intArrayOf(4, 0, 2)
+                            else -> intArrayOf(6, 8)
+                        },
+                    )
+                },
             ).bake()
             val projection = if (prepared) {
                 PropagationProblem.preparation(source).asSequence().filterNotNull().last()
@@ -378,12 +384,14 @@ class RootInprocessingTest {
     fun `a clause beyond the remaining literal space should wait for the next slice`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                5001, 0, emptyArray(),
+                5001,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(IntArray(5000) { it * 2 }),
-                Clause(IntArray(5000) { it * 2 + 1 }),
-                Clause(intArrayOf(0)),
-            )
+                    Clause(IntArray(5000) { it * 2 }),
+                    Clause(IntArray(5000) { it * 2 + 1 }),
+                    Clause(intArrayOf(0)),
+                ),
             )
             val session = PropagationSession(source.bake(), nativeSat = native)
             val pass = RootSimplificationPass()
@@ -442,9 +450,9 @@ class RootInprocessingTest {
             assertFalse(session.isLearnedClause(1))
             assertTrue(
                 (0 until session.learnedClauseCount).any {
-                session.isLearnedClause(it) && session.learnedClauseLiterals(it).toSet() == setOf(4, 6)
-            },
-                "native=$native work=$work learning=${stats.snapshot().learning}"
+                    session.isLearnedClause(it) && session.learnedClauseLiterals(it).toSet() == setOf(4, 6)
+                },
+                "native=$native work=$work learning=${stats.snapshot().learning}",
             )
         }
     }
@@ -453,22 +461,22 @@ class RootInprocessingTest {
     fun `an unfundable learned selection should yield without replacement admission`() {
         for (native in listOf(false, true)) {
             for (grant in listOf(1L, 10L)) {
-            val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
-            assertEquals(native, session.usesNativeSat)
-            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
-            session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
-            val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
-            val params = BacktrackParams(inprocessingRootWork = grant)
+                val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
+                assertEquals(native, session.usesNativeSat)
+                session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+                session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
+                val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
+                val params = BacktrackParams(inprocessingRootWork = grant)
 
-            repeat(64) { loop.onRestart(session, params) }
-            val partners = ArrayList<Int>()
-            session.explanationState.forEachBinaryPartner(4) { partners.add(it) }
+                repeat(64) { loop.onRestart(session, params) }
+                val partners = ArrayList<Int>()
+                session.explanationState.forEachBinaryPartner(4) { partners.add(it) }
 
-            assertTrue(partners.isEmpty())
-            assertEquals(2, session.learnedClauseCount)
-            assertFalse(session.hasLearnedRetirementContinuation)
-            assertEquals(0, session.decisionLevel)
-        }
+                assertTrue(partners.isEmpty())
+                assertEquals(2, session.learnedClauseCount)
+                assertFalse(session.hasLearnedRetirementContinuation)
+                assertEquals(0, session.decisionLevel)
+            }
         }
     }
 
@@ -538,11 +546,11 @@ class RootInprocessingTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 problem(
-                intArrayOf(1, 2),
-                intArrayOf(1, 4),
-                intArrayOf(3, 5, 6),
-            ).bake(),
-                nativeSat = native
+                    intArrayOf(1, 2),
+                    intArrayOf(1, 4),
+                    intArrayOf(3, 5, 6),
+                ).bake(),
+                nativeSat = native,
             )
             val stats = SearchStatsSink()
 
@@ -564,11 +572,11 @@ class RootInprocessingTest {
             RootProbingPass().run(
                 session,
                 BacktrackParams(
-                rootProbeBatch = 1,
-                rootProbeImplications = false,
-                rootProbeBinaryGate = gate,
-            ),
-                stats
+                    rootProbeBatch = 1,
+                    rootProbeImplications = false,
+                    rootProbeBinaryGate = gate,
+                ),
+                stats,
             )
 
             assertEquals(if (native && gate) 0L else 1L, stats.inprocessProbes)
@@ -621,11 +629,11 @@ class RootInprocessingTest {
             RootProbingPass().run(
                 session,
                 BacktrackParams(
-                rootProbeBatch = 1,
-                rootProbeImplications = false,
-                rootProbeBinaryGate = true,
-            ),
-                stats
+                    rootProbeBatch = 1,
+                    rootProbeImplications = false,
+                    rootProbeBinaryGate = true,
+                ),
+                stats,
             )
 
             assertEquals(1L, stats.inprocessProbes)
@@ -680,11 +688,13 @@ class RootInprocessingTest {
     @Test
     fun `a new General learned neighborhood should prove a root fact after exploratory probing`() {
         val source = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             arrayOf<Factor>(
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(2, 4, 6), PbOp.LE, 1),
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(3, 4, 6), PbOp.GE, 2),
-        )
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(2, 4, 6), PbOp.LE, 1),
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(3, 4, 6), PbOp.GE, 2),
+            ),
         )
         val session = PropagationSession(source.bake(), nativeSat = false)
         val pass = RootProbingPass()
@@ -719,11 +729,13 @@ class RootInprocessingTest {
     fun `an empty General neighborhood should retain its productive opposite through an unfunded slice`() {
         for (releaseBuffers in listOf(false, true)) {
             val source = Problem(
-                4, 0, emptyArray(),
+                4,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(2, 4, 6), PbOp.LE, 1),
-                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(3, 4, 6), PbOp.GE, 2),
-            )
+                    PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(2, 4, 6), PbOp.LE, 1),
+                    PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(3, 4, 6), PbOp.GE, 2),
+                ),
             )
             val session = PropagationSession(source.bake(), nativeSat = false)
             val pass = RootProbingPass()
@@ -753,11 +765,13 @@ class RootInprocessingTest {
     @Test
     fun `two empty General polarities should leave a later learned literal reachable`() {
         val source = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             arrayOf<Factor>(
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(2, 4, 6), PbOp.LE, 1),
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(3, 4, 6), PbOp.GE, 2),
-        )
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(2, 4, 6), PbOp.LE, 1),
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(3, 4, 6), PbOp.GE, 2),
+            ),
         )
         val session = PropagationSession(source.bake(), nativeSat = false)
         val pass = RootProbingPass()
@@ -793,11 +807,11 @@ class RootInprocessingTest {
             RootProbingPass().run(
                 session,
                 BacktrackParams(
-                rootProbeBatch = 1,
-                rootProbeImplications = false,
-                rootProbeGeneralGate = true,
-            ),
-                stats
+                    rootProbeBatch = 1,
+                    rootProbeImplications = false,
+                    rootProbeGeneralGate = true,
+                ),
+                stats,
             )
 
             val learning = stats.snapshot().learning
@@ -811,11 +825,13 @@ class RootInprocessingTest {
     @Test
     fun `General admission should preserve useful initial probing without binary hints`() {
         val source = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf<Factor>(
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(0, 2, 4), PbOp.LE, 1),
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(1, 2, 4), PbOp.GE, 2),
-        )
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(0, 2, 4), PbOp.LE, 1),
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(1, 2, 4), PbOp.GE, 2),
+            ),
         )
         val session = PropagationSession(source.bake(), nativeSat = false)
         val stats = SearchStatsSink()
@@ -823,11 +839,11 @@ class RootInprocessingTest {
         RootProbingPass().run(
             session,
             BacktrackParams(
-            rootProbeBatch = 1,
-            rootProbeImplications = false,
-            rootProbeGeneralGate = true,
-        ),
-            stats
+                rootProbeBatch = 1,
+                rootProbeImplications = false,
+                rootProbeGeneralGate = true,
+            ),
+            stats,
         )
 
         assertEquals(1L, stats.inprocessProbes)
@@ -880,11 +896,11 @@ class RootInprocessingTest {
             RootProbingPass().run(
                 session,
                 BacktrackParams(
-                rootProbeBatch = 1,
-                rootProbeImplications = false,
-                rootProbeGeneralGate = true,
-            ),
-                stats
+                    rootProbeBatch = 1,
+                    rootProbeImplications = false,
+                    rootProbeGeneralGate = true,
+                ),
+                stats,
             )
 
             assertEquals(1L, stats.inprocessProbes)
@@ -896,11 +912,13 @@ class RootInprocessingTest {
     fun `General admission should preserve integer endpoint probing`() {
         for (gate in listOf(false, true)) {
             val source = Problem(
-                0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+                0,
+                2,
+                arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
                 arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
-            )
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                    Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             )
             val session = PropagationSession(source.bake())
 
@@ -914,10 +932,12 @@ class RootInprocessingTest {
     @Test
     fun `General admission should publish a retained implication after optional buffer release`() {
         val source = Problem(
-            3, 0, emptyArray(),
+            3,
+            0,
+            emptyArray(),
             arrayOf<Factor>(
-            PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(0, 2, 4), PbOp.LE, 1),
-        )
+                PseudoBoolean(longArrayOf(1, 1, 1), intArrayOf(0, 2, 4), PbOp.LE, 1),
+            ),
         )
         val session = PropagationSession(source.bake(), nativeSat = false)
         val pass = RootProbingPass()
@@ -1026,11 +1046,11 @@ class RootInprocessingTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 problem(
-                intArrayOf(1, 2),
-                intArrayOf(1, 4),
-                intArrayOf(3, 5, 6),
-            ).bake(),
-                nativeSat = native
+                    intArrayOf(1, 2),
+                    intArrayOf(1, 4),
+                    intArrayOf(3, 5, 6),
+                ).bake(),
+                nativeSat = native,
             )
             val pass = RootProbingPass()
             val stats = SearchStatsSink()
@@ -1050,15 +1070,17 @@ class RootInprocessingTest {
         for ((native, interrupt) in listOf(false to false, false to true, true to false, true to true)) {
             val session = PropagationSession(
                 Problem(
-                    5, 0, emptyArray(),
+                    5,
+                    0,
+                    emptyArray(),
                     arrayOf<Factor>(
-                Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(1, 4)),
-                Clause(intArrayOf(3, 5, 6)),
-                Clause(intArrayOf(3, 5, 8)),
-            )
+                        Clause(intArrayOf(1, 2)),
+                        Clause(intArrayOf(1, 4)),
+                        Clause(intArrayOf(3, 5, 6)),
+                        Clause(intArrayOf(3, 5, 8)),
+                    ),
                 ).bake(),
-                nativeSat = native
+                nativeSat = native,
             )
             val implications = RootProbeImplications()
             val params = BacktrackParams()
@@ -1083,10 +1105,10 @@ class RootInprocessingTest {
                     implications.releaseRetainedBuffers()
                     assertTrue(
                         implications.advance(
-                        session,
-                        params,
-                        InprocessingBudget(session, params, stats, InprocessingKind.Probe, 4096L),
-                    )
+                            session,
+                            params,
+                            InprocessingBudget(session, params, stats, InprocessingKind.Probe, 4096L),
+                        ),
                     )
                 }
                 if (attempt == 0) {
@@ -1108,12 +1130,12 @@ class RootInprocessingTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 problem(
-                intArrayOf(1, 2),
-                intArrayOf(3, 4),
-                intArrayOf(5, 6),
-                intArrayOf(7, 0),
-            ).bake(),
-                nativeSat = native
+                    intArrayOf(1, 2),
+                    intArrayOf(3, 4),
+                    intArrayOf(5, 6),
+                    intArrayOf(7, 0),
+                ).bake(),
+                nativeSat = native,
             )
             val pass = RootProbingPass()
             val stats = SearchStatsSink()
@@ -1148,11 +1170,11 @@ class RootInprocessingTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 problem(
-                intArrayOf(1, 2),
-                intArrayOf(1, 4),
-                intArrayOf(3, 5, 6),
-            ).bake(),
-                nativeSat = native
+                    intArrayOf(1, 2),
+                    intArrayOf(1, 4),
+                    intArrayOf(3, 5, 6),
+                ).bake(),
+                nativeSat = native,
             )
             val pass = RootProbingPass()
 
@@ -1213,11 +1235,13 @@ class RootInprocessingTest {
     fun `buffer release should preserve progress toward a later failed literal`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                8, 0, emptyArray(),
+                8,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(14, 2)),
-                Clause(intArrayOf(14, 3)),
-            )
+                    Clause(intArrayOf(14, 2)),
+                    Clause(intArrayOf(14, 3)),
+                ),
             )
             val session = PropagationSession(source.bake(), nativeSat = native)
             val pass = RootProbingPass()
@@ -1255,10 +1279,12 @@ class RootInprocessingTest {
     @Test
     fun `root probes should preserve saved integer phases`() {
         val source = Problem(
-            1, 1, arrayOf(IntDomain(0, 1)),
+            1,
+            1,
+            arrayOf(IntDomain(0, 1)),
             arrayOf<Factor>(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
-        )
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            ),
         )
         val session = PropagationSession(source.bake(), nativeSat = false)
         val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
@@ -1310,11 +1336,13 @@ class RootInprocessingTest {
     fun `a short learned neighborhood should reach a failed literal within one funded probe`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                8, 0, emptyArray(),
+                8,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(14, 2)),
-                Clause(intArrayOf(14, 3)),
-            )
+                    Clause(intArrayOf(14, 2)),
+                    Clause(intArrayOf(14, 3)),
+                ),
             )
             val session = PropagationSession(source.bake(), nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(14, 12)), 2)
@@ -1330,13 +1358,15 @@ class RootInprocessingTest {
     fun `a shortened source neighborhood should reach a failed literal within one funded probe`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                9, 0, emptyArray(),
+                9,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(17)),
-                Clause(intArrayOf(14, 2)),
-                Clause(intArrayOf(14, 3)),
-                Clause(intArrayOf(14, 12, 16)),
-            )
+                    Clause(intArrayOf(17)),
+                    Clause(intArrayOf(14, 2)),
+                    Clause(intArrayOf(14, 3)),
+                    Clause(intArrayOf(14, 12, 16)),
+                ),
             )
             val session = PropagationSession(source.bake(), nativeSat = native)
             RootSimplificationPass().run(session, BacktrackParams(), null)
@@ -1352,11 +1382,13 @@ class RootInprocessingTest {
     fun `an existing integer bound should yield a proved root bound`() {
         for (atMost in listOf(false, true)) {
             val source = Problem(
-                0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+                0,
+                2,
+                arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
                 arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
-            )
+                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                    Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             )
             val session = PropagationSession(source.bake())
             if (atMost) session.boundLeLit(0, 0, true) else session.boundGeLit(0, 1, true)
@@ -1398,16 +1430,18 @@ class RootInprocessingTest {
     fun `integer endpoints should yield root bounds without existing atoms`() {
         for (lower in listOf(false, true)) {
             val source = Problem(
-                0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+                0,
+                2,
+                arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
                 arrayOf<Factor>(
-                Linear(
-                    intArrayOf(1, 1),
-                    intArrayOf(0, 1),
-                    if (lower) LinearOp.GE else LinearOp.LE,
-                    if (lower) 1 else 3,
+                    Linear(
+                        intArrayOf(1, 1),
+                        intArrayOf(0, 1),
+                        if (lower) LinearOp.GE else LinearOp.LE,
+                        if (lower) 1 else 3,
+                    ),
+                    Linear(intArrayOf(-1, 1), intArrayOf(0, 1), if (lower) LinearOp.LE else LinearOp.GE, 0),
                 ),
-                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), if (lower) LinearOp.LE else LinearOp.GE, 0),
-            )
             )
             val session = PropagationSession(source.bake())
 
@@ -1439,11 +1473,13 @@ class RootInprocessingTest {
     @Test
     fun `a locally capped endpoint probe should restore the complete root`() {
         val source = Problem(
-            0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
             arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
         )
         val session = PropagationSession(source.bake())
         val pass = RootProbingPass()
@@ -1460,11 +1496,13 @@ class RootInprocessingTest {
     @Test
     fun `a learned bound neighborhood should reach a failed bound within one funded probe`() {
         val source = Problem(
-            4, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            4,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
             arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
         )
         val session = PropagationSession(source.bake())
         val first = session.boundLeLit(0, 0, true)
@@ -1480,11 +1518,13 @@ class RootInprocessingTest {
     @Test
     fun `a locally capped bound probe should restore the complete root`() {
         val source = Problem(
-            0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
             arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
         )
         val session = PropagationSession(source.bake())
         session.boundLeLit(0, 0, true)
@@ -1530,11 +1570,11 @@ class RootInprocessingTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 problem(
-                intArrayOf(0, 2),
-                intArrayOf(0, 3),
-                intArrayOf(1, 4, 6),
-            ).bake(),
-                nativeSat = native
+                    intArrayOf(0, 2),
+                    intArrayOf(0, 3),
+                    intArrayOf(1, 4, 6),
+                ).bake(),
+                nativeSat = native,
             )
             val params = BacktrackParams(rootSimplification = true, rootProbeBatch = 2)
             val loop = assertNotNull(Inprocessing.from(params))
@@ -1580,11 +1620,11 @@ class RootInprocessingTest {
             assertNull(
                 Inprocessing.from(
                     BacktrackParams(
-                rootSimplification = true,
-                rootProbeBatch = 8,
-                assumptions = Assumptions(bools = mapOf(0 to true)),
-            )
-                )
+                        rootSimplification = true,
+                        rootProbeBatch = 8,
+                        assumptions = Assumptions(bools = mapOf(0 to true)),
+                    ),
+                ),
             )
         }
     }

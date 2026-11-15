@@ -243,8 +243,8 @@ class BoardRestartOutcomeTest {
         assertEquals(8, outcomes.size)
         assertTrue(
             outcomes.all {
-            it == BoardRestartOutcome.DeclinedRepair || it == BoardRestartOutcome.DeclinedUnchanged
-        }
+                it == BoardRestartOutcome.DeclinedRepair || it == BoardRestartOutcome.DeclinedUnchanged
+            },
         )
         assertTrue(BoardRestartOutcome.DeclinedRepair in outcomes)
     }
@@ -276,10 +276,10 @@ class BoardRestartOutcomeTest {
         ).use { handle ->
             assertNull(
                 handle.runSlice(
-                ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
-                Long.MAX_VALUE,
-                -1L,
-            ) {}
+                    ExecutionControl { policy.incumbents.isNotEmpty() && ++polls >= 3 },
+                    Long.MAX_VALUE,
+                    -1L,
+                ) {},
             )
             assertNull(policy.lastBoardRestartOutcome)
             assertEquals(0L, policy.changedBoardRestarts + policy.declinedBoardRestarts)
@@ -326,8 +326,8 @@ class BoardRestartOutcomeTest {
         assertEquals(8, outcomes.size)
         assertTrue(
             outcomes.all {
-            it == BoardRestartOutcome.DeclinedPreparation || it == BoardRestartOutcome.DeclinedUnchanged
-        }
+                it == BoardRestartOutcome.DeclinedPreparation || it == BoardRestartOutcome.DeclinedUnchanged
+            },
         )
         assertTrue(BoardRestartOutcome.DeclinedPreparation in outcomes)
     }

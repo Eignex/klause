@@ -37,16 +37,16 @@ internal class LpRowBound internal constructor(
             action(column, !upper)
             for (term in terms) {
                 if (term.column != column) {
-                action(term.column, true)
-                action(term.column, false)
-            }
+                    action(term.column, true)
+                    action(term.column, false)
+                }
             }
             return
         }
         for (term in terms) {
             if (term.column != column) {
-            action(term.column, minimum == (term.coefficient.signum() > 0))
-        }
+                action(term.column, minimum == (term.coefficient.signum() > 0))
+            }
         }
     }
 
@@ -54,8 +54,8 @@ internal class LpRowBound internal constructor(
         if (!lattice) return
         for (term in terms) {
             if (term.column < authority.model.n && authority.model.column(term.column).integral) {
-            action(term.column)
-        }
+                action(term.column)
+            }
         }
     }
 }

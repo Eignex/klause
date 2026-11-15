@@ -440,9 +440,9 @@ class ReconstructedCertificateTest {
         val source = ExactLpModel(
             listOf(
                 listOf(
-                ExactLpEntry(0, ExactLpNumber.of(-65521L)),
-                ExactLpEntry(1, ExactLpNumber.of(65497L)),
-            )
+                    ExactLpEntry(0, ExactLpNumber.of(-65521L)),
+                    ExactLpEntry(1, ExactLpNumber.of(65497L)),
+                ),
             ),
             listOf(ExactLpNumber.of(-65521L), zero),
             listOf(ExactLpColumn(ExactLpBounds())) +
@@ -462,10 +462,10 @@ class ReconstructedCertificateTest {
             assertEquals(listOf(0, 1), proof.rows.toList())
             assertEquals(
                 listOf(
-                BigFraction.of(BIG_ONE, bigIntOf(65521)),
-                BigFraction.of(BIG_ONE, bigIntOf(65497)),
-            ),
-                proof.multipliers
+                    BigFraction.of(BIG_ONE, bigIntOf(65521)),
+                    BigFraction.of(BIG_ONE, bigIntOf(65497)),
+                ),
+                proof.multipliers,
             )
             assertNotNull(result.conflictSupport)
             assertNotNull(result.metrics.vectorRejection)
@@ -479,9 +479,9 @@ class ReconstructedCertificateTest {
         val source = ExactLpModel(
             listOf(
                 listOf(
-                ExactLpEntry(0, ExactLpNumber.of(-65521L)),
-                ExactLpEntry(1, ExactLpNumber.of(65497L)),
-            )
+                    ExactLpEntry(0, ExactLpNumber.of(-65521L)),
+                    ExactLpEntry(1, ExactLpNumber.of(65497L)),
+                ),
             ),
             listOf(ExactLpNumber.of(-65521L), ExactLpNumber.of(65497L)),
             listOf(ExactLpColumn(ExactLpBounds())) +
@@ -507,9 +507,9 @@ class ReconstructedCertificateTest {
         val source = ExactLpModel(
             listOf(
                 listOf(
-                ExactLpEntry(0, ExactLpNumber.of(-65521L)),
-                ExactLpEntry(1, ExactLpNumber.of(65497L)),
-            )
+                    ExactLpEntry(0, ExactLpNumber.of(-65521L)),
+                    ExactLpEntry(1, ExactLpNumber.of(65497L)),
+                ),
             ),
             listOf(ExactLpNumber.of(-65521L), zero),
             listOf(ExactLpColumn(ExactLpBounds())) +

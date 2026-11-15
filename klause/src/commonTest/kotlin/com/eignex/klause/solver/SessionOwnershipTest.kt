@@ -68,8 +68,8 @@ class SessionOwnershipTest {
         assertSame(
             failure,
             assertFailsWith<IllegalArgumentException> {
-            owned.runSlice(ExecutionControl.Never, 1L, 1L)
-        }
+                owned.runSlice(ExecutionControl.Never, 1L, 1L)
+            },
         )
 
         assertTrue(failure.suppressedExceptions.isEmpty())

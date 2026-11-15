@@ -170,12 +170,12 @@ internal class BooleanRepairClosure private constructor(
             yield(
                 PreparedBooleanRepairs(
                     BooleanRepairClosure(
-                edges as Array<IntArray>, units.toIntArray(), clauses.toTypedArray(),
-                occurrences as Array<IntArray>, frozen, stamps, values, queue,
-                seedStamps, seedParity, seeds, inconsistent, support,
-                state.repairWork,
-            )
-                )
+                        edges as Array<IntArray>, units.toIntArray(), clauses.toTypedArray(),
+                        occurrences as Array<IntArray>, frozen, stamps, values, queue,
+                        seedStamps, seedParity, seeds, inconsistent, support,
+                        state.repairWork,
+                    ),
+                ),
             )
         }
     }

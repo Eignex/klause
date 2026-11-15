@@ -90,7 +90,9 @@ internal class ComponentLpDeductionCache(size: Int) {
                         observer,
                         onAdditionalCertificate = if (withAlternatives) {
                             { alternatives.add(it) }
-                        } else null,
+                        } else {
+                            null
+                        },
                         sharedMeter = meter,
                         scaleBits = scaleBits,
                         requireIntegerPrimary = true,
@@ -134,9 +136,9 @@ internal class ComponentLpDeductionCache(size: Int) {
                 bound = meter.add(
                     bound,
                     meter.add(
-                    children[index].primary.exactObjectiveBound(),
-                    part.model.exactConstant().negated(),
-                )
+                        children[index].primary.exactObjectiveBound(),
+                        part.model.exactConstant().negated(),
+                    ),
                 )
             }
             for (column in isolated) {

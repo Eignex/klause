@@ -68,8 +68,8 @@ internal object NumericalResidualProfile {
         val suppliedKeys = setOf("mps64", "problem", "sha256", "root")
         require(
             input.keys == catalogKeys || input.keys == catalogKeys + "root" ||
-            input.keys == catalogKeys + setOf("root", "unbaked") ||
-            input.keys == suppliedKeys || input.keys == suppliedKeys + "exact"
+                input.keys == catalogKeys + setOf("root", "unbaked") ||
+                input.keys == suppliedKeys || input.keys == suppliedKeys + "exact",
         )
         val unbaked = input["unbaked"]?.jsonPrimitive?.content?.toBooleanStrict() == true
         require(!unbaked || input["root"]?.jsonPrimitive?.content?.toBooleanStrict() == true)
@@ -351,12 +351,12 @@ internal object NumericalResidualProfile {
                         }
                     }
                     if (auditBasis && (
-                        (phase == "refactorize" && result == true) ||
-                            (phase == "update" && result.toString() != "SINGULAR")
-                    )
+                            (phase == "refactorize" && result == true) ||
+                                (phase == "update" && result.toString() != "SINGULAR")
+                            )
                     ) {
-                                recordBasisSlices(backend, phase)
-                            }
+                        recordBasisSlices(backend, phase)
+                    }
                     if (phase == "update" && result.toString() != "SINGULAR") {
                         val spread = call(backend, "getRcond") as Double
                         if (spread.isFinite() && spread >= 0.0) {

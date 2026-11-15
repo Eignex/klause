@@ -19,7 +19,7 @@ class LpCaptureTest {
     fun `bounded exact encoding should retain the complete wire format`() {
         val model = assertNotNull(
             LpBuilder().apply { addVar(0L, 3L, cost = 1L) }
-            .build(Sense.MINIMIZE).authoritativeModel()
+                .build(Sense.MINIMIZE).authoritativeModel(),
         )
         val capture = LpExactCapture.capture(model, LpReplaySettings("bounded", 1L), emptyList())
 
@@ -33,7 +33,7 @@ class LpCaptureTest {
     fun `bounded exact encoding should withhold partial or cancelled payloads`() {
         val model = assertNotNull(
             LpBuilder().apply { addVar(0L, 3L, cost = 1L) }
-            .build(Sense.MINIMIZE).authoritativeModel()
+                .build(Sense.MINIMIZE).authoritativeModel(),
         )
         val capture = LpExactCapture.capture(model, LpReplaySettings("bounded", 1L), emptyList())
 

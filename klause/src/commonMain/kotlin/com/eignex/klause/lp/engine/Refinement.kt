@@ -1392,8 +1392,8 @@ internal fun refineLp(
             current.unboundedness != null || meter.metrics.strictWitnesses > 0 ||
             (
                 (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION) &&
-                current.candidate.point != null
-            )
+                    current.candidate.point != null
+                )
         ) {
             null
         } else {

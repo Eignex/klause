@@ -59,10 +59,10 @@ internal object TableSubstitutionProfile {
                 val started = System.nanoTime()
                 val prepared = FinitePipeline.prepare(
                     FinitePipelineRequest(
-                    parsed.problem, FiniteEngine.BACKTRACK, objective, PresolveConfig.parse(mode),
-                    explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
-                    presolveBudget = budget, randomSeed = 3,
-                )
+                        parsed.problem, FiniteEngine.BACKTRACK, objective, PresolveConfig.parse(mode),
+                        explicitPresolveConfig = true, cancellation = stop, solveCancellation = stop,
+                        presolveBudget = budget, randomSeed = 3,
+                    ),
                 )
                 val elapsed = System.nanoTime() - started
                 val allocatedBytes = allocation.getThreadAllocatedBytes(Thread.currentThread().threadId()) - allocated
@@ -72,63 +72,63 @@ internal object TableSubstitutionProfile {
                 directory.resolve(if (mode == "default") "control.json" else "substitution.json")
                     .writeText(
                         buildJsonObject {
-                        put("input", input)
-                        put("revision", Reports.readGitSha())
-                        put("mode", mode)
-                        put("sourceObjective", objective.toString())
-                        put("preparedObjective", prepared.objective.toString())
-                        put("sourceIntegers", parsed.problem.numIntVars)
-                        put("preparedIntegers", model.numIntVars)
-                        put("preparedBooleans", model.numBoolVars)
-                        put("preparedFactors", model.factors.size)
-                        put("preparationNs", elapsed)
-                        put("preparationAllocatedBytes", allocatedBytes)
-                        put("preparationWork", budget.spent())
-                        put("stopped", stop())
-                        put("infeasible", prepared.presolve?.infeasible)
-                        put("tables", model.factors.count { it is Table })
-                        put(
-                            "objectiveCoordinates",
-                            buildJsonArray {
-                            for (v in costs.indices) {
-                                if (costs[v] != 0L) {
-                                add(
-                                    buildJsonObject {
-                                put("variable", v)
-                                put("coefficient", costs[v])
-                                put("domain", baked?.rootIntDomain(v).toString())
-                                put(
-                                    "readerKinds",
-                                    model.factors.filter { v in it.intVars }
-                                    .groupingBy { it::class.simpleName }.eachCount().toString()
-                                )
-                            }
-                                )
-                            }
-                            }
-                        }
-                        )
-                        put("passes", JsonArray(prepared.presolve?.passes.orEmpty().map(::JsonPrimitive)))
-                        put(
-                            "invocations",
-                            buildJsonArray {
-                            for (call in budget.invocations) {
-                                add(
-                                    buildJsonObject {
-                                put("lane", call.lane.name)
-                                put("pass", call.pass)
-                                put("outcome", call.outcome.name)
-                                put("work", call.work)
-                                put("ns", call.elapsed.inWholeNanoseconds)
-                                put("narrowedColumns", call.narrowedColumns)
-                            }
-                                )
-                            }
-                        }
-                        )
-                        put("searchExecuted", false)
-                        put("independentSourceValidation", false)
-                    }.toString()
+                            put("input", input)
+                            put("revision", Reports.readGitSha())
+                            put("mode", mode)
+                            put("sourceObjective", objective.toString())
+                            put("preparedObjective", prepared.objective.toString())
+                            put("sourceIntegers", parsed.problem.numIntVars)
+                            put("preparedIntegers", model.numIntVars)
+                            put("preparedBooleans", model.numBoolVars)
+                            put("preparedFactors", model.factors.size)
+                            put("preparationNs", elapsed)
+                            put("preparationAllocatedBytes", allocatedBytes)
+                            put("preparationWork", budget.spent())
+                            put("stopped", stop())
+                            put("infeasible", prepared.presolve?.infeasible)
+                            put("tables", model.factors.count { it is Table })
+                            put(
+                                "objectiveCoordinates",
+                                buildJsonArray {
+                                    for (v in costs.indices) {
+                                        if (costs[v] != 0L) {
+                                            add(
+                                                buildJsonObject {
+                                                    put("variable", v)
+                                                    put("coefficient", costs[v])
+                                                    put("domain", baked?.rootIntDomain(v).toString())
+                                                    put(
+                                                        "readerKinds",
+                                                        model.factors.filter { v in it.intVars }
+                                                            .groupingBy { it::class.simpleName }.eachCount().toString(),
+                                                    )
+                                                },
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                            put("passes", JsonArray(prepared.presolve?.passes.orEmpty().map(::JsonPrimitive)))
+                            put(
+                                "invocations",
+                                buildJsonArray {
+                                    for (call in budget.invocations) {
+                                        add(
+                                            buildJsonObject {
+                                                put("lane", call.lane.name)
+                                                put("pass", call.pass)
+                                                put("outcome", call.outcome.name)
+                                                put("work", call.work)
+                                                put("ns", call.elapsed.inWholeNanoseconds)
+                                                put("narrowedColumns", call.narrowedColumns)
+                                            },
+                                        )
+                                    }
+                                },
+                            )
+                            put("searchExecuted", false)
+                            put("independentSourceValidation", false)
+                        }.toString(),
                     )
                 println("${source.getValue("problem")}: $mode, ${model.factors.size} factors, stopped=${stop()}")
             }

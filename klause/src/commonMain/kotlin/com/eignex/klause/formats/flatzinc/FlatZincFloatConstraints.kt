@@ -352,10 +352,10 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
     }
     factors.add(
         GridProduct(
-        gridArithmeticCoordinate(aRef, "__grid_product"),
-        gridArithmeticCoordinate(bRef, "__grid_product"),
-        gridArithmeticCoordinate(cRef, "__grid_product"),
-    )
+            gridArithmeticCoordinate(aRef, "__grid_product"),
+            gridArithmeticCoordinate(bRef, "__grid_product"),
+            gridArithmeticCoordinate(cRef, "__grid_product"),
+        ),
     )
 }
 

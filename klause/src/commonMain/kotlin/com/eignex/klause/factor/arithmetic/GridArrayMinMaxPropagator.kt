@@ -42,10 +42,10 @@ internal class GridArrayMinMaxPropagator(private val factor: GridArrayMinMax) : 
         val literals = IntArrayList()
         for (variable in factor.variables.ints) {
             for (lower in listOf(false, true)) {
-            val value = state.boundAt(variable, lower, atTrail)
-            val literal = state.boundLiteral(variable, lower, value, atTrail, atLevel)
-            if (literal != Lit.NONE) literals.add(literal)
-        }
+                val value = state.boundAt(variable, lower, atTrail)
+                val literal = state.boundLiteral(variable, lower, value, atTrail, atLevel)
+                if (literal != Lit.NONE) literals.add(literal)
+            }
         }
         return literals.toIntArray()
     }

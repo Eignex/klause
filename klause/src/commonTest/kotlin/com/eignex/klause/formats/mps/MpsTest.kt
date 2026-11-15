@@ -171,8 +171,8 @@ class MpsTest {
 
         val source = assertNotNull(
             parsed.copy(name = "copy").toLinearSourceProblem(
-            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-        )
+                SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+            ),
         )
 
         val witness = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ONE)))

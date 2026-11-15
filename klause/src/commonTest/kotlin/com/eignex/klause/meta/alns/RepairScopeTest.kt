@@ -32,20 +32,20 @@ class RepairScopeTest {
             DefinitionalSweep.infer(
                 problem,
                 boolFolds = listOf(
-            BoolFoldDefinition(1, intArrayOf(Lit.make(0, true)), true),
-            BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), true),
-        )
-            )
+                    BoolFoldDefinition(1, intArrayOf(Lit.make(0, true)), true),
+                    BoolFoldDefinition(2, intArrayOf(Lit.make(1, false)), true),
+                ),
+            ),
         )
         val caller = Assumptions(bools = mapOf(1 to false), ints = mapOf(0 to 1L))
 
         val freed = assertNotNull(
             RepairScope.effective(
-            FreedVars(intArrayOf(2), intArrayOf(0)),
-            caller,
-            sweep,
-            ExecutionControl.Never,
-        )
+                FreedVars(intArrayOf(2), intArrayOf(0)),
+                caller,
+                sweep,
+                ExecutionControl.Never,
+            ),
         )
 
         assertContentEquals(intArrayOf(2, 0), freed.bools)
@@ -59,18 +59,18 @@ class RepairScopeTest {
             DefinitionalSweep.infer(
                 problem,
                 boolFolds = listOf(
-            BoolFoldDefinition(1, intArrayOf(Lit.make(0, true)), true),
-        )
-            )
+                    BoolFoldDefinition(1, intArrayOf(Lit.make(0, true)), true),
+                ),
+            ),
         )
 
         assertNull(
             RepairScope.effective(
-            FreedVars(intArrayOf(1), intArrayOf()),
-            Assumptions.None,
-            sweep,
-            ExecutionControl { true },
-        )
+                FreedVars(intArrayOf(1), intArrayOf()),
+                Assumptions.None,
+                sweep,
+                ExecutionControl { true },
+            ),
         )
     }
 
@@ -96,11 +96,11 @@ class RepairScopeTest {
             )) {
                 val freed = assertNotNull(
                     RepairScope.effective(
-                    FreedVars(intArrayOf(), requested),
-                    Assumptions.None,
-                    null,
-                    ExecutionControl.Never,
-                )
+                        FreedVars(intArrayOf(), requested),
+                        Assumptions.None,
+                        null,
+                        ExecutionControl.Never,
+                    ),
                 )
                 val params = BacktrackParams(assumptions = RepairScope.pins(problem, center, freed), maxDecisions = 100)
 

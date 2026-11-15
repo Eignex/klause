@@ -255,8 +255,8 @@ class PresolvePipelineTest {
         assertEquals(
             2,
             BacktrackSolver(outcome.problem.bake()).enumerate().minOf {
-            outcome.reconstruct(it).bools.count { value -> value }
-        }
+                outcome.reconstruct(it).bools.count { value -> value }
+            },
         )
     }
 

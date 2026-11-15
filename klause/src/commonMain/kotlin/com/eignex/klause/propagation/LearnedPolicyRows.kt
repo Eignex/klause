@@ -133,7 +133,7 @@ internal class LearnedPolicyRows(
                 0L
             } else {
                 tableInstallWork(index) +
-                if (directory.size == 0) 8L else (Int.SIZE_BITS - index.countLeadingZeroBits()) * 2L + 18L
+                    if (directory.size == 0) 8L else (Int.SIZE_BITS - index.countLeadingZeroBits()) * 2L + 18L
             }
             return (if (objectColumns) 9L else 7L) + insertion + allocationWork(page, (size and PAGE_MASK) + 1)
         }
@@ -177,10 +177,10 @@ internal class LearnedPolicyRows(
         val slot = index and PAGE_MASK
         if (page == null || page.retained and (1 shl slot) == 0) {
             return when (column) {
-            STAGES -> retiredFlag
-            ORIGIN -> OWN_ORIGIN
-            else -> 0
-        }
+                STAGES -> retiredFlag
+                ORIGIN -> OWN_ORIGIN
+                else -> 0
+            }
         }
         return page.values[slot * columns + column]
     }
@@ -262,8 +262,8 @@ internal class LearnedPolicyRows(
     fun resetRetirements(): Long {
         var work = 2L
         fun clear(page: Page) {
-            page.pending = 0;
-            page.nextRetired = null;
+            page.pending = 0
+            page.nextRetired = null
             work += 2L
         }
         primary?.let(::clear)
@@ -300,7 +300,7 @@ internal class LearnedPolicyRows(
         page.values = emptyIntArray()
         page.admissions = longArrayOf()
         if (objectColumns) {
-            page.propagators = emptyArray();
+            page.propagators = emptyArray()
             page.payloads = emptyArray()
         }
         page.retained = 0
@@ -337,7 +337,7 @@ internal class LearnedPolicyRows(
         if (page.retained != 0) return
         val slot = page.slot
         if (slot == null) {
-            check(primary === page);
+            check(primary === page)
             primary = null
         } else {
             check(directory.remove(slot, {}, {}))
@@ -370,9 +370,11 @@ internal class LearnedPolicyRows(
         require(count in 0..size)
         var work = 4L
         val retained = ((count.toLong() + PAGE_MASK) ushr PAGE_SHIFT).toInt()
-        if (count == 0) primary?.let {
-            discard(it);
+        if (count == 0) {
+            primary?.let {
+            discard(it)
             work += 8L
+        }
         }
         if (count > 0 && count and PAGE_MASK != 0) {
             val last = pageAt((count - 1) ushr PAGE_SHIFT)
@@ -381,7 +383,7 @@ internal class LearnedPolicyRows(
                 last.retained = last.retained and ((1 shl required) - 1)
                 last.pending = last.pending and ((1 shl required) - 1)
                 if (last.retained == 0) {
-                    discard(last);
+                    discard(last)
                     work += 8L
                 } else {
                     resize(last, required)
@@ -391,7 +393,7 @@ internal class LearnedPolicyRows(
         }
         directory.forEach({ work += it }) { index, page ->
             if (index >= retained) {
-                discard(page);
+                discard(page)
                 work += 8L
             }
         }
@@ -422,15 +424,15 @@ internal class LearnedPolicyRows(
         val pageBytes = PAGE_SIZE * rowBytes + 12L
         if (objectColumns) {
             active.atomic(
-            size * 4L + (directory.size + 1L) * 2L,
-            pages * (pageBytes + PAGE_SIZE * Long.SIZE_BYTES * 2L) * 4L + (directory.size + 1L) * Long.SIZE_BYTES,
-        )
+                size * 4L + (directory.size + 1L) * 2L,
+                pages * (pageBytes + PAGE_SIZE * Long.SIZE_BYTES * 2L) * 4L + (directory.size + 1L) * Long.SIZE_BYTES,
+            )
         } else {
             active.atomic(
-            size * (columns * 2L + 12L) + pages * pageBytes / Int.SIZE_BYTES * 2L +
-                (directory.size + 1L) * 8L,
-            pages * pageBytes * 4L + (directory.size + 1L) * Long.SIZE_BYTES,
-        )
+                size * (columns * 2L + 12L) + pages * pageBytes / Int.SIZE_BYTES * 2L +
+                    (directory.size + 1L) * 8L,
+                pages * pageBytes * 4L + (directory.size + 1L) * Long.SIZE_BYTES,
+            )
         }
     }
 

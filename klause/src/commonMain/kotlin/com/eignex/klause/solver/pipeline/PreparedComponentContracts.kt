@@ -30,17 +30,17 @@ internal val finiteOperations = ExecutionOperation.entries.toSet()
 
 internal fun Problem.unplacedArithmeticContract(
     projections: PreparedFactorProjections? = null,
-):
-    ComponentExecutionContract {
+): ComponentExecutionContract {
     val missing = ComponentStrategySupport(
-        ProcedureCompleteness.UNAVAILABLE, emptySet(),
+        ProcedureCompleteness.UNAVAILABLE,
+        emptySet(),
         listOf(
             ExecutionDecline(
-        ExecutionDeclineCause.SOURCE_COMPLETION,
-        "unplaced-arithmetic",
-        preparation = PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT,
-    )
-        )
+                ExecutionDeclineCause.SOURCE_COMPLETION,
+                "unplaced-arithmetic",
+                preparation = PreparedPlanDecline.UNOWNED_SOURCE_COMPONENT,
+            ),
+        ),
     )
     val checkedDiscrete = numRealVars == 0 && factors.indices.all { index ->
         (projections?.capabilities(index) ?: factors[index].executionCapabilities()).assignmentCheck in setOf(
@@ -50,9 +50,9 @@ internal fun Problem.unplacedArithmeticContract(
     }
     val local = if (checkedDiscrete) {
         ComponentStrategySupport(
-        ProcedureCompleteness.WITNESS_SEARCH,
-        witnessAuthority,
-    )
+            ProcedureCompleteness.WITNESS_SEARCH,
+            witnessAuthority,
+        )
     } else {
         missing
     }
@@ -96,20 +96,20 @@ internal fun Problem.finiteRealFactorSupported(index: Int, projections: Prepared
     if (!encoder.enforcesSource && encoder.support != EncoderSupport.CONDITIONED) return false
     if (factor is RealProduct) {
         return intBounds.hasLower(factor.intOperand) &&
-        intBounds.hasUpper(factor.intOperand) &&
-        intBounds.lower(factor.intOperand) >= -9007199254740992L &&
-        intBounds.upper(factor.intOperand) <= 9007199254740992L
+            intBounds.hasUpper(factor.intOperand) &&
+            intBounds.lower(factor.intOperand) >= -9007199254740992L &&
+            intBounds.upper(factor.intOperand) <= 9007199254740992L
     }
     return factor is RealAbs || factor is RealElement || factor is RealFiniteDomain ||
         (
             factor is ContinuousProduct &&
-            (factor.hasCompleteGuardedLpCompletion() || factor.finiteChoices?.hasGuards == false)
-        ) ||
+                (factor.hasCompleteGuardedLpCompletion() || factor.finiteChoices?.hasGuards == false)
+            ) ||
         (factor is Power && factor.base is Power.Coordinate.Real && factor.exponent <= 1) ||
         (
             (factor.linearForm is LinearForm.Conjunction || factor.linearForm is LinearForm.Disjunction) &&
-            factor.linearForm!!.rows.none { it.strict }
-        )
+                factor.linearForm!!.rows.none { it.strict }
+            )
 }
 
 internal fun Problem.finiteComponentContract(

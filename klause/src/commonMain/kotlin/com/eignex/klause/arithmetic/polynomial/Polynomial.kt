@@ -25,13 +25,13 @@ internal class Monomial private constructor(private val powers: Map<Int, Int>) :
         if (other.variableCount == 0) return this
         return of(
             buildMap {
-            putAll(powers)
-            for ((variable, degree) in other.powers) {
-                val previous = get(variable) ?: 0
-                require(degree <= Int.MAX_VALUE - previous) { "monomial degree overflow" }
-                put(variable, previous + degree)
-            }
-        }
+                putAll(powers)
+                for ((variable, degree) in other.powers) {
+                    val previous = get(variable) ?: 0
+                    require(degree <= Int.MAX_VALUE - previous) { "monomial degree overflow" }
+                    put(variable, previous + degree)
+                }
+            },
         )
     }
 

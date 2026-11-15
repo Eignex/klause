@@ -68,8 +68,8 @@ class ExactLinear private constructor(
             activator
         } else {
             mapping.bool(activator).also {
-            require(it >= 0) { "removed exact row activator" }
-        }
+                require(it >= 0) { "removed exact row activator" }
+            }
         },
     )
 

@@ -20,7 +20,7 @@ class NonlinearIntegerResidueReductionTest {
         val source = PolynomialRealFormula.Or(List(16) { atom })
         var checks = 0
         val reduction = NonlinearIntegerResidueReduction({}, {}) {
-            checks++;
+            checks++
             true
         }
 

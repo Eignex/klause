@@ -52,15 +52,15 @@ internal object NumericalActiveRowsControls {
             put(
                 "coordinates",
                 buildJsonArray {
-                source.coordinates.sortedWith(compareBy({ it.kind.ordinal }, { it.id })).forEach { coordinate ->
-                    add(
-                        buildJsonObject {
-                        put("kind", coordinate.kind.name)
-                        put("id", coordinate.id)
+                    source.coordinates.sortedWith(compareBy({ it.kind.ordinal }, { it.id })).forEach { coordinate ->
+                        add(
+                            buildJsonObject {
+                                put("kind", coordinate.kind.name)
+                                put("id", coordinate.id)
+                            },
+                        )
                     }
-                    )
-                }
-            }
+                },
             )
             put("system", NumericalFrontierSnapshot.system(source))
         }
@@ -124,14 +124,14 @@ internal object NumericalActiveRowsControls {
                     put(
                         "nativeTerminalCheck",
                         terminal?.let {
-                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(it, checkStop).toString()
-                    }
+                            SourceEvidenceVerifier(source.withLinearAuthority()).verify(it, checkStop).toString()
+                        },
                     )
                     put(
                         "nativeBoundCheck",
                         bound?.let {
-                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(it, checkStop).toString()
-                    }
+                            SourceEvidenceVerifier(source.withLinearAuthority()).verify(it, checkStop).toString()
+                        },
                     )
                     put("independentProofCheck", false)
                     put("booleanDecisions", progress.openTheory.openBoolDecisions)
@@ -139,22 +139,22 @@ internal object NumericalActiveRowsControls {
                     put(
                         "sourceLp",
                         buildJsonObject {
-                        val work = progress.smt.sourceLp
-                        put("operations", work.operations)
-                        put("preparationWork", work.preparationWork)
-                        put("floatWork", work.floatWork)
-                        put("continuationWork", work.continuationWork)
-                        put("refinementWork", work.refinementWork)
-                        put("boundCertificationWork", work.boundCertificationWork)
-                        put("conflictCertificationWork", work.conflictCertificationWork)
-                        put("modeledAllocation", work.modeledAllocation)
-                    }
+                            val work = progress.smt.sourceLp
+                            put("operations", work.operations)
+                            put("preparationWork", work.preparationWork)
+                            put("floatWork", work.floatWork)
+                            put("continuationWork", work.continuationWork)
+                            put("refinementWork", work.refinementWork)
+                            put("boundCertificationWork", work.boundCertificationWork)
+                            put("conflictCertificationWork", work.conflictCertificationWork)
+                            put("modeledAllocation", work.modeledAllocation)
+                        },
                     )
                     put(
                         "stages",
                         buildJsonObject {
-                        progress.smt.completeSearchStages.orEmpty().forEach { (key, value) -> put(key, value) }
-                    }
+                            progress.smt.completeSearchStages.orEmpty().forEach { (key, value) -> put(key, value) }
+                        },
                     )
                 }
                 output.appendText(entry.toString() + "\n")
@@ -182,10 +182,10 @@ internal object NumericalActiveRowsControls {
         when (name) {
             "closed", "strict" -> rows["upper"] = SourcePremise(
                 SourceInequality(
-                mapOf(x to one),
-                if (name == "strict") zero else one.negated(),
-                strict = name == "strict",
-            )
+                    mapOf(x to one),
+                    if (name == "strict") zero else one.negated(),
+                    strict = name == "strict",
+                ),
             )
 
             "guarded", "inactive", "unresolved" -> rows["upper"] = SourcePremise(

@@ -35,9 +35,9 @@ internal fun resolveSmtLibSemantics(
     return smtLibSemantics.resolve(
         overrides.copy(
             undeclaredIntegers = BoundsOverride(
-        overrides.undeclaredIntegers?.lower ?: legacy.lower,
-        overrides.undeclaredIntegers?.upper ?: legacy.upper,
-    )
-        )
+                overrides.undeclaredIntegers?.lower ?: legacy.lower,
+                overrides.undeclaredIntegers?.upper ?: legacy.upper,
+            ),
+        ),
     )
 }

@@ -59,9 +59,9 @@ class BinaryObjectiveViewTest {
             assertNull(view.objective.binaryIntegerSource)
             for (binary in 0L..1L) {
                 for (integer in listOf(0L, 2L, 4L)) {
-                val sample = Sample(booleanArrayOf(binary == bound), longArrayOf(binary, integer))
-                assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
-            }
+                    val sample = Sample(booleanArrayOf(binary == bound), longArrayOf(binary, integer))
+                    assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
+                }
             }
         }
     }
@@ -84,11 +84,13 @@ class BinaryObjectiveViewTest {
         )
         for ((bound, original) in objectives) {
             val problem = Problem(
-                2, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)),
+                2,
+                3,
+                arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)),
                 listOf(
-                ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, bound),
-                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
-            )
+                    ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, bound),
+                    ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+                ),
             ).bake()
 
             val view = checkNotNull(BinaryObjectiveView.create(problem, original, allowMixedObjective = true))
@@ -97,9 +99,9 @@ class BinaryObjectiveViewTest {
             assertEquals(listOf(1L, 0L, 3L), view.objective.intCoefficients.toList())
             for (a in 0L..1L) {
                 for (b in 0L..1L) {
-                val sample = Sample(booleanArrayOf(a == bound, b == 1L), longArrayOf(a, b, 2))
-                assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
-            }
+                    val sample = Sample(booleanArrayOf(a == bound, b == 1L), longArrayOf(a, b, 2))
+                    assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
+                }
             }
         }
     }
@@ -132,11 +134,13 @@ class BinaryObjectiveViewTest {
     @Test
     fun `an unprojected mixed binary cost should stay protected during column substitution`() {
         val source = Problem(
-            2, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)),
+            2,
+            3,
+            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)),
             listOf(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
-            ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
-        )
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+            ),
         )
         val original = LinearObjective(longArrayOf(Long.MAX_VALUE, 0), longArrayOf(1, 2, 3))
         val config = PresolveConfig.parse("off,+binary-columns").withAffinePivotOrder(AffinePivotOrder.REWRITE_COST)
@@ -278,8 +282,8 @@ class BinaryObjectiveViewTest {
         )
         val config = PresolveConfig(
             overrides = PresolvePass.entries.associateWith {
-            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-        }
+                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+            },
         )
         val outcome = PresolvePipeline.run(source, original, config, false)
         val objective = checkNotNull(outcome.objective)
@@ -311,14 +315,14 @@ class BinaryObjectiveViewTest {
         val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyList())
         val approximate = source.withSourceSemantics(
             SourceSemantics(
-            SourceFormat.IR,
-            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
-        ).resolve()
+                SourceFormat.IR,
+                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+            ).resolve(),
         )
         val config = PresolveConfig(
             overrides = PresolvePass.entries.associateWith {
-            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-        }
+                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+            },
         )
         for ((problem, sensitive) in listOf(approximate to false, source to true)) {
             val outcome = PresolvePipeline.run(problem, original, config, sensitive)
@@ -338,19 +342,19 @@ class BinaryObjectiveViewTest {
         val original = LinearObjective(intCoefficients = longArrayOf(-3, 5), constant = 7)
         val transformed = checkNotNull(
             BinaryColumnSubstitution.substitute(
-            source,
-            setOf(0, 1),
-            BakeConfig.NONE,
-            original,
-        )
+                source,
+                setOf(0, 1),
+                BakeConfig.NONE,
+                original,
+            ),
         )
         val objective = checkNotNull(transformed.objective)
 
         val result = assertIs<MinimizeResult.Optimal>(
             BacktrackSolver(transformed.problem).minimize(
-            objective,
-            BacktrackParams(nativeSat = false, pbObjectiveCutoff = true),
-        )
+                objective,
+                BacktrackParams(nativeSat = false, pbObjectiveCutoff = true),
+            ),
         )
         val sample = transformed.reconstruct(result.sample)
 
@@ -392,29 +396,29 @@ class BinaryObjectiveViewTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(-3, 5), constant = 7)
         val config = PresolveConfig(
             overrides = PresolvePass.entries.associateWith {
-            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-        }
+                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+            },
         )
         for (maximize in listOf(false, true)) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.BACKTRACK,
-                objective,
-                maximize,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.OPTIMIZE,
+                    FiniteEngine.BACKTRACK,
+                    objective,
+                    maximize,
+                ),
             )
             val policy = SourceExecutionPolicy(portfolioArms = 1, explicitPresolve = true)
 
             val result = assertIs<SourceExecutionResult.Finite>(
                 SourceSetup.execute(
                     SourceExecutionRequest(
-                invocation,
-                presolveConfig = config,
-                finiteRequest = { shape -> policy.finiteRequest(shape, FiniteEngine.BACKTRACK, config) },
-            )
-                )
+                        invocation,
+                        presolveConfig = config,
+                        finiteRequest = { shape -> policy.finiteRequest(shape, FiniteEngine.BACKTRACK, config) },
+                    ),
+                ),
             )
             val optimum = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
             val sample = checkNotNull(optimum.bestSample)
@@ -452,17 +456,17 @@ class BinaryObjectiveViewTest {
             val original = LinearObjective(longArrayOf(5), longArrayOf(3))
             val transformed = checkNotNull(
                 BinaryColumnSubstitution.substitute(
-                source,
-                setOf(0),
-                BakeConfig.NONE,
-                original,
-            )
+                    source,
+                    setOf(0),
+                    BakeConfig.NONE,
+                    original,
+                ),
             )
 
             val result = assertIs<MinimizeResult.Optimal>(
                 BacktrackSolver(transformed.problem).minimize(
-                checkNotNull(transformed.objective),
-            )
+                    checkNotNull(transformed.objective),
+                ),
             )
             val restored = transformed.reconstruct(result.sample)
 
@@ -482,17 +486,17 @@ class BinaryObjectiveViewTest {
         val original = LinearObjective(intCoefficients = longArrayOf(1, 2))
         val config = PresolveConfig(
             overrides = PresolvePass.entries.associateWith {
-            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-        }
+                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+            },
         )
         val prepared = PresolvePipeline.run(source, original, config, false)
         val objective = checkNotNull(prepared.objective)
 
         val result = assertIs<MinimizeResult.Optimal>(
             BacktrackSolver(prepared.problem.bake()).minimize(
-            objective,
-            BacktrackParams(lpConfig = LpConfig.AGGRESSIVE),
-        )
+                objective,
+                BacktrackParams(lpConfig = LpConfig.AGGRESSIVE),
+            ),
         )
 
         assertEquals(1L, original.evaluateLong(prepared.reconstruct(result.sample)))
@@ -511,11 +515,11 @@ class BinaryObjectiveViewTest {
 
         val transformed = checkNotNull(
             BinaryColumnSubstitution.substitute(
-            source,
-            setOf(0, 1),
-            BakeConfig.NONE,
-            original,
-        )
+                source,
+                setOf(0, 1),
+                BakeConfig.NONE,
+                original,
+            ),
         )
         val objective = checkNotNull(transformed.objective)
         val samples = BacktrackSolver(transformed.problem).enumerate().toList()

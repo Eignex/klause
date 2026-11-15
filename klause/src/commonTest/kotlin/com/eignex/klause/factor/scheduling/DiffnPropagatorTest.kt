@@ -43,12 +43,12 @@ class DiffnPropagatorTest {
             arrayOf(IntDomain(0, 0), IntDomain(1, 1), IntDomain(0, 0), IntDomain(0, 0)),
             arrayOf(
                 Diffn(
-                intArrayOf(0, 1),
-                intArrayOf(2, 3),
-                longArrayOf(2, 0),
-                longArrayOf(1, 1),
-                nonStrict = true,
-            )
+                    intArrayOf(0, 1),
+                    intArrayOf(2, 3),
+                    longArrayOf(2, 0),
+                    longArrayOf(1, 1),
+                    nonStrict = true,
+                ),
             ),
         )
 

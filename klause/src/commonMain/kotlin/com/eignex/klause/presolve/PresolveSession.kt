@@ -364,9 +364,8 @@ internal class PresolveSession(
     }
 
     // Under a monotone narrowing, equal endpoints and exact hole counts mean no new exclusions.
-    private fun unchangedNarrowing(current: IntDomain, target: IntDomain): Boolean =
-        current === target || (
-            current.min == target.min && current.max == target.max &&
+    private fun unchangedNarrowing(current: IntDomain, target: IntDomain): Boolean = current === target || (
+        current.min == target.min && current.max == target.max &&
             current.holeCount != Long.MAX_VALUE && current.holeCount == target.holeCount
         )
 

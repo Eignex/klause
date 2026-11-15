@@ -68,10 +68,10 @@ class ResumableOpenTheoryTest {
 
         val result = assertIs<OpenTheoryResult.Unknown>(
             search.runSlice(
-            ExecutionControl { true },
-            sliceMillis = Long.MAX_VALUE,
-            sliceWork = 1,
-        )
+                ExecutionControl { true },
+                sliceMillis = Long.MAX_VALUE,
+                sliceWork = 1,
+            ),
         )
         search.close()
 
@@ -92,10 +92,10 @@ class ResumableOpenTheoryTest {
 
         val result = assertIs<OpenTheoryResult.Sat>(
             search.runSlice(
-            ExecutionControl.Never,
-            sliceMillis = Long.MAX_VALUE,
-            sliceWork = Long.MAX_VALUE,
-        )
+                ExecutionControl.Never,
+                sliceMillis = Long.MAX_VALUE,
+                sliceWork = Long.MAX_VALUE,
+            ),
         )
         search.close()
 
@@ -121,10 +121,10 @@ class ResumableOpenTheoryTest {
 
         val result = assertIs<OpenTheoryResult.Unknown>(
             search.runSlice(
-            ExecutionControl.Never,
-            sliceMillis = Long.MAX_VALUE,
-            sliceWork = 1,
-        )
+                ExecutionControl.Never,
+                sliceMillis = Long.MAX_VALUE,
+                sliceWork = 1,
+            ),
         )
         search.close()
 

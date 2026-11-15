@@ -16,9 +16,9 @@ class SourceDefinitionReferencesTest {
         val references = SourceDefinitionReferences(
             intArrayOf(0, 1),
             listOf(
-            BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
-            BoolFoldDefinition(2, intArrayOf(Lit.make(1, true)), false),
-        )
+                BoolFoldDefinition(1, intArrayOf(Lit.make(0, false)), true),
+                BoolFoldDefinition(2, intArrayOf(Lit.make(1, true)), false),
+            ),
         )
         val coordinates = VarRemap(intArrayOf(1, 0, -1), intArrayOf(-1, 0))
 
@@ -34,8 +34,8 @@ class SourceDefinitionReferencesTest {
         val references = SourceDefinitionReferences(
             intArrayOf(),
             listOf(
-            BoolFoldDefinition(2, intArrayOf(Lit.make(0, true), Lit.make(1, false)), true),
-        )
+                BoolFoldDefinition(2, intArrayOf(Lit.make(0, true), Lit.make(1, false)), true),
+            ),
         )
         var charged = 0L
         val stop = object : ExecutionControl() {

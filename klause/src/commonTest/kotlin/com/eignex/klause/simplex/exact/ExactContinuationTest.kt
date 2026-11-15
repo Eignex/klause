@@ -117,10 +117,10 @@ class ExactContinuationTest {
             probe.resume(
                 replacement = changed,
                 cancellation = ExecutionControl {
-            checks++
-            false
-        }
-            ).values
+                    checks++
+                    false
+                },
+            ).values,
         )
         var promotionInterruptions = 0
         var previousCheckpoints = 0

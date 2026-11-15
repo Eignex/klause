@@ -71,7 +71,7 @@ class ArithmeticLearningTraceTest {
             assertContentEquals(
                 longArrayOf(1, 3),
                 trace.events.filter { it.kind == kind }
-                .map { it.data[0] }.toLongArray()
+                    .map { it.data[0] }.toLongArray(),
             )
             assertEquals(8L, trace.omittedObservations)
             assertFalse(trace.truncated)
@@ -86,15 +86,16 @@ class ArithmeticLearningTraceTest {
             val row = requireNotNull(
                 IntegerConflictRow.source(
                     LinearPropagator(
-                intArrayOf(),
-                intArrayOf(0),
-                longArrayOf(1),
-                intArrayOf(0),
-                LinearOp.LE,
-                6,
-            ),
-                useLo = true, guard = guard
-                )
+                        intArrayOf(),
+                        intArrayOf(0),
+                        longArrayOf(1),
+                        intArrayOf(0),
+                        LinearOp.LE,
+                        6,
+                    ),
+                    useLo = true,
+                    guard = guard,
+                ),
             )
             val trace = ArithmeticLearningTrace()
 
@@ -134,26 +135,26 @@ class ArithmeticLearningTraceTest {
     fun `historical capture should exclude a later journalled hole`() {
         val state = PropagationState(
             Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 6).excludeValue(1)),
-            emptyArray(),
-        ),
-            Assumptions.None
+                0,
+                1,
+                arrayOf(IntDomain(0, 6).excludeValue(1)),
+                emptyArray(),
+            ),
+            Assumptions.None,
         )
         state.undoLogging = true
         val row = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0),
-            longArrayOf(1),
-            intArrayOf(0),
-            LinearOp.LE,
-            6,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0),
+                    longArrayOf(1),
+                    intArrayOf(0),
+                    LinearOp.LE,
+                    6,
+                ),
+                useLo = true,
+            ),
         )
         assertTrue(state.excludeIntValueImpl(0, 3, null))
         val trace = ArithmeticLearningTrace()
@@ -194,15 +195,15 @@ class ArithmeticLearningTraceTest {
         val row = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0),
-            longArrayOf(1),
-            intArrayOf(0),
-            LinearOp.LE,
-            6,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0),
+                    longArrayOf(1),
+                    intArrayOf(0),
+                    LinearOp.LE,
+                    6,
+                ),
+                useLo = true,
+            ),
         )
         val trace = ArithmeticLearningTrace().apply { captureFirstInteger = true }
         trace.record("prefix", 1)
@@ -223,7 +224,7 @@ class ArithmeticLearningTraceTest {
         assertContentEquals(
             longArrayOf(1, 2),
             trace.events.filter { it.kind == "consumer.upper" }
-            .map { it.data[3] }.toLongArray()
+                .map { it.data[3] }.toLongArray(),
         )
         assertEquals(1, trace.events.count { it.kind == "traversal.pick" })
         assertEquals(-1L, trace.events.last().data[2])
@@ -280,15 +281,15 @@ class ArithmeticLearningTraceTest {
         for (capture in 0..2) {
             val native = PropagationSession(
                 Problem(
-                0,
-                3,
-                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-                arrayOf(
-                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    0,
+                    3,
+                    arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                    arrayOf(
+                        Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                        Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    ),
                 ),
-            ),
-                pbLearning = false
+                pbLearning = false,
             ).apply { enableIntegerRowLearning() }
             val trace = ArithmeticLearningTrace().apply { captureFirstInteger = capture == 2 }
             if (capture != 0) native.explanationState.arithmeticLearningTrace = trace

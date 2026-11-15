@@ -80,18 +80,20 @@ internal class LearnedIndex<V : Any> {
 
     private fun insert(node: Node<V>?, key: Long, value: V): Node<V> {
         if (node == null) {
-            size++;
+            size++
             return Node(key, value)
         }
         return when {
             key < node.key -> {
-                node.left = insert(node.left, key, value);
+                node.left = insert(node.left, key, value)
                 balance(node)
             }
+
             key > node.key -> {
-                node.right = insert(node.right, key, value);
+                node.right = insert(node.right, key, value)
                 balance(node)
             }
+
             else -> node.also { it.value = value }
         }
     }
@@ -105,11 +107,11 @@ internal class LearnedIndex<V : Any> {
 
             else -> {
                 if (node.left == null) {
-                    size--;
+                    size--
                     return node.right
                 }
                 if (node.right == null) {
-                    size--;
+                    size--
                     return node.left
                 }
                 var successor = checkNotNull(node.right)

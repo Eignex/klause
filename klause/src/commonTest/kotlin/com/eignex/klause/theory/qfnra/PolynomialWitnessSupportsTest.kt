@@ -43,13 +43,13 @@ class PolynomialWitnessSupportsTest {
 
             val point = assertNotNull(
                 PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                emptyMap(),
-                takeAxis = { ++axes <= 32 },
-                takeProposal = { ++proposals <= 63 },
-            )
+                    atoms,
+                    atoms.map { it.polynomial.terms },
+                    source.realCount,
+                    emptyMap(),
+                    takeAxis = { ++axes <= 32 },
+                    takeProposal = { ++proposals <= 63 },
+                ),
             )
 
             val coordinates = point.mapValues { algebraic.rational(it.value) }
@@ -75,13 +75,13 @@ class PolynomialWitnessSupportsTest {
 
         val point = assertNotNull(
             PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            emptyMap(),
-            { true },
-            { true },
-        )
+                atoms,
+                atoms.map { it.polynomial.terms },
+                source.realCount,
+                emptyMap(),
+                { true },
+                { true },
+            ),
         )
 
         val coordinates = point.mapValues { algebraic.rational(it.value) }
@@ -107,13 +107,13 @@ class PolynomialWitnessSupportsTest {
 
         val point = assertNotNull(
             PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            mapOf(0 to BigFraction.ONE),
-            { true },
-            { true },
-        )
+                atoms,
+                atoms.map { it.polynomial.terms },
+                source.realCount,
+                mapOf(0 to BigFraction.ONE),
+                { true },
+                { true },
+            ),
         )
 
         assertEquals(BigFraction.ONE, point.getValue(0))
@@ -135,13 +135,13 @@ class PolynomialWitnessSupportsTest {
 
         val point = assertNotNull(
             PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            emptyMap(),
-            { true },
-            { true },
-        )
+                atoms,
+                atoms.map { it.polynomial.terms },
+                source.realCount,
+                emptyMap(),
+                { true },
+                { true },
+            ),
         )
 
         assertEquals(BigFraction.ZERO, point.getValue(2))
@@ -162,13 +162,13 @@ class PolynomialWitnessSupportsTest {
 
         val point = assertNotNull(
             PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            emptyMap(),
-            { true },
-            { true },
-        )
+                atoms,
+                atoms.map { it.polynomial.terms },
+                source.realCount,
+                emptyMap(),
+                { true },
+                { true },
+            ),
         )
 
         val coordinates = point.mapValues { algebraic.rational(it.value) }
@@ -400,13 +400,13 @@ class PolynomialWitnessSupportsTest {
 
         val point = assertNotNull(
             PolynomialWitnessSupports(arithmetic, 2048, 8, 3, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            mapOf(2 to BigFraction.ofLong(3)),
-            { true },
-            { true },
-        )
+                atoms,
+                atoms.map { it.polynomial.terms },
+                source.realCount,
+                mapOf(2 to BigFraction.ofLong(3)),
+                { true },
+                { true },
+            ),
         )
 
         val coordinates = point.mapValues { algebraic.rational(it.value) }
@@ -454,13 +454,13 @@ class PolynomialWitnessSupportsTest {
         }
         assertNotNull(
             PolynomialWitnessSupports(PolynomialArithmetic(counter), 2048, 8, 4096, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            emptyMap(),
-            { true },
-            { true },
-        )
+                atoms,
+                atoms.map { it.polynomial.terms },
+                source.realCount,
+                emptyMap(),
+                { true },
+                { true },
+            ),
         )
         for (limit in listOf(1L, completed / 2, completed - 1)) {
             var spent = 0L
@@ -492,10 +492,10 @@ class PolynomialWitnessSupportsTest {
         )
         val completed = assertIs<QfNraResult.Satisfiable>(
             solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-        )
+                source.formula,
+                source.boolCount,
+                source.realCount,
+            ),
         )
 
         val stopped = solveQfNra(

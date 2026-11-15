@@ -120,7 +120,7 @@ internal object MpsLpQuery {
                 val rootUnchanged = !sameRoot || (
                     rootDomains.indices.all { session.intDomain(it) === rootDomains[it] } &&
                         rootBooleans.indices.all { session.boolValue(it) == rootBooleans[it] }
-                )
+                    )
                 val floatTermination = (afterPrune["scopedPreparation"] as? JsonObject)
                     ?.get("floatTermination")?.jsonPrimitive?.content
                 val completedRoot = nodeOnly && lower.isFinite() && floatTermination == "OPTIMAL_CANDIDATE"
@@ -144,42 +144,42 @@ internal object MpsLpQuery {
                 val closeAllocated = bean.getThreadAllocatedBytes(thread) - closeBytes
                 emit(
                     buildJsonObject {
-                    put("scope", "native-prepared-root-queries")
-                    put("sourceVerdictClaim", false)
-                    put("threadAllocationOnly", true)
-                    put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
-                    put("mode", mode)
-                    put("repeat", repeat)
-                    put("ownerReused", reused)
-                    put("freshRootSession", !sameRoot || repeat == 0)
-                    put("rootUnchanged", rootUnchanged)
-                    put("stopReason", stopReason)
-                    put("rootQueryPolicy", rootPolicy)
-                    put("checkedBoundOrigin", if (nodeOnly) "node-query" else "fresh-root")
-                    put("checkedRootBoundExecuted", !nodeOnly)
-                    put("plan", plan.toString())
-                    put("containingSeconds", 30)
-                    put("querySeconds", 10)
-                    put("cutoff", "positive-infinity")
-                    if (lower.isFinite()) {
-                        put("checkedNativeLowerBound", lower)
-                    } else {
-                        put("checkedNativeLowerBound", JsonNull)
-                    }
-                    put("certifiedNodePrune", prune)
-                    put("cancelled", token())
-                    put("setupNs", setupNs)
-                    put("setupThreadBytes", setupBytes)
-                    put("checkedRootBoundNs", boundElapsed)
-                    put("checkedRootBoundThreadBytes", boundAllocated)
-                    put("nodeSessionAndPruneNs", pruneElapsed)
-                    put("nodeSessionAndPruneThreadBytes", pruneAllocated)
-                    put("closeNs", closeElapsed)
-                    put("closeThreadBytes", closeAllocated)
-                    put("before", before)
-                    put("afterCheckedRootBound", afterBound)
-                    put("afterNodePrune", afterPrune)
-                }
+                        put("scope", "native-prepared-root-queries")
+                        put("sourceVerdictClaim", false)
+                        put("threadAllocationOnly", true)
+                        put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
+                        put("mode", mode)
+                        put("repeat", repeat)
+                        put("ownerReused", reused)
+                        put("freshRootSession", !sameRoot || repeat == 0)
+                        put("rootUnchanged", rootUnchanged)
+                        put("stopReason", stopReason)
+                        put("rootQueryPolicy", rootPolicy)
+                        put("checkedBoundOrigin", if (nodeOnly) "node-query" else "fresh-root")
+                        put("checkedRootBoundExecuted", !nodeOnly)
+                        put("plan", plan.toString())
+                        put("containingSeconds", 30)
+                        put("querySeconds", 10)
+                        put("cutoff", "positive-infinity")
+                        if (lower.isFinite()) {
+                            put("checkedNativeLowerBound", lower)
+                        } else {
+                            put("checkedNativeLowerBound", JsonNull)
+                        }
+                        put("certifiedNodePrune", prune)
+                        put("cancelled", token())
+                        put("setupNs", setupNs)
+                        put("setupThreadBytes", setupBytes)
+                        put("checkedRootBoundNs", boundElapsed)
+                        put("checkedRootBoundThreadBytes", boundAllocated)
+                        put("nodeSessionAndPruneNs", pruneElapsed)
+                        put("nodeSessionAndPruneThreadBytes", pruneAllocated)
+                        put("closeNs", closeElapsed)
+                        put("closeThreadBytes", closeAllocated)
+                        put("before", before)
+                        put("afterCheckedRootBound", afterBound)
+                        put("afterNodePrune", afterPrune)
+                    },
                 )
                 if (stopReason != null) break
                 repeat++
@@ -230,14 +230,14 @@ internal object MpsLpQuery {
             put(
                 "offeredNodeWork",
                 owner.javaClass.methods.single {
-                it.name.startsWith("nodeWorkBudget") && it.parameterCount == 0
-            }.invoke(owner) as Long
+                    it.name.startsWith("nodeWorkBudget") && it.parameterCount == 0
+                }.invoke(owner) as Long,
             )
             put(
                 "offeredPreparationWork",
                 owner.javaClass.methods.single {
-                it.name.startsWith("nodePreparationWorkBudget") && it.parameterCount == 0
-            }.invoke(owner) as Long
+                    it.name.startsWith("nodePreparationWorkBudget") && it.parameterCount == 0
+                }.invoke(owner) as Long,
             )
             put("scopedPreparation", scopedPreparation(owner))
             put("nodePasses", lp.nodePasses.sum)
@@ -259,15 +259,15 @@ internal object MpsLpQuery {
             put(
                 "certifiers",
                 buildJsonObject {
-                for ((name, value) in listOf(
-                    "integer" to lp.integerCertify,
-                    "safeBound" to lp.safeObjectiveLowerBound,
-                    "farkas" to lp.exactFarkasRay,
-                    "rational" to lp.rationalOutcome,
-                )) {
-                    put(name, certifier(value))
-                }
-            }
+                    for ((name, value) in listOf(
+                        "integer" to lp.integerCertify,
+                        "safeBound" to lp.safeObjectiveLowerBound,
+                        "farkas" to lp.exactFarkasRay,
+                        "rational" to lp.rationalOutcome,
+                    )) {
+                        put(name, certifier(value))
+                    }
+                },
             )
         }
     }
@@ -279,7 +279,7 @@ internal object MpsLpQuery {
             put(
                 "floatTermination",
                 propagator.javaClass.getMethod("getFloatTermination")
-                .invoke(propagator)?.toString()
+                    .invoke(propagator)?.toString(),
             )
             put("floatPaused", propagator.javaClass.getMethod("getFloatPaused").invoke(propagator) as Boolean)
             for (name in listOf(

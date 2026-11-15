@@ -32,15 +32,17 @@ import kotlin.test.assertTrue
 
 class RootInprocessingSearchTest {
     private fun problem(): Problem = Problem(
-        6, 0, emptyArray(),
+        6,
+        0,
+        emptyArray(),
         arrayOf<Factor>(
-        Clause(intArrayOf(9)),
-        Clause(intArrayOf(0, 2, 8)),
-        Clause(intArrayOf(4, 6)),
-        Clause(intArrayOf(4, 7)),
-        Clause(intArrayOf(2, 6, 10, 8)),
-        Clause(intArrayOf(2, 6, 11, 8)),
-    )
+            Clause(intArrayOf(9)),
+            Clause(intArrayOf(0, 2, 8)),
+            Clause(intArrayOf(4, 6)),
+            Clause(intArrayOf(4, 7)),
+            Clause(intArrayOf(2, 6, 10, 8)),
+            Clause(intArrayOf(2, 6, 11, 8)),
+        ),
     )
 
     private fun params(native: Boolean, exchange: ClauseExchange? = null): BacktrackParams = BacktrackParams(
@@ -123,11 +125,13 @@ class RootInprocessingSearchTest {
     @Test
     fun `ordinary integer search should consume endpoint probing without existing atoms`() {
         val source = Problem(
-            0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
+            0,
+            2,
+            arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
             arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.LE, 0),
+            ),
         )
         val configured = BacktrackParams(
             nativeSat = true,
@@ -297,12 +301,14 @@ class RootInprocessingSearchTest {
     fun `restarting assumption searches should keep root passes disabled`() {
         for (native in listOf(false, true)) {
             val guarded = Problem(
-                5, 0, emptyArray(),
+                5,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(5, 6, 8)),
-                Clause(intArrayOf(5, 6, 9)),
-            )
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(5, 6, 8)),
+                    Clause(intArrayOf(5, 6, 9)),
+                ),
             )
             val configured = params(native).copy(assumptions = Assumptions(bools = mapOf(2 to true)))
 
@@ -319,12 +325,14 @@ class RootInprocessingSearchTest {
     fun `selected retirement should wait until its root premise reaches a peer`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                4, 0, emptyArray(),
+                4,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(0, 3)),
-                Clause(intArrayOf(4, 6)),
-            )
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(0, 3)),
+                    Clause(intArrayOf(4, 6)),
+                ),
             )
             var retained: PropagationSession? = null
             var target = -1
@@ -375,12 +383,14 @@ class RootInprocessingSearchTest {
     fun `a paused peer publication should retain selected ownership until resumed`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                4, 0, emptyArray(),
+                4,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(0, 3)),
-                Clause(intArrayOf(4, 6)),
-            )
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(0, 3)),
+                    Clause(intArrayOf(4, 6)),
+                ),
             )
             var retained: PropagationSession? = null
             var target = -1
@@ -442,14 +452,16 @@ class RootInprocessingSearchTest {
     fun `a completed probing contradiction should close the real root`() {
         for (native in listOf(false, true)) {
             val unsat = Problem(
-                4, 0, emptyArray(),
+                4,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(4, 6)),
-                Clause(intArrayOf(4, 7)),
-                Clause(intArrayOf(5, 6)),
-                Clause(intArrayOf(5, 7)),
-            )
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(4, 6)),
+                    Clause(intArrayOf(4, 7)),
+                    Clause(intArrayOf(5, 6)),
+                    Clause(intArrayOf(5, 7)),
+                ),
             )
             var retained: PropagationSession? = null
             val exchange = object : ClauseExchange {

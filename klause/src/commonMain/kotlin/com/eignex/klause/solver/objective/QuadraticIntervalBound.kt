@@ -29,14 +29,14 @@ internal fun QuadraticObjectiveSpec.intervalBounds(
                 }
         } else {
             listOf(
-            first.first * second.first,
-            first.first * second.second,
-            first.second * second.first,
-            first.second * second.second,
-        )
+                first.first * second.first,
+                first.first * second.second,
+                first.second * second.first,
+                first.second * second.second,
+            )
         }
         val scaled = values.map {
-            step();
+            step()
             it * coefficient
         }
         lower += scaled.reduce { left, right -> if (left < right) left else right }

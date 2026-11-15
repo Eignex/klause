@@ -43,13 +43,15 @@ class BooleanCoverageAttributionTest {
     @Test
     fun `actual refuted replicas should attribute completed native coverage separately from visits`() {
         val model = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(0, 2)),
-            Clause(intArrayOf(0, 3)),
-            Clause(intArrayOf(1, 2)),
-            Clause(intArrayOf(1, 3)),
-        )
+                Clause(intArrayOf(0, 2)),
+                Clause(intArrayOf(0, 3)),
+                Clause(intArrayOf(1, 2)),
+                Clause(intArrayOf(1, 3)),
+            ),
         ).bake()
         val capture = BooleanCoverageAttribution(context)
 

@@ -11,8 +11,8 @@ import com.eignex.util.numbers.toLongExact
 internal fun ExactLinear.finiteRelaxationSupported(): Boolean = relation != LinearOp.NE &&
     (
         (compactRelaxationSupported() && (activator == LinearRow.ALWAYS || relation != LinearOp.EQ)) ||
-        (!strict && activator == LinearRow.ALWAYS && numericalRow() != null)
-    )
+            (!strict && activator == LinearRow.ALWAYS && numericalRow() != null)
+        )
 
 internal fun ExactLinear.compactRelaxationSupported(): Boolean = constants.exactBound.fitsLong() &&
     constants.exactBound.toLongExact() in -9007199254740992L..9007199254740992L &&

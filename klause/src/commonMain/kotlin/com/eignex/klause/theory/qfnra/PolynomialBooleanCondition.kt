@@ -42,10 +42,10 @@ internal object PolynomialBooleanCondition {
                     val condition = values.getValue(node.condition)
                     if (condition is PolynomialRealFormula.Constant) {
                         PolynomialRealFormula.Atom(
-                        PolynomialExpression.Variable(node.result),
-                        PolynomialRelation.EQ,
-                        if (condition.value) node.whenTrue else node.whenFalse,
-                    )
+                            PolynomialExpression.Variable(node.result),
+                            PolynomialRelation.EQ,
+                            if (condition.value) node.whenTrue else node.whenFalse,
+                        )
                     } else {
                         PolynomialSelection(node.result, condition, node.whenTrue, node.whenFalse)
                     }

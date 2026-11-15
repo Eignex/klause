@@ -53,11 +53,11 @@ internal object LinearPrefixInspection {
             val started = System.nanoTime()
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                compiled.source,
-                ExecutionOperation.SATISFY,
-                FiniteEngine.BACKTRACK,
-                cancellation = stop,
-            )
+                    compiled.source,
+                    ExecutionOperation.SATISFY,
+                    FiniteEngine.BACKTRACK,
+                    cancellation = stop,
+                ),
             )
             val request = (invocation.route as? SourceProblemRoute.OpenTheory)?.request
                 ?: error("prefix capture requires an open theory route")
@@ -140,9 +140,9 @@ internal object LinearPrefixInspection {
                     val before = work.snapshot()
                     val deductions = if (probe && replay == 1) {
                         call(
-                        requireNotNull(planned.theory),
-                        "probePartialLinearImplications",
-                    )
+                            requireNotNull(planned.theory),
+                            "probePartialLinearImplications",
+                        )
                     } else {
                         null
                     }
@@ -181,8 +181,8 @@ internal object LinearPrefixInspection {
                             "assignedBooleans",
                             (
                                 0 until (field(requireNotNull(planned.theory), "model") as Problem)
-                            .numBoolVars
-                            ).count { planned.session.boolValue(it) != null }
+                                    .numBoolVars
+                                ).count { planned.session.boolValue(it) != null },
                         )
                         put("stopCause", planned.session.executionControls.stopCause?.name)
                         put(
@@ -303,10 +303,10 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
             put(
                 "sourceNames",
                 buildJsonObject {
-                put("integers", scalar(compiled.intVarNames))
-                put("booleans", scalar(compiled.boolVarNames))
-                put("reals", scalar(compiled.realVarNames))
-            }
+                    put("integers", scalar(compiled.intVarNames))
+                    put("booleans", scalar(compiled.boolVarNames))
+                    put("reals", scalar(compiled.realVarNames))
+                },
             )
             put("sourceModel", dimensions(member(mapping, "getSource") as Problem))
             put("preparedModel", dimensions(member(mapping, "getTarget") as Problem))
@@ -318,83 +318,83 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
             put(
                 "booleanPins",
                 buildJsonArray {
-                for (variable in pins.indices) {
-                    tick()
-                    val shared = session.boolValue(variable)
-                    val received = when (pins[variable]) {
-                        -1 -> null
-                        0 -> false
-                        1 -> true
-                        else -> error("invalid arithmetic Boolean pin")
+                    for (variable in pins.indices) {
+                        tick()
+                        val shared = session.boolValue(variable)
+                        val received = when (pins[variable]) {
+                            -1 -> null
+                            0 -> false
+                            1 -> true
+                            else -> error("invalid arithmetic Boolean pin")
+                        }
+                        require(shared == received) { "undelivered Boolean pin" }
+                        add(
+                            buildJsonObject {
+                                put("value", scalar(shared))
+                                put("reason", scalar(session.reasonFor(variable)?.literals))
+                                put("level", scalar(shared?.let { session.levelOf(variable shl 1) }))
+                            },
+                        )
                     }
-                    require(shared == received) { "undelivered Boolean pin" }
-                    add(
-                        buildJsonObject {
-                        put("value", scalar(shared))
-                        put("reason", scalar(session.reasonFor(variable)?.literals))
-                        put("level", scalar(shared?.let { session.levelOf(variable shl 1) }))
-                    }
-                    )
-                }
-            }
+                },
             )
             put("registeredAtoms", scalar(atoms?.let { field(it, "assertions") }))
             put(
                 "registeredPins",
                 buildJsonArray {
-                val assertions = (atoms?.let { field(it, "assertions") } as? List<*>).orEmpty()
-                for (assertion in assertions) {
-                    val literal = member(requireNotNull(assertion), "getLiteral") as Int
-                    if (literal and 1 != 0) continue
-                    add(
-                        buildJsonObject {
-                        put("literal", literal)
-                        val value = session.boolValue(literal ushr 1)
-                        put("value", scalar(value))
-                        put("level", scalar(value?.let { session.levelOf(literal) }))
-                        put("reason", scalar(session.reasonFor(literal ushr 1)?.literals))
+                    val assertions = (atoms?.let { field(it, "assertions") } as? List<*>).orEmpty()
+                    for (assertion in assertions) {
+                        val literal = member(requireNotNull(assertion), "getLiteral") as Int
+                        if (literal and 1 != 0) continue
+                        add(
+                            buildJsonObject {
+                                put("literal", literal)
+                                val value = session.boolValue(literal ushr 1)
+                                put("value", scalar(value))
+                                put("level", scalar(value?.let { session.levelOf(literal) }))
+                                put("reason", scalar(session.reasonFor(literal ushr 1)?.literals))
+                            },
+                        )
                     }
-                    )
-                }
-            }
+                },
             )
             put(
                 "integerBounds",
                 buildJsonArray {
-                for (variable in 0 until model.numIntVars) {
-                    tick()
-                    add(
-                        buildJsonObject {
-                        put("variable", variable)
-                        put("declaredLower", model.intBounds.lowerAsBigInteger(variable)?.toString())
-                        put("declaredUpper", model.intBounds.upperAsBigInteger(variable)?.toString())
-                        put("finite", model.intDomainOrNull(variable) != null)
-                        put("publishedLower", scalar(session.intLowerBound(variable)))
-                        put("publishedUpper", scalar(session.intUpperBound(variable)))
-                        put("lowerPremise", scalar(session.intLowerBoundPremise(variable)))
-                        put("upperPremise", scalar(session.intUpperBoundPremise(variable)))
+                    for (variable in 0 until model.numIntVars) {
+                        tick()
+                        add(
+                            buildJsonObject {
+                                put("variable", variable)
+                                put("declaredLower", model.intBounds.lowerAsBigInteger(variable)?.toString())
+                                put("declaredUpper", model.intBounds.upperAsBigInteger(variable)?.toString())
+                                put("finite", model.intDomainOrNull(variable) != null)
+                                put("publishedLower", scalar(session.intLowerBound(variable)))
+                                put("publishedUpper", scalar(session.intUpperBound(variable)))
+                                put("lowerPremise", scalar(session.intLowerBoundPremise(variable)))
+                                put("upperPremise", scalar(session.intUpperBoundPremise(variable)))
+                            },
+                        )
                     }
-                    )
-                }
-            }
+                },
             )
             put(
                 "rows",
                 buildJsonArray {
-                for ((factorIndex, factor) in model.factors.withIndex()) {
-                    for ((rowIndex, row) in factor.linearRows.withIndex()) {
-                        tick()
-                        add(
-                            buildJsonObject {
-                            put("factor", factorIndex)
-                            put("row", rowIndex)
-                            put("form", factor.linearForm?.javaClass?.simpleName)
-                            put("data", LinearDisjunctionInspection.rowRecord(row))
+                    for ((factorIndex, factor) in model.factors.withIndex()) {
+                        for ((rowIndex, row) in factor.linearRows.withIndex()) {
+                            tick()
+                            add(
+                                buildJsonObject {
+                                    put("factor", factorIndex)
+                                    put("row", rowIndex)
+                                    put("form", factor.linearForm?.javaClass?.simpleName)
+                                    put("data", LinearDisjunctionInspection.rowRecord(row))
+                                },
+                            )
                         }
-                        )
                     }
-                }
-            }
+                },
             )
             put("assertionLevels", scalar(field(theory, "sourceAssertionLevels")))
             put("lpWitnessPremises", scalar(field(lp, "witnesses")))
@@ -419,11 +419,11 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
             val rebuild = requireNotNull(member(current, "getRebuild"))
             add(
                 buildJsonObject {
-                put("source", dimensions(member(current, "getSource") as Problem))
-                put("target", dimensions(member(current, "getTarget") as Problem))
-                put("sourceBooleanCount", scalar(member(rebuild, "getSourceBoolVars")))
-                put("steps", scalar(field(rebuild, "steps")))
-            }
+                    put("source", dimensions(member(current, "getSource") as Problem))
+                    put("target", dimensions(member(current, "getTarget") as Problem))
+                    put("sourceBooleanCount", scalar(member(rebuild, "getSourceBoolVars")))
+                    put("steps", scalar(field(rebuild, "steps")))
+                },
             )
         }
     }
@@ -480,11 +480,11 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
 
             is Map<*, *> -> JsonArray(
                 value.entries.map {
-                buildJsonObject {
-                    put("key", scalar(it.key, depth + 1))
-                    put("value", scalar(it.value, depth + 1))
-                }
-            }
+                    buildJsonObject {
+                        put("key", scalar(it.key, depth + 1))
+                        put("value", scalar(it.value, depth + 1))
+                    }
+                },
             )
 
             is SearchAtomPremise -> premiseReference(value)
@@ -507,20 +507,20 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
             val premise = premises[index++]
             add(
                 buildJsonObject {
-                when (premise) {
-                    is SearchAtomPremise.Asserted -> {
-                        put("type", "asserted")
-                        put("decision", scalar(premise.decision))
-                    }
+                    when (premise) {
+                        is SearchAtomPremise.Asserted -> {
+                            put("type", "asserted")
+                            put("decision", scalar(premise.decision))
+                        }
 
-                    is SearchAtomPremise.All -> {
-                        put("type", "all")
-                        put("children", scalar(field(premise, "premises")))
-                    }
+                        is SearchAtomPremise.All -> {
+                            put("type", "all")
+                            put("children", scalar(field(premise, "premises")))
+                        }
 
-                    SearchAtomPremise.Unavailable -> put("type", "unavailable")
-                }
-            }
+                        SearchAtomPremise.Unavailable -> put("type", "unavailable")
+                    }
+                },
             )
         }
     }

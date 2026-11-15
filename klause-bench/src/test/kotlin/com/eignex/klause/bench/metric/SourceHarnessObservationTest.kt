@@ -19,11 +19,11 @@ class SourceHarnessObservationTest {
 
         assertEquals(
             mapOf(
-            "sourceHarnessThreadCpuMs" to "8",
-            "sourceHarnessGcCount" to "2",
-            "sourceHarnessGcTimeMs" to "10",
-        ),
-            stats.filterKeys { it.startsWith("sourceHarness") }
+                "sourceHarnessThreadCpuMs" to "8",
+                "sourceHarnessGcCount" to "2",
+                "sourceHarnessGcTimeMs" to "10",
+            ),
+            stats.filterKeys { it.startsWith("sourceHarness") },
         )
     }
 

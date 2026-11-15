@@ -58,8 +58,7 @@ internal class SmtLibPolynomialProblem(
 
 internal fun SmtLibPolynomialProblem.realSource(
     semantics: EffectiveSourceSemantics = smtLibSemantics.resolve(),
-):
-    PolynomialRealProblem {
+): PolynomialRealProblem {
     require(intVarNames.isEmpty()) { "real source contains integer declarations" }
     return PolynomialRealProblem(
         formula,

@@ -18,7 +18,9 @@ internal class LearnedIntegerRows : AbstractList<LearnedIntegerPropagator>() {
             val slot = (size - PAGE_SIZE) and PAGE_MASK
             val page = pages.getOrNull(index)
             val directory = if (index >= pages.size) pages.size * 3L + 1L else 0L
-            val allocation = if (page == null) 1L else if (slot == page.size) {
+            val allocation = if (page == null) {
+                1L
+            } else if (slot == page.size) {
                 page.size * 3L + 1L
             } else {
                 0L

@@ -161,8 +161,8 @@ internal class NonlinearIntegerCursor(
         current = current.mapIndexed(::bounded)
         hints = (
             sourceIntegerHints(problem.formula, arithmetic) +
-            (condition.lower.values + condition.upper.values).map { it.ceilInteger() }
-        ).distinct()
+                (condition.lower.values + condition.upper.values).map { it.ceilInteger() }
+            ).distinct()
         enumeration = (listOf(BIG_ZERO, BIG_ONE, -BIG_ONE) + hints).distinct()
         val fixedIntegers = coordinates.all {
             condition.lower[it] != null && condition.lower[it] == condition.upper[it]
@@ -382,10 +382,10 @@ internal class NonlinearIntegerCursor(
         }
         return invocation.check(
             PolynomialCondition(
-            condition.bools,
-            intersect(condition.lower, true),
-            intersect(condition.upper, false),
-        )
+                condition.bools,
+                intersect(condition.lower, true),
+                intersect(condition.upper, false),
+            ),
         )
     }
 

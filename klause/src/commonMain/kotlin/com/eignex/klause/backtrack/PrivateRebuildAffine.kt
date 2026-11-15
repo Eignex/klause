@@ -93,7 +93,7 @@ internal class PrivateRebuildAffine(
                 (expandedWidth > 64 || forwardWidth < expandedWidth)
             val width = if (useForward) checkNotNull(forwardWidth) else expandedWidth
             if (width > 64) {
-                onDecline("ParityRowWidth");
+                onDecline("ParityRowWidth")
                 return null
             }
             forward[row] = useForward

@@ -42,8 +42,8 @@ internal fun linearRefutationSupport(
             if (coordinate.kind == SourceCoordinate.Kind.Integer && coordinate.id == excludedCoordinate &&
                 isUpper != excluded.upper
             ) {
-                    continue
-                }
+                continue
+            }
             val rootBound = (if (isUpper) upper else lower)[coordinate]
             if (rootBound != null && if (isUpper) rootBound <= value else rootBound >= value) continue
             var found: SearchDecision? = null

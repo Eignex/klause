@@ -65,8 +65,8 @@ internal fun Compiler.Builder.isRealExpr(t: SExpr): Boolean {
                 } else if (node.text in realNames || macros[node.text]?.isReal == true ||
                     (
                         node.text !in intNames && node.text !in boolNames && node.text !in macros &&
-                        isRealLiteral(node.text)
-                    )
+                            isRealLiteral(node.text)
+                        )
                 ) {
                     return true
                 }

@@ -185,8 +185,8 @@ internal class SourceRowCompletion(
             Long.MAX_VALUE
         } else {
             ceiling.toLongExact().let {
-            if (row.strict && integral && it < Long.MAX_VALUE) it + 1 else it
-        }
+                if (row.strict && integral && it < Long.MAX_VALUE) it + 1 else it
+            }
         }
         return shift(center, input, -coefficient.signum(), steps.coerceAtLeast(1L))
     }

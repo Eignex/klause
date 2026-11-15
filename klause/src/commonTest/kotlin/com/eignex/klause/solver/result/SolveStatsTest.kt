@@ -335,15 +335,16 @@ class SolveStatsTest {
     @Test
     fun `snapshots combine live LP observations and presolve contributions`() {
         val prepared = listOf(
-            null, LpStats(),
+            null,
+            LpStats(),
             LpStats(
-            rootPasses = SumResult(2.0),
-            solves = SumResult(3.0),
-            phases = mapOf(
-                "PRESOLVE" to
-                    LpPhaseStats(calls = 1L, outcomes = mapOf("ACCEPTED" to 1L)),
+                rootPasses = SumResult(2.0),
+                solves = SumResult(3.0),
+                phases = mapOf(
+                    "PRESOLVE" to
+                        LpPhaseStats(calls = 1L, outcomes = mapOf("ACCEPTED" to 1L)),
+                ),
             ),
-        )
         )
         for (presolveLp in prepared) {
             for (sparse in listOf(emptyMap(), mapOf("Pending" to -1L, "Rows" to 3L))) {

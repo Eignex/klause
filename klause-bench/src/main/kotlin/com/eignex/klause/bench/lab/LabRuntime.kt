@@ -20,13 +20,13 @@ internal object LabRuntime {
         }
         addAll(
             listOf(
-            "-cp",
-            System.getProperty("java.class.path"),
-            "com.eignex.klause.bench.lab.LabAdapterKt",
-            "solve-record",
-            input.toString(),
-            report.toString(),
-        )
+                "-cp",
+                System.getProperty("java.class.path"),
+                "com.eignex.klause.bench.lab.LabAdapterKt",
+                "solve-record",
+                input.toString(),
+                report.toString(),
+            ),
         )
     }
 

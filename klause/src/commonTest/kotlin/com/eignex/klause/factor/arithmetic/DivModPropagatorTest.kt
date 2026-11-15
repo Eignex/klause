@@ -22,13 +22,14 @@ class DivModPropagatorTest {
     @Test
     fun `exhausted support retention should preserve domain filtering`() {
         val source = Problem(
-            0, 3,
+            0,
+            3,
             arrayOf(
-            intDomainFromSurvivors(longArrayOf(1, 5)),
-            IntDomain(0, 2),
-            IntDomain(0, 1),
-        ),
-            arrayOf(DivMod(0, bigIntOf(2), 1, 2))
+                intDomainFromSurvivors(longArrayOf(1, 5)),
+                IntDomain(0, 2),
+                IntDomain(0, 1),
+            ),
+            arrayOf(DivMod(0, bigIntOf(2), 1, 2)),
         )
         val state = PropagationState(source, Assumptions.None)
         state.divModSupportCells = 1 shl 20
@@ -44,14 +45,15 @@ class DivModPropagatorTest {
     fun `restored output holes should recover their signed supports`() {
         for (convention in DivisionConvention.entries) {
             val source = Problem(
-                0, 4,
+                0,
+                4,
                 arrayOf(
-                IntDomain(-7, 7),
-                IntDomain(-3, -3),
-                IntDomain(-3, 3),
-                IntDomain(-2, 2),
-            ),
-                arrayOf(DivMod(0, 1, 2, 3, convention))
+                    IntDomain(-7, 7),
+                    IntDomain(-3, -3),
+                    IntDomain(-3, 3),
+                    IntDomain(-2, 2),
+                ),
+                arrayOf(DivMod(0, 1, 2, 3, convention)),
             )
             val session = PropagationSession(source)
             val expected = if (convention == DivisionConvention.TRUNCATING) -7L else -5L
@@ -62,9 +64,9 @@ class DivModPropagatorTest {
             assertIs<PropagationResult.Implied>(session.pinInt(2, 2))
             assertIs<PropagationResult.Implied>(
                 session.pinInt(
-                3,
-                if (convention == DivisionConvention.TRUNCATING) -1 else 1,
-            )
+                    3,
+                    if (convention == DivisionConvention.TRUNCATING) -1 else 1,
+                ),
             )
 
             assertEquals(IntDomain(expected, expected), session.intDomain(0))
@@ -75,14 +77,15 @@ class DivModPropagatorTest {
     fun `small branch supports should rebuild after restoring an operand hole`() {
         for (restoredOperand in 0..1) {
             val source = Problem(
-                0, 4,
+                0,
+                4,
                 arrayOf(
-                IntDomain(0, 64),
-                IntDomain(1, 65),
-                IntDomain(0, 64),
-                IntDomain(0, 64),
-            ),
-                arrayOf(DivMod(0, 1, 2, 3))
+                    IntDomain(0, 64),
+                    IntDomain(1, 65),
+                    IntDomain(0, 64),
+                    IntDomain(0, 64),
+                ),
+                arrayOf(DivMod(0, 1, 2, 3)),
             )
             val state = PropagationState(source, Assumptions.None)
             val propagator = DivModPropagator(source.factors[0] as DivMod)
@@ -105,13 +108,14 @@ class DivModPropagatorTest {
     fun `sparse dividend buckets should preserve distant sibling values`() {
         val high = 1_000_000_000_000L
         val source = Problem(
-            0, 3,
+            0,
+            3,
             arrayOf(
-            intDomainFromSurvivors(longArrayOf(0, high)),
-            IntDomain(0, high / 2),
-            IntDomain(0, 1),
-        ),
-            arrayOf(DivMod(0, bigIntOf(2), 1, 2))
+                intDomainFromSurvivors(longArrayOf(0, high)),
+                IntDomain(0, high / 2),
+                IntDomain(0, 1),
+            ),
+            arrayOf(DivMod(0, bigIntOf(2), 1, 2)),
         )
         val session = PropagationSession(source)
         assertIs<PropagationResult.Implied>(session.pinInt(0, 0))
@@ -125,13 +129,14 @@ class DivModPropagatorTest {
     @Test
     fun `small branch supports should rebuild for a distant sibling of a wide root`() {
         val source = Problem(
-            0, 3,
+            0,
+            3,
             arrayOf(
-            IntDomain(0, 10000),
-            IntDomain(0, 5000),
-            IntDomain(0, 1),
-        ),
-            arrayOf(DivMod(0, bigIntOf(2), 1, 2))
+                IntDomain(0, 10000),
+                IntDomain(0, 5000),
+                IntDomain(0, 1),
+            ),
+            arrayOf(DivMod(0, bigIntOf(2), 1, 2)),
         )
         val session = PropagationSession(source)
         assertIs<PropagationResult.Implied>(session.pinIntAtMost(0, 5))
@@ -190,13 +195,14 @@ class DivModPropagatorTest {
     @Test
     fun `shared projection should isolate branch support construction`() {
         val source = Problem(
-            0, 3,
+            0,
+            3,
             arrayOf(
-            IntDomain(0, 10000),
-            IntDomain(0, 5000),
-            IntDomain(0, 1),
-        ),
-            arrayOf(DivMod(0, bigIntOf(2), 1, 2))
+                IntDomain(0, 10000),
+                IntDomain(0, 5000),
+                IntDomain(0, 1),
+            ),
+            arrayOf(DivMod(0, bigIntOf(2), 1, 2)),
         )
         val projection = PropagationProblem(source)
         val first = PropagationSession(projection)
@@ -213,13 +219,14 @@ class DivModPropagatorTest {
     fun `retained supports should preserve arbitrary width literal division`() {
         for (convention in DivisionConvention.entries) {
             val source = Problem(
-                0, 3,
+                0,
+                3,
                 arrayOf(
-                IntDomain(0, 5),
-                IntDomain(0, 1),
-                IntDomain(0, 5),
-            ),
-                arrayOf(DivMod(0, parseBigInt("9223372036854775808"), 1, 2, convention))
+                    IntDomain(0, 5),
+                    IntDomain(0, 1),
+                    IntDomain(0, 5),
+                ),
+                arrayOf(DivMod(0, parseBigInt("9223372036854775808"), 1, 2, convention)),
             )
             val session = PropagationSession(source)
             assertIs<PropagationResult.Implied>(session.pinInt(0, 1))

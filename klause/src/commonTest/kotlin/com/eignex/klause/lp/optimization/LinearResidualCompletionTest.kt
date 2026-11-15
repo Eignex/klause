@@ -23,23 +23,23 @@ class LinearResidualCompletionTest {
         val budget = SourceLpBudget(funding = funding)
         val rows = listOf(
             ExactRationalInequality(
-            intArrayOf(0, 1),
-            List(2) { BigFraction.MINUS_ONE },
-            BigFraction.MINUS_ONE,
-        )
+                intArrayOf(0, 1),
+                List(2) { BigFraction.MINUS_ONE },
+                BigFraction.MINUS_ONE,
+            ),
         )
         funding.grant(100_000L)
 
         LinearResidualCompletion(budget, SparseSourceLpPolicy(), LpFloatAllowance(1L, 1)).use { completion ->
             assertNull(
                 completion.complete(
-                rows,
-                2,
-                ExecutionControl.Never,
-                { _, _ -> },
-                List(2) { BigFraction.ONE },
-                small = { null },
-            )
+                    rows,
+                    2,
+                    ExecutionControl.Never,
+                    { _, _ -> },
+                    List(2) { BigFraction.ONE },
+                    small = { null },
+                ),
             )
             val work = budget.measuredFloatWork
             funding.grant(100_000L)
@@ -128,11 +128,11 @@ class LinearResidualCompletionTest {
     fun `a sparse closed endpoint should not satisfy a strict residual`() {
         val rows = listOf(
             ExactRationalInequality(
-            intArrayOf(0),
-            listOf(BigFraction.MINUS_ONE),
-            BigFraction.ZERO,
-            strict = true,
-        )
+                intArrayOf(0),
+                listOf(BigFraction.MINUS_ONE),
+                BigFraction.ZERO,
+                strict = true,
+            ),
         )
 
         val point = LinearResidualCompletion(SourceLpBudget(), SparseSourceLpPolicy()).use {
@@ -157,9 +157,9 @@ class LinearResidualCompletionTest {
                 val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE))
                 assertNull(
                     it.complete(rows, 1, ExecutionControl.Never, observe, small = {
-                    attempts++;
-                    null
-                })
+                        attempts++
+                        null
+                    }),
                 )
             }
         }
@@ -179,15 +179,15 @@ class LinearResidualCompletionTest {
                 val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), rhs))
                 assertNull(
                     completion.complete(
-                    rows,
-                    1,
-                    ExecutionControl.Never,
-                    { _, _ -> },
-                    small = {
-                        attempts++;
-                        null
-                    },
-                )
+                        rows,
+                        1,
+                        ExecutionControl.Never,
+                        { _, _ -> },
+                        small = {
+                            attempts++
+                            null
+                        },
+                    ),
                 )
             }
         }

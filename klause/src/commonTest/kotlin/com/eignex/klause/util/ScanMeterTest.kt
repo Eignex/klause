@@ -12,9 +12,9 @@ class ScanMeterTest {
         var polls = 0
         val scan = ScanMeter(
             ExecutionControl {
-            polls++;
-            false
-        }
+                polls++
+                false
+            },
         )
 
         repeat(1024) { assertTrue(scan.visit(5000L)) }

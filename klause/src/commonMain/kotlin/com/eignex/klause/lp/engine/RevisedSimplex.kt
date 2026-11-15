@@ -227,14 +227,14 @@ internal class RevisedSimplex(
         }
         trace.samples.add(
             SimplexProgressSample(
-            phase,
-            observations.pivots,
-            work.ops,
-            objective,
-            violation,
-            maximum,
-            count,
-        )
+                phase,
+                observations.pivots,
+                work.ops,
+                objective,
+                violation,
+                maximum,
+                count,
+            ),
         )
     }
     internal val lastNumericalMetrics: SimplexNumericalMetrics get() = observations.numericalMetrics
@@ -2897,8 +2897,8 @@ internal class RevisedSimplex(
         if (numerical.applied &&
             (
                 !observations.sourcePrimalResidual.isFinite() ||
-                !observations.sourceBoundViolation.isFinite() || !dualResidual.isFinite()
-            )
+                    !observations.sourceBoundViolation.isFinite() || !dualResidual.isFinite()
+                )
         ) {
             throw LpScalingArithmeticException()
         }
@@ -3102,11 +3102,11 @@ internal class RevisedSimplex(
             RevisedSimplex(
                 child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
                 basisSolverFactory,
-                    pricing.copy(
+                pricing.copy(
                     basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
                     basisWorkLimit = minOf(pricing.basisWorkLimit, work),
                 ),
-                    reuseRationalOrder, scalingOptions,
+                reuseRationalOrder, scalingOptions,
                 primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
                 singletonStart, initialScaling = view, initialMatrix = probeMatrix.takeIf { view != null },
                 allowUnscaledFallback = view == null, initialOrder = order, initialFactorCopy = factors,
@@ -3182,11 +3182,11 @@ internal class RevisedSimplex(
                 RevisedSimplex(
                     child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
                     basisSolverFactory,
-                        pricing.copy(
+                    pricing.copy(
                         basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
                         basisWorkLimit = minOf(pricing.basisWorkLimit, work),
                     ),
-                        reuseRationalOrder, scalingOptions,
+                    reuseRationalOrder, scalingOptions,
                     primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
                     singletonStart, initialScaling = view, initialMatrix = probeMatrix.takeIf { view != null },
                     allowUnscaledFallback = view == null, initialOrder = order, initialFactorCopy = factors,

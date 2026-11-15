@@ -41,12 +41,12 @@ class GeneralMetadataReclamationTest {
         val clause = Clause(intArrayOf(8, 10))
         val session = PropagationSession(
             Problem(
-            6,
-            0,
-            emptyArray(),
-            arrayOf(clause, Clause(intArrayOf(1))),
-        ),
-            nativeSat = false
+                6,
+                0,
+                emptyArray(),
+                arrayOf(clause, Clause(intArrayOf(1))),
+            ),
+            nativeSat = false,
         )
         repeat(16) { session.addLearnedClause(clause, 2, permanent = true) }
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)

@@ -103,7 +103,7 @@ class FiniteWitnessVerificationTest {
     fun `a tolerance check cut short by cancellation should stay indeterminate`() {
         var cancelled = false
         val tolerance: (Sample) -> Boolean = {
-            cancelled = true;
+            cancelled = true
             true
         }
         val model = Problem(

@@ -65,10 +65,10 @@ class SourceExecutionPolicyTest {
         for (source in sources) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SmtLib.parse(source).source,
-                ExecutionOperation.SATISFY,
-                FiniteEngine.BACKTRACK,
-            )
+                    SmtLib.parse(source).source,
+                    ExecutionOperation.SATISFY,
+                    FiniteEngine.BACKTRACK,
+                ),
             )
 
             val request = SourceExecutionRequest(invocation, ExecutionOptions(), presolveConfig = PresolveConfig.NONE)
@@ -81,10 +81,10 @@ class SourceExecutionPolicyTest {
     fun `native formula sources should explain unavailable individual reductions`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
 
         val failure = assertFailsWith<PipelineConfigException> {

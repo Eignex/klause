@@ -23,11 +23,13 @@ class LocalSearchMoveInspectionTest {
     @Test
     fun `inspection preserves violated factor sampling order`() {
         val problem = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true))),
-            Clause(intArrayOf(Lit.make(1, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(1, true))),
+            ),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
         state.recompute()
@@ -41,10 +43,12 @@ class LocalSearchMoveInspectionTest {
     @Test
     fun `inspection restores grades and search activity without random draws`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 4) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 4) },
             arrayOf(
-            Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-        )
+                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+            ),
         )
         val random = object : Random() {
             override fun nextBits(bitCount: Int): Int = error("inspection consumed a random draw")
@@ -103,10 +107,12 @@ class LocalSearchMoveInspectionTest {
     @Test
     fun `inspection preserves the walk across instruction slices`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 4)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 4)),
             arrayOf(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
-        )
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
+            ),
         )
         fun trace(inspect: Boolean, slice: Long): List<Long> {
             val values = ArrayList<Long>()

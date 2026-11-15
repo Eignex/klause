@@ -61,8 +61,8 @@ class MpsCompilerExactTest {
         val tolerance = assertNotNull(source.toLinearSourceProblem())
         val exact = assertNotNull(
             source.toLinearSourceProblem(
-            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-        )
+                SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+            ),
         )
 
         assertTrue(source.toProblem().sourceExact)
@@ -156,8 +156,8 @@ class MpsCompilerExactTest {
         val source = Mps.parse("ROWS\n N COST\n E ROW\nCOLUMNS\n X ROW 0.1\nRHS\n R ROW 0.3\nENDATA")
         val linear = assertNotNull(
             source.toLinearSourceProblem(
-            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-        )
+                SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+            ),
         )
         source.constraints.single().coeffs[0] = 1.0
 
@@ -185,11 +185,11 @@ class MpsCompilerExactTest {
         )
         assertNotNull(
             assertNotNull(source.toLinearSourceProblem(exact)).checkMpsWitness(
-            compiled.columns.map { column ->
-                val parts = sat.assignment.realValue(column.id).split('/')
-                BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
-            },
-        )
+                compiled.columns.map { column ->
+                    val parts = sat.assignment.realValue(column.id).split('/')
+                    BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
+                },
+            ),
         )
     }
 

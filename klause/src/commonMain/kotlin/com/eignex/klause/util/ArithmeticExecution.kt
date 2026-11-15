@@ -42,7 +42,9 @@ internal fun ArithmeticWorkSource.withQuota(bound: ArithmeticWorkSource): Arithm
         override val quotaRemaining: Long? get() {
             val own = this@withQuota.quotaRemaining
             val remaining = bound.quotaRemaining
-            return if (own == null) remaining else if (remaining == null) {
+            return if (own == null) {
+                remaining
+            } else if (remaining == null) {
                 own
             } else {
                 minOf(own, remaining)
@@ -51,7 +53,9 @@ internal fun ArithmeticWorkSource.withQuota(bound: ArithmeticWorkSource): Arithm
         override val quotaAvailable: Long? get() {
             val own = this@withQuota.quotaAvailable
             val available = bound.quotaAvailable
-            return if (own == null) available else if (available == null) {
+            return if (own == null) {
+                available
+            } else if (available == null) {
                 own
             } else {
                 minOf(own, available)

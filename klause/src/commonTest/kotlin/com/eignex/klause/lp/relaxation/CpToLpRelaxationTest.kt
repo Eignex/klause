@@ -32,10 +32,12 @@ class CpToLpRelaxationTest {
     @Test
     fun `completed assembly reports no discarded work`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 10)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
-        )
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+            ),
         )
         var discardCalls = 0
 
@@ -49,11 +51,13 @@ class CpToLpRelaxationTest {
     @Test
     fun `cancelled assembly reports discarded construction work`() {
         val problem = Problem(
-            0, 4, Array(4) { IntDomain(0, 10) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 10) },
             arrayOf<Factor>(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 5),
-            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 5),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 5),
+                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 5),
+            ),
         )
         val root = RootDomains(problem)
         var cancelled = false
@@ -86,13 +90,13 @@ class CpToLpRelaxationTest {
         )
         for (source in sources) {
             for (factor in listOf<Factor>(source, object : Factor by source {})) {
-            val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
-            val objective = LinearObjective(boolWeights = longArrayOf(1, 1))
+                val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
+                val objective = LinearObjective(boolWeights = longArrayOf(1, 1))
 
-            val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))
+                val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))
 
-            assertEquals(0, relaxation.model.m)
-        }
+                assertEquals(0, relaxation.model.m)
+            }
         }
     }
 

@@ -37,10 +37,10 @@ internal class GridArrayMinMaxInvariant(private val factor: GridArrayMinMax) : I
         if (bounds.all { holds(it, state, changed, value) } &&
             equalities.any { holds(it, state, changed, value) }
         ) {
-                0
-            } else {
-                1
-            }
+            0
+        } else {
+            1
+        }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = degree(state) != 0
 
@@ -60,8 +60,8 @@ internal class GridArrayMinMaxInvariant(private val factor: GridArrayMinMax) : I
             var residual = constants.exactBound
             for (index in row.vars.indices) {
                 if (index != position) {
-                residual -= constants.exactCoeff(index) * bigIntOf(state.assignment.intValue(row.vars[index]))
-            }
+                    residual -= constants.exactCoeff(index) * bigIntOf(state.assignment.intValue(row.vars[index]))
+                }
             }
             val target = residual / coefficient
             if (!target.fitsLong()) continue

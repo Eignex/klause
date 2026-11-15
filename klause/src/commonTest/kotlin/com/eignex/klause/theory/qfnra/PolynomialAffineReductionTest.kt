@@ -48,23 +48,23 @@ class PolynomialAffineReductionTest {
         val equation = PolynomialAtom(arithmetic.subtract(norm, Polynomial.ONE), PolynomialRelation.EQ)
         val formula = PolynomialFormula.conjunction(
             listOf(
-            equation,
-            PolynomialAtom(
-                arithmetic.subtract(
-                arithmetic.scale(expression, BigFraction.ofLong(4)),
-                Polynomial.constant(BigFraction.ofLong(5)),
+                equation,
+                PolynomialAtom(
+                    arithmetic.subtract(
+                        arithmetic.scale(expression, BigFraction.ofLong(4)),
+                        Polynomial.constant(BigFraction.ofLong(5)),
+                    ),
+                    PolynomialRelation.GT,
+                ),
+                PolynomialAtom(
+                    arithmetic.subtract(
+                        arithmetic.scale(expression, BigFraction.ofLong(3)),
+                        Polynomial.constant(BigFraction.ofLong(4)),
+                    ),
+                    PolynomialRelation.LT,
+                ),
             ),
-                PolynomialRelation.GT
-            ),
-            PolynomialAtom(
-                arithmetic.subtract(
-                arithmetic.scale(expression, BigFraction.ofLong(3)),
-                Polynomial.constant(BigFraction.ofLong(4)),
-            ),
-                PolynomialRelation.LT
-            ),
-        ),
-            arithmetic
+            arithmetic,
         )
         val region = PolynomialBooleanRegion(mapOf(0 to true, 1 to true, 2 to true), emptyMap())
 
@@ -76,17 +76,17 @@ class PolynomialAffineReductionTest {
         assertEquals(0, result.eliminatedCount)
         assertEquals(
             listOf(
-            equation,
-            PolynomialAtom(
-                arithmetic.subtract(arithmetic.scale(x, BigFraction.ofLong(4)), Polynomial.ONE),
-                PolynomialRelation.GT,
+                equation,
+                PolynomialAtom(
+                    arithmetic.subtract(arithmetic.scale(x, BigFraction.ofLong(4)), Polynomial.ONE),
+                    PolynomialRelation.GT,
+                ),
+                PolynomialAtom(
+                    arithmetic.subtract(arithmetic.scale(x, BigFraction.ofLong(3)), Polynomial.ONE),
+                    PolynomialRelation.LT,
+                ),
             ),
-            PolynomialAtom(
-                arithmetic.subtract(arithmetic.scale(x, BigFraction.ofLong(3)), Polynomial.ONE),
-                PolynomialRelation.LT,
-            ),
-        ),
-            result.atoms
+            result.atoms,
         )
     }
 
@@ -98,11 +98,11 @@ class PolynomialAffineReductionTest {
         val graph = arithmetic.subtract(y, arithmetic.scale(x, BigFraction.ofLong(8)))
         val formula = PolynomialFormula.conjunction(
             listOf(
-            PolynomialAtom(graph, PolynomialRelation.LE),
-            PolynomialAtom(arithmetic.scale(graph, BigFraction.ofLong(-2)), PolynomialRelation.LE),
-            PolynomialAtom(arithmetic.multiply(x, y), PolynomialRelation.GT),
-        ),
-            arithmetic
+                PolynomialAtom(graph, PolynomialRelation.LE),
+                PolynomialAtom(arithmetic.scale(graph, BigFraction.ofLong(-2)), PolynomialRelation.LE),
+                PolynomialAtom(arithmetic.multiply(x, y), PolynomialRelation.GT),
+            ),
+            arithmetic,
         )
         val region = PolynomialBooleanRegion(mapOf(0 to true, 1 to true, 2 to true), emptyMap())
 
@@ -124,12 +124,12 @@ class PolynomialAffineReductionTest {
         val z = Polynomial.variable(2)
         val formula = PolynomialFormula.conjunction(
             listOf(
-            PolynomialAtom(arithmetic.subtract(z, y), PolynomialRelation.EQ),
-            PolynomialAtom(arithmetic.subtract(x, z), PolynomialRelation.LE),
-            PolynomialAtom(arithmetic.subtract(y, x), PolynomialRelation.LE),
-            PolynomialAtom(arithmetic.multiply(x, y), PolynomialRelation.GT),
-        ),
-            arithmetic
+                PolynomialAtom(arithmetic.subtract(z, y), PolynomialRelation.EQ),
+                PolynomialAtom(arithmetic.subtract(x, z), PolynomialRelation.LE),
+                PolynomialAtom(arithmetic.subtract(y, x), PolynomialRelation.LE),
+                PolynomialAtom(arithmetic.multiply(x, y), PolynomialRelation.GT),
+            ),
+            arithmetic,
         )
         val region = PolynomialBooleanRegion(mapOf(0 to true, 1 to true, 2 to true, 3 to true), emptyMap())
 
@@ -148,10 +148,10 @@ class PolynomialAffineReductionTest {
         val polynomial = arithmetic.subtract(Polynomial.variable(0), Polynomial.variable(1))
         val formula = PolynomialFormula.conjunction(
             listOf(
-            PolynomialAtom(polynomial, PolynomialRelation.GE),
-            PolynomialAtom(polynomial, PolynomialRelation.LE),
-        ),
-            arithmetic
+                PolynomialAtom(polynomial, PolynomialRelation.GE),
+                PolynomialAtom(polynomial, PolynomialRelation.LE),
+            ),
+            arithmetic,
         )
         val region = PolynomialBooleanRegion(mapOf(0 to true, 1 to true), emptyMap())
         val pending = PolynomialAffineReduction.prepare(formula, region, 2, arithmetic)

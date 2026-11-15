@@ -53,10 +53,10 @@ class AlgebraicArithmeticTest {
         )
         val source = polynomial.subtract(
             polynomial.subtract(
-            polynomial.power(Polynomial.variable(0), 5),
-            Polynomial.variable(1),
-        ),
-            Polynomial.ONE
+                polynomial.power(Polynomial.variable(0), 5),
+                Polynomial.variable(1),
+            ),
+            Polynomial.ONE,
         )
         val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
 
@@ -97,10 +97,10 @@ class AlgebraicArithmeticTest {
         val caller = AlgebraicArithmetic(
             PolynomialArithmetic(
                 limits = PolynomialLimits(
-            maxDenseCoefficients = 1,
-            maxMatrixCells = 0,
-        )
-            )
+                    maxDenseCoefficients = 1,
+                    maxMatrixCells = 0,
+                ),
+            ),
         )
 
         val sign = caller.signAt(Polynomial.variable(0), mapOf(0 to value))
@@ -172,12 +172,12 @@ class AlgebraicArithmeticTest {
     fun `separated univariate signs should retain the caller without wide base division`() {
         val defining = RationalPolynomial(
             List(13) { index ->
-            when (index) {
-                0 -> BigFraction.ofLong(-2)
-                12 -> BigFraction.ONE
-                else -> BigFraction.ZERO
-            }
-        }
+                when (index) {
+                    0 -> BigFraction.ofLong(-2)
+                    12 -> BigFraction.ONE
+                    else -> BigFraction.ZERO
+                }
+            },
         )
         val value = arithmetic.roots(defining).last()
         val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 2)))
@@ -226,10 +226,10 @@ class AlgebraicArithmeticTest {
         val z = Polynomial.variable(2)
         val relation = polynomial.add(
             polynomial.add(
-            polynomial.power(z, 2),
-            polynomial.multiply(Polynomial.variable(0), z),
-        ),
-            Polynomial.variable(1)
+                polynomial.power(z, 2),
+                polynomial.multiply(Polynomial.variable(0), z),
+            ),
+            Polynomial.variable(1),
         )
         val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
 
@@ -248,10 +248,10 @@ class AlgebraicArithmeticTest {
 
         val roots = arithmetic.roots(
             arithmetic.specialize(
-            relation,
-            2,
-            mapOf(0 to bases.first(), 1 to bases.last()),
-        )
+                relation,
+                2,
+                mapOf(0 to bases.first(), 1 to bases.last()),
+            ),
         )
 
         assertEquals(1, roots.size)
@@ -267,10 +267,10 @@ class AlgebraicArithmeticTest {
         val z = Polynomial.variable(2)
         val relation = polynomial.add(
             polynomial.add(
-            polynomial.power(z, 2),
-            polynomial.multiply(Polynomial.variable(0), z),
-        ),
-            Polynomial.variable(1)
+                polynomial.power(z, 2),
+                polynomial.multiply(Polynomial.variable(0), z),
+            ),
+            Polynomial.variable(1),
         )
         val specialized = producer.specialize(relation, 2, mapOf(0 to base, 1 to square))
         val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
@@ -288,10 +288,10 @@ class AlgebraicArithmeticTest {
         val z = Polynomial.variable(2)
         val relation = polynomial.add(
             polynomial.add(
-            polynomial.power(z, 2),
-            polynomial.multiply(Polynomial.variable(0), z),
-        ),
-            Polynomial.variable(1)
+                polynomial.power(z, 2),
+                polynomial.multiply(Polynomial.variable(0), z),
+            ),
+            Polynomial.variable(1),
         )
         val specialized = arithmetic.specialize(relation, 2, coordinates)
         coordinates[0] = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
@@ -380,37 +380,37 @@ class AlgebraicArithmeticTest {
     fun `wide captured bases should leave admitted scalar arithmetic available`() {
         val defining = RationalPolynomial(
             List(13) { index ->
-            when (index) {
-                0 -> BigFraction.ofLong(-2)
-                12 -> BigFraction.ONE
-                else -> BigFraction.ZERO
-            }
-        }
+                when (index) {
+                    0 -> BigFraction.ofLong(-2)
+                    12 -> BigFraction.ONE
+                    else -> BigFraction.ZERO
+                }
+            },
         )
         val base = arithmetic.roots(defining).last()
         val first = arithmetic.evaluate(
             RationalPolynomial(
                 List(5) { index ->
-            if (index == 4) BigFraction.ONE else BigFraction.ZERO
-        }
+                    if (index == 4) BigFraction.ONE else BigFraction.ZERO
+                },
             ),
-            base
+            base,
         )
         val second = arithmetic.evaluate(
             RationalPolynomial(
                 List(9) { index ->
-            if (index == 8) BigFraction.ONE else BigFraction.ZERO
-        }
+                    if (index == 8) BigFraction.ONE else BigFraction.ZERO
+                },
             ),
-            base
+            base,
         )
         val caller = AlgebraicArithmetic(
             PolynomialArithmetic(
                 limits = PolynomialLimits(
-            maxDenseCoefficients = 10,
-            maxMatrixCells = 36,
-        )
-            )
+                    maxDenseCoefficients = 10,
+                    maxMatrixCells = 36,
+                ),
+            ),
         )
 
         val sum = caller.add(first, second)
@@ -437,9 +437,9 @@ class AlgebraicArithmeticTest {
         var cancelled = false
         val producer = AlgebraicArithmetic(
             PolynomialArithmetic(
-            ExecutionControl { cancelled },
-            limits = PolynomialLimits(maxMatrixCells = 0),
-        )
+                ExecutionControl { cancelled },
+                limits = PolynomialLimits(maxMatrixCells = 0),
+            ),
         )
         val specialized = producer.specialize(relation, 1, mapOf(0 to base))
         cancelled = true

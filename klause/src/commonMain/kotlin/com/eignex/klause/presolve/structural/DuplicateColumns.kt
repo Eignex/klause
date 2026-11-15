@@ -347,8 +347,8 @@ internal object DuplicateColumns {
                 keepOf[it] != it
             }
         ) {
-                return factor
-            }
+            return factor
+        }
         val keptVars = IntArrayList(linear.vars.size)
         val keptCoeffs = LongArrayList(linear.vars.size)
         for (i in linear.vars.indices) {

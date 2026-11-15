@@ -402,11 +402,13 @@ class InprocessingTest {
     fun `deferred implications should resume before the next optional probe interval`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                4, 0, emptyArray(),
+                4,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(3, 4)),
-            )
+                    Clause(intArrayOf(1, 2)),
+                    Clause(intArrayOf(3, 4)),
+                ),
             )
             val session = PropagationSession(source.bake(), nativeSat = native)
             val pass = RootProbingPass()
@@ -456,11 +458,13 @@ class InprocessingTest {
     fun `memory pressure should protect an interrupted root attachment`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                3, 0, emptyArray(),
+                3,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(0, 3)),
-            )
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(0, 3)),
+                ),
             )
             val session = PropagationSession(source, nativeSat = native)
             repeat(2) { session.addLearnedClause(Clause(intArrayOf(4, 5)), 4) }
@@ -493,11 +497,13 @@ class InprocessingTest {
     fun `memory pressure should preserve completed root facts awaiting publication`() {
         for (native in listOf(false, true)) {
             val source = Problem(
-                2, 0, emptyArray(),
+                2,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(0, 3)),
-            )
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(0, 3)),
+                ),
             )
             val session = PropagationSession(source, nativeSat = native)
             val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1)

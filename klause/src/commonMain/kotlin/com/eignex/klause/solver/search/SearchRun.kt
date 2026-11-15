@@ -638,21 +638,21 @@ class SearchRun internal constructor(
             consumedModel || pendingCancellation || retryingAssertion || learnedPropagationPending ||
             budgetInterrupted
         ) {
-                return false
-            }
+            return false
+        }
         val frame = frames.firstOrNull() ?: return false
         if (frame.level != minimumDecisionLevel || session.decisionLevel <= frame.level ||
             frame.decisions.size != 2
         ) {
-                return false
-            }
+            return false
+        }
         val selected = frame.decisions.getOrNull(frame.next - 1) as? SearchDecision.Bool ?: return false
         val opposite = frame.decisions.getOrNull(2 - frame.next) as? SearchDecision.Bool ?: return false
         if (selected.literal != literal || opposite.literal != (literal xor 1) ||
             session.boolValue(literal ushr 1) != (literal and 1 == 0)
         ) {
-                return false
-            }
+            return false
+        }
         // The peer owns the complementary region; descendant frames and their charged work stay here.
         frames.removeAt(0)
         queryRoot = frame.level + 1

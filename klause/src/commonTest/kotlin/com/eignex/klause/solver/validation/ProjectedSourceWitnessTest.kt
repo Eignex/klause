@@ -52,13 +52,13 @@ class ProjectedSourceWitnessTest {
             emptyArray<IntDomain>(),
             arrayOf(
                 Linear(
-                intArrayOf(),
-                doubleArrayOf(),
-                intArrayOf(0),
-                doubleArrayOf(1.0),
-                LinearOp.EQ,
-                0.25,
-            )
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.EQ,
+                    0.25,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),

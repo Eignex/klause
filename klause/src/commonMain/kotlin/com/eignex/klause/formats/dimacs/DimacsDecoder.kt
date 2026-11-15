@@ -98,10 +98,10 @@ fun WcnfDocument.toProblem(
         }
         boolFolds.add(
             BoolFoldDefinition(
-            relax,
-            soft.literals.map { Lit.negate(it) }.distinct().toIntArray(),
-            isAnd = true,
-        )
+                relax,
+                soft.literals.map { Lit.negate(it) }.distinct().toIntArray(),
+                isAnd = true,
+            ),
         )
         weights[relax++] = soft.weight
     }

@@ -30,25 +30,25 @@ class GuardedIntegerSourceTest {
     fun `compact exact integer sources should derive a mapped consumed row`() {
         val native = PropagationSession(
             Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-            arrayOf(
-                ExactLinear.of(
-                    IntArray(3) { Term.ofIntVar(it) },
-                    listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.MINUS_ONE),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                ),
-                ExactLinear.of(
-                    IntArray(2) { Term.ofIntVar(it) },
-                    listOf(BigFraction.ofLong(2), BigFraction.MINUS_ONE),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
+                0,
+                3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                arrayOf(
+                    ExactLinear.of(
+                        IntArray(3) { Term.ofIntVar(it) },
+                        listOf(BigFraction.ofLong(2), BigFraction.ONE, BigFraction.MINUS_ONE),
+                        LinearOp.LE,
+                        BigFraction.ZERO,
+                    ),
+                    ExactLinear.of(
+                        IntArray(2) { Term.ofIntVar(it) },
+                        listOf(BigFraction.ofLong(2), BigFraction.MINUS_ONE),
+                        LinearOp.LE,
+                        BigFraction.ZERO,
+                    ),
                 ),
             ),
-        ),
-            pbLearning = false
+            pbLearning = false,
         ).apply { enableIntegerRowLearning() }
         val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))
         val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
@@ -69,18 +69,20 @@ class GuardedIntegerSourceTest {
         for (truth in listOf(false, true)) {
             val state = PropagationState(
                 Problem(
-                    1, 1, arrayOf(IntDomain(0, 6)),
+                    1,
+                    1,
+                    arrayOf(IntDomain(0, 6)),
                     arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofIntVar(0)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.LE,
-                    BigFraction.ofLong(3),
-                    activator = 0,
+                        ExactLinear.of(
+                            intArrayOf(Term.ofIntVar(0)),
+                            listOf(BigFraction.ONE),
+                            LinearOp.LE,
+                            BigFraction.ofLong(3),
+                            activator = 0,
+                        ),
+                    ),
                 ),
-            )
-                ),
-                Assumptions.None
+                Assumptions.None,
             )
             assertTrue(state.pinBool(0, truth))
 
@@ -94,17 +96,19 @@ class GuardedIntegerSourceTest {
     fun `a wide exact projection should retain clause fallback`() {
         val state = PropagationState(
             Problem(
-                0, 1, arrayOf(IntDomain(0, 6)),
+                0,
+                1,
+                arrayOf(IntDomain(0, 6)),
                 arrayOf(
-            ExactLinear.of(
-                intArrayOf(Term.ofIntVar(0)),
-                listOf(BigFraction.ofLong(Long.MIN_VALUE)),
-                LinearOp.LE,
-                BigFraction.ZERO,
+                    ExactLinear.of(
+                        intArrayOf(Term.ofIntVar(0)),
+                        listOf(BigFraction.ofLong(Long.MIN_VALUE)),
+                        LinearOp.LE,
+                        BigFraction.ZERO,
+                    ),
+                ),
             ),
-        )
-            ),
-            Assumptions.None
+            Assumptions.None,
         )
 
         val source = GuardedIntegerSource(state).source(0)
@@ -116,12 +120,14 @@ class GuardedIntegerSourceTest {
     fun `a guard pinned after the historical boundary should withhold the source row`() {
         val state = PropagationState(
             Problem(
-                1, 1, arrayOf(IntDomain(0, 6)),
+                1,
+                1,
+                arrayOf(IntDomain(0, 6)),
                 arrayOf(
-            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
-        )
+                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 3),
+                ),
             ),
-            Assumptions.None
+            Assumptions.None,
         )
         state.undoLogging = true
         val before = state.undo.size
@@ -137,28 +143,30 @@ class GuardedIntegerSourceTest {
             val left = assertNotNull(
                 IntegerConflictRow.source(
                     LinearPropagator(
-                intArrayOf(),
-                intArrayOf(0, 1),
-                longArrayOf(1, 1),
-                intArrayOf(0, 1),
-                LinearOp.LE,
-                3,
-            ),
-                true, Lit.make(0, true)
-                )
+                        intArrayOf(),
+                        intArrayOf(0, 1),
+                        longArrayOf(1, 1),
+                        intArrayOf(0, 1),
+                        LinearOp.LE,
+                        3,
+                    ),
+                    true,
+                    Lit.make(0, true),
+                ),
             )
             val other = assertNotNull(
                 IntegerConflictRow.source(
                     LinearPropagator(
-                intArrayOf(),
-                intArrayOf(1, 2),
-                longArrayOf(-1, 1),
-                intArrayOf(1, 2),
-                LinearOp.LE,
-                3,
-            ),
-                true, right
-                )
+                        intArrayOf(),
+                        intArrayOf(1, 2),
+                        longArrayOf(-1, 1),
+                        intArrayOf(1, 2),
+                        LinearOp.LE,
+                        3,
+                    ),
+                    true,
+                    right,
+                ),
             )
 
             assertNull(left.resolve(other, 1))
@@ -179,25 +187,27 @@ class GuardedIntegerSourceTest {
         )) {
             val native = PropagationSession(
                 Problem(
-                1,
-                3,
-                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-                arrayOf(
-                    ReifiedLinear(
-                        0,
-                        intArrayOf(2 * sign, sign, -sign),
-                        intArrayOf(0, 1, 2),
-                        op,
-                        if (truth || op == LinearOp.NE) 0 else if (op == LinearOp.GE) {
-                            1
-                        } else {
-                            -1
-                        },
+                    1,
+                    3,
+                    arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
+                    arrayOf(
+                        ReifiedLinear(
+                            0,
+                            intArrayOf(2 * sign, sign, -sign),
+                            intArrayOf(0, 1, 2),
+                            op,
+                            if (truth || op == LinearOp.NE) {
+                                0
+                            } else if (op == LinearOp.GE) {
+                                1
+                            } else {
+                                -1
+                            },
+                        ),
+                        Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
                     ),
-                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
                 ),
-            ),
-                pbLearning = false
+                pbLearning = false,
             ).apply { enableIntegerRowLearning() }
             val cp = CpSearchComponent(native, intArrayOf(4, 7, 9))
             val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))

@@ -164,11 +164,11 @@ internal fun recoverLinearPrimal(
                 meter.reserve(row.columns.size.toLong() + 1L, 64L + 32L * row.columns.size)
                 localRows.add(
                     ExactRationalInequality(
-                    IntArray(row.columns.size) { local[row.columns[it]] },
-                    row.coefficients,
-                    row.rhs,
-                    row.strict,
-                )
+                        IntArray(row.columns.size) { local[row.columns[it]] },
+                        row.coefficients,
+                        row.rhs,
+                        row.strict,
+                    ),
                 )
             }
             if (meter.satisfies(List(members.size) { recovered[members[it]] }, localRows)) continue

@@ -48,9 +48,9 @@ internal class TableStr2State(
             null
         } else {
             Array(xs.size) {
-            state.checkFiniteWork()
-            state.intDomains[xs[it]]
-        }
+                state.checkFiniteWork()
+                state.intDomains[xs[it]]
+            }
         }
         return delta
     }

@@ -29,12 +29,11 @@ internal sealed interface PolynomialCellScope {
         }
 
         companion object {
-            fun prepare(source: PolynomialRealFormula, arithmetic: PolynomialArithmetic): Source =
-                Source(
-                    source,
-                    PolynomialFormula.normalize(source, arithmetic).forcedAtoms(arithmetic)
-                    .orEmpty().take(MAX_CELL_PREMISES)
-                )
+            fun prepare(source: PolynomialRealFormula, arithmetic: PolynomialArithmetic): Source = Source(
+                source,
+                PolynomialFormula.normalize(source, arithmetic).forcedAtoms(arithmetic)
+                    .orEmpty().take(MAX_CELL_PREMISES),
+            )
         }
     }
     class Query(
@@ -259,7 +258,7 @@ internal class PolynomialCellRefinement(
             return@optional null
         }
         val atoms = reduction.atoms.map {
-            arithmetic.step();
+            arithmetic.step()
             it
         }
         val scope = PolynomialCellScope.Region(
@@ -268,11 +267,11 @@ internal class PolynomialCellRefinement(
             snapshot,
             PolynomialBooleanRegion(
                 premises.atoms.mapValues {
-                    arithmetic.step();
+                    arithmetic.step()
                     it.value
                 },
                 premises.bools.mapValues {
-                    arithmetic.step();
+                    arithmetic.step()
                     it.value
                 },
             ),
@@ -320,9 +319,9 @@ internal class PolynomialCellRefinement(
                 return value
             }
             val support = if (sourceAtoms.any {
-                arithmetic.step();
-                it == rejected
-            }
+                    arithmetic.step()
+                    it == rejected
+                }
             ) {
                 checkNotNull(sourceScope)
             } else {
@@ -337,7 +336,7 @@ internal class PolynomialCellRefinement(
                     it.variable == variable && (it.scope === scope || it.scope === sourceScope)
                 }
                 existing.any {
-                    arithmetic.step();
+                    arithmetic.step()
                     it.contains(value, algebraic)
                 }
             }
@@ -383,7 +382,7 @@ internal class PolynomialCellRefinement(
             return (lower == null || algebraic.compare(value, lower) >= 0) &&
                 (upper == null || algebraic.compare(value, upper) <= 0) &&
                 cells.none {
-                    arithmetic.step();
+                    arithmetic.step()
                     it.contains(value, algebraic)
                 }
         }
@@ -392,9 +391,9 @@ internal class PolynomialCellRefinement(
             arithmetic.step()
             val sample = algebraic.rational(
                 algebraic.sampleBetween(
-                distinct.getOrNull(index - 1),
-                distinct.getOrNull(index),
-            )
+                    distinct.getOrNull(index - 1),
+                    distinct.getOrNull(index),
+                ),
             )
             if (accepted(sample)) return sample
         }

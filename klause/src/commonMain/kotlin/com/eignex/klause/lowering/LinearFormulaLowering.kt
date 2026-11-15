@@ -26,9 +26,9 @@ internal class LinearFormulaLowering(private val cancellation: ExecutionControl)
             val next = ArrayList<List<LinearRow>>()
             for (left in clauses) {
                 for (right in operand) {
-                checkpoint(left.size.toLong() + right.size + 1)
-                next += left + right
-            }
+                    checkpoint(left.size.toLong() + right.size + 1)
+                    next += left + right
+                }
             }
             clauses = next
         }
@@ -40,11 +40,11 @@ internal class LinearFormulaLowering(private val cancellation: ExecutionControl)
         val singletons = clauses.filter { it.size == 1 }.map { it.single() }
         return (
             if (singletons.isNotEmpty() || clauses.isEmpty()) {
-            listOf(LinearForm.Conjunction(singletons))
-        } else {
-            emptyList()
-        }
-        ) +
+                listOf(LinearForm.Conjunction(singletons))
+            } else {
+                emptyList()
+            }
+            ) +
             clauses.filter { it.size != 1 }.map { LinearForm.Disjunction(it) }
     }
 

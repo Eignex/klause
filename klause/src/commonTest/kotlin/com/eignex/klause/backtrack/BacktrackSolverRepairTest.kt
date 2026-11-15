@@ -30,11 +30,15 @@ class BacktrackSolverRepairTest {
     @Test
     fun `exact repair should distinguish both sides of a rational cutoff from equality`() {
         val problem = Problem(
-            0, 0, emptyArray(),
+            0,
+            0,
+            emptyArray(),
             arrayOf(
-            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(3.0), LinearOp.EQ, 1.0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         ).bake()
         val third = BigFraction.ofLong(3L).reciprocal()
         val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()

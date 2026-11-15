@@ -193,19 +193,19 @@ internal class CpSatisfactionTraversal(
     private val cp = CpSearchComponent(
         (
             preparedSession ?: PropagationSession(
-            projection,
-            propagationCancellation,
-            params.propagationCancelFloor,
-            nativeSat = params.nativeSat ?: true,
-            pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
-            attribution = params.propagationAttribution,
-            historicalTables = params.historicalTableReasons,
-            costAware = params.costAwarePropagation,
-            reasonPreflight = params.reasonPreflight,
-            cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
-            onPropagationWork = onPropagationWork,
-        )
-        ).also {
+                projection,
+                propagationCancellation,
+                params.propagationCancelFloor,
+                nativeSat = params.nativeSat ?: true,
+                pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
+                attribution = params.propagationAttribution,
+                historicalTables = params.historicalTableReasons,
+                costAware = params.costAwarePropagation,
+                reasonPreflight = params.reasonPreflight,
+                cumulativeUnarySubsets = problem.numRealVars == 0 && params.useCumulativeUnarySubsets,
+                onPropagationWork = onPropagationWork,
+            )
+            ).also {
             if (params.integerRowLearning) it.enableIntegerRowLearning()
             it.configureAttribution(
                 params.propagationAttribution,
@@ -260,9 +260,9 @@ internal class CpSatisfactionTraversal(
             if (rebindable) {
                 require(
                     problem.numIntVars == 0 && problem.numRealVars == 0 &&
-                    problem.factors.all { it is Clause } && !problem.hasSymmetryBreaking &&
-                    !params.integerRowLearning && params.componentFactory == null &&
-                    params.lpConfig == null && params.lpPlan.hasDefaultNumericalSettings()
+                        problem.factors.all { it is Clause } && !problem.hasSymmetryBreaking &&
+                        !params.integerRowLearning && params.componentFactory == null &&
+                        params.lpConfig == null && params.lpPlan.hasDefaultNumericalSettings(),
                 )
             }
             completion = BacktrackCompletion.of(problem, cp, params, sink, solveContext)
@@ -287,29 +287,29 @@ internal class CpSatisfactionTraversal(
             components.forEach(resources::ownComponent)
             resources.own(
                 AutoCloseable {
-                try {
-                    params.clauseExchange?.onSearchClose(cp.session)
-                } finally {
-                    cp.session.sharedLearningMemory = null
-                    cp.session.sharedLearningPosition = null
-                }
-            }
+                    try {
+                        params.clauseExchange?.onSearchClose(cp.session)
+                    } finally {
+                        cp.session.sharedLearningMemory = null
+                        cp.session.sharedLearningPosition = null
+                    }
+                },
             )
             onRelease?.let { capture -> resources.own(AutoCloseable { capture(cp.session) }) }
             cp.useEnforcingPeers(
                 components.filterIsInstance<FiniteFactorEnforcer>()
-                .flatMap { it.enforcingFiniteFactors(problem) }.toSet()
+                    .flatMap { it.enforcingFiniteFactors(problem) }.toSet(),
             )
             deferredRoot = deferredInitialization &&
                 (preparedSession != null || components.any { it is PreparingSearchComponent })
             val sharedCancellation = if (deferredRoot) {
                 cancelledWhen({
-                if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
-            }, { params.cancellation.workScheduled() }, {
-                if (run == null) propagationCancellation.stopPolling else params.cancellation.stopPolling
-            }) {
-                if (run == null) propagationCancellation() else params.cancellation()
-            }
+                    if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
+                }, { params.cancellation.workScheduled() }, {
+                    if (run == null) propagationCancellation.stopPolling else params.cancellation.stopPolling
+                }) {
+                    if (run == null) propagationCancellation() else params.cancellation()
+                }
             } else {
                 params.cancellation
             }
@@ -412,7 +412,7 @@ internal class CpSatisfactionTraversal(
         currentAssumptions = assumptions
         val exhausted = SearchOutcome.Exhausted(
             touchedAssumptionLevels =
-            IntArray(assumptions.numBools) { it + 1 }
+            IntArray(assumptions.numBools) { it + 1 },
         )
         rootOutcome = if (seeded is PropagationResult.Unsat || cp.session.isUnsatAtRoot) {
             exhausted
@@ -505,9 +505,9 @@ internal class CpSatisfactionTraversal(
                 // Learned decision levels describe traversal, not every premise of the exhausted tree.
                 SearchOutcome.Exhausted(
                     touchedAssumptionLevels = IntArray(
-                    currentAssumptions.numBools + currentAssumptions.numInts +
-                        (if (traversal.retainedRoot) 1 else 0),
-                ) { it + 1 }
+                        currentAssumptions.numBools + currentAssumptions.numInts +
+                            (if (traversal.retainedRoot) 1 else 0),
+                    ) { it + 1 },
                 )
             }
 
@@ -702,8 +702,8 @@ private class CpSatisfactionTraversalPolicy(
         while (session.nativeCapWindowPending && slice?.pauses() == true &&
             (
                 session.nativeCapContinuationCursor != seenCursor || session.nativeCapContinuationHeap != seenHeap ||
-                session.nativeCapContinuationOperation != seenOperation
-            )
+                    session.nativeCapContinuationOperation != seenOperation
+                )
         ) {
             if (params.cancellation()) return SearchRunDisposition.Pause
             seenCursor = session.nativeCapContinuationCursor
@@ -1157,10 +1157,10 @@ private class ResidualRealComponent(
                 (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
         }
     ) {
-            AbsRealCompletion(problem)
-        } else {
-            null
-        }
+        AbsRealCompletion(problem)
+    } else {
+        null
+    }
 
     // A finite membership is the one exact-completion relation a float leaf point can satisfy within tolerance.
     private val floatMembership = toleranceCheck.permitsToleranceOptimum() &&

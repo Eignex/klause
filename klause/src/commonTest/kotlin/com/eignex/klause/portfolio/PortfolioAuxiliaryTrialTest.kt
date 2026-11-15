@@ -165,7 +165,7 @@ class PortfolioAuxiliaryTrialTest {
         assertEquals(
             "trial-search-time",
             events.filterIsInstance<PortfolioEvent.WorkerExit>()
-            .single { it.arm == 1 }.cause
+                .single { it.arm == 1 }.cause,
         )
     }
 
@@ -234,7 +234,7 @@ class PortfolioAuxiliaryTrialTest {
         assertEquals(
             "trial-preparation-time",
             events.filterIsInstance<PortfolioEvent.WorkerExit>()
-            .single { it.arm == 1 }.cause
+                .single { it.arm == 1 }.cause,
         )
     }
 

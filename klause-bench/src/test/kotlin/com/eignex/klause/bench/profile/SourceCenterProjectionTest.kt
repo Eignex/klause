@@ -47,9 +47,9 @@ class SourceCenterProjectionTest {
         )
         val sweep = assertNotNull(
             DefinitionalSweep.fromSource(
-            problem,
-            listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true))),
-        )
+                problem,
+                listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true))),
+            ),
         )
         val center = Sample(booleanArrayOf(true), longArrayOf(1))
 
@@ -92,9 +92,9 @@ class SourceCenterProjectionTest {
     fun `conflicting aliases decline rather than selecting the last source value`() {
         val state = LocalSearchState(
             LocalSearchModel.open(
-            Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray()),
-        ),
-            Random(0)
+                Problem(0, 1, arrayOf(IntDomain(0, 9)), emptyArray()),
+            ),
+            Random(0),
         )
 
         val decline = loadSourceCenter(
@@ -111,9 +111,9 @@ class SourceCenterProjectionTest {
     fun `an unmapped searched coordinate declines instead of receiving a default value`() {
         val state = LocalSearchState(
             LocalSearchModel.open(
-            Problem(1, 1, arrayOf(IntDomain(0, 9)), emptyArray()),
-        ),
-            Random(0)
+                Problem(1, 1, arrayOf(IntDomain(0, 9)), emptyArray()),
+            ),
+            Random(0),
         )
 
         val decline = loadSourceCenter(

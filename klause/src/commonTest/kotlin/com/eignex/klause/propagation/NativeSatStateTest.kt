@@ -57,13 +57,13 @@ class NativeSatStateTest {
             ) { false }
             val handle = assertNotNull(
                 session.queueLearnedRetirement(
-                0,
-                session.learnedRetirementGeneration,
-                256L,
-                256L,
-                1_024L,
-                { false },
-            ).handle
+                    0,
+                    session.learnedRetirementGeneration,
+                    256L,
+                    256L,
+                    1_024L,
+                    { false },
+                ).handle,
             )
             session.authorizeLearnedRetirement(handle, true, 256L, 256L) { false }
 

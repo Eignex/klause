@@ -198,12 +198,12 @@ internal class LinearAuthorityLp(
             val workingRows = prepared?.rows?.size ?: rows.size
             onShape(
                 LinearAuthorityLpShape(
-                rows.size,
-                workingRows,
-                costs.size,
-                budget.admitsDimensions(costs.size, workingRows.toLong()),
-                prepared = prepared != null,
-            )
+                    rows.size,
+                    workingRows,
+                    costs.size,
+                    budget.admitsDimensions(costs.size, workingRows.toLong()),
+                    prepared = prepared != null,
+                ),
             )
         }
     }
@@ -297,13 +297,13 @@ internal class LinearAuthorityLp(
         }.also {
             onShape(
                 LinearAuthorityLpShape(
-                rows.size,
-                workingRows,
-                costs.size,
-                it != null,
-                sparse = true,
-                phase = phase,
-            )
+                    rows.size,
+                    workingRows,
+                    costs.size,
+                    it != null,
+                    sparse = true,
+                    phase = phase,
+                ),
             )
         }
     }
@@ -406,11 +406,11 @@ internal class LinearAuthorityLp(
         for (column in coefficients.indices) {
             equality(
                 rows.map { row ->
-                row.columns.indexOf(column).let {
-                    if (it < 0) BigFraction.ZERO else row.coefficients[it]
-                }
-            } + if (strict) listOf(BigFraction.ZERO) else emptyList(),
-                coefficients[column]
+                    row.columns.indexOf(column).let {
+                        if (it < 0) BigFraction.ZERO else row.coefficients[it]
+                    }
+                } + if (strict) listOf(BigFraction.ZERO) else emptyList(),
+                coefficients[column],
             )
         }
         equality(rows.map { it.rhs } + if (strict) listOf(BigFraction.ZERO) else emptyList(), rhs)

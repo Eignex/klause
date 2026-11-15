@@ -101,16 +101,16 @@ class PresolveStructuralImpactTest {
         )
         for (lane in PresolveLane.entries) {
             for (preserve in listOf(false, true)) {
-            val config = PresolveConfig.parse("off,+structural").withEffort(preserveStructure = preserve)
+                val config = PresolveConfig.parse("off,+structural").withEffort(preserveStructure = preserve)
 
-            val result = if (lane == PresolveLane.SOURCE) {
-                Presolver.runSource(source, config).problem
-            } else {
-                Presolver.run(source.bake(), config).problem
+                val result = if (lane == PresolveLane.SOURCE) {
+                    Presolver.runSource(source, config).problem
+                } else {
+                    Presolver.run(source.bake(), config).problem
+                }
+
+                assertEquals(preserve, result.factors.any { it is Table }, "$lane $preserve")
             }
-
-            assertEquals(preserve, result.factors.any { it is Table }, "$lane $preserve")
-        }
         }
     }
 

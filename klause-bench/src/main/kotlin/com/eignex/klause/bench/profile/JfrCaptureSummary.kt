@@ -22,15 +22,15 @@ internal object JfrCaptureSummary : BenchSuite {
         validate(request.parameters)
         return listOf(
             BenchCase(
-            "jfr/${request.parameters.getValue("sha256")}",
-            request.parameters,
-            BenchResources(
-                cpus = 1,
-                memoryMiB = 2048,
-                timeoutSeconds = 120,
-                requiredTags = setOf("platform:linux", "arch:x86_64"),
+                "jfr/${request.parameters.getValue("sha256")}",
+                request.parameters,
+                BenchResources(
+                    cpus = 1,
+                    memoryMiB = 2048,
+                    timeoutSeconds = 120,
+                    requiredTags = setOf("platform:linux", "arch:x86_64"),
+                ),
             ),
-        )
         )
     }
 
@@ -56,10 +56,10 @@ internal object JfrCaptureSummary : BenchSuite {
         val events = case.parameters["events"]?.toBooleanStrict() ?: false
         if (events) {
             HarnessRecording.extract(
-            context.outputDirectory,
-            capture,
-            "retained capture: ${case.parameters.getValue("source")}; original recording scope applies",
-        )
+                context.outputDirectory,
+                capture,
+                "retained capture: ${case.parameters.getValue("source")}; original recording scope applies",
+            )
         }
         val error = context.outputDirectory.resolve("harness-analysis-error.txt")
         val extractionFailed = events && Files.exists(error)
@@ -147,17 +147,17 @@ internal object JfrCaptureSummary : BenchSuite {
             put(
                 "sampledMethods",
                 buildJsonArray {
-                for ((method, count) in methods.toList().sortedWith(
-                    compareByDescending<Pair<String, Long>> { it.second }.thenBy { it.first },
-                )) {
-                    add(
-                        buildJsonObject {
-                    put("method", method)
-                    put("samples", count)
-                }
-                    )
-                }
-            }
+                    for ((method, count) in methods.toList().sortedWith(
+                        compareByDescending<Pair<String, Long>> { it.second }.thenBy { it.first },
+                    )) {
+                        add(
+                            buildJsonObject {
+                                put("method", method)
+                                put("samples", count)
+                            },
+                        )
+                    }
+                },
             )
         }
     }

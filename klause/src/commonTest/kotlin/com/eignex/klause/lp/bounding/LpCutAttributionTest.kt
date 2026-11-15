@@ -30,11 +30,13 @@ class LpCutAttributionTest {
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 2L)
         }.build(Sense.MINIMIZE)
         val map = CutSourceMap(
-            problem, 0L, listOf(null),
+            problem,
+            0L,
+            listOf(null),
             parentRows = mapOf(
-            0 to CutProvenance(problem, 0L, emptyList(), family = CutFamily.GOMORY),
-            1 to CutProvenance(problem, 0L, emptyList(), family = CutFamily.MIR),
-        )
+                0 to CutProvenance(problem, 0L, emptyList(), family = CutFamily.GOMORY),
+                1 to CutProvenance(problem, 0L, emptyList(), family = CutFamily.MIR),
+            ),
         )
         val relaxation = LpRelaxation(
             model,
@@ -51,12 +53,12 @@ class LpCutAttributionTest {
         val sink = SolveStatsSink(backend = "cut-attribution")
         val lower = assertNotNull(
             certifiedTightObjectiveLowerBound(
-            model,
-            duals,
-            certificate,
-            sink.lp.certificationObserver(),
-            ProductionLpCertificationPolicy,
-        )
+                model,
+                duals,
+                certificate,
+                sink.lp.certificationObserver(),
+                ProductionLpCertificationPolicy,
+            ),
         )
         assertEquals(2.0, lower)
 

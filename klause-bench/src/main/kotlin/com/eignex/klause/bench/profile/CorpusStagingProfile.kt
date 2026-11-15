@@ -64,21 +64,21 @@ internal object CorpusStagingProfile {
         val profileStart = System.nanoTime()
         out.resolve("request.json").writeText(
             buildJsonObject {
-            put("source", packed.absolutePath)
-            put("expectedSha256", expectedHash)
-            put("budgetMs", budget)
-            put("repeats", repeats)
-            put("order", controls.order)
-            put("stagingTarget", controls.stagingTarget)
-            put("stagingBufferBytes", controls.bufferKiB * 1024)
-            put("stagingDirectory", stagingRoot.absolutePath)
-            put("instrumentation", "stage-uninstrumented and stage-prehashed have no JFR")
-            put("prehash", "stage-prehashed matches canonical source hashing before the source deadline")
-            put("osCache", "uncontrolled; parent identity reads and plain materialization precede trials")
-            put("jvmCache", "fresh child per mode; first operation then repeated operations in that child")
-            put("solverExecuted", false)
-            put("throughputQualification", false)
-        }.toString()
+                put("source", packed.absolutePath)
+                put("expectedSha256", expectedHash)
+                put("budgetMs", budget)
+                put("repeats", repeats)
+                put("order", controls.order)
+                put("stagingTarget", controls.stagingTarget)
+                put("stagingBufferBytes", controls.bufferKiB * 1024)
+                put("stagingDirectory", stagingRoot.absolutePath)
+                put("instrumentation", "stage-uninstrumented and stage-prehashed have no JFR")
+                put("prehash", "stage-prehashed matches canonical source hashing before the source deadline")
+                put("osCache", "uncontrolled; parent identity reads and plain materialization precede trials")
+                put("jvmCache", "fresh child per mode; first operation then repeated operations in that child")
+                put("solverExecuted", false)
+                put("throughputQualification", false)
+            }.toString(),
         )
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         val setupStart = System.nanoTime()
@@ -92,19 +92,19 @@ internal object CorpusStagingProfile {
             require(expectedHash == null || sourceHash == expectedHash)
             out.resolve("identity.json").writeText(
                 buildJsonObject {
-                put("sourceSha256", sourceHash)
-                put("packedSha256", digest(packed.inputStream()))
-                put("packedBytes", packed.length())
-                put("plainBytes", plain.length())
-                put("sourceFileStore", Files.getFileStore(packed.toPath()).toString())
-                put("plainFileStore", Files.getFileStore(plain.toPath()).toString())
-                put(
-                    "identityStagingFileStore",
-                    Files.getFileStore(File(CorpusFetcher.cacheRoot, ".plain").toPath()).toString(),
-                )
-                put("stagingFileStore", Files.getFileStore(stagingRoot.toPath()).toString())
-                put("setupNanos", System.nanoTime() - setupStart)
-            }.toString()
+                    put("sourceSha256", sourceHash)
+                    put("packedSha256", digest(packed.inputStream()))
+                    put("packedBytes", packed.length())
+                    put("plainBytes", plain.length())
+                    put("sourceFileStore", Files.getFileStore(packed.toPath()).toString())
+                    put("plainFileStore", Files.getFileStore(plain.toPath()).toString())
+                    put(
+                        "identityStagingFileStore",
+                        Files.getFileStore(File(CorpusFetcher.cacheRoot, ".plain").toPath()).toString(),
+                    )
+                    put("stagingFileStore", Files.getFileStore(stagingRoot.toPath()).toString())
+                    put("setupNanos", System.nanoTime() - setupStart)
+                }.toString(),
             )
             val modes = listOf(
                 "packed-read",
@@ -119,12 +119,12 @@ internal object CorpusStagingProfile {
                 val command = buildList {
                     addAll(
                         listOf(
-                        File(System.getProperty("java.home"), "bin/java").absolutePath,
-                        "-Xmx512m",
-                        "-XX:ActiveProcessorCount=1",
-                        "--enable-native-access=ALL-UNNAMED",
-                        "-Dklause.bench.corpusCache=${CorpusFetcher.cacheRoot}",
-                    )
+                            File(System.getProperty("java.home"), "bin/java").absolutePath,
+                            "-Xmx512m",
+                            "-XX:ActiveProcessorCount=1",
+                            "--enable-native-access=ALL-UNNAMED",
+                            "-Dklause.bench.corpusCache=${CorpusFetcher.cacheRoot}",
+                        ),
                     )
                     if (mode !in setOf("stage-uninstrumented", "stage-prehashed")) {
                         add(
@@ -135,12 +135,12 @@ internal object CorpusStagingProfile {
                     addAll(
                         listOf(
                             "-cp", System.getProperty("java.class.path"), CorpusStagingProfile::class.java.name,
-                        "trial-path=${if (mode == "plain-hash") plain else packed}", "mode=$mode",
-                        "sha256=$sourceHash", "budget-ms=$budget", "repeats=$repeats",
-                        "samples=${out.resolve("$mode.jsonl")}", "staging-target=${controls.stagingTarget}",
-                        "staging-buffer-bytes=${controls.bufferKiB * 1024}",
-                        "staging-directory=${stagingRoot.absolutePath}",
-                        )
+                            "trial-path=${if (mode == "plain-hash") plain else packed}", "mode=$mode",
+                            "sha256=$sourceHash", "budget-ms=$budget", "repeats=$repeats",
+                            "samples=${out.resolve("$mode.jsonl")}", "staging-target=${controls.stagingTarget}",
+                            "staging-buffer-bytes=${controls.bufferKiB * 1024}",
+                            "staging-directory=${stagingRoot.absolutePath}",
+                        ),
                     )
                 }
                 out.resolve("$mode-command.json").writeText(Reports.json.encodeToString(command))
@@ -161,9 +161,9 @@ internal object CorpusStagingProfile {
                 }
                 out.resolve("$mode-exit.json").writeText(
                     buildJsonObject {
-                    put("completed", completed)
-                    put("exit", if (process.isAlive) null else process.exitValue())
-                }.toString()
+                        put("completed", completed)
+                        put("exit", if (process.isAlive) null else process.exitValue())
+                    }.toString(),
                 )
             }
             for (mode in modes) {
@@ -184,13 +184,13 @@ internal object CorpusStagingProfile {
         val mode = request.getValue("mode")
         require(
             mode in setOf(
-            "packed-read",
-            "decode-hash",
-            "stage",
-            "stage-uninstrumented",
-            "stage-prehashed",
-            "plain-hash",
-        )
+                "packed-read",
+                "decode-hash",
+                "stage",
+                "stage-uninstrumented",
+                "stage-prehashed",
+                "plain-hash",
+            ),
         )
         val budget = request.getValue("budget-ms").toLong()
         val cpu = ManagementFactory.getThreadMXBean()
@@ -252,29 +252,29 @@ internal object CorpusStagingProfile {
                 val cpuEnd = if (cpu.isCurrentThreadCpuTimeSupported) cpu.currentThreadCpuTime else -1L
                 samples.println(
                     buildJsonObject {
-                    put("mode", mode)
-                    put("instrumented", mode !in setOf("stage-uninstrumented", "stage-prehashed"))
-                    put("operation", index)
-                    put("jvmCache", if (index == 0) "fresh-first-operation" else "same-process-repeated-operation")
-                    put("osCache", "uncontrolled; parent read and materialization completed before child startup")
-                    put("sourcePath", source.absolutePath)
-                    put("stagingTarget", request.getValue("staging-target"))
-                    put("stagingBufferBytes", request.getValue("staging-buffer-bytes").toInt())
-                    put("stagingDirectory", request.getValue("staging-directory"))
-                    put("sourceFileBytes", source.length())
-                    put("stagedBytes", stagedBytes)
-                    put("sha256", observedHash)
-                    put("matchesPlainSource", observedHash?.let { it == request.getValue("sha256") })
-                    put("sourceAllowanceMs", budget)
-                    put("prehashNanos", prehashNanos)
-                    put("stagingNanos", stagingNanos)
-                    put("cleanupNanos", cleanupNanos)
-                    put("verificationNanos", verificationNanos)
-                    put("totalNanos", total)
-                    put("iterationTotalNanos", System.nanoTime() - iterationStart)
-                    put("threadCpuNanos", if (cpuStart >= 0L && cpuEnd >= 0L) cpuEnd - cpuStart else null)
-                    put("failure", failure)
-                }
+                        put("mode", mode)
+                        put("instrumented", mode !in setOf("stage-uninstrumented", "stage-prehashed"))
+                        put("operation", index)
+                        put("jvmCache", if (index == 0) "fresh-first-operation" else "same-process-repeated-operation")
+                        put("osCache", "uncontrolled; parent read and materialization completed before child startup")
+                        put("sourcePath", source.absolutePath)
+                        put("stagingTarget", request.getValue("staging-target"))
+                        put("stagingBufferBytes", request.getValue("staging-buffer-bytes").toInt())
+                        put("stagingDirectory", request.getValue("staging-directory"))
+                        put("sourceFileBytes", source.length())
+                        put("stagedBytes", stagedBytes)
+                        put("sha256", observedHash)
+                        put("matchesPlainSource", observedHash?.let { it == request.getValue("sha256") })
+                        put("sourceAllowanceMs", budget)
+                        put("prehashNanos", prehashNanos)
+                        put("stagingNanos", stagingNanos)
+                        put("cleanupNanos", cleanupNanos)
+                        put("verificationNanos", verificationNanos)
+                        put("totalNanos", total)
+                        put("iterationTotalNanos", System.nanoTime() - iterationStart)
+                        put("threadCpuNanos", if (cpuStart >= 0L && cpuEnd >= 0L) cpuEnd - cpuStart else null)
+                        put("failure", failure)
+                    },
                 )
                 samples.flush()
             }
@@ -299,9 +299,9 @@ internal object CorpusStagingProfile {
         output.bufferedWriter().use { writer ->
             writer.appendLine(
                 buildJsonObject {
-                put("scope", "Recorded JFR IO events only; recording thresholds can omit short operations")
-                put("overlapPolicy", "Event durations are observations, not disjoint source cost totals")
-            }.toString()
+                    put("scope", "Recorded JFR IO events only; recording thresholds can omit short operations")
+                    put("overlapPolicy", "Event durations are observations, not disjoint source cost totals")
+                }.toString(),
             )
             RecordingFile(recording.toPath()).use { events ->
                 while (events.hasMoreEvents()) {
@@ -309,30 +309,30 @@ internal object CorpusStagingProfile {
                     if (event.eventType.name !in ioEvents) continue
                     writer.appendLine(
                         buildJsonObject {
-                        put("event", event.eventType.name)
-                        put("start", event.startTime.toString())
-                        put("durationNanos", event.duration.toNanos())
-                        put("path", event.getString("path"))
-                        put("thread", event.thread?.javaName)
-                        put(
-                            "bytes",
-                            event.getLong(
-                            if (event.eventType.name == "jdk.FileRead") {
-                                "bytesRead"
-                            } else {
-                                "bytesWritten"
-                            },
-                        )
-                        )
-                        put(
-                            "stack",
-                            JsonArray(
-                                event.stackTrace?.frames.orEmpty().take(16).map {
-                            JsonPrimitive("${it.method.type.name}.${it.method.name}")
-                        }
+                            put("event", event.eventType.name)
+                            put("start", event.startTime.toString())
+                            put("durationNanos", event.duration.toNanos())
+                            put("path", event.getString("path"))
+                            put("thread", event.thread?.javaName)
+                            put(
+                                "bytes",
+                                event.getLong(
+                                    if (event.eventType.name == "jdk.FileRead") {
+                                        "bytesRead"
+                                    } else {
+                                        "bytesWritten"
+                                    },
+                                ),
                             )
-                        )
-                    }.toString()
+                            put(
+                                "stack",
+                                JsonArray(
+                                    event.stackTrace?.frames.orEmpty().take(16).map {
+                                        JsonPrimitive("${it.method.type.name}.${it.method.name}")
+                                    },
+                                ),
+                            )
+                        }.toString(),
                     )
                 }
             }

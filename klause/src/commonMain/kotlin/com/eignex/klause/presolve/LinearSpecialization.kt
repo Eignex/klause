@@ -59,8 +59,8 @@ internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>
             Term.isBool(ref(it))
         }
     ) {
-            return null
-        }
+        return null
+    }
     val isStrict = if (truth) strict else !strict
     val variables = ArrayList<Int>()
     return when (val c = constants) {
@@ -162,10 +162,12 @@ internal fun integralLinear(
     ) {
         Linear(
             LongArray(normalized.size) {
-            visit()
-            normalized[it].toLongExact()
-        },
-            variables, relation, rhs.toLongExact()
+                visit()
+                normalized[it].toLongExact()
+            },
+            variables,
+            relation,
+            rhs.toLongExact(),
         )
     } else {
         Linear(variables, normalized, relation, rhs)

@@ -132,10 +132,10 @@ private class FloatChoicePlanner(
             if (exponent != null && exponent.value >= 0 && exponent.value <= Int.MAX_VALUE.toDouble() &&
                 exponent.value == exponent.value.toInt().toDouble()
             ) {
-                    0
-                } else {
-                    null
-                }
+                0
+            } else {
+                null
+            }
         }
 
         else -> null

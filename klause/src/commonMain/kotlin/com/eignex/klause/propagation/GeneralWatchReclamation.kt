@@ -8,8 +8,8 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
         if (learned.sweptRetirements == learned.retiredCount &&
             (
                 learned.deferredWatchTrimWork == 0L ||
-                !budget.supports(learned.deferredWatchTrimWork, learned.deferredWatchTrimScratch)
-            )
+                    !budget.supports(learned.deferredWatchTrimWork, learned.deferredWatchTrimScratch)
+                )
         ) {
             return
         }

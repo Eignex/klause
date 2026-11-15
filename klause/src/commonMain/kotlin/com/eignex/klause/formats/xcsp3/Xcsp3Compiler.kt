@@ -498,11 +498,11 @@ internal object Compiler {
             } else {
                 factors.add(
                     Linear(
-                    LongArray(coeffs.size + 1) { if (it < coeffs.size) coeffs[it].toLong() else -1L },
-                    vars + rhsVar,
-                    op,
-                    k,
-                )
+                        LongArray(coeffs.size + 1) { if (it < coeffs.size) coeffs[it].toLong() else -1L },
+                        vars + rhsVar,
+                        op,
+                        k,
+                    ),
                 )
                 // `(eq, v)` makes v the sum's value: v = Σ coeffs·vars. Orienting a bare equality could
                 // pick a decision var as the output, so the front-end records the definition itself.

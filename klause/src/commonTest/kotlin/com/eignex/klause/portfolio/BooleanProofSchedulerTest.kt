@@ -34,10 +34,12 @@ import kotlin.test.assertTrue
 class BooleanProofSchedulerTest {
     private val context = BooleanProofContext(SourceScope(SourceRevision("fixture", "exact-cnf")), "identity:0")
     private val contradiction = Problem(
-        5, 0, emptyArray(),
+        5,
+        0,
+        emptyArray(),
         Array(8) { mask ->
-        Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
-    }
+            Clause(IntArray(3) { bit -> Lit.make(bit + 2, mask and (1 shl bit) != 0) })
+        },
     ).bake()
 
     @Test
@@ -70,10 +72,12 @@ class BooleanProofSchedulerTest {
     @Test
     fun `an adopted probe should finish within its original remaining decision allowance`() {
         val problem = Problem(
-            5, 0, emptyArray(),
+            5,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(IntArray(5) { Lit.make(it, true) }),
-        )
+                Clause(IntArray(5) { Lit.make(it, true) }),
+            ),
         ).bake()
         for (native in listOf(false, true)) {
             val budget = NodeBudget(5L)
@@ -146,10 +150,12 @@ class BooleanProofSchedulerTest {
     @Test
     fun `a checked witness should preserve caller pins and leave proof coverage open`() {
         val problem = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ),
         ).bake()
         val assumptions = Assumptions(bools = mapOf(1 to false))
         val scoped = context.copy(scope = context.scope.copy(condition = SourceCondition(bools = assumptions.bools)))
@@ -198,9 +204,9 @@ class BooleanProofSchedulerTest {
             scheduler.replaceContext(
                 context.copy(
                     scope = context.scope.copy(
-                condition = SourceCondition(bools = mapOf(1 to true)),
-            )
-                )
+                        condition = SourceCondition(bools = mapOf(1 to true)),
+                    ),
+                ),
             )
 
             assertEquals(0, scheduler.completed)
@@ -230,8 +236,8 @@ class BooleanProofSchedulerTest {
     fun `objective contexts should decline before constructing private search`() {
         val optimizing = context.copy(
             scope = context.scope.copy(
-            objective = SourceObjective("cost", ObjectiveSense.MINIMIZE),
-        )
+                objective = SourceObjective("cost", ObjectiveSense.MINIMIZE),
+            ),
         )
 
         assertFailsWith<IllegalArgumentException> {

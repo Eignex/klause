@@ -205,23 +205,23 @@ internal class MpsOutput(
         }
     } else {
         when (verdict) {
-        Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
-            when {
-                best == null -> "s UNKNOWN"
-                verdict == Verdict.OPTIMAL -> "s OPTIMUM FOUND"
-                else -> "s SATISFIABLE"
+            Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
+                when {
+                    best == null -> "s UNKNOWN"
+                    verdict == Verdict.OPTIMAL -> "s OPTIMUM FOUND"
+                    else -> "s SATISFIABLE"
+                }
+
+            Verdict.UNBOUNDED -> when {
+                exactSourceWitness() != false -> "s UNBOUNDED"
+                best != null -> "s SATISFIABLE"
+                else -> "s UNKNOWN"
             }
 
-        Verdict.UNBOUNDED -> when {
-            exactSourceWitness() != false -> "s UNBOUNDED"
-            best != null -> "s SATISFIABLE"
-            else -> "s UNKNOWN"
+            Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
+
+            Verdict.UNKNOWN -> "s UNKNOWN"
         }
-
-        Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
-
-        Verdict.UNKNOWN -> "s UNKNOWN"
-    }
     }
 
     override fun lpStatisticPairs(stats: SolveStats): List<Pair<String, String>> {
@@ -229,11 +229,11 @@ internal class MpsOutput(
         val qualified = linearSource
         val key = if (qualified != null) {
             when {
-            !qualified.nativeClaimsUnrestricted -> "restrictedModelLpRootBound"
-            qualified.nominalSourceExact && qualified.claimsCoverTolerance -> "lpRootBound"
-            qualified.nominalSourceExact -> "nominalSourceLpRootBound"
-            else -> "workingModelLpRootBound"
-        }
+                !qualified.nativeClaimsUnrestricted -> "restrictedModelLpRootBound"
+                qualified.nominalSourceExact && qualified.claimsCoverTolerance -> "lpRootBound"
+                qualified.nominalSourceExact -> "nominalSourceLpRootBound"
+                else -> "workingModelLpRootBound"
+            }
         } else {
             "lpRootBound"
         }
@@ -254,8 +254,8 @@ internal class MpsOutput(
                 val attained = source.incumbent?.objective?.let { it == source.acceptedObjectiveBound } == true ||
                     (
                         source.nominalSourceExact && source.claimsCoverTolerance && source.incumbent?.exact == true &&
-                        nativeOptimumExact
-                    )
+                            nativeOptimumExact
+                        )
                 val status = if (source.numericalClaims && !attained) "tolerance-optimum" else "attained-optimum"
                 return "optimizationStatus=$status"
             }
@@ -336,10 +336,10 @@ internal class MpsOutput(
                 LinearSourceConclusion.UNSATISFIABLE,
             )
         ) {
-                "MPS numerical status under configured tolerances"
-            } else {
-                null
-            }
+            "MPS numerical status under configured tolerances"
+        } else {
+            null
+        }
         return listOfNotNull(declaration, numerical, qualification, witness, cause)
             .joinToString("; ").ifEmpty { null }
     }

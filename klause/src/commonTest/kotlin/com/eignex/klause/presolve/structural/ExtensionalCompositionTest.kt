@@ -106,11 +106,13 @@ class ExtensionalCompositionTest {
     @Test
     fun `source presolve should retain the completed shared tuple refutation`() {
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 1) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             arrayOf<Factor>(
-            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
-            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+            ),
         )
 
         val result = Presolver.runSource(problem, PresolveConfig.parse("off,+extensional"))
@@ -131,12 +133,14 @@ class ExtensionalCompositionTest {
             3,
         )
         val problem = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             arrayOf<Factor>(
-            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
-            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
-            diagram,
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+                diagram,
+            ),
         )
         val budget = PresolveBudget(10_000)
 
@@ -163,11 +167,13 @@ class ExtensionalCompositionTest {
             3,
         )
         val problem = Problem(
-            0, 2, Array(2) { IntDomain(0, 1) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             arrayOf<Factor>(
-            diagram,
-            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
-        )
+                diagram,
+                Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+            ),
         )
         val budget = PresolveBudget(10_000)
 

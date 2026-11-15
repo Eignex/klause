@@ -45,15 +45,18 @@ class ExactNeighborhoodTest {
         var exhausted = false
         var checks = 0
         val search = ExactNeighborhood(
-            0, listOf(BigFraction.ZERO),
+            0,
+            listOf(BigFraction.ZERO),
             ExactNeighborhoodCompletion { _, _ ->
-            checks++
-            ExactNeighborhoodResult.Undecided
-        },
-            coordinateValues = { emptyList() }, prepareBooleanCenter = {
-            exhausted = true
-            false
-        }, completionExhausted = { exhausted }
+                checks++
+                ExactNeighborhoodResult.Undecided
+            },
+            coordinateValues = { emptyList() },
+            prepareBooleanCenter = {
+                exhausted = true
+                false
+            },
+            completionExhausted = { exhausted },
         )
 
         assertTrue(search.advance(ExecutionControl.Never, Long.MAX_VALUE))

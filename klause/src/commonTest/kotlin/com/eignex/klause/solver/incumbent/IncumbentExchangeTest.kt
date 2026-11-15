@@ -32,13 +32,13 @@ class IncumbentExchangeTest {
         assertEquals("best", subscription.poll()?.assignment)
         assertEquals(
             mapOf(
-            IncumbentOfferEvent.Segments to 1,
-            IncumbentOfferEvent.Offered to 3,
-            IncumbentOfferEvent.Coalesced to 2,
-            IncumbentOfferEvent.Checked to 1,
-            IncumbentOfferEvent.Installed to 1,
-        ),
-            events.groupingBy { it }.eachCount()
+                IncumbentOfferEvent.Segments to 1,
+                IncumbentOfferEvent.Offered to 3,
+                IncumbentOfferEvent.Coalesced to 2,
+                IncumbentOfferEvent.Checked to 1,
+                IncumbentOfferEvent.Installed to 1,
+            ),
+            events.groupingBy { it }.eachCount(),
         )
     }
 

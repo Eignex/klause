@@ -108,12 +108,14 @@ internal class SourceClauseGuidance private constructor(
             }
             if (!consultation.reserve()) return null
             return Truth(
-                if (satisfied) true else if (unresolved) {
-                null
-            } else {
-                false
-            },
-                point
+                if (satisfied) {
+                    true
+                } else if (unresolved) {
+                    null
+                } else {
+                    false
+                },
+                point,
             )
         }
 
@@ -170,7 +172,9 @@ internal class SourceClauseGuidance private constructor(
                         falseInput = true
                     }
                 }
-                val conjunction = if (falseInput) false else if (unknownInput) {
+                val conjunction = if (falseInput) {
+                    false
+                } else if (unknownInput) {
                     null
                 } else {
                     true
@@ -243,7 +247,7 @@ internal class SourceClauseGuidance private constructor(
             var width = size
             var levels = 1
             while (width > 0) {
-                width = width ushr 1;
+                width = width ushr 1
                 levels++
             }
             return levels + minOf(size, 16)

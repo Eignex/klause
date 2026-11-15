@@ -54,10 +54,10 @@ class OpenSourcePreparationTest {
 
         val planned = assertIs<OpenSourcePreparation.Planned>(
             model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"),
-            projections = projections,
-            capturedPlan = captured,
-        )
+                config = PresolveConfig.parse("off,+dependent-rows"),
+                projections = projections,
+                capturedPlan = captured,
+            ),
         )
 
         assertNotSame(captured, planned.plan)
@@ -97,10 +97,10 @@ class OpenSourcePreparationTest {
 
         val planned = assertIs<OpenSourcePreparation.Planned>(
             model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"),
-            projections = projections,
-            capturedPlan = captured,
-        )
+                config = PresolveConfig.parse("off,+dependent-rows"),
+                projections = projections,
+                capturedPlan = captured,
+            ),
         )
 
         assertFalse(planned.plan.factorEncoded(0))
@@ -121,26 +121,26 @@ class OpenSourcePreparationTest {
         var installations = 0
         val projections = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val selected = BuiltInEncoderProvider.select(factor, target)
-            if (!selected.enforcesSource) {
-                selected
-            } else {
-                Encoder(selected.support) { view, encoding ->
-                installations++
-                selected.install(view, encoding)
-            }
-            }
-        }
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (!selected.enforcesSource) {
+                    selected
+                } else {
+                    Encoder(selected.support) { view, encoding ->
+                        installations++
+                        selected.install(view, encoding)
+                    }
+                }
+            },
         ).prepare(model)
         val captured = model.componentPlan(projections)
         installations = 0
 
         val planned = assertIs<OpenSourcePreparation.Planned>(
             model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"),
-            projections = projections,
-            capturedPlan = captured,
-        )
+                config = PresolveConfig.parse("off,+dependent-rows"),
+                projections = projections,
+                capturedPlan = captured,
+            ),
         )
 
         assertEquals(1, planned.model.numFactors)
@@ -165,10 +165,10 @@ class OpenSourcePreparationTest {
 
         val planned = assertIs<OpenSourcePreparation.Planned>(
             model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"),
-            projections = projections,
-            capturedPlan = captured,
-        )
+                config = PresolveConfig.parse("off,+dependent-rows"),
+                projections = projections,
+                capturedPlan = captured,
+            ),
         )
 
         assertEquals(1, planned.model.numFactors)
@@ -215,10 +215,10 @@ class OpenSourcePreparationTest {
 
         val planned = assertIs<OpenSourcePreparation.Planned>(
             model.prepareOpenSource(
-            config = PresolveConfig.parse("off,+dependent-rows"),
-            projections = projections,
-            capturedPlan = captured,
-        )
+                config = PresolveConfig.parse("off,+dependent-rows"),
+                projections = projections,
+                capturedPlan = captured,
+            ),
         )
 
         assertEquals(1, planned.model.numFactors)
@@ -240,12 +240,12 @@ class OpenSourcePreparationTest {
 
         val planned = assertIs<OpenSourcePreparation.Planned>(
             model.prepareOpenSource(
-            config = PresolveConfig.NONE,
-            projections = projections,
-            capturedPlan = captured,
-            budget = budget,
-            cancellation = token,
-        )
+                config = PresolveConfig.NONE,
+                projections = projections,
+                capturedPlan = captured,
+                budget = budget,
+                cancellation = token,
+            ),
         )
 
         assertSame(model, planned.model)
@@ -294,10 +294,10 @@ class OpenSourcePreparationTest {
 
         val planned = assertIs<OpenSourcePreparation.Planned>(
             model.prepareOpenSource(
-            config = PresolveConfig.NONE,
-            projections = different,
-            capturedPlan = captured,
-        )
+                config = PresolveConfig.NONE,
+                projections = different,
+                capturedPlan = captured,
+            ),
         )
 
         assertNotSame(captured, planned.plan)
@@ -313,10 +313,10 @@ class OpenSourcePreparationTest {
 
         val planned = assertIs<OpenSourcePreparation.Planned>(
             model.prepareOpenSource(
-            config = PresolveConfig.NONE,
-            projections = projections,
-            capturedPlan = captured,
-        )
+                config = PresolveConfig.NONE,
+                projections = projections,
+                capturedPlan = captured,
+            ),
         )
 
         assertNotSame(captured, planned.plan)
@@ -326,25 +326,29 @@ class OpenSourcePreparationTest {
     @Test
     fun `captured satisfaction plans should install once across independent executions`() {
         val model = Problem(
-            0, 0, emptyArray(),
+            0,
+            0,
+            emptyArray(),
             arrayOf<Factor>(
-            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0)
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 1.0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(2.0),
         )
         var installations = 0
         val projections = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val selected = BuiltInEncoderProvider.select(factor, target)
-            if (!selected.enforcesSource) {
-                selected
-            } else {
-                Encoder(selected.support) { view, encoding ->
-                installations++
-                selected.install(view, encoding)
-            }
-            }
-        }
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                if (!selected.enforcesSource) {
+                    selected
+                } else {
+                    Encoder(selected.support) { view, encoding ->
+                        installations++
+                        selected.install(view, encoding)
+                    }
+                }
+            },
         ).prepare(model)
         val captured = model.componentPlan(projections)
         val request = OpenTheoryRequest(model, componentPlan = captured).withPresolve(PresolveConfig.NONE)
@@ -389,10 +393,10 @@ class OpenSourcePreparationTest {
 
         val planned = assertIs<OpenSourcePreparation.Planned>(
             model.prepareOpenSource(
-            config = aggregateOnly,
-            projections = declared.factorProjections,
-            capturedPlan = declared,
-        )
+                config = aggregateOnly,
+                projections = declared.factorProjections,
+                capturedPlan = declared,
+            ),
         )
 
         assertNotSame(declared, planned.plan)

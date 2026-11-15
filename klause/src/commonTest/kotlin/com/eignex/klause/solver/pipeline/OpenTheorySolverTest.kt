@@ -91,26 +91,30 @@ class OpenTheorySolverTest {
     @Test
     fun `default ordinary linear traversal should publish a strict guard consequence`() {
         val model = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
-            ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                listOf(BigFraction.ofLong(2), BigFraction.ofLong(3)),
-                LinearOp.LE,
-                BigFraction.ONE,
+                ExactLinear.of(
+                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.ofLong(2), BigFraction.ofLong(3)),
+                    LinearOp.LE,
+                    BigFraction.ONE,
+                ),
+                ReifiedRealLinear(
+                    0,
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0, 1),
+                    doubleArrayOf(2.0, -3.0),
+                    LinearOp.LE,
+                    0.0,
+                    strict = true,
+                ),
             ),
-            ReifiedRealLinear(
-                0,
-                intArrayOf(),
-                doubleArrayOf(),
-                intArrayOf(0, 1),
-                doubleArrayOf(2.0, -3.0),
-                LinearOp.LE,
-                0.0,
-                strict = true,
-            ),
-        ),
-            numRealVars = 2, realLower = DoubleArray(2), realUpper = DoubleArray(2)
+            numRealVars = 2,
+            realLower = DoubleArray(2),
+            realUpper = DoubleArray(2),
         )
         val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
 

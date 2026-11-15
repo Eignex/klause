@@ -40,14 +40,14 @@ internal object ExactLinearScoringProfile {
                 )
                 val model = LocalSearchModel.open(
                     Problem(
-                    0,
-                    width / 2,
-                    Array(width / 2) { IntDomain(-16, 16) },
-                    arrayOf(row),
-                    numRealVars = width / 2,
-                    realLower = DoubleArray(width / 2) { -16.0 },
-                    realUpper = DoubleArray(width / 2) { 16.0 },
-                )
+                        0,
+                        width / 2,
+                        Array(width / 2) { IntDomain(-16, 16) },
+                        arrayOf(row),
+                        numRealVars = width / 2,
+                        realLower = DoubleArray(width / 2) { -16.0 },
+                        realUpper = DoubleArray(width / 2) { 16.0 },
+                    ),
                 )
                 val state = LocalSearchState(model, Random(3))
                 val rounds = 256

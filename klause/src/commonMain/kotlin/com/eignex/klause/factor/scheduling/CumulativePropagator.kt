@@ -68,9 +68,9 @@ internal class CumulativePropagator(
             requireNotNull(unarySubset).explain(state, factorId, payload, atTrail, atLevel)
         } else {
             View(state, atTrail, atLevel).run {
-            explainPayload(payload)
-            literals()
-        }
+                explainPayload(payload)
+                literals()
+            }
         }
 
     private fun View.explainPayload(p: IntArray) {
@@ -437,13 +437,13 @@ internal class CumulativePropagator(
             val envTheta = tree.envOfTheta()
             if (envTheta > effCap * tau) {
                 return fail(state) {
-                if (reverse) {
-                    for (v in intVars) domainOf(v)
-                    for (i in 0 until n) if (present(i)) task(i)
-                } else {
-                    thetaOverload(tau)
+                    if (reverse) {
+                        for (v in intVars) domainOf(v)
+                        for (i in 0 until n) if (present(i)) task(i)
+                    } else {
+                        thetaOverload(tau)
+                    }
                 }
-            }
             }
             for (ki in k until m) {
                 state.checkFiniteWork()

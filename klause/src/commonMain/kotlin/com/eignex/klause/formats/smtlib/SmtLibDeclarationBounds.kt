@@ -22,11 +22,11 @@ internal fun Compiler.Builder.retainDeclarationBounds() {
     ) { id, real, lower, value ->
         factors.add(
             ExactLinear.of(
-            intArrayOf(if (real) Term.ofRealVar(id) else Term.ofIntVar(id)),
-            listOf(BigFraction.ONE),
-            if (lower) LinearOp.GE else LinearOp.LE,
-            BigFraction.of(value.numerator, value.denominator),
-        )
+                intArrayOf(if (real) Term.ofRealVar(id) else Term.ofIntVar(id)),
+                listOf(BigFraction.ONE),
+                if (lower) LinearOp.GE else LinearOp.LE,
+                BigFraction.of(value.numerator, value.denominator),
+            ),
         )
     }
 }
@@ -41,10 +41,10 @@ internal fun smtPolynomialDeclarationBounds(
     visitSmtDeclarationBounds(semantics, integers, reals, cancellation) { id, _, lower, value ->
         formulas.add(
             PolynomialRealFormula.Atom(
-            PolynomialExpression.Variable(SourceRealId(id)),
-            if (lower) PolynomialRelation.GE else PolynomialRelation.LE,
-            PolynomialExpression.Constant.of(value.numerator, value.denominator),
-        )
+                PolynomialExpression.Variable(SourceRealId(id)),
+                if (lower) PolynomialRelation.GE else PolynomialRelation.LE,
+                PolynomialExpression.Constant.of(value.numerator, value.denominator),
+            ),
         )
     }
     return formulas

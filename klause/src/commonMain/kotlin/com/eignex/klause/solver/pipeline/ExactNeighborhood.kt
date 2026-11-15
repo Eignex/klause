@@ -68,7 +68,7 @@ internal class ExactNeighborhood(
         (
             MutableList<BigFraction>,
             BooleanArray,
-        ExactNeighborhoodCondition,
+            ExactNeighborhoodCondition,
             ExecutionControl,
         ) -> Unit
     )? = null,
@@ -160,8 +160,8 @@ internal class ExactNeighborhood(
             val total = centers.size + boolCount
             val operator = pending?.first ?: operator()
             val count = when (operator) {
-                0 -> 1;
-                1 -> maxOf(1, total / 2);
+                0 -> 1
+                1 -> maxOf(1, total / 2)
                 else -> total
             }
             val before = nativeWork()

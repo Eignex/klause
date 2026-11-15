@@ -59,11 +59,11 @@ internal object ExactFeasibilityCapture {
         require(compiled.objective == null)
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            compiled.source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            cancellation = stop,
-        )
+                compiled.source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                cancellation = stop,
+            ),
         )
         val request = (invocation.route as? SourceProblemRoute.OpenTheory)?.request
             ?: error("source did not select exact linear execution")
@@ -116,20 +116,20 @@ internal object ExactFeasibilityCapture {
         out.resolve("premises.json").writeText(capturedPremises.toString())
         out.resolve("capture.json").writeText(
             buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("sourceSha256", sha256(bytes))
-            put("captureSha256", sha256(encoded))
-            put("entry", "diagnostic direct complete worker; no CLI or default portfolio equivalence")
-            put("sourceVerdictClaim", false)
-            put("containingTimeoutMs", 10_000)
-            put("seed", 3)
-            put("processors", Runtime.getRuntime().availableProcessors())
-            put("observerCaptureNs", captureNs)
-            put("capturedCompleteDimensionObservations", observations)
-            put("rawResult", result?.javaClass?.simpleName)
-            put("booleans", buildJsonArray { requireNotNull(booleans).forEach { add(JsonPrimitive(it)) } })
-            put("shape", shape(captured))
-        }.toString()
+                put("revision", Reports.readGitSha())
+                put("sourceSha256", sha256(bytes))
+                put("captureSha256", sha256(encoded))
+                put("entry", "diagnostic direct complete worker; no CLI or default portfolio equivalence")
+                put("sourceVerdictClaim", false)
+                put("containingTimeoutMs", 10_000)
+                put("seed", 3)
+                put("processors", Runtime.getRuntime().availableProcessors())
+                put("observerCaptureNs", captureNs)
+                put("capturedCompleteDimensionObservations", observations)
+                put("rawResult", result?.javaClass?.simpleName)
+                put("booleans", buildJsonArray { requireNotNull(booleans).forEach { add(JsonPrimitive(it)) } })
+                put("shape", shape(captured))
+            }.toString(),
         )
     }
 
@@ -165,15 +165,15 @@ internal object ExactFeasibilityCapture {
         val sides = buildJsonArray {
             for (column in 0 until count) {
                 for (upper in listOf(false, true)) {
-                val premise = call(lp, "activeBoundPremise", column, upper) as? SearchAtomPremise ?: continue
-                add(
-                    buildJsonObject {
-                    put("column", column)
-                    put("upper", upper)
-                    put("premise", visit(premise))
+                    val premise = call(lp, "activeBoundPremise", column, upper) as? SearchAtomPremise ?: continue
+                    add(
+                        buildJsonObject {
+                            put("column", column)
+                            put("upper", upper)
+                            put("premise", visit(premise))
+                        },
+                    )
                 }
-                )
-            }
             }
         }
         return buildJsonObject {
@@ -215,12 +215,12 @@ internal object ExactFeasibilityCapture {
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("shape.json").writeText(
             buildJsonObject {
-            put("inspectionRevision", Reports.readGitSha())
-            put("sourceJob", sourceJob)
-            put("captureSha256", sha256(bytes))
-            put("shape", shape(state))
-            put("fixedAndComponents", components(state))
-        }.toString()
+                put("inspectionRevision", Reports.readGitSha())
+                put("sourceJob", sourceJob)
+                put("captureSha256", sha256(bytes))
+                put("shape", shape(state))
+                put("fixedAndComponents", components(state))
+            }.toString(),
         )
         out.resolve("continuation.json").writeText(continuation(state).toString())
         val contextCompanion = Class.forName(prefix + "LpSolveContext").getField("Companion").get(null)
@@ -232,30 +232,30 @@ internal object ExactFeasibilityCapture {
         val steps = call(report, "getSteps") as List<*>
         out.resolve("replay.json").writeText(
             buildJsonObject {
-            put("inspectionRevision", Reports.readGitSha())
-            put("captureSha256", sha256(bytes))
-            put("coldReplayElapsedNs", elapsed)
-            put("declinedEvent", call(report, "getDeclinedEventIndex")?.toString())
-            put("originalWarmFactorsCaptured", false)
-            put("sourceVerdictClaim", false)
-            put(
-                "steps",
-                buildJsonArray {
-                for (step in steps) {
-                    val current = requireNotNull(step)
-                    val result = call(current, "getResult")
-                    add(
-                        buildJsonObject {
-                        put("accepted", call(current, "getAccepted") as Boolean)
-                        put("verdict", result?.let { call(it, "getVerdict") }?.toString())
-                        put("hasExactPoint", result?.let { call(it, "getExactPrimal") } != null)
-                        put("continuation", result?.let { call(it, "getContinuation") }?.toString())
-                    }
-                    )
-                }
-            }
-            )
-        }.toString()
+                put("inspectionRevision", Reports.readGitSha())
+                put("captureSha256", sha256(bytes))
+                put("coldReplayElapsedNs", elapsed)
+                put("declinedEvent", call(report, "getDeclinedEventIndex")?.toString())
+                put("originalWarmFactorsCaptured", false)
+                put("sourceVerdictClaim", false)
+                put(
+                    "steps",
+                    buildJsonArray {
+                        for (step in steps) {
+                            val current = requireNotNull(step)
+                            val result = call(current, "getResult")
+                            add(
+                                buildJsonObject {
+                                    put("accepted", call(current, "getAccepted") as Boolean)
+                                    put("verdict", result?.let { call(it, "getVerdict") }?.toString())
+                                    put("hasExactPoint", result?.let { call(it, "getExactPrimal") } != null)
+                                    put("continuation", result?.let { call(it, "getContinuation") }?.toString())
+                                },
+                            )
+                        }
+                    },
+                )
+            }.toString(),
         )
     }
 
@@ -340,17 +340,17 @@ internal object ExactFeasibilityCapture {
             put(
                 "components",
                 buildJsonArray {
-                for ((key, rows) in grouped) {
-                    val columns = (0 until n).filter { !fixed[it] && root(it) == key }
-                    add(
-                        buildJsonObject {
-                        put("rows", JsonArray(rows.map(::JsonPrimitive)))
-                        put("columns", JsonArray(columns.map(::JsonPrimitive)))
-                        put("denseCells", rows.size.toLong() * (columns.size.toLong() + 2L * rows.size + 1))
+                    for ((key, rows) in grouped) {
+                        val columns = (0 until n).filter { !fixed[it] && root(it) == key }
+                        add(
+                            buildJsonObject {
+                                put("rows", JsonArray(rows.map(::JsonPrimitive)))
+                                put("columns", JsonArray(columns.map(::JsonPrimitive)))
+                                put("denseCells", rows.size.toLong() * (columns.size.toLong() + 2L * rows.size + 1))
+                            },
+                        )
                     }
-                    )
-                }
-            }
+                },
             )
         }
     }
@@ -414,9 +414,9 @@ internal object ExactFeasibilityCapture {
         ) + args
         out.resolve("runtime.json").writeText(
             buildJsonObject {
-            put("command", JsonArray(command.map(::JsonPrimitive)))
-            put("parentOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
-        }.toString()
+                put("command", JsonArray(command.map(::JsonPrimitive)))
+                put("parentOptions", ManagementFactory.getRuntimeMXBean().inputArguments.joinToString(" "))
+            }.toString(),
         )
         val process = ProcessBuilder(command)
             .redirectOutput(out.resolve("child.stdout"))

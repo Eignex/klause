@@ -92,8 +92,8 @@ class NativeLearnedPayloadsTest {
 
         val values = assertNotNull(
             sample.snapshot {
-            payloads.sharingMemory(sample, true, false) { false }
-        }.completeValues
+                payloads.sharingMemory(sample, true, false) { false }
+            }.completeValues,
         )
 
         assertEquals(0L, payloads.referenceCapacity)
@@ -212,8 +212,8 @@ class NativeLearnedPayloadsTest {
 
         val values = assertNotNull(
             sample.snapshot {
-            payloads.sharingMemory(sample, true, false) { it == 0 }
-        }.completeValues
+                payloads.sharingMemory(sample, true, false) { it == 0 }
+            }.completeValues,
         )
 
         assertEquals(payloads.primitiveBytes + payloads.capacityBytes, values["ownedPrimitiveBytes"])

@@ -62,13 +62,13 @@ internal class NonlinearIntegerResidueReduction(
                 is PolynomialRealFormula.And, is PolynomialRealFormula.Or -> {
                     val conjunction = formula is PolynomialRealFormula.And
                     val operands = children.map {
-                        step();
+                        step()
                         reduced.getValue(FormulaIdentity(it))
                     }
                     if (operands.indices.all {
-                        step();
-                        operands[it] === children[it]
-                    }
+                            step()
+                            operands[it] === children[it]
+                        }
                     ) {
                         formula
                     } else {

@@ -22,8 +22,8 @@ class FlatZincSolutionWriterTest {
         val program = parseFlatZinc("var 0.0..2.0: x :: output_var; solve minimize x;", exactFloats = true)
         val root = AlgebraicArithmetic().roots(
             RationalPolynomial(
-            listOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE),
-        )
+                listOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE),
+            ),
         ).last()
         val assignment = OpenTheoryAssignment.ExactNra(ExactNraAssignment(BooleanArray(0), listOf(root)))
 

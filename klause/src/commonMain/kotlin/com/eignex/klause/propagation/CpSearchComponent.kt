@@ -91,8 +91,8 @@ class CpSearchComponent(
         val usable = checkIntegerRow(learned)
         if (!usable) {
             session.explanationState.arithmeticLearningTrace?.record(
-            "integer.decline.shared-assertion-or-premise",
-        )
+                "integer.decline.shared-assertion-or-premise",
+            )
         }
         return usable
     }
@@ -123,9 +123,9 @@ class CpSearchComponent(
                     if (context.intLowerBound(source) != value || context.intUpperBound(source) != value) return false
                     SearchAtomPremise.All(
                         listOf(
-                        context.intLowerBoundPremise(source),
-                        context.intUpperBoundPremise(source),
-                    )
+                            context.intLowerBoundPremise(source),
+                            context.intUpperBoundPremise(source),
+                        ),
                     )
                 }
                 if (context.explainAtoms(premise, maxNodes = 128) == null) {
@@ -386,12 +386,12 @@ class CpSearchComponent(
     private fun conflict(result: PropagationResult.Unsat): ComponentResult.Conflict = ComponentResult.Conflict(
         (
             when (val learned = result.learnedClause) {
-            is ConflictAnalyzer.AnalysisResult.Learned -> learned
-            is ConflictAnalyzer.AnalysisResult.LearnedPb -> learned.fallbackClause
-            is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> learned.fallbackClause
-            else -> null
-        }
-        )
+                is ConflictAnalyzer.AnalysisResult.Learned -> learned
+                is ConflictAnalyzer.AnalysisResult.LearnedPb -> learned.fallbackClause
+                is ConflictAnalyzer.AnalysisResult.LearnedIntegerRow -> learned.fallbackClause
+                else -> null
+            }
+            )
             ?.literals
             ?.takeIf { literals -> literals.all { Lit.variable(it) < session.problem.numBoolVars } }
             ?.let(::SearchExplanation),

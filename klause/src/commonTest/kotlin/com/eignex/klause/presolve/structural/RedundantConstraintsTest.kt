@@ -130,14 +130,16 @@ class RedundantConstraintsTest {
             val tight = le(1, 0, 1, 1, 1)
             val memo = SubsumeMemo()
             val original = Problem(
-                2, 2, dom(2, 2),
+                2,
+                2,
+                dom(2, 2),
                 listOf(
-                clause,
-                loose,
-                if (shared) clause else Clause(intArrayOf(pos(0), pos(1))),
-                if (shared) loose else le(2, 0, 1, 1, 1),
-                tight,
-            )
+                    clause,
+                    loose,
+                    if (shared) clause else Clause(intArrayOf(pos(0), pos(1))),
+                    if (shared) loose else le(2, 0, 1, 1, 1),
+                    tight,
+                ),
             )
             checkIncrementalAssignments(
                 original,
@@ -432,11 +434,13 @@ class RedundantConstraintsTest {
         for (coefficient in listOf(large, -large)) {
             val domains = arrayOf(IntDomain(0, 1), if (coefficient > 0) IntDomain(-2, -1) else IntDomain(1, 2))
             val problem = Problem(
-                0, 2, domains,
+                0,
+                2,
+                domains,
                 listOf(
-                Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
-                Linear(longArrayOf(1, coefficient), intArrayOf(0, 1), LinearOp.LE, 0L),
-            )
+                    Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 0L),
+                    Linear(longArrayOf(1, coefficient), intArrayOf(0, 1), LinearOp.LE, 0L),
+                ),
             )
 
             val delta = Presolve.removeRedundantSourceConstraints(problem, ExecutionControl.Never)

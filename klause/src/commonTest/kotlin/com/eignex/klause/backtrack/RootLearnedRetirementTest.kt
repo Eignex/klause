@@ -33,12 +33,12 @@ class RootLearnedRetirementTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(4, 6))),
-            ),
-                nativeSat = native
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(4, 6))),
+                ),
+                nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -56,8 +56,8 @@ class RootLearnedRetirementTest {
             val before = SharingMemoryObservation(1024L, 128, { false }, {})
             val retained = assertNotNull(
                 before.snapshot {
-                retirement.retainedMemory(before, owner)
-            }.completeValues
+                    retirement.retainedMemory(before, owner)
+                }.completeValues,
             )
             assertEquals(12L, retained["protectedPrimitiveBytes"])
             assertEquals(3L, retained["protectedReferenceSlots"])
@@ -66,8 +66,8 @@ class RootLearnedRetirementTest {
             val after = SharingMemoryObservation(1024L, 128, { false }, {})
             val released = assertNotNull(
                 after.snapshot {
-                retirement.retainedMemory(after, owner)
-            }.completeValues
+                    retirement.retainedMemory(after, owner)
+                }.completeValues,
             )
 
             assertEquals(12L, released["ownedPrimitiveBytes"])
@@ -82,12 +82,12 @@ class RootLearnedRetirementTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(4, 6))),
-            ),
-                nativeSat = native
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(4, 6))),
+                ),
+                nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -123,12 +123,12 @@ class RootLearnedRetirementTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(4, 6))),
-            ),
-                nativeSat = native
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(4, 6))),
+                ),
+                nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -164,12 +164,12 @@ class RootLearnedRetirementTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(4, 6))),
-            ),
-                nativeSat = native
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(4, 6))),
+                ),
+                nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -212,12 +212,12 @@ class RootLearnedRetirementTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(1))),
-            ),
-                nativeSat = native
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(1))),
+                ),
+                nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -255,12 +255,12 @@ class RootLearnedRetirementTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(1))),
-            ),
-                nativeSat = native
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(1))),
+                ),
+                nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -298,34 +298,34 @@ class RootLearnedRetirementTest {
     fun `an unfundable class grant should leave capture ownership unchanged`() {
         for (native in listOf(false, true)) {
             for (grant in listOf(1L, 10L)) {
-            val session = PropagationSession(
-                Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(4, 6))),
-            ),
-                nativeSat = native
-            )
-            assertEquals(native, session.usesNativeSat)
-            session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
-            val retirement = RootLearnedRetirement()
-            val spending = InprocessingSpending(InprocessingKind.Root)
-            val params = BacktrackParams(inprocessingRootWork = grant)
-            val before = session.work
-
-            spending.run(session, params, null) { budget ->
-                assertEquals(
-                    LearnedRetirementStatus.Deferred,
-                    retirement.capture(session, 0, session.learnedRetirementGeneration, params, budget),
+                val session = PropagationSession(
+                    Problem(
+                        4,
+                        0,
+                        emptyArray(),
+                        arrayOf(Clause(intArrayOf(4, 6))),
+                    ),
+                    nativeSat = native,
                 )
-            }
+                assertEquals(native, session.usesNativeSat)
+                session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+                val retirement = RootLearnedRetirement()
+                val spending = InprocessingSpending(InprocessingKind.Root)
+                val params = BacktrackParams(inprocessingRootWork = grant)
+                val before = session.work
 
-            assertEquals(before, session.work)
-            assertFalse(retirement.hasCapture)
-            assertFalse(session.hasLearnedRetirementContinuation)
-            assertTrue(session.isLearnedClause(0))
-        }
+                spending.run(session, params, null) { budget ->
+                    assertEquals(
+                        LearnedRetirementStatus.Deferred,
+                        retirement.capture(session, 0, session.learnedRetirementGeneration, params, budget),
+                    )
+                }
+
+                assertEquals(before, session.work)
+                assertFalse(retirement.hasCapture)
+                assertFalse(session.hasLearnedRetirementContinuation)
+                assertTrue(session.isLearnedClause(0))
+            }
         }
     }
 
@@ -334,12 +334,12 @@ class RootLearnedRetirementTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(1))),
-            ),
-                nativeSat = native
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(1))),
+                ),
+                nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -385,12 +385,12 @@ class RootLearnedRetirementTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(4, 6))),
-            ),
-                nativeSat = native
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(4, 6))),
+                ),
+                nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
@@ -417,12 +417,12 @@ class RootLearnedRetirementTest {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
                 Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(4, 6))),
-            ),
-                nativeSat = native
+                    4,
+                    0,
+                    emptyArray(),
+                    arrayOf(Clause(intArrayOf(4, 6))),
+                ),
+                nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)

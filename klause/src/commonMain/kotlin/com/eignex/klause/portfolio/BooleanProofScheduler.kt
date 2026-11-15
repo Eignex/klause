@@ -91,11 +91,11 @@ internal class BooleanProofScheduler(
             )
             require(
                 params.componentFactory == null && params.objectiveBoundSupplier == null &&
-                params.objectiveLowerBoundSupplier == null && params.globalVarLowerSupplier == null &&
-                params.globalVarUpperSupplier == null && params.toleranceCheck == null &&
-                params.cutExchange == null &&
-                (params.clauseExchange == null || params.clauseExchange is ConditionedClauseExchange) &&
-                params.improvedSolutionSink == null && params.pooledIncumbents == null
+                    params.objectiveLowerBoundSupplier == null && params.globalVarLowerSupplier == null &&
+                    params.globalVarUpperSupplier == null && params.toleranceCheck == null &&
+                    params.cutExchange == null &&
+                    (params.clauseExchange == null || params.clauseExchange is ConditionedClauseExchange) &&
+                    params.improvedSolutionSink == null && params.pooledIncumbents == null,
             )
         }
     }
@@ -256,8 +256,8 @@ internal class BooleanProofScheduler(
     private fun validate(value: BooleanProofContext) {
         require(
             value.scope.condition.bools.keys.none { id ->
-            id in splitVariablesForValidation
-        }
+                id in splitVariablesForValidation
+            },
         )
         require(value.scope.revision == sourceRevision && value.mapping == sourceMapping) {
             "a changed source or mapping requires a fresh scheduler"

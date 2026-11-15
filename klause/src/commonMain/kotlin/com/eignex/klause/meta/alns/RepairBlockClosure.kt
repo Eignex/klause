@@ -128,10 +128,10 @@ internal object RepairBlockClosure {
         val slots = mutable.toIntArray().also { it.sort() }
         return ClosedRepairBlock(
             FreedVars(
-            slots.filter { it < bools }.toIntArray(),
-            slots.filter { it >= bools }.map { it - bools }.toIntArray(),
-        ),
-            leaves.size
+                slots.filter { it < bools }.toIntArray(),
+                slots.filter { it >= bools }.map { it - bools }.toIntArray(),
+            ),
+            leaves.size,
         )
     }
 }

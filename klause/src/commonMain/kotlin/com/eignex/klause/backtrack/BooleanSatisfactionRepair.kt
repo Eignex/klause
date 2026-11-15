@@ -18,18 +18,18 @@ internal class BooleanSatisfactionRepair(solver: BacktrackSolver, private val pa
     init {
         require(
             solver.problem.numIntVars == 0 && solver.problem.numRealVars == 0 &&
-            solver.problem.factors.all { it is Clause } && !solver.problem.hasSymmetryBreaking
+                solver.problem.factors.all { it is Clause } && !solver.problem.hasSymmetryBreaking,
         )
         require(
             params.componentFactory == null && params.lpConfig == null &&
-            params.lpPlan.hasDefaultNumericalSettings() && !params.integerRowLearning
+                params.lpPlan.hasDefaultNumericalSettings() && !params.integerRowLearning,
         )
         require(
             params.objectiveBoundSupplier == null && params.objectiveLowerBoundSupplier == null &&
-            params.globalVarLowerSupplier == null && params.globalVarUpperSupplier == null &&
-            params.toleranceCheck == null && params.cutExchange == null &&
-            (params.clauseExchange == null || params.clauseExchange is ConditionedClauseExchange) &&
-            params.improvedSolutionSink == null && params.pooledIncumbents == null
+                params.globalVarLowerSupplier == null && params.globalVarUpperSupplier == null &&
+                params.toleranceCheck == null && params.cutExchange == null &&
+                (params.clauseExchange == null || params.clauseExchange is ConditionedClauseExchange) &&
+                params.improvedSolutionSink == null && params.pooledIncumbents == null,
         )
     }
 

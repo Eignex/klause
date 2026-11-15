@@ -29,10 +29,10 @@ class SourceRowCompletionTest {
         val objective = LinearObjective(intCoefficients = LongArray(model.numIntVars) { if (it == 0) 1L else 0L })
         val source = assertNotNull(
             model.linearAuthorityContext(
-            objective,
-            ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never,
-        )
+                objective,
+                ObjectiveSense.MINIMIZE,
+                ExecutionControl.Never,
+            ),
         )
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val packets = SourceRowCompletion(model, source, funding, frozen) { funding.paused }
@@ -48,11 +48,13 @@ class SourceRowCompletionTest {
     @Test
     fun `a blocked seed should complete through every equality its move breaks`() {
         val chain = Problem(
-            0, 5, Array(5) { IntDomain(0, 1) },
+            0,
+            5,
+            Array(5) { IntDomain(0, 1) },
             listOf(
-            Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0L),
-            Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0L),
-        )
+                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0L),
+                Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0L),
+            ),
         )
 
         val packet = complete(chain, longArrayOf(1, 1, 1, 0, 0), 0 to -1)
@@ -67,10 +69,12 @@ class SourceRowCompletionTest {
     fun `branching equality repairs should retain compensators in source order`() {
         val count = 12
         val problem = Problem(
-            0, count, Array(count) { IntDomain(0, 1) },
+            0,
+            count,
+            Array(count) { IntDomain(0, 1) },
             (1 until count).map {
-            Linear(longArrayOf(1, -1), intArrayOf(0, it), LinearOp.EQ, 0L)
-        }
+                Linear(longArrayOf(1, -1), intArrayOf(0, it), LinearOp.EQ, 0L)
+            },
         )
 
         val packet = complete(problem, LongArray(count) { 1L }, 0 to -1)

@@ -25,10 +25,10 @@ internal fun lowerQuadraticObjective(
         val result = LinkedHashMap<List<Int>, BigFraction>()
         for ((first, a) in left) {
             for ((second, b) in right) {
-            step()
-            if (first.size + second.size > 2) return null
-            add(result, (first + second).sorted(), a * b)
-        }
+                step()
+                if (first.size + second.size > 2) return null
+                add(result, (first + second).sorted(), a * b)
+            }
         }
         return result
     }
@@ -65,8 +65,8 @@ internal fun lowerQuadraticObjective(
             is PolynomialExpression.Sum -> LinkedHashMap<List<Int>, BigFraction>().also { result ->
                 for (child in children) {
                     for ((powers, coefficient) in values.getValue(child)) {
-                    add(result, powers, coefficient)
-                }
+                        add(result, powers, coefficient)
+                    }
                 }
             }
 

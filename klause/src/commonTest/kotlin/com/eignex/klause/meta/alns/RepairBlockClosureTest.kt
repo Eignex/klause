@@ -21,24 +21,25 @@ class RepairBlockClosureTest {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 100) }, emptyArray()).bake()
         val network = InvariantNetwork(
             listOf(
-            DefinitionalSweep.SweepNode.IntDef(
-                FunctionalObjective.Plus(
-                2,
-                FunctionalObjective.Operand.v(0),
-                FunctionalObjective.Operand.v(1),
+                DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(
+                        2,
+                        FunctionalObjective.Operand.v(0),
+                        FunctionalObjective.Operand.v(1),
+                    ),
+                    intArrayOf(0, 1),
+                ),
+                DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Times(
+                        3,
+                        FunctionalObjective.Operand.v(2),
+                        FunctionalObjective.Operand.v(2),
+                    ),
+                    intArrayOf(2),
+                ),
             ),
-                intArrayOf(0, 1)
-            ),
-            DefinitionalSweep.SweepNode.IntDef(
-                FunctionalObjective.Times(
-                3,
-                FunctionalObjective.Operand.v(2),
-                FunctionalObjective.Operand.v(2),
-            ),
-                intArrayOf(2)
-            ),
-        ),
-            4, 0
+            4,
+            0,
         )
         val selector = SemanticBlockRemoval(SemanticBlockRemoval.Kind.Assignment, network)
 
@@ -60,14 +61,15 @@ class RepairBlockClosureTest {
             listOf(
                 DefinitionalSweep.SweepNode.IntDef(
                     FunctionalObjective.Plus(
-            2,
-            FunctionalObjective.Operand.v(0),
-            FunctionalObjective.Operand.v(1),
-        ),
-            intArrayOf(0, 1)
-                )
+                        2,
+                        FunctionalObjective.Operand.v(0),
+                        FunctionalObjective.Operand.v(1),
+                    ),
+                    intArrayOf(0, 1),
+                ),
             ),
-            3, 0
+            3,
+            0,
         )
         val selector = SemanticBlockRemoval(SemanticBlockRemoval.Kind.Assignment, network)
 
@@ -108,14 +110,15 @@ class RepairBlockClosureTest {
             listOf(
                 DefinitionalSweep.SweepNode.IntDef(
                     FunctionalObjective.Plus(
-            1,
-            FunctionalObjective.Operand.v(0),
-            FunctionalObjective.Operand.c(1),
-        ),
-            intArrayOf(0)
-                )
+                        1,
+                        FunctionalObjective.Operand.v(0),
+                        FunctionalObjective.Operand.c(1),
+                    ),
+                    intArrayOf(0),
+                ),
             ),
-            2, 0
+            2,
+            0,
         )
         val selector = SemanticBlockRemoval(SemanticBlockRemoval.Kind.Assignment, network)
 

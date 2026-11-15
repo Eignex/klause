@@ -60,7 +60,7 @@ class NativeLpAdapterTest {
         val root = Files.createTempDirectory("native-cli-command").toFile()
         try {
             val executable = root.resolve("klause-cli.kexe").apply {
-                writeText("fixture");
+                writeText("fixture")
                 setExecutable(true)
             }
             val source = root.resolve(filename)

@@ -48,13 +48,14 @@ internal object MixedPbLocalityProfile {
                         add(
                             Cardinality(
                                 intArrayOf(
-                            Lit.make(0, false),
-                            Lit.make(2, true),
-                            Lit.make(3, true),
-                            Lit.make(4, true),
-                        ),
-                            min = 2, max = 4
-                            )
+                                    Lit.make(0, false),
+                                    Lit.make(2, true),
+                                    Lit.make(3, true),
+                                    Lit.make(4, true),
+                                ),
+                                min = 2,
+                                max = 4,
+                            ),
                         )
                         add(Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))))
                         add(Clause(intArrayOf(Lit.make(1, true), Lit.make(3, false))))
@@ -110,10 +111,10 @@ internal object MixedPbLocalityProfile {
                         val checker = PropagationSession(
                             problem.withIntDomains(
                                 Array(problem.numIntVars) {
-                            val value = native.intDomain(it).min
-                            IntDomain(value, value)
-                        }
-                            )
+                                    val value = native.intDomain(it).min
+                                    IntDomain(value, value)
+                                },
+                            ),
                         )
                         check(!checker.isUnsatAtRoot)
                         for (variable in 0 until booleans) {
@@ -142,8 +143,8 @@ internal object MixedPbLocalityProfile {
                         put(
                             "work",
                             state.javaClass.declaredMethods.single {
-                            it.name.startsWith("getWork") && it.parameterCount == 0
-                        }.invoke(state) as Long
+                                it.name.startsWith("getWork") && it.parameterCount == 0
+                            }.invoke(state) as Long,
                         )
                         put("elapsedNs", System.nanoTime() - started)
                         put("threadAllocatedBytes", bean.getThreadAllocatedBytes(thread) - before)

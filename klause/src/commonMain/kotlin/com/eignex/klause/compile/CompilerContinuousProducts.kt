@@ -66,21 +66,21 @@ internal fun Lowering.assertContinuousEquality(equality: ContinuousRealEquality)
 
             is ContinuousRealExpr.Power -> factors.add(
                 Power(
-                Power.Coordinate.Real(SourceRealId(lift(expression.base))),
-                expression.exponent,
-                Power.Coordinate.Real(SourceRealId(result)),
-            )
+                    Power.Coordinate.Real(SourceRealId(lift(expression.base))),
+                    expression.exponent,
+                    Power.Coordinate.Real(SourceRealId(result)),
+                ),
             )
 
             is ContinuousRealExpr.Affine -> factors.add(
                 Linear(
-                intArrayOf(),
-                doubleArrayOf(),
-                intArrayOf(lift(expression), result),
-                doubleArrayOf(1.0, -1.0),
-                LinearOp.EQ,
-                0.0,
-            )
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(lift(expression), result),
+                    doubleArrayOf(1.0, -1.0),
+                    LinearOp.EQ,
+                    0.0,
+                ),
             )
         }
     }

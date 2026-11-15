@@ -18,12 +18,12 @@ internal class LpSolveCursor<T>(private val completed: () -> Unit = {}, operatio
     private var continuation: Continuation<Unit>? = operation.createCoroutine(
         this,
         object : Continuation<T> {
-        override val context = EmptyCoroutineContext
-        override fun resumeWith(result: Result<T>) {
-            outcome = result
-            completed()
-        }
-    }
+            override val context = EmptyCoroutineContext
+            override fun resumeWith(result: Result<T>) {
+                outcome = result
+                completed()
+            }
+        },
     )
     private var closed = false
     private var advancing = false

@@ -44,9 +44,9 @@ class LinearAggregateBranchesTest {
     private val rows = mapOf(
         "lower" to SourcePremise(
             SourceInequality(
-            weights.mapValues { it.value.negated() },
-            BigFraction.ofLong(-150),
-        )
+                weights.mapValues { it.value.negated() },
+                BigFraction.ofLong(-150),
+            ),
         ),
         "upper" to SourcePremise(SourceInequality(weights, BigFraction.ofLong(151))),
     ) + integers.associate { id ->
@@ -78,9 +78,9 @@ class LinearAggregateBranchesTest {
         val premises = mapOf(
             "lower" to SourcePremise(
                 SourceInequality(
-                coefficients.mapValues { it.value.negated() },
-                BigFraction.ofLong(-450),
-            )
+                    coefficients.mapValues { it.value.negated() },
+                    BigFraction.ofLong(-450),
+                ),
             ),
             "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ofLong(451))),
         ) + ids.associate { id ->
@@ -93,10 +93,10 @@ class LinearAggregateBranchesTest {
 
         assertEquals(
             SourceInequality(
-            ids.zip(listOf(1L, 1L, 2L, 2L).map(BigFraction::ofLong)).toMap(),
-            BigFraction.ofLong(4),
-        ),
-            row
+                ids.zip(listOf(1L, 1L, 2L, 2L).map(BigFraction::ofLong)).toMap(),
+                BigFraction.ofLong(4),
+            ),
+            row,
         )
     }
 
@@ -129,18 +129,20 @@ class LinearAggregateBranchesTest {
     @Test
     fun `declared finite coordinates should retain checked aggregate coverage`() {
         val model = Problem(
-            0, 2, Array(2) { IntDomain(0, 1) },
+            0,
+            2,
+            Array(2) { IntDomain(0, 1) },
             listOf(
-            Linear(longArrayOf(101, 102), intArrayOf(0, 1), LinearOp.GE, 150L),
-            Linear(longArrayOf(101, 102), intArrayOf(0, 1), LinearOp.LE, 151L),
-        )
+                Linear(longArrayOf(101, 102), intArrayOf(0, 1), LinearOp.GE, 150L),
+                Linear(longArrayOf(101, 102), intArrayOf(0, 1), LinearOp.LE, 151L),
+            ),
         )
         val sourceScope = scope.copy(revision = SourceRevision("finite-aggregate", "klause-ir-exact-v1"))
         val context = assertNotNull(
             model.sourceProofContext(
-            sourceScope,
-            LinearObjective(intCoefficients = longArrayOf(0, 0)),
-        )
+                sourceScope,
+                LinearObjective(intCoefficients = longArrayOf(0, 0)),
+            ),
         )
 
         val result = LinearAuthorityInvocation(

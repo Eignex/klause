@@ -32,27 +32,27 @@ class FiniteIncumbentCompletionTest {
         val source = LinearSourceProblem(
             listOf(
                 LinearSourceVariable(
-                "r",
-                false,
-                SemanticRational.ZERO,
-                SemanticRational.ONE,
-            )
+                    "r",
+                    false,
+                    SemanticRational.ZERO,
+                    SemanticRational.ONE,
+                ),
             ),
             emptyList(),
             LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
             SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
-            )
+                    absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+                ),
             ).resolve(),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED,
+            ),
         )
         val original = assertNotNull(invocation.linearSource)
         val value = BigFraction.ONE + BigFraction.ofLong(2_000_000).reciprocal()
@@ -75,11 +75,11 @@ class FiniteIncumbentCompletionTest {
             val source = LinearSourceProblem(
                 listOf(
                     LinearSourceVariable(
-                    "r",
-                    false,
-                    SemanticRational.ZERO,
-                    SemanticRational.ONE,
-                )
+                        "r",
+                        false,
+                        SemanticRational.ZERO,
+                        SemanticRational.ONE,
+                    ),
                 ),
                 emptyList(),
                 LinearSourceObjective(
@@ -90,11 +90,11 @@ class FiniteIncumbentCompletionTest {
             )
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.MIXED,
-                maximize = sense == ObjectiveSense.MAXIMIZE,
-            )
+                    SourceAttachment(source, ProblemSettings()),
+                    ExecutionOperation.OPTIMIZE,
+                    FiniteEngine.MIXED,
+                    maximize = sense == ObjectiveSense.MAXIMIZE,
+                ),
             )
             val original = assertNotNull(invocation.linearSource)
             val model = original.view.model
@@ -124,21 +124,21 @@ class FiniteIncumbentCompletionTest {
         val source = LinearSourceProblem(
             listOf(
                 LinearSourceVariable(
-                "r",
-                false,
-                SemanticRational.ZERO,
-                SemanticRational.ONE,
-            )
+                    "r",
+                    false,
+                    SemanticRational.ZERO,
+                    SemanticRational.ONE,
+                ),
             ),
             emptyList(),
             LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED,
+            ),
         )
         val original = assertNotNull(invocation.linearSource)
         val two = BigFraction.ofLong(2)
@@ -157,21 +157,21 @@ class FiniteIncumbentCompletionTest {
         val source = LinearSourceProblem(
             listOf(
                 LinearSourceVariable(
-                "r",
-                false,
-                SemanticRational.ZERO,
-                SemanticRational.ONE,
-            )
+                    "r",
+                    false,
+                    SemanticRational.ZERO,
+                    SemanticRational.ONE,
+                ),
             ),
             emptyList(),
             LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED,
+            ),
         )
         val original = assertNotNull(invocation.linearSource)
         val half = BigFraction.ofLong(2).reciprocal()

@@ -33,8 +33,8 @@ internal class SourceWorkerBinding(
             require(
                 plan.quadraticObjective == null || (
                     plan.quadraticObjective === quadratic.objective &&
-                plan.quadraticSense == quadratic.sense
-                )
+                        plan.quadraticSense == quadratic.sense
+                    ),
             ) {
                 "quadratic producer has another source objective or direction"
             }
@@ -56,11 +56,11 @@ internal class SourceWorkerBinding(
         invocation.sameAs(other.invocation) && sharingInvocation.sameAs(other.sharingInvocation) &&
         (
             if (quadraticInvocation == null) {
-            other.quadraticInvocation == null
-        } else {
-            other.quadraticInvocation?.let(quadraticInvocation::matches) == true
-        }
-        )
+                other.quadraticInvocation == null
+            } else {
+                other.quadraticInvocation?.let(quadraticInvocation::matches) == true
+            }
+            )
 
     private fun EngineInvocation?.sameAs(other: EngineInvocation?): Boolean =
         if (this == null) other == null else other != null && matches(other)

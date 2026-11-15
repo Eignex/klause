@@ -33,10 +33,12 @@ class BacktrackWorkerConfigTest {
     @Test
     fun `guidance observation should preserve cutoff reads and improving witnesses`() {
         val problem = Problem(
-            8, 0, emptyArray(),
+            8,
+            0,
+            emptyArray(),
             arrayOf<Factor>(
-            Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
-        )
+                Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
+            ),
         ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L))
         val events = mutableListOf<PooledGuidanceObservation>()
@@ -56,9 +58,9 @@ class BacktrackWorkerConfigTest {
             val config = BacktrackWorkerConfig(recipe).let { config ->
                 if (observed) {
                     config.withGuidanceObserver { worker, event ->
-                    assertEquals("bt/guided", worker)
-                    events += event
-                }
+                        assertEquals("bt/guided", worker)
+                        events += event
+                    }
                 } else {
                     config
                 }
@@ -72,11 +74,11 @@ class BacktrackWorkerConfigTest {
                     identity = ModelIdentity.of(problem, objective),
                     acceptedIncumbents = exchange,
                 ),
-                    )
+            )
             witnesses += worker.use {
                 it.improvements(
                     {
-                        cutoffReads++;
+                        cutoffReads++
                         Double.POSITIVE_INFINITY
                     },
                     ExecutionControl.Never,
@@ -96,18 +98,20 @@ class BacktrackWorkerConfigTest {
         assertTrue(events.any { it.kind == PooledGuidanceKind.LOCAL })
         assertTrue(
             events.groupBy { it.kind }.all { (kind, values) ->
-            values.size <= if (kind == PooledGuidanceKind.IMPORT || kind == PooledGuidanceKind.LOCAL) 16 else 128
-        }
+                values.size <= if (kind == PooledGuidanceKind.IMPORT || kind == PooledGuidanceKind.LOCAL) 16 else 128
+            },
         )
     }
 
     @Test
     fun `a worker should read canonical guidance only for the same model and objective`() {
         val problem = Problem(
-            8, 0, emptyArray(),
+            8,
+            0,
+            emptyArray(),
             arrayOf<Factor>(
-            Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
-        )
+                Cardinality(IntArray(8) { Lit.make(it, true) }, min = 3, max = 8),
+            ),
         ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L))
         val exchange = IncumbentExchange.minimizing<Sample>().apply {
@@ -134,11 +138,11 @@ class BacktrackWorkerConfigTest {
                     null,
                     identity = identity,
                     acceptedIncumbents = IncumbentSource {
-                        reads++;
+                        reads++
                         exchange.current()
                     },
                 ),
-                    )
+            )
 
             worker.use { it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last() }
 

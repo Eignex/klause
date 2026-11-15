@@ -88,27 +88,29 @@ internal class MutableLongIntIndex {
 
     private fun insert(node: Node?, key: Long, value: Int): Node {
         if (node == null) {
-            lastMutationWork += 8L;
-            size++;
+            lastMutationWork += 8L
+            size++
             return Node(key, value)
         }
         lastMutationWork += 4L
         return when {
             key < node.key -> {
-                node.left = insert(node.left, key, value);
+                node.left = insert(node.left, key, value)
                 balance(node)
             }
+
             key > node.key -> {
-                node.right = insert(node.right, key, value);
+                node.right = insert(node.right, key, value)
                 balance(node)
             }
+
             else -> node.also { it.value = value }
         }
     }
 
     private fun delete(node: Node?, key: Long): Node? {
         if (node == null) {
-            lastMutationWork++;
+            lastMutationWork++
             return null
         }
         lastMutationWork += 4L
@@ -119,13 +121,13 @@ internal class MutableLongIntIndex {
 
             else -> {
                 if (node.left == null) {
-                    lastMutationWork += 4L;
-                    size--;
+                    lastMutationWork += 4L
+                    size--
                     return node.right
                 }
                 if (node.right == null) {
-                    lastMutationWork += 4L;
-                    size--;
+                    lastMutationWork += 4L
+                    size--
                     return node.left
                 }
                 var successor = checkNotNull(node.right)

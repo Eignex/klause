@@ -88,16 +88,16 @@ internal object FiniteConflictSelection {
         val required = setOf("suite", "problem", "sha256", "center", "seed")
         require(
             options.keys.containsAll(required) && options.keys.all {
-            it in required || it in setOf(
-                "acquisition",
-                "semantic",
-                "ownerReplay",
-                "ownerWork",
-                "ownerFragmentWork",
-                "numerical",
-                "numerical-cuts",
-            )
-        }
+                it in required || it in setOf(
+                    "acquisition",
+                    "semantic",
+                    "ownerReplay",
+                    "ownerWork",
+                    "ownerFragmentWork",
+                    "numerical",
+                    "numerical-cuts",
+                )
+            },
         )
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
@@ -214,15 +214,15 @@ internal object FiniteConflictSelection {
                 val fraction = (rawCount + 0.25) / total
                 raw = checkNotNull(
                     destroyMethod.invoke(
-                    operator,
-                    Random(drawSeed),
-                    problem,
-                    center,
-                    objective,
-                    fraction,
-                    Assumptions.None,
-                    stop,
-                )
+                        operator,
+                        Random(drawSeed),
+                        problem,
+                        center,
+                        objective,
+                        fraction,
+                        Assumptions.None,
+                        stop,
+                    ),
                 )
                 rawCount++
             } while (!completePacket && coordinates(raw).count { it in eligible } < count &&
@@ -256,17 +256,17 @@ internal object FiniteConflictSelection {
                     (if (semanticKind == null) emptyList() else listOf("semantic")) +
                     (
                         if (numerical) {
-                        listOf(
-                        "numerical-disagreement",
-                        "numerical-refutation",
-                        "numerical-ablated",
-                        "numerical-disagreement-completed",
-                        "numerical-refutation-completed",
-                    )
-                    } else {
-                        emptyList()
-                    }
-                    )
+                            listOf(
+                                "numerical-disagreement",
+                                "numerical-refutation",
+                                "numerical-ablated",
+                                "numerical-disagreement-completed",
+                                "numerical-refutation-completed",
+                            )
+                        } else {
+                            emptyList()
+                        }
+                        )
                 for (arm in arms) {
                     val deadline = ExecutionControl.after(5.seconds)
                     val containingWork = if (numerical) 2_000_000L else DECISIONS
@@ -463,16 +463,16 @@ internal object FiniteConflictSelection {
                                 null
                             } else {
                                 BacktrackSolver(problem).minimize(
-                                objective,
-                                BacktrackParams(
-                                    randomSeed = seed,
-                                    cancellation = deadline,
-                                    objectiveBoundSupplier = { objective.evaluate(center) },
-                                    maxDecisions = REPAIR_DECISIONS,
-                                    nodeBudget = subsetAllowance,
-                                    assumptions = subsetPins,
-                                ),
-                            )
+                                    objective,
+                                    BacktrackParams(
+                                        randomSeed = seed,
+                                        cancellation = deadline,
+                                        objectiveBoundSupplier = { objective.evaluate(center) },
+                                        maxDecisions = REPAIR_DECISIONS,
+                                        nodeBudget = subsetAllowance,
+                                        assumptions = subsetPins,
+                                    ),
+                                )
                             }
                             val subsetRepaired = subsetResult?.assignment
                             val subsetAccepted = subsetRepaired?.let { checkSource(it, deadline) }
@@ -483,9 +483,9 @@ internal object FiniteConflictSelection {
                                 put(
                                     "strictImprovement",
                                     subsetRepaired?.let {
-                                    subsetAccepted == true &&
-                                        objective.evaluateExact(it) < objective.evaluateExact(center)
-                                } ?: false
+                                        subsetAccepted == true &&
+                                            objective.evaluateExact(it) < objective.evaluateExact(center)
+                                    } ?: false,
                                 )
                                 put(
                                     "completedLocalExhaustion",
@@ -529,15 +529,15 @@ internal object FiniteConflictSelection {
                                 put(
                                     "originPinnedBoolValues",
                                     JsonArray(
-                                    originPins?.boolValues?.map(::JsonPrimitive).orEmpty(),
-                                )
+                                        originPins?.boolValues?.map(::JsonPrimitive).orEmpty(),
+                                    ),
                                 )
                                 put("originPinnedInts", JsonArray(originPins?.intKeys?.map(::JsonPrimitive).orEmpty()))
                                 put(
                                     "originPinnedIntValues",
                                     JsonArray(
-                                    originPins?.intValues?.map(::JsonPrimitive).orEmpty(),
-                                )
+                                        originPins?.intValues?.map(::JsonPrimitive).orEmpty(),
+                                    ),
                                 )
                                 put("sourceCoordinateMapping", "identity")
                                 put("center", sample(center))
@@ -558,7 +558,7 @@ internal object FiniteConflictSelection {
                                 put(
                                     "numericalGuidanceConsumed",
                                     numericalCapture?.get("guidanceStatus") ==
-                                    JsonPrimitive("Supported") && arm != "numerical-ablated"
+                                        JsonPrimitive("Supported") && arm != "numerical-ablated",
                                 )
                                 if (completedArm) put("completionConsumed", packet.isNotEmpty())
                                 put("capturedConflicts", get(guidance, "Conflicts") as Int)

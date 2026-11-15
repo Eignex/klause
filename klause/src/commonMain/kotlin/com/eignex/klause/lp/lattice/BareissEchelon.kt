@@ -80,10 +80,10 @@ internal fun bareissEchelon(
     val rhs = rhsIn?.copyOf()
     var entries = a.sumOf { it.index.size.toLong() }
     if (limits != null && (
-        entries > limits.maxTotalEntries || a.any { row ->
-            row.index.size > limits.maxRowEntries || row.value.any { it.magnitudeBitLength() > limits.maxBits }
-        } || rhs?.any { it.magnitudeBitLength() > limits.maxBits } == true
-    )
+            entries > limits.maxTotalEntries || a.any { row ->
+                row.index.size > limits.maxRowEntries || row.value.any { it.magnitudeBitLength() > limits.maxBits }
+            } || rhs?.any { it.magnitudeBitLength() > limits.maxBits } == true
+            )
     ) {
         return BareissEchelon(emptyList(), IntArray(0))
     }
@@ -119,9 +119,9 @@ internal fun bareissEchelon(
             val scaleQ = pivotValue / g
             val scaleP = factor / g
             if (limits != null && (
-                !productFits(w[q], scaleQ, rhs?.get(q), limits.maxBits) ||
-                    !productFits(w[p], scaleP, rhs?.get(p), limits.maxBits)
-            )
+                    !productFits(w[q], scaleQ, rhs?.get(q), limits.maxBits) ||
+                        !productFits(w[p], scaleP, rhs?.get(p), limits.maxBits)
+                    )
             ) {
                 return BareissEchelon(emptyList(), IntArray(0))
             }

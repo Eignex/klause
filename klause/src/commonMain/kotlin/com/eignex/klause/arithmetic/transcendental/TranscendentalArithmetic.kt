@@ -182,10 +182,10 @@ internal class TranscendentalArithmetic(
         // atan(1/2) + atan(1/3) = pi/4: tangent addition gives 1 and both angles lie in (0, pi/4).
         return@operation multiply(
             add(
-            atanUnit(divide(BigFraction.ONE, q(2)), terms),
-            atanUnit(divide(BigFraction.ONE, q(3)), terms),
-        ),
-            RationalEnclosure.point(q(4))
+                atanUnit(divide(BigFraction.ONE, q(2)), terms),
+                atanUnit(divide(BigFraction.ONE, q(3)), terms),
+            ),
+            RationalEnclosure.point(q(4)),
         )
     }
 

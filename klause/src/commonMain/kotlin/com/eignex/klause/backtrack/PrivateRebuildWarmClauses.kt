@@ -72,7 +72,7 @@ internal class PrivateRebuildWarmClauses private constructor(
                 for (literal in source) {
                     val variable = Lit.variable(literal)
                     if (variable >= fixed.size) {
-                        supported = false;
+                        supported = false
                         break
                     }
                     needsProjection = needsProjection || projection.eliminates(variable)

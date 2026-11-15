@@ -45,11 +45,11 @@ class ChannelViewTest {
 
         assertEquals(
             setOf(
-            listOf(0L, 2L, 1L, 0L, 2L, 1L),
-            listOf(1L, 0L, 2L, 1L, 0L, 2L),
-            listOf(2L, 1L, 0L, 2L, 1L, 0L),
-        ),
-            neighbors
+                listOf(0L, 2L, 1L, 0L, 2L, 1L),
+                listOf(1L, 0L, 2L, 1L, 0L, 2L),
+                listOf(2L, 1L, 0L, 2L, 1L, 0L),
+            ),
+            neighbors,
         )
     }
 

@@ -726,15 +726,15 @@ internal fun buildPortfolioScenario(
     val sharingMemoryBytes = p[ExecutionOption.sharingMemoryBytes]
     if (sharingMemoryBytes != null && sharingMemoryBytes < 0L) {
         pipelineConfigError(
-        "sharing memory bytes must be nonnegative",
-    )
+            "sharing memory bytes must be nonnegative",
+        )
     }
     val sharingMemoryWork = p[ExecutionOption.sharingMemoryWork] ?: 32_768L
     val sharingMemoryScratch = p[ExecutionOption.sharingMemoryScratch] ?: 4_096
     if (sharingMemoryWork < 0L || sharingMemoryScratch < 0) {
         pipelineConfigError(
-        "sharing memory limits must be nonnegative",
-    )
+            "sharing memory limits must be nonnegative",
+        )
     }
     val earlyCoreAdmission = p[ExecutionOption.coreEarly] ?: false
     val companionIntegers = p[ExecutionOption.companionIntegers] ?: false

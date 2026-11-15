@@ -102,9 +102,9 @@ internal fun literalDefinitions(
         val constants = row.integerConstants ?: continue
         if (constants.coeff(0) != 1L && constants.coeff(0) != -1L) continue
         if (constants.coeff(0) == -1L && (
-            constants.bound == Long.MIN_VALUE ||
-                !problem.intBounds.hasLower(row.vars[0]) || problem.intBounds.lower(row.vars[0]) == Long.MIN_VALUE
-        )
+                constants.bound == Long.MIN_VALUE ||
+                    !problem.intBounds.hasLower(row.vars[0]) || problem.intBounds.lower(row.vars[0]) == Long.MIN_VALUE
+                )
         ) {
             continue
         }
@@ -122,10 +122,10 @@ internal fun literalDefinitions(
         val value = if (reversed) -constants.bound else constants.bound
         val op = if (reversed) {
             when (row.op) {
-            LinearOp.LE -> LinearOp.GE
-            LinearOp.GE -> LinearOp.LE
-            else -> row.op
-        }
+                LinearOp.LE -> LinearOp.GE
+                LinearOp.GE -> LinearOp.LE
+                else -> row.op
+            }
         } else {
             row.op
         }

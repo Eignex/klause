@@ -129,10 +129,12 @@ internal class CutProvenance(
             assumptionSnapshot,
             ruleSnapshot.map { rule ->
                 CutRoundingRule(
-                    rule.divisor, rule.mir, rule.reduction,
+                    rule.divisor,
+                    rule.mir,
+                    rule.reduction,
                     rule.rows.map {
-                    it.copy(row = it.row.copy(expression = it.row.expression.remapSources(mapping)))
-                }
+                        it.copy(row = it.row.copy(expression = it.row.expression.remapSources(mapping)))
+                    },
                 )
             },
             conclusion?.let { it.copy(expression = it.expression.remapSources(mapping)) },

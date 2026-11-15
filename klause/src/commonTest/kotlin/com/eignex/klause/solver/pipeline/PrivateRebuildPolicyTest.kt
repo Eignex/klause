@@ -33,11 +33,11 @@ class PrivateRebuildPolicyTest {
         assertEquals(
             listOf(0.0, 0.98),
             clausalProofShares(
-            selected,
-            profile,
-            listOf("ls/probsat/plain", "bt/clausal-balanced"),
-            privateRebuildBudgetOnly = true,
-        ).toList()
+                selected,
+                profile,
+                listOf("ls/probsat/plain", "bt/clausal-balanced"),
+                privateRebuildBudgetOnly = true,
+            ).toList(),
         )
     }
 
@@ -84,8 +84,8 @@ class PrivateRebuildPolicyTest {
                 assertEquals(
                     work,
                     assertNotNull(selected.btEdit).invoke(
-                    BacktrackParams(privateRebuildWork = -1L),
-                ).privateRebuildWork
+                        BacktrackParams(privateRebuildWork = -1L),
+                    ).privateRebuildWork,
                 )
             }
         }
@@ -110,22 +110,22 @@ class PrivateRebuildPolicyTest {
         assertSame(
             scenario,
             privateRebuildDefaultScenario(
-            scenario,
-            problem,
-            profile,
-            ExecutionOptions(ExecutionOption.booleanProofTasks(true)),
-            false,
-        )
+                scenario,
+                problem,
+                profile,
+                ExecutionOptions(ExecutionOption.booleanProofTasks(true)),
+                false,
+            ),
         )
         assertSame(
             scenario,
             privateRebuildDefaultScenario(
-            scenario,
-            problem,
-            profile.copy(problemClass = ProblemClass.PseudoBoolean),
-            ExecutionOptions(),
-            false,
-        )
+                scenario,
+                problem,
+                profile.copy(problemClass = ProblemClass.PseudoBoolean),
+                ExecutionOptions(),
+                false,
+            ),
         )
         for (columns in listOf(127, 2_001)) {
             val outside = Problem(columns, 0, emptyArray(), problem.factors)

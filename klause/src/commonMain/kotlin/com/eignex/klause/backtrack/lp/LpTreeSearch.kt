@@ -71,8 +71,8 @@ internal fun LpEngine.lbTreeSearch(
             accountPropagation()
             return stop() || (
                 params.lpPlan.rootBudgetFraction > 0.0 &&
-                workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)
-            ) ||
+                    workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)
+                ) ||
                 lpWorkAllowanceSpent(sink.lp.standaloneWork)
         }
         override fun deadline() = stop.deadline()

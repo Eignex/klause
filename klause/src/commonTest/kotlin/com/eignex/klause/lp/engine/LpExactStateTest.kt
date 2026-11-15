@@ -18,7 +18,7 @@ class LpExactStateTest {
     fun `single appended bounds match a fresh exact replay`() {
         val source = assertNotNull(
             LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
-            .build(Sense.MINIMIZE).authoritativeModel()
+                .build(Sense.MINIMIZE).authoritativeModel(),
         )
         val root = LpExactState(source)
         val existing = LpBoundAssertion(1, false, ExactLpSide(ExactLpNumber.of(4L)), 1L, 0)
@@ -53,9 +53,9 @@ class LpExactStateTest {
         for (upper in listOf(false, true)) {
             val source = assertNotNull(
                 LpBuilder().apply {
-                addVar(3L, 9L)
-                addVar(0L, 10L)
-            }.build(Sense.MINIMIZE).authoritativeModel()
+                    addVar(3L, 9L)
+                    addVar(0L, 10L)
+                }.build(Sense.MINIMIZE).authoritativeModel(),
             )
             val parent = LpExactState(source)
             val parentView = assertNotNull(parent.ownerWorkingModel())
@@ -95,7 +95,7 @@ class LpExactStateTest {
         for (order in listOf(listOf(0, 1), listOf(1, 0))) {
             val source = assertNotNull(
                 LpBuilder().apply { repeat(2) { addVar(0L, 10L) } }
-                .build(Sense.MINIMIZE).authoritativeModel()
+                    .build(Sense.MINIMIZE).authoritativeModel(),
             )
             var state = LpExactState(source)
             for (column in order) {

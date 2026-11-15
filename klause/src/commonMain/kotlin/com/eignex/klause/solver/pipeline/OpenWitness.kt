@@ -15,9 +15,9 @@ internal fun OpenTheoryAssignment.toSample(model: Problem, invocation: EngineInv
         invocation == null || (
             (
                 invocation.sourceModel.sameModel(ModelIdentity.of(model)) ||
-        invocation.preparedPlan.model === model
-            ) && invocation.model.sameModel(ModelIdentity.of(model))
-        )
+                    invocation.preparedPlan.model === model
+                ) && invocation.model.sameModel(ModelIdentity.of(model))
+            ),
     ) {
         "theory witness invocation has a different source"
     }
@@ -33,10 +33,10 @@ internal fun OpenTheoryAssignment.toSample(model: Problem, invocation: EngineInv
         sample.witnessCertificate = invocation?.let { binding ->
             EvidenceCertificate.published(
                 CompletedEnginePublication.Witness(
-                binding,
-                sample,
-                binding.executionObjective?.evaluateExact(sample)?.toDouble(),
-            )
+                    binding,
+                    sample,
+                    binding.executionObjective?.evaluateExact(sample)?.toDouble(),
+                ),
             )
         }
     }

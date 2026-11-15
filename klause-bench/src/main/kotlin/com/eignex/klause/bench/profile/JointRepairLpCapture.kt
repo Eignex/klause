@@ -46,32 +46,32 @@ internal object JointRepairLpCapture {
         val seed = options.getValue("seed").toLong()
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.MIXED,
-            maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE,
-            cancellation = stop,
-        )
+                SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.MIXED,
+                maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE,
+                cancellation = stop,
+            ),
         )
         val executionPolicy = SourceExecutionPolicy()
         val prepared = SourceSetup.execute(
             SourceExecutionRequest(
-            invocation,
-            executionPolicy,
-            ExecutionOptions.parse(FinitePortfolioLpCapture.parameters(options)),
-            finiteRequest = { shape ->
-                executionPolicy.finiteRequest(
-                    shape,
-                    FiniteEngine.MIXED,
-                    cancellation = stop,
-                    randomSeed = seed,
-                    prepareOnly = true,
-                )
-            },
-            randomSeed = seed,
-            timeout = stop,
-            cancellation = stop,
-        )
+                invocation,
+                executionPolicy,
+                ExecutionOptions.parse(FinitePortfolioLpCapture.parameters(options)),
+                finiteRequest = { shape ->
+                    executionPolicy.finiteRequest(
+                        shape,
+                        FiniteEngine.MIXED,
+                        cancellation = stop,
+                        randomSeed = seed,
+                        prepareOnly = true,
+                    )
+                },
+                randomSeed = seed,
+                timeout = stop,
+                cancellation = stop,
+            ),
         )
         val preparation = (prepared as? SourceExecutionResult.Finite)?.result?.preparation
             ?: error("joint capture requires finite preparation")
@@ -129,17 +129,17 @@ internal object JointRepairLpCapture {
                 )
                 out.resolve("conditional-$id.json").writeText(
                     buildJsonObject {
-                    put("condition", NumericalResidualProfile.json(field(owner, "pending")))
-                    put("scope", NumericalFrontierSnapshot.scope(requireNotNull(currentScope)))
-                    put("conditionScope", NumericalFrontierSnapshot.scope(invocationContext.scope))
-                    put("stateIdentity", state)
-                    put("route", call(query, "getRoute").toString())
-                    put("sourceSha256", sha256(bytes))
-                    put("captureSha256", payload?.let(::sha256))
-                    put("basisSha256", basis)
-                    put("captureDeclined", payload == null)
-                    put("sourceVerdictClaim", false)
-                }.toString()
+                        put("condition", NumericalResidualProfile.json(field(owner, "pending")))
+                        put("scope", NumericalFrontierSnapshot.scope(requireNotNull(currentScope)))
+                        put("conditionScope", NumericalFrontierSnapshot.scope(invocationContext.scope))
+                        put("stateIdentity", state)
+                        put("route", call(query, "getRoute").toString())
+                        put("sourceSha256", sha256(bytes))
+                        put("captureSha256", payload?.let(::sha256))
+                        put("basisSha256", basis)
+                        put("captureDeclined", payload == null)
+                        put("sourceVerdictClaim", false)
+                    }.toString(),
                 )
                 observerNs += System.nanoTime() - started
             }
@@ -195,29 +195,29 @@ internal object JointRepairLpCapture {
                         observerNs += System.nanoTime() - started
                         out.resolve("guidance.jsonl").appendText(
                             buildJsonObject {
-                            put("phase", phase)
-                            put("termination", termination)
-                            put("guidanceClaim", guidanceClaim)
-                            put("primalSize", (call(guide, "getPrimal") as DoubleArray?)?.size)
-                            put("certificateMetrics", NumericalResidualProfile.json(metrics))
-                            put("scope", NumericalFrontierSnapshot.scope(requireNotNull(scope)))
-                            put("conditionId", id)
-                            put("stateIdentity", state)
-                            put("captureStateMatched", matched)
-                            put("rayCaptureSha256", rayCapture)
-                            rejection?.let { missing ->
-                                put(
-                                    "dualRejection",
-                                    buildJsonObject {
-                                    put("column", call(missing, "getColumn") as Int)
-                                    put("upper", call(missing, "getUpper") as Boolean)
-                                    put("reduced", call(missing, "getReduced").toString())
+                                put("phase", phase)
+                                put("termination", termination)
+                                put("guidanceClaim", guidanceClaim)
+                                put("primalSize", (call(guide, "getPrimal") as DoubleArray?)?.size)
+                                put("certificateMetrics", NumericalResidualProfile.json(metrics))
+                                put("scope", NumericalFrontierSnapshot.scope(requireNotNull(scope)))
+                                put("conditionId", id)
+                                put("stateIdentity", state)
+                                put("captureStateMatched", matched)
+                                put("rayCaptureSha256", rayCapture)
+                                rejection?.let { missing ->
+                                    put(
+                                        "dualRejection",
+                                        buildJsonObject {
+                                            put("column", call(missing, "getColumn") as Int)
+                                            put("upper", call(missing, "getUpper") as Boolean)
+                                            put("reduced", call(missing, "getReduced").toString())
+                                        },
+                                    )
                                 }
-                                )
-                            }
-                            put("missingBoundSide", rejection != null)
-                            put("checkedKernelRayAvailable", checkedRay)
-                        }.toString() + "\n"
+                                put("missingBoundSide", rejection != null)
+                                put("checkedKernelRayAvailable", checkedRay)
+                            }.toString() + "\n",
                         )
                         val matchedRejection = rejection != null && matched
                         unresolvedMissingSide = matchedRejection && !checkedRay
@@ -232,37 +232,37 @@ internal object JointRepairLpCapture {
             out.resolve("source-queries.json").writeText(snapshots.capture(journal).toString())
             out.resolve("result.json").writeText(
                 buildJsonObject {
-                put("captureMode", "standalone-joint-before")
-                put("sourceSha256", sha256(bytes))
-                put("sourceSeed", seed)
-                put("workerSeed", seed + 9)
-                put("workerSeedBasis", "ordinary eight finite workers plus leading numerical companion")
-                put("preparedIntegers", model.numIntVars)
-                put("preparedReals", model.numRealVars)
-                put("preparedFactors", model.numFactors)
-                put("presolve", NumericalResidualProfile.json(preparation.presolve))
-                put("activeLimitMs", 4000)
-                put("sourceLpWorkLimit", params.sourceLpWorkLimit)
-                put("sourceLpAllocationLimit", params.sourceLpAllocationLimit)
-                put("capturedSnapshots", window.size)
-                put("captureObserverNs", observerNs)
-                put("observerTimeInsideActiveLimit", true)
-                put("missingBoundSideObserved", missingSide)
-                put("stoppedOnUnresolvedMissingSide", unresolvedMissingSide)
-                put("resultRequiresMatchingCaptureState", true)
-                put("rejectionCondition", rejectionCondition)
-                put(
-                    "rejectionCaptureAvailable",
-                    rejectionCondition?.let {
-                    out.resolve("conditional-$it.klexact").isFile
-                } == true
-                )
-                put("rejectionRayCaptureAvailable", rejectionRayCapture != null)
-                put("stats", NumericalResidualProfile.json(call(owner, "getStats")))
-                put("sourceVerdictClaim", false)
-                put("fullPortfolioReplayQualified", false)
-                put("performanceQualified", false)
-            }.toString()
+                    put("captureMode", "standalone-joint-before")
+                    put("sourceSha256", sha256(bytes))
+                    put("sourceSeed", seed)
+                    put("workerSeed", seed + 9)
+                    put("workerSeedBasis", "ordinary eight finite workers plus leading numerical companion")
+                    put("preparedIntegers", model.numIntVars)
+                    put("preparedReals", model.numRealVars)
+                    put("preparedFactors", model.numFactors)
+                    put("presolve", NumericalResidualProfile.json(preparation.presolve))
+                    put("activeLimitMs", 4000)
+                    put("sourceLpWorkLimit", params.sourceLpWorkLimit)
+                    put("sourceLpAllocationLimit", params.sourceLpAllocationLimit)
+                    put("capturedSnapshots", window.size)
+                    put("captureObserverNs", observerNs)
+                    put("observerTimeInsideActiveLimit", true)
+                    put("missingBoundSideObserved", missingSide)
+                    put("stoppedOnUnresolvedMissingSide", unresolvedMissingSide)
+                    put("resultRequiresMatchingCaptureState", true)
+                    put("rejectionCondition", rejectionCondition)
+                    put(
+                        "rejectionCaptureAvailable",
+                        rejectionCondition?.let {
+                            out.resolve("conditional-$it.klexact").isFile
+                        } == true,
+                    )
+                    put("rejectionRayCaptureAvailable", rejectionRayCapture != null)
+                    put("stats", NumericalResidualProfile.json(call(owner, "getStats")))
+                    put("sourceVerdictClaim", false)
+                    put("fullPortfolioReplayQualified", false)
+                    put("performanceQualified", false)
+                }.toString(),
             )
         } finally {
             (search as AutoCloseable).close()

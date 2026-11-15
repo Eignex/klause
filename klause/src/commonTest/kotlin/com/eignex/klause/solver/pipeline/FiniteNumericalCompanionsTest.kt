@@ -38,11 +38,15 @@ class FiniteNumericalCompanionsTest {
     @Test
     fun `point delivery should control imported seeds for both companions`() {
         val model = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             arrayOf(
-            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)
+                Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.0),
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
         val plan = model.prepareExecutionPlan(objective, preferFinite = true)
@@ -62,50 +66,54 @@ class FiniteNumericalCompanionsTest {
 
         for (sharePoints in listOf(false, true)) {
             for (arm in 0..1) {
-            val events = mutableListOf<PortfolioLifecycleKind>()
-            val companions = assertNotNull(
-                FiniteNumericalCompanions.prepare(
-                model,
-                objective,
-                params,
-                ExecutionControl.Never,
-                cost,
-                incumbentCompletionCheck = { _, _, _ -> true },
-            ).companions
-            )
-            companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
+                val events = mutableListOf<PortfolioLifecycleKind>()
+                val companions = assertNotNull(
+                    FiniteNumericalCompanions.prepare(
+                        model,
+                        objective,
+                        params,
+                        ExecutionControl.Never,
+                        cost,
+                        incumbentCompletionCheck = { _, _, _ -> true },
+                    ).companions,
+                )
+                companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
 
-            PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
-                companions.factories(plan, 0, sharePoints).elementAt(arm)
-                    .materialize(plan, resources.slots[arm]).use { worker ->
-                        worker.onLifecycle = { kind, _ -> events += kind }
-                        assertNotNull(worker.newResumableSearch(companions.incumbents::bound)).use { search ->
-                            repeat(4) {
-                                if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { }
+                PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
+                    companions.factories(plan, 0, sharePoints).elementAt(arm)
+                        .materialize(plan, resources.slots[arm]).use { worker ->
+                            worker.onLifecycle = { kind, _ -> events += kind }
+                            assertNotNull(worker.newResumableSearch(companions.incumbents::bound)).use { search ->
+                                repeat(4) {
+                                    if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { }
+                                }
                             }
                         }
-                    }
-            }
+                }
 
-            assertEquals(sharePoints, PortfolioLifecycleKind.INCUMBENT_IMPORTED in events)
-            if (!sharePoints) {
-                assertFalse(PortfolioLifecycleKind.INCUMBENT_READ in events)
-                assertFalse(PortfolioLifecycleKind.INCUMBENT_CONSUMED in events)
+                assertEquals(sharePoints, PortfolioLifecycleKind.INCUMBENT_IMPORTED in events)
+                if (!sharePoints) {
+                    assertFalse(PortfolioLifecycleKind.INCUMBENT_READ in events)
+                    assertFalse(PortfolioLifecycleKind.INCUMBENT_CONSUMED in events)
+                }
+                assertEquals(4.0, companions.incumbents.bound())
+                assertSame(center, companions.incumbents.exchange.current()?.assignment)
             }
-            assertEquals(4.0, companions.incumbents.bound())
-            assertSame(center, companions.incumbents.exchange.current()?.assignment)
-        }
         }
     }
 
     @Test
     fun `quiet companion workers should report proposals without comparison logging`() {
         val model = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             arrayOf(
-            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)
+                Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.0),
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
         val plan = model.prepareExecutionPlan(objective, preferFinite = true)
@@ -119,13 +127,13 @@ class FiniteNumericalCompanionsTest {
         val events = mutableListOf<Pair<Long, JointRepairObservation>>()
         val companions = assertNotNull(
             FiniteNumericalCompanions.prepare(
-            model,
-            objective,
-            params,
-            ExecutionControl.Never,
-            cost,
-            onObservation = { seed, event -> events += seed to event },
-        ).companions
+                model,
+                objective,
+                params,
+                ExecutionControl.Never,
+                cost,
+                onObservation = { seed, event -> events += seed to event },
+            ).companions,
         )
 
         PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
@@ -145,13 +153,17 @@ class FiniteNumericalCompanionsTest {
     @Test
     fun `a paused numerical companion should retain its global bound after retirement`() {
         val model = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
             arrayOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.0),
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val plan = model.prepareExecutionPlan(objective, preferFinite = true)
@@ -164,12 +176,12 @@ class FiniteNumericalCompanionsTest {
         ).requirements.construction
         val companions = assertNotNull(
             FiniteNumericalCompanions.prepare(
-            model,
-            objective,
-            params,
-            ExecutionControl.Never,
-            cost,
-        ).companions
+                model,
+                objective,
+                params,
+                ExecutionControl.Never,
+                cost,
+            ).companions,
         )
 
         PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
@@ -192,11 +204,15 @@ class FiniteNumericalCompanionsTest {
     @Test
     fun `checked repair comparisons should use the current pool instead of the captured center`() {
         val model = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             arrayOf(
-            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)
+                Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 1, 2, 3), LinearOp.GE, 0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.0),
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1))
         val plan = model.prepareExecutionPlan(objective, preferFinite = true)
@@ -219,25 +235,25 @@ class FiniteNumericalCompanionsTest {
             lateinit var companions: FiniteNumericalCompanions
             companions = assertNotNull(
                 FiniteNumericalCompanions.prepare(
-                model,
-                objective,
-                params,
-                ExecutionControl.Never,
-                cost,
-                incumbentCompletionCheck = { sample, value, _ ->
-                    if (value < BigFraction.ofLong(4)) {
-                        val pool = if (disposition == "dominated") center.copy(ints = LongArray(4)) else sample
-                        if (disposition != "improving") {
-                            companions.incumbents.exchange.offer(
-                            pool,
-                            objective.evaluateExact(pool),
-                        )
+                    model,
+                    objective,
+                    params,
+                    ExecutionControl.Never,
+                    cost,
+                    incumbentCompletionCheck = { sample, value, _ ->
+                        if (value < BigFraction.ofLong(4)) {
+                            val pool = if (disposition == "dominated") center.copy(ints = LongArray(4)) else sample
+                            if (disposition != "improving") {
+                                companions.incumbents.exchange.offer(
+                                    pool,
+                                    objective.evaluateExact(pool),
+                                )
+                            }
                         }
-                    }
-                    true
-                },
-                onComparison = { events += it },
-            ).companions
+                        true
+                    },
+                    onComparison = { events += it },
+                ).companions,
             )
             companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
 
@@ -261,12 +277,16 @@ class FiniteNumericalCompanionsTest {
     @Test
     fun `opt in companion repair should publish a coupled three integer improvement`() {
         val model = Problem(
-            0, 3, Array(3) { IntDomain(0, 1) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 1) },
             arrayOf(
-            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-            Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0)
+                Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(0.0),
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
         val plan = model.prepareExecutionPlan(objective, preferFinite = true)
@@ -280,14 +300,14 @@ class FiniteNumericalCompanionsTest {
         for (adaptive in listOf(false, true)) {
             val companions = assertNotNull(
                 FiniteNumericalCompanions.prepare(
-                model,
-                objective,
-                params,
-                ExecutionControl.Never,
-                cost,
-                incumbentCompletionCheck = { _, _, _ -> true },
-                adaptiveRepair = adaptive,
-            ).companions
+                    model,
+                    objective,
+                    params,
+                    ExecutionControl.Never,
+                    cost,
+                    incumbentCompletionCheck = { _, _, _ -> true },
+                    adaptiveRepair = adaptive,
+                ).companions,
             )
             val center = Sample(
                 BooleanArray(0),
@@ -400,8 +420,8 @@ class FiniteNumericalCompanionsTest {
         assertEquals(2, declined.size)
         assertTrue(
             declined.all {
-            !it.admitted && !it.selected && it.declines == listOf("companion-lifetime-unfunded")
-        }
+                !it.admitted && !it.selected && it.declines == listOf("companion-lifetime-unfunded")
+            },
         )
     }
 
@@ -536,9 +556,9 @@ class FiniteNumericalCompanionsTest {
         val observed = mutableListOf<PortfolioProgress>()
         val scenario = PortfolioScenario.sequential(Kind.COP).copy(
             rewardPolicy = PortfolioRewardPolicy {
-            observed += it
-            it.ordinaryReward
-        }
+                observed += it
+                it.ordinaryReward
+            },
         )
 
         FinitePipeline.portfolioExecutor(
@@ -590,11 +610,11 @@ class FiniteNumericalCompanionsTest {
             assertEquals(
                 admitted,
                 finiteNumericalCompanionEligibility(
-                model,
-                scenario,
-                LinearObjective(intCoefficients = longArrayOf(1)),
-                TheoryParams(),
-            ).admitted
+                    model,
+                    scenario,
+                    LinearObjective(intCoefficients = longArrayOf(1)),
+                    TheoryParams(),
+                ).admitted,
             )
         }
     }
@@ -696,10 +716,10 @@ class FiniteNumericalCompanionsTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val context = assertNotNull(
             model.linearAuthorityContext(
-            objective,
-            ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never,
-        )
+                objective,
+                ObjectiveSense.MINIMIZE,
+                ExecutionControl.Never,
+            ),
         )
         val result = OpenTheoryPipeline.optimizeLinear(context)
 
@@ -719,10 +739,10 @@ class FiniteNumericalCompanionsTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val context = assertNotNull(
             model.linearAuthorityContext(
-            objective,
-            ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never,
-        )
+                objective,
+                ObjectiveSense.MINIMIZE,
+                ExecutionControl.Never,
+            ),
         )
         val result = OpenTheoryPipeline.optimizeLinear(context)
 
@@ -766,16 +786,16 @@ class FiniteNumericalCompanionsTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val context = assertNotNull(
             model.linearAuthorityContext(
-            objective,
-            ObjectiveSense.MINIMIZE,
-            ExecutionControl.Never,
-        )
+                objective,
+                ObjectiveSense.MINIMIZE,
+                ExecutionControl.Never,
+            ),
         )
         val restricted = SourceProofContext(
             context.scope.copy(
                 condition = SourceCondition(
-                lower = mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ONE),
-            )
+                    lower = mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ONE),
+                ),
             ),
             context.coordinates,
             context.premises,

@@ -52,9 +52,9 @@ class ChannelTrajectoryTest {
         )
         val sweep = assertNotNull(
             DefinitionalSweep.fromSource(
-            problem,
-            listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true))),
-        )
+                problem,
+                listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true))),
+            ),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.invariants = ChannelView.SearchedValues.sweep(sweep, ExecutionControl.Never)
@@ -69,12 +69,12 @@ class ChannelTrajectoryTest {
         assertEquals(
             "true",
             candidate.getValue("source").jsonObject.getValue("bools")
-            .jsonArray.single().jsonPrimitive.content
+                .jsonArray.single().jsonPrimitive.content,
         )
         assertEquals(
             "0",
             candidate.getValue("source").jsonObject.getValue("ints")
-            .jsonArray.single().jsonPrimitive.content
+                .jsonArray.single().jsonPrimitive.content,
         )
     }
 

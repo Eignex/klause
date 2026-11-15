@@ -28,8 +28,8 @@ class CorpusZipSelectionTest {
         val name = "source.wcnf" + if (xz) ".xz" else ""
         val packed = if (xz) {
             ByteArrayOutputStream().also { out ->
-            XZOutputStream(out, LZMA2Options(0)).use { it.write(bytes) }
-        }.toByteArray()
+                XZOutputStream(out, LZMA2Options(0)).use { it.write(bytes) }
+            }.toByteArray()
         } else {
             bytes
         }
@@ -38,11 +38,11 @@ class CorpusZipSelectionTest {
                 val unrelated = ByteArray(262144)
                 zip.putNextEntry(
                     ZipEntry("unrelated").apply {
-                    method = ZipEntry.STORED
-                    size = unrelated.size.toLong()
-                    compressedSize = size
-                    crc = CRC32().also { it.update(unrelated) }.value
-                }
+                        method = ZipEntry.STORED
+                        size = unrelated.size.toLong()
+                        compressedSize = size
+                        crc = CRC32().also { it.update(unrelated) }.value
+                    },
                 )
                 zip.write(unrelated)
                 zip.closeEntry()

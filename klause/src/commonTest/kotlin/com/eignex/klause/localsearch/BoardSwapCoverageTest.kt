@@ -142,12 +142,14 @@ class BoardSwapCoverageTest {
         val sink = MoveSink(state.assumptions)
         sink.setOwners(
             IntArray(10) {
-            if (it == 1) 99 else if (it < 5) {
-            0
-        } else {
-            1
-        }
-        }
+                if (it == 1) {
+                    99
+                } else if (it < 5) {
+                    0
+                } else {
+                    1
+                }
+            },
         )
         val source = SatisfiedStructured.structural(1)
         val moves = mutableListOf<Move>()
@@ -196,10 +198,10 @@ class BoardSwapCoverageTest {
                 repeat(if (sliced) 256 else 1) {
                     if (!handle.isDone) {
                         result = counted.runInstructionSlice(
-                        ExecutionControl.Never,
-                        Long.MAX_VALUE,
-                        if (sliced) 1L else Long.MAX_VALUE,
-                    ) {}
+                            ExecutionControl.Never,
+                            Long.MAX_VALUE,
+                            if (sliced) 1L else Long.MAX_VALUE,
+                        ) {}
                     }
                 }
                 assertEquals(0.0, assertIs<MinimizeResult.BestFound>(result).objective)
@@ -529,13 +531,13 @@ class BoardSwapCoverageTest {
 
         assertTrue(
             moves.any { move ->
-            (move as Move.Compound).parts.any { (it as Move.IntSet).varId >= 2 }
-        }
+                (move as Move.Compound).parts.any { (it as Move.IntSet).varId >= 2 }
+            },
         )
         assertTrue(
             moves.any { move ->
-            (move as Move.Compound).parts.any { (it as Move.IntSet).varId < 2 }
-        }
+                (move as Move.Compound).parts.any { (it as Move.IntSet).varId < 2 }
+            },
         )
     }
 

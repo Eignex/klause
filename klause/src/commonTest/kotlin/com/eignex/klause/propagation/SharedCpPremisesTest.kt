@@ -35,17 +35,17 @@ class SharedCpPremisesTest {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                 if (decision == SearchDecision.Bool(0)) {
                     context.publish(
-                    SearchDecision.IntAtLeast(0, 3),
-                    SearchAtomPremise.All(
-                        listOf(
-                            SearchAtomPremise.All(
-                                listOf(
-                        SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                        SearchDecision.IntAtLeast(0, 3),
+                        SearchAtomPremise.All(
+                            listOf(
+                                SearchAtomPremise.All(
+                                    listOf(
+                                        SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                                    ),
+                                ),
+                            ),
+                        ),
                     )
-                            )
-                        )
-                    ),
-                )
                 } else {
                     ComponentResult.Consistent
                 }
@@ -136,13 +136,15 @@ class SharedCpPremisesTest {
     fun `unavailable proof branch should not replace an independent named premise`() {
         val native = PropagationSession(
             Problem(
-                2, 4, Array(4) { IntDomain(0, 10) },
+                2,
+                4,
+                Array(4) { IntDomain(0, 10) },
                 arrayOf(
-            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-            Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.LE, 0),
-        )
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                    Linear(intArrayOf(1, -1), intArrayOf(2, 3), LinearOp.LE, 0),
+                ),
             ),
-            pbLearning = false
+            pbLearning = false,
         )
         val peer = object : SearchComponent {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = when (decision) {
@@ -180,12 +182,14 @@ class SharedCpPremisesTest {
     fun `independent inherited bounds should preserve both equality premises`() {
         val native = PropagationSession(
             Problem(
-                2, 2, Array(2) { IntDomain(0, 10) },
+                2,
+                2,
+                Array(2) { IntDomain(0, 10) },
                 arrayOf(
-            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-        )
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+                ),
             ),
-            pbLearning = false
+            pbLearning = false,
         )
         val peer = object : SearchComponent {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = when (decision) {
@@ -210,9 +214,9 @@ class SharedCpPremisesTest {
 
         val equality = SearchAtomPremise.All(
             listOf(
-            publication.bound(1, upper = false),
-            publication.bound(1, upper = true),
-        )
+                publication.bound(1, upper = false),
+                publication.bound(1, upper = true),
+            ),
         )
 
         assertContentEquals(intArrayOf(1, 3), assertNotNull(shared.explainAtoms(equality)).literals.sortedArray())
@@ -222,20 +226,22 @@ class SharedCpPremisesTest {
     fun `inactive inherited assertions should not supply publication reasons`() {
         val native = PropagationSession(
             Problem(
-                2, 2, Array(2) { IntDomain(0, 10) },
+                2,
+                2,
+                Array(2) { IntDomain(0, 10) },
                 arrayOf(
-            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-        )
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-            pbLearning = false
+            pbLearning = false,
         )
         val peer = object : SearchComponent {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                 if (decision == SearchDecision.Bool(2)) {
                     context.publish(
-                    SearchDecision.IntAtLeast(0, 3),
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
-                )
+                        SearchDecision.IntAtLeast(0, 3),
+                        SearchAtomPremise.Asserted(SearchDecision.Bool(0)),
+                    )
                 } else {
                     ComponentResult.Consistent
                 }
@@ -256,25 +262,27 @@ class SharedCpPremisesTest {
     fun `branched inherited proofs should retain unavailable siblings`() {
         val native = PropagationSession(
             Problem(
-                1, 2, Array(2) { IntDomain(0, 10) },
+                1,
+                2,
+                Array(2) { IntDomain(0, 10) },
                 arrayOf(
-            Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-        )
+                    Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                ),
             ),
-            pbLearning = false
+            pbLearning = false,
         )
         val peer = object : SearchComponent {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                 if (decision == SearchDecision.Bool(0)) {
                     context.publish(
-                    SearchDecision.IntAtLeast(0, 3),
-                    SearchAtomPremise.All(
-                        listOf(
-                        SearchAtomPremise.Asserted(decision),
-                        SearchAtomPremise.Unavailable,
+                        SearchDecision.IntAtLeast(0, 3),
+                        SearchAtomPremise.All(
+                            listOf(
+                                SearchAtomPremise.Asserted(decision),
+                                SearchAtomPremise.Unavailable,
+                            ),
+                        ),
                     )
-                    ),
-                )
                 } else {
                     ComponentResult.Consistent
                 }
@@ -295,12 +303,14 @@ class SharedCpPremisesTest {
     fun `native deductions should preserve distinct named bounds`() {
         val native = PropagationSession(
             Problem(
-                2, 3, Array(3) { IntDomain(0, 10) },
+                2,
+                3,
+                Array(3) { IntDomain(0, 10) },
                 arrayOf(
-            Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-        )
+                    Linear(intArrayOf(1, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                ),
             ),
-            pbLearning = false
+            pbLearning = false,
         )
         val peer = object : SearchComponent {
             override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult = when (decision) {

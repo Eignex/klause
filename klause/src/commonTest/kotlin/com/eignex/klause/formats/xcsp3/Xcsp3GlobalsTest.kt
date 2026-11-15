@@ -124,12 +124,12 @@ class Xcsp3GlobalsTest {
         assertEquals(0, parsed.problem.numBoolVars)
         assertEquals(
             setOf(
-            listOf(0L, 0L, 0L),
-            listOf(0L, 1L, 1L),
-            listOf(1L, 0L, 2L),
-            listOf(1L, 1L, 3L),
-        ),
-            solutions(parsed, 3)
+                listOf(0L, 0L, 0L),
+                listOf(0L, 1L, 1L),
+                listOf(1L, 0L, 2L),
+                listOf(1L, 1L, 3L),
+            ),
+            solutions(parsed, 3),
         )
     }
 
@@ -229,8 +229,8 @@ class Xcsp3GlobalsTest {
 
         assertEquals(
             (0L..2L).flatMap { x -> (0L..2L).map { y -> listOf(x, y) } }
-            .filter { it != listOf(1L, 1L) }.toSet(),
-                solutions(parsed, 2)
+                .filter { it != listOf(1L, 1L) }.toSet(),
+            solutions(parsed, 2),
         )
     }
 
@@ -262,12 +262,12 @@ class Xcsp3GlobalsTest {
 
         assertEquals(
             setOf(
-            listOf(0L, 0L, 1L),
-            listOf(0L, 1L, 1L),
-            listOf(1L, 0L, 0L),
-            listOf(1L, 1L, 0L),
-        ),
-            solutions(parsed, 3)
+                listOf(0L, 0L, 1L),
+                listOf(0L, 1L, 1L),
+                listOf(1L, 0L, 0L),
+                listOf(1L, 1L, 0L),
+            ),
+            solutions(parsed, 3),
         )
     }
 
@@ -327,14 +327,14 @@ class Xcsp3GlobalsTest {
 
         assertEquals(
             setOf(
-            listOf(0L, 1L),
-            listOf(1L, 0L),
-            listOf(1L, 1L),
-            listOf(0L, 2L),
-            listOf(2L, 0L),
-            listOf(2L, 2L),
-        ),
-            solutions(parsed, 2)
+                listOf(0L, 1L),
+                listOf(1L, 0L),
+                listOf(1L, 1L),
+                listOf(0L, 2L),
+                listOf(2L, 0L),
+                listOf(2L, 2L),
+            ),
+            solutions(parsed, 2),
         )
     }
 

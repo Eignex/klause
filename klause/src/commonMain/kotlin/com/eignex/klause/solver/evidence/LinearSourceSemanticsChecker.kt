@@ -27,10 +27,10 @@ class LinearSourceSemanticsChecker(
         require(this.objective.keys.all(this.coordinates::contains))
         require(
             this.premises.all { premise ->
-            premise.guards.keys.all {
-                SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in this.coordinates
-            }
-        }
+                premise.guards.keys.all {
+                    SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in this.coordinates
+                }
+            },
         )
         require(this.premises.all { premise -> premise.integerPins.keys.all(this.coordinates::contains) })
         for (kind in SourceCoordinate.Kind.entries) {
@@ -140,9 +140,9 @@ class LinearSourceSemanticsChecker(
                 value = algebraic.add(
                     value,
                     algebraic.multiply(
-                    at(sample, id, algebraic),
-                    algebraic.rational(coefficient),
-                )
+                        at(sample, id, algebraic),
+                        algebraic.rational(coefficient),
+                    ),
                 )
             }
             val comparison = algebraic.compare(value, algebraic.rational(row.rhs))

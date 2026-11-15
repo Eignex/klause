@@ -30,11 +30,13 @@ class LpRootTargetsTest {
     @Test
     fun `restarted root hints replay owned coordinates without reviving stale readers`() {
         val problem = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+            ),
         ).bake()
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         val session = PropagationSession(problem)
@@ -46,11 +48,11 @@ class LpRootTargetsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             sink,
             LpSolveContext(factory),
@@ -79,12 +81,12 @@ class LpRootTargetsTest {
             assertEquals(
                 1L,
                 sink.snapshot().lp.phases["PRIMAL_RESTART_REPLAY_ROOT"]
-                ?.outcomes?.get("RETAINED")
+                    ?.outcomes?.get("RETAINED"),
             )
             assertEquals(
                 1L,
                 sink.snapshot().lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
-                ?.outcomes?.get("RESTART_REPLAY_OFFERED")
+                    ?.outcomes?.get("RESTART_REPLAY_OFFERED"),
             )
         }
     }
@@ -106,11 +108,11 @@ class LpRootTargetsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("discarded-restart-value-order"),
             LpSolveContext(factory),
@@ -156,11 +158,11 @@ class LpRootTargetsTest {
                 objective,
                 LpParams(
                     lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                )
+                        bounding = true,
+                        probe = true,
+                        componentOwnership = true,
+                        rootCutHarvest = false,
+                    ),
                 ),
                 SolveStatsSink("guarded-restart-value-order"),
                 LpSolveContext(factory),
@@ -212,11 +214,13 @@ class LpRootTargetsTest {
     @Test
     fun `completed component preferences take precedence over auxiliary root coordinates`() {
         val problem = Problem(
-            0, 4, Array(4) { IntDomain(0, 1) },
+            0,
+            4,
+            Array(4) { IntDomain(0, 1) },
             listOf(
-            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-        )
+                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+            ),
         ).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 2, 3, 4))
         val factory = RecordingLpEngineFactory()
@@ -226,11 +230,11 @@ class LpRootTargetsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             sink,
             LpSolveContext(factory),
@@ -251,7 +255,7 @@ class LpRootTargetsTest {
             val completed = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(1L, 0L)).toList()
             assertNull(
                 sink.snapshot().lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
-                ?.outcomes?.get("AUXILIARY_ROOT_VALUE_ORDER_OFFERED")
+                    ?.outcomes?.get("AUXILIARY_ROOT_VALUE_ORDER_OFFERED"),
             )
             val auxiliary = engine.orderRootValues(VarRef.IntVar(1), sequenceOf(0L, 1L)).toList()
 
@@ -262,7 +266,7 @@ class LpRootTargetsTest {
             assertEquals(
                 1L,
                 sink.snapshot().lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
-                ?.outcomes?.get("AUXILIARY_ROOT_VALUE_ORDER_OFFERED")
+                    ?.outcomes?.get("AUXILIARY_ROOT_VALUE_ORDER_OFFERED"),
             )
         }
     }
@@ -283,11 +287,11 @@ class LpRootTargetsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             sink,
             LpSolveContext(factory),
@@ -303,7 +307,7 @@ class LpRootTargetsTest {
             assertEquals(
                 1L,
                 sink.snapshot().lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]
-                ?.outcomes?.get("AUXILIARY_ROOT_VALUE_ORDER_OFFERED")
+                    ?.outcomes?.get("AUXILIARY_ROOT_VALUE_ORDER_OFFERED"),
             )
         }
     }
@@ -325,20 +329,20 @@ class LpRootTargetsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("resumed-auxiliary-value-order"),
             LpSolveContext(factory),
         ).use { engine ->
             assertNull(
                 engine.lpRoundingProbe(objective, token, accept = {
-                stopped = true
-                null
-            })
+                    stopped = true
+                    null
+                }),
             )
             val constructed = factory.calls.size
             assertFalse(engine.retainRootPrimalTargets(token))
@@ -378,12 +382,12 @@ class LpRootTargetsTest {
                 objective,
                 LpParams(
                     lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    branching = guard != "branching",
-                    componentOwnership = guard != "ordinary",
-                    rootCutHarvest = false,
-                )
+                        bounding = true,
+                        probe = true,
+                        branching = guard != "branching",
+                        componentOwnership = guard != "ordinary",
+                        rootCutHarvest = false,
+                    ),
                 ),
                 SolveStatsSink("qualified-auxiliary-value-order"),
             ).use { engine ->
@@ -420,11 +424,11 @@ class LpRootTargetsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("masked-root-value-order"),
             LpSolveContext(factory),
@@ -470,11 +474,11 @@ class LpRootTargetsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("fresh-node-before-root-target"),
         ).use { engine ->
@@ -512,11 +516,11 @@ class LpRootTargetsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("replaced-root-value-target"),
         ).use { engine ->
@@ -552,12 +556,12 @@ class LpRootTargetsTest {
             objective,
             LpParams(
                 lpPlan = LpPlan(
-                bounding = true,
-                probe = true,
-                branching = false,
-                componentOwnership = true,
-                rootCutHarvest = false,
-            )
+                    bounding = true,
+                    probe = true,
+                    branching = false,
+                    componentOwnership = true,
+                    rootCutHarvest = false,
+                ),
             ),
             SolveStatsSink("disabled-root-value-target"),
         ).use { engine ->

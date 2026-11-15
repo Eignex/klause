@@ -162,15 +162,17 @@ class DependentEqualitiesTest {
     @Test
     fun `positive source tolerance should decline nominal row deductions`() {
         val p = Problem(
-            0, 3, Array(3) { IntDomain(0, 10) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 10) },
             listOf(
-            eq(intArrayOf(1), intArrayOf(0), 1),
-            eq(intArrayOf(1), intArrayOf(0), 2),
-        ),
+                eq(intArrayOf(1), intArrayOf(0), 1),
+                eq(intArrayOf(1), intArrayOf(0), 2),
+            ),
             semantics = SourceSemantics(
-            SourceFormat.IR,
-            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
-        ).resolve()
+                SourceFormat.IR,
+                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+            ).resolve(),
         )
 
         assertTrue(dropped(p).isEmpty)
@@ -179,16 +181,18 @@ class DependentEqualitiesTest {
     @Test
     fun `a typed float source without real coordinates should keep nominal row deductions`() {
         val p = Problem(
-            0, 3, Array(3) { IntDomain(0, 10) },
+            0,
+            3,
+            Array(3) { IntDomain(0, 10) },
             listOf(
-            eq(intArrayOf(1), intArrayOf(0), 1),
-            eq(intArrayOf(1), intArrayOf(0), 2),
-        ),
+                eq(intArrayOf(1), intArrayOf(0), 1),
+                eq(intArrayOf(1), intArrayOf(0), 2),
+            ),
             semantics = SourceSemantics(
-            SourceFormat.IR,
-            floats = FloatSemantics.Continuous,
-            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
-        ).resolve()
+                SourceFormat.IR,
+                floats = FloatSemantics.Continuous,
+                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+            ).resolve(),
         )
 
         assertTrue(dropped(p).infeasible)

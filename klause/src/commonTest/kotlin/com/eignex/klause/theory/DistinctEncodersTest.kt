@@ -39,9 +39,9 @@ class DistinctEncodersTest {
         for (truth in listOf(false, true)) {
             val distinct = Distinct(
                 (0..1).map {
-                Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-            },
-                activator = 0
+                    Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
+                },
+                activator = 0,
             )
             val source = Problem(
                 1,
@@ -54,12 +54,12 @@ class DistinctEncodersTest {
             )
             val providers = FactorProjectionProviders(
                 encoder = EncoderProvider { factor, target ->
-                if (factor === distinct && target == EncodingTarget.LINEAR) {
-                    DistinctEncoders.linear
-                } else {
-                    BuiltInEncoderProvider.select(factor, target)
-                }
-            }
+                    if (factor === distinct && target == EncodingTarget.LINEAR) {
+                        DistinctEncoders.linear
+                    } else {
+                        BuiltInEncoderProvider.select(factor, target)
+                    }
+                },
             )
             val plan = source.prepareExecutionPlan(providers)
             val request = OpenTheoryRequest(
@@ -92,9 +92,9 @@ class DistinctEncodersTest {
         for ((real, expectedSat) in listOf(1.0 to false, 2.0 to true)) {
             val distinct = Distinct(
                 listOf(
-                Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
-                Distinct.Operand(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE)),
-            )
+                    Distinct.Operand(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE)),
+                    Distinct.Operand(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE)),
+                ),
             )
             val source = Problem(
                 0,
@@ -107,12 +107,12 @@ class DistinctEncodersTest {
             )
             val providers = FactorProjectionProviders(
                 encoder = EncoderProvider { factor, target ->
-                if (factor === distinct && target == EncodingTarget.LINEAR) {
-                    DistinctEncoders.linear
-                } else {
-                    BuiltInEncoderProvider.select(factor, target)
-                }
-            }
+                    if (factor === distinct && target == EncodingTarget.LINEAR) {
+                        DistinctEncoders.linear
+                    } else {
+                        BuiltInEncoderProvider.select(factor, target)
+                    }
+                },
             )
             val installed = assertNotNull(providers.prepare(source).linearTheoryModel(EncodingTarget.LINEAR))
 
@@ -126,8 +126,8 @@ class DistinctEncodersTest {
     fun `selected polynomial distinct encoding should refute a pinned affine collision`() {
         val distinct = Distinct(
             (0..1).map {
-            Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-        }
+                Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
+            },
         )
         val source = Problem(
             0,
@@ -140,12 +140,12 @@ class DistinctEncodersTest {
         )
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            if (factor === distinct && target == EncodingTarget.POLYNOMIAL) {
-                DistinctEncoders.polynomial
-            } else {
-                BuiltInEncoderProvider.select(factor, target)
-            }
-        }
+                if (factor === distinct && target == EncodingTarget.POLYNOMIAL) {
+                    DistinctEncoders.polynomial
+                } else {
+                    BuiltInEncoderProvider.select(factor, target)
+                }
+            },
         )
         val shared = assertNotNull(source.preparePolynomialExecutionPlan(providers = providers).polynomialModel)
 
@@ -159,8 +159,8 @@ class DistinctEncodersTest {
     fun `cancelled distinct installation should publish no partial enforcing relation`() {
         val distinct = Distinct(
             (0..2).map {
-            Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-        }
+                Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
+            },
         )
         val source = Problem(
             0,
@@ -173,12 +173,12 @@ class DistinctEncodersTest {
         )
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            if (factor === distinct && target == EncodingTarget.LINEAR) {
-                DistinctEncoders.linear
-            } else {
-                BuiltInEncoderProvider.select(factor, target)
-            }
-        }
+                if (factor === distinct && target == EncodingTarget.LINEAR) {
+                    DistinctEncoders.linear
+                } else {
+                    BuiltInEncoderProvider.select(factor, target)
+                }
+            },
         )
         var work = 0L
         val cancellation = object : ExecutionControl() {

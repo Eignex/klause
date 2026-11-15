@@ -99,9 +99,9 @@ class ArmNeedsTest {
         val source = Problem(0, side * side, Array(side * side) { IntDomain(0, 1) }, rows)
         val objective = LinearObjective(
             intCoefficients = LongArray(side * side) {
-            val distance = it / side - it % side
-            (distance * distance).toLong()
-        }
+                val distance = it / side - it % side
+                (distance * distance).toLong()
+            },
         )
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective))
         val model = prepared.executableProblem()
@@ -130,8 +130,8 @@ class ArmNeedsTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(3, 5))
         val config = PresolveConfig(
             overrides = PresolvePass.entries.associateWith {
-            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS || it == PresolvePass.POST_DIFFERENCE_SYSTEM
-        }
+                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS || it == PresolvePass.POST_DIFFERENCE_SYSTEM
+            },
         )
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective, config))
         val model = prepared.executableProblem()

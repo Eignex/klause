@@ -403,9 +403,9 @@ private fun Compiler.Builder.combineInt(head: String, args: List<Res>): Res = wh
 
     "^" -> Res.I(
         integerPower(
-        args[0].asIntComb(),
-        (args[1] as? Res.I)?.term ?: smtUnsupported("power requires an integer exponent"),
-    )
+            args[0].asIntComb(),
+            (args[1] as? Res.I)?.term ?: smtUnsupported("power requires an integer exponent"),
+        ),
     )
 
     "to_real" -> Res.I(args[0].asIntComb())

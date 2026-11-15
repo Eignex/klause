@@ -39,8 +39,8 @@ internal class WideDivMod(
     override val variables = IntVars(
         (
             dividend.coefficients.keys + quotient.coefficients.keys +
-        remainder.coefficients.keys
-        ).distinct().toIntArray()
+                remainder.coefficients.keys
+            ).distinct().toIntArray(),
     )
 
     override fun remap(mapping: VarRemap): Factor = WideDivMod(

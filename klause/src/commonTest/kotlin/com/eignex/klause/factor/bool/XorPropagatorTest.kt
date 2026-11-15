@@ -53,10 +53,12 @@ class XorPropagatorTest {
     fun `complementary unassigned literals should retain their parity constant`() {
         for (target in 0..1) {
             val problem = Problem(
-                2, 0, emptyArray(),
+                2,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true)), target),
-            )
+                    Xor(intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true)), target),
+                ),
             )
 
             val session = PropagationSession(problem)

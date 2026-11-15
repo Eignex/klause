@@ -27,8 +27,8 @@ internal fun trajectorySourceBytes(
             decoded
         } else {
             GZIPInputStream(ByteArrayInputStream(decoded)).use {
-            it.readNBytes(64 * 1024 * 1024 + 1)
-        }
+                it.readNBytes(64 * 1024 * 1024 + 1)
+            }
         }
     }
     require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == expectedSha256)

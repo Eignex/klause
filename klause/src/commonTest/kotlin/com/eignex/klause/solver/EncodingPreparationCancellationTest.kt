@@ -47,14 +47,14 @@ class EncodingPreparationCancellationTest {
         var cancelled = false
         val scope = (
             ExecutionControl {
-            visited += 1;
-            cancelled
-        } or
-            ExecutionControl {
-                visited += 2;
-                false
-            }
-        ).encodingPreparationScope()
+                visited += 1
+                cancelled
+            } or
+                ExecutionControl {
+                    visited += 2
+                    false
+                }
+            ).encodingPreparationScope()
 
         assertFalse(scope())
         assertEquals(listOf(1, 2), visited)

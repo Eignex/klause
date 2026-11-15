@@ -232,8 +232,8 @@ class Sample private constructor(
             if (values.all { it.fitsLong() }) {
                 require(
                     values.size == integerValues.size && values.indices.all {
-                    values[it].toLongExact() == integerValues[it]
-                }
+                        values[it].toLongExact() == integerValues[it]
+                    },
                 ) { "exact and finite integer coordinates differ" }
             } else {
                 require(integerValues.isEmpty()) { "a wide witness has no finite integer coordinates" }
@@ -302,12 +302,11 @@ class Sample private constructor(
             exactReals == other.exactReals && algebraicReals == other.algebraicReals &&
             symbolicReals == other.symbolicReals
     }
-    override fun hashCode(): Int =
+    override fun hashCode(): Int = 31 * (
         31 * (
             31 * (
-                31 * (
-                    31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
-            (exactInts?.hashCode() ?: 0)
+                31 * (31 * booleanValues.contentHashCode() + integerValues.contentHashCode()) +
+                    (exactInts?.hashCode() ?: 0)
                 ) + approximateReals.contentHashCode()
             ) +
             (exactReals?.hashCode() ?: 0)

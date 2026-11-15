@@ -598,10 +598,10 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     key,
                     getValue(key).mergedWith(
                         LpPhaseStats(
-                    calls = directionalCalls,
-                    outcomes = directionalOutcomes.toMap(),
-                )
-                    )
+                            calls = directionalCalls,
+                            outcomes = directionalOutcomes.toMap(),
+                        ),
+                    ),
                 )
             }
             if (templatePreparationSeen) {
@@ -623,12 +623,12 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     key,
                     getValue(key).mergedWith(
                         LpPhaseStats(
-                    calls = templatePrepared + templateDeclined,
-                    nanos = templateNanos,
-                    work = templateWork,
-                    outcomes = outcomes,
-                )
-                    )
+                            calls = templatePrepared + templateDeclined,
+                            nanos = templateNanos,
+                            work = templateWork,
+                            outcomes = outcomes,
+                        ),
+                    ),
                 )
             }
             if (templateAssemblySeen) {
@@ -637,19 +637,19 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     key,
                     getValue(key).mergedWith(
                         LpPhaseStats(
-                    work = templateBoundChecks + templateBoundColumnWork,
-                    outcomes = buildMap {
-                        put("ROWS", templateRows)
-                        put("BOUNDS", templateBounds)
-                        put("EXACT_BOUND_OBJECTS", templateExactBounds)
-                        if (templateBoundRowsSeen) {
-                            put("BOUND_ROW_CHECKS", templateBoundChecks)
-                            put("BOUND_COLUMN_WORK", templateBoundColumnWork)
-                            put("SOURCE_ROWS_OMITTED", templateRowsOmitted)
-                        }
-                    },
-                )
-                    )
+                            work = templateBoundChecks + templateBoundColumnWork,
+                            outcomes = buildMap {
+                                put("ROWS", templateRows)
+                                put("BOUNDS", templateBounds)
+                                put("EXACT_BOUND_OBJECTS", templateExactBounds)
+                                if (templateBoundRowsSeen) {
+                                    put("BOUND_ROW_CHECKS", templateBoundChecks)
+                                    put("BOUND_COLUMN_WORK", templateBoundColumnWork)
+                                    put("SOURCE_ROWS_OMITTED", templateRowsOmitted)
+                                }
+                            },
+                        ),
+                    ),
                 )
             }
         }
@@ -763,17 +763,17 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
         cutLifecycle.shared(
             "SOLVE",
             LpPhaseStats(
-            calls = if (finished) 1L else 0L,
-            work = metrics.workOps + metrics.preparationOps,
-            pivots = metrics.pivots.toLong(),
-            outcomes = mapOf(
-                "COMPONENT_SOLVED" to metrics.componentSolves.toLong(),
-                "COMPONENT_REUSED" to metrics.componentReuses.toLong(),
-                "COLD_FACTOR" to metrics.initialRefactorizations.toLong(),
-                "WARM_FACTOR" to metrics.warmStartRefactorizations.toLong(),
-                "SINGULAR_FACTOR" to metrics.singularRecoveryRefactorizations.toLong(),
+                calls = if (finished) 1L else 0L,
+                work = metrics.workOps + metrics.preparationOps,
+                pivots = metrics.pivots.toLong(),
+                outcomes = mapOf(
+                    "COMPONENT_SOLVED" to metrics.componentSolves.toLong(),
+                    "COMPONENT_REUSED" to metrics.componentReuses.toLong(),
+                    "COLD_FACTOR" to metrics.initialRefactorizations.toLong(),
+                    "WARM_FACTOR" to metrics.warmStartRefactorizations.toLong(),
+                    "SINGULAR_FACTOR" to metrics.singularRecoveryRefactorizations.toLong(),
+                ),
             ),
-        )
         )
         val basisBuild = LpPhaseStats(
             work = metrics.basisBuildWork,
@@ -863,10 +863,10 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                     cutLifecycle.shared(
                         "CERTIFIER_${certifier.name}",
                         LpPhaseStats(
-                        calls = 1L,
-                        work = (cost as? LpCertifierCost.Metered)?.work ?: 0L,
-                        outcomes = mapOf((if (success) "CERTIFIED" else "DECLINED") to 1L),
-                    )
+                            calls = 1L,
+                            work = (cost as? LpCertifierCost.Metered)?.work ?: 0L,
+                            outcomes = mapOf((if (success) "CERTIFIED" else "DECLINED") to 1L),
+                        ),
                     )
                     val i = certifier.ordinal
                     certifierAttempts[i]++
@@ -881,13 +881,13 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                         cutLifecycle.shared(
                             "CONTINUATION_${phase.name}",
                             LpPhaseStats(
-                            calls = 1L,
-                            work = work,
-                            outcomes = mapOf(
-                                (metrics.decline?.name ?: "COMPLETED") to 1L,
-                                "ALLOCATION" to (metrics.allocationByPhase[phase] ?: 0L),
+                                calls = 1L,
+                                work = work,
+                                outcomes = mapOf(
+                                    (metrics.decline?.name ?: "COMPLETED") to 1L,
+                                    "ALLOCATION" to (metrics.allocationByPhase[phase] ?: 0L),
+                                ),
                             ),
-                        )
                         )
                     }
                 }
@@ -896,13 +896,13 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
                         cutLifecycle.shared(
                             "BASIS_${operation.phase.name}",
                             LpPhaseStats(
-                            calls = 1L,
-                            work = operation.work,
-                            outcomes = mapOf(
-                                (metrics.decline?.name ?: "COMPLETED") to 1L,
-                                "ALLOCATION" to operation.allocation,
+                                calls = 1L,
+                                work = operation.work,
+                                outcomes = mapOf(
+                                    (metrics.decline?.name ?: "COMPLETED") to 1L,
+                                    "ALLOCATION" to operation.allocation,
+                                ),
                             ),
-                        )
                         )
                     }
                     basisVerification = basisVerification.mergedWith(

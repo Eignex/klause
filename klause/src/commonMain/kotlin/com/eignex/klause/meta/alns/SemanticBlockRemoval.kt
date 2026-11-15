@@ -199,7 +199,7 @@ internal class SemanticBlockRemoval(
         val count = factor.starts.size
         if (count > maxVariables) work.stop(RepairBlockDecline.Oversized)
         val starts = LongArray(count) {
-            work.charge();
+            work.charge()
             center.intValue(factor.starts[it])
         }
         val order = (0 until count).sortedWith { left, right ->

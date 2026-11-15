@@ -184,12 +184,12 @@ private fun Factor.generalExecutionCapabilities(): FactorExecutionCapabilities? 
 
     is RealFiniteDomain -> if (size == 0) {
         realArithmetic.copy(
-        propagation = PropagationCapability.SOUND_FILTERING,
-        propagationCheck = AssignmentCheckCapability.EXACT,
-        scoring = ScoringCapability.INERT,
-        relaxation = RelaxationCapability.NONE,
-        inertReason = "Empty real membership is enforced by finite propagation and exact source certification.",
-    )
+            propagation = PropagationCapability.SOUND_FILTERING,
+            propagationCheck = AssignmentCheckCapability.EXACT,
+            scoring = ScoringCapability.INERT,
+            relaxation = RelaxationCapability.NONE,
+            inertReason = "Empty real membership is enforced by finite propagation and exact source certification.",
+        )
     } else {
         realArithmetic.copy(scoring = ScoringCapability.INERT, relaxation = RelaxationCapability.NONE)
     }

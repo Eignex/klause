@@ -28,9 +28,9 @@ class DiophantineReductionTest {
             var polls = 0
             val token = budget.orSpent(
                 ExecutionControl {
-                polls++;
-                true
-            }
+                    polls++
+                    true
+                },
             )
 
             if (sourceLane) {
@@ -135,9 +135,9 @@ class DiophantineReductionTest {
             var polls = 0
             val token = budget.orSpent(
                 ExecutionControl {
-                polls++;
-                !workLimited && budget.spent() >= 64
-            }
+                    polls++
+                    !workLimited && budget.spent() >= 64
+                },
             )
 
             val delta = DiophantineReduction.reduce(model, token)
@@ -163,9 +163,9 @@ class DiophantineReductionTest {
         var polls = 0
         val token = budget.orSpent(
             ExecutionControl {
-            polls++;
-            false
-        }
+                polls++
+                false
+            },
         )
 
         val delta = DiophantineReduction.reduce(model, token)

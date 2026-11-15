@@ -78,26 +78,26 @@ class SourceCondition(
     internal fun pin(id: Int, value: Boolean): SourceCondition =
         SourceCondition(capturedBools + (id to value), capturedLower, capturedUpper).withRows(capturedIntegerRows)
 
-    internal fun bound(id: SourceCoordinate, value: BigFraction, upper: Boolean): SourceCondition =
-        if (upper) {
-            SourceCondition(
-                capturedBools, capturedLower,
-                capturedUpper + (
-                    id to
-            (capturedUpper[id]?.let { if (it < value) it else value } ?: value)
-                )
-            ).withRows(capturedIntegerRows)
-        } else {
-            SourceCondition(
-                capturedBools,
-                capturedLower + (
-                    id to
-            (capturedLower[id]?.let { if (it > value) it else value } ?: value)
+    internal fun bound(id: SourceCoordinate, value: BigFraction, upper: Boolean): SourceCondition = if (upper) {
+        SourceCondition(
+            capturedBools,
+            capturedLower,
+            capturedUpper + (
+                id to
+                    (capturedUpper[id]?.let { if (it < value) it else value } ?: value)
                 ),
-                capturedUpper
-            )
+        ).withRows(capturedIntegerRows)
+    } else {
+        SourceCondition(
+            capturedBools,
+            capturedLower + (
+                id to
+                    (capturedLower[id]?.let { if (it > value) it else value } ?: value)
+                ),
+            capturedUpper,
+        )
             .withRows(capturedIntegerRows)
-        }
+    }
 
     internal fun integerBound(row: SourceInequality): SourceCondition =
         SourceCondition(capturedBools, capturedLower, capturedUpper).withRows(capturedIntegerRows + row)

@@ -111,8 +111,8 @@ internal class SharedPolynomialModel private constructor(
                     if (!participating[index] && projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
                         (
                             factor.intVars.any { relevantIntegers[it] } ||
-                            factor.boolVars.any { relevantBooleans[it] }
-                        )
+                                factor.boolVars.any { relevantBooleans[it] }
+                            )
                     ) {
                         participating[index] = true
                         changed = true

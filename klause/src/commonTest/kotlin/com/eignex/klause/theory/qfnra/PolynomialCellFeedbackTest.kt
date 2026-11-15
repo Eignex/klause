@@ -63,14 +63,14 @@ class PolynomialCellFeedbackTest {
         val feedback = PolynomialCellFeedback(source.formula, condition)
         assertNull(
             feedback.rejection(
-            0,
-            predicate,
-            first,
-            assertNotNull(cell.upper),
-            listOf(cell),
-            arithmetic,
-            algebraic,
-        )
+                0,
+                predicate,
+                first,
+                assertNotNull(cell.upper),
+                listOf(cell),
+                arithmetic,
+                algebraic,
+            ),
         )
 
         assertNotNull(feedback.rejection(0, predicate, second, zero, emptyList(), arithmetic, algebraic))
@@ -93,11 +93,11 @@ class PolynomialCellFeedbackTest {
         val value = algebraic.roots(
             RationalPolynomial(
                 listOf(
-            BigFraction.ofLong(-3),
-            BigFraction.ZERO,
-            BigFraction.ofLong(2),
-        )
-            )
+                    BigFraction.ofLong(-3),
+                    BigFraction.ZERO,
+                    BigFraction.ofLong(2),
+                ),
+            ),
         ).last()
         assertTrue(cell.contains(value, algebraic))
         val feedback = PolynomialCellFeedback(
@@ -108,11 +108,11 @@ class PolynomialCellFeedbackTest {
         )
         val scope = assertNotNull(
             feedback.candidateScope(
-            snapshot,
-            PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
-            null,
-            arithmetic,
-        )
+                snapshot,
+                PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
+                null,
+                arithmetic,
+            ),
         )
 
         val rejected = feedback.candidateRejection(predicate, scope, mapOf(0 to value)) { listOf(cell) }
@@ -138,11 +138,11 @@ class PolynomialCellFeedbackTest {
         val producerWork = refinement.stats.work
         val scope = assertNotNull(
             feedback.candidateScope(
-            snapshot,
-            PolynomialBooleanRegion(mapOf(0 to true, 1 to true), emptyMap()),
-            null,
-            arithmetic,
-        )
+                snapshot,
+                PolynomialBooleanRegion(mapOf(0 to true, 1 to true), emptyMap()),
+                null,
+                arithmetic,
+            ),
         )
         val predicate = refinement.cells.first().predicate
         val point = mapOf(0 to algebraic.rational(BigFraction.ZERO))
@@ -206,11 +206,11 @@ class PolynomialCellFeedbackTest {
         val feedback = PolynomialCellFeedback(source.formula, PolynomialCondition(), parent = parent)
         val scope = assertNotNull(
             feedback.candidateScope(
-            snapshot,
-            PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
-            null,
-            arithmetic,
-        )
+                snapshot,
+                PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
+                null,
+                arithmetic,
+            ),
         )
         stopped = true
 
@@ -320,14 +320,14 @@ class PolynomialCellFeedbackTest {
             assertEquals(cell.upperClosed, rejected != null)
             assertNull(
                 feedback.rejection(
-                0,
-                predicate,
-                scope,
-                algebraic.rational(BigFraction.ofLong(2)),
-                emptyList(),
-                arithmetic,
-                algebraic,
-            )
+                    0,
+                    predicate,
+                    scope,
+                    algebraic.rational(BigFraction.ofLong(2)),
+                    emptyList(),
+                    arithmetic,
+                    algebraic,
+                ),
             )
         }
     }

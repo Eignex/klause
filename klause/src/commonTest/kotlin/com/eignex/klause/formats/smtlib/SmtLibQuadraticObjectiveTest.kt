@@ -35,7 +35,7 @@ class SmtLibQuadraticObjectiveTest {
                 "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
                     "(minimize (let ((x 99)) (f 3)))",
             )
-        )
+            )
         val sample = Sample(
             booleanArrayOf(),
             longArrayOf(),
@@ -55,7 +55,7 @@ class SmtLibQuadraticObjectiveTest {
             SmtLib.parse(
                 "(declare-const x Real) (minimize (* (/ 9007199254740993 7) x x))",
             )
-        )
+            )
         val sample = Sample(
             booleanArrayOf(),
             longArrayOf(),
@@ -75,7 +75,7 @@ class SmtLibQuadraticObjectiveTest {
                 "(declare-const x Real) (declare-const i Int) (declare-const b Bool) " +
                     "(minimize (+ (* (to_real i) x) (* (ite b 1 0) i)))",
             )
-        )
+            )
         val sample = Sample(
             booleanArrayOf(true),
             longArrayOf(3),
@@ -96,7 +96,7 @@ class SmtLibQuadraticObjectiveTest {
                 "(declare-const x Real) (declare-const b Bool) " +
                     "(minimize (+ (* (ite b x 0) 2) (* x x)))",
             )
-        )
+            )
         val sample = Sample(
             booleanArrayOf(true),
             longArrayOf(),
@@ -115,7 +115,7 @@ class SmtLibQuadraticObjectiveTest {
             SmtLib.parse(
                 "(declare-const b Bool) (declare-const c Bool) (minimize (^ (ite b (ite c 2 0) 0) 1))",
             )
-        )
+            )
 
         val value = assertNotNull(input.quadraticObjective).evaluateExact(
             Sample(booleanArrayOf(true, true), longArrayOf()),
@@ -132,23 +132,23 @@ class SmtLibQuadraticObjectiveTest {
                 "(declare-const x Real) (declare-const i Int) (declare-const b Bool) " +
                     "(minimize (+ (* i i) (^ (- x (ite b 1 0)) 2)))",
             )
-        )
+            )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            input.source,
-            FiniteEngine.BACKTRACK,
-            assertNotNull(input.quadraticObjective),
-            input.sense,
-        )
+                input.source,
+                FiniteEngine.BACKTRACK,
+                assertNotNull(input.quadraticObjective),
+                input.sense,
+            ),
         )
 
         val execution = assertIs<SourceExecutionResult.Quadratic>(
             SourceSetup.execute(
                 SourceExecutionRequest(
-            invocation,
-            NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(maximumWork = 100000)),
-        )
-            )
+                    invocation,
+                    NonlinearIntegerTheoryParams(polynomial = PolynomialTheoryParams(maximumWork = 100000)),
+                ),
+            ),
         )
 
         val result = assertIs<QuadraticOptimizationResult.Optimal>(execution.result.result)
@@ -162,7 +162,7 @@ class SmtLibQuadraticObjectiveTest {
             SmtLib.parse(
                 "(declare-const x Real) (maximize (- 5 (* x x)))",
             )
-        )
+            )
 
         val value = assertNotNull(input.quadraticObjective).evaluateExact(
             Sample(

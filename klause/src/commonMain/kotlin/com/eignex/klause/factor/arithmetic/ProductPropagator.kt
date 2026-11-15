@@ -76,8 +76,8 @@ internal class ProductPropagator(
                 state.composeIntVarAtomAntecedents(intArrayOf(a)),
             )
         ) {
-                return false
-            }
+            return false
+        }
         val output = state.intDomains[result]
         val upperRoot = floorSquareRoot(output.max)
         val floorLower = floorSquareRoot(output.min)

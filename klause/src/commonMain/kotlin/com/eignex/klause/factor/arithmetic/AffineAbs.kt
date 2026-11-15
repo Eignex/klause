@@ -85,7 +85,7 @@ internal class AbsAffineValue(coefficients: Map<Int, BigInt>, val constant: BigI
 internal class AffineAbs(val operand: AbsAffineValue, val result: AbsAffineValue) : Factor {
     override val variables: VarList = IntVars(
         (operand.coefficients.keys + result.coefficients.keys)
-        .distinct().sorted().toIntArray()
+            .distinct().sorted().toIntArray(),
     )
 
     override fun remap(mapping: VarRemap): Factor = AffineAbs(operand.remap(mapping), result.remap(mapping))
@@ -101,8 +101,8 @@ internal class AffineAbs(val operand: AbsAffineValue, val result: AbsAffineValue
 
     override val linearForm: LinearForm = LinearForm.Relaxation(
         listOf(
-        result.comparedTo(operand, BIG_ONE, LinearOp.GE),
-        result.comparedTo(operand, -BIG_ONE, LinearOp.GE),
-    )
+            result.comparedTo(operand, BIG_ONE, LinearOp.GE),
+            result.comparedTo(operand, -BIG_ONE, LinearOp.GE),
+        ),
     )
 }

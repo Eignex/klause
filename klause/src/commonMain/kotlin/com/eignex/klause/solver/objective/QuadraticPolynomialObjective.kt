@@ -23,10 +23,10 @@ internal fun QuadraticObjectiveSpec.polynomialFor(finite: Sample): PolynomialExp
             terms.map { term ->
                 PolynomialExpression.Product(
                     buildList {
-                    add(PolynomialExpression.Constant.of(term.coefficient.numerator, term.coefficient.denominator))
-                    add(coordinate(term.first))
-                    term.second?.let { add(coordinate(it)) }
-                }
+                        add(PolynomialExpression.Constant.of(term.coefficient.numerator, term.coefficient.denominator))
+                        add(coordinate(term.first))
+                        term.second?.let { add(coordinate(it)) }
+                    },
                 )
             },
     )
@@ -46,8 +46,8 @@ internal fun QuadraticObjectiveSpec.evaluateExact(sample: Sample, arithmetic: Al
             is QuadraticVariable.Real -> sample.algebraicReals?.get(variable.id.index)
                 ?: arithmetic.rational(
                     requireNotNull(sample.exactReals?.get(variable.id.index)) {
-                    "quadratic objective evaluation requires an exact real witness"
-                }
+                        "quadratic objective evaluation requires an exact real witness"
+                    },
                 )
         }
     }

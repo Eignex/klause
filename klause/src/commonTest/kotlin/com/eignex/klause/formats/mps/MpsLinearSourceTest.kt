@@ -119,13 +119,13 @@ class MpsLinearSourceTest {
             listOf(MpsVar("B", true, 0.0, 2.0), MpsVar("X", false, null, null)),
             listOf(
                 MpsConstraint(
-                "R",
-                intArrayOf(1, 1),
-                doubleArrayOf(1.0, -1.0),
-                null,
-                1.0,
-                MpsIndicator(0, false),
-            )
+                    "R",
+                    intArrayOf(1, 1),
+                    doubleArrayOf(1.0, -1.0),
+                    null,
+                    1.0,
+                    MpsIndicator(0, false),
+                ),
             ),
         )
 
@@ -186,8 +186,8 @@ class MpsLinearSourceTest {
         assertEquals(BigFraction.of(bigIntOf(-2), bigIntOf(5)), witness.objective)
         val exact = assertNotNull(
             parsed.toLinearSourceProblem(
-            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-        )
+                SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+            ),
         )
         assertNull(exact.checkMpsWitness(listOf(BigFraction.ofLong(3))))
     }
@@ -202,10 +202,10 @@ class MpsLinearSourceTest {
             for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH)) {
                 val invocation = SourceSetup.prepare(
                     SourceSetupRequest(
-                    SourceAttachment(source, ProblemSettings()),
-                    ExecutionOperation.OPTIMIZE,
-                    engine,
-                )
+                        SourceAttachment(source, ProblemSettings()),
+                        ExecutionOperation.OPTIMIZE,
+                        engine,
+                    ),
                 )
 
                 assertEquals(SourceExecutionKind.FINITE, SourceSetup.executionKind(invocation))

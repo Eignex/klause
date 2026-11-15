@@ -29,10 +29,12 @@ class LpRetainedSourcesTest {
     @Test
     fun `completed source preparation should charge fresh emissions once`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 10)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
-        )
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+            ),
         )
         val sources = LpRetainedSources(
             problem,
@@ -54,10 +56,12 @@ class LpRetainedSourcesTest {
     @Test
     fun `cancelled source preparation should retain completed emission charges`() {
         val problem = Problem(
-            0, 1, arrayOf(IntDomain(0, 10)),
+            0,
+            1,
+            arrayOf(IntDomain(0, 10)),
             arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
-        )
+                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 3),
+            ),
         )
         val sources = LpRetainedSources(
             problem,
@@ -81,51 +85,53 @@ class LpRetainedSourcesTest {
         val modes = listOf(false to false, true to false, true to true)
         for ((templates, metadata) in modes) {
             for (open in listOf(false, true)) {
-            val origin = 9_007_199_254_740_993L
-            val problem = Problem(
-                0, 2, Array(2) { IntDomain(origin, origin + 4L) },
-                arrayOf<Factor>(
-                Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 2L * origin + 3L),
-            ),
-                openIntHi = booleanArrayOf(false, open)
-            )
-            val consumer = CpToLpRelaxation(
-                problem,
-                LinearObjective(intCoefficients = longArrayOf(1L, 1L)),
-                projections = FactorProjectionProviders.Default.prepare(problem),
-                reuseSourceTemplates = templates,
-                reuseTemplateMetadata = metadata,
-            )
-            val sources = LpRetainedSources(problem, consumer)
-            LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
-                val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
-                val assertions = assertNotNull(edit.boundAssertions(0L))
-                assertTrue(
-                    owner.replaceRows(
-                    edit.retired,
-                    edit.columns,
-                    edit.rows,
-                    false,
-                    permanentRows = edit.permanentRows,
-                    objective = edit.objective,
-                    assertions = assertions,
+                val origin = 9_007_199_254_740_993L
+                val problem = Problem(
+                    0,
+                    2,
+                    Array(2) { IntDomain(origin, origin + 4L) },
+                    arrayOf<Factor>(
+                        Linear(longArrayOf(1L, 1L), intArrayOf(0, 1), LinearOp.GE, 2L * origin + 3L),
+                    ),
+                    openIntHi = booleanArrayOf(false, open),
                 )
+                val consumer = CpToLpRelaxation(
+                    problem,
+                    LinearObjective(intCoefficients = longArrayOf(1L, 1L)),
+                    projections = FactorProjectionProviders.Default.prepare(problem),
+                    reuseSourceTemplates = templates,
+                    reuseTemplateMetadata = metadata,
                 )
-                edit.commit()
+                val sources = LpRetainedSources(problem, consumer)
+                LpScopedSolver(LpExactState(LpRetainedSources.emptyModel())).use { owner ->
+                    val edit = assertNotNull(sources.prepare(owner.state, RootDomains(problem)))
+                    val assertions = assertNotNull(edit.boundAssertions(0L))
+                    assertTrue(
+                        owner.replaceRows(
+                            edit.retired,
+                            edit.columns,
+                            edit.rows,
+                            false,
+                            permanentRows = edit.permanentRows,
+                            objective = edit.objective,
+                            assertions = assertions,
+                        ),
+                    )
+                    edit.commit()
 
-                val result = assertNotNull(owner.solve())
+                    val result = assertNotNull(owner.solve())
 
-                assertEquals(BigFraction.ofLong(2L * origin + 3L), result.lowerBound)
-                assertEquals(BigFraction.ofLong(origin), owner.state.model.column(0).origin.value)
-                assertEquals(open, owner.state.model.column(1).bounds.upper == null)
-                if (templates) {
-                    assertSame(
-                    assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column,
-                    owner.state.model.column(0),
-                )
+                    assertEquals(BigFraction.ofLong(2L * origin + 3L), result.lowerBound)
+                    assertEquals(BigFraction.ofLong(origin), owner.state.model.column(0).origin.value)
+                    assertEquals(open, owner.state.model.column(1).bounds.upper == null)
+                    if (templates) {
+                        assertSame(
+                            assertNotNull(consumer.preparationTemplates).bounds.getValue(0).column,
+                            owner.state.model.column(0),
+                        )
+                    }
                 }
             }
-        }
         }
     }
 

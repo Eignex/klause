@@ -11,7 +11,9 @@ class ExtensionalSupportIndexTest {
     fun `mixed sparse and dense supports should visit exactly the requested rows`() {
         val tuples = LongArray(256 * 2) { cell ->
             val row = cell / 2
-            if (cell % 2 == 0) row.toLong() else if (row < 128) {
+            if (cell % 2 == 0) {
+                row.toLong()
+            } else if (row < 128) {
                 -1
             } else {
                 row.toLong()

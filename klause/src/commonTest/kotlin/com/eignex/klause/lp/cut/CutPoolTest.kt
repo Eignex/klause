@@ -38,40 +38,40 @@ class CutPoolTest {
         )
         for (prepared in listOf(false, true)) {
             for (missing in premises) {
-            val events = ArrayList<Triple<CutFamily, String, String>>()
-            val pool = CutPool(
-                prepareSources = prepared,
-                observe = { family, stage, outcome -> events.add(Triple(family, stage, outcome)) },
-            )
-            val active = CutSourceMap(model, 0L, listOf(CutColumnSource(source)), activePremises = premises.toSet())
-            assertTrue(pool.add(cut, active))
-            repeat(2) { pool.remap(active) }
-            pool.remap(
-                CutSourceMap(
-                Any(),
-                0L,
-                listOf(CutColumnSource(source)),
-                activePremises = premises.toSet(),
-            )
-            )
-            assertTrue(pool.cuts().isEmpty())
-            pool.remap(active)
+                val events = ArrayList<Triple<CutFamily, String, String>>()
+                val pool = CutPool(
+                    prepareSources = prepared,
+                    observe = { family, stage, outcome -> events.add(Triple(family, stage, outcome)) },
+                )
+                val active = CutSourceMap(model, 0L, listOf(CutColumnSource(source)), activePremises = premises.toSet())
+                assertTrue(pool.add(cut, active))
+                repeat(2) { pool.remap(active) }
+                pool.remap(
+                    CutSourceMap(
+                        Any(),
+                        0L,
+                        listOf(CutColumnSource(source)),
+                        activePremises = premises.toSet(),
+                    ),
+                )
+                assertTrue(pool.cuts().isEmpty())
+                pool.remap(active)
 
-            pool.remap(
-                CutSourceMap(
-                model,
-                1L,
-                listOf(CutColumnSource(source)),
-                activePremises = (premises - missing).toSet(),
-            )
-            )
+                pool.remap(
+                    CutSourceMap(
+                        model,
+                        1L,
+                        listOf(CutColumnSource(source)),
+                        activePremises = (premises - missing).toSet(),
+                    ),
+                )
 
-            assertTrue(pool.cuts().isEmpty())
-            assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "UNAVAILABLE") in events)
-            pool.remap(active)
-            assertEquals(CutFamily.GOMORY, pool.cuts().single().family)
-            assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "REACTIVATED") in events)
-        }
+                assertTrue(pool.cuts().isEmpty())
+                assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "UNAVAILABLE") in events)
+                pool.remap(active)
+                assertEquals(CutFamily.GOMORY, pool.cuts().single().family)
+                assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "REACTIVATED") in events)
+            }
         }
     }
 
@@ -85,13 +85,15 @@ class CutPoolTest {
             CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true),
         )
         val source = SourceCut(
-            expression, Relation.LE, BigFraction.ONE,
+            expression,
+            Relation.LE,
+            BigFraction.ONE,
             CutProvenance(
-            model,
-            0,
-            facts,
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
-        )
+                model,
+                0,
+                facts,
+                conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+            ),
         )
         val first = CutSourceMap(model, 0, listOf(null, CutColumnSource(x)))
         val events = ArrayList<Pair<String, String>>()
@@ -123,13 +125,15 @@ class CutPoolTest {
             CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true),
         )
         val source = SourceCut(
-            expression, Relation.LE, BigFraction.ONE,
+            expression,
+            Relation.LE,
+            BigFraction.ONE,
             CutProvenance(
-            model,
-            0,
-            facts,
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
-        )
+                model,
+                0,
+                facts,
+                conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+            ),
         )
         val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
         var cancelled = false
@@ -187,13 +191,15 @@ class CutPoolTest {
         val x = CutSource(CutSourceKind.INTEGER, 0)
         val expression = CutExpression(mapOf(x to BigFraction.ONE))
         val source = SourceCut(
-            expression, Relation.LE, BigFraction.ONE,
+            expression,
+            Relation.LE,
+            BigFraction.ONE,
             CutProvenance(
-            model,
-            0,
-            listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true)),
-            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
-        )
+                model,
+                0,
+                listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ONE), true)),
+                conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ONE),
+            ),
         )
         val map = CutSourceMap(model, 0, listOf(CutColumnSource(x)))
         var cancelled = false
@@ -203,7 +209,7 @@ class CutPoolTest {
             prepareSources = true,
             cancellation = ExecutionControl { cancelled },
             onPreparationWork = {
-                work += it;
+                work += it
                 if (cancelOnCharge) cancelled = true
             },
         )
@@ -233,18 +239,18 @@ class CutPoolTest {
             assertTrue(
                 pool.add(
                     SourceCut(
-                expression,
-                Relation.LE,
-                BigFraction.ofLong(rhs),
-                CutProvenance(
-                    model,
-                    0,
-                    listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ofLong(rhs)), true)),
-                    conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ofLong(rhs)),
+                        expression,
+                        Relation.LE,
+                        BigFraction.ofLong(rhs),
+                        CutProvenance(
+                            model,
+                            0,
+                            listOf(CutProofFact(CutPremise.Bound(expression, true, BigFraction.ofLong(rhs)), true)),
+                            conclusion = CutPremise.Row(expression, Relation.LE, BigFraction.ofLong(rhs)),
+                        ),
+                    ),
+                    map,
                 ),
-            ),
-                map
-                )
             )
         }
         repeat(2) { pool.remap(map) }

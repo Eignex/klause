@@ -260,7 +260,7 @@ class CpToLpRelaxationHullTest {
 
             val hull = solveLp(
                 CpToLpRelaxation(problem, objective, nValueHull = true)
-                .build(PropagationSession(problem)).model
+                    .build(PropagationSession(problem)).model,
             )
 
             assertEquals(FloatLpStatus.OPTIMAL, hull.status)

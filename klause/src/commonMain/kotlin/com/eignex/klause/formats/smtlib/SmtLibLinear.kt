@@ -72,9 +72,9 @@ internal fun Compiler.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray,
 internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb) {
     if (op == "=") {
         conditionalEquality(a, b)?.let {
-        forceTrue(it)
-        return
-    }
+            forceTrue(it)
+            return
+        }
     }
     val linOp = relLinearOp(op)
     when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {

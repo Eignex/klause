@@ -14,15 +14,15 @@ class LearnedIntegerRowsTest {
         val row = assertNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0),
-            longArrayOf(1),
-            intArrayOf(0),
-            LinearOp.LE,
-            10,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0),
+                    longArrayOf(1),
+                    intArrayOf(0),
+                    LinearOp.LE,
+                    10,
+                ),
+                useLo = true,
+            ),
         )
         val rows = Array(20_000) { LearnedIntegerPropagator(row) }
         val cache = LearnedIntegerRows()
@@ -46,15 +46,15 @@ class LearnedIntegerRowsTest {
         val row = assertNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0),
-            longArrayOf(1),
-            intArrayOf(0),
-            LinearOp.LE,
-            10,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0),
+                    longArrayOf(1),
+                    intArrayOf(0),
+                    LinearOp.LE,
+                    10,
+                ),
+                useLo = true,
+            ),
         )
         val rows = Array(20_000) { LearnedIntegerPropagator(row) }
         val cache = LearnedIntegerRows()
@@ -78,15 +78,15 @@ class LearnedIntegerRowsTest {
         val row = assertNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0),
-            longArrayOf(1),
-            intArrayOf(0),
-            LinearOp.LE,
-            10,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0),
+                    longArrayOf(1),
+                    intArrayOf(0),
+                    LinearOp.LE,
+                    10,
+                ),
+                useLo = true,
+            ),
         )
         val rows = Array(20_000) { LearnedIntegerPropagator(row) }
         val cache = LearnedIntegerRows()
@@ -109,15 +109,15 @@ class LearnedIntegerRowsTest {
         val row = assertNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0),
-            longArrayOf(1),
-            intArrayOf(0),
-            LinearOp.LE,
-            10,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0),
+                    longArrayOf(1),
+                    intArrayOf(0),
+                    LinearOp.LE,
+                    10,
+                ),
+                useLo = true,
+            ),
         )
         val rows = Array(130) { LearnedIntegerPropagator(row) }
         val cache = LearnedIntegerRows()

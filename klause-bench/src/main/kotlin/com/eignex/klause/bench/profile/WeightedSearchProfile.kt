@@ -46,11 +46,11 @@ internal object WeightedSearchProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(
             options.keys.all {
-            it in setOf(
-                "suite", "problem", "sha256", "format", "policy", "timeout-ms",
-                "work", "slice-work", "seed",
-            )
-        }
+                it in setOf(
+                    "suite", "problem", "sha256", "format", "policy", "timeout-ms",
+                    "work", "slice-work", "seed",
+                )
+            },
         )
         val suite = requireNotNull(options["suite"])
         val problem = requireNotNull(options["problem"])
@@ -86,14 +86,14 @@ internal object WeightedSearchProfile {
         val budget = PresolveBudget(100_000_000L)
         val prepared = FinitePipeline.prepare(
             FinitePipelineRequest(
-            source,
-            FiniteEngine.BACKTRACK,
-            objective,
-            cancellation = stop,
-            solveCancellation = stop,
-            presolveBudget = budget,
-            randomSeed = seed,
-        )
+                source,
+                FiniteEngine.BACKTRACK,
+                objective,
+                cancellation = stop,
+                solveCancellation = stop,
+                presolveBudget = budget,
+                randomSeed = seed,
+            ),
         )
         val model = prepared.problem as? BakedProblem
         val preparationNanos = System.nanoTime() - opened
@@ -115,27 +115,27 @@ internal object WeightedSearchProfile {
                 previousQueries = queries
                 output.appendLine(
                     buildJsonObject {
-                    put("event", event)
-                    put("elapsedNs", System.nanoTime() - opened)
-                    put("floor", floor)
-                    put("cores", stats.cores)
-                    put("largestCore", stats.largestCore)
-                    put("coreWeight", weight.get(live).toString())
-                    put("coreSize", (core.get(live) as IntArray).size)
-                    put("threshold", threshold.get(live)?.toString())
-                    put("querySofts", (softs.get(live) as IntArray).size)
-                    put("incumbent", incumbent)
-                    put("witness", witness)
-                    put("work", live.work)
-                    put("nodes", live.stats.search.nodes.sum)
-                    put("propagationVisits", live.stats.search.propagationWork.sum)
-                    for ((name, field) in fields) put(name, field.getLong(live))
-                }.toString()
+                        put("event", event)
+                        put("elapsedNs", System.nanoTime() - opened)
+                        put("floor", floor)
+                        put("cores", stats.cores)
+                        put("largestCore", stats.largestCore)
+                        put("coreWeight", weight.get(live).toString())
+                        put("coreSize", (core.get(live) as IntArray).size)
+                        put("threshold", threshold.get(live)?.toString())
+                        put("querySofts", (softs.get(live) as IntArray).size)
+                        put("incumbent", incumbent)
+                        put("witness", witness)
+                        put("work", live.work)
+                        put("nodes", live.stats.search.nodes.sum)
+                        put("propagationVisits", live.stats.search.propagationWork.sum)
+                        for ((name, field) in fields) put(name, field.getLong(live))
+                    }.toString(),
                 )
                 output.flush()
             }
             val observing = stop or ExecutionControl {
-                observe("bound");
+                observe("bound")
                 false
             }
             val params = BacktrackParams(
@@ -181,27 +181,27 @@ internal object WeightedSearchProfile {
                             Reports.writeJson(
                                 out.resolve(requireNotNull(witness)).path,
                                 buildJsonObject {
-                                put("sourceSha256", hash)
-                                put("objectiveExact", incumbent)
-                                put(
-                                    "originalBooleanValues",
-                                    JsonArray(
-                                        (0 until sourceBooleans).map {
-                                    JsonPrimitive(point.boolValue(it))
-                                }
+                                    put("sourceSha256", hash)
+                                    put("objectiveExact", incumbent)
+                                    put(
+                                        "originalBooleanValues",
+                                        JsonArray(
+                                            (0 until sourceBooleans).map {
+                                                JsonPrimitive(point.boolValue(it))
+                                            },
+                                        ),
                                     )
-                                )
-                                put(
-                                    "loweredBooleanValues",
-                                    JsonArray(
-                                        (0 until source.numBoolVars).map {
-                                    JsonPrimitive(point.boolValue(it))
-                                }
+                                    put(
+                                        "loweredBooleanValues",
+                                        JsonArray(
+                                            (0 until source.numBoolVars).map {
+                                                JsonPrimitive(point.boolValue(it))
+                                            },
+                                        ),
                                     )
-                                )
-                                put("coordinateOrder", "source variable i+1 at index i")
-                                put("validation", "native-original-source")
-                            }
+                                    put("coordinateOrder", "source variable i+1 at index i")
+                                    put("validation", "native-original-source")
+                                },
                             )
                             checked++
                             observe("accepted-incumbent", true)
@@ -214,29 +214,29 @@ internal object WeightedSearchProfile {
             Reports.writeJson(
                 out.resolve("summary.json").path,
                 buildJsonObject {
-                put("suite", suite)
-                put("problem", problem)
-                put("sourceSha256", sha256(bytes))
-                put("policy", policy)
-                put("seed", seed)
-                put("maximumWork", maximumWork)
-                put("sliceWork", sliceWork)
-                put("containingMillis", timeout)
-                put("sourcePreparationNs", preparationNanos)
-                put("presolveVisits", budget.spent())
-                put("preparedBooleans", model?.numBoolVars)
-                put("preparedFactors", model?.numFactors)
-                put("preparedIntegers", model?.numIntVars)
-                put("result", result?.javaClass?.simpleName)
-                put("acceptedIncumbents", checked)
-                put("capturedWitnessValues", witnessValues)
-                put("slices", slices)
-                put("finalWork", handle?.work)
-                handle?.let { live -> for ((name, field) in fields) put(name, field.getLong(live)) }
-                put("elapsedNsIncludingClose", System.nanoTime() - opened)
-                put("sourceCheck", "native-Boolean-point-propagation")
-                put("independentProofCheck", false)
-            }
+                    put("suite", suite)
+                    put("problem", problem)
+                    put("sourceSha256", sha256(bytes))
+                    put("policy", policy)
+                    put("seed", seed)
+                    put("maximumWork", maximumWork)
+                    put("sliceWork", sliceWork)
+                    put("containingMillis", timeout)
+                    put("sourcePreparationNs", preparationNanos)
+                    put("presolveVisits", budget.spent())
+                    put("preparedBooleans", model?.numBoolVars)
+                    put("preparedFactors", model?.numFactors)
+                    put("preparedIntegers", model?.numIntVars)
+                    put("result", result?.javaClass?.simpleName)
+                    put("acceptedIncumbents", checked)
+                    put("capturedWitnessValues", witnessValues)
+                    put("slices", slices)
+                    put("finalWork", handle?.work)
+                    handle?.let { live -> for ((name, field) in fields) put(name, field.getLong(live)) }
+                    put("elapsedNsIncludingClose", System.nanoTime() - opened)
+                    put("sourceCheck", "native-Boolean-point-propagation")
+                    put("independentProofCheck", false)
+                },
             )
         }
     }

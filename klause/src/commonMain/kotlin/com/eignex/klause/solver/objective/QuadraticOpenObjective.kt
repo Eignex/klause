@@ -50,10 +50,10 @@ internal fun QuadraticObjectiveSpec.openPolynomial(
             step()
             PolynomialExpression.Product(
                 buildList {
-                add(PolynomialExpression.Constant.of(term.coefficient.numerator, term.coefficient.denominator))
-                add(coordinate(term.first))
-                term.second?.let { add(coordinate(it)) }
-            }
+                    add(PolynomialExpression.Constant.of(term.coefficient.numerator, term.coefficient.denominator))
+                    add(coordinate(term.first))
+                    term.second?.let { add(coordinate(it)) }
+                },
             )
         },
     )

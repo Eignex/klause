@@ -465,8 +465,8 @@ internal class LinearAuthority(
             relaxedPoint = relaxedPoint,
             paused = result.paused || (
                 result.evidence == null && result.split == null &&
-                result.incumbent == null && budget.funding?.paused == true
-            ),
+                    result.incumbent == null && budget.funding?.paused == true
+                ),
         )
     }
 
@@ -522,8 +522,8 @@ internal class LinearAuthority(
             primalStages = primalStages.toMap(),
             paused = result.paused || (
                 result.evidence == null && result.split == null &&
-                result.incumbent == null && budget.funding?.paused == true
-            ),
+                    result.incumbent == null && budget.funding?.paused == true
+                ),
         )
         capture?.record(source, capturedQuery, capturedTemplate, capturedPoint, completed)
         capturedQuery = null
@@ -616,9 +616,9 @@ internal class LinearAuthority(
                 it.matches(source) && (it.cuts != null) == cuts &&
                     (
                         !cuts || it.cuts?.complementary == (cutMask != null) ||
-                        pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
-                        it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }
-                    )
+                            pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
+                            it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }
+                        )
             }
                 ?: LinearAuthorityTemplate.prepare(
                     source,
@@ -945,9 +945,9 @@ internal class LinearAuthority(
                     val attained = (bound?.claim as? SourceClaim.Bound)?.value?.let { limit ->
                         val value = (
                             accepted.indices.fold(constant) { total, id ->
-                            total + costs[id] * accepted[id]
-                        }
-                        ) * sign
+                                total + costs[id] * accepted[id]
+                            }
+                            ) * sign
                         limit == SourceValue.Rational(value)
                     } == true
                     if (!attained && !attempt.refinementFinished) {

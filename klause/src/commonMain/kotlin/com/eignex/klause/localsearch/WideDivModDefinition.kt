@@ -89,8 +89,8 @@ internal fun wideDivModDefinitions(
                     (output in relation.quotient.coefficients && output in relation.remainder.coefficients) ||
                     !problem.intBounds.hasLower(output) || problem.intBounds.lower(output) == Long.MIN_VALUE
                 ) {
-                        continue
-                    }
+                    continue
+                }
                 definitions += WideDivModDefinition(relation, output, quotient, expression, weight, radix)
             }
         }

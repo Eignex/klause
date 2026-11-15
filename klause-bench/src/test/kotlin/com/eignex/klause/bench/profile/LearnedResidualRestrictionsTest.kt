@@ -59,11 +59,13 @@ class LearnedResidualRestrictionsTest {
     @Test
     fun `established PB weight should discharge its free bridge`() {
         val problem = Problem(
-            5, 0, emptyArray(),
+            5,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(1, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(4, true))),
-        )
+                Clause(intArrayOf(Lit.make(1, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(4, true))),
+            ),
         )
         val session = PropagationSession(problem, nativeSat = false)
         session.addLearnedPb(longArrayOf(5L, 2L, 3L), IntArray(3) { Lit.make(it, true) }, 5L, 2)
@@ -77,7 +79,7 @@ class LearnedResidualRestrictionsTest {
         assertEquals(
             2,
             recorder.summary().getValue("lastEnforcingIncidence").jsonObject
-            .getValue("allEnforcingComponents").jsonPrimitive.int
+                .getValue("allEnforcingComponents").jsonPrimitive.int,
         )
     }
 

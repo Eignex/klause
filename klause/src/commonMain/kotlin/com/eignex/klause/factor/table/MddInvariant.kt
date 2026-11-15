@@ -269,10 +269,10 @@ internal class MddInvariant(
                 it == current
             }
         ) {
-                weight
-            } else {
-                null
-            }
+            weight
+        } else {
+            null
+        }
     }
 
     private fun buildState(state: LocalSearchState): MddLsState {

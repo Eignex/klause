@@ -160,10 +160,10 @@ class SparseLpAdmissionTest {
         )
         val complete = requireNotNull(
             LpAutoConfig.admission(
-            problem,
-            LpConfig.parse("default,+sparse-trial"),
-            LpPlan(),
-        ).sparseTrial
+                problem,
+                LpConfig.parse("default,+sparse-trial"),
+                LpPlan(),
+            ).sparseTrial,
         )
         assertTrue(complete.admitted)
         for (chunks in 1..2) {
@@ -425,12 +425,12 @@ class SparseLpAdmissionTest {
             emptyArray(),
             listOf(
                 ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0)),
-                listOf(BigFraction.ONE),
-                LinearOp.GE,
-                BigFraction.ZERO,
-                strict = true,
-            )
+                    intArrayOf(Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE),
+                    LinearOp.GE,
+                    BigFraction.ZERO,
+                    strict = true,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
@@ -452,11 +452,11 @@ class SparseLpAdmissionTest {
             arrayOf(IntDomain(0, 1)),
             listOf(
                 ExactLinear.of(
-                intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE),
-                LinearOp.GE,
-                BigFraction.ONE,
-            )
+                    intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
+                    listOf(BigFraction.ONE, BigFraction.ONE),
+                    LinearOp.GE,
+                    BigFraction.ONE,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(0.0),
@@ -518,11 +518,11 @@ class SparseLpAdmissionTest {
         var emitted = false
         val projections = FactorProjectionProviders(
             relaxation = RelaxationProjectionProvider {
-            RelaxationProjection(RelaxationCapability.SOUND) { _, builder ->
-                emitted = true
-                builder.linearRow(LinearOp.LE, intArrayOf(0), longArrayOf(1), 1)
-            }
-        }
+                RelaxationProjection(RelaxationCapability.SOUND) { _, builder ->
+                    emitted = true
+                    builder.linearRow(LinearOp.LE, intArrayOf(0), longArrayOf(1), 1)
+                }
+            },
         ).prepare(problem)
         val sink = SolveStatsSink("custom-projection")
 

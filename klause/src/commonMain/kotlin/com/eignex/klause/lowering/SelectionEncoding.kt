@@ -34,11 +34,11 @@ internal fun <T> minMaxEncoding(
         val variables = intArrayOf(factor.result, operand)
         bounds += row(
             LinearRow.ofInts(
-            variables,
-            longArrayOf(1, -1),
-            if (factor.max) LinearOp.GE else LinearOp.LE,
-            0,
-        )
+                variables,
+                longArrayOf(1, -1),
+                if (factor.max) LinearOp.GE else LinearOp.LE,
+                0,
+            ),
         )
         equalities += row(LinearRow.ofInts(variables, longArrayOf(1, -1), LinearOp.EQ, 0))
     }
@@ -65,11 +65,11 @@ internal fun <T> realMinMaxEncoding(
         )
         bounds += row(
             LinearRow.ofColumns(
-            intArrayOf(),
-            variables,
-            constants,
-            if (factor.max) LinearOp.GE else LinearOp.LE,
-        )
+                intArrayOf(),
+                variables,
+                constants,
+                if (factor.max) LinearOp.GE else LinearOp.LE,
+            ),
         )
         equalities += row(LinearRow.ofColumns(intArrayOf(), variables, constants, LinearOp.EQ))
     }

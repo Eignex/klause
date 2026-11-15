@@ -20,8 +20,8 @@ internal fun quadraticScalar(
 ): MinimizeResult.BestFound {
     val value = point.value.rational?.toDouble() ?: (
         (point.value.lowerBound + point.value.upperBound) *
-        BigFraction.ofLong(2).reciprocal()
-    ).toDouble()
+            BigFraction.ofLong(2).reciprocal()
+        ).toDouble()
     return MinimizeResult.BestFound(
         point.sample,
         if (sense == ObjectiveSense.MINIMIZE) value else -value,

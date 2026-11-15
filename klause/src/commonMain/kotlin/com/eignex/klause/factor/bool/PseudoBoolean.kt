@@ -67,12 +67,11 @@ class PseudoBoolean private constructor(override val constants: IntegralConstant
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PSEUDO_BOOLEAN, ::buildKey)
 
-    override fun remapStructuralHash(mapping: VarRemap): Int =
-        if (integerConstants != null) {
-            hashRemappedKey(FactorKind.PSEUDO_BOOLEAN, mapping, ::buildKey)
-        } else {
-            remap(mapping).structuralKey().hashCode()
-        }
+    override fun remapStructuralHash(mapping: VarRemap): Int = if (integerConstants != null) {
+        hashRemappedKey(FactorKind.PSEUDO_BOOLEAN, mapping, ::buildKey)
+    } else {
+        remap(mapping).structuralKey().hashCode()
+    }
 
     private fun buildKey(sink: KeySink) {
         pseudoBooleanKey(sink, constants, literals, op)

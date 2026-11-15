@@ -80,8 +80,8 @@ internal object FixedWorkSatSuite : BenchSuite {
                     listOf(Source(parameters.getValue("source-path"), parameters.getValue("sha256")))
                 } else {
                     parameters.getValue("sources").split(',').map { entry ->
-                    Source(entry.substringAfter(':'), entry.substringBefore(':'))
-                }
+                        Source(entry.substringAfter(':'), entry.substringBefore(':'))
+                    }
                 }
                 require(sources.size in 1..MAX_SOURCES && sources.map { it.path }.distinct().size == sources.size) {
                     "1 to $MAX_SOURCES distinct sources"
@@ -217,10 +217,10 @@ internal object FixedWorkSatSuite : BenchSuite {
             put(
                 "process",
                 buildJsonObject {
-                put("exit", exit)
-                put("emergencyKilled", killed)
-                put("ceilingSeconds", options.processSeconds)
-            }
+                    put("exit", exit)
+                    put("emergencyKilled", killed)
+                    put("ceilingSeconds", options.processSeconds)
+                },
             )
             put("comparable", comparable)
             put("interrupted", interrupted)
@@ -228,12 +228,12 @@ internal object FixedWorkSatSuite : BenchSuite {
             put(
                 "warmupDigestsMatch",
                 if (measured == null || warmups.isEmpty()) {
-                JsonNull
-            } else {
-                JsonPrimitive(
-                warmups.all { it.digest() == measured.digest() },
-            )
-            }
+                    JsonNull
+                } else {
+                    JsonPrimitive(
+                        warmups.all { it.digest() == measured.digest() },
+                    )
+                },
             )
             put("warmups", JsonArray(warmups))
             put("measured", measured ?: JsonNull)
@@ -271,7 +271,7 @@ internal object FixedWorkSatSuite : BenchSuite {
         val message = when {
             !comparable ->
                 "Interrupted by the ${options.deadlineSeconds}s emergency deadline before the fixed-work " +
-                "limit; partial work is not comparable"
+                    "limit; partial work is not comparable"
 
             truncated -> "Retained trace rows are truncated; the digest still covers every event"
 

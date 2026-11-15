@@ -100,8 +100,8 @@ class PolynomialEquationalProjectionTest {
         assertEquals(0, projection.equationalSections)
         assertTrue(
             projection.polynomials(0).any {
-            arithmetic.substitute(it, 0, Polynomial.ONE).isZero
-        }
+                arithmetic.substitute(it, 0, Polynomial.ONE).isZero
+            },
         )
     }
 

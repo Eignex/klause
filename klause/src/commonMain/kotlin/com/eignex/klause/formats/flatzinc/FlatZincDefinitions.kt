@@ -79,11 +79,11 @@ private fun FlatZincCompiler.integerDefinition(c: FznConstraint, output: Int): D
                 null
             } else {
                 DefinitionHint.Linear(
-                output,
-                coefficients,
-                inputs,
-                bound,
-            )
+                    output,
+                    coefficients,
+                    inputs,
+                    bound,
+                )
             }
         }
 

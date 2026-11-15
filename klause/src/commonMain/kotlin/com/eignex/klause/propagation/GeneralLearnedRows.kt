@@ -30,11 +30,11 @@ internal class GeneralLearnedRows(state: PropagationState? = null) : AbstractLis
         rows[index, column] = value
     }
     fun payload(index: Int): Any? {
-        checkIndex(index);
+        checkIndex(index)
         return rows.payload(index)
     }
     fun setPayload(index: Int, value: Any?): Any? {
-        checkIndex(index);
+        checkIndex(index)
         return rows.setPayload(index, value)
     }
     fun admission(index: Int): Long = rows.admission(index)

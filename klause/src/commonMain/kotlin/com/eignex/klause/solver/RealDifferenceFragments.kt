@@ -174,12 +174,12 @@ private class RealDifferenceFragment(
             edge.selector?.let { selectors[result.size] = it }
             result.add(
                 DifferenceEdge(
-                edge.source,
-                edge.target,
-                numerator * multiplier - if (edge.strict) 1L else 0L,
-                edge.guard,
-                edge.domain,
-            )
+                    edge.source,
+                    edge.target,
+                    numerator * multiplier - if (edge.strict) 1L else 0L,
+                    edge.guard,
+                    edge.domain,
+                ),
             )
         }
         if (stop()) return null

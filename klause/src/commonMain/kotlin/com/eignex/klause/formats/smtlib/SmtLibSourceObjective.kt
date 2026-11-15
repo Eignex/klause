@@ -43,7 +43,7 @@ internal fun SmtLibPolynomialProblem.bindObjective(
     fun mapping(names: Map<String, Int>, retained: Map<String, Int>): IntArray {
         val canonical = retained.mapKeys { polynomialSymbol(it.key) }
         return names.keys.map {
-            cancellation.polynomialSourceCheckpoint();
+            cancellation.polynomialSourceCheckpoint()
             canonical.getValue(it)
         }.toIntArray()
     }

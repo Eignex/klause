@@ -17,8 +17,8 @@ class LocalSearchTrajectorySourceTest {
         val source = "<instance format=\"XCSP3\" type=\"CSP\"/>".encodeToByteArray()
         val payload = if (compressed) {
             ByteArrayOutputStream().apply {
-            GZIPOutputStream(this).use { it.write(source) }
-        }.toByteArray()
+                GZIPOutputStream(this).use { it.write(source) }
+            }.toByteArray()
         } else {
             source
         }
@@ -41,8 +41,8 @@ class LocalSearchTrajectorySourceTest {
         val source = "<instance/>".encodeToByteArray()
         val payload = if (compressed) {
             ByteArrayOutputStream().apply {
-            GZIPOutputStream(this).use { it.write(source) }
-        }.toByteArray()
+                GZIPOutputStream(this).use { it.write(source) }
+            }.toByteArray()
         } else {
             source
         }

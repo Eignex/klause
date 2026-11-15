@@ -735,7 +735,7 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
                     basis.basicVars,
                     { a.matrix[it] },
                     { work, bytes ->
-                        meter.step(work);
+                        meter.step(work)
                         if (bytes > 0L) meter.storage(bytes)
                     },
                     { reason -> throw ReconstructionLayoutStop(reason) },
@@ -1180,15 +1180,15 @@ internal fun certifyLpConflictOnly(
     val checked = certifyLpConflictOnlyWithin(model, ray, limits, cancellation, observation ?: observer, policy)
     observation?.finish(
         CertifiedLpResult(
-        null,
-        checked.bound,
-        null,
-        null,
-        checked.conflict,
-        false,
-        { null },
-        reconstruction = checked.metrics,
-    )
+            null,
+            checked.bound,
+            null,
+            null,
+            checked.conflict,
+            false,
+            { null },
+            reconstruction = checked.metrics,
+        ),
     )
     return checked
 }
@@ -1234,15 +1234,15 @@ internal fun certifyLpIntegerBoundOnly(
     val checked = certifyLpIntegerBoundWithin(model, duals, limits, cancellation, observation ?: observer, policy)
     observation?.finish(
         CertifiedLpResult(
-        null,
-        checked.bound,
-        null,
-        null,
-        null,
-        false,
-        { null },
-        reconstruction = checked.metrics,
-    )
+            null,
+            checked.bound,
+            null,
+            null,
+            null,
+            false,
+            { null },
+            reconstruction = checked.metrics,
+        ),
     )
     return checked
 }
@@ -1329,15 +1329,15 @@ internal fun certifyLpBoundOnly(
     val checked = certifyLpBoundOnlyWithin(model, duals, limits, cancellation, observation ?: observer, policy, basis)
     observation?.finish(
         CertifiedLpResult(
-        null,
-        checked.bound,
-        null,
-        null,
-        checked.conflict,
-        false,
-        { null },
-        reconstruction = checked.metrics,
-    )
+            null,
+            checked.bound,
+            null,
+            null,
+            checked.conflict,
+            false,
+            { null },
+            reconstruction = checked.metrics,
+        ),
     )
     return checked
 }

@@ -19,18 +19,19 @@ class SourceIntegerAggregateSplitTest {
     private val above = below.adjacentIntegerAbove()
     private val quarter = BigFraction.ofLong(4).reciprocal()
     private val source = SourceProofContext(
-        scope, setOf(x, y),
+        scope,
+        setOf(x, y),
         mapOf(
-        "lower" to SourcePremise(SourceInequality(form.mapValues { it.value.negated() }, quarter.negated())),
-        "upper" to SourcePremise(SourceInequality(form, BigFraction.ONE - quarter)),
-    )
+            "lower" to SourcePremise(SourceInequality(form.mapValues { it.value.negated() }, quarter.negated())),
+            "upper" to SourcePremise(SourceInequality(form, BigFraction.ONE - quarter)),
+        ),
     )
 
     private fun child(id: String, row: SourceInequality): SourceDerivation = SourceDerivation.Combination(
         listOf(
-        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise(id)),
-        SourceDerivation.Combination.Term(BigFraction.ONE, SourceIntegerRowAssumption(row)),
-    )
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise(id)),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceIntegerRowAssumption(row)),
+        ),
     )
 
     private fun proof(): SourceDerivation =
@@ -141,9 +142,9 @@ class SourceIntegerAggregateSplitTest {
             SourceEvidenceVerifier(context).verify(
                 evidence,
                 ExecutionControl {
-                polls++;
-                false
-            }
+                    polls++
+                    false
+                },
             ),
         )
 

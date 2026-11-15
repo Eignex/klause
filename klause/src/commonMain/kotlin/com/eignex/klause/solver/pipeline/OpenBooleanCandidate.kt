@@ -371,7 +371,7 @@ internal class SourceConjunctionHints private constructor(
                             var width = count
                             var levels = 0
                             while (width > 0) {
-                                width = width ushr 1;
+                                width = width ushr 1
                                 levels++
                             }
                             val sortingWork = count.toLong() * levels

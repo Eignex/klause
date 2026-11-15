@@ -96,8 +96,8 @@ internal class TranscendentalSourceCheck(
             val children = when (node) {
                 is TranscendentalDistinct -> listOf(
                     distincts.getOrPut(node) {
-                    transcendentalDistinctEncoding(node, arithmetic.transcendental::step)
-                }
+                        transcendentalDistinctEncoding(node, arithmetic.transcendental::step)
+                    },
                 )
 
                 is TranscendentalFormula.Not -> listOf(node.operand)

@@ -20,39 +20,41 @@ class IntegerConflictRowTest {
         for (guard in guards) {
             for (otherGuard in guards) {
                 for (bound in listOf(3L, 5L, 7L)) {
-            val retained = requireNotNull(
-                IntegerConflictRow.source(
-                    LinearPropagator(
-                intArrayOf(),
-                intArrayOf(0),
-                longArrayOf(2),
-                intArrayOf(0),
-                LinearOp.LE,
-                10,
-            ),
-                useLo = true, guard = guard
-                )
-            )
-            val candidate = requireNotNull(
-                IntegerConflictRow.source(
-                    LinearPropagator(
-                intArrayOf(),
-                intArrayOf(0),
-                longArrayOf(1),
-                intArrayOf(0),
-                LinearOp.LE,
-                bound,
-            ),
-                useLo = true, guard = otherGuard
-                )
-            )
+                    val retained = requireNotNull(
+                        IntegerConflictRow.source(
+                            LinearPropagator(
+                                intArrayOf(),
+                                intArrayOf(0),
+                                longArrayOf(2),
+                                intArrayOf(0),
+                                LinearOp.LE,
+                                10,
+                            ),
+                            useLo = true,
+                            guard = guard,
+                        ),
+                    )
+                    val candidate = requireNotNull(
+                        IntegerConflictRow.source(
+                            LinearPropagator(
+                                intArrayOf(),
+                                intArrayOf(0),
+                                longArrayOf(1),
+                                intArrayOf(0),
+                                LinearOp.LE,
+                                bound,
+                            ),
+                            useLo = true,
+                            guard = otherGuard,
+                        ),
+                    )
 
-            assertEquals(
-                bound >= 5 && (guard == Lit.NONE || guard == otherGuard),
-                retained.subsumes(candidate),
-                "guard=$guard otherGuard=$otherGuard bound=$bound",
-            )
-        }
+                    assertEquals(
+                        bound >= 5 && (guard == Lit.NONE || guard == otherGuard),
+                        retained.subsumes(candidate),
+                        "guard=$guard otherGuard=$otherGuard bound=$bound",
+                    )
+                }
             }
         }
     }
@@ -62,29 +64,29 @@ class IntegerConflictRowTest {
         val retained = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0, 1),
-            longArrayOf(1, -1),
-            intArrayOf(0, 1),
-            LinearOp.LE,
-            0,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0, 1),
+                    longArrayOf(1, -1),
+                    intArrayOf(0, 1),
+                    LinearOp.LE,
+                    0,
+                ),
+                useLo = true,
+            ),
         )
         for (coefficients in listOf(longArrayOf(1, 1), longArrayOf(-1, 1), longArrayOf(2, -1))) {
             val candidate = requireNotNull(
                 IntegerConflictRow.source(
                     LinearPropagator(
-                intArrayOf(),
-                intArrayOf(0, 1),
-                coefficients,
-                intArrayOf(0, 1),
-                LinearOp.LE,
-                1,
-            ),
-                useLo = true
-                )
+                        intArrayOf(),
+                        intArrayOf(0, 1),
+                        coefficients,
+                        intArrayOf(0, 1),
+                        LinearOp.LE,
+                        1,
+                    ),
+                    useLo = true,
+                ),
             )
 
             assertFalse(retained.subsumes(candidate))
@@ -96,24 +98,24 @@ class IntegerConflictRowTest {
         val row = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0, 1),
-            longArrayOf(2, -3),
-            intArrayOf(0, 1),
-            LinearOp.LE,
-            -1,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0, 1),
+                    longArrayOf(2, -3),
+                    intArrayOf(0, 1),
+                    LinearOp.LE,
+                    -1,
+                ),
+                useLo = true,
+            ),
         )
         val state = PropagationState(
             Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 10).excludeValue(5), IntDomain(0, 4)),
-            emptyArray(),
-        ),
-            Assumptions.None
+                0,
+                2,
+                arrayOf(IntDomain(0, 10).excludeValue(5), IntDomain(0, 4)),
+                emptyArray(),
+            ),
+            Assumptions.None,
         )
 
         assertTrue(row.assertsAt(state, 0))
@@ -124,15 +126,15 @@ class IntegerConflictRowTest {
         val row = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0),
-            longArrayOf(1),
-            intArrayOf(0),
-            LinearOp.LE,
-            3,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0),
+                    longArrayOf(1),
+                    intArrayOf(0),
+                    LinearOp.LE,
+                    3,
+                ),
+                useLo = true,
+            ),
         )
         val state = PropagationState(
             Problem(0, 1, arrayOf(IntDomain(0, 6).excludeValue(3)), emptyArray()),
@@ -149,15 +151,15 @@ class IntegerConflictRowTest {
         val row = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0),
-            longArrayOf(1),
-            intArrayOf(0),
-            LinearOp.LE,
-            3,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0),
+                    longArrayOf(1),
+                    intArrayOf(0),
+                    LinearOp.LE,
+                    3,
+                ),
+                useLo = true,
+            ),
         )
         val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 6)), emptyArray()), Assumptions.None)
         state.undoLogging = true
@@ -174,28 +176,28 @@ class IntegerConflictRowTest {
         val left = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0, 1),
-            longArrayOf(Long.MAX_VALUE, 1),
-            intArrayOf(0, 1),
-            LinearOp.LE,
-            Long.MAX_VALUE,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0, 1),
+                    longArrayOf(Long.MAX_VALUE, 1),
+                    intArrayOf(0, 1),
+                    LinearOp.LE,
+                    Long.MAX_VALUE,
+                ),
+                useLo = true,
+            ),
         )
         val right = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0, 2),
-            longArrayOf(-2, 1),
-            intArrayOf(0, 2),
-            LinearOp.LE,
-            0,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0, 2),
+                    longArrayOf(-2, 1),
+                    intArrayOf(0, 2),
+                    LinearOp.LE,
+                    0,
+                ),
+                useLo = true,
+            ),
         )
 
         assertFailsWith<CheckedLongOverflowException> { left.resolve(right, 0) }
@@ -206,15 +208,15 @@ class IntegerConflictRowTest {
         val row = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0, 1),
-            longArrayOf(Long.MAX_VALUE, 1),
-            intArrayOf(0, 1),
-            LinearOp.LE,
-            Long.MAX_VALUE,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0, 1),
+                    longArrayOf(Long.MAX_VALUE, 1),
+                    intArrayOf(0, 1),
+                    LinearOp.LE,
+                    Long.MAX_VALUE,
+                ),
+                useLo = true,
+            ),
         )
         val state = PropagationState(Problem(0, 2, Array(2) { IntDomain(1, 1) }, emptyArray()), Assumptions.None)
 
@@ -267,28 +269,28 @@ class IntegerConflictRowTest {
         val left = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0, 1, 2),
-            longArrayOf(2, 1, -1),
-            intArrayOf(0, 1, 2),
-            LinearOp.LE,
-            0,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0, 1, 2),
+                    longArrayOf(2, 1, -1),
+                    intArrayOf(0, 1, 2),
+                    LinearOp.LE,
+                    0,
+                ),
+                useLo = true,
+            ),
         )
         val right = requireNotNull(
             IntegerConflictRow.source(
                 LinearPropagator(
-            intArrayOf(),
-            intArrayOf(0, 1),
-            longArrayOf(2, -1),
-            intArrayOf(0, 1),
-            LinearOp.LE,
-            0,
-        ),
-            useLo = true
-            )
+                    intArrayOf(),
+                    intArrayOf(0, 1),
+                    longArrayOf(2, -1),
+                    intArrayOf(0, 1),
+                    LinearOp.LE,
+                    0,
+                ),
+                useLo = true,
+            ),
         )
 
         val row = requireNotNull(left.resolve(right, 1))
@@ -296,13 +298,13 @@ class IntegerConflictRowTest {
         for (x in 0L..6L) {
             for (y in 0L..12L) {
                 for (z in 0L..24L) {
-            if (2 * x + y <= z && 2 * x - y <= 0) {
-                val assignment = longArrayOf(x, y, z)
-                var activity = 0L
-                for (i in row.variables.indices) activity += row.coefficients[i] * assignment[row.variables[i]]
-                assertTrue(activity <= row.bound)
-            }
-        }
+                    if (2 * x + y <= z && 2 * x - y <= 0) {
+                        val assignment = longArrayOf(x, y, z)
+                        var activity = 0L
+                        for (i in row.variables.indices) activity += row.coefficients[i] * assignment[row.variables[i]]
+                        assertTrue(activity <= row.bound)
+                    }
+                }
             }
         }
     }

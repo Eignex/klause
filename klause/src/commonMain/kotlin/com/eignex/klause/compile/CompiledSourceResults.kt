@@ -16,11 +16,11 @@ internal fun CompiledSourceBinding.bindResult(
     val native = execution.result
     fun interrupted(): QuadraticOptimizationExecution = native.copy(
         result = QuadraticOptimizationResult.Unknown(
-        null,
-        stopped(),
-        native.result.sense,
-        native.result.stats,
-    )
+            null,
+            stopped(),
+            native.result.sense,
+            native.result.stats,
+        ),
     )
     if (stop()) return interrupted()
     fun sample(point: Sample): Sample {

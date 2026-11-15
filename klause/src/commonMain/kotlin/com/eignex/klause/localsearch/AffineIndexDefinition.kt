@@ -114,10 +114,10 @@ private class AffineIndexInference(
         return when (this) {
             is Element -> idx == v && result != v && (
                 !arrIsVars || arr.none {
-                if (cancellation.definitionStopped()) return false
-                it == v.toLong()
-            }
-            )
+                    if (cancellation.definitionStopped()) return false
+                    it == v.toLong()
+                }
+                )
 
             is ReifiedLinear -> op == LinearOp.EQ && vars.size == 1 && vars[0] == v &&
                 integerConstants?.coeff(0) == 1L

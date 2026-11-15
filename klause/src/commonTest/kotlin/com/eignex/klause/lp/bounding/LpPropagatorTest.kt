@@ -188,7 +188,7 @@ class LpPropagatorTest {
             object : LpSearchPolicy {},
             cancellation = ExecutionControl { stopped },
             queryWorkAllowance = {
-                queries++;
+                queries++
                 100_000L
             },
             onPreparation = { reported += it.workOps },
@@ -209,10 +209,12 @@ class LpPropagatorTest {
     @Test
     fun `declined source preparation should report its spent work`() {
         val problem = Problem(
-            0, 8, Array(8) { IntDomain(0, 3) },
+            0,
+            8,
+            Array(8) { IntDomain(0, 3) },
             arrayOf(
-            Linear(IntArray(8) { 1 }, IntArray(8) { it }, LinearOp.GE, 1),
-        )
+                Linear(IntArray(8) { 1 }, IntArray(8) { it }, LinearOp.GE, 1),
+            ),
         )
         val sources = LpRetainedSources(problem, CpToLpRelaxation(problem, LinearObjective()))
         var reported = 0L
@@ -237,9 +239,9 @@ class LpPropagatorTest {
         val sources = LpRetainedSources(
             problem,
             CpToLpRelaxation(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1L)),
-        )
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1L)),
+            ),
         )
         var reported = 0L
         LpPropagator(object : LpSearchPolicy {}, onPreparation = { reported += it.workOps }).use { lp ->

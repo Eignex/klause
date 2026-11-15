@@ -17,14 +17,15 @@ class TranscendentalTheoryRequest internal constructor(
         val result = OpenTheoryPipeline.execute(
             this,
             TranscendentalTheoryParams(
-            maximumWork = params.maximumWork,
-            maximumDenseCoefficients = params.maximumDenseCoefficients,
-            maximumMatrixCells = params.maximumMatrixCells,
-            timeout = params.timeout,
-            cancellation = params.cancellation,
-            strategy = params.strategy,
-        ),
-            engine, cores
+                maximumWork = params.maximumWork,
+                maximumDenseCoefficients = params.maximumDenseCoefficients,
+                maximumMatrixCells = params.maximumMatrixCells,
+                timeout = params.timeout,
+                cancellation = params.cancellation,
+                strategy = params.strategy,
+            ),
+            engine,
+            cores,
         )
         return PolynomialTheoryExecution(
             result.result,
@@ -106,16 +107,16 @@ fun OpenTheoryPipeline.execute(
     require(cores > 0)
     return (
         if (request.problem.hasObjective || !params.supportsInvocation(engine)) {
-        TranscendentalTheoryExecution(
-            OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
-            0,
-            false,
-        )
-    } else if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
-        TranscendentalPortfolioInvocation(request, params, engine, cores).execute()
-    } else {
-        TranscendentalWorkerAdapter(request.problem, params, engine).use { it.execute() }
-    }
+            TranscendentalTheoryExecution(
+                OpenTheoryResult.Unknown(TerminationReason.Unsupported, SolveStats.EMPTY),
+                0,
+                false,
+            )
+        } else if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
+            TranscendentalPortfolioInvocation(request, params, engine, cores).execute()
+        } else {
+            TranscendentalWorkerAdapter(request.problem, params, engine).use { it.execute() }
+        }
         )
         .withSourceSemantics(request.problem.semantics)
 }

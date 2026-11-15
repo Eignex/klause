@@ -86,9 +86,10 @@ class DifferenceSearchComponent private constructor(
         modelIntVars: IntArray = IntArray(model.numIntVars) { it },
     ) : this(
         requireNotNull(projections.linearTheoryModel(EncodingTarget.DIFFERENCE)) {
-        "unsupported selected difference encoding"
-    }.also { projections.requireSource(model) },
-        modelIntVars, intArrayOf()
+            "unsupported selected difference encoding"
+        }.also { projections.requireSource(model) },
+        modelIntVars,
+        intArrayOf(),
     )
 
     override fun initialize(context: SearchContext): ComponentResult {

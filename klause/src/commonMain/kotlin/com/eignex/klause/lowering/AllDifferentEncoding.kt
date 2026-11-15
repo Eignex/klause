@@ -20,10 +20,11 @@ internal fun allDifferentLinearFormula(factor: AllDifferent, cancellation: Execu
         LinearEncodingFormula.Comparison(
             EncodingAffineExpression(
                 terms.map { (term, coefficient) ->
-            EncodingLinearTerm.source(term, coefficient)
-        }
+                    EncodingLinearTerm.source(term, coefficient)
+                },
             ),
-            op, bound
+            op,
+            bound,
         )
     val clauses = ArrayList<LinearEncodingFormula>()
     for (i in factor.vars.indices) {
@@ -34,10 +35,10 @@ internal fun allDifferentLinearFormula(factor: AllDifferent, cancellation: Execu
             val b = Term.ofIntVar(factor.vars[j])
             val choices = arrayListOf<LinearEncodingFormula>(
                 comparison(
-                listOf(a to BigFraction.ONE, b to BigFraction.ONE.negated()),
-                LinearOp.NE,
-                BigFraction.ZERO,
-            )
+                    listOf(a to BigFraction.ONE, b to BigFraction.ONE.negated()),
+                    LinearOp.NE,
+                    BigFraction.ZERO,
+                ),
             )
             for (position in intArrayOf(i, j)) {
                 if (factor.presents.isNotEmpty()) {

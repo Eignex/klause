@@ -490,9 +490,9 @@ data class BacktrackParams(
         require(
             listOf(
                 inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
-            inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval,
-            inprocessingCooldown, inprocessingWarmupWork, inprocessingProbeInterval,
-            ).all { it >= 0L }
+                inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval,
+                inprocessingCooldown, inprocessingWarmupWork, inprocessingProbeInterval,
+            ).all { it >= 0L },
         ) {
             "inprocessing work limits must be nonnegative"
         }

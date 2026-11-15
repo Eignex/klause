@@ -33,10 +33,10 @@ internal class SourceRateReward(val priceFamilies: Boolean = false, families: Li
         familyReward = if (familyAccount != null &&
             (progress.phase != PortfolioPhase.FEASIBILITY || accepted != null)
         ) {
-                0.0
-            } else {
-                null
-            }
+            0.0
+        } else {
+            null
+        }
         if (!progress.idleCredit) {
             val cost = progress.nanos.coerceAtLeast(0L).toDouble() +
                 progress.constructionNanos.coerceAtLeast(0L)

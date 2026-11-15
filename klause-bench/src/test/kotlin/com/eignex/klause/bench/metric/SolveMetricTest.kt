@@ -275,7 +275,7 @@ class SolveMetricTest {
             "now",
             "fixture",
             installedBuild = {
-                nanos += 30_000_000;
+                nanos += 30_000_000
                 null
             },
             invoke = { _, supplied, allowance, _ ->

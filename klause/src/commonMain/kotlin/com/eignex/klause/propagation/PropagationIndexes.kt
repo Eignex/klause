@@ -99,14 +99,14 @@ internal class PropagationIndexes(
             @Suppress("UNCHECKED_CAST")
             yield(
                 PropagationIndexes(
-                bools as Array<IntArray>,
-                ints as Array<IntArray>,
-                nonBools as Array<IntArray>,
-                nonInts as Array<IntArray>,
-                events,
-                deltas,
-                clausal,
-            )
+                    bools as Array<IntArray>,
+                    ints as Array<IntArray>,
+                    nonBools as Array<IntArray>,
+                    nonInts as Array<IntArray>,
+                    events,
+                    deltas,
+                    clausal,
+                ),
             )
         }
     }

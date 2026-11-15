@@ -32,12 +32,12 @@ class NValueInvariantTest {
                 intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
                 factors = arrayOf(
                     NValue(
-                    0,
-                    intArrayOf(0, 1, 1),
-                    mode,
-                    presents = intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(0, false)),
-                    exceptSet = longArrayOf(0, 2),
-                )
+                        0,
+                        intArrayOf(0, 1, 1),
+                        mode,
+                        presents = intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(0, false)),
+                        exceptSet = longArrayOf(0, 2),
+                    ),
                 ),
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))

@@ -182,34 +182,34 @@ internal class LinearAuthorityTraversal(
             "numericalLpReuses" to authority.reuses,
         ) + (
             aggregateBranches?.let {
-            mapOf(
-                "numericalAggregateBranchWork" to it.work,
-                "numericalAggregateBranchAllocation" to it.allocation,
-                "numericalAggregateBranchProposals" to it.proposals,
-            )
-        } ?: emptyMap()
-        ) +
+                mapOf(
+                    "numericalAggregateBranchWork" to it.work,
+                    "numericalAggregateBranchAllocation" to it.allocation,
+                    "numericalAggregateBranchProposals" to it.proposals,
+                )
+            } ?: emptyMap()
+            ) +
         (
             feedback?.let {
-            mapOf(
-                "numericalFeedbackCollections" to it.collections,
-                "numericalFeedbackLateCollections" to it.lateCollections,
-                "numericalFeedbackUnavailable" to it.unavailable,
-                "numericalFeedbackCutEvaluations" to it.evaluatedCuts,
-                "numericalFeedbackArithmeticTerms" to it.evaluatedTerms,
-            )
-        } ?: emptyMap()
-        ) +
+                mapOf(
+                    "numericalFeedbackCollections" to it.collections,
+                    "numericalFeedbackLateCollections" to it.lateCollections,
+                    "numericalFeedbackUnavailable" to it.unavailable,
+                    "numericalFeedbackCutEvaluations" to it.evaluatedCuts,
+                    "numericalFeedbackArithmeticTerms" to it.evaluatedTerms,
+                )
+            } ?: emptyMap()
+            ) +
         (
             supportBranching?.let {
-            mapOf(
-                "numericalSupportConsultations" to it.consultations,
-                "numericalSupportSelections" to it.selections,
-                "numericalSupportFallbacks" to it.fallbacks,
-            )
-        }
-            ?: emptyMap()
-        ) + refutations?.observations().orEmpty()
+                mapOf(
+                    "numericalSupportConsultations" to it.consultations,
+                    "numericalSupportSelections" to it.selections,
+                    "numericalSupportFallbacks" to it.fallbacks,
+                )
+            }
+                ?: emptyMap()
+            ) + refutations?.observations().orEmpty()
 
     private fun observe(stage: String) {
         observations[stage] = (observations[stage] ?: 0L) + 1L
@@ -235,10 +235,10 @@ internal class LinearAuthorityTraversal(
         budget.funding?.charge(
             0L,
             1024L + 256L *
-            (
-                condition.bools.size.toLong() + condition.lower.size + condition.upper.size +
-                condition.integerRows.sumOf { it.supportSize.toLong() + 1L }
-            )
+                (
+                    condition.bools.size.toLong() + condition.lower.size + condition.upper.size +
+                        condition.integerRows.sumOf { it.supportSize.toLong() + 1L }
+                    ),
         )
         peakPending = maxOf(peakPending, pending)
     }

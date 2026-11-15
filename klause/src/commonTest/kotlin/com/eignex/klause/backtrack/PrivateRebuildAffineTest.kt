@@ -25,11 +25,11 @@ class PrivateRebuildAffineTest {
         val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
         val generation = assertNotNull(
             PrivateRebuildGeneration.prepare(
-            session,
-            1_048_576L,
-            ExecutionControl.Never,
-            parity = captured,
-        )
+                session,
+                1_048_576L,
+                ExecutionControl.Never,
+                parity = captured,
+            ),
         )
         val privatePoint = BooleanArray(72) { it == 70 }
 
@@ -39,8 +39,8 @@ class PrivateRebuildAffineTest {
         assertEquals(true, lifted.boolValue(70))
         assertTrue(
             clauses.all { factor ->
-            (factor as Clause).literals.any { Lit.evaluate(it, lifted.boolValue(Lit.variable(it))) }
-        }
+                (factor as Clause).literals.any { Lit.evaluate(it, lifted.boolValue(Lit.variable(it))) }
+            },
         )
     }
 }

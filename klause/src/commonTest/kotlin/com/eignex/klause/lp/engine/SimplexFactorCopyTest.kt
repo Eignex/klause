@@ -53,10 +53,10 @@ class SimplexFactorCopyTest {
                     intArrayOf(if (mismatch == "column") 1 else 0),
                     intArrayOf(
                         when (mismatch) {
-                        "unit" -> 0;
-                        "sentinel" -> -2;
-                        else -> -1
-                    }
+                            "unit" -> 0
+                            "sentinel" -> -2
+                            else -> -1
+                        },
                     ),
                 )
                 val target = if (mismatch == "matrix") {
@@ -67,12 +67,12 @@ class SimplexFactorCopyTest {
 
                 assertFalse(
                     copy.install(
-                    owner,
-                    target,
-                    1,
-                    if (mismatch == "storage") offer.entries - 1L else offer.entries,
-                    10_000L,
-                ) { mismatch == "cancel" }
+                        owner,
+                        target,
+                        1,
+                        if (mismatch == "storage") offer.entries - 1L else offer.entries,
+                        10_000L,
+                    ) { mismatch == "cancel" },
                 )
 
                 assertNull(owner.current)

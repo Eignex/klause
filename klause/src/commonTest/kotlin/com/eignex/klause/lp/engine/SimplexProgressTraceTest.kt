@@ -34,14 +34,14 @@ class SimplexProgressTraceTest {
             if (trace.iteration(SimplexPhase.PRIMAL_FEASIBILITY)) {
                 trace.samples.add(
                     SimplexProgressSample(
-                    SimplexPhase.PRIMAL_FEASIBILITY,
-                    it,
-                    0L,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0,
-                )
+                        SimplexPhase.PRIMAL_FEASIBILITY,
+                        it,
+                        0L,
+                        0.0,
+                        0.0,
+                        0.0,
+                        0,
+                    ),
                 )
             }
         }
@@ -192,13 +192,13 @@ class SimplexProgressTraceTest {
                         assertTrue(
                             owner.append(
                                 LpScopedRow(
-                            1L,
-                            listOf(0 to ExactLpNumber.of(-1L), 1 to ExactLpNumber.of(-1L)),
-                            ExactLpNumber.of(-6L),
-                            ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
-                        ),
-                            true
-                            )
+                                    1L,
+                                    listOf(0 to ExactLpNumber.of(-1L), 1 to ExactLpNumber.of(-1L)),
+                                    ExactLpNumber.of(-6L),
+                                    ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
+                                ),
+                                true,
+                            ),
                         )
                     }
                 }

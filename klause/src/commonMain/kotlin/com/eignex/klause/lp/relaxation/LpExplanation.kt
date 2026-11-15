@@ -260,7 +260,9 @@ internal object LpExplanation {
         val dot = Int128()
         model.forEachInColumn(column) { row, value -> dot.addProduct(ray[row], value) }
         if (dot.overflow) return null
-        return if (dot.hi == 0L && dot.lo == 0L) 0 else if (dot.isNonNegative()) {
+        return if (dot.hi == 0L && dot.lo == 0L) {
+            0
+        } else if (dot.isNonNegative()) {
             1
         } else {
             -1
@@ -447,7 +449,9 @@ internal object LpExplanation {
             upper == strict -> value.ceilInteger()
             else -> -value.negated().ceilInteger()
         }
-        return if (!strict) rounded else if (upper) {
+        return if (!strict) {
+            rounded
+        } else if (upper) {
             rounded - BIG_ONE
         } else {
             rounded + BIG_ONE

@@ -42,8 +42,8 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
                 reason,
             )
         ) {
-                return false
-            }
+            return false
+        }
         // Within each nonzero divisor sign, quotient extrema lie at operand interval endpoints.
         val divisors = if (constant != null) {
             listOf(constant)
@@ -76,8 +76,8 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
                 reason,
             )
         ) {
-                return false
-            }
+            return false
+        }
         val currentA = state.intDomains[relation.dividend]
         if (!tighten(
                 state,
@@ -87,8 +87,8 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
                 reason,
             )
         ) {
-                return false
-            }
+            return false
+        }
         if (divisor != null && !filterDivisor(state, divisor, reason)) return false
         return filterTuples(state, factorId, reason)
     }
@@ -109,8 +109,8 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
                 reason,
             )
         ) {
-                return false
-            }
+            return false
+        }
         if (currentB.max < 0L && !tighten(
                 state,
                 divisor,
@@ -119,8 +119,8 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
                 reason,
             )
         ) {
-                return false
-            }
+            return false
+        }
         val currentQ = state.intDomains[relation.quotient]
         if (currentQ.min == currentQ.max && currentQ.min != 0L) {
             val dividend = state.intDomains[relation.dividend]

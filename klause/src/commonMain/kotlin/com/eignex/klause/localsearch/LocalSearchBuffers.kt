@@ -81,22 +81,22 @@ internal class LocalSearchBuffers(
             }
             yield(
                 LocalSearchBuffers(
-                checkNotNull(assignment),
-                checkNotNull(violated),
-                factorDegree,
-                intPayload,
-                longPayload,
-                refPayload,
-                doublePayload,
-                checkNotNull(tabu),
-                cachedBoolBreakCount,
-                cachedBoolMakeCount,
-                boolConfChange,
-                intConfChange,
-                confNeighbours,
-                probeTouched,
-                probeWasViolated,
-            )
+                    checkNotNull(assignment),
+                    checkNotNull(violated),
+                    factorDegree,
+                    intPayload,
+                    longPayload,
+                    refPayload,
+                    doublePayload,
+                    checkNotNull(tabu),
+                    cachedBoolBreakCount,
+                    cachedBoolMakeCount,
+                    boolConfChange,
+                    intConfChange,
+                    confNeighbours,
+                    probeTouched,
+                    probeWasViolated,
+                ),
             )
         }
     }

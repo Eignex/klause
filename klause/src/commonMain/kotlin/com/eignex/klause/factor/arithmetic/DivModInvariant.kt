@@ -29,10 +29,10 @@ internal class DivModInvariant(private val relation: DivMod) : Invariant {
                 ?: return compressViolation(Long.MAX_VALUE, state.violationSoftCap)
             return compressViolation(
                 saturatedAdd(
-                distance(outputs.first, value(relation.quotient)),
-                distance(outputs.second, value(relation.remainder)),
-            ),
-                state.violationSoftCap
+                    distance(outputs.first, value(relation.quotient)),
+                    distance(outputs.second, value(relation.remainder)),
+                ),
+                state.violationSoftCap,
             )
         }
         val outputs = relation.outputs(
@@ -44,10 +44,10 @@ internal class DivModInvariant(private val relation: DivMod) : Invariant {
             if (expected.fitsLong()) distance(expected.toLongExact(), actual) else Long.MAX_VALUE
         return compressViolation(
             saturatedAdd(
-            error(outputs.first, value(relation.quotient)),
-            error(outputs.second, value(relation.remainder)),
-        ),
-            state.violationSoftCap
+                error(outputs.first, value(relation.quotient)),
+                error(outputs.second, value(relation.remainder)),
+            ),
+            state.violationSoftCap,
         )
     }
 

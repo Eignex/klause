@@ -77,8 +77,8 @@ internal class PortfolioIncumbents<V>(
                     val value = exactValue(item)
                     value.rational?.toDouble() ?: (
                         (value.lowerBound + value.upperBound) *
-                        BigFraction.ofLong(2).reciprocal()
-                    ).toDouble()
+                            BigFraction.ofLong(2).reciprocal()
+                        ).toDouble()
                 },
                 gain = { standing, candidate ->
                     (exactValue(standing).lowerBound - exactValue(candidate).upperBound).toDouble().coerceAtLeast(0.0)

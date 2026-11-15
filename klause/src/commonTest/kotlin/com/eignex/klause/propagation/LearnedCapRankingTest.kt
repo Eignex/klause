@@ -18,20 +18,20 @@ class LearnedCapRankingTest {
         val policy = object : LearnedCapPolicy {
             override fun alive(index: Int): Boolean = alive[index]
             override fun lbd(index: Int): Int {
-                budget.visit();
+                budget.visit()
                 return 9 - index
             }
             override fun prepare(index: Int): Boolean {
-                budget.visit(CAP_ROW_POLICY_WORK);
+                budget.visit(CAP_ROW_POLICY_WORK)
                 return true
             }
             override fun keep(index: Int): Boolean {
-                classified[index]++;
+                classified[index]++
                 return false
             }
             override fun retire(index: Int): Boolean {
-                budget.visit(8L);
-                alive[index] = false;
+                budget.visit(8L)
+                alive[index] = false
                 return true
             }
             override fun visited() = Unit
@@ -61,17 +61,17 @@ class LearnedCapRankingTest {
         val policy = object : LearnedCapPolicy {
             override fun alive(index: Int): Boolean = alive[index]
             override fun lbd(index: Int): Int {
-                budget.visit();
+                budget.visit()
                 return 9 - index
             }
             override fun prepare(index: Int): Boolean {
-                budget.visit(CAP_ROW_POLICY_WORK);
+                budget.visit(CAP_ROW_POLICY_WORK)
                 return true
             }
             override fun keep(index: Int): Boolean = false
             override fun retire(index: Int): Boolean {
-                budget.visit(8L);
-                alive[index] = false;
+                budget.visit(8L)
+                alive[index] = false
                 return true
             }
             override fun visited() = Unit
@@ -102,17 +102,17 @@ class LearnedCapRankingTest {
         val policy = object : LearnedCapPolicy {
             override fun alive(index: Int): Boolean = alive[index]
             override fun lbd(index: Int): Int {
-                budget.visit();
+                budget.visit()
                 return index + 1
             }
             override fun prepare(index: Int): Boolean {
-                budget.visit(CAP_ROW_POLICY_WORK);
+                budget.visit(CAP_ROW_POLICY_WORK)
                 return true
             }
             override fun keep(index: Int): Boolean = false
             override fun retire(index: Int): Boolean {
-                budget.visit(8L);
-                alive[index] = false;
+                budget.visit(8L)
+                alive[index] = false
                 return true
             }
             override fun visited() = Unit

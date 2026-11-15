@@ -47,8 +47,8 @@ class Xcsp3Test {
             Xcsp3.parse(
                 xml,
                 semanticOverrides = SemanticOverrides(
-                undeclaredIntegers = BoundsOverride(lower = BoundOverride.Open),
-            )
+                    undeclaredIntegers = BoundsOverride(lower = BoundOverride.Open),
+                ),
             )
         }
 

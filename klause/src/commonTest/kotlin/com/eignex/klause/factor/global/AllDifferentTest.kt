@@ -45,17 +45,17 @@ class AllDifferentTest {
             val duplicate = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO, 2 to BigFraction.ofLong(2))
             assertIs<ExactNeighborhoodResult.Refuted>(
                 it.check(
-                ExactNeighborhoodCondition(emptyMap(), duplicate, duplicate),
-                ExecutionControl.Never,
-            )
+                    ExactNeighborhoodCondition(emptyMap(), duplicate, duplicate),
+                    ExecutionControl.Never,
+                ),
             )
             val distinct = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ZERO, 2 to BigFraction.ofLong(2))
 
             val sample = assertIs<ExactNeighborhoodResult.Witness>(
                 it.check(
-                ExactNeighborhoodCondition(emptyMap(), distinct, distinct),
-                ExecutionControl.Never,
-            )
+                    ExactNeighborhoodCondition(emptyMap(), distinct, distinct),
+                    ExecutionControl.Never,
+                ),
             ).sample
 
             assertEquals(BigFraction.ONE, sample.exactReals?.single())

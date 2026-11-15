@@ -547,15 +547,14 @@ internal fun FinitePipeline.solve(
         nativeSourceMinimum: MinimizeResult? = null,
         completeSearchAdmitted: Boolean? = null,
         nativeObjectiveBound: FiniteObjectiveBound? = null,
-    ): FiniteSolveResult =
-        (
-            gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
+    ): FiniteSolveResult = (
+        gridPublication?.result(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
             ?: FiniteSolveResult(preparation, elapsed, outcome, nativeSourceResult, nativeSourceMinimum)
         )
-            .also {
-                it.bindCompleteSearchAdmission(completeSearchAdmitted)
-                if (gridPublication == null) it.nativeObjectiveBound = nativeObjectiveBound
-            }
+        .also {
+            it.bindCompleteSearchAdmission(completeSearchAdmitted)
+            if (gridPublication == null) it.nativeObjectiveBound = nativeObjectiveBound
+        }
     if (request.shape.sourceInvocation != null && stop()) {
         return result(
             FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
@@ -637,9 +636,9 @@ internal fun FinitePipeline.solve(
     val sourceCheck: ((Sample) -> Boolean)? = if (linearSource == null) {
         (
             request.toleranceCheck ?: invocation?.takeIf { gridPublication == null }?.let {
-            capturedRealAcceptance(it.source.problem, stop)
-        }
-        )?.let { check ->
+                capturedRealAcceptance(it.source.problem, stop)
+            }
+            )?.let { check ->
             FiniteSourceAcceptance(
                 check,
                 permitsToleranceOptimum && check.permitsToleranceOptimum(),
@@ -1188,7 +1187,7 @@ private fun executePortfolio(
     val admission = request.executionOptions.reader()[ExecutionOption.companionAdmission]
     val adaptiveCompanionRepair = when (
         val repair =
-        request.executionOptions.reader()[ExecutionOption.companionRepair]
+            request.executionOptions.reader()[ExecutionOption.companionRepair]
     ) {
         null, "fixed" -> false
         "adaptive" -> true
@@ -1196,7 +1195,7 @@ private fun executePortfolio(
     }
     val bufferedPublications = when (
         val publications =
-        request.executionOptions.reader()[ExecutionOption.portfolioPublications]
+            request.executionOptions.reader()[ExecutionOption.portfolioPublications]
     ) {
         null, "immediate" -> false
         "segment" -> true
@@ -1262,9 +1261,9 @@ private fun executePortfolio(
         pipelineConfigError("portfolio-proof-share must be finite and in [0.5, 1]")
     }
     if (proofCoverageConfigured && (
-        !request.optimize || request.cores != 1 ||
-            request.engine !in setOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK)
-    )
+            !request.optimize || request.cores != 1 ||
+                request.engine !in setOf(FiniteEngine.MIXED, FiniteEngine.BACKTRACK)
+            )
     ) {
         pipelineConfigError("portfolio proof coverage requires curated single-core finite optimization")
     }
@@ -1296,33 +1295,33 @@ private fun executePortfolio(
         ),
     )
     if (proofCoverageConfigured && (
-        plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
-            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null
-    )
+            plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+                plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null
+            )
     ) {
         pipelineConfigError("portfolio proof coverage requires a curated recipe pool")
     }
     if (deferLpProbes && (
-        plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
-            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
-            plan.scenario.annotationArm != null
-    )
+            plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+                plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
+                plan.scenario.annotationArm != null
+            )
     ) {
         pipelineConfigError("portfolio-lp-start requires a curated recipe pool")
     }
     if (probePolicy != InitialProbePolicy.ORDINARY && (
-        plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
-            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
-            (probePolicy != InitialProbePolicy.HEURISTIC_SECOND && plan.scenario.annotationArm != null)
-    )
+            plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+                plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
+                (probePolicy != InitialProbePolicy.HEURISTIC_SECOND && plan.scenario.annotationArm != null)
+            )
     ) {
         pipelineConfigError("portfolio-probes requires a curated recipe pool")
     }
     if (bufferedPublications && (
-        plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
-            plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
-            plan.scenario.annotationArm != null
-    )
+            plan !is PortfolioPlan.Execute || plan.scenario.explicitArms ||
+                plan.scenario.btPool != null || plan.scenario.lsPool != null || plan.scenario.btEdit != null ||
+                plan.scenario.annotationArm != null
+            )
     ) {
         pipelineConfigError("portfolio-publications requires a curated recipe pool")
     }
@@ -1360,12 +1359,12 @@ private fun executePortfolio(
         request.onPortfolioEvent?.invoke(
             "portfolio",
             SearchEvent.WorkerAdmission(
-            "core-guided/weighted-default",
-            admitted = true,
-            requirements = "bounded early trial with historical-reason refinement",
-            declines = emptyList(),
-            selected = true,
-        )
+                "core-guided/weighted-default",
+                admitted = true,
+                requirements = "bounded early trial with historical-reason refinement",
+                declines = emptyList(),
+                selected = true,
+            ),
         )
     }
     val executor = FinitePipeline.portfolioExecutor(

@@ -413,7 +413,7 @@ internal class LinearAuthorityCapture(
             if (full) values?.toMap() else values, candidates.toList(),
             if (full) template?.cuts?.observations.orEmpty().toMap() else emptyMap(), result.bound,
             retainedRefutation,
-                when {
+            when {
                 refutation != null -> "checked-refutation"
                 open && query != null -> "active-no-refutation"
                 open -> "open-booleans"
@@ -422,7 +422,7 @@ internal class LinearAuthorityCapture(
                 result.bound == null -> "bound-unavailable"
                 else -> "completed"
             },
-                projection = projection, generationScope = generationScope,
+            projection = projection, generationScope = generationScope,
         )
         if (archive) {
             retained += captured

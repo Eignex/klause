@@ -46,8 +46,8 @@ internal class MonotoneClausePrimal private constructor(
         override fun isCancelled(): Boolean = lifetime() || params.nodeBudget?.allowance?.exhausted() == true ||
             (
                 !lifetime.workScheduled() &&
-                activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis
-            )
+                    activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis
+                )
         override fun deadline() = lifetime.deadline()
     }
     private var closed = false

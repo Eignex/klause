@@ -127,12 +127,12 @@ internal class LinearAuthorityInvocation(
                     ) +
                     (
                         frontier?.let {
-                        mapOf(
-                            "numericalFrontierPending" to it.pending.toLong(),
-                            "numericalFrontierPeakPending" to it.peakPending.toLong(),
-                        )
-                    } ?: emptyMap()
-                    ),
+                            mapOf(
+                                "numericalFrontierPending" to it.pending.toLong(),
+                                "numericalFrontierPeakPending" to it.peakPending.toLong(),
+                            )
+                        } ?: emptyMap()
+                        ),
             )
         },
         openTheory = state.work.snapshot(),
@@ -210,7 +210,7 @@ internal class LinearAuthorityInvocation(
         SearchFrontierRun(
             session, SearchSolveParams(state.remainingDecisions()), branching, component, state.decisionBudget,
             component::frontierRank,
-                Comparator { left, right ->
+            Comparator { left, right ->
                 when {
                     left == null && right == null -> 0
                     left == null -> -1
@@ -218,7 +218,7 @@ internal class LinearAuthorityInvocation(
                     else -> left.compareTo(right)
                 }
             },
-                ::paused, { incumbentRevision },
+            ::paused, { incumbentRevision },
         )
     }
 
@@ -363,11 +363,11 @@ internal class LinearAuthorityInvocation(
         }
         val checked = SourceEvidenceVerifier(context.withLinearAuthority()).verify(
             SourceEvidence(
-            context.scope,
-            SourceClaim.Witness(sample),
-            SourceDerivation.SourceWitness,
-        ),
-            checking
+                context.scope,
+                SourceClaim.Witness(sample),
+                SourceDerivation.SourceWitness,
+            ),
+            checking,
         )
         if (checked != SourceEvidenceCheck.Checked) {
             observeExternalOffer(

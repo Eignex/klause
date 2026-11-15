@@ -46,13 +46,13 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
         require(grid != null) { "float grid controls do not apply to ${declared.format}" }
         resolved = resolved.copy(
             floats = grid.copy(
-            buckets = fields.floatBuckets ?: grid.buckets,
-            linearScale = fields.floatScale ?: grid.linearScale,
-            unrangedBounds = UndeclaredRealBounds(
-                fields.gridLower ?: grid.unrangedBounds.lower,
-                fields.gridUpper ?: grid.unrangedBounds.upper,
+                buckets = fields.floatBuckets ?: grid.buckets,
+                linearScale = fields.floatScale ?: grid.linearScale,
+                unrangedBounds = UndeclaredRealBounds(
+                    fields.gridLower ?: grid.unrangedBounds.lower,
+                    fields.gridUpper ?: grid.unrangedBounds.upper,
+                ),
             ),
-        )
         )
     }
     if (fields.absoluteTolerance != null || fields.relativeTolerance != null) {
@@ -64,9 +64,9 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
         require(tolerance != null) { "source feasibility tolerance does not apply to ${declared.format}" }
         resolved = resolved.copy(
             feasibilityTolerance = SourceTolerance(
-            fields.absoluteTolerance ?: tolerance.absolute,
-            fields.relativeTolerance ?: tolerance.relative,
-        )
+                fields.absoluteTolerance ?: tolerance.absolute,
+                fields.relativeTolerance ?: tolerance.relative,
+            ),
         )
     }
     if (exact) {
@@ -94,32 +94,32 @@ internal fun sourceFlagSpecs(options: CommonOptions): List<FlagSpec> = listOf(
         val bounds = options.semanticOverrides.undeclaredIntegers ?: BoundsOverride()
         options.semanticOverrides = options.semanticOverrides.copy(
             undeclaredIntegers = bounds.copy(
-            lower = integerBound(it),
-        )
+                lower = integerBound(it),
+            ),
         )
     },
     sourceFlag("--unbounded-int-hi", "integer|open", "default upper bound for undeclared integers") {
         val bounds = options.semanticOverrides.undeclaredIntegers ?: BoundsOverride()
         options.semanticOverrides = options.semanticOverrides.copy(
             undeclaredIntegers = bounds.copy(
-            upper = integerBound(it),
-        )
+                upper = integerBound(it),
+            ),
         )
     },
     sourceFlag("--unbounded-real-lo", "number|open", "default lower bound for undeclared reals") {
         val bounds = options.semanticOverrides.undeclaredReals ?: BoundsOverride()
         options.semanticOverrides = options.semanticOverrides.copy(
             undeclaredReals = bounds.copy(
-            lower = realBound(it),
-        )
+                lower = realBound(it),
+            ),
         )
     },
     sourceFlag("--unbounded-real-hi", "number|open", "default upper bound for undeclared reals") {
         val bounds = options.semanticOverrides.undeclaredReals ?: BoundsOverride()
         options.semanticOverrides = options.semanticOverrides.copy(
             undeclaredReals = bounds.copy(
-            upper = realBound(it),
-        )
+                upper = realBound(it),
+            ),
         )
     },
     sourceFlag("--float-semantics", "continuous|grid", "float declaration interpretation") {

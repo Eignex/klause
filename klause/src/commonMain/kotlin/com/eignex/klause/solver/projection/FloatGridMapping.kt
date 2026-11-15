@@ -88,15 +88,15 @@ internal class FloatGridMapping(
         )
         require(
             capturedColumns.all {
-            it.source.index in 0 until source.numRealVars &&
-                it.coordinate.variable in source.numIntVars until target.numIntVars &&
-                this.retainedReals[it.source.index] == -1
-        }
+                it.source.index in 0 until source.numRealVars &&
+                    it.coordinate.variable in source.numIntVars until target.numIntVars &&
+                    this.retainedReals[it.source.index] == -1
+            },
         )
         require(
             (0 until source.numRealVars).all {
-            it in bySource || this.retainedReals[it] in 0 until target.numRealVars
-        }
+                it in bySource || this.retainedReals[it] in 0 until target.numRealVars
+            },
         )
         require(this.retainedReals.filter { it >= 0 }.distinct().size == target.numRealVars)
         require(origins.toSet().size == source.numFactors)

@@ -48,11 +48,11 @@ internal object OrdinaryArithmeticLearningProfile {
         val options = args.associate { it.substringBefore('=') to it.substringAfter('=') }
         require(
             options.keys.all {
-            it in setOf(
-                "suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
-                "attribution",
-            )
-        }
+                it in setOf(
+                    "suite", "problem", "sha256", "timeout-ms", "nodes", "lp", "trace", "source64", "format",
+                    "attribution",
+                )
+            },
         )
         val suite = requireNotNull(options["suite"])
         val name = requireNotNull(options["problem"])
@@ -81,12 +81,12 @@ internal object OrdinaryArithmeticLearningProfile {
         Reports.writeJson(out.resolve("provenance.json").path, provenance)
         publish(
             buildJsonObject {
-            put("event", "provenance")
-            put("fingerprint", fingerprint)
-            put("build", Reports.json.encodeToString(provenance))
-            put("javaRuntimeVersion", System.getProperty("java.runtime.version"))
-            put("javaVmName", System.getProperty("java.vm.name"))
-        }.toString()
+                put("event", "provenance")
+                put("fingerprint", fingerprint)
+                put("build", Reports.json.encodeToString(provenance))
+                put("javaRuntimeVersion", System.getProperty("java.runtime.version"))
+                put("javaVmName", System.getProperty("java.vm.name"))
+            }.toString(),
         )
         val source64 = options["source64"]
         val catalogRef = if (source64 == null) Catalog.uncapped(suite).problems.single { it.name == name } else null
@@ -101,13 +101,13 @@ internal object OrdinaryArithmeticLearningProfile {
         val observedHash = sha256(bytes)
         publish(
             buildJsonObject {
-            put("event", "source")
-            put("suite", suite)
-            put("problem", name)
-            put("expectedSha256", hash)
-            put("observedSha256", observedHash)
-            put("sourceMode", if (source64 == null) "catalog" else "frozen")
-        }.toString()
+                put("event", "source")
+                put("suite", suite)
+                put("problem", name)
+                put("expectedSha256", hash)
+                put("observedSha256", observedHash)
+                put("sourceMode", if (source64 == null) "catalog" else "frozen")
+            }.toString(),
         )
         check(observedHash == hash) { "source hash mismatch: expected $hash, observed $observedHash" }
         val ref = catalogRef ?: ProblemRef(
@@ -129,13 +129,13 @@ internal object OrdinaryArithmeticLearningProfile {
                 require(original.numIntVars <= 4096 && original.numBoolVars <= 4096)
                 val prepared = FinitePipeline.prepare(
                     FinitePipelineRequest(
-                    original,
-                    FiniteEngine.BACKTRACK,
-                    entry.objective,
-                    cancellation = stop,
-                    solveCancellation = stop,
-                    randomSeed = 3L,
-                )
+                        original,
+                        FiniteEngine.BACKTRACK,
+                        entry.objective,
+                        cancellation = stop,
+                        solveCancellation = stop,
+                        randomSeed = 3L,
+                    ),
                 )
                 val label = if (learning) "integer" else "clause"
                 val originalJson = codec.encodeToString(original)

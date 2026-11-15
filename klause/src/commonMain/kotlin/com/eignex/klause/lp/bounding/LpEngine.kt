@@ -166,8 +166,8 @@ internal class LpEngine(
         require(
             rootQueryPolicy == LpRootQueryPolicy.SHARED_WORK || (
                 params0.lpPlan.boundMaxDepth == 0 &&
-            lpWorkAllowance(params0.solveBudgetMillis, params0.lpPlan.lpWorkBudgetFraction) > 0L
-            )
+                    lpWorkAllowance(params0.solveBudgetMillis, params0.lpPlan.lpWorkBudgetFraction) > 0L
+                ),
         )
     }
 
@@ -1228,9 +1228,9 @@ internal class LpEngine(
 
     internal fun observeNodeWorkStop(solver: LpSolver) {
         if ((
-            rootQueryPolicy == LpRootQueryPolicy.SHARED_WORK ||
-                rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK
-        ) && adaptiveWork &&
+                rootQueryPolicy == LpRootQueryPolicy.SHARED_WORK ||
+                    rootQueryPolicy == LpRootQueryPolicy.INTERRUPTED_WORK
+                ) && adaptiveWork &&
             solver.lastTermination == LpFloatTermination.WORK && solver.lastPivots > 0
         ) {
             lpWorkBudget.observeWorkStop()

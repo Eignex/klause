@@ -36,8 +36,8 @@ internal class PowerInvariant(private val base: Int, private val exponent: Int, 
             if (value in state.rootDomains[variable] && value != state.assignment.intValue(variable) &&
                 degree(state, variable, value) <= before
             ) {
-                    sink.addChannelingIntSet(state, variable, value)
-                }
+                sink.addChannelingIntSet(state, variable, value)
+            }
         }
         integerPowerOrNull(state.assignment.intValue(base), exponent)?.let { propose(result, it) }
         if (exponent == 0) return

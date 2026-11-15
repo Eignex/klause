@@ -100,7 +100,7 @@ class PortfolioProgressTest {
         assertEquals(
             4L,
             events.filterIsInstance<PortfolioEvent.Lifecycle>()
-            .last { it.kind == PortfolioLifecycleKind.INCUMBENT_AVAILABLE }.version
+                .last { it.kind == PortfolioLifecycleKind.INCUMBENT_AVAILABLE }.version,
         )
     }
 
@@ -313,10 +313,11 @@ class PortfolioProgressTest {
     fun `repeated incumbents should preserve the first availability timestamp`() {
         val clock = TestTimeSource()
         val worker = trackingWorker(
-            "finder", 0,
+            "finder",
+            0,
             ScriptedSearch({ true }, perSlice = 3) {
-            clock += 10.nanoseconds
-        }
+                clock += 10.nanoseconds
+            },
         )
         val result = Portfolio.thompson(
             listOf(worker),
@@ -359,10 +360,11 @@ class PortfolioProgressTest {
         val workers = listOf(
             trackingWorker("producer", 0, ScriptedSearch({ false }) { }),
             trackingWorker(
-                "consumer", 1,
+                "consumer",
+                1,
                 ScriptedSearch({ it == 0 }) {
-                pools.contributions.note(Contribution.Clause, 0)
-            }
+                    pools.contributions.note(Contribution.Clause, 0)
+                },
             ),
         ).onEach { it.sharedPools = pools }
         workers[0].sharing = setOf(Contribution.Clause)
@@ -374,7 +376,7 @@ class PortfolioProgressTest {
             sliceGrowth = 1.0,
             diagnostics = PortfolioDiagnostics(3),
             rewardPolicy = PortfolioRewardPolicy {
-                observed += it;
+                observed += it
                 it.ordinaryReward
             },
         ).use {
@@ -451,7 +453,7 @@ class PortfolioProgressTest {
             reseedStaleThreshold = 0,
             diagnostics = PortfolioDiagnostics(10),
             rewardPolicy = PortfolioRewardPolicy {
-                observations += it;
+                observations += it
                 it.ordinaryReward
             },
         ).use {
@@ -506,11 +508,12 @@ class PortfolioProgressTest {
                 ),
                 trackingWorker("local", 1, ScriptedSearch({ true }, start = 2_000.0) { }),
                 trackingWorker(
-                    "deferred", 2,
+                    "deferred",
+                    2,
                     ScriptedSearch({ false }) {
-                    assertTrue(accepted >= 2)
-                    queries++
-                }
+                        assertTrue(accepted >= 2)
+                        queries++
+                    },
                 ).also { it.startAfterAcceptedImprovement = true },
             )
             Portfolio.thompson(
@@ -563,18 +566,20 @@ class PortfolioProgressTest {
             var queries = 0
             val workers = listOf(
                 trackingWorker(
-                    "finder", 0,
+                    "finder",
+                    0,
                     ScriptedSearch(
-                    { it == 0 },
-                    start = if (improves) 998.0 else 1_000.0,
-                ) { }
+                        { it == 0 },
+                        start = if (improves) 998.0 else 1_000.0,
+                    ) { },
                 ),
                 trackingWorker(
-                    "deferred", 1,
+                    "deferred",
+                    1,
                     ScriptedSearch({ false }) {
-                    assertEquals(1, accepted)
-                    queries++
-                }
+                        assertEquals(1, accepted)
+                        queries++
+                    },
                 ).also { it.startAfterAcceptedImprovement = true },
             )
 

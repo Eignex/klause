@@ -104,12 +104,12 @@ class PolynomialBooleanRegionsTest {
 
         assertEquals(
             listOf(
-            mapOf(1 to true, 3 to true),
-            mapOf(1 to true, 2 to true),
-            mapOf(0 to true, 3 to true),
-            mapOf(0 to true, 2 to true),
-        ),
-            regions.map { it.bools }
+                mapOf(1 to true, 3 to true),
+                mapOf(1 to true, 2 to true),
+                mapOf(0 to true, 3 to true),
+                mapOf(0 to true, 2 to true),
+            ),
+            regions.map { it.bools },
         )
     }
 
@@ -154,10 +154,10 @@ class PolynomialBooleanRegionsTest {
 
         assertEquals(
             listOf(
-            PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
-            PolynomialBooleanRegion(emptyMap(), mapOf(0 to true)),
-        ),
-            regions
+                PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
+                PolynomialBooleanRegion(emptyMap(), mapOf(0 to true)),
+            ),
+            regions,
         )
     }
 
@@ -178,12 +178,12 @@ class PolynomialBooleanRegionsTest {
         val regions = formula.booleanRegions(PolynomialArithmetic()).asSequence().filterNotNull().toList()
         assertEquals(
             listOf(
-            mapOf(1 to true, 3 to true),
-            mapOf(1 to true, 2 to true),
-            mapOf(0 to true, 3 to true),
-            mapOf(0 to true, 2 to true),
-        ),
-            regions.map { it.bools }
+                mapOf(1 to true, 3 to true),
+                mapOf(1 to true, 2 to true),
+                mapOf(0 to true, 3 to true),
+                mapOf(0 to true, 2 to true),
+            ),
+            regions.map { it.bools },
         )
     }
 
@@ -203,11 +203,11 @@ class PolynomialBooleanRegionsTest {
             val point = mapOf(0 to algebraic.rational(value))
             assertTrue(
                 regions.any { region ->
-                region.bools[0] == gate && region.atoms.all { (index, required) ->
-                    val atom = formula.atoms[index]
-                    atom.holds(algebraic.signAt(atom.polynomial, point)) == required
-                }
-            }
+                    region.bools[0] == gate && region.atoms.all { (index, required) ->
+                        val atom = formula.atoms[index]
+                        atom.holds(algebraic.signAt(atom.polynomial, point)) == required
+                    }
+                },
             )
         }
     }
@@ -293,11 +293,11 @@ class PolynomialBooleanRegionsTest {
             "(declare-const gate Bool) "
         fun formula(closing: String) = PolynomialFormula.normalize(
             SmtLibPolynomial.parse(
-            declarations +
-                "(assert (or gate (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
-                "(= (* x y) 1) (= (* y z) 1) (= (* x z) $closing))))",
-        ).formula,
-            PolynomialArithmetic()
+                declarations +
+                    "(assert (or gate (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
+                    "(= (* x y) 1) (= (* y z) 1) (= (* x z) $closing))))",
+            ).formula,
+            PolynomialArithmetic(),
         )
         val progress = PolynomialQueryProgress()
         val coupled = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
@@ -402,9 +402,9 @@ class PolynomialBooleanRegionsTest {
         val original = formula.booleanRegions(arithmetic, progress).asSequence().filterNotNull().toList()
         val replacement = formula.withAtoms(
             formula.atoms.map { atom ->
-            if (atom.relation == PolynomialRelation.LT) atom.copy(relation = PolynomialRelation.GT) else atom
-        },
-            arithmetic
+                if (atom.relation == PolynomialRelation.LT) atom.copy(relation = PolynomialRelation.GT) else atom
+            },
+            arithmetic,
         )
 
         val regions = replacement.booleanRegions(arithmetic).asSequence().filterNotNull().toList()
@@ -642,9 +642,9 @@ class PolynomialBooleanRegionsTest {
                     assertEquals(
                         0,
                         algebraic.compare(
-                        witness.realValue(2),
-                        algebraic.multiply(witness.realValue(0), witness.realValue(1)),
-                    )
+                            witness.realValue(2),
+                            algebraic.multiply(witness.realValue(0), witness.realValue(1)),
+                        ),
                     )
                 } else {
                     assertEquals(0, algebraic.sign(witness.realValue(0)))
@@ -837,9 +837,9 @@ class PolynomialBooleanRegionsTest {
         assertEquals(
             0,
             algebraic.compare(
-            algebraic.multiply(witness.realValue(0), witness.realValue(0)),
-            algebraic.rational(BigFraction.ofLong(2)),
-        )
+                algebraic.multiply(witness.realValue(0), witness.realValue(0)),
+                algebraic.rational(BigFraction.ofLong(2)),
+            ),
         )
         assertEquals(33, witness.realCount)
     }
@@ -981,9 +981,9 @@ class PolynomialBooleanRegionsTest {
                 assertEquals(
                     0,
                     algebraic.compare(
-                    witness.realValue(0),
-                    algebraic.rational(BigFraction.ofLong(if (pin) 2L else 3L)),
-                )
+                        witness.realValue(0),
+                        algebraic.rational(BigFraction.ofLong(if (pin) 2L else 3L)),
+                    ),
                 )
             }
         }

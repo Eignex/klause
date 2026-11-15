@@ -107,12 +107,12 @@ internal fun Compiler.Builder.realProduct(parts: List<RealComb>): Res.R {
                     val right = if (rightInt != null) mixedProductIntColumn(rightInt) else productRealColumn(part)
                     factors.add(
                         if (leftInt != null) {
-                        RealProduct(left, right, value, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
-                    } else if (rightInt != null) {
-                        RealProduct(right, left, value, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
-                    } else {
-                        ContinuousProduct(left, right, value)
-                    }
+                            RealProduct(left, right, value, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
+                        } else if (rightInt != null) {
+                            RealProduct(right, left, value, Double.NEGATIVE_INFINITY, Double.POSITIVE_INFINITY)
+                        } else {
+                            ContinuousProduct(left, right, value)
+                        },
                     )
                     RealComb(emptyMap(), mapOf(value to BigFraction.ONE), BigFraction.ZERO)
                 }

@@ -35,13 +35,13 @@ class SelectedFloatGridTest {
             emptyArray<IntDomain>(),
             arrayOf(
                 Linear(
-                intArrayOf(),
-                doubleArrayOf(),
-                intArrayOf(0),
-                doubleArrayOf(1.0),
-                LinearOp.LE,
-                0.5,
-            )
+                    intArrayOf(),
+                    doubleArrayOf(),
+                    intArrayOf(0),
+                    doubleArrayOf(1.0),
+                    LinearOp.LE,
+                    0.5,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
@@ -50,10 +50,10 @@ class SelectedFloatGridTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.ENUMERATE,
-            FiniteEngine.MIXED,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.ENUMERATE,
+                FiniteEngine.MIXED,
+            ),
         )
         assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
 
@@ -78,13 +78,13 @@ class SelectedFloatGridTest {
                     emptyArray<IntDomain>(),
                     arrayOf(
                         Linear(
-                        intArrayOf(),
-                        doubleArrayOf(),
-                        intArrayOf(0),
-                        doubleArrayOf(1.0),
-                        LinearOp.EQ,
-                        0.25,
-                    )
+                            intArrayOf(),
+                            doubleArrayOf(),
+                            intArrayOf(0),
+                            doubleArrayOf(1.0),
+                            LinearOp.EQ,
+                            0.25,
+                        ),
                     ),
                     numRealVars = 1,
                     realLower = doubleArrayOf(0.0),
@@ -98,22 +98,22 @@ class SelectedFloatGridTest {
                 }
                 val invocation = SourceSetup.prepare(
                     SourceSetupRequest(
-                    SourceAttachment(source),
-                    operation,
-                    engine,
-                    objective,
-                    maximize = objective != null,
-                )
+                        SourceAttachment(source),
+                        operation,
+                        engine,
+                        objective,
+                        maximize = objective != null,
+                    ),
                 )
                 val canonical = invocation.preparedPlan
                 assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(invocation.admission).arms)
 
                 val result = assertIs<SelectedFloatGridPreparation.Declined>(
                     SourceSetup.prepareSelectedFloatGrid(
-                    invocation,
-                    listOf(FloatGridVariable(SourceRealId(0))),
-                    FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
-                )
+                        invocation,
+                        listOf(FloatGridVariable(SourceRealId(0))),
+                        FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
+                    ),
                 )
 
                 assertEquals(SelectedGridDecline.CONSUMER, result.cause)
@@ -133,13 +133,13 @@ class SelectedFloatGridTest {
                 emptyArray<IntDomain>(),
                 arrayOf(
                     Linear(
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.LE,
-                    0.5,
-                )
+                        intArrayOf(),
+                        doubleArrayOf(),
+                        intArrayOf(0),
+                        doubleArrayOf(1.0),
+                        LinearOp.LE,
+                        0.5,
+                    ),
                 ),
                 numRealVars = 1,
                 realLower = doubleArrayOf(0.0),
@@ -148,29 +148,29 @@ class SelectedFloatGridTest {
             )
             val providers = FactorProjectionProviders(
                 encoder = EncoderProvider { factor, target ->
-                if (factor.variables.reals.isNotEmpty()) {
-                    Encoder(EncoderSupport.UNSUPPORTED)
-                } else {
-                    BuiltInEncoderProvider.select(factor, target)
-                }
-            }
+                    if (factor.variables.reals.isNotEmpty()) {
+                        Encoder(EncoderSupport.UNSUPPORTED)
+                    } else {
+                        BuiltInEncoderProvider.select(factor, target)
+                    }
+                },
             )
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.SATISFY,
-                engine,
-                providers = providers,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.SATISFY,
+                    engine,
+                    providers = providers,
+                ),
             )
             assertTrue(ExecutionStrategy.COMPLETE !in assertNotNull(invocation.admission).arms)
 
             assertIs<SelectedFloatGridPreparation.Prepared>(
                 SourceSetup.prepareSelectedFloatGrid(
-                invocation,
-                listOf(FloatGridVariable(SourceRealId(0))),
-                FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
-            )
+                    invocation,
+                    listOf(FloatGridVariable(SourceRealId(0))),
+                    FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
+                ),
             )
 
             assertNotNull(invocation.floatProjection)
@@ -193,19 +193,19 @@ class SelectedFloatGridTest {
             )
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.SATISFY,
-                engine,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.SATISFY,
+                    engine,
+                ),
             )
             assertTrue(ExecutionStrategy.COMPLETE in assertNotNull(invocation.admission).arms)
 
             assertIs<SelectedFloatGridPreparation.Prepared>(
                 SourceSetup.prepareSelectedFloatGrid(
-                invocation,
-                listOf(FloatGridVariable(SourceRealId(0))),
-                FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-            )
+                    invocation,
+                    listOf(FloatGridVariable(SourceRealId(0))),
+                    FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
+                ),
             )
 
             assertNotNull(invocation.floatProjection)
@@ -229,10 +229,10 @@ class SelectedFloatGridTest {
 
         val result = assertIs<SelectedFloatGridPreparation.Declined>(
             SourceSetup.prepareSelectedFloatGrid(
-            invocation,
-            listOf(FloatGridVariable(SourceRealId(0))),
-            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
-        )
+                invocation,
+                listOf(FloatGridVariable(SourceRealId(0))),
+                FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
+            ),
         )
 
         assertEquals(SelectedGridDecline.SOURCE_REFUTED, result.cause)
@@ -256,27 +256,27 @@ class SelectedFloatGridTest {
         val observed = ArrayList<Any>()
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            observed += factor
-            BuiltInEncoderProvider.select(factor, target)
-        }
+                observed += factor
+                BuiltInEncoderProvider.select(factor, target)
+            },
         )
         val attachment = SourceAttachment(source)
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            attachment,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            providers = providers,
-        )
+                attachment,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                providers = providers,
+            ),
         )
         val canonical = assertNotNull(invocation.preparedPlan)
 
         val selected = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(
-            invocation,
-            listOf(FloatGridVariable(SourceRealId(0))),
-            FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-        )
+                invocation,
+                listOf(FloatGridVariable(SourceRealId(0))),
+                FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
+            ),
         )
         val shape = selected.invocation.finiteShape()
 
@@ -311,10 +311,10 @@ class SelectedFloatGridTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
 
         assertNull(invocation.floatGrid)
@@ -336,10 +336,10 @@ class SelectedFloatGridTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
         val shape = invocation.finiteShape()
 
@@ -369,19 +369,19 @@ class SelectedFloatGridTest {
         )
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.LOCAL_SEARCH,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.LOCAL_SEARCH,
+            ),
         )
         val canonical = invocation.preparedPlan
 
         val result = assertIs<SelectedFloatGridPreparation.Declined>(
             SourceSetup.prepareSelectedFloatGrid(
-            invocation,
-            listOf(FloatGridVariable(SourceRealId(0))),
-            FloatGridConsumerPurpose.HEURISTIC_VIEW,
-        )
+                invocation,
+                listOf(FloatGridVariable(SourceRealId(0))),
+                FloatGridConsumerPurpose.HEURISTIC_VIEW,
+            ),
         )
 
         assertEquals(SelectedGridDecline.PROJECTION, result.cause)
@@ -405,28 +405,28 @@ class SelectedFloatGridTest {
         var stopped = false
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.LOCAL_SEARCH,
-            cancellation = ExecutionControl { stopped },
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.LOCAL_SEARCH,
+                cancellation = ExecutionControl { stopped },
+            ),
         )
         stopped = true
 
         val result = assertIs<SelectedFloatGridPreparation.Declined>(
             SourceSetup.prepareSelectedFloatGrid(
-            invocation,
-            listOf(FloatGridVariable(SourceRealId(0))),
-            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
-        )
+                invocation,
+                listOf(FloatGridVariable(SourceRealId(0))),
+                FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
+            ),
         )
         stopped = false
         val repeated = assertIs<SelectedFloatGridPreparation.Declined>(
             SourceSetup.prepareSelectedFloatGrid(
-            invocation,
-            listOf(FloatGridVariable(SourceRealId(0))),
-            FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
-        )
+                invocation,
+                listOf(FloatGridVariable(SourceRealId(0))),
+                FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY,
+            ),
         )
 
         assertEquals(SelectedGridDecline.RESOURCE, result.cause)

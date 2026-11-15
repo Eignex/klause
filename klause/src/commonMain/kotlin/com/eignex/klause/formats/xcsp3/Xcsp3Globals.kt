@@ -877,12 +877,12 @@ internal fun Compiler.Builder.minMax(e: XmlElement, max: Boolean) {
     if (index != null) {
         factors.add(
             Element(
-            singleTermVar(index.textContent),
-            m,
-            vars.widenToLong(),
-            arrIsVars = true,
-            indexOffset = selectionOffset(e),
-        )
+                singleTermVar(index.textContent),
+                m,
+                vars.widenToLong(),
+                arrIsVars = true,
+                indexOffset = selectionOffset(e),
+            ),
         )
     }
     if (condition != null && target == null) postCondition(intArrayOf(1), intArrayOf(m), condition)
@@ -956,12 +956,12 @@ internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
     // without depending on the factor-shape inference recognising the reified rows.
     definitionHints.add(
         DefinitionHint.Comparison(
-        eq,
-        longArrayOf(1),
-        arrayOf(DefinitionHint.Operand.Variable(x)),
-        value,
-        LinearOp.EQ,
-    )
+            eq,
+            longArrayOf(1),
+            arrayOf(DefinitionHint.Operand.Variable(x)),
+            value,
+            LinearOp.EQ,
+        ),
     )
     definitionHints.add(DefinitionHint.BooleanValue(indicator, literal))
     classes.define(indicator, start)

@@ -51,13 +51,13 @@ internal class LinearAuthorityQuery private constructor(
         this.checkUnselectedCuts == checkUnselectedCuts && this.retainMaskedCuts == retainMaskedCuts &&
         (
             source === other ||
-            (
-                source.scope == other.scope &&
-                source.hasSameLinearData(other) &&
-                source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
-                source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker
+                (
+                    source.scope == other.scope &&
+                        source.hasSameLinearData(other) &&
+                        source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
+                        source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker
+                    )
             )
-        )
 
     companion object {
         fun prepare(
@@ -109,13 +109,13 @@ internal class LinearAuthorityQuery private constructor(
                 SourceEvidenceVerifier(numeric.atScope(source.scope), maximumSteps = maximumCutProofSteps)
                     .verifyAll(
                         active.map { id ->
-                        val cut = cuts[id]
-                        SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
-                    },
+                            val cut = cuts[id]
+                            SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
+                        },
                         ExecutionControl {
-                        cutVerificationWork++
-                        cancellation()
-                    }
+                            cutVerificationWork++
+                            cancellation()
+                        },
                     )
             }
             onCutWork(cutVerificationWork)

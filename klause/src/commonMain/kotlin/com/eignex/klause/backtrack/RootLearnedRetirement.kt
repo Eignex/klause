@@ -79,9 +79,9 @@ internal class RootLearnedRetirement {
         } else if (result.status == LearnedRetirementStatus.Deferred &&
             (
                 result.minimumWork + CAPTURE_OWNER_WORK > budget.limit ||
-                result.minimumScratchBytes > params.learnedMemoryScratchBytes ||
-                result.minimumRetainedBytes > (retained - CALLER_BYTES).coerceAtLeast(0L)
-            )
+                    result.minimumScratchBytes > params.learnedMemoryScratchBytes ||
+                    result.minimumRetainedBytes > (retained - CALLER_BYTES).coerceAtLeast(0L)
+                )
         ) {
             budget.note("RetirementUnfundableCapture")
         }
@@ -90,8 +90,8 @@ internal class RootLearnedRetirement {
         if (result.status == LearnedRetirementStatus.AlreadyOwned &&
             (
                 result.handle?.status == LearnedRetirementStatus.Captured ||
-                result.handle?.status == LearnedRetirementStatus.Cancelled
-            )
+                    result.handle?.status == LearnedRetirementStatus.Cancelled
+                )
         ) {
             return LearnedRetirementStatus.Deferred
         }

@@ -32,9 +32,9 @@ class LinearOptimizationResult internal constructor(
     val evidence: SourceResultEvidence = SourceResultEvidence(
         scope,
         buildList {
-        incumbent?.let { add(SourceEvidence(scope, SourceClaim.Witness(it), SourceDerivation.SourceWitness)) }
-        bound?.let(::add)
-        terminal?.let(::add)
-    }
+            incumbent?.let { add(SourceEvidence(scope, SourceClaim.Witness(it), SourceDerivation.SourceWitness)) }
+            bound?.let(::add)
+            terminal?.let(::add)
+        },
     )
 }

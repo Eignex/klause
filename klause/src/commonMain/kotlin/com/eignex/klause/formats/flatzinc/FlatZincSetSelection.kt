@@ -31,9 +31,9 @@ internal fun FlatZincCompiler.emitSetSelection(constraint: FznConstraint, variab
     val universe = (
         result.elements.toList() + (
             variableRows?.flatMap { it.elements.toList() }
-        ?: checkNotNull(constantRows).flatMap { it.toList() }
-        )
-    ).distinct().sorted()
+                ?: checkNotNull(constantRows).flatMap { it.toList() }
+            )
+        ).distinct().sorted()
     if (universe.isEmpty()) {
         val zero = allocInt("__set_selection_zero_${factors.size}", 0, 0)
         factors.add(Element(index, zero, LongArray(count), arrIsVars = false))

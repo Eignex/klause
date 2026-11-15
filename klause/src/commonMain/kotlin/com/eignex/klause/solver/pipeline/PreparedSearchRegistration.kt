@@ -238,8 +238,8 @@ internal class PreparedSearchRegistrations(
                 opening.candidateHints(
                     source,
                     theory.takeIf {
-                    arithmetic.size == 1 && (source.numRealVars > 0 || source.numIntVars > 0)
-                }
+                        arithmetic.size == 1 && (source.numRealVars > 0 || source.numIntVars > 0)
+                    },
                 ),
             )
         } catch (failure: Throwable) {

@@ -44,16 +44,16 @@ internal fun distinctLinearFormula(factor: Distinct, cancellation: ExecutionCont
     if (factor.activator == LinearRow.ALWAYS) return distinct
     val activator = EncodingAffineExpression(
         listOf(
-        EncodingLinearTerm.source(Term.ofLit(Lit.make(factor.activator, true)), BigFraction.ONE),
-    )
+            EncodingLinearTerm.source(Term.ofLit(Lit.make(factor.activator, true)), BigFraction.ONE),
+        ),
     )
     val positive = LinearEncodingFormula.Comparison(activator, LinearOp.EQ, BigFraction.ONE)
     val negative = LinearEncodingFormula.Comparison(activator, LinearOp.EQ, BigFraction.ZERO)
     return LinearEncodingFormula.And(
         listOf(
-        LinearEncodingFormula.Or(listOf(negative, distinct)),
-        LinearEncodingFormula.Or(listOf(positive, LinearEncodingFormula.Or(collisions))),
-    )
+            LinearEncodingFormula.Or(listOf(negative, distinct)),
+            LinearEncodingFormula.Or(listOf(positive, LinearEncodingFormula.Or(collisions))),
+        ),
     )
 }
 

@@ -14,15 +14,15 @@ internal class GridArithmeticInvariant(private val relation: GridArithmetic) : I
         if (relation.inputs.any { !it.contains(value(it.variable)) } ||
             !relation.output.contains(value(relation.output.variable))
         ) {
-                return state.violationSoftCap
-            }
+            return state.violationSoftCap
+        }
         val image = relation.image(value) ?: return maxOf(
             1,
             numericalEqualityDegree(
-            relation.evaluate(value),
-            relation.output.value(value(relation.output.variable)),
-            state.violationSoftCap,
-        )
+                relation.evaluate(value),
+                relation.output.value(value(relation.output.variable)),
+                state.violationSoftCap,
+            ),
         )
         return compressViolation(distance(image, value(relation.output.variable)), state.violationSoftCap)
     }

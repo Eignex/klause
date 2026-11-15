@@ -27,11 +27,11 @@ class SmtLibSourceObjectiveTest {
         val objective = assertNotNull(source.objective).toLinearObjective()
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            source.source,
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-        )
+                source.source,
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+            ),
         )
 
         val execution = assertIs<SourceExecutionResult.Quadratic>(

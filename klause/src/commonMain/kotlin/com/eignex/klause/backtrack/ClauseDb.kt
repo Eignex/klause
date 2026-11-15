@@ -52,16 +52,16 @@ private fun forgetWindow(
                 (
                     !params.tieredLearnedDb || (
                         session.learnedClauseTier(index) == ClauseTier.LOCAL &&
-                    !session.learnedClauseUsedSinceReduction(index)
+                            !session.learnedClauseUsedSinceReduction(index)
+                        )
                     )
-                )
         },
         nativePolicy = if (session.usesNativeSat) {
             NativeCapConfiguration(
-            params.tieredLearnedDb,
-            params.lbdGlueThreshold,
-            params.midLbdThreshold,
-        )
+                params.tieredLearnedDb,
+                params.lbdGlueThreshold,
+                params.midLbdThreshold,
+            )
         } else {
             null
         },

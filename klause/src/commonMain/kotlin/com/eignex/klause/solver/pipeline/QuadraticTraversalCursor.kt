@@ -33,8 +33,8 @@ internal class QuadraticTraversalCursor(
         problem,
         params.copy(
             cancellation = cancelledWhen({
-            listOfNotNull(global.deadline(), slice.deadline).minOrNull()
-        }) { global() || slice.expired() }
+                listOfNotNull(global.deadline(), slice.deadline).minOrNull()
+            }) { global() || slice.expired() },
         ),
         sink,
         LpSolveContext.Production,

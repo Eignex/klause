@@ -18,11 +18,11 @@ class InprocessingBudgetTest {
     fun `containing exhaustion should withhold optional work without creating class debt`() {
         val session = PropagationSession(
             Problem(
-            2,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(Clause(intArrayOf(0, 2))),
-        ).bake()
+                2,
+                0,
+                emptyArray(),
+                arrayOf<Factor>(Clause(intArrayOf(0, 2))),
+            ).bake(),
         )
         val spending = InprocessingSpending(InprocessingKind.Root)
         val params = BacktrackParams(inprocessingRootWork = 10L)
@@ -42,11 +42,11 @@ class InprocessingBudgetTest {
     fun `remaining work should include class debt before a containing grant`() {
         val session = PropagationSession(
             Problem(
-            2,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(Clause(intArrayOf(0, 2))),
-        ).bake()
+                2,
+                0,
+                emptyArray(),
+                arrayOf<Factor>(Clause(intArrayOf(0, 2))),
+            ).bake(),
         )
         val spending = InprocessingSpending(InprocessingKind.Root)
         val params = BacktrackParams(inprocessingRootWork = 3L)
@@ -62,11 +62,13 @@ class InprocessingBudgetTest {
     fun `zero class allowances should withhold all enabled passes`() {
         for (native in listOf(false, true)) {
             val problem = Problem(
-                3, 0, emptyArray(),
+                3,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(1)),
-                Clause(intArrayOf(0, 2, 4)),
-            )
+                    Clause(intArrayOf(1)),
+                    Clause(intArrayOf(0, 2, 4)),
+                ),
             )
             val session = PropagationSession(problem.bake(), nativeSat = native)
             val stats = SearchStatsSink()
@@ -108,8 +110,8 @@ class InprocessingBudgetTest {
 
             assertTrue(
                 (0 until session.learnedClauseCount).any {
-                session.learnedClauseLiterals(it).toSet() == setOf(0, 4)
-            }
+                    session.learnedClauseLiterals(it).toSet() == setOf(0, 4)
+                },
             )
             assertTrue(session.work > before)
             assertTrue(stats.snapshot().learning.getValue("inprocessSubsumptionAttachmentWork") > 0L)
@@ -123,11 +125,13 @@ class InprocessingBudgetTest {
     fun `interrupted vivification should retract probes before another invocation`() {
         for (native in listOf(false, true)) {
             val problem = Problem(
-                3, 0, emptyArray(),
+                3,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(3, 4)),
-            )
+                    Clause(intArrayOf(1, 2)),
+                    Clause(intArrayOf(3, 4)),
+                ),
             )
             val session = PropagationSession(problem.bake(), nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(1, 3, 4)), 3)
@@ -154,12 +158,14 @@ class InprocessingBudgetTest {
     fun `interrupted root attachment should complete before the root is exposed`() {
         for (native in listOf(false, true)) {
             val problem = Problem(
-                3, 0, emptyArray(),
+                3,
+                0,
+                emptyArray(),
                 arrayOf<Factor>(
-                Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(0, 3)),
-                Clause(intArrayOf(1, 4)),
-            )
+                    Clause(intArrayOf(0, 2)),
+                    Clause(intArrayOf(0, 3)),
+                    Clause(intArrayOf(1, 4)),
+                ),
             )
             val session = PropagationSession(problem.bake(), nativeSat = native)
             session.withCancellation(ExecutionControl { true }) {

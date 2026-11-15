@@ -50,8 +50,8 @@ class BoundedIntegerProbingTest {
         assertEquals(
             List(2) { listOf(0L, 2L) },
             (0..1).map { v ->
-            (0L..2L).filter { it in result.rootIntDomain(v) }
-        }
+                (0L..2L).filter { it in result.rootIntDomain(v) }
+            },
         )
     }
 

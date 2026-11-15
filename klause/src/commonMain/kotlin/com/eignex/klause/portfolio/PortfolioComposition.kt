@@ -305,11 +305,11 @@ internal object PortfolioComposition {
                 numerical
             } else {
                 when (numerical) {
-                is BacktrackWorkerConfig -> numerical.withToleranceCheck(check)
-                is LocalSearchWorkerConfig -> numerical.withToleranceCheck(check)
-                is AlnsWorkerConfig -> numerical.withToleranceCheck(check)
-                else -> numerical
-            }
+                    is BacktrackWorkerConfig -> numerical.withToleranceCheck(check)
+                    is LocalSearchWorkerConfig -> numerical.withToleranceCheck(check)
+                    is AlnsWorkerConfig -> numerical.withToleranceCheck(check)
+                    else -> numerical
+                }
             }
             SeatedArm(checked, arm.role, arm.needed)
         }
@@ -459,17 +459,17 @@ internal object PortfolioComposition {
         if (pool != null) {
             return RosterRank(
                 pool.map { recipe ->
-                RosterCandidate(LocalSearchCatalog.armOf(recipe().label)?.role) {
-                    LocalSearchWorkerConfig(recipe(), budget)
-                }
-            },
-                pinned = true
+                    RosterCandidate(LocalSearchCatalog.armOf(recipe().label)?.role) {
+                        LocalSearchWorkerConfig(recipe(), budget)
+                    }
+                },
+                pinned = true,
             )
         }
         return RosterRank(
             LocalSearchCatalog.rankedArms(scenario.kind, facts.profile).map { arm ->
-            RosterCandidate(arm.role) { LocalSearchWorkerConfig(LocalSearchCatalog.recipe(arm), budget) }
-        }
+                RosterCandidate(arm.role) { LocalSearchWorkerConfig(LocalSearchCatalog.recipe(arm), budget) }
+            },
         )
     }
 
@@ -480,9 +480,9 @@ internal object PortfolioComposition {
         if (pool != null) {
             return RosterRank(
                 pool.map { recipe ->
-                RosterCandidate(BacktrackCatalog.armOf(recipe().label)?.role) { injected(scenario, recipe) }
-            },
-                pinned = true
+                    RosterCandidate(BacktrackCatalog.armOf(recipe().label)?.role) { injected(scenario, recipe) }
+                },
+                pinned = true,
             )
         }
         val edit = curatedEdit(scenario, facts)

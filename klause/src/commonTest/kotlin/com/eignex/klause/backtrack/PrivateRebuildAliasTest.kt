@@ -22,13 +22,15 @@ class PrivateRebuildAliasTest {
                 Clause(intArrayOf(Lit.negate(replacement), 2)),
             )
             val source = Problem(
-                4, 0, emptyArray(),
+                4,
+                0,
+                emptyArray(),
                 arrayOf(
-                Clause(intArrayOf(0, 4)),
-                Clause(intArrayOf(2, 6)),
-                premises[0],
-                premises[1],
-            )
+                    Clause(intArrayOf(0, 4)),
+                    Clause(intArrayOf(2, 6)),
+                    premises[0],
+                    premises[1],
+                ),
             )
 
             val delta = PrivateRebuildAlias.reduce(source, premises, ExecutionControl.Never)
@@ -45,8 +47,8 @@ class PrivateRebuildAliasTest {
                     val original = lift(point)
                     assertTrue(
                         source.factors.all { factor ->
-                        (factor as Clause).literals.any { Lit.evaluate(it, original.boolValue(Lit.variable(it))) }
-                    }
+                            (factor as Clause).literals.any { Lit.evaluate(it, original.boolValue(Lit.variable(it))) }
+                        },
                     )
                 }
             }
@@ -61,8 +63,8 @@ class PrivateRebuildAliasTest {
 
         val reduced = assertNotNull(
             source.withSourcePassDelta(
-            PrivateRebuildAlias.reduce(source, premises, ExecutionControl.Never),
-        )
+                PrivateRebuildAlias.reduce(source, premises, ExecutionControl.Never),
+            ),
         )
 
         assertSame(unchanged, reduced.factors.single())
@@ -83,12 +85,14 @@ class PrivateRebuildAliasTest {
         for (allowance in listOf(0L, 8L, 16L, 32L)) {
             val premises = arrayOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3)))
             val source = Problem(
-                3, 0, emptyArray(),
+                3,
+                0,
+                emptyArray(),
                 arrayOf(
-                Clause(intArrayOf(2, 4)),
-                premises[0],
-                premises[1],
-            )
+                    Clause(intArrayOf(2, 4)),
+                    premises[0],
+                    premises[1],
+                ),
             )
             var spent = 0L
             val meter = WorkMeter { spent += it }

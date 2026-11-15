@@ -30,13 +30,13 @@ class SparseSourceLpTest {
         )
         val prepared = assertNotNull(
             SparseSourceLp.prepare(
-            rows,
-            List(2) { ExactLpColumn(ExactLpBounds()) },
-            List(2) { BigFraction.ZERO },
-            BigFraction.ZERO,
-            limits,
-            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
-        ).prepared
+                rows,
+                List(2) { ExactLpColumn(ExactLpBounds()) },
+                List(2) { BigFraction.ZERO },
+                BigFraction.ZERO,
+                limits,
+                rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+            ).prepared,
         )
         for ((inactive, expected) in listOf(
             setOf(2) to setOf(1),
@@ -57,13 +57,13 @@ class SparseSourceLpTest {
         )
         val prepared = assertNotNull(
             SparseSourceLp.prepare(
-            rows,
-            listOf(ExactLpColumn(ExactLpBounds())),
-            listOf(BigFraction.ZERO),
-            BigFraction.ZERO,
-            limits,
-            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
-        ).prepared
+                rows,
+                listOf(ExactLpColumn(ExactLpBounds())),
+                listOf(BigFraction.ZERO),
+                BigFraction.ZERO,
+                limits,
+                rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+            ).prepared,
         )
         for (inactive in listOf(setOf(0), setOf(1))) {
             val mapped = prepared.emittedInactiveRows(inactive, ExecutionControl.Never) { _, _ -> true }
@@ -80,13 +80,13 @@ class SparseSourceLpTest {
         )
         val prepared = assertNotNull(
             SparseSourceLp.prepare(
-            rows,
-            listOf(ExactLpColumn(ExactLpBounds())),
-            listOf(BigFraction.ZERO),
-            BigFraction.ZERO,
-            limits,
-            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
-        ).prepared
+                rows,
+                listOf(ExactLpColumn(ExactLpBounds())),
+                listOf(BigFraction.ZERO),
+                BigFraction.ZERO,
+                limits,
+                rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+            ).prepared,
         )
         var charges = 0
 
@@ -108,13 +108,13 @@ class SparseSourceLpTest {
         )
         val prepared = assertNotNull(
             SparseSourceLp.prepare(
-            rows,
-            List(2) { ExactLpColumn(ExactLpBounds()) },
-            List(2) { BigFraction.ZERO },
-            BigFraction.ZERO,
-            limits,
-            rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
-        ).prepared
+                rows,
+                List(2) { ExactLpColumn(ExactLpBounds()) },
+                List(2) { BigFraction.ZERO },
+                BigFraction.ZERO,
+                limits,
+                rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+            ).prepared,
         )
         val model = assertNotNull(LpExactState(prepared.model).toWorkingModel())
         val points = listOf(
@@ -144,27 +144,27 @@ class SparseSourceLpTest {
         for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
             val prepared = assertNotNull(
                 SparseSourceLp.prepare(
-                rows,
-                List(2) { ExactLpColumn(ExactLpBounds()) },
-                List(2) { sign },
-                BigFraction.ZERO,
-                limits,
-                rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
-            ).prepared
+                    rows,
+                    List(2) { ExactLpColumn(ExactLpBounds()) },
+                    List(2) { sign },
+                    BigFraction.ZERO,
+                    limits,
+                    rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES,
+                ).prepared,
             )
             val model = assertNotNull(LpExactState(prepared.model).toWorkingModel())
 
             val bound = assertNotNull(
                 certifyLpBoundOnly(
-                model,
-                doubleArrayOf(sign.toDouble()),
-                ReconstructionLimits(),
-            ).bound
+                    model,
+                    doubleArrayOf(sign.toDouble()),
+                    ReconstructionLimits(),
+                ).bound,
             )
             val weights = assertNotNull(
                 prepared.sourceRowWeights(
-                assertNotNull(bound.dualMultipliers).map { it.negated() },
-            )
+                    assertNotNull(bound.dualMultipliers).map { it.negated() },
+                ),
             )
 
             assertEquals(sign, bound.value)
@@ -190,13 +190,13 @@ class SparseSourceLpTest {
         for ((rows, policy) in cases) {
             val prepared = assertNotNull(
                 SparseSourceLp.prepare(
-                rows,
-                listOf(ExactLpColumn(ExactLpBounds())),
-                listOf(BigFraction.ZERO),
-                BigFraction.ZERO,
-                limits,
-                rowPolicy = policy,
-            ).prepared
+                    rows,
+                    listOf(ExactLpColumn(ExactLpBounds())),
+                    listOf(BigFraction.ZERO),
+                    BigFraction.ZERO,
+                    limits,
+                    rowPolicy = policy,
+                ).prepared,
             )
 
             assertEquals(2, prepared.emittedRowCount)

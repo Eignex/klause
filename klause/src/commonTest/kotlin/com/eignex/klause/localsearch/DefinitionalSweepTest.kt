@@ -33,18 +33,18 @@ class DefinitionalSweepTest {
             DefinitionalSweep.infer(
                 problem,
                 boolFolds = listOf(
-            BoolFoldDefinition(1, intArrayOf(Lit.make(0, true)), true),
-            BoolFoldDefinition(2, intArrayOf(Lit.make(1, true)), false),
-        )
-            )
+                    BoolFoldDefinition(1, intArrayOf(Lit.make(0, true)), true),
+                    BoolFoldDefinition(2, intArrayOf(Lit.make(1, true)), false),
+                ),
+            ),
         )
 
         val objective = assertIs<FunctionalObjective>(
             sweep.functionalObjective(
-            LinearObjective(longArrayOf(0, 0, 7)),
-            ExecutionControl.Never,
-            captureBooleanCosts = true,
-        )
+                LinearObjective(longArrayOf(0, 0, 7)),
+                ExecutionControl.Never,
+                captureBooleanCosts = true,
+            ),
         )
 
         assertNull(objective.booleanCostSweep)
@@ -57,17 +57,17 @@ class DefinitionalSweepTest {
             DefinitionalSweep.infer(
                 problem,
                 boolFolds = listOf(
-            BoolFoldDefinition(2, intArrayOf(Lit.make(0, true), Lit.make(1, false)), true),
-        )
-            )
+                    BoolFoldDefinition(2, intArrayOf(Lit.make(0, true), Lit.make(1, false)), true),
+                ),
+            ),
         )
 
         val objective = assertIs<FunctionalObjective>(
             sweep.functionalObjective(
-            LinearObjective(longArrayOf(3, 0, 7)),
-            ExecutionControl.Never,
-            captureBooleanCosts = true,
-        )
+                LinearObjective(longArrayOf(3, 0, 7)),
+                ExecutionControl.Never,
+                captureBooleanCosts = true,
+            ),
         )
 
         assertNull(objective.booleanCostSweep)
@@ -80,18 +80,18 @@ class DefinitionalSweepTest {
             DefinitionalSweep.infer(
                 problem,
                 boolFolds = listOf(
-            BoolFoldDefinition(2, intArrayOf(Lit.make(0, true)), true),
-            BoolFoldDefinition(3, intArrayOf(Lit.make(1, true)), false),
-        )
-            )
+                    BoolFoldDefinition(2, intArrayOf(Lit.make(0, true)), true),
+                    BoolFoldDefinition(3, intArrayOf(Lit.make(1, true)), false),
+                ),
+            ),
         )
 
         val objective = assertIs<FunctionalObjective>(
             sweep.functionalObjective(
-            LinearObjective(longArrayOf(0, 0, 7)),
-            ExecutionControl.Never,
-            captureBooleanCosts = true,
-        )
+                LinearObjective(longArrayOf(0, 0, 7)),
+                ExecutionControl.Never,
+                captureBooleanCosts = true,
+            ),
         )
 
         assertNull(objective.booleanCostSweep)
@@ -102,22 +102,24 @@ class DefinitionalSweepTest {
         for (variableArray in listOf(false, true)) {
             val domains = arrayOf(IntDomain(0, 1), IntDomain(10, 20), IntDomain(10, 20), IntDomain(10, 20))
             val source = Problem(
-                0, 4, domains,
+                0,
+                4,
+                domains,
                 listOf(
                     Element(
-                0,
-                3,
-                if (variableArray) longArrayOf(1, 2) else longArrayOf(10, 20),
-                variableArray,
-                indexOffset = 0,
-            )
-                )
+                        0,
+                        3,
+                        if (variableArray) longArrayOf(1, 2) else longArrayOf(10, 20),
+                        variableArray,
+                        indexOffset = 0,
+                    ),
+                ),
             )
             val sweep = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(3)))
             val objective = assertNotNull(
                 sweep.functionalObjective(
-                LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)),
-            )
+                    LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)),
+                ),
             )
             val assignment = com.eignex.klause.solver.Assignment(0, 4)
             assignment.setInt(0, 1)
@@ -161,8 +163,8 @@ class DefinitionalSweepTest {
         val sweep = assertNotNull(DefinitionalSweep.infer(source, intArrayOf(3)))
         val objective = assertNotNull(
             sweep.functionalObjective(
-            LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)),
-        )
+                LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1)),
+            ),
         )
         val assignment = com.eignex.klause.solver.Assignment(0, 4)
         assignment.setInt(0, 1)
@@ -201,10 +203,10 @@ class DefinitionalSweepTest {
         val inferred = DefinitionalSweep.infer(problem, intArrayOf(2, 3, 4))
         val source = listOf(
             DefinitionHint.Product(
-            2,
-            DefinitionHint.Operand.Variable(0),
-            DefinitionHint.Operand.Variable(1),
-        )
+                2,
+                DefinitionHint.Operand.Variable(0),
+                DefinitionHint.Operand.Variable(1),
+            ),
         )
         val assignment = com.eignex.klause.solver.Assignment(0, 5)
         assignment.setInt(0, 2)

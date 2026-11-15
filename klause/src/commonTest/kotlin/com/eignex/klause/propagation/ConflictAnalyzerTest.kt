@@ -190,10 +190,12 @@ class ConflictAnalyzerTest {
     @Test
     fun `historical table selection should leave extended reasons and scope premises intact`() {
         val problem = Problem(
-            1, 2, Array(2) { IntDomain(0, 1) },
+            1,
+            2,
+            Array(2) { IntDomain(0, 1) },
             arrayOf<Factor>(
-            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
-        )
+                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+            ),
         )
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true

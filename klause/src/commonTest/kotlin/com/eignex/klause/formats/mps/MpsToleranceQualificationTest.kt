@@ -19,8 +19,8 @@ class MpsToleranceQualificationTest {
     fun `a rounded equality should retain an accepted bound below its nominal float optimum`() {
         val source = assertNotNull(
             Mps.parse(
-            "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3.0000000000000001\nRHS\n RHS R 1\nENDATA",
-        ).toLinearSourceProblem()
+                "ROWS\n N COST\n E R\nCOLUMNS\n X COST 1 R 3.0000000000000001\nRHS\n RHS R 1\nENDATA",
+            ).toLinearSourceProblem(),
         )
         val expected = BigFraction.of(bigIntOf(9999999000000000L), bigIntOf(30000000000000001L))
 
@@ -37,11 +37,11 @@ class MpsToleranceQualificationTest {
     fun `enabled one term rows should preserve an empty tolerance accepted set`() {
         val source = assertNotNull(
             Mps.parse(
-            "ROWS\n N COST\n G A\n L B\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 0\n" +
-                " M1 'MARKER' 'INTEND'\n X A 1 B 1\nRHS\n RHS A 0.2 B 0.1\n" +
-                "BOUNDS\n FX BN I 1\n LO BN X 0\n UP BN X 1\n" +
-                "INDICATORS\n IF A I 1\n IF B I 1\nENDATA",
-        ).toLinearSourceProblem()
+                "ROWS\n N COST\n G A\n L B\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 0\n" +
+                    " M1 'MARKER' 'INTEND'\n X A 1 B 1\nRHS\n RHS A 0.2 B 0.1\n" +
+                    "BOUNDS\n FX BN I 1\n LO BN X 0\n UP BN X 1\n" +
+                    "INDICATORS\n IF A I 1\n IF B I 1\nENDATA",
+            ).toLinearSourceProblem(),
         )
 
         val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
@@ -53,10 +53,10 @@ class MpsToleranceQualificationTest {
     fun `an unfixed indicator should not supply an unconditional accepted objective bound`() {
         val source = assertNotNull(
             Mps.parse(
-            "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 0\n" +
-                " M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 2\n" +
-                "BOUNDS\n FR B X\nINDICATORS\n IF R I 1\nENDATA",
-        ).toLinearSourceProblem()
+                "ROWS\n N COST\n G R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 0\n" +
+                    " M1 'MARKER' 'INTEND'\n X COST 1 R 1\nRHS\n RHS R 2\n" +
+                    "BOUNDS\n FR B X\nINDICATORS\n IF R I 1\nENDATA",
+            ).toLinearSourceProblem(),
         )
 
         val bound = source.toleranceQualification(ExecutionControl.Never)?.objectiveBound()
@@ -69,14 +69,14 @@ class MpsToleranceQualificationTest {
         for ((lower, expected) in listOf("10" to "5", "-10" to "-20")) {
             val source = assertNotNull(
                 Mps.parse(
-                "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R $lower\nBOUNDS\n FR B X\nENDATA",
-            ).toLinearSourceProblem(
-                SemanticOverrides(
-                    feasibilityTolerance = SourceTolerance(
-                relative = SemanticRational.of(BIG_ONE, bigIntOf(2)),
-            )
-                )
-            )
+                    "ROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R 1\nRHS\n RHS R $lower\nBOUNDS\n FR B X\nENDATA",
+                ).toLinearSourceProblem(
+                    SemanticOverrides(
+                        feasibilityTolerance = SourceTolerance(
+                            relative = SemanticRational.of(BIG_ONE, bigIntOf(2)),
+                        ),
+                    ),
+                ),
             )
 
             val bound = source.toleranceQualification(ExecutionControl.Never)?.objectiveBound()
@@ -92,15 +92,15 @@ class MpsToleranceQualificationTest {
     fun `negative row coefficients should retain absolute slack in original row units`() {
         val source = assertNotNull(
             Mps.parse(
-            "OBJSENSE\n MAX\nROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R -2\nRHS\n RHS R 4\n" +
-                "BOUNDS\n FR B X\nENDATA",
-        ).toLinearSourceProblem(
-            SemanticOverrides(
-                feasibilityTolerance = SourceTolerance(
-            absolute = SemanticRational.of(BIG_ONE, bigIntOf(10)),
-        )
-            )
-        )
+                "OBJSENSE\n MAX\nROWS\n N COST\n G R\nCOLUMNS\n X COST 1 R -2\nRHS\n RHS R 4\n" +
+                    "BOUNDS\n FR B X\nENDATA",
+            ).toLinearSourceProblem(
+                SemanticOverrides(
+                    feasibilityTolerance = SourceTolerance(
+                        absolute = SemanticRational.of(BIG_ONE, bigIntOf(10)),
+                    ),
+                ),
+            ),
         )
         val expected = BigFraction.of(bigIntOf(-39), bigIntOf(20))
 
@@ -139,8 +139,8 @@ class MpsToleranceQualificationTest {
         for ((bound, covered) in listOf("0.00000005" to false, "1" to true)) {
             val source = assertNotNull(
                 Mps.parse(
-                "ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R $bound\nENDATA",
-            ).toLinearSourceProblem()
+                    "ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R $bound\nENDATA",
+                ).toLinearSourceProblem(),
             )
 
             val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
@@ -154,9 +154,9 @@ class MpsToleranceQualificationTest {
     fun `small tolerance should preserve bounded rational integer rows`() {
         val source = assertNotNull(
             Mps.parse(
-            "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R 0.1\n" +
-                " J R 0.2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 0.15\nENDATA",
-        ).toLinearSourceProblem()
+                "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R 0.1\n" +
+                    " J R 0.2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 0.15\nENDATA",
+            ).toLinearSourceProblem(),
         )
 
         val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
@@ -168,15 +168,15 @@ class MpsToleranceQualificationTest {
     fun `slack reaching the next integer activity should not preserve the nominal row`() {
         val source = assertNotNull(
             Mps.parse(
-            "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R 0.1\n" +
-                " J R 0.2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 0.15\nENDATA",
-        ).toLinearSourceProblem(
-            SemanticOverrides(
-                feasibilityTolerance = SourceTolerance(
-            absolute = SemanticRational.of(BIG_ONE, bigIntOf(20)),
-        )
-            )
-        )
+                "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R 0.1\n" +
+                    " J R 0.2\n M1 'MARKER' 'INTEND'\nRHS\n RHS R 0.15\nENDATA",
+            ).toLinearSourceProblem(
+                SemanticOverrides(
+                    feasibilityTolerance = SourceTolerance(
+                        absolute = SemanticRational.of(BIG_ONE, bigIntOf(20)),
+                    ),
+                ),
+            ),
         )
 
         val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
@@ -193,9 +193,9 @@ class MpsToleranceQualificationTest {
                 .toLinearSourceProblem(
                     SemanticOverrides(
                         feasibilityTolerance = SourceTolerance(
-                    absolute = SemanticRational.ONE,
-                )
-                    )
+                            absolute = SemanticRational.ONE,
+                        ),
+                    ),
                 ),
         )
 
@@ -210,9 +210,9 @@ class MpsToleranceQualificationTest {
     fun `relative activity must include cancelling integer terms`() {
         val source = assertNotNull(
             Mps.parse(
-            "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R 1000000000\n" +
-                " J R -1000000000\n M1 'MARKER' 'INTEND'\nRHS\n RHS R -1\nENDATA",
-        ).toLinearSourceProblem()
+                "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R 1000000000\n" +
+                    " J R -1000000000\n M1 'MARKER' 'INTEND'\nRHS\n RHS R -1\nENDATA",
+            ).toLinearSourceProblem(),
         )
 
         val qualified = source.toleranceQualification(ExecutionControl.Never)?.verify()
@@ -229,9 +229,9 @@ class MpsToleranceQualificationTest {
                 .toLinearSourceProblem(
                     SemanticOverrides(
                         feasibilityTolerance = SourceTolerance(
-                    absolute = SemanticRational.of(BIG_ONE, bigIntOf(2)),
-                )
-                    )
+                            absolute = SemanticRational.of(BIG_ONE, bigIntOf(2)),
+                        ),
+                    ),
                 ),
         )
 
@@ -247,9 +247,9 @@ class MpsToleranceQualificationTest {
                 .toLinearSourceProblem(
                     SemanticOverrides(
                         feasibilityTolerance = SourceTolerance(
-                    relative = SemanticRational.ONE,
-                )
-                    )
+                            relative = SemanticRational.ONE,
+                        ),
+                    ),
                 ),
         )
 

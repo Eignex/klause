@@ -91,25 +91,25 @@ class GlobalScoringViewsTest {
         for (a in 0L..2L) {
             for (b in 0L..2L) {
                 for (c in 0L..2L) {
-            state.assignment.setInt(0, a)
-            state.assignment.setInt(1, b)
-            state.assignment.setInt(2, c)
-            state.recompute()
-            for (id in 0..2) {
-                for (value in 0L..2L) {
-                val old = state.assignment.intValue(id)
-                val before = state.cost
-                val move = Move.IntSet(id, value)
-                val delta = state.netDelta(move)
+                    state.assignment.setInt(0, a)
+                    state.assignment.setInt(1, b)
+                    state.assignment.setInt(2, c)
+                    state.recompute()
+                    for (id in 0..2) {
+                        for (value in 0L..2L) {
+                            val old = state.assignment.intValue(id)
+                            val before = state.cost
+                            val move = Move.IntSet(id, value)
+                            val delta = state.netDelta(move)
 
-                state.apply(move)
+                            state.apply(move)
 
-                assertEquals(before + delta, state.cost)
-                state.apply(Move.IntSet(id, old))
-                assertEquals(before, state.cost)
-            }
-            }
-        }
+                            assertEquals(before + delta, state.cost)
+                            state.apply(Move.IntSet(id, old))
+                            assertEquals(before, state.cost)
+                        }
+                    }
+                }
             }
         }
     }
@@ -121,20 +121,20 @@ class GlobalScoringViewsTest {
         for (a in 0L..2L) {
             for (b in 0L..2L) {
                 for (c in 0L..2L) {
-            for (state in states) {
-                state.assignment.setInt(0, a)
-                state.assignment.setInt(1, b)
-                state.assignment.setInt(2, c)
-                state.recompute()
-            }
-            assertEquals(1, states.map { it.cost }.distinct().size)
-            for (id in 0..2) {
-                for (value in 0L..2L) {
-                val move = Move.IntSet(id, value)
-                assertEquals(1, states.map { it.netDelta(move) }.distinct().size)
-            }
-            }
-        }
+                    for (state in states) {
+                        state.assignment.setInt(0, a)
+                        state.assignment.setInt(1, b)
+                        state.assignment.setInt(2, c)
+                        state.recompute()
+                    }
+                    assertEquals(1, states.map { it.cost }.distinct().size)
+                    for (id in 0..2) {
+                        for (value in 0L..2L) {
+                            val move = Move.IntSet(id, value)
+                            assertEquals(1, states.map { it.netDelta(move) }.distinct().size)
+                        }
+                    }
+                }
             }
         }
     }
@@ -308,9 +308,9 @@ class GlobalScoringViewsTest {
 
     private fun state(factor: Factor): LocalSearchState = LocalSearchState(
         LocalSearchModel.open(
-        Problem(0, 3, Array(3) { IntDomain(0, 7) }, arrayOf(factor)),
-    ),
-        Random(7)
+            Problem(0, 3, Array(3) { IntDomain(0, 7) }, arrayOf(factor)),
+        ),
+        Random(7),
     )
 
     companion object {

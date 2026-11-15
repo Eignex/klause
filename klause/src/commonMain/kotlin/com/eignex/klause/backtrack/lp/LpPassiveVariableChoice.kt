@@ -69,12 +69,12 @@ internal class LpPassiveVariableChoice(
         observe(if (applyAdvice) "PASSIVE_VARIABLE_COMMITTED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD")
         if (wasChanged) {
             observe(
-            if (applyAdvice) {
-                "PASSIVE_VARIABLE_COMMIT_CHANGED"
-            } else {
-                "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
-            },
-        )
+                if (applyAdvice) {
+                    "PASSIVE_VARIABLE_COMMIT_CHANGED"
+                } else {
+                    "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
+                },
+            )
         }
     }
 
@@ -89,11 +89,11 @@ internal class LpPassiveVariableChoice(
 
         is SearchDecision.IntAtMost ->
             variable is VarRef.IntVar && variable.varId == decision.variable &&
-            decision.upper == floor(point).toLong()
+                decision.upper == floor(point).toLong()
 
         is SearchDecision.IntAtLeast ->
             variable is VarRef.IntVar && variable.varId == decision.variable &&
-            decision.lower == floor(point).toLong() + 1L
+                decision.lower == floor(point).toLong() + 1L
 
         else -> false
     }

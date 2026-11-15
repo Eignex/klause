@@ -89,14 +89,14 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
     fun note(mask: Int, metric: Metric, value: Long = 1) {
         for (family in FactorFamily.entries) {
             if (mask and (1 shl family.ordinal) != 0) {
-            val row = counts[family.ordinal]
-            val i = metric.ordinal
-            row[i] = if (metric == Metric.MaxSupport) {
-                maxOf(row[i], value)
-            } else {
-                row[i] + value.coerceIn(0, Long.MAX_VALUE - row[i])
+                val row = counts[family.ordinal]
+                val i = metric.ordinal
+                row[i] = if (metric == Metric.MaxSupport) {
+                    maxOf(row[i], value)
+                } else {
+                    row[i] + value.coerceIn(0, Long.MAX_VALUE - row[i])
+                }
             }
-        }
         }
     }
 
@@ -179,23 +179,22 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
     fun snapshot(): Map<String, Long> = buildMap {
         for (family in FactorFamily.entries) {
             for (metric in Metric.entries) {
-            val value = counts[family.ordinal][metric.ordinal]
-            if (value != 0L) put("factor${family.name}${metric.name}", value)
-        }
+                val value = counts[family.ordinal][metric.ordinal]
+                if (value != 0L) put("factor${family.name}${metric.name}", value)
+            }
         }
         put("factorTrackedReasons", reasons.size.toLong())
         put("factorTrackedLearning", learned.size.toLong())
     }
 }
 
-internal fun PropagationState.attributionFamily(fid: Int): Int =
-    if (nativeEngine != null) {
-        1 shl FactorFamily.Clause.ordinal
-    } else if (fid >= 0) {
-        factorAttribution?.family(factorAt(fid)) ?: 0
-    } else {
-        1 shl FactorFamily.Unattributed.ordinal
-    }
+internal fun PropagationState.attributionFamily(fid: Int): Int = if (nativeEngine != null) {
+    1 shl FactorFamily.Clause.ordinal
+} else if (fid >= 0) {
+    factorAttribution?.family(factorAt(fid)) ?: 0
+} else {
+    1 shl FactorFamily.Unattributed.ordinal
+}
 
 internal fun PropagationState.attributeReason(reason: IntArray?) {
     factorAttribution?.let { it.remember(reason, attributionFamily(currentFactor), !isLazyReason(reason)) }

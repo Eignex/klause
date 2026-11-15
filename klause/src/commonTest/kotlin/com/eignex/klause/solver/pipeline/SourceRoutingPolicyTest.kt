@@ -37,23 +37,23 @@ class SourceRoutingPolicyTest {
             }
             val providers = FactorProjectionProviders(
                 encoder = EncoderProvider { factor, target ->
-                val selected = BuiltInEncoderProvider.select(factor, target)
-                Encoder(selected.support, selected.requiredIntegers, selected.requiredBooleans) { view, encoding ->
-                    installations++
-                    encoding.cancellation.charge(1000)
-                    selected.install(view, encoding)
-                }
-            }
+                    val selected = BuiltInEncoderProvider.select(factor, target)
+                    Encoder(selected.support, selected.requiredIntegers, selected.requiredBooleans) { view, encoding ->
+                        installations++
+                        encoding.cancellation.charge(1000)
+                        selected.install(view, encoding)
+                    }
+                },
             )
 
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.SATISFY,
-                engine,
-                providers = providers,
-                cancellation = stop,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.SATISFY,
+                    engine,
+                    providers = providers,
+                    cancellation = stop,
+                ),
             )
 
             val route = assertIs<SourceProblemRoute.Finite>(invocation.route)
@@ -79,11 +79,11 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            cancellation = stop,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                cancellation = stop,
+            ),
         ) {
             observations++
             stopped = true
@@ -108,23 +108,23 @@ class SourceRoutingPolicyTest {
         var installations = 0
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            val selected = BuiltInEncoderProvider.select(factor, target)
-            Encoder(selected.support, selected.requiredIntegers, selected.requiredBooleans) { view, encoding ->
-                installations++
-                selected.install(view, encoding)
-            }
-        }
+                val selected = BuiltInEncoderProvider.select(factor, target)
+                Encoder(selected.support, selected.requiredIntegers, selected.requiredBooleans) { view, encoding ->
+                    installations++
+                    selected.install(view, encoding)
+                }
+            },
         )
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-            maximize = true,
-            providers = providers,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+                maximize = true,
+                providers = providers,
+            ),
         )
 
         val route = assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
@@ -145,11 +145,11 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            cancellation = stop,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                cancellation = stop,
+            ),
         )
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(invocation.route)

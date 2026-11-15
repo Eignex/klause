@@ -80,7 +80,7 @@ class QfLiraSolverLpTest {
             assertEquals(
                 1L,
                 stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
-                .outcomes["FEASIBLE_COMPLETION"]
+                    .outcomes["FEASIBLE_COMPLETION"],
             )
         }
     }
@@ -108,7 +108,7 @@ class QfLiraSolverLpTest {
             assertEquals(
                 1L,
                 stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
-                .outcomes["CONTRADICTION"]
+                    .outcomes["CONTRADICTION"],
             )
         }
     }
@@ -143,7 +143,7 @@ class QfLiraSolverLpTest {
 
             assertTrue(
                 stats.snapshot().phases.getValue("CLAIM_FEASIBLE_COMPLETION_STANDALONE")
-                .outcomes.getValue("SATISFIED") > 0L
+                    .outcomes.getValue("SATISFIED") > 0L,
             )
             assertNull(stats.snapshot().phases["CLAIM_CONSUMPTION_STANDALONE"])
         }

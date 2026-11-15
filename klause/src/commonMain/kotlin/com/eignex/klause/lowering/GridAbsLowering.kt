@@ -29,10 +29,10 @@ internal fun gridAbsoluteValueRows(factor: GridAbs, cancellation: ExecutionContr
         clauses.add(
             LinearForm.Disjunction(
                 listOf(
-            Linear(intArrayOf(1), intArrayOf(factor.operand), LinearOp.NE, input),
-            Linear(intArrayOf(1), intArrayOf(factor.result), LinearOp.EQ, output),
-        )
-            )
+                    Linear(intArrayOf(1), intArrayOf(factor.operand), LinearOp.NE, input),
+                    Linear(intArrayOf(1), intArrayOf(factor.result), LinearOp.EQ, output),
+                ),
+            ),
         )
     }
     if (cancellation()) return null

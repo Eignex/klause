@@ -227,12 +227,12 @@ object FinitePipeline {
                 bakedModel.withRealDifferenceSystem(token) { observation.preparationInterrupted() }.also {
                     if (it === bakedModel) {
                         observation?.outcome = if (
-                        bakedModel.numRealVars !in 1..10000 || bakedModel.semantics.isApproximate
-                    ) {
-                        PresolveInvocationOutcome.ELIGIBILITY_SKIP
-                    } else {
-                        PresolveInvocationOutcome.COMPLETE_MISS
-                    }
+                            bakedModel.numRealVars !in 1..10000 || bakedModel.semantics.isApproximate
+                        ) {
+                            PresolveInvocationOutcome.ELIGIBILITY_SKIP
+                        } else {
+                            PresolveInvocationOutcome.COMPLETE_MISS
+                        }
                     }
                 }
             }
@@ -243,8 +243,8 @@ object FinitePipeline {
             outcome.mapping
         } else {
             outcome.mapping.then(
-            SourceMapping(outcome.mapping.target, finiteModel, TransformationGuarantees.IDENTITY),
-        )
+                SourceMapping(outcome.mapping.target, finiteModel, TransformationGuarantees.IDENTITY),
+            )
         }
         val sameCoordinatesAndFactors = finiteModel.numBoolVars == request.problem.numBoolVars &&
             finiteModel.numIntVars == request.problem.numIntVars &&

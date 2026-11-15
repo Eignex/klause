@@ -19,8 +19,8 @@ class WatchedClauseStoreTest {
         val firstSample = SharingMemoryObservation(100_000L, 1024, { false }, {})
         val firstProtected = requireNotNull(
             firstSample.snapshot {
-            store.memory(firstSample) { it == first }
-        }.completeValues
+                store.memory(firstSample) { it == first }
+            }.completeValues,
         )
         val allSample = SharingMemoryObservation(100_000L, 1024, { false }, {})
 
@@ -34,7 +34,7 @@ class WatchedClauseStoreTest {
         assertTrue(firstProtected.getValue("protectedPrimitiveBytes") > 2L * Int.SIZE_BYTES)
         assertTrue(
             allProtected.getValue("protectedPrimitiveBytes") -
-            firstProtected.getValue("protectedPrimitiveBytes") > 2L * Int.SIZE_BYTES
+                firstProtected.getValue("protectedPrimitiveBytes") > 2L * Int.SIZE_BYTES,
         )
     }
 }

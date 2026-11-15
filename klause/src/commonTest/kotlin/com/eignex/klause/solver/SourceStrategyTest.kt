@@ -126,19 +126,21 @@ class SourceStrategyTest {
     @Test
     fun `finite affine optimization should preserve complete decision limits`() {
         val source = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
                 Clause(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-        )
-            )
+                    intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+                ),
+            ),
         )
         val objective = LinearObjective(boolWeights = longArrayOf(1, 2), constant = 7)
         val strategy = BacktrackSolver.source(source)
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
-            backtrack = BacktrackParams(maxDecisions = 0L, nativeSat = false),
-        )
+                backtrack = BacktrackParams(maxDecisions = 0L, nativeSat = false),
+            ),
         )
 
         val stopped = assertIs<OpenTheoryExecution.Optimize>(strategy.optimizeOpen(objective, params)).result
@@ -155,8 +157,8 @@ class SourceStrategyTest {
         val strategy = BacktrackSolver.source(source)
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
-            backtrack = BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to true))),
-        )
+                backtrack = BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to true))),
+            ),
         )
 
         val pinned = assertIs<OpenTheoryExecution.Optimize>(strategy.optimizeOpen(objective, params)).result
@@ -173,8 +175,8 @@ class SourceStrategyTest {
         val objective = LinearObjective(constant = 7)
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
-            localSearch = LocalSearchParams(initialAssignment = initial, maxFlips = 1L, randomSeed = 17L),
-        )
+                localSearch = LocalSearchParams(initialAssignment = initial, maxFlips = 1L, randomSeed = 17L),
+            ),
         )
 
         val execution = LocalSearchSolver.source(source).optimizeOpen(objective, params)
@@ -202,22 +204,22 @@ class SourceStrategyTest {
             val budget = NodeBudget(1000)
             val params = PolynomialTheoryParams(
                 strategy = PolynomialStrategyParams(
-                localSearch = LocalSearchParams(
-                    maxFlips = 1,
-                    randomSeed = 17,
-                    nodeBudget = budget,
-                    initialAssignment = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(0.0)),
+                    localSearch = LocalSearchParams(
+                        maxFlips = 1,
+                        randomSeed = 17,
+                        nodeBudget = budget,
+                        initialAssignment = Sample(booleanArrayOf(), longArrayOf(0), doubleArrayOf(0.0)),
+                    ),
                 ),
-            )
             )
 
             val execution = assertIs<OpenTheoryExecution.Optimize>(
                 LocalSearchSolver.source(source).optimizeOpen(
-                objective,
-                params,
-                TheoryParams(randomSeed = 17, nodeBudget = budget),
-                sense,
-            )
+                    objective,
+                    params,
+                    TheoryParams(randomSeed = 17, nodeBudget = budget),
+                    sense,
+                ),
             )
 
             val result = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
@@ -240,13 +242,13 @@ class SourceStrategyTest {
             arrayOf(IntDomain(1, 2)),
             arrayOf(
                 Linear(
-                intArrayOf(0),
-                doubleArrayOf(-1.0),
-                intArrayOf(0),
-                doubleArrayOf(3.0),
-                LinearOp.EQ,
-                0.0,
-            )
+                    intArrayOf(0),
+                    doubleArrayOf(-1.0),
+                    intArrayOf(0),
+                    doubleArrayOf(3.0),
+                    LinearOp.EQ,
+                    0.0,
+                ),
             ),
             numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
@@ -257,17 +259,17 @@ class SourceStrategyTest {
             val budget = NodeBudget(1000)
             val params = PolynomialTheoryParams(
                 strategy = PolynomialStrategyParams(
-                localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17, nodeBudget = budget),
-            )
+                    localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17, nodeBudget = budget),
+                ),
             )
 
             val execution = assertIs<OpenTheoryExecution.Optimize>(
                 LocalSearchSolver.source(source).optimizeOpen(
-                objective,
-                params,
-                TheoryParams(randomSeed = 17, nodeBudget = budget),
-                sense,
-            )
+                    objective,
+                    params,
+                    TheoryParams(randomSeed = 17, nodeBudget = budget),
+                    sense,
+                ),
             )
 
             val result = assertIs<OpenTheoryOptimum.Bounded>(execution.result)
@@ -331,12 +333,14 @@ class SourceStrategyTest {
     @Test
     fun `finite source satisfaction should preserve typed complete decision limits`() {
         val source = Problem(
-            2, 0, emptyArray(),
+            2,
+            0,
+            emptyArray(),
             arrayOf(
                 Clause(
-            intArrayOf(Lit.make(0, true), Lit.make(1, true)),
-        )
-            )
+                    intArrayOf(Lit.make(0, true), Lit.make(1, true)),
+                ),
+            ),
         )
         val strategy = BacktrackSolver.source(source)
 

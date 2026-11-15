@@ -98,12 +98,12 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
             row.secondKey == literal -> row.second = pack(literal, value)
 
             row.firstKey < 0 -> {
-                row.first = pack(literal, value);
+                row.first = pack(literal, value)
                 size++
             }
 
             row.secondKey < 0 -> {
-                row.second = pack(literal, value);
+                row.second = pack(literal, value)
                 size++
             }
 
@@ -163,8 +163,8 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
         if (!valid(row.firstKey, row.firstValue) ||
             (row.secondKey >= 0 && !valid(row.secondKey, row.secondValue))
         ) {
-                return null
-            }
+            return null
+        }
         size -= if (row.secondKey >= 0) 2 else 1
         lastWork++
         dropRow(factor)
@@ -302,13 +302,13 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
     private fun ensureRow(factor: Int): Row {
         if (factor < baseLimit) {
             if (baseRows.isEmpty()) {
-                baseRows = arrayOfNulls(baseLimit);
+                baseRows = arrayOfNulls(baseLimit)
                 lastWork += baseLimit + 1L
             }
             lastWork++
             return baseRows[factor] ?: Row().also {
-                baseRows[factor] = it;
-                rows++;
+                baseRows[factor] = it
+                rows++
                 lastWork += 8L
             }
         }
@@ -364,9 +364,9 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
 
     private fun dropRow(factor: Int) {
         if (factor < baseLimit) {
-            baseRows[factor] = null;
-            rows--;
-            lastWork += 2L;
+            baseRows[factor] = null
+            rows--
+            lastWork += 2L
             return
         }
         val reserved = factor.toLong() - reservationFirst
@@ -376,7 +376,7 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
             reservationLive--
             lastWork += 3L
             if (reservationLive == 0) {
-                reservationRows = emptyArray();
+                reservationRows = emptyArray()
                 lastWork++
             }
             return
@@ -389,9 +389,9 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
             lastWork += 3L
         }
         if (root?.live == 0) {
-            root = null;
-            depth = 0;
-            directories--;
+            root = null
+            depth = 0
+            directories--
             lastWork += 3L
         }
     }

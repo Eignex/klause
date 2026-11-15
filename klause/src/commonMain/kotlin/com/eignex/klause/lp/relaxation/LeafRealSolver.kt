@@ -177,7 +177,9 @@ internal class LeafRealSolver(
         try {
             if (close) solvers.close() else solvers.releaseSolvers()
         } catch (cleanup: Throwable) {
-            if (failure == null) failure = cleanup else if (failure !== cleanup) {
+            if (failure == null) {
+                failure = cleanup
+            } else if (failure !== cleanup) {
                 failure.addSuppressed(cleanup)
             }
         }

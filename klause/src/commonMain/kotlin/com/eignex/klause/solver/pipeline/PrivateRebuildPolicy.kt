@@ -26,8 +26,8 @@ internal fun privateRebuildDefaultScenario(
     if (reader[ExecutionOption.privateRebuildWork] != null ||
         reader[ExecutionOption.booleanProofTasks] == true
     ) {
-            return scenario
-        }
+        return scenario
+    }
     val privateBytes = reader[ExecutionOption.privateRebuildBytes]
     val sharedScratch = reader[ExecutionOption.learnedMemoryScratchBytes]
     val edit = scenario.btEdit

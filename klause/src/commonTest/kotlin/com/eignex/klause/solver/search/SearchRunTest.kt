@@ -70,12 +70,12 @@ class SearchRunTest {
     fun `restarts and learned conflicts should preserve a retained Boolean root`() {
         val session = SearchSession(
             listOf(object : SearchComponent {
-            override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(1) == false) {
-                ComponentCheck.Infeasible(SearchExplanation(intArrayOf(Lit.make(1, true))))
-            } else {
-                ComponentCheck.Feasible
-            }
-        })
+                override fun check(context: SearchContext): ComponentCheck = if (context.boolValue(1) == false) {
+                    ComponentCheck.Infeasible(SearchExplanation(intArrayOf(Lit.make(1, true))))
+                } else {
+                    ComponentCheck.Feasible
+                }
+            }),
         )
         session.initialize()
         var pause = true
@@ -152,8 +152,10 @@ class SearchRunTest {
             val run = session.openRun(
                 1,
                 lifecycle = object : SearchRunLifecycle {
-                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
-            }
+                    override fun onCancellation(
+                        context: SearchContext,
+                    ): SearchRunDisposition = SearchRunDisposition.Pause
+                },
             )
 
             assertIs<SearchRunEvent.Paused>(run.next())
@@ -192,10 +194,13 @@ class SearchRunTest {
             val session = SearchSession(listOf(cp, component), cancellation = ExecutionControl { cancelled })
             session.initialize()
             val run = session.openRun(
-                1, modelContinuation = continuation,
+                1,
+                modelContinuation = continuation,
                 lifecycle = object : SearchRunLifecycle {
-                override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause
-            }
+                    override fun onCancellation(
+                        context: SearchContext,
+                    ): SearchRunDisposition = SearchRunDisposition.Pause
+                },
             )
 
             assertIs<SearchRunEvent.Paused>(run.next())
@@ -233,11 +238,12 @@ class SearchRunTest {
                 val session = SearchSession(listOf(cp, component), cancellation = ExecutionControl { cancelled })
                 session.initialize()
                 val run = session.openRun(
-                    1, modelContinuation = continuation,
+                    1,
+                    modelContinuation = continuation,
                     lifecycle = object : SearchRunLifecycle {
-                    override fun onCancellation(context: SearchContext): SearchRunDisposition =
-                        SearchRunDisposition.Pause
-                }
+                        override fun onCancellation(context: SearchContext): SearchRunDisposition =
+                            SearchRunDisposition.Pause
+                    },
                 )
 
                 assertIs<SearchRunEvent.Paused>(run.next())
@@ -263,8 +269,10 @@ class SearchRunTest {
         val run = session.openRun(
             0,
             lifecycle = object : SearchRunLifecycle {
-            override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Exhausted
-        }
+                override fun onCancellation(
+                    context: SearchContext,
+                ): SearchRunDisposition = SearchRunDisposition.Exhausted
+            },
         )
 
         val result = run.next()
@@ -435,16 +443,16 @@ class SearchRunTest {
         var decline = true
         val session = SearchSession(
             listOf(object : SearchComponent {
-            override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
-        })
+                override fun check(context: SearchContext): ComponentCheck = ComponentCheck.Feasible
+            }),
         )
         session.initialize()
         val run = session.openRun(
             0,
             nodePolicy = object : SearchNodePolicy {
-            override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
-                if (decline) SearchNodeDisposition.Indeterminate else SearchNodeDisposition.Expand
-        }
+                override fun beforeBranch(context: SearchContext): SearchNodeDisposition =
+                    if (decline) SearchNodeDisposition.Indeterminate else SearchNodeDisposition.Expand
+            },
         ).also { it.recordComponentStops = true }
         assertEquals(SearchRunEvent.Indeterminate.Component, run.next())
         assertEquals(SearchComponentStop.Site.NodePolicy, run.componentStop?.site)

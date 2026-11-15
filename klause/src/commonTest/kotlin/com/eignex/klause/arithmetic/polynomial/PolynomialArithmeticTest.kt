@@ -300,8 +300,8 @@ class PolynomialArithmeticTest {
     fun `unit division completes within the containing work allowance`() {
         val dividend = Polynomial.of(
             (0 until 128).map { exponent ->
-            PolynomialTerm(Monomial.of(mapOf(0 to exponent, 1 to 1)), fraction(exponent.toLong() + 1))
-        }
+                PolynomialTerm(Monomial.of(mapOf(0 to exponent, 1 to 1)), fraction(exponent.toLong() + 1))
+            },
         )
         var spent = 0L
         val meter = WorkMeter { spent += it }

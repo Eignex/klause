@@ -31,10 +31,10 @@ class LabAdapterTest {
             val directory = Files.createDirectory(root.resolve("models"))
             val request = BenchRequest(
                 parameters = mapOf(
-                "selections" to """[{"suite":"mzn-smoke","name":"argmax"},
+                    "selections" to """[{"suite":"mzn-smoke","name":"argmax"},
                     {"suite":"mzn-smoke","name":"queens"}]""",
-                "input-only" to "true",
-            )
+                    "input-only" to "true",
+                ),
             )
 
             val cases = KlauseLabSuite.plan(request) { ref, inputOnly ->
@@ -77,11 +77,11 @@ class LabAdapterTest {
         val cases = KlauseLabSuite.plan(
             BenchRequest(
                 parameters = mapOf(
-                "selections" to """[{"suite":"dimacs-core","name":"php4"},
+                    "selections" to """[{"suite":"dimacs-core","name":"php4"},
                     {"suite":"mps-core","name":"blend-tiny"}]""",
-                "solver-seeds" to "1,3",
-                "repeats" to "2",
-            )
+                    "solver-seeds" to "1,3",
+                    "repeats" to "2",
+                ),
             ),
         )
 

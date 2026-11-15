@@ -139,12 +139,14 @@ class ResultSemanticsTest {
     fun `finite root refutations should retain source qualification`() {
         val semantics = SourceSemantics(SourceFormat.DIMACS).resolve()
         val model = Problem(
-            1, 0, emptyArray(),
+            1,
+            0,
+            emptyArray(),
             arrayOf(
-            Clause(intArrayOf(Lit.make(0, true))),
-            Clause(intArrayOf(Lit.make(0, false))),
-        ),
-            semantics = semantics
+                Clause(intArrayOf(Lit.make(0, true))),
+                Clause(intArrayOf(Lit.make(0, false))),
+            ),
+            semantics = semantics,
         ).bake()
 
         val results = listOf(

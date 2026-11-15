@@ -94,9 +94,9 @@ internal class BooleanProofPortfolio private constructor(
         require(condition.bools.keys.all { it in 0 until problem.numBoolVars })
         require(
             parameters.all {
-            it.assumptions.numInts == 0 && it.assumptions.deductions.isEmpty &&
-                it.assumptions.bools == condition.bools
-        }
+                it.assumptions.numInts == 0 && it.assumptions.deductions.isEmpty &&
+                    it.assumptions.bools == condition.bools
+            },
         )
     }
 
@@ -267,14 +267,14 @@ internal class BooleanProofPortfolio private constructor(
         private inline fun BakedProblem.matchesPreparedModel(model: Problem?, poll: () -> Unit): Boolean =
             model === this || (
                 model != null && model !is BakedProblem && model.numBoolVars == numBoolVars &&
-                model.numIntVars == 0 && model.numRealVars == 0 && !model.hasSymmetryBreaking &&
-                model.semantics === semantics && model.settings === settings &&
-                model.impliedFactorMask === impliedFactorMask &&
-                model.numFactors == numFactors && factors.indices.all { index ->
-                    if (index and 63 == 0) poll()
-                    factors[index] === model.factors[index]
-                }
-            )
+                    model.numIntVars == 0 && model.numRealVars == 0 && !model.hasSymmetryBreaking &&
+                    model.semantics === semantics && model.settings === settings &&
+                    model.impliedFactorMask === impliedFactorMask &&
+                    model.numFactors == numFactors && factors.indices.all { index ->
+                        if (index and 63 == 0) poll()
+                        factors[index] === model.factors[index]
+                    }
+                )
 
         fun forWorkers(
             workers: List<PortfolioWorker>,

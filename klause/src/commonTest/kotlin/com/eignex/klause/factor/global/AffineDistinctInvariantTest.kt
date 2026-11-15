@@ -22,12 +22,12 @@ class AffineDistinctInvariantTest {
     fun `affine collision repairs should offer improving atomic swaps without implicit seeding`() {
         val factor = Distinct(
             (0..3).map { i ->
-            Distinct.Operand(
-                intArrayOf(Term.ofIntVar(i)),
-                listOf(BigFraction.ONE),
-                BigFraction.ofLong(if (i == 1) -1 else 0),
-            )
-        }
+                Distinct.Operand(
+                    intArrayOf(Term.ofIntVar(i)),
+                    listOf(BigFraction.ONE),
+                    BigFraction.ofLong(if (i == 1) -1 else 0),
+                )
+            },
         )
         val source = Problem(
             0,
@@ -58,12 +58,12 @@ class AffineDistinctInvariantTest {
     fun `owned affine collision repairs should preserve the seeded distinctness`() {
         val factor = Distinct(
             (0..3).map { i ->
-            Distinct.Operand(
-                intArrayOf(Term.ofIntVar(i)),
-                listOf(BigFraction.ONE),
-                BigFraction.ofLong(if (i == 1) -1 else 0),
-            )
-        }
+                Distinct.Operand(
+                    intArrayOf(Term.ofIntVar(i)),
+                    listOf(BigFraction.ONE),
+                    BigFraction.ofLong(if (i == 1) -1 else 0),
+                )
+            },
         )
         val source = Problem(
             0,
@@ -95,12 +95,12 @@ class AffineDistinctInvariantTest {
     fun `owned affine collision repairs should honor frozen coordinates`() {
         val factor = Distinct(
             (0..1).map { i ->
-            Distinct.Operand(
-                intArrayOf(Term.ofIntVar(i)),
-                listOf(BigFraction.ONE),
-                BigFraction.ofLong(-i.toLong()),
-            )
-        }
+                Distinct.Operand(
+                    intArrayOf(Term.ofIntVar(i)),
+                    listOf(BigFraction.ONE),
+                    BigFraction.ofLong(-i.toLong()),
+                )
+            },
         )
         val source = Problem(
             0,
@@ -127,12 +127,12 @@ class AffineDistinctInvariantTest {
             val offsets = longArrayOf(0, 1, 0, -1)
             val factor = Distinct(
                 vars.indices.map { i ->
-                Distinct.Operand(
-                    intArrayOf(Term.ofIntVar(vars[i])),
-                    listOf(BigFraction.ONE),
-                    base + BigFraction.ofLong(offsets[i]),
-                )
-            }
+                    Distinct.Operand(
+                        intArrayOf(Term.ofIntVar(vars[i])),
+                        listOf(BigFraction.ONE),
+                        base + BigFraction.ofLong(offsets[i]),
+                    )
+                },
             )
             val source = Problem(0, 3, Array(3) { IntDomain(-2, 2) }, arrayOf(factor))
             val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
@@ -163,8 +163,8 @@ class AffineDistinctInvariantTest {
     fun `compound probes should restore affine collision counts before applying repeated coordinates`() {
         val factor = Distinct(
             (0..2).map { i ->
-            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(i.toLong()))
-        }
+                Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), BigFraction.ofLong(i.toLong()))
+            },
         )
         val source = Problem(0, 3, Array(3) { IntDomain(-2, 2) }, arrayOf(factor))
         val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
@@ -188,8 +188,8 @@ class AffineDistinctInvariantTest {
         val offset = BigFraction.of(parseBigInt("9223372036854775808"), BIG_ONE)
         val factor = Distinct(
             (0..1).map { i ->
-            Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), offset)
-        }
+                Distinct.Operand(intArrayOf(Term.ofIntVar(i)), listOf(BigFraction.ONE), offset)
+            },
         )
         val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(factor))
         val state = LocalSearchState(LocalSearchModel.open(source), Random(3))

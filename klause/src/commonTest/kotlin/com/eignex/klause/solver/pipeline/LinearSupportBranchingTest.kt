@@ -118,10 +118,11 @@ class LinearSupportBranchingTest {
         )) {
             val selected = branching.select(
                 SourceNumericalFeedbackResult.Available(
-                query.copy(cuts = listOf(ignored)),
-                null,
-            ),
-                point.toList(), ExecutionControl.Never
+                    query.copy(cuts = listOf(ignored)),
+                    null,
+                ),
+                point.toList(),
+                ExecutionControl.Never,
             )
 
             assertEquals(x to point.getValue(x), selected)

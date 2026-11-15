@@ -37,21 +37,21 @@ internal class PolynomialWitnessDefinitions(
                 if (index != pivot.atom) {
                     updated.add(
                         PolynomialAtom(
-                        arithmetic.substitute(atom.polynomial, pivot.variable, replacement),
-                        atom.relation,
-                    )
+                            arithmetic.substitute(atom.polynomial, pivot.variable, replacement),
+                            atom.relation,
+                        ),
                     )
                 }
             }
             val retained = buildList {
                 for (definition in definitions) {
-                    arithmetic.step();
+                    arithmetic.step()
                     add(definition.second)
                 }
                 arithmetic.step()
                 add(replacement)
                 for (atom in updated) {
-                    arithmetic.step();
+                    arithmetic.step()
                     add(atom.polynomial)
                 }
             }
@@ -64,10 +64,10 @@ internal class PolynomialWitnessDefinitions(
         val referenced = HashSet<Int>()
         for (atom in atoms) {
             for (variable in atom.polynomial.variables) {
-            arithmetic.step()
-            require(variable in 0 until realCount)
-            referenced.add(variable)
-        }
+                arithmetic.step()
+                require(variable in 0 until realCount)
+                referenced.add(variable)
+            }
         }
         val point = LinkedHashMap<Int, BigFraction>()
         for (id in 0 until realCount) {
@@ -79,11 +79,11 @@ internal class PolynomialWitnessDefinitions(
         if (!hint(residual, point, fixed)) return null
         val protectedVariables = HashSet<Int>()
         for (id in fixed.keys) {
-            arithmetic.step();
+            arithmetic.step()
             protectedVariables.add(id)
         }
         for ((id, _) in definitions) {
-            arithmetic.step();
+            arithmetic.step()
             protectedVariables.add(id)
         }
         arithmetic.step()
@@ -142,7 +142,7 @@ internal class PolynomialWitnessDefinitions(
             arithmetic.step()
             val terms = atom.polynomial.terms
             val linear = terms.filter {
-                arithmetic.step();
+                arithmetic.step()
                 it.monomial != Monomial.ONE
             }.singleOrNull() ?: continue
             val variable = linear.monomial.variables.singleOrNull() ?: continue

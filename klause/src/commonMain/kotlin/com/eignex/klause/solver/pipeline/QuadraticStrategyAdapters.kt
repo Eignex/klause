@@ -55,14 +55,14 @@ internal class QuadraticStrategyAdapters(
                 }
                 val worker = slot.own(
                     QuadraticWorkerAdapter(
-                    request,
-                    model,
-                    objective,
-                    sense,
-                    controls,
-                    scope,
-                    selected,
-                )
+                        request,
+                        model,
+                        objective,
+                        sense,
+                        controls,
+                        scope,
+                        selected,
+                    ),
                 )
                 worker.readIncumbent = read
                 worker.worker(arm, plan)

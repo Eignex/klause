@@ -18,10 +18,10 @@ internal object PowerEncoders {
         factor as Power
         encoding.polynomial(
             PolynomialRealFormula.Atom(
-            PolynomialExpression.Power(encoding.coordinate(factor.base), factor.exponent),
-            PolynomialRelation.EQ,
-            encoding.coordinate(factor.result),
-        )
+                PolynomialExpression.Power(encoding.coordinate(factor.base), factor.exponent),
+                PolynomialRelation.EQ,
+                encoding.coordinate(factor.result),
+            ),
         )
         null
     }
@@ -34,11 +34,11 @@ internal object PowerEncoders {
         }
         encoding.linear(
             ExactSearchRow.of(
-            terms,
-            if (factor.exponent == 0) listOf(BigFraction.ONE) else listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
-            LinearOp.EQ,
-            if (factor.exponent == 0) BigFraction.ONE else BigFraction.ZERO,
-        ).linearForm
+                terms,
+                if (factor.exponent == 0) listOf(BigFraction.ONE) else listOf(BigFraction.ONE, BigFraction.MINUS_ONE),
+                LinearOp.EQ,
+                if (factor.exponent == 0) BigFraction.ONE else BigFraction.ZERO,
+            ).linearForm,
         )
         null
     }
@@ -60,11 +60,11 @@ internal object PowerEncoders {
                 ?: return@Encoder EncoderDecline.UNSUPPORTED
             encoding.linear(
                 ExactSearchRow.of(
-                intArrayOf(view.result.term()),
-                listOf(BigFraction.ONE),
-                LinearOp.EQ,
-                BigFraction.ofLong(value),
-            ).linearForm
+                    intArrayOf(view.result.term()),
+                    listOf(BigFraction.ONE),
+                    LinearOp.EQ,
+                    BigFraction.ofLong(value),
+                ).linearForm,
             )
             null
         }

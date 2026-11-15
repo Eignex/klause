@@ -13,7 +13,7 @@ internal class PolynomialBooleanWitness(
     private val arithmetic: PolynomialArithmetic,
 ) {
     private val supported = IntArray(nodes.size) {
-        arithmetic.step();
+        arithmetic.step()
         UNASSIGNED
     }
     private val trueChildren = IntArray(nodes.size)

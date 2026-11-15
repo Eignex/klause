@@ -35,21 +35,23 @@ class XorUnitsTest {
     fun `source pins should refute exactly the incompatible sibling parities`() {
         for (c in listOf(false, true)) {
             for (d in listOf(false, true)) {
-            val problem = Problem(
-                4, 0, emptyArray(),
-                listOf(
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
-                Clause(intArrayOf(Lit.make(2, c))),
-                Clause(intArrayOf(Lit.make(3, d))),
-            )
-            )
+                val problem = Problem(
+                    4,
+                    0,
+                    emptyArray(),
+                    listOf(
+                        Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
+                        Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
+                        Clause(intArrayOf(Lit.make(2, c))),
+                        Clause(intArrayOf(Lit.make(3, d))),
+                    ),
+                )
 
-            val delta = XorUnits.deriveXorUnits(problem)
+                val delta = XorUnits.deriveXorUnits(problem)
 
-            assertEquals(c != d, delta.infeasible, "c=$c d=$d")
-            assertTrue(delta.isEmpty)
-        }
+                assertEquals(c != d, delta.infeasible, "c=$c d=$d")
+                assertTrue(delta.isEmpty)
+            }
         }
     }
 
@@ -57,20 +59,22 @@ class XorUnitsTest {
     fun `constant xor rows should respect signed repeated literal parity`() {
         for (positive in listOf(false, true)) {
             for (target in 0..1) {
-            for (fixed in listOf(null, false, true)) {
-                val problem = Problem(
-                    1, 0, emptyArray(),
-                    listOf(
-                    Xor(intArrayOf(Lit.make(0, true), Lit.make(0, positive)), target),
-                ) + if (fixed == null) emptyList() else listOf(Clause(intArrayOf(Lit.make(0, fixed))))
-                )
+                for (fixed in listOf(null, false, true)) {
+                    val problem = Problem(
+                        1,
+                        0,
+                        emptyArray(),
+                        listOf(
+                            Xor(intArrayOf(Lit.make(0, true), Lit.make(0, positive)), target),
+                        ) + if (fixed == null) emptyList() else listOf(Clause(intArrayOf(Lit.make(0, fixed)))),
+                    )
 
-                val delta = XorUnits.deriveXorUnits(problem)
+                    val delta = XorUnits.deriveXorUnits(problem)
 
-                assertEquals(target != (if (positive) 0 else 1), delta.infeasible)
-                assertTrue(delta.isEmpty)
+                    assertEquals(target != (if (positive) 0 else 1), delta.infeasible)
+                    assertTrue(delta.isEmpty)
+                }
             }
-        }
         }
     }
 
@@ -78,37 +82,39 @@ class XorUnitsTest {
     fun `substitution should derive signed units once while cancelling repeated literals`() {
         for (value in listOf(false, true)) {
             for (pinPositive in listOf(false, true)) {
-            for (freePositive in listOf(false, true)) {
-                val problem = Problem(
-                    4, 0, emptyArray(),
-                    listOf(
-                    Xor(
-                        intArrayOf(
-                        Lit.make(0, pinPositive),
-                        Lit.make(1, freePositive),
-                        Lit.make(2, true),
-                        Lit.make(2, true),
-                        Lit.make(3, true),
-                        Lit.make(3, false),
-                    ),
-                        0
-                    ),
-                    Clause(intArrayOf(Lit.make(0, value))),
-                )
-                )
-                val expected = value xor !pinPositive xor !freePositive xor true
+                for (freePositive in listOf(false, true)) {
+                    val problem = Problem(
+                        4,
+                        0,
+                        emptyArray(),
+                        listOf(
+                            Xor(
+                                intArrayOf(
+                                    Lit.make(0, pinPositive),
+                                    Lit.make(1, freePositive),
+                                    Lit.make(2, true),
+                                    Lit.make(2, true),
+                                    Lit.make(3, true),
+                                    Lit.make(3, false),
+                                ),
+                                0,
+                            ),
+                            Clause(intArrayOf(Lit.make(0, value))),
+                        ),
+                    )
+                    val expected = value xor !pinPositive xor !freePositive xor true
 
-                val delta = XorUnits.deriveXorUnits(problem)
-                val once = assertNotNull(problem.withSourcePassDelta(delta))
-                val again = XorUnits.deriveXorUnits(once)
+                    val delta = XorUnits.deriveXorUnits(problem)
+                    val once = assertNotNull(problem.withSourcePassDelta(delta))
+                    val again = XorUnits.deriveXorUnits(once)
 
-                assertEquals(listOf(Lit.make(0, value), Lit.make(1, expected)), units(once))
-                assertTrue(delta.rebuild.isEmpty)
-                assertTrue(again.isEmpty)
-                assertFalse(again.infeasible)
-                assertTrue(again.rebuild.isEmpty)
+                    assertEquals(listOf(Lit.make(0, value), Lit.make(1, expected)), units(once))
+                    assertTrue(delta.rebuild.isEmpty)
+                    assertTrue(again.isEmpty)
+                    assertFalse(again.infeasible)
+                    assertTrue(again.rebuild.isEmpty)
+                }
             }
-        }
         }
     }
 
@@ -116,13 +122,15 @@ class XorUnitsTest {
     fun `finite root implied pins should supply new units without republishing established pins`() {
         for (value in listOf(false, true)) {
             val source = Problem(
-                5, 0, emptyArray(),
+                5,
+                0,
+                emptyArray(),
                 listOf(
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
-                Clause(intArrayOf(Lit.make(4, value))),
-                Clause(intArrayOf(Lit.make(4, !value), Lit.make(2, value))),
-            )
+                    Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
+                    Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
+                    Clause(intArrayOf(Lit.make(4, value))),
+                    Clause(intArrayOf(Lit.make(4, !value), Lit.make(2, value))),
+                ),
             )
             val baked = source.bake()
             assertEquals(value, assertIs<PropagationResult.Implied>(baked.rootDeductions).boolValueOrNull(2))
@@ -140,30 +148,34 @@ class XorUnitsTest {
     fun `fixed integer rows should refute exactly the incompatible constant parity`() {
         for (fixed in listOf(-3L, 0L, 2L)) {
             for (bound in 0L..1L) {
-            val problem = Problem(
-                0, 1, arrayOf(IntDomain(fixed, fixed)),
-                listOf(
-                Linear(longArrayOf(1L), intArrayOf(0), LinearOp.EQ, bound),
-            )
-            )
+                val problem = Problem(
+                    0,
+                    1,
+                    arrayOf(IntDomain(fixed, fixed)),
+                    listOf(
+                        Linear(longArrayOf(1L), intArrayOf(0), LinearOp.EQ, bound),
+                    ),
+                )
 
-            val delta = XorUnits.deriveXorUnits(problem)
+                val delta = XorUnits.deriveXorUnits(problem)
 
-            assertEquals((fixed and 1L) != bound, delta.infeasible)
-            assertTrue(delta.isEmpty)
-        }
+                assertEquals((fixed and 1L) != bound, delta.infeasible)
+                assertTrue(delta.isEmpty)
+            }
         }
     }
 
     @Test
     fun `interrupted collection and elimination should publish no partial deductions`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
-            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
-            Clause(intArrayOf(Lit.make(2, true))),
-        )
+                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
+                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
+                Clause(intArrayOf(Lit.make(2, true))),
+            ),
         )
         for (limit in listOf(0L, 1L, 15L, 17L)) {
             val budget = PresolveBudget(limit)

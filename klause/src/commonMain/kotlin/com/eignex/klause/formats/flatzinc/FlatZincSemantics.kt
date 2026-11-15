@@ -49,13 +49,13 @@ internal class FlatZincSemantics(
                 FloatSemantics.Continuous
             } else {
                 FloatSemantics.Grid(
-                floatBuckets,
-                floatScale,
-                UndeclaredRealBounds(
-                    semanticFloat(unboundedFloatLo),
-                    semanticFloat(unboundedFloatHi),
-                ),
-            )
+                    floatBuckets,
+                    floatScale,
+                    UndeclaredRealBounds(
+                        semanticFloat(unboundedFloatLo),
+                        semanticFloat(unboundedFloatHi),
+                    ),
+                )
             },
             feasibilityTolerance = if (exactFloats) SourceTolerance() else flatZincSemantics.feasibilityTolerance,
             undeclaredIntegers = UndeclaredIntegerBounds(

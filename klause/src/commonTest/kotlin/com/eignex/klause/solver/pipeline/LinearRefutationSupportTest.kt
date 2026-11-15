@@ -23,10 +23,10 @@ class LinearRefutationSupportTest {
         session.initialize()
         val x = assertNotNull(
             SourceBoundAtom.integerSplit(
-            session,
-            listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
-            BigFraction.ZERO,
-        )
+                session,
+                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                BigFraction.ZERO,
+            ),
         )
 
         val selected = linearRefutationSupport(SourceCondition(), emptyList(), SourceCondition(), x.negative) {
@@ -43,32 +43,32 @@ class LinearRefutationSupportTest {
             session.initialize()
             val x = assertNotNull(
                 SourceBoundAtom.integerSplit(
-                session,
-                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
-                endpoint,
-            )
+                    session,
+                    listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
+                    endpoint,
+                ),
             )
             val y = assertNotNull(
                 SourceBoundAtom.integerSplit(
-                session,
-                listOf(SourceBoundTerm(SearchIntValue(1), BigFraction.ONE)),
-                BigFraction.ZERO,
-            )
+                    session,
+                    listOf(SourceBoundTerm(SearchIntValue(1), BigFraction.ONE)),
+                    BigFraction.ZERO,
+                ),
             )
             val z = assertNotNull(
                 SourceBoundAtom.integerSplit(
-                session,
-                listOf(SourceBoundTerm(SearchIntValue(2), BigFraction.ONE)),
-                BigFraction.ZERO,
-            )
+                    session,
+                    listOf(SourceBoundTerm(SearchIntValue(2), BigFraction.ONE)),
+                    BigFraction.ZERO,
+                ),
             )
             val assertions = listOf(SearchDecision.Theory(z.positive), SearchDecision.Theory(x.positive))
             assertions.forEach { session.push(it) }
             val support = SourceCondition(
                 upper = mapOf(
-                SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ZERO,
-                SourceCoordinate(SourceCoordinate.Kind.Integer, 1) to BigFraction.ZERO,
-            )
+                    SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ZERO,
+                    SourceCoordinate(SourceCoordinate.Kind.Integer, 1) to BigFraction.ZERO,
+                ),
             )
 
             val selected = linearRefutationSupport(SourceCondition(), assertions, support, y.negative)
@@ -80,10 +80,10 @@ class LinearRefutationSupportTest {
                 val reason = assertNotNull(
                     session.explainAtoms(
                         SearchAtomPremise.All(
-                    assertNotNull(selected).map { SearchAtomPremise.Asserted(it) },
-                ),
-                    SearchDecision.Theory(y.negative)
-                    )
+                            assertNotNull(selected).map { SearchAtomPremise.Asserted(it) },
+                        ),
+                        SearchDecision.Theory(y.negative),
+                    ),
                 )
                 assertEquals(setOf(y.negative.literal, x.negative.literal), reason.literals.toSet())
             }

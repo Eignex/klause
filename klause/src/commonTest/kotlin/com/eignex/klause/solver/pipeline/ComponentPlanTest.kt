@@ -132,20 +132,20 @@ class ComponentPlanTest {
             val installations = mutableMapOf<EncodingTarget, Int>()
             val providers = FactorProjectionProviders(
                 encoder = EncoderProvider { factor, target ->
-                val selected = if (factor === global) {
-                    Encoder(EncoderSupport.UNSUPPORTED)
-                } else {
-                    BuiltInEncoderProvider.select(factor, target)
-                }
-                if (!selected.enforcesSource) {
-                    selected
-                } else {
-                    Encoder(selected.support) { view, encoding ->
-                    installations[target] = (installations[target] ?: 0) + 1
-                    selected.install(view, encoding)
-                }
-                }
-            }
+                    val selected = if (factor === global) {
+                        Encoder(EncoderSupport.UNSUPPORTED)
+                    } else {
+                        BuiltInEncoderProvider.select(factor, target)
+                    }
+                    if (!selected.enforcesSource) {
+                        selected
+                    } else {
+                        Encoder(selected.support) { view, encoding ->
+                            installations[target] = (installations[target] ?: 0) + 1
+                            selected.install(view, encoding)
+                        }
+                    }
+                },
             )
 
             val plan = source.componentPlan(providers.prepare(source))
@@ -185,16 +185,16 @@ class ComponentPlanTest {
         val installations = mutableMapOf<EncodingTarget, Int>()
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
-            if (target == EncodingTarget.POLYNOMIAL) {
-                BuiltInEncoderProvider.select(factor, target)
-            } else {
-                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                installations[target] = (installations[target] ?: 0) + 1
-                encoding.linear(assertNotNull(view.linearForm))
-                null
-            }
-            }
-        }
+                if (target == EncodingTarget.POLYNOMIAL) {
+                    BuiltInEncoderProvider.select(factor, target)
+                } else {
+                    Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                        installations[target] = (installations[target] ?: 0) + 1
+                        encoding.linear(assertNotNull(view.linearForm))
+                        null
+                    }
+                }
+            },
         )
 
         val plan = source.componentPlan(providers.prepare(source))

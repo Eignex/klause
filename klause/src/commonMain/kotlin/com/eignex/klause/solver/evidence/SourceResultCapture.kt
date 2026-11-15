@@ -189,8 +189,8 @@ class SourceResultCapture private constructor(
             value = arithmetic.add(
                 value,
                 arithmetic.rational(
-                BigFraction.of(sample.exactIntValue(id), BIG_ONE) * BigFraction.ofLong(coefficient),
-            )
+                    BigFraction.of(sample.exactIntValue(id), BIG_ONE) * BigFraction.ofLong(coefficient),
+                ),
             )
         }
         for ((id, coefficient) in objective.realCoefficients.withIndex()) {
@@ -198,9 +198,9 @@ class SourceResultCapture private constructor(
             value = arithmetic.add(
                 value,
                 arithmetic.multiply(
-                checkNotNull(sample.algebraicReals)[id],
-                arithmetic.rational(scalar),
-            )
+                    checkNotNull(sample.algebraicReals)[id],
+                    arithmetic.rational(scalar),
+                ),
             )
         }
         return value.rational?.let { SourceValue.Rational(it) } ?: SourceValue.Algebraic(value)

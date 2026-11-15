@@ -26,12 +26,14 @@ class BooleanCountComponentsTest {
     @Test
     fun `component products should match monolithic counts for every Boolean projection`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
+            ),
         ).bake()
 
         for (mask in 0 until 16) {
@@ -48,11 +50,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `unprojected components should contribute feasibility rather than completion counts`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake()
 
         val result = AnytimeCounter.run(problem, ExactCountConfig(samplingSet = intArrayOf(2))).last()
@@ -64,14 +68,16 @@ class BooleanCountComponentsTest {
     @Test
     fun `an infeasible unprojected component should annihilate the count`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
-            Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, false))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(2, false), Lit.make(3, false))),
+            ),
         ).bake()
         val config = ExactCountConfig(samplingSet = intArrayOf(0))
 
@@ -85,11 +91,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `free projected columns should multiply component counts`() {
         val problem = Problem(
-            6, 0, emptyArray(),
+            6,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake()
 
         val result = AnytimeCounter.run(problem, ExactCountConfig(samplingSet = intArrayOf(0, 2, 4))).last()
@@ -104,12 +112,14 @@ class BooleanCountComponentsTest {
             val bridge = mutableListOf(Lit.make(0, true), Lit.make(2, true))
             bridge.add(position, Lit.make(4, true))
             val problem = Problem(
-                5, 0, emptyArray(),
+                5,
+                0,
+                emptyArray(),
                 listOf(
-                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-                Clause(bridge.toIntArray()),
-            )
+                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                    Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+                    Clause(bridge.toIntArray()),
+                ),
             ).bake().countingScope(Assumptions(bools = mapOf(4 to true)))
             val config = ExactCountConfig()
 
@@ -125,12 +135,14 @@ class BooleanCountComponentsTest {
     @Test
     fun `a live bridge should retain monolithic counting`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
+            ),
         ).bake()
         val config = ExactCountConfig(maxChecks = 3L)
 
@@ -141,11 +153,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `components should share one feasibility check allowance`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake()
         val config = ExactCountConfig(samplingSet = intArrayOf(0, 2), maxChecks = 5L)
 
@@ -162,11 +176,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `stopping before an existential component should retain uncertainty`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake()
         val config = ExactCountConfig(samplingSet = intArrayOf(0), maxChecks = 3L)
 
@@ -180,11 +196,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `component intervals should tighten monotonically across budget boundaries`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake()
         var previous = Count(0L, 0L, 16L, exact = false, confidence = 1.0)
 
@@ -209,11 +227,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `disjoint pairs should complete with fewer checks than the monolithic traversal`() {
         val problem = Problem(
-            6, 0, emptyArray(),
+            6,
+            0,
+            emptyArray(),
             List(6) { index ->
-            val first = index / 2 * 2
-            Clause(intArrayOf(Lit.make(first, index % 2 == 0), Lit.make(first + 1, index % 2 == 0)))
-        }
+                val first = index / 2 * 2
+                Clause(intArrayOf(Lit.make(first, index % 2 == 0), Lit.make(first + 1, index % 2 == 0)))
+            },
         ).bake()
         val config = ExactCountConfig(maxChecks = 21L)
 
@@ -230,11 +250,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `undecided component checks should preserve all unchecked mass`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake()
 
         val result = AnytimeCounter.run(problem, ExactCountConfig(maxDecisionsPerCheck = 0L)).last()
@@ -272,11 +294,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `free column mass beyond Long range should remain in the composed result`() {
         val problem = Problem(
-            67, 0, emptyArray(),
+            67,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake()
 
         val result = AnytimeCounter.run(problem, ExactCountConfig(maxChecks = 14L)).last()
@@ -289,11 +313,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `empty projections should use one whole model feasibility check`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake()
 
         for (config in listOf(
@@ -311,12 +337,14 @@ class BooleanCountComponentsTest {
     fun `component products should preserve the original source interpretation`() {
         val semantics = SourceSemantics(SourceFormat.DIMACS).resolve()
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        ),
-            semantics = semantics
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
+            semantics = semantics,
         ).bake()
 
         val result = AnytimeCounter.run(problem, ExactCountConfig()).last()
@@ -327,12 +355,14 @@ class BooleanCountComponentsTest {
     @Test
     fun `unsupported globals and custom projections should retain the monolithic fallback`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-            Cardinality(IntArray(4) { Lit.make(it, true) }, min = 1, max = 2),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+                Cardinality(IntArray(4) { Lit.make(it, true) }, min = 1, max = 2),
+            ),
         )
         val config = ExactCountConfig(maxChecks = 3L)
 
@@ -346,11 +376,13 @@ class BooleanCountComponentsTest {
     @Test
     fun `captured default projections should admit component counting`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake(FactorProjectionProviders.Default)
         val config = ExactCountConfig(samplingSet = intArrayOf(0, 2), maxChecks = 6L)
 
@@ -364,12 +396,16 @@ class BooleanCountComponentsTest {
     @Test
     fun `real ownership should decline Boolean component counting`() {
         val problem = Problem(
-            4, 0, emptyArray(),
+            4,
+            0,
+            emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        ),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
         ).bake()
 
         assertNull(BooleanCountComponents.partition(problem, ExactCountConfig()))
@@ -379,11 +415,13 @@ class BooleanCountComponentsTest {
     fun `integer holes should retain monolithic projected counting`() {
         val domain = IntDomain(-2, 2).excludeValues(longArrayOf(-1, 1))!!
         val problem = Problem(
-            4, 1, arrayOf(domain),
+            4,
+            1,
+            arrayOf(domain),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
+            ),
         ).bake()
         val config = ExactCountConfig(intSamplingSet = intArrayOf(0))
 

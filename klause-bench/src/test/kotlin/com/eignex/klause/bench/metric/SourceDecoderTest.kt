@@ -12,7 +12,7 @@ class SourceDecoderTest {
         val root = Files.createTempDirectory("source-decoder").toFile()
         try {
             val executable = root.resolve("zstd").apply {
-                writeBytes(byteArrayOf());
+                writeBytes(byteArrayOf())
                 setExecutable(true)
             }
 

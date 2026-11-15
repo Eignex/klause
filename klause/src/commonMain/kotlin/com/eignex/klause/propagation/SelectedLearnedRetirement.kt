@@ -39,16 +39,16 @@ private fun PropagationState.retireSelectedGeneralClause(
     }
     if (index !in 0 until learned.size) {
         return LearnedRetirementResult(
-        LearnedRetirementStatus.AlreadyGone,
-        payloadReleased = true,
-        physicalReleased = true,
-    )
+            LearnedRetirementStatus.AlreadyGone,
+            payloadReleased = true,
+            physicalReleased = true,
+        )
     }
     if (learned.retiredOf(index)) {
         return LearnedRetirementResult(
-        LearnedRetirementStatus.AlreadyGone,
-        payloadReleased = true,
-    )
+            LearnedRetirementStatus.AlreadyGone,
+            payloadReleased = true,
+        )
     }
     budget.visit(8L)
     val clause = learned.store[index] as? ClausePropagator

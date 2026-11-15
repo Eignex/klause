@@ -40,12 +40,12 @@ class LpStatsTest {
                 LpPhaseStats(
                     calls = 4L,
                     outcomes = mapOf(
-                "UP" to 2L,
-                "DOWN" to 1L,
-                "RESET" to 1L,
-            )
+                        "UP" to 2L,
+                        "DOWN" to 1L,
+                        "RESET" to 1L,
+                    ),
                 ),
-                phase
+                phase,
             )
             for ((outcome, count) in phase.outcomes) assertEquals(count, sink.directionalBranchCount(outcome))
             assertEquals(0L, sink.directionalBranchCount("MISSING"))
@@ -87,14 +87,16 @@ class LpStatsTest {
 
         assertEquals(
             LpPhaseStats(
-                calls = 2L, nanos = 20L, work = 30L,
+                calls = 2L,
+                nanos = 20L,
+                work = 30L,
                 outcomes = mapOf(
-            "DECLINED" to 1L, "PREPARED" to 1L, "FACTORS_REUSED" to 2L, "SOURCE_REBOUND" to 1L,
-            "INDEXES_REUSED" to 1L, "BOUNDS_REUSED" to 3L, "COMPONENTS_REUSED" to 1L,
-            "COMPONENTS_DIRTY" to 1L, "RETAINED_UNITS_SUM" to 17L,
-        )
+                    "DECLINED" to 1L, "PREPARED" to 1L, "FACTORS_REUSED" to 2L, "SOURCE_REBOUND" to 1L,
+                    "INDEXES_REUSED" to 1L, "BOUNDS_REUSED" to 3L, "COMPONENTS_REUSED" to 1L,
+                    "COMPONENTS_DIRTY" to 1L, "RETAINED_UNITS_SUM" to 17L,
+                ),
             ),
-            phase
+            phase,
         )
     }
 

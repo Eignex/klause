@@ -17,18 +17,19 @@ internal object LinearIndicatorEncoder {
         val inactive = LinearEncodingFormula.Comparison(
             EncodingAffineExpression(
                 listOf(
-            EncodingLinearTerm.source(Term.ofIntVar(view.indicator), BigFraction.ONE),
-        )
+                    EncodingLinearTerm.source(Term.ofIntVar(view.indicator), BigFraction.ONE),
+                ),
             ),
-            LinearOp.NE, BigFraction.ofLong(if (view.whenOne) 1 else 0)
+            LinearOp.NE,
+            BigFraction.ofLong(if (view.whenOne) 1 else 0),
         )
         encoding.linearFormula(
             LinearEncodingFormula.Or(
                 listOf(
-            inactive,
-            LinearEncodingFormula.Relation(view.row.linearForm),
-        )
-            )
+                    inactive,
+                    LinearEncodingFormula.Relation(view.row.linearForm),
+                ),
+            ),
         )
         null
     }

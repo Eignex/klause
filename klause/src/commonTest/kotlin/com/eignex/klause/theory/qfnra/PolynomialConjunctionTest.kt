@@ -38,10 +38,10 @@ class PolynomialConjunctionTest {
         )
         val distance = arithmetic.subtract(
             arithmetic.add(
-            arithmetic.power(arithmetic.subtract(a, c), 2),
-            arithmetic.power(arithmetic.subtract(b, d), 2),
-        ),
-            Polynomial.ONE
+                arithmetic.power(arithmetic.subtract(a, c), 2),
+                arithmetic.power(arithmetic.subtract(b, d), 2),
+            ),
+            Polynomial.ONE,
         )
         val expected = arithmetic.subtract(
             Polynomial.ONE,
@@ -115,9 +115,9 @@ class PolynomialConjunctionTest {
         assertEquals(
             0,
             algebraic.compare(
-            algebraic.power(witness.realValue(0), 2),
-            algebraic.rational(BigFraction.ofLong(4)),
-        )
+                algebraic.power(witness.realValue(0), 2),
+                algebraic.rational(BigFraction.ofLong(4)),
+            ),
         )
     }
 
@@ -127,10 +127,10 @@ class PolynomialConjunctionTest {
         val large = Polynomial.of(
             listOf(
                 PolynomialTerm(
-            Monomial.of(mapOf(0 to Int.MAX_VALUE)),
-            BigFraction.ONE,
-        )
-            )
+                    Monomial.of(mapOf(0 to Int.MAX_VALUE)),
+                    BigFraction.ONE,
+                ),
+            ),
         )
         val y = Polynomial.variable(1)
         val equation = arithmetic.subtract(y, large)
@@ -288,11 +288,11 @@ class PolynomialConjunctionTest {
         )
         val completed = assertIs<QfNraResult.Unsatisfiable>(
             solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(maximumWork = 100_000),
-        )
+                source.formula,
+                source.boolCount,
+                source.realCount,
+                QfNraParams(maximumWork = 100_000),
+            ),
         )
 
         val result = solveQfNra(

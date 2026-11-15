@@ -43,8 +43,8 @@ class CountTypesTest {
             val source = parseFlatZinc(
                 "var int: x; solve satisfy;",
                 semanticOverrides = SemanticOverrides(
-                undeclaredIntegers = BoundsOverride(BoundOverride.Value(1L), BoundOverride.Value(upper)),
-            )
+                    undeclaredIntegers = BoundsOverride(BoundOverride.Value(1L), BoundOverride.Value(upper)),
+                ),
             )
 
             val count = BacktrackSolver(source.problem.bake()).exactCount().last()

@@ -397,10 +397,10 @@ internal class FiniteNumericalRemoval(
         return closeSelection(
             problem,
             FreedVars(
-            selected.filter { it < model.numBoolVars }.toIntArray(),
-            selected.filter { it >= model.numBoolVars }.map { it - model.numBoolVars }.toIntArray(),
-        ),
-            cancellation
+                selected.filter { it < model.numBoolVars }.toIntArray(),
+                selected.filter { it >= model.numBoolVars }.map { it - model.numBoolVars }.toIntArray(),
+            ),
+            cancellation,
         )
     }
 

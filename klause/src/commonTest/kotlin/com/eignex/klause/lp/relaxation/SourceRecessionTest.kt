@@ -168,8 +168,8 @@ class SourceRecessionTest {
     fun `distinct rays should preserve every affine separation`() {
         val distinct = Distinct(
             (0..1).map {
-            Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-        }
+                Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
+            },
         )
         val cases = listOf(
             Case("separating values", listOf(distinct), listOf(1L, 0L), listOf(1L, 0L)) to true,
@@ -184,9 +184,9 @@ class SourceRecessionTest {
     fun `false distinct rays should retain a permanent affine collision`() {
         val distinct = Distinct(
             (0..1).map {
-            Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
-        },
-            activator = 0
+                Distinct.Operand(intArrayOf(Term.ofRealVar(it)), listOf(BigFraction.ONE))
+            },
+            activator = 0,
         )
         val cases = listOf(
             Case("persistent collision", listOf(distinct), listOf(0L, 0L), listOf(1L, 1L), aux = false) to true,

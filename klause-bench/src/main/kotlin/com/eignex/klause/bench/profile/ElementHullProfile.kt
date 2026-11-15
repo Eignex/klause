@@ -49,14 +49,14 @@ internal object ElementHullProfile {
         val budget = PresolveBudget(1_650_000_000L)
         val prepared = FinitePipeline.prepare(
             FinitePipelineRequest(
-            parsed.problem,
-            FiniteEngine.MIXED,
-            objective,
-            cancellation = stop,
-            solveCancellation = stop,
-            presolveBudget = budget,
-            randomSeed = 3L,
-        )
+                parsed.problem,
+                FiniteEngine.MIXED,
+                objective,
+                cancellation = stop,
+                solveCancellation = stop,
+                presolveBudget = budget,
+                randomSeed = 3L,
+            ),
         )
         check(prepared.presolve?.infeasible != true && !stop())
         val problem = prepared.problem
@@ -95,16 +95,16 @@ internal object ElementHullProfile {
             put(
                 "selectorMemberships",
                 buildJsonArray {
-                requirements.filterNotNull().groupingBy { (it as LongArray)[0] }.eachCount().toSortedMap()
-                    .forEach { (index, count) ->
-                        add(
-                            buildJsonObject {
-                        put("index", index);
-                        put("choices", count)
-                    }
-                        )
-                    }
-            }
+                    requirements.filterNotNull().groupingBy { (it as LongArray)[0] }.eachCount().toSortedMap()
+                        .forEach { (index, count) ->
+                            add(
+                                buildJsonObject {
+                                    put("index", index)
+                                    put("choices", count)
+                                },
+                            )
+                        }
+                },
             )
             put("assemblyNs", assemblyNs)
             put("assemblyThreadAllocatedBytes", allocated)

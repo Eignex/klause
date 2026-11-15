@@ -24,12 +24,12 @@ internal fun compressTrajectoryOutput(out: File) {
     }
     out.resolve("compression.json").writeText(
         buildJsonObject {
-        put("files", records.size)
-        put("inputBytes", inputBytes)
-        put("outputBytes", outputBytes)
-        put("elapsedNanos", System.nanoTime() - started)
-        put("allocatedBytes", trajectoryThreadBytes() - before)
-        put("includedInWalkAllowance", false)
-    }.toString()
+            put("files", records.size)
+            put("inputBytes", inputBytes)
+            put("outputBytes", outputBytes)
+            put("elapsedNanos", System.nanoTime() - started)
+            put("allocatedBytes", trajectoryThreadBytes() - before)
+            put("includedInWalkAllowance", false)
+        }.toString(),
     )
 }

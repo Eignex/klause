@@ -431,9 +431,9 @@ object LpAutoConfig {
         observe?.invoke(
             LpAdmission(
                 rows, baseCols, cells, structApplicable,
-            config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan,
-            if (base.element) null else selection.elementIndexes.toSet(), sparse,
-            )
+                config.resolved(LpTechnique.BOUNDING), coneRequested || cells <= ceilingCap, base.bounding, plan,
+                if (base.element) null else selection.elementIndexes.toSet(), sparse,
+            ),
         )
         return plan
     }

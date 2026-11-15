@@ -85,9 +85,9 @@ internal fun Compiler.Builder.wideAbsTerm(x: WideLinComb): IntComb {
     val output = y.toWide()
     factors.add(
         AffineAbs(
-        AbsAffineValue(x.coeffs, x.constant),
-        AbsAffineValue(output.coeffs, output.constant),
-    )
+            AbsAffineValue(x.coeffs, x.constant),
+            AbsAffineValue(output.coeffs, output.constant),
+        ),
     )
     return y
 }

@@ -135,22 +135,22 @@ internal class LearnedClauseDb(
         emptyMap()
     } else {
         mapOf(
-        "learnedCapGeneralBackend" to 1L,
-        "learnedCapCalls" to capCalls,
-        "learnedCapWork" to capWork,
-        "learnedCapVisits" to capVisits,
-        "learnedCapBoundaryDefers" to capBoundaryDefers,
-        "learnedCapFloorDefers" to 0L,
-        "learnedCapPreparationDefers" to capPreparationDefers,
-        "learnedCapRankedPasses" to capRanking.passes,
-        "learnedCapPermanentClauses" to permanentClauseCount.toLong(),
-        "learnedCapPermanentArithmetic" to permanentArithmeticCount.toLong(),
-        "learnedCapNonClauseFloor" to 0L,
-        "learnedCapActiveArithmetic" to nonClauseCount.toLong(),
-        "learnedCapRetainedSlots" to size.toLong(),
-        "learnedCapRetiredSlots" to retiredCount.toLong(),
-        "learnedCapActiveClauses" to activeCount.toLong(),
-    )
+            "learnedCapGeneralBackend" to 1L,
+            "learnedCapCalls" to capCalls,
+            "learnedCapWork" to capWork,
+            "learnedCapVisits" to capVisits,
+            "learnedCapBoundaryDefers" to capBoundaryDefers,
+            "learnedCapFloorDefers" to 0L,
+            "learnedCapPreparationDefers" to capPreparationDefers,
+            "learnedCapRankedPasses" to capRanking.passes,
+            "learnedCapPermanentClauses" to permanentClauseCount.toLong(),
+            "learnedCapPermanentArithmetic" to permanentArithmeticCount.toLong(),
+            "learnedCapNonClauseFloor" to 0L,
+            "learnedCapActiveArithmetic" to nonClauseCount.toLong(),
+            "learnedCapRetainedSlots" to size.toLong(),
+            "learnedCapRetiredSlots" to retiredCount.toLong(),
+            "learnedCapActiveClauses" to activeCount.toLong(),
+        )
     }
 
     private companion object {

@@ -24,16 +24,16 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         val rank: Long get() = (lbd.toLong() shl Int.SIZE_BITS) or index.toLong()
     }
     class SignatureBucket(val key: Int) {
-        var first: Row? = null;
+        var first: Row? = null
         var last: Row? = null
     }
     class Posting(val literal: Int) {
-        var first: Watch? = null;
-        var last: Watch? = null;
+        var first: Watch? = null
+        var last: Watch? = null
         var size = 0
     }
     class Watch(val row: Row, val posting: Posting) {
-        var previous: Watch? = null;
+        var previous: Watch? = null
         var next: Watch? = null
     }
     private val rows = LearnedIndex<Row>()
@@ -86,7 +86,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         if (literals.isEmpty()) return null
         var hash = 0
         for (literal in literals) {
-            charge(5L);
+            charge(5L)
             hash += mix(literal)
         }
         hash = hash * 31 + literals.size
@@ -190,7 +190,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
 
     private fun removeWatch(watch: Watch?, budget: SharedReclamationBudget) {
         if (watch == null) {
-            budget.pay(1L);
+            budget.pay(1L)
             return
         }
         val posting = watch.posting
@@ -302,7 +302,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
             for (position in 2 until literals.size) {
                 charge(1L)
                 if (host.truth(literals[position]) != false) {
-                    replacement = position;
+                    replacement = position
                     break
                 }
             }
@@ -358,11 +358,11 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
             var leftCount = 0
             var rightCount = 0
             for (value in left) {
-                charge(1L);
+                charge(1L)
                 if (value == literal) leftCount++
             }
             for (value in right) {
-                charge(1L);
+                charge(1L)
                 if (value == literal) rightCount++
             }
             if (leftCount != rightCount) return false
@@ -410,8 +410,8 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
             var retained = false
             var entry = posting.first
             while (entry != null) {
-                sample.step();
-                retained = protected(entry.row) || retained;
+                sample.step()
+                retained = protected(entry.row) || retained
                 entry = entry.next
             }
             sample.owned(posting, 8L, retained)
@@ -421,16 +421,16 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         sample.ownedReferences(this, 9L, anyProtected)
         sample.record(
             mapOf(
-            "sharedLearnedObjects" to size.toLong(),
-            "sharedLearnedRetiredObjects" to (objects - size).toLong(),
-            "sharedLearnedPayloadBytes" to payloadLiterals * Int.SIZE_BYTES,
-            "sharedLearnedIndexCapacityBytes" to (ownedBytes - payloadLiterals * Int.SIZE_BYTES),
-            "sharedLearnedReferenceSlots" to (
-                objects * 13L + watchNodes * 4L +
-                signatures.size * 2L + watches.size * 2L +
-                (rows.size + ranks.size + signatures.size + watches.size) * 3L + 13L
+                "sharedLearnedObjects" to size.toLong(),
+                "sharedLearnedRetiredObjects" to (objects - size).toLong(),
+                "sharedLearnedPayloadBytes" to payloadLiterals * Int.SIZE_BYTES,
+                "sharedLearnedIndexCapacityBytes" to (ownedBytes - payloadLiterals * Int.SIZE_BYTES),
+                "sharedLearnedReferenceSlots" to (
+                    objects * 13L + watchNodes * 4L +
+                        signatures.size * 2L + watches.size * 2L +
+                        (rows.size + ranks.size + signatures.size + watches.size) * 3L + 13L
+                    ),
             ),
-        )
         )
         return anyProtected
     }

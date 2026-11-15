@@ -129,13 +129,13 @@ internal object SmtLibFormat : ProblemFormat {
                 }
                 val invocation = SourceSetup.prepare(
                     SourceSetupRequest(
-                    parsed.source,
-                    operation,
-                    FiniteEngine.BACKTRACK,
-                    objective,
-                    maximize,
-                    boundCancellation = ExecutionControl { true },
-                )
+                        parsed.source,
+                        operation,
+                        FiniteEngine.BACKTRACK,
+                        objective,
+                        maximize,
+                        boundCancellation = ExecutionControl { true },
+                    ),
                 )
                 check(invocation.route is SourceProblemRoute.Finite) {
                     "${file.name}: in-process benchmarks require finite source bounds; use the CLI for open models"

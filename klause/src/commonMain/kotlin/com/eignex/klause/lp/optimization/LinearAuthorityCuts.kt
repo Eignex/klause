@@ -175,8 +175,8 @@ internal class LinearAuthorityCuts private constructor(
                     )
                     val combination = SourceDerivation.Combination(
                         listOf(
-                        SourceDerivation.Combination.Term(multiplier, SourceDerivation.Premise(entry.key)),
-                    )
+                            SourceDerivation.Combination.Term(multiplier, SourceDerivation.Premise(entry.key)),
+                        ),
                     )
                     if (mixed) {
                         val sides = coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Real }
@@ -248,7 +248,7 @@ internal class LinearAuthorityCuts private constructor(
                             }
                             if ((conclusion.coefficients.values + conclusion.rhs).any {
                                     it.num.magnitudeBitLength() > 4096 || it.den.magnitudeBitLength() > 4096
-                            }
+                                }
                             ) {
                                 observe("MixedWidthLimited")
                                 continue

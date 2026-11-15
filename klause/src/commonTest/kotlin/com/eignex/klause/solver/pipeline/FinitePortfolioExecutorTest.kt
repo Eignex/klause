@@ -112,12 +112,13 @@ class FinitePortfolioExecutorTest {
         val elapsed = LongArray(3)
         val workers = List(3) { arm ->
             trackingWorker(
-                "worker$arm", arm,
+                "worker$arm",
+                arm,
                 ScriptedSearch({ arm == 2 && it == 0 }) {
-                visits += arm
-                elapsed[arm] += 100L
-                clock += 100.milliseconds
-            }
+                    visits += arm
+                    elapsed[arm] += 100L
+                    clock += 100.milliseconds
+                },
             ).also { if (arm == 2) it.family = ArmFamily.LocalSearch }
         }
 

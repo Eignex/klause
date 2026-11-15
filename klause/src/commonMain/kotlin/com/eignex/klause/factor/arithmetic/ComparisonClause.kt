@@ -64,11 +64,11 @@ class ComparisonClause(val vars: IntArray, val ops: Array<LinearOp>, val consts:
             nextConsts[i] = requireNotNull(translatedConstant(i, scale, offset))
             if (scale < 0) {
                 nextOps[i] = when (ops[i]) {
-                LinearOp.LE -> LinearOp.GE
-                LinearOp.GE -> LinearOp.LE
-                LinearOp.EQ -> LinearOp.EQ
-                LinearOp.NE -> LinearOp.NE
-            }
+                    LinearOp.LE -> LinearOp.GE
+                    LinearOp.GE -> LinearOp.LE
+                    LinearOp.EQ -> LinearOp.EQ
+                    LinearOp.NE -> LinearOp.NE
+                }
             }
         }
         return ComparisonClause(nextVars, nextOps, nextConsts)

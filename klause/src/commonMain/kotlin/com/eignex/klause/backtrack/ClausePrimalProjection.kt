@@ -89,9 +89,9 @@ internal class ClausePrimalProjection private constructor(
                 charge(clause.literals.size.toLong())
                 Clause(
                     IntArray(clause.literals.size) { index ->
-                    val literal = clause.literals[index]
-                    Lit.make(mapping[Lit.variable(literal)], Lit.isPositive(literal))
-                }
+                        val literal = clause.literals[index]
+                        Lit.make(mapping[Lit.variable(literal)], Lit.isPositive(literal))
+                    },
                 )
             }.toTypedArray()
             val problem = Problem(

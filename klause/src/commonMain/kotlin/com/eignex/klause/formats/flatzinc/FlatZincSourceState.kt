@@ -60,10 +60,10 @@ internal class FlatZincSourceState(
         if (variables.isEmpty()) return FlatZincGridGeometry(null, representations)
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            attachment(),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.LOCAL_SEARCH,
-        )
+                attachment(),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.LOCAL_SEARCH,
+            ),
         )
         val prepared = SourceSetup.prepareSelectedFloatGrid(
             invocation,
@@ -139,13 +139,13 @@ internal class FlatZincSourceState(
         val program = withSearch(projectedProgram(original, view))
         return program.suppliedCopy().retainSource(
             FlatZincSourceState(
-            original,
-            declaredReals,
-            selectLegacy,
-            lazyOf(view),
-            program,
-            projectSearch,
-        )
+                original,
+                declaredReals,
+                selectLegacy,
+                lazyOf(view),
+                program,
+                projectSearch,
+            ),
         )
     }
 

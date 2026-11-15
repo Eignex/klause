@@ -259,9 +259,9 @@ class LpConfig(
             if (s.isEmpty()) return AUTO
             if (s == "all") {
                 return LpConfig(
-                LpEmphasis.AGGRESSIVE,
-                LpTechnique.entries.associateWith { it != LpTechnique.SPARSE_TRIAL },
-            )
+                    LpEmphasis.AGGRESSIVE,
+                    LpTechnique.entries.associateWith { it != LpTechnique.SPARSE_TRIAL },
+                )
             }
             val tokens = s.split(",").map { it.trim() }.filter { it.isNotEmpty() }
             // Emphasis-base form: first token is a level, the rest are +/- deltas.

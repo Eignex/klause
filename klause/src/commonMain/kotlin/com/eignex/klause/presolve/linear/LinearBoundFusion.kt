@@ -103,8 +103,8 @@ internal object LinearBoundFusion {
                 dropped.addAll(group.droppable)
                 added.add(
                     integralLinear(group.terms.vars, group.terms.exactCoefficients(), LinearOp.EQ, upper) {
-                    visit(scan)
-                }
+                        visit(scan)
+                    },
                 )
             }
         }
@@ -140,8 +140,8 @@ internal object LinearBoundFusion {
                 !Term.isInt(row.ref(it))
             }
         ) {
-                return null
-            }
+            return null
+        }
         if (constants is IntegerConstants) {
             try {
                 return canonicalizeLong(row, constants, scan)
@@ -252,9 +252,9 @@ internal object LinearBoundFusion {
             Terms(
                 vars,
                 LongArray(coefficients.size) {
-                visit(scan)
-                coefficients[it].toLongExact()
-            }
+                    visit(scan)
+                    coefficients[it].toLongExact()
+                },
             )
         } else {
             Terms(vars, null, coefficients)

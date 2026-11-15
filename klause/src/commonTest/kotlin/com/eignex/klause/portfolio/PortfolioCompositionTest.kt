@@ -206,10 +206,10 @@ class PortfolioCompositionTest {
         assertTrue(params.isNotEmpty())
         assertTrue(
             params.all {
-            !it.rootSimplification && it.rootProbeBatch == 0 &&
-                it.rootProbeImplications && !it.rootProbeGeneralGate && it.rootProbeWork == 23L &&
-                it.inprocessingWork == 17L && it.inprocessingSubsumeWork == 13L && it.inprocessingVivifyWork == 19L
-        }
+                !it.rootSimplification && it.rootProbeBatch == 0 &&
+                    it.rootProbeImplications && !it.rootProbeGeneralGate && it.rootProbeWork == 23L &&
+                    it.inprocessingWork == 17L && it.inprocessingSubsumeWork == 13L && it.inprocessingVivifyWork == 19L
+            },
         )
     }
 

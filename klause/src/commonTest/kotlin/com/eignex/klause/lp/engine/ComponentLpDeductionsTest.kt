@@ -47,10 +47,10 @@ class ComponentLpDeductionsTest {
             val wholeAlternatives = ArrayList<LpDeductionCertificate>()
             val whole = assertNotNull(
                 nodeDualCertificate(
-                model,
-                result.duals,
-                onAdditionalCertificate = { wholeAlternatives.add(it) },
-            )
+                    model,
+                    result.duals,
+                    onAdditionalCertificate = { wholeAlternatives.add(it) },
+                ),
             )
 
             val deductions = assertNotNull(it.nodeDeductions(result.duals, withAlternatives = true))
@@ -70,15 +70,15 @@ class ComponentLpDeductionsTest {
             }
             for (candidate in listOf(whole) + wholeAlternatives) {
                 for (column in 0 until model.n) {
-                val steps = candidate.fixSteps(column, 10L, 0L) ?: continue
-                assertTrue(
-                    candidates.any { assembled ->
-                    (assembled.fixingColumns()?.contains(column) != false) &&
-                        assembled.reducedCostSign(column) == candidate.reducedCostSign(column) &&
-                        assembled.fixSteps(column, 10L, 0L)?.let { it <= steps } == true
+                    val steps = candidate.fixSteps(column, 10L, 0L) ?: continue
+                    assertTrue(
+                        candidates.any { assembled ->
+                            (assembled.fixingColumns()?.contains(column) != false) &&
+                                assembled.reducedCostSign(column) == candidate.reducedCostSign(column) &&
+                                assembled.fixSteps(column, 10L, 0L)?.let { it <= steps } == true
+                        },
+                    )
                 }
-                )
-            }
             }
         }
     }

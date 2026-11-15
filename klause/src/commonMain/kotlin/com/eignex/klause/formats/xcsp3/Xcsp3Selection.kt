@@ -15,12 +15,12 @@ internal fun Compiler.Builder.selectionTerm(condition: Int, whenTrue: Int, whenF
     )
     factors.add(
         Element(
-        index,
-        result,
-        longArrayOf(whenFalse.toLong(), whenTrue.toLong()),
-        arrIsVars = true,
-        indexOffset = 0,
-    )
+            index,
+            result,
+            longArrayOf(whenFalse.toLong(), whenTrue.toLong()),
+            arrIsVars = true,
+            indexOffset = 0,
+        ),
     )
     definedVars.add(result)
     return IntComb.Narrow(LinComb(mapOf(result to 1L), 0L))
@@ -72,19 +72,19 @@ internal fun Compiler.Builder.elementConstantMatrix(
     factors.add(Linear(longArrayOf(1, -1), intArrayOf(column, length), LinearOp.LE, columnOffset.toLong() - 1))
     factors.add(
         Linear(
-        longArrayOf(1, 1, -1),
-        intArrayOf(start, column, index),
-        LinearOp.EQ,
-        columnOffset.toLong(),
-    )
+            longArrayOf(1, 1, -1),
+            intArrayOf(start, column, index),
+            LinearOp.EQ,
+            columnOffset.toLong(),
+        ),
     )
     factors.add(
         Element(
-        index,
-        result,
-        rows.flatMap { it.map(Int::toLong) }.toLongArray(),
-        arrIsVars = false,
-        indexOffset = 0,
-    )
+            index,
+            result,
+            rows.flatMap { it.map(Int::toLong) }.toLongArray(),
+            arrIsVars = false,
+            indexOffset = 0,
+        ),
     )
 }

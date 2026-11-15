@@ -42,10 +42,10 @@ class QuadraticControlTest {
         var charged = 0L
         val control = QuadraticControl(
             object : ExecutionControl() {
-            override fun isCancelled(): Boolean = false
-            override val accounting: WorkMeter get() = WorkMeter { charged += it }
-        },
-            maximumWork = 0
+                override fun isCancelled(): Boolean = false
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
+            },
+            maximumWork = 0,
         )
 
         val stop = assertFailsWith<QuadraticInterrupted> { control.step() }

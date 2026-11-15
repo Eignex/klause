@@ -49,59 +49,59 @@ internal object RepairTrajectory {
                 val center = (get(entry, "Center") as Sample?)?.let(prepared.reconstruct)
                 writer.appendLine(
                     buildJsonObject {
-                    put("id", get(entry, "Id") as Int)
-                    put("owner", get(entry, "Owner").toString())
-                    put("freedScopeAvailable", get(entry, "ScopeComplete") as Boolean)
-                    put("seed", get(entry, "Seed") as Long?)
-                    put("descentRule", get(trace, "DescentRule").toString())
-                    put("endpoint", get(entry, "Endpoint").toString())
-                    put("repairVerdict", get(entry, "RepairVerdict") as String?)
-                    put("repairReason", get(entry, "RepairReason")?.toString())
-                    put("bestObjectiveCutoff", get(entry, "BestObjectiveCutoff") as Double?)
-                    put("exactBestObjective", get(entry, "ExactBestObjective")?.toString())
-                    (get(entry, "BestSample") as Sample?)?.let {
-                        put("sourceBest", sample(prepared.reconstruct(it)))
-                    }
-                    put("basinClassified", false)
-                    for (scope in listOf("RequestedBools", "RequestedInts", "EffectiveBools", "EffectiveInts")) {
-                        put(
-                            scope.replaceFirstChar { it.lowercase() },
-                            JsonArray((get(entry, scope) as IntArray).map(::JsonPrimitive)),
-                        )
-                    }
-                    if (center != null) put("sourceCenter", sample(center))
-                    put(
-                        "frames",
-                        JsonArray(
-                            frames.map { frame ->
-                        val captured = checkNotNull(frame)
-                        val working = get(captured, "Sample") as Sample
-                        val source = prepared.reconstruct(working)
-                        buildJsonObject {
-                            put("stage", get(captured, "Stage").toString())
-                            put("cost", get(captured, "Cost") as Long?)
-                            put("working", sample(working))
-                            put("source", sample(source))
-                            put("fromBefore", distance(sourceBefore, source, inputs))
-                            if (center != null) put("fromCenter", distance(center, source, inputs))
-                            put("workingDiscreteChanges", before.hammingDistanceTo(working))
+                        put("id", get(entry, "Id") as Int)
+                        put("owner", get(entry, "Owner").toString())
+                        put("freedScopeAvailable", get(entry, "ScopeComplete") as Boolean)
+                        put("seed", get(entry, "Seed") as Long?)
+                        put("descentRule", get(trace, "DescentRule").toString())
+                        put("endpoint", get(entry, "Endpoint").toString())
+                        put("repairVerdict", get(entry, "RepairVerdict") as String?)
+                        put("repairReason", get(entry, "RepairReason")?.toString())
+                        put("bestObjectiveCutoff", get(entry, "BestObjectiveCutoff") as Double?)
+                        put("exactBestObjective", get(entry, "ExactBestObjective")?.toString())
+                        (get(entry, "BestSample") as Sample?)?.let {
+                            put("sourceBest", sample(prepared.reconstruct(it)))
                         }
-                    }
+                        put("basinClassified", false)
+                        for (scope in listOf("RequestedBools", "RequestedInts", "EffectiveBools", "EffectiveInts")) {
+                            put(
+                                scope.replaceFirstChar { it.lowercase() },
+                                JsonArray((get(entry, scope) as IntArray).map(::JsonPrimitive)),
+                            )
+                        }
+                        if (center != null) put("sourceCenter", sample(center))
+                        put(
+                            "frames",
+                            JsonArray(
+                                frames.map { frame ->
+                                    val captured = checkNotNull(frame)
+                                    val working = get(captured, "Sample") as Sample
+                                    val source = prepared.reconstruct(working)
+                                    buildJsonObject {
+                                        put("stage", get(captured, "Stage").toString())
+                                        put("cost", get(captured, "Cost") as Long?)
+                                        put("working", sample(working))
+                                        put("source", sample(source))
+                                        put("fromBefore", distance(sourceBefore, source, inputs))
+                                        if (center != null) put("fromCenter", distance(center, source, inputs))
+                                        put("workingDiscreteChanges", before.hammingDistanceTo(working))
+                                    }
+                                },
+                            ),
                         )
-                    )
-                }.toString()
+                    }.toString(),
                 )
                 writer.flush()
             }
         }
         file.resolveSibling("${file.nameWithoutExtension}-cost.json").writeText(
             buildJsonObject {
-            put("coordinateReads", get(trace, "CoordinateReads") as Long)
-            put("declinedAttempts", get(trace, "Declined") as Long)
-            put("maxAttempts", get(trace, "MaxAttempts") as Int)
-            put("maxCoordinates", get(trace, "MaxCoordinates") as Int)
-            put("sourceVerdictClaim", false)
-        }.toString()
+                put("coordinateReads", get(trace, "CoordinateReads") as Long)
+                put("declinedAttempts", get(trace, "Declined") as Long)
+                put("maxAttempts", get(trace, "MaxAttempts") as Int)
+                put("maxCoordinates", get(trace, "MaxCoordinates") as Int)
+                put("sourceVerdictClaim", false)
+            }.toString(),
         )
     }
 
@@ -161,9 +161,9 @@ internal object RepairTrajectory {
                     repeat(4) {
                         if (eligible.size >= variables.size) {
                             candidates.add(
-                            "size-matched-sample" to
-                                eligible.shuffled(random).take(variables.size).toIntArray(),
-                        )
+                                "size-matched-sample" to
+                                    eligible.shuffled(random).take(variables.size).toIntArray(),
+                            )
                         }
                     }
                 }
@@ -179,49 +179,49 @@ internal object RepairTrajectory {
                     val result = BacktrackSolver(problem).minimize(
                         objective,
                         BacktrackParams(
-                        assumptions = assumptions,
-                        maxDecisions = 10_000,
-                        cancellation = stop,
-                        randomSeed = seed,
-                    )
+                            assumptions = assumptions,
+                            maxDecisions = 10_000,
+                            cancellation = stop,
+                            randomSeed = seed,
+                        ),
                     )
                     val elapsed = System.nanoTime() - started
                     val completed = result is MinimizeResult.Optimal || result is MinimizeResult.Infeasible
                     if (completed) completedControls++
                     writer.appendLine(
                         buildJsonObject {
-                        put("centerId", get(entry, "Id") as Int)
-                        put("candidateIndex", candidateIndex)
-                        put("candidateCount", candidates.size)
-                        put("selector", label)
-                        put("requestedInts", JsonArray(variables.map(::JsonPrimitive)))
-                        put("effectiveInts", JsonArray(variables.map(::JsonPrimitive)))
-                        put("center", sample(center))
-                        put("centerObjective", objective.evaluate(center))
-                        put("result", result::class.simpleName)
-                        put(
-                            "reason",
-                            when (result) {
-                                is MinimizeResult.Unknown -> result.reason.toString()
-                                is MinimizeResult.BestFound -> result.reason.toString()
-                                else -> null
-                            },
-                        )
-                        put("completedLocalExhaustion", completed)
-                        put(
-                            "strictImprovement",
+                            put("centerId", get(entry, "Id") as Int)
+                            put("candidateIndex", candidateIndex)
+                            put("candidateCount", candidates.size)
+                            put("selector", label)
+                            put("requestedInts", JsonArray(variables.map(::JsonPrimitive)))
+                            put("effectiveInts", JsonArray(variables.map(::JsonPrimitive)))
+                            put("center", sample(center))
+                            put("centerObjective", objective.evaluate(center))
+                            put("result", result::class.simpleName)
+                            put(
+                                "reason",
+                                when (result) {
+                                    is MinimizeResult.Unknown -> result.reason.toString()
+                                    is MinimizeResult.BestFound -> result.reason.toString()
+                                    else -> null
+                                },
+                            )
+                            put("completedLocalExhaustion", completed)
+                            put(
+                                "strictImprovement",
+                                result.assignment?.let {
+                                    objective.evaluateExact(it) < objective.evaluateExact(center)
+                                } ?: false,
+                            )
+                            put("nodes", result.stats.search.nodes.sum)
+                            put("elapsedNanos", elapsed)
                             result.assignment?.let {
-                            objective.evaluateExact(it) < objective.evaluateExact(center)
-                        } ?: false
-                        )
-                        put("nodes", result.stats.search.nodes.sum)
-                        put("elapsedNanos", elapsed)
-                        result.assignment?.let {
-                            put("repaired", sample(it))
-                            put("nativeSourceAccepted", checkSource(source, prepared.reconstruct(it)))
-                        }
-                        put("globalProofClaim", false)
-                    }.toString()
+                                put("repaired", sample(it))
+                                put("nativeSourceAccepted", checkSource(source, prepared.reconstruct(it)))
+                            }
+                            put("globalProofClaim", false)
+                        }.toString(),
                     )
                     writer.flush()
                 }
@@ -229,19 +229,19 @@ internal object RepairTrajectory {
         }
         file.resolveSibling("${file.nameWithoutExtension}-limits.json").writeText(
             buildJsonObject {
-            put("maxCenters", 4)
-            put("maxBlocksPerCenter", 4)
-            put("maxRelationBlockCoordinates", 6)
-            put("optionalRelationBlocks", "declined")
-            put("maxDecisionsPerRepair", 10_000)
-            put("cancelled", stop())
-            put("centersVisited", centers)
-            put("plannedControls", planned)
-            put("attemptedControls", attempted)
-            put("completedControls", completedControls)
-            put("boundedScanCompleted", !stop() && attempted == planned)
-            put("wholeSourceExhaustionClaim", false)
-        }.toString()
+                put("maxCenters", 4)
+                put("maxBlocksPerCenter", 4)
+                put("maxRelationBlockCoordinates", 6)
+                put("optionalRelationBlocks", "declined")
+                put("maxDecisionsPerRepair", 10_000)
+                put("cancelled", stop())
+                put("centersVisited", centers)
+                put("plannedControls", planned)
+                put("attemptedControls", attempted)
+                put("completedControls", completedControls)
+                put("boundedScanCompleted", !stop() && attempted == planned)
+                put("wholeSourceExhaustionClaim", false)
+            }.toString(),
         )
     }
 
@@ -263,22 +263,22 @@ internal object RepairTrajectory {
     ) {
         file.writeText(
             buildJsonObject {
-            put("objective", result.objectiveValue)
-            put("picks", picks)
-            put("moves", result.stats.ls.moves.sum)
-            put("restarts", result.stats.search.restarts.sum)
-            put("stalls", result.stats.ls.stalls.sum)
-            put("runElapsedNanos", runNanos)
-            put("runThreadAllocatedBytes", allocatedBytes)
-            put("checker", "native finiteWitnessVerifier/FinitePointCheck")
-            put("independentWitnessCheck", false)
-            result.assignment?.let {
-                val reconstructed = prepared.reconstruct(it)
-                put("working", sample(it))
-                put("source", sample(reconstructed))
-                put("nativeSourceAccepted", checkSource(source, reconstructed))
-            }
-        }.toString()
+                put("objective", result.objectiveValue)
+                put("picks", picks)
+                put("moves", result.stats.ls.moves.sum)
+                put("restarts", result.stats.search.restarts.sum)
+                put("stalls", result.stats.ls.stalls.sum)
+                put("runElapsedNanos", runNanos)
+                put("runThreadAllocatedBytes", allocatedBytes)
+                put("checker", "native finiteWitnessVerifier/FinitePointCheck")
+                put("independentWitnessCheck", false)
+                result.assignment?.let {
+                    val reconstructed = prepared.reconstruct(it)
+                    put("working", sample(it))
+                    put("source", sample(reconstructed))
+                    put("nativeSourceAccepted", checkSource(source, reconstructed))
+                }
+            }.toString(),
         )
     }
 
@@ -306,8 +306,8 @@ internal object RepairTrajectory {
         put(
             "approximateRealL1Displacement",
             (0 until before.numRealVars).sumOf {
-            abs(before.approximateRealValue(it) - after.approximateRealValue(it))
-        }
+                abs(before.approximateRealValue(it) - after.approximateRealValue(it))
+            },
         )
     }
 

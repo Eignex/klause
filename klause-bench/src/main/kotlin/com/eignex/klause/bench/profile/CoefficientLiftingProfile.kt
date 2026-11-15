@@ -34,8 +34,8 @@ internal object CoefficientLiftingProfile {
             put(
                 "jvmOptions",
                 buildJsonArray {
-                ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-            }
+                    ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
+                },
             )
         }
         out.resolve("identity.json").writeText("$identity\n")

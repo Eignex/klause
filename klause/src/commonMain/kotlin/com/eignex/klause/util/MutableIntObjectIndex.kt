@@ -161,9 +161,11 @@ internal class MutableIntObjectIndex<V : Any> {
     private fun replace(parent: Branch<V>?, previous: Node<V>, next: Node<V>) {
         when {
             parent == null -> root = next
+
             parent.zero === previous -> parent.zero = next
+
             else -> {
-                check(parent.one === previous);
+                check(parent.one === previous)
                 parent.one = next
             }
         }
@@ -201,8 +203,9 @@ internal class MutableIntObjectIndex<V : Any> {
         visit(1L)
         when (node) {
             is Leaf -> action(node.key, node.value)
+
             is Branch -> {
-                walk(node.zero, visit, action);
+                walk(node.zero, visit, action)
                 walk(node.one, visit, action)
             }
         }

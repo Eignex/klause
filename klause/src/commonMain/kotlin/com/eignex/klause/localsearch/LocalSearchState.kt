@@ -148,8 +148,8 @@ class LocalSearchState private constructor(
     internal val repairChainClauseOnly: Boolean by lazy(LazyThreadSafetyMode.NONE) {
         (
             projection.selection == null ||
-            projection.selection.builtInScoring
-        ) &&
+                projection.selection.builtInScoring
+            ) &&
             problem.factors.all { it is Clause }
     }
 

@@ -36,20 +36,21 @@ class SeparableObjectiveViewTest {
     @Test
     fun `shared unit definitions should retain one orientation and combine leaf costs`() {
         val problem = Problem(
-            0, 6,
+            0,
+            6,
             arrayOf(
-            IntDomain(0, 1),
-            IntDomain(0, 1),
-            IntDomain(0, 1),
-            IntDomain(0, 2),
-            IntDomain(0, 2),
-            IntDomain(0, 4),
-        ),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 1),
+                IntDomain(0, 2),
+                IntDomain(0, 2),
+                IntDomain(0, 4),
+            ),
             listOf(
-            Linear(longArrayOf(1, -1, -1), intArrayOf(5, 3, 4), LinearOp.EQ, 0),
-            Linear(longArrayOf(1, -1, -1), intArrayOf(3, 0, 1), LinearOp.EQ, 0),
-            Linear(longArrayOf(1, -1, -1), intArrayOf(4, 0, 2), LinearOp.EQ, 0),
-        )
+                Linear(longArrayOf(1, -1, -1), intArrayOf(5, 3, 4), LinearOp.EQ, 0),
+                Linear(longArrayOf(1, -1, -1), intArrayOf(3, 0, 1), LinearOp.EQ, 0),
+                Linear(longArrayOf(1, -1, -1), intArrayOf(4, 0, 2), LinearOp.EQ, 0),
+            ),
         ).bake()
         val source = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 0, 0, 1))
 
@@ -87,10 +88,10 @@ class SeparableObjectiveViewTest {
             assertSame(source, view.sourceObjective)
             assertEquals(
                 LinearObjective(
-                intCoefficients = longArrayOf(5 * scale, 0, 0, 0),
-                constant = 7 + 3 * scale,
-            ),
-                view.objective
+                    intCoefficients = longArrayOf(5 * scale, 0, 0, 0),
+                    constant = 7 + 3 * scale,
+                ),
+                view.objective,
             )
             for (x in -1L..1L) {
                 val point = Sample(booleanArrayOf(), longArrayOf(x, 2 * x + 1, 3 * x + 2, 5 * x + 3))
@@ -147,10 +148,11 @@ class SeparableObjectiveViewTest {
         for (scale in listOf(-3L, 2L)) {
             val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, scale), constant = 7)
             val search = CoreGuidedSearch(
-                problem, objective,
+                problem,
+                objective,
                 BacktrackParams(
-                assumptions = Assumptions(ints = mapOf(0 to 1L)),
-            )
+                    assumptions = Assumptions(ints = mapOf(0 to 1L)),
+                ),
             )
 
             val result = search.use {
@@ -181,19 +183,20 @@ class SeparableObjectiveViewTest {
     @Test
     fun `retained finite sum aliases should consume overlapping cheap term cores`() {
         val source = Problem(
-            0, 4,
+            0,
+            4,
             arrayOf(
-            intDomainFromSurvivors(longArrayOf(0, 3, 8)),
-            intDomainFromSurvivors(longArrayOf(0, 3, 10)),
-            intDomainFromSurvivors(longArrayOf(0, 3, 11)),
-            IntDomain(0, 29),
-        ),
+                intDomainFromSurvivors(longArrayOf(0, 3, 8)),
+                intDomainFromSurvivors(longArrayOf(0, 3, 10)),
+                intDomainFromSurvivors(longArrayOf(0, 3, 11)),
+                IntDomain(0, 29),
+            ),
             listOf(
-            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-            Linear(longArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
-            Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
-            Linear(longArrayOf(1, 1, 1, -1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 0),
-        )
+                Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+                Linear(longArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 3),
+                Linear(longArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
+                Linear(longArrayOf(1, 1, 1, -1), intArrayOf(0, 1, 2, 3), LinearOp.EQ, 0),
+            ),
         )
         val original = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
         val prepared = PresolvePipeline.run(source, original, PresolveConfig.DEFAULT, false)
@@ -292,22 +295,26 @@ class SeparableObjectiveViewTest {
     @Test
     fun `depth and surviving term limits should decline complete expansion`() {
         val chain = Problem(
-            0, 18, Array(18) { IntDomain(0, 1) },
+            0,
+            18,
+            Array(18) { IntDomain(0, 1) },
             List(17) {
-            Linear(longArrayOf(1, -2), intArrayOf(it + 1, it), LinearOp.EQ, 0)
-        }
+                Linear(longArrayOf(1, -2), intArrayOf(it + 1, it), LinearOp.EQ, 0)
+            },
         ).bake()
         val wide = Problem(
-            0, 258, Array(258) { IntDomain(0, 514) },
+            0,
+            258,
+            Array(258) { IntDomain(0, 514) },
             listOf(
-            Linear(LongArray(258) { if (it == 257) -1 else 2 }, IntArray(258) { it }, LinearOp.EQ, 0),
-        )
+                Linear(LongArray(258) { if (it == 257) -1 else 2 }, IntArray(258) { it }, LinearOp.EQ, 0),
+            ),
         ).bake()
         for (problem in listOf(chain, wide)) {
             val objective = LinearObjective(
                 intCoefficients = LongArray(problem.numIntVars) {
-                if (it == problem.numIntVars - 1) 1 else 0
-            }
+                    if (it == problem.numIntVars - 1) 1 else 0
+                },
             )
 
             assertNull(SeparableObjectiveView.create(problem, objective))
@@ -320,9 +327,9 @@ class SeparableObjectiveViewTest {
         val approximate = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(definition))
             .withSourceSemantics(
                 SourceSemantics(
-                SourceFormat.IR,
-                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
-            ).resolve()
+                    SourceFormat.IR,
+                    feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+                ).resolve(),
             ).bake()
         val open = BakedProblem(
             0,
@@ -352,10 +359,10 @@ class SeparableObjectiveViewTest {
 
         assertNull(
             SeparableObjectiveView.create(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(1)),
-            cancellation,
-        )
+                problem,
+                LinearObjective(intCoefficients = longArrayOf(1)),
+                cancellation,
+            ),
         )
         assertTrue(charged >= 2)
     }

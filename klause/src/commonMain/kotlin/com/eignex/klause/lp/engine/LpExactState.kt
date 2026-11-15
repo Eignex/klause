@@ -138,9 +138,9 @@ internal class LpExactState internal constructor(
         var witness = 0L
         for (assertion in activeAssertions) {
             if (assertion.witness >= witness) {
-            if (assertion.witness == Long.MAX_VALUE) return null
-            witness = assertion.witness + 1L
-        }
+                if (assertion.witness == Long.MAX_VALUE) return null
+                witness = assertion.witness + 1L
+            }
         }
         val side = ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(endpoint) - origin))
         return LpExactState(
@@ -373,8 +373,8 @@ internal class LpExactState internal constructor(
         deriveVectors(
             previous,
             (0 until model.numVars).filter {
-            model.column(it).bounds != previous.model.column(it).bounds
-        }.toIntArray()
+                model.column(it).bounds != previous.model.column(it).bounds
+            }.toIntArray(),
         )
     }
 

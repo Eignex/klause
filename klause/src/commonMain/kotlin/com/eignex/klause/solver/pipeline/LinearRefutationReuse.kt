@@ -202,9 +202,9 @@ internal class LinearRefutationReuse(
             val rowBytes = 128L + 96L * entries
             if (!spend(entries - 1L, rowBytes)) return null
             if (!(
-                premise.inequality.coefficients.values + premise.inequality.rhs +
-                    premise.integerPins.values
-            ).all(::admitted)
+                    premise.inequality.coefficients.values + premise.inequality.rhs +
+                        premise.integerPins.values
+                    ).all(::admitted)
             ) {
                 sourceWidthDeclined = true
                 observe("WidthDeclines")
@@ -234,8 +234,8 @@ internal class LinearRefutationReuse(
             return SourceEvidenceVerifier(checker.atScope(evidence.scope)).verify(
                 evidence,
                 ExecutionControl {
-                ++proofPolls > 100_000 || !spend(1L)
-            }
+                    ++proofPolls > 100_000 || !spend(1L)
+                },
             )
         } finally {
             verificationWork += work - before

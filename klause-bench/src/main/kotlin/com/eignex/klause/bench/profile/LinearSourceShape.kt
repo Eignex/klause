@@ -65,10 +65,10 @@ internal object LinearSourceShape {
         val parsingNs = System.nanoTime() - started
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            parsed.source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                parsed.source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            ),
         )
         val model = requireNotNull(invocation.preparedPlan?.model) { "source has no factor inspection view" }
         val exactRows = model.factors.filterIsInstance<ExactLinear>()
@@ -83,17 +83,17 @@ internal object LinearSourceShape {
                     require(capturedEntries <= 262144) { "equality capture exceeds entry limit" }
                     add(
                         buildJsonObject {
-                        put("factor", factorIndex)
-                        put("singleEqualityMeaning", factor.linearForm is LinearForm.Conjunction && rows.size == 1)
-                        put("taggedRefs", buildJsonArray { repeat(row.size) { add(JsonPrimitive(row.ref(it))) } })
-                        put(
-                            "coefficients",
-                            buildJsonArray {
-                            repeat(row.size) { add(JsonPrimitive(constants.exactCoeff(it).toString())) }
-                        }
-                        )
-                        put("bound", constants.exactBound.toString())
-                    }
+                            put("factor", factorIndex)
+                            put("singleEqualityMeaning", factor.linearForm is LinearForm.Conjunction && rows.size == 1)
+                            put("taggedRefs", buildJsonArray { repeat(row.size) { add(JsonPrimitive(row.ref(it))) } })
+                            put(
+                                "coefficients",
+                                buildJsonArray {
+                                    repeat(row.size) { add(JsonPrimitive(constants.exactCoeff(it).toString())) }
+                                },
+                            )
+                            put("bound", constants.exactBound.toString())
+                        },
                     )
                 }
             }
@@ -131,9 +131,9 @@ internal object LinearSourceShape {
             put(
                 "factorKinds",
                 buildJsonObject {
-                model.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
-                    .forEach { (kind, count) -> put(kind, count) }
-            }
+                    model.factors.groupingBy { it::class.simpleName ?: "Factor" }.eachCount().toSortedMap()
+                        .forEach { (kind, count) -> put(kind, count) }
+                },
             )
             put("exactRows", exactRows.size)
             put("exactRowTerms", exactRows.sumOf { it.size.toLong() })
@@ -158,8 +158,8 @@ internal object LinearSourceShape {
             put(
                 "jvmOptions",
                 buildJsonArray {
-                ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
-            }
+                    ManagementFactory.getRuntimeMXBean().inputArguments.forEach { add(JsonPrimitive(it)) }
+                },
             )
         }
         out.resolve("shape.json").writeText(shape.toString() + "\n")

@@ -331,8 +331,8 @@ internal object Compiler {
             lowerOpenIteChains()
             val compiledObjective = if (includeObjective) {
                 objectiveSpec?.let { (t, _) ->
-                if (isRealExpr(t)) realObjective(t, false) else linearObjective(t, false)
-            }
+                    if (isRealExpr(t)) realObjective(t, false) else linearObjective(t, false)
+                }
             } else {
                 null
             }

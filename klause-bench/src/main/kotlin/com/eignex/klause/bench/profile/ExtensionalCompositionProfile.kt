@@ -30,8 +30,8 @@ internal object ExtensionalCompositionProfile {
         require(options.keys.containsAll(setOf("suite", "problem", "sha256")))
         require(
             options.keys.all {
-            it in setOf("suite", "problem", "sha256", "prepared", "preparationWork", "sensitive", "cycles")
-        }
+                it in setOf("suite", "problem", "sha256", "prepared", "preparationWork", "sensitive", "cycles")
+            },
         )
         val preparationWorkLimit = options["preparationWork"]?.toLong() ?: 2_000_000_000L
         require(preparationWorkLimit > 0)
@@ -63,19 +63,19 @@ internal object ExtensionalCompositionProfile {
         val problem = preparation?.problem ?: source
         out.resolve("preparation.json").writeText(
             buildJsonObject {
-            put("requested", preparation != null)
-            put("solutionSetSensitive", sensitive)
-            put("cancelled", preparationToken())
-            put("work", preparationWork)
-            put("workLimit", preparationWorkLimit)
-            put("elapsedNs", System.nanoTime() - preparationStart)
-            put("infeasible", preparation?.stats?.infeasible ?: false)
-            put("sourceIntVars", source.numIntVars)
-            put("preparedIntVars", problem.numIntVars)
-            put("sourceFactors", source.factors.size)
-            put("preparedFactors", problem.factors.size)
-            put("allDifferent", problem.factors.count { it is AllDifferent })
-        }.toString()
+                put("requested", preparation != null)
+                put("solutionSetSensitive", sensitive)
+                put("cancelled", preparationToken())
+                put("work", preparationWork)
+                put("workLimit", preparationWorkLimit)
+                put("elapsedNs", System.nanoTime() - preparationStart)
+                put("infeasible", preparation?.stats?.infeasible ?: false)
+                put("sourceIntVars", source.numIntVars)
+                put("preparedIntVars", problem.numIntVars)
+                put("sourceFactors", source.factors.size)
+                put("preparedFactors", problem.factors.size)
+                put("allDifferent", problem.factors.count { it is AllDifferent })
+            }.toString(),
         )
         if (preparationToken() || preparation?.stats?.infeasible == true) return
         val tables = problem.factors.filterIsInstance<Table>()
@@ -84,93 +84,93 @@ internal object ExtensionalCompositionProfile {
             put(
                 "tables",
                 buildJsonArray {
-                tables.groupingBy { "${it.arity}/${it.numTuples}/${it.hi != null}" }.eachCount()
-                    .forEach { (shape, count) ->
-                        add(
-                            buildJsonObject {
-                            put("arity/rows/intervals", shape);
-                            put("count", count)
+                    tables.groupingBy { "${it.arity}/${it.numTuples}/${it.hi != null}" }.eachCount()
+                        .forEach { (shape, count) ->
+                            add(
+                                buildJsonObject {
+                                    put("arity/rows/intervals", shape)
+                                    put("count", count)
+                                },
+                            )
                         }
-                        )
-                    }
-            }
+                },
             )
             put(
                 "tableScopes",
                 buildJsonArray {
-                for ((id, table) in tables.withIndex()) {
-                    add(
-                        buildJsonObject {
-                    put("table", id)
-                    put("scope", table.xs.joinToString(","))
-                    put(
-                        "sourcePayloads",
-                        source.factors.indices.filter {
-                        val original = source.factors[it] as? Table
-                        original != null && original.tuples.contentEquals(table.tuples)
-                    }.joinToString(",")
-                    )
-                }
-                    )
-                }
-            }
+                    for ((id, table) in tables.withIndex()) {
+                        add(
+                            buildJsonObject {
+                                put("table", id)
+                                put("scope", table.xs.joinToString(","))
+                                put(
+                                    "sourcePayloads",
+                                    source.factors.indices.filter {
+                                        val original = source.factors[it] as? Table
+                                        original != null && original.tuples.contentEquals(table.tuples)
+                                    }.joinToString(","),
+                                )
+                            },
+                        )
+                    }
+                },
             )
             put(
                 "tablePairs",
                 buildJsonArray {
-                for (a in tables.indices) {
-                    for (b in a + 1 until tables.size) {
-                    val shared = tables[a].xs.count { it in tables[b].xs }
-                    if (shared == 0) continue
-                    add(
-                        buildJsonObject {
-                        put("left", a);
-                        put("right", b);
-                        put("shared", shared)
+                    for (a in tables.indices) {
+                        for (b in a + 1 until tables.size) {
+                            val shared = tables[a].xs.count { it in tables[b].xs }
+                            if (shared == 0) continue
+                            add(
+                                buildJsonObject {
+                                    put("left", a)
+                                    put("right", b)
+                                    put("shared", shared)
+                                },
+                            )
+                        }
                     }
-                    )
-                }
-                }
-            }
+                },
             )
             put(
                 "allDifferentScopes",
                 buildJsonArray {
-                for (factor in problem.factors.filterIsInstance<AllDifferent>()) {
-                    add(buildJsonObject { put("scope", factor.vars.joinToString(",")) })
-                }
-            }
+                    for (factor in problem.factors.filterIsInstance<AllDifferent>()) {
+                        add(buildJsonObject { put("scope", factor.vars.joinToString(",")) })
+                    }
+                },
             )
             put(
                 "diagrams",
                 buildJsonArray {
-                diagrams.groupingBy { diagramShape(it) }
-                    .eachCount().forEach { (shape, count) ->
-                        add(
-                            buildJsonObject {
-                            put("arity/states/records", shape);
-                            put("count", count)
+                    diagrams.groupingBy { diagramShape(it) }
+                        .eachCount().forEach { (shape, count) ->
+                            add(
+                                buildJsonObject {
+                                    put("arity/states/records", shape)
+                                    put("count", count)
+                                },
+                            )
                         }
-                        )
-                    }
-            }
+                },
             )
             put(
                 "overlaps",
                 buildJsonArray {
-                for (diagram in diagrams.take(1)) {
-                    for (table in tables) {
-                    val positions = diagram.seq.indices.filter { diagram.seq[it] in table.xs }
-                    if (positions.size < 2) continue
-                    add(
-                        buildJsonObject {
-                        put("positions", positions.joinToString(","));
-                        put("rows", table.numTuples)
+                    for (diagram in diagrams.take(1)) {
+                        for (table in tables) {
+                            val positions = diagram.seq.indices.filter { diagram.seq[it] in table.xs }
+                            if (positions.size < 2) continue
+                            add(
+                                buildJsonObject {
+                                    put("positions", positions.joinToString(","))
+                                    put("rows", table.numTuples)
+                                },
+                            )
+                        }
                     }
-                    )
-                }
-                }
-            }
+                },
             )
         }
         out.resolve("shapes.json").writeText(shapes.toString())
@@ -188,71 +188,71 @@ internal object ExtensionalCompositionProfile {
         out.resolve("composition.jsonl").bufferedWriter().use { writer ->
             for ((name, factors) in samples) {
                 repeat(3) { iteration ->
-                var work = 0L
-                val meter = WorkMeter { work += it }
-                val token = object : ExecutionControl() {
-                    override fun isCancelled(): Boolean = false
-                    override val accounting: WorkMeter get() = meter
-                }
-                val allocation = bean.getThreadAllocatedBytes(thread)
-                val start = System.nanoTime()
-                val delta = Presolve.composeExtensional(problem.withFactors(factors), token)
-                val elapsed = System.nanoTime() - start
-                val allocated = bean.getThreadAllocatedBytes(thread) - allocation
-                val row = buildJsonObject {
-                    put("revision", Reports.readGitSha())
-                    put("sourceSha256", sha256(bytes))
-                    put("osName", System.getProperty("os.name"))
-                    put("osArch", System.getProperty("os.arch"))
-                    put("javaVersion", System.getProperty("java.version"))
-                    put("sample", name)
-                    put("iteration", iteration)
-                    put("work", work)
-                    put("elapsedNs", elapsed)
-                    put("allocatedBytes", allocated)
-                    put("replaced", delta.droppedIndices.size)
-                    put(
-                        "removedTableRows",
-                        delta.droppedIndices.sumOf { (factors[it] as? Table)?.numTuples ?: 0 } -
-                            delta.addedFactors.filterIsInstance<Table>().sumOf { it.numTuples },
-                    )
-                    put(
-                        "restrictions",
-                        buildJsonArray {
-                        for (id in delta.droppedIndices) {
-                            val before = factors[id] as? Table ?: continue
-                            val after = delta.addedFactors.filterIsInstance<Table>()
-                                .singleOrNull { it.xs.contentEquals(before.xs) } ?: continue
-                            add(
-                                buildJsonObject {
-                                put("factor", id)
-                                put("scope", before.xs.joinToString(","))
-                                put("beforeRows", before.numTuples)
-                                put("afterRows", after.numTuples)
-                                put(
-                                    "sourcePayloads",
-                                    source.factors.indices.filter {
-                                    val original = source.factors[it] as? Table
-                                    original != null && original.tuples.contentEquals(before.tuples)
-                                }.joinToString(",")
-                                )
-                            }
-                            )
-                        }
+                    var work = 0L
+                    val meter = WorkMeter { work += it }
+                    val token = object : ExecutionControl() {
+                        override fun isCancelled(): Boolean = false
+                        override val accounting: WorkMeter get() = meter
                     }
-                    )
-                    put("infeasible", delta.infeasible)
-                    put(
-                        "mddRecords",
-                        delta.addedFactors.filterIsInstance<Mdd>()
-                            .sumOf { it.transitions.size / it.recordStride },
-                    )
-                    put("sourceVerdictClaim", false)
+                    val allocation = bean.getThreadAllocatedBytes(thread)
+                    val start = System.nanoTime()
+                    val delta = Presolve.composeExtensional(problem.withFactors(factors), token)
+                    val elapsed = System.nanoTime() - start
+                    val allocated = bean.getThreadAllocatedBytes(thread) - allocation
+                    val row = buildJsonObject {
+                        put("revision", Reports.readGitSha())
+                        put("sourceSha256", sha256(bytes))
+                        put("osName", System.getProperty("os.name"))
+                        put("osArch", System.getProperty("os.arch"))
+                        put("javaVersion", System.getProperty("java.version"))
+                        put("sample", name)
+                        put("iteration", iteration)
+                        put("work", work)
+                        put("elapsedNs", elapsed)
+                        put("allocatedBytes", allocated)
+                        put("replaced", delta.droppedIndices.size)
+                        put(
+                            "removedTableRows",
+                            delta.droppedIndices.sumOf { (factors[it] as? Table)?.numTuples ?: 0 } -
+                                delta.addedFactors.filterIsInstance<Table>().sumOf { it.numTuples },
+                        )
+                        put(
+                            "restrictions",
+                            buildJsonArray {
+                                for (id in delta.droppedIndices) {
+                                    val before = factors[id] as? Table ?: continue
+                                    val after = delta.addedFactors.filterIsInstance<Table>()
+                                        .singleOrNull { it.xs.contentEquals(before.xs) } ?: continue
+                                    add(
+                                        buildJsonObject {
+                                            put("factor", id)
+                                            put("scope", before.xs.joinToString(","))
+                                            put("beforeRows", before.numTuples)
+                                            put("afterRows", after.numTuples)
+                                            put(
+                                                "sourcePayloads",
+                                                source.factors.indices.filter {
+                                                    val original = source.factors[it] as? Table
+                                                    original != null && original.tuples.contentEquals(before.tuples)
+                                                }.joinToString(","),
+                                            )
+                                        },
+                                    )
+                                }
+                            },
+                        )
+                        put("infeasible", delta.infeasible)
+                        put(
+                            "mddRecords",
+                            delta.addedFactors.filterIsInstance<Mdd>()
+                                .sumOf { it.transitions.size / it.recordStride },
+                        )
+                        put("sourceVerdictClaim", false)
+                    }
+                    writer.appendLine(row.toString())
+                    writer.flush()
+                    println(row)
                 }
-                writer.appendLine(row.toString())
-                writer.flush()
-                println(row)
-            }
             }
         }
     }

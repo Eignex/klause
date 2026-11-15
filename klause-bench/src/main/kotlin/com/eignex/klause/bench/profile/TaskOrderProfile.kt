@@ -65,11 +65,11 @@ internal object TaskOrderProfile {
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         out.resolve("runtime.txt").writeText(
             listOf(
-            System.getProperty("os.name"),
-            System.getProperty("os.arch"),
-            System.getProperty("java.version"),
-            ManagementFactory.getRuntimeMXBean().inputArguments.toString(),
-        ).joinToString("\n")
+                System.getProperty("os.name"),
+                System.getProperty("os.arch"),
+                System.getProperty("java.version"),
+                ManagementFactory.getRuntimeMXBean().inputArguments.toString(),
+            ).joinToString("\n"),
         )
         if (args.firstOrNull() == "mode=source") {
             inspectSource(args.drop(1).toTypedArray(), out)
@@ -118,13 +118,13 @@ internal object TaskOrderProfile {
         val variables = if (arm.orders && model !== source) PairFirst(source.numBoolVars) else base.variableSelector
         val result = BacktrackSolver(baked).solve(
             base.copy(
-            maxDecisions = DECISIONS,
-            randomSeed = 1,
-            cancellation = stop,
-            valueSelector = values,
-            variableSelector = variables,
-            lpConfig = if (arm.lp) LpConfig.AGGRESSIVE else null,
-        )
+                maxDecisions = DECISIONS,
+                randomSeed = 1,
+                cancellation = stop,
+                valueSelector = values,
+                variableSelector = variables,
+                lpConfig = if (arm.lp) LpConfig.AGGRESSIVE else null,
+            ),
         )
         val solveNs = System.nanoTime() - started - preparationNs
         val sample = (result as? SolveResult.Sat)?.assignment?.let(prepared.reconstruct)
@@ -132,39 +132,39 @@ internal object TaskOrderProfile {
         directory.resolve("trace.json").writeText(JsonArray(trace.map(::JsonPrimitive)).toString())
         directory.resolve("summary.json").writeText(
             buildJsonObject {
-            put("revision", Reports.readGitSha())
-            put("source", name)
-            put("arm", arm.name)
-            put("decisionCap", DECISIONS)
-            put("timeoutSeconds", 5)
-            put("annotationSelected", annotated != null)
-            put("sourceBooleans", source.numBoolVars)
-            put("addedOrderBooleans", model.numBoolVars - source.numBoolVars)
-            put("addedOrderFactors", model.factors.size - source.factors.size)
-            put("preparedUnaryFactors", baked.factors.filterIsInstance<Cumulative>().count { it.unary })
-            put(
-                "preparedUnaryShapes",
-                JsonArray(
-                    baked.factors.filterIsInstance<Cumulative>()
-                .filter { it.unary }.map { JsonPrimitive(unaryShape(it)) }
+                put("revision", Reports.readGitSha())
+                put("source", name)
+                put("arm", arm.name)
+                put("decisionCap", DECISIONS)
+                put("timeoutSeconds", 5)
+                put("annotationSelected", annotated != null)
+                put("sourceBooleans", source.numBoolVars)
+                put("addedOrderBooleans", model.numBoolVars - source.numBoolVars)
+                put("addedOrderFactors", model.factors.size - source.factors.size)
+                put("preparedUnaryFactors", baked.factors.filterIsInstance<Cumulative>().count { it.unary })
+                put(
+                    "preparedUnaryShapes",
+                    JsonArray(
+                        baked.factors.filterIsInstance<Cumulative>()
+                            .filter { it.unary }.map { JsonPrimitive(unaryShape(it)) },
+                    ),
                 )
-            )
-            put("preparedDifferenceSystems", baked.factors.count { it.javaClass.simpleName == "DifferenceSystem" })
-            put("preparedFactors", baked.factors.size)
-            put("preparationNs", preparationNs)
-            put("solveNs", solveNs)
-            put("sourceCheckNs", System.nanoTime() - started - preparationNs - solveNs)
-            put("threadAllocatedBytesIncludingCheck", bean.getThreadAllocatedBytes(thread) - allocation)
-            put("result", result.javaClass.simpleName)
-            put("nativeWitnessAccepted", checked)
-            put("independentSourceProof", false)
-            put("nodes", result.stats.search.nodes.sum)
-            put("fails", result.stats.search.fails.sum)
-            put("learnedClauses", result.stats.search.learnedClauses.sum)
-            put("propagationWork", result.stats.search.propagationWork.sum)
-            put("traceCapped", trace.size >= TRACE_LIMIT)
-            put("deadlineReached", stop())
-        }.toString()
+                put("preparedDifferenceSystems", baked.factors.count { it.javaClass.simpleName == "DifferenceSystem" })
+                put("preparedFactors", baked.factors.size)
+                put("preparationNs", preparationNs)
+                put("solveNs", solveNs)
+                put("sourceCheckNs", System.nanoTime() - started - preparationNs - solveNs)
+                put("threadAllocatedBytesIncludingCheck", bean.getThreadAllocatedBytes(thread) - allocation)
+                put("result", result.javaClass.simpleName)
+                put("nativeWitnessAccepted", checked)
+                put("independentSourceProof", false)
+                put("nodes", result.stats.search.nodes.sum)
+                put("fails", result.stats.search.fails.sum)
+                put("learnedClauses", result.stats.search.learnedClauses.sum)
+                put("propagationWork", result.stats.search.propagationWork.sum)
+                put("traceCapped", trace.size >= TRACE_LIMIT)
+                put("deadlineReached", stop())
+            }.toString(),
         )
     }
 
@@ -228,16 +228,16 @@ internal object TaskOrderProfile {
         val source = resolved.problem
         out.resolve("source-shape.json").writeText(
             buildJsonObject {
-            put("suite", options.getValue("suite"))
-            put("problem", reference.name)
-            put("modelSha256", options.getValue("modelSha256"))
-            put("dataSha256", options.getValue("dataSha256"))
-            put("hasAnnotation", resolved.searchParams != null)
-            put("unaryFactors", source.factors.filterIsInstance<Cumulative>().count { it.unary })
-            put("eligiblePairFound", withOrderPair(source).numBoolVars > source.numBoolVars)
-            put("objective", resolved.objective.toString())
-            put("scope", "satisfaction projection; no objective or original MiniZinc proof claim")
-        }.toString()
+                put("suite", options.getValue("suite"))
+                put("problem", reference.name)
+                put("modelSha256", options.getValue("modelSha256"))
+                put("dataSha256", options.getValue("dataSha256"))
+                put("hasAnnotation", resolved.searchParams != null)
+                put("unaryFactors", source.factors.filterIsInstance<Cumulative>().count { it.unary })
+                put("eligiblePairFound", withOrderPair(source).numBoolVars > source.numBoolVars)
+                put("objective", resolved.objective.toString())
+                put("scope", "satisfaction projection; no objective or original MiniZinc proof claim")
+            }.toString(),
         )
         capture(source, "original", Arm("annotated", prepare = "default"), out, resolved.searchParams)
         for (arm in listOf(

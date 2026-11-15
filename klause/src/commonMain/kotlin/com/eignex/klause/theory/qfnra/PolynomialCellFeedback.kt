@@ -121,11 +121,11 @@ internal class PolynomialCellFeedback(
             snapshot,
             PolynomialBooleanRegion(
                 premises.atoms.mapValues {
-                    step(arithmetic);
+                    step(arithmetic)
                     it.value
                 },
                 premises.bools.mapValues {
-                    step(arithmetic);
+                    step(arithmetic)
                     it.value
                 },
             ),
@@ -241,12 +241,12 @@ internal class PolynomialCellFeedback(
         if (cell.scope.source !== source) return
         val regional = cell.scope as? PolynomialCellScope.Region
         if (regional != null && (
-            regional.premises.atoms.size > MAX_FEEDBACK_PREMISES ||
-                regional.premises.bools.size > MAX_FEEDBACK_PREMISES - regional.premises.atoms.size
-        )
+                regional.premises.atoms.size > MAX_FEEDBACK_PREMISES ||
+                    regional.premises.bools.size > MAX_FEEDBACK_PREMISES - regional.premises.atoms.size
+                )
         ) {
-                    return
-                }
+            return
+        }
         val entry = Entry(cell, origin)
         if (!valid(entry, context)) return
         for (retained in entries) {

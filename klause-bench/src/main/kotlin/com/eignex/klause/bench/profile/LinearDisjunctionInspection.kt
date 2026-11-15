@@ -139,20 +139,20 @@ internal object LinearDisjunctionInspection {
             put(
                 "proposed",
                 buildJsonArray {
-                for (entry in proposed) {
-                    val matched = named[entry.payload] as? RegisteredTheoryDecision
-                    add(
-                        buildJsonObject {
-                        put("payload", payloadRecord(entry.payload))
-                        put("existingLiteral", matched?.literal)
-                        matched?.let {
-                            val index = (it.literal xor 1) - existing.sourceBooleanCount * 2
-                            put("existingComplement", payloadRecord(previous[index].payload))
-                        }
+                    for (entry in proposed) {
+                        val matched = named[entry.payload] as? RegisteredTheoryDecision
+                        add(
+                            buildJsonObject {
+                                put("payload", payloadRecord(entry.payload))
+                                put("existingLiteral", matched?.literal)
+                                matched?.let {
+                                    val index = (it.literal xor 1) - existing.sourceBooleanCount * 2
+                                    put("existingComplement", payloadRecord(previous[index].payload))
+                                }
+                            },
+                        )
                     }
-                    )
-                }
-            }
+                },
             )
         }
     }
@@ -169,8 +169,8 @@ internal object LinearDisjunctionInspection {
                 put(
                     "coefficients",
                     buildJsonArray {
-                    for (i in 0 until row.size) add(JsonPrimitive(constants.exactCoeff(i).toString()))
-                }
+                        for (i in 0 until row.size) add(JsonPrimitive(constants.exactCoeff(i).toString()))
+                    },
                 )
             }
 
@@ -179,18 +179,18 @@ internal object LinearDisjunctionInspection {
                 put(
                     "discreteCoefficientBits",
                     buildJsonArray {
-                    for (i in 0 until constants.intCoefficients.size) {
-                        add(JsonPrimitive(constants.intCoefficients.at(i).toRawBits()))
-                    }
-                }
+                        for (i in 0 until constants.intCoefficients.size) {
+                            add(JsonPrimitive(constants.intCoefficients.at(i).toRawBits()))
+                        }
+                    },
                 )
                 put(
                     "realCoefficientBits",
                     buildJsonArray {
-                    for (i in 0 until constants.realCoefficients.size) {
-                        add(JsonPrimitive(constants.realCoefficients.at(i).toRawBits()))
-                    }
-                }
+                        for (i in 0 until constants.realCoefficients.size) {
+                            add(JsonPrimitive(constants.realCoefficients.at(i).toRawBits()))
+                        }
+                    },
                 )
             }
         }
@@ -205,8 +205,8 @@ internal object LinearDisjunctionInspection {
             put(
                 "terms",
                 buildJsonArray {
-                for (term in payload.terms) add(JsonPrimitive("${term.source}:${term.coefficient}"))
-            }
+                    for (term in payload.terms) add(JsonPrimitive("${term.source}:${term.coefficient}"))
+                },
             )
         } else {
             put("description", payload.toString())

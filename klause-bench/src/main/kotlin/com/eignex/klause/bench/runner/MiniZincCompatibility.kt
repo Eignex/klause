@@ -105,9 +105,9 @@ internal object MiniZincCompatibility {
             check(hash(executable) == executableHash) { "MiniZinc executable changed during identity discovery" }
             System.err.println(
                 buildJsonObject {
-                put("phase", "compiler-identity-completed")
-                put("compilerIdentity", Reports.json.encodeToJsonElement(it))
-            }
+                    put("phase", "compiler-identity-completed")
+                    put("compilerIdentity", Reports.json.encodeToJsonElement(it))
+                },
             )
         }
     }

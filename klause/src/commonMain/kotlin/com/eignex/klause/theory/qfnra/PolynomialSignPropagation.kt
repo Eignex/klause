@@ -34,11 +34,11 @@ internal fun preparePolynomialSignPropagation(
 
 internal class PolynomialSignPropagation(realCount: Int, private val arithmetic: PolynomialArithmetic) {
     private val domains = IntArray(realCount) {
-        arithmetic.step();
+        arithmetic.step()
         ALL_SIGNS
     }
     private val adjacent = Array(realCount) {
-        arithmetic.step();
+        arithmetic.step()
         IntArrayList()
     }
     private val constraints = ArrayList<SignConstraint>()

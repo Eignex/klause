@@ -187,8 +187,8 @@ class PolynomialProjectionTest {
         assertEquals(0, projection.variable(1))
         assertTrue(
             projection.polynomials(0).any {
-            arithmetic.substitute(it, 1, Polynomial.ZERO).isZero
-        }
+                arithmetic.substitute(it, 1, Polynomial.ZERO).isZero
+            },
         )
     }
 

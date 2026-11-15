@@ -214,11 +214,11 @@ class PreparedFactorProjections internal constructor(
         problem.factors[id].variables.reals.isNotEmpty() &&
             (
                 problem.factors[id] is Distinct || problem.factors[id] is RealAbs ||
-                problem.factors[id] is ContinuousProduct ||
-                problem.factors[id] is RealFiniteDomain ||
-                problem.factors[id] is ExactLinear || problem.factors[id] is LinearIndicator ||
-                propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id)
-            )
+                    problem.factors[id] is ContinuousProduct ||
+                    problem.factors[id] is RealFiniteDomain ||
+                    problem.factors[id] is ExactLinear || problem.factors[id] is LinearIndicator ||
+                    propagation[id]?.builtIn != true || !usesBuiltInRelaxation(id)
+                )
     }
 
     /** Retain selection only for the identical canonical source; rewrites select against their own factors. */
@@ -354,8 +354,8 @@ class PreparedFactorProjections internal constructor(
     internal fun usesBuiltInRelaxation(factorId: Int): Boolean = relaxation[factorId]?.builtIn == true ||
         (
             relaxation[factorId] == null &&
-            problem.factors[factorId].defaultExecutionCapabilities().relaxation == RelaxationCapability.NONE
-        )
+                problem.factors[factorId].defaultExecutionCapabilities().relaxation == RelaxationCapability.NONE
+            )
 
     internal fun emitRelaxation(factorId: Int, builder: RelaxationBuilder, linear: LinearLpProjection?) {
         relaxation[factorId]?.emit(problem.factors[factorId], builder, linear)

@@ -458,11 +458,11 @@ internal class ComponentLpSolver(
             } else {
                 (
                     isolatedValue(j) ?: run {
-                    val direction = recessionDirection ?: DoubleArray(model.n).also { recessionDirection = it }
-                    direction[j] = if (c < 0.0) 1.0 else -1.0
-                    feasibleIsolatedValue(j)
-                }
-                ).toDouble()
+                        val direction = recessionDirection ?: DoubleArray(model.n).also { recessionDirection = it }
+                        direction[j] = if (c < 0.0) 1.0 else -1.0
+                        feasibleIsolatedValue(j)
+                    }
+                    ).toDouble()
             }
             status[j] = when {
                 model.fixed(j) -> VarStatus.FIXED

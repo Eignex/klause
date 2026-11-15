@@ -80,12 +80,12 @@ internal class LocalSearchRunControl(private val lifetime: ExecutionControl) : L
         hasSliceAllowance = slice.begin(millis, sliceNodes)
         token = (
             if (millis == Long.MAX_VALUE) {
-            lifetime.lifetimeCancellation() or global
-        } else {
-            lifetime.lifetimeCancellation() or global or
-                ExecutionControl.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
-        }
-        ).bindStopControl()
+                lifetime.lifetimeCancellation() or global
+            } else {
+                lifetime.lifetimeCancellation() or global or
+                    ExecutionControl.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
+            }
+            ).bindStopControl()
         limit = this.instructions + minOf(instructions, available, Long.MAX_VALUE - this.instructions)
     }
 

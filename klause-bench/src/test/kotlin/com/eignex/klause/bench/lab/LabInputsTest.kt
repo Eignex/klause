@@ -40,10 +40,10 @@ class LabInputsTest {
     fun `smoke selection retains original bytes under isolated filenames`(name: String, sha256: String) {
         val request = BenchRequest(
             parameters = mapOf(
-            "suite" to "mzn-smoke",
-            "name" to name,
-            "input-only" to "true",
-        )
+                "suite" to "mzn-smoke",
+                "name" to name,
+                "input-only" to "true",
+            ),
         )
 
         val case = KlauseLabSuite.plan(request).single()
@@ -60,10 +60,10 @@ class LabInputsTest {
     fun `smoke include directories contain only namespaced diagnostic models`() {
         val request = BenchRequest(
             parameters = mapOf(
-            "suite" to "mzn-smoke",
-            "name" to "argmax",
-            "input-only" to "true",
-        )
+                "suite" to "mzn-smoke",
+                "name" to "argmax",
+                "input-only" to "true",
+            ),
         )
 
         val case = KlauseLabSuite.plan(request).single()
@@ -76,8 +76,8 @@ class LabInputsTest {
         assertEquals(
             listOf("globals.mzn"),
             LabInputs.includeNames(
-            CorpusFetcher.workspaceRoot().resolve(case.inputs.single { it.role == "model" }.path).readText(),
-        )
+                CorpusFetcher.workspaceRoot().resolve(case.inputs.single { it.role == "model" }.path).readText(),
+            ),
         )
     }
 

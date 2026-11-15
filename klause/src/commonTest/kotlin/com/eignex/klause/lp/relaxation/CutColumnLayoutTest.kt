@@ -54,7 +54,7 @@ class CutColumnLayoutTest {
         var work = 0L
 
         val interrupted = layout.bind(map, ExecutionControl { cancelled }) {
-            work += it;
+            work += it
             cancelled = true
         }
 

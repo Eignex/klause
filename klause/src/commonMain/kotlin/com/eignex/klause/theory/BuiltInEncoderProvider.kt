@@ -81,15 +81,15 @@ object BuiltInEncoderProvider : EncoderProvider {
         view as RealProduct
         encoding.polynomial(
             PolynomialRealFormula.Atom(
-            PolynomialExpression.Product(
-                listOf(
-                encoding.integer(SourceIntId(view.intOperand)),
-                encoding.real(SourceRealId(view.realOperand)),
-            )
+                PolynomialExpression.Product(
+                    listOf(
+                        encoding.integer(SourceIntId(view.intOperand)),
+                        encoding.real(SourceRealId(view.realOperand)),
+                    ),
+                ),
+                PolynomialRelation.EQ,
+                encoding.real(SourceRealId(view.result)),
             ),
-            PolynomialRelation.EQ,
-            encoding.real(SourceRealId(view.result)),
-        )
         )
         null
     }
@@ -161,8 +161,8 @@ object BuiltInEncoderProvider : EncoderProvider {
 
         factor.exactTheoryOwnable && (
             target != EncodingTarget.DIFFERENCE ||
-            (factor.variables.reals.isEmpty() && differenceSupported(factor))
-        ) -> when {
+                (factor.variables.reals.isEmpty() && differenceSupported(factor))
+            ) -> when {
             target == EncodingTarget.POLYNOMIAL -> polynomialRows
             factor is LinearRow -> nativeLinear
             else -> equivalentLinear
@@ -181,11 +181,11 @@ object BuiltInEncoderProvider : EncoderProvider {
         val value = encoding.fixedInteger(SourceIntId(view.intOperand)) ?: return@Encoder EncoderDecline.CONDITIONS
         encoding.linear(
             ExactSearchRow.of(
-            intArrayOf(Term.ofRealVar(view.result), Term.ofRealVar(view.realOperand)),
-            listOf(BigFraction.ONE, BigFraction.of(value, BIG_ONE).negated()),
-            LinearOp.EQ,
-            BigFraction.ZERO,
-        ).linearForm
+                intArrayOf(Term.ofRealVar(view.result), Term.ofRealVar(view.realOperand)),
+                listOf(BigFraction.ONE, BigFraction.of(value, BIG_ONE).negated()),
+                LinearOp.EQ,
+                BigFraction.ZERO,
+            ).linearForm,
         )
         null
     }
@@ -201,12 +201,12 @@ object BuiltInEncoderProvider : EncoderProvider {
         if (form.rows.any { row ->
                 row.size > 2 || (
                     row.isIntegerOnly && row.constants is IntegerConstants && row.size == 2 &&
-                    row.coeff(0) != Long.MIN_VALUE && row.coeff(0) != -row.coeff(1)
-                )
+                        row.coeff(0) != Long.MIN_VALUE && row.coeff(0) != -row.coeff(1)
+                    )
             }
         ) {
-                return false
-            }
+            return false
+        }
         return hasCompleteDifferenceCoverage(arrayOf(factor))
     }
 }

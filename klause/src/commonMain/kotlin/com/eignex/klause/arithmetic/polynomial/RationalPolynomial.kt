@@ -52,9 +52,9 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             arithmetic.step()
             return@operation RationalPolynomial(
                 value.coefficients.map {
-                arithmetic.step(it, coefficient)
-                it * coefficient
-            }
+                    arithmetic.step(it, coefficient)
+                    it * coefficient
+                },
             )
         }
 
@@ -68,9 +68,9 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
             val result = MutableList(arithmetic.denseSize(left.degree + right.degree)) { BigFraction.ZERO }
             for (i in 0..left.degree) {
                 for (j in 0..right.degree) {
-                arithmetic.step(left[i], right[j])
-                result[i + j] = result[i + j] + left[i] * right[j]
-            }
+                    arithmetic.step(left[i], right[j])
+                    result[i + j] = result[i + j] + left[i] * right[j]
+                }
             }
             return@operation RationalPolynomial(result)
         }
@@ -80,9 +80,9 @@ internal class RationalPolynomialArithmetic(val arithmetic: PolynomialArithmetic
         arithmetic.denseSize((value.degree - 1).coerceAtLeast(-1))
         return@operation RationalPolynomial(
             (1..value.degree).map {
-            arithmetic.step(value[it])
-            value[it] * BigFraction.ofLong(it.toLong())
-        }
+                arithmetic.step(value[it])
+                value[it] * BigFraction.ofLong(it.toLong())
+            },
         )
     }
 

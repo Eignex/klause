@@ -78,10 +78,10 @@ class EngineParamsTest {
         val selected = scenario(
             1,
             listOf(
-            "companion-after-incumbent=true",
-            "companion-active-ms=7000",
-            "portfolio-progress=true",
-        )
+                "companion-after-incumbent=true",
+                "companion-active-ms=7000",
+                "portfolio-progress=true",
+            ),
         )
 
         assertTrue(selected.companionAfterIncumbent)
@@ -117,13 +117,13 @@ class EngineParamsTest {
             base,
             EngineParams(
                 listOf(
-            "root-simplification=true", "root-simplify-batch=7", "root-probe-batch=3", "root-probe-work=256",
-            "root-rebuild-capture-visits=1024", "root-probe-implications=false",
-            "root-probe-binary-gate=true",
-            "root-probe-general-gate=true",
-            "private-rebuild-work=65536",
-        )
-            )
+                    "root-simplification=true", "root-simplify-batch=7", "root-probe-batch=3", "root-probe-work=256",
+                    "root-rebuild-capture-visits=1024", "root-probe-implications=false",
+                    "root-probe-binary-gate=true",
+                    "root-probe-general-gate=true",
+                    "private-rebuild-work=65536",
+                ),
+            ),
         )
         assertEquals(true, configured.rootSimplification)
         assertEquals(7, configured.rootSimplifyBatch)
@@ -142,26 +142,26 @@ class EngineParamsTest {
             com.eignex.klause.backtrack.BacktrackParams(),
             EngineParams(
                 listOf(
-            "inprocessing-work=100", "inprocessing-root-work=11", "inprocessing-probe-work=12",
-            "inprocessing-subsume-work=13", "inprocessing-vivify-work=14", "inprocessing-interval=15",
-            "inprocessing-growth=16", "inprocessing-cooldown=17", "inprocessing-warmup-work=18",
-            "inprocessing-probe-interval=20",
-        )
-            )
+                    "inprocessing-work=100", "inprocessing-root-work=11", "inprocessing-probe-work=12",
+                    "inprocessing-subsume-work=13", "inprocessing-vivify-work=14", "inprocessing-interval=15",
+                    "inprocessing-growth=16", "inprocessing-cooldown=17", "inprocessing-warmup-work=18",
+                    "inprocessing-probe-interval=20",
+                ),
+            ),
         )
 
         assertEquals(
             listOf(100L, 11L, 12L, 13L, 14L, 15L, 17L, 18L),
             listOf(
-            configured.inprocessingWork,
-            configured.inprocessingRootWork,
-            configured.inprocessingProbeWork,
-            configured.inprocessingSubsumeWork,
-            configured.inprocessingVivifyWork,
-            configured.inprocessingInterval,
-            configured.inprocessingCooldown,
-            configured.inprocessingWarmupWork,
-        )
+                configured.inprocessingWork,
+                configured.inprocessingRootWork,
+                configured.inprocessingProbeWork,
+                configured.inprocessingSubsumeWork,
+                configured.inprocessingVivifyWork,
+                configured.inprocessingInterval,
+                configured.inprocessingCooldown,
+                configured.inprocessingWarmupWork,
+            ),
         )
         assertEquals(16, configured.inprocessingGrowth)
         assertEquals(20L, configured.inprocessingProbeInterval)
@@ -224,10 +224,10 @@ class EngineParamsTest {
         val resolved = resolveLocalSearchRecipes(
             EngineParams(
                 listOf(
-            "arm=cbls-plateau/ils-basin",
-            "objective-guidance=functional,geometric",
-        )
-            )
+                    "arm=cbls-plateau/ils-basin",
+                    "objective-guidance=functional,geometric",
+                ),
+            ),
         )
 
         val recipes = resolved.pool!!.map { it() }

@@ -42,7 +42,9 @@ internal object MpsFeasibility {
             if (!line.first().isWhitespace()) {
                 section = fields.first()
             } else if (section == "ROWS") {
-                if (fields.first() == "N") freeRows.add(fields[1]) else if (zeroRow == null) {
+                if (fields.first() == "N") {
+                    freeRows.add(fields[1])
+                } else if (zeroRow == null) {
                     zeroRow = fields[1]
                 }
             }

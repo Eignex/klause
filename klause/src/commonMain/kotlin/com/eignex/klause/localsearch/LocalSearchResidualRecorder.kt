@@ -71,13 +71,14 @@ internal class LocalSearchResidualRecorder {
             }
         val definitions = definitionDetails(state, factors)
         best = LocalSearchResidual(
-            state.cost, byKind,
+            state.cost,
+            byKind,
             factors.map { factor ->
-            val details = LinkedHashMap(factor.details)
-            for (v in factor.ints.keys) details.putAll(definitions.getValue("i$v"))
-            for (v in factor.bools.keys) details.putAll(definitions.getValue("b$v"))
-            factor.copy(details = details)
-        }
+                val details = LinkedHashMap(factor.details)
+                for (v in factor.ints.keys) details.putAll(definitions.getValue("i$v"))
+                for (v in factor.bools.keys) details.putAll(definitions.getValue("b$v"))
+                factor.copy(details = details)
+            },
         )
     }
 
