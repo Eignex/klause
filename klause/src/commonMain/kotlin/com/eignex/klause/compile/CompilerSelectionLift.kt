@@ -12,7 +12,7 @@ import com.eignex.klause.model.IntRef
 
 internal fun Lowering.liftElement(index: IntExpr, items: List<IntExpr>): IntExpr {
     val idx = intVarOf(materializeIntVar(lift(index)).name)
-    val entries = IntArray(items.size) { intVarOf(materializeIntVar(lift(items[it])).name) }
+    val entries = items.map { intVarOf(materializeIntVar(lift(it)).name) }.toIntArray()
     val result = problemBuilder.newIntSelection(idx, LongArray(entries.size) { entries[it].toLong() },
         selectionBounds(entries, intDomains), freshInt = { intVarOf(newAuxIntVar(it)) })
     return IntRef(idToIntName.getValue(result))
@@ -31,7 +31,7 @@ internal fun Lowering.liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE: IntE
 }
 
 internal fun Lowering.liftMinMax(children: List<IntExpr>, isMin: Boolean): IntExpr {
-    val entries = IntArray(children.size) { intVarOf(materializeIntVar(lift(children[it])).name) }
+    val entries = children.map { intVarOf(materializeIntVar(lift(it)).name) }.toIntArray()
     val result = problemBuilder.newIntExtreme(entries, max = !isMin,
         domain = extremeBounds(entries, intDomains, max = !isMin), freshInt = { intVarOf(newAuxIntVar(it)) })
     return IntRef(idToIntName.getValue(result))
