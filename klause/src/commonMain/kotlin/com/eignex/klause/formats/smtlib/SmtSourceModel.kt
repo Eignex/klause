@@ -160,6 +160,8 @@ data class SmtSourceBinding(
     val declaration: SmtSourceDeclaration,
     /** Owned encoding recipe. */
     val reconstruction: SmtReconstruction,
+    /** Encoding identity, distinct for each instantiated source signature. */
+    val key: String = declaration.name,
 )
 
 /** An original-source obligation with immutable captures, evaluated under each candidate's allowance. */
@@ -208,7 +210,7 @@ private fun <T> withSmtModelValues(
     val integers = problem.encodingIntVarNames.mapKeys { checkpoint(); polynomialSymbol(it.key) }
     val reals = problem.encodingRealVarNames.mapKeys { checkpoint(); polynomialSymbol(it.key) }
     val recipes = problem.privateBindings.mapKeys { polynomialSymbol(it.key) }.toMutableMap()
-    for (binding in problem.sourceBindings) recipes[polynomialSymbol(binding.declaration.name)] = binding.reconstruction
+    for (binding in problem.sourceBindings) recipes[polynomialSymbol(binding.key)] = binding.reconstruction
     val cache = HashMap<String, SmtValue>()
     val realAuthorities = HashMap<String, ExactRealValue>()
     val active = HashSet<String>()
@@ -274,7 +276,7 @@ internal fun reconstructSmtModel(
 ): SmtSourceModel = withSmtModelValues(problem, boolean, integer, real, cancellation, exactReal) { values, checkpoint ->
     val model = SmtSourceModel(problem.sourceBindings.map { binding ->
         checkpoint()
-        binding.declaration to values.value(binding.declaration.name)
+        binding.declaration to values.value(binding.key)
     })
     checkSmtSource(problem, values, checkpoint)
     model

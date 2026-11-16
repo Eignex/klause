@@ -57,7 +57,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
     private val sortScope = SmtLibScope(cancellation, allowSolverSymbols = true)
     private val bindings = HashMap<String, Binding>()
     private val functions = LinkedHashMap<String, Function>()
-    private val sourceBindings = input.bindings.associateByTo(LinkedHashMap()) { polynomialSymbol(it.declaration.name) }
+    private val sourceBindings = input.bindings.associateByTo(LinkedHashMap()) { polynomialSymbol(it.key) }
     private val privateBindings = input.privateBindings.toMutableMap()
     private val output = ArrayList<SExpr>()
     private val atoms = HashMap<String, Term>()

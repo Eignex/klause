@@ -29,7 +29,7 @@ internal fun lowerSmtBitVectors(source: SmtReduction, cancellation: ExecutionCon
     val recipes = lowered.bitNames.mapValues { SmtReconstruction.Bits(it.value) }
         .mapKeys { polynomialSymbol(it.key) }
     val bindings = source.bindings.map { binding ->
-        val recipe = recipes[polynomialSymbol(binding.declaration.name)]
+        val recipe = recipes[polynomialSymbol(binding.key)]
         if (recipe == null) binding else binding.copy(reconstruction = recipe)
     }
     return source.copy(commands = lowered.commands, bindings = bindings,
