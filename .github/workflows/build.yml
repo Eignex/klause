@@ -124,6 +124,9 @@ jobs:
           persist-credentials: false
           ref: ${{ inputs.ref || github.sha }}
 
+      - name: Install native debugger
+        run: sudo apt-get update && sudo apt-get install --yes gdb
+
       - name: Set up JDK
         uses: actions/setup-java@v6
         with:
@@ -171,7 +174,7 @@ jobs:
           ) > native-diagnostics/watchdog.log 2>&1 &
           # Leave time for Gradle to flush partial reports and for the artifact upload.
           # The runner signals timeout directly so cancellation reaches Gradle's process group.
-          exec timeout --signal=INT --kill-after=60s 30m ./gradlew --no-daemon --max-workers=1 --console=plain --info --stacktrace --refresh-dependencies "$NATIVE_CACHE_OPTION" "-PnativeTestRepeat=$NATIVE_TEST_REPEAT" :klause:linuxX64Test :klause-cli:linkReleaseExecutableLinuxX64 :klause:linkLpProfileReleaseExecutableLinuxX64 > >(tee native-diagnostics/gradle.log) 2>&1
+          exec timeout --signal=INT --kill-after=60s 30m bash klause/scripts/native-ci.sh > >(tee native-diagnostics/gradle.log) 2>&1
 
       - name: Start the Linux native CLI
         run: klause-cli/build/bin/linuxX64/releaseExecutable/klause-cli.kexe --version
