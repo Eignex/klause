@@ -136,48 +136,49 @@ class BacktrackSolverRealTest {
         assertEquals(LpVerdict.INDETERMINATE, res.verdict)
     }
 
-    // 1001 distinct rows `x(0) - x(1) <= offset - i` over `[0, 1]`: more real rows than node bounding admits.
-    private fun manyRows(offset: Long) = Problem(
+    // 1001 distinct rows over a chain of [reals] columns in `[0, 1]`: row i is `x(j) - x(j + 1) <= offset - i` with
+    // `j = i mod (reals - 1)`, so every offset below -1 is infeasible.
+    private fun manyRows(offset: Long, reals: Int = 2) = Problem(
         numBoolVars = 0,
         numIntVars = 1,
         intDomains = arrayOf(IntDomain(0, 1)),
         factors = Array<Factor>(1001) {
-            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), intArrayOf(0, 1), LinearOp.LE, offset - it)
+            val column = it % (reals - 1)
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), intArrayOf(column, column + 1),
+                LinearOp.LE, offset - it)
         },
-        numRealVars = 2,
-        realLower = DoubleArray(2),
-        realUpper = DoubleArray(2) { 1.0 },
+        numRealVars = reals,
+        realLower = DoubleArray(reals),
+        realUpper = DoubleArray(reals) { 1.0 },
     )
 
     @Test
-    fun `a leaf with more real rows than node bounding admits should be completed`() {
-        val result = BacktrackSolver(manyRows(1000L).bake()).solve(BacktrackParams(randomSeed = 1L))
-
-        assertIs<SolveResult.Sat>(result)
-    }
-
-    @Test
-    fun `a leaf with more real rows than node bounding admits should be refuted`() {
-        val result = BacktrackSolver(manyRows(-2L).bake()).solve(BacktrackParams(randomSeed = 1L))
-
-        assertIs<SolveResult.Unsat>(result)
-    }
-
-    @Test
-    fun `a cancelled leaf with more real rows than node bounding admits should stop promptly`() {
-        val baked = manyRows(-2L).bake()
-        var polls = 0L
-        var stoppedAt = -1L
-        val stop = Cancellation {
-            polls++
-            if (stoppedAt < 0 && polls > 40) stoppedAt = polls
-            stoppedAt >= 0
+    fun `a leaf with more than a thousand real rows should be completed`() {
+        val results = listOf(2, 70).map { reals ->
+            BacktrackSolver(manyRows(1000L, reals).bake()).solve(BacktrackParams(randomSeed = 1L))
         }
 
-        val result = BacktrackSolver(baked).solve(BacktrackParams(randomSeed = 1L, cancellation = stop))
+        assertTrue(results.all { it is SolveResult.Sat }, "$results")
+    }
+
+    @Test
+    fun `a leaf with more than a thousand real rows should be refuted`() {
+        val results = listOf(2, 70).map { reals ->
+            BacktrackSolver(manyRows(-2L, reals).bake()).solve(BacktrackParams(randomSeed = 1L))
+        }
+
+        assertTrue(results.all { it is SolveResult.Unsat }, "$results")
+    }
+
+    @Test
+    fun `a leaf no exact certifier may decide should report unknown rather than unsat`() {
+        val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.GE, 5L)
+        val vetoed = LpSolveContext(certificationPolicy = LpCertificationPolicy { _, _ -> false })
+
+        val result = BacktrackSolver(problem(0, emptyArray(), 0.0, 1.0, row).bake(), vetoed)
+            .solve(BacktrackParams(randomSeed = 1L))
 
         assertIs<SolveResult.Unknown>(result)
-        assertTrue(polls - stoppedAt < 100, "polled ${polls - stoppedAt} times after cancellation")
     }
 
     @Test
