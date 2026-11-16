@@ -604,7 +604,9 @@ class SmtQfConformanceTest {
     @Test
     fun `symbolic query syntax cannot replace unavailable native authority`() {
         val source = SExprReader("(declare-const x Real)").readAll()
-        val value = SmtValue.Real("(exp 1.0)")
+        val exponential = smtExactArithmetic(ExecutionControl.Never)
+            .function(ExactRealFunction.EXP, BigFraction.ONE.toExactRealValue())
+        val value = SmtValue.Real(smtSymbolicTerm(exponential))
         val declaration = SmtSourceDeclaration("x", emptyList(), SmtSort.Real)
         val values = object : SmtModelValues {
             override fun checkpoint(units: Long) = Unit
