@@ -175,8 +175,8 @@ internal class AffineSeedOccurrences(
 }
 
 /**
- * The working factor set for one [eliminateAffineSingletons] call, keyed by a stable id: ids
- * `[0, base.size)` are the pristine inputs; each appended factor takes the next id. A dropped id is
+ * The working factor set for one [AffineSingletons.eliminateAffineSingletons] call, keyed by a stable id.
+ * Ids `[0, base.size)` are the pristine inputs; each appended factor takes the next id. A dropped id is
  * tombstoned (its slot becomes `null`) and never reused, so a live factor keeps its id — and hence
  * its position in stable-id order — for the whole run. The candidate scan walks the slots in id
  * order, which is exactly the order a fresh compacted list would present.

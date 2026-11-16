@@ -282,7 +282,7 @@ internal fun equitablePartition(
  *
  *  Each port contributes a single hash word rather than its full [StructuralKey] words, since a factor
  *  with large constant data (a table's tuple set) has a large key. A hash collision merely merges two
- *  colours (a coarser partition); every candidate is re-checked by [isAutomorphism], so a collision
+ *  colours (a coarser partition); every candidate undergoes an automorphism check, so a collision
  *  can only cost extra verification, never admit a false symmetry. */
 private fun portSignature(
     problem: Problem,
