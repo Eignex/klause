@@ -141,10 +141,8 @@ class SmtGroundDatatypesTest {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)
             (declare-datatype Nat ((zero) (succ (pred Nat))))
-            (declare-const x Nat)
-            (declare-const y Nat)
-            (assert (= x (succ zero)))
-            (assert (= y (succ (succ zero))))
+            (define-fun x () Nat (succ zero))
+            (define-fun y () Nat (succ (succ zero)))
             (assert (distinct x y))
             (assert (= ((_ is succ) x) ((_ is succ) y)))
         """.trimIndent())
