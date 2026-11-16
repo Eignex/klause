@@ -53,6 +53,8 @@ import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
+import com.eignex.klause.solver.validation.toleranceSearch
+import com.eignex.klause.theory.SourceToleranceSearch
 import com.eignex.klause.util.Cancellation
 import kotlin.time.Duration
 import kotlin.time.TimeMark
@@ -623,8 +625,13 @@ internal fun FinitePipeline.solve(
         (request.toleranceCheck ?: invocation?.takeIf { gridPublication == null }?.let {
             capturedRealAcceptance(it.source.problem, stop)
         })?.let { check ->
+            val source = invocation?.source?.problem
+            val policy = source?.semantics?.effective?.feasibilityTolerance
             FiniteSourceAcceptance(check, permitsToleranceOptimum && check.permitsToleranceOptimum(),
-                (check as? FiniteSourceAcceptance)?.objective)
+                (check as? FiniteSourceAcceptance)?.objective,
+                (check as? FiniteSourceAcceptance)?.search ?: policy?.takeIf {
+                    !it.isExact && request.toleranceCheck == null && check is FiniteSourceAcceptance
+                }?.let { SourceToleranceSearch(checkNotNull(source), it) })
         }
     } else {
         FiniteSourceAcceptance(
@@ -684,7 +691,7 @@ internal fun FinitePipeline.solve(
                     FiniteSourceAcceptance({ check(preparation.reconstruct(it)) }, check.permitsToleranceOptimum(),
                         (check as? FiniteSourceAcceptance)?.objective?.let { score ->
                             { sample -> score(preparation.reconstruct(sample)) }
-                        })
+                        }, check.toleranceSearch()?.reconstructedBy(preparation.reconstruct))
                 }
             } else null,
             sourceInvocation = request.shape.sourceInvocation,

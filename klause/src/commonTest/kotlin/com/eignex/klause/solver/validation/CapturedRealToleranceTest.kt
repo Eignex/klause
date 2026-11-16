@@ -14,6 +14,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
@@ -40,9 +41,11 @@ class CapturedRealToleranceTest {
         tolerance: SourceTolerance = tenth,
         reals: Int = 1,
         ints: Int = 0,
+        bools: Int = 0,
+        lower: Double = 0.0,
     ) = Problem(
-        0, ints, Array(ints) { IntDomain(0, 1) }, arrayOf(*factors), numRealVars = reals,
-        realLower = DoubleArray(reals) { 0.0 }, realUpper = DoubleArray(reals) { 1.0 },
+        bools, ints, Array(ints) { IntDomain(0, 1) }, arrayOf(*factors), numRealVars = reals,
+        realLower = DoubleArray(reals) { lower }, realUpper = DoubleArray(reals) { 1.0 },
         semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
             feasibilityTolerance = tolerance).resolve(),
     )
@@ -50,7 +53,8 @@ class CapturedRealToleranceTest {
     private fun row(op: LinearOp, bound: Double, strict: Boolean = false, real: Int = 0) =
         Linear(intArrayOf(), doubleArrayOf(), intArrayOf(real), doubleArrayOf(1.0), op, bound, strict)
 
-    private fun point(vararg reals: Double, ints: LongArray = longArrayOf()) = Sample(booleanArrayOf(), ints, reals)
+    private fun point(vararg reals: Double, ints: LongArray = longArrayOf(), bools: BooleanArray = booleanArrayOf()) =
+        Sample(bools, ints, reals)
 
     @Test
     fun `a binary64 completion within the slack of a linear row should be accepted`() {
@@ -174,6 +178,41 @@ class CapturedRealToleranceTest {
         val accepts = assertNotNull(capturedRealAcceptance(source(product, reals = 3), Cancellation.Never))
 
         assertTrue(accepts(point(0.55, 0.5, 0.25)))
+    }
+
+    private val guardedProduct = ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.5, 1.0),
+        intArrayOf(Lit.make(0, true), Lit.make(0, false)))
+
+    @Test
+    fun `a guarded choice product should accept an operand within the slack of the member its guards name`() {
+        val accepts = assertNotNull(capturedRealAcceptance(source(guardedProduct, reals = 3, bools = 1),
+            Cancellation.Never))
+
+        assertTrue(accepts(point(0.55, 0.5, 0.25, bools = booleanArrayOf(true))))
+    }
+
+    @Test
+    fun `a guarded choice product should refuse an operand beyond the slack of the member its guards name`() {
+        val accepts = assertNotNull(capturedRealAcceptance(source(guardedProduct, reals = 3, bools = 1),
+            Cancellation.Never))
+
+        assertFalse(accepts(point(0.55, 0.5, 0.25, bools = booleanArrayOf(false))))
+    }
+
+    @Test
+    fun `an odd power of a negative base should keep its sign within the slack`() {
+        val cube = Power(Power.Coordinate.Real(SourceRealId(0)), 3, Power.Coordinate.Real(SourceRealId(1)))
+        val accepts = assertNotNull(capturedRealAcceptance(source(cube, reals = 2, lower = -1.0), Cancellation.Never))
+
+        assertEquals(listOf(true, false), listOf(accepts(point(-0.5, -0.2)), accepts(point(-0.5, 0.125))))
+    }
+
+    @Test
+    fun `a zeroth power should read its result as the row r = 1`() {
+        val unit = Power(Power.Coordinate.Real(SourceRealId(0)), 0, Power.Coordinate.Real(SourceRealId(1)))
+        val accepts = assertNotNull(capturedRealAcceptance(source(unit, reals = 2), Cancellation.Never))
+
+        assertEquals(listOf(true, false), listOf(accepts(point(0.3, 0.95)), accepts(point(0.3, 0.8))))
     }
 
     @Test

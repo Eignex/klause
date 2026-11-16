@@ -25,19 +25,20 @@ import com.eignex.klause.solver.search.SearchExecutionControlAdapter
 import com.eignex.klause.solver.search.SearchExecutionControls
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.solver.validation.permitsToleranceOptimum
+import com.eignex.klause.solver.validation.ToleranceRealSearch
+import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 
 // Completes the real coordinates of a fixed discrete point by an exact search over the linear encodings of the
-// source's real relations. With a positive tolerance whose relations `toleranceLinearModel` states, a point the
-// exact search refutes is searched again with every relation within that tolerance, so a witness of that search is
-// a point within tolerance and its refutation shows that no such point exists.
+// source's real relations. With a positive tolerance it searches the `ToleranceLinearLayout` model instead, in which
+// every relation of the tolerance components holds within the slack its bound admits: a witness is a point within
+// tolerance and a refutation shows that no such point exists.
 internal class AbsRealCompletion(private val source: Problem, tolerance: SourceTolerance? = null) {
     private val encoders = source.selectedFactorProjections()
-    private val tolerance = tolerance?.takeUnless { it.isExact || !toleranceLinearModelSupported(source) }
+    private val layout = tolerance?.takeUnless { it.isExact }?.let { ToleranceLinearLayout(source, it) }
 
     sealed interface Result {
         // A completion; [withinTolerance] when it holds the relations only within the source tolerance.
@@ -67,17 +68,12 @@ internal class AbsRealCompletion(private val source: Problem, tolerance: SourceT
         val metered = object : SearchExecutionControls by containing {
             override val cancellation: Cancellation = counted
         }
-        // An exact completion is preferred: it strains no relation, and the tolerance search runs only where the
-        // slack decides feasibility.
-        val exact = completeWith(sample, counted, metered, solveContext,
-            encoders.finiteLinearModel(sample, counted))
-        val result = tolerance?.takeIf { exact == Result.Refuted && !counted() }?.let { policy ->
-            when (val relaxed = completeWith(sample, counted, metered, solveContext,
-                encoders.toleranceLinearModel(sample, policy, counted))) {
-                is Result.Witness -> Result.Witness(relaxed.reals, withinTolerance = true)
-                else -> relaxed
-            }
-        } ?: exact
+        val encoding = layout?.model(encoders, sample, counted) ?: encoders.finiteLinearModel(sample, counted)
+            .takeIf { layout == null }
+        val result = when (val found = completeWith(sample, counted, metered, solveContext, encoding)) {
+            is Result.Witness -> Result.Witness(found.reals, withinTolerance = layout != null)
+            else -> found
+        }
         return Completed(if (counted()) Result.Undecided else result, work)
     }
 
@@ -133,13 +129,39 @@ internal class AbsRealCompletion(private val source: Problem, tolerance: SourceT
     }
 }
 
+// The tolerance search of a source, read through [lift] from the frame its callers complete in.
+internal class SourceToleranceSearch private constructor(
+    private val completion: AbsRealCompletion,
+    private val realCount: Int,
+    private val lift: (Sample) -> Sample,
+) : ToleranceRealSearch {
+    constructor(source: Problem, policy: SourceTolerance) :
+        this(AbsRealCompletion(source, policy), source.numRealVars, { it })
+
+    override fun complete(
+        discrete: Sample,
+        cancellation: Cancellation,
+        controls: SearchExecutionControls?,
+        context: LpSolveContext,
+    ): ToleranceSearchResult {
+        val point = lift(discrete)
+        val completed = completion.complete(point, cancellation, controls, context)
+        return when (val result = completed.result) {
+            is AbsRealCompletion.Result.Witness -> if (result.reals.size == realCount) {
+                ToleranceSearchResult.Witness(result.reals, completed.work)
+            } else ToleranceSearchResult.Undecided(completed.work)
+            AbsRealCompletion.Result.Refuted -> ToleranceSearchResult.Refuted(completed.work)
+            AbsRealCompletion.Result.Undecided -> ToleranceSearchResult.Undecided(completed.work)
+        }
+    }
+
+    override fun reconstructedBy(lift: (Sample) -> Sample): ToleranceRealSearch =
+        SourceToleranceSearch(completion, realCount) { this.lift(lift(it)) }
+}
+
 // Whether a fixed discrete point needs a search to complete the reals: an absolute value, a finite membership or a
 // product with unguarded finite choices states a disjunction that no single linear relaxation decides.
 internal fun Problem.requiresRealCompletionSearch(): Boolean = factors.any {
     it is RealAbs || it is RealFiniteDomain ||
         (it is ContinuousProduct && it.finiteChoices != null && !it.finiteChoices.hasGuards)
 }
-
-// The tolerance a leaf completion reads: the source's positive tolerance, when [check] accepts tolerance points.
-internal fun Problem.completionTolerance(check: ((Sample) -> Boolean)?): SourceTolerance? =
-    semantics.effective.feasibilityTolerance?.takeIf { !it.isExact && check.permitsToleranceOptimum() }

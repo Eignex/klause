@@ -2,8 +2,10 @@ package com.eignex.klause.solver.validation
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
+import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticRational
@@ -77,5 +79,21 @@ class ProjectedSourceWitnessTest {
             Cancellation.Never) { true }
 
         assertIs<Verification.Rejected>(result)
+    }
+
+    @Test
+    fun `a tolerant relation without a checker should remain indeterminate despite an extra callback`() {
+        val unchecked = object : Factor by Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0) {
+            override val linearForm: LinearForm? = null
+        }
+        val source = tolerantProduct().withFactors(arrayOf(unchecked))
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5, 0.5),
+            exactReals = listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.of(bigIntOf(1), bigIntOf(2))))
+
+        val result = verifyProjectedSourceWitness(source, source.withFactors(emptyArray()).bake(), point,
+            Cancellation.Never) { true }
+
+        assertIs<Verification.Indeterminate>(result)
     }
 }

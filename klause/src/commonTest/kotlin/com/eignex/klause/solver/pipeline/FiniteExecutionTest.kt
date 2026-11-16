@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
+import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.prepareSourceExecution
 import com.eignex.klause.formats.flatzinc.sourceAttachment
@@ -18,6 +19,9 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
+import com.eignex.klause.solver.validation.capturedRealAcceptance
+import com.eignex.klause.theory.SourceToleranceSearch
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,12 +50,17 @@ class FiniteExecutionTest {
         onSample: (Sample) -> Unit = {},
         declarations: String = "",
         constraints: String = "",
+        source: String = roundedBound(declarations, constraints),
+        floatPoints: Boolean = true,
     ): FiniteSolveVerdict {
-        val program = parseFlatZinc(roundedBound(declarations, constraints), semanticOverrides = overrides)
+        val program = parseFlatZinc(source, semanticOverrides = overrides)
+        val objective = program.linearObjective()
         val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
-            ExecutionOperation.SATISFY, engine))
+            if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE, engine,
+            objective = objective))
         val request = SourceExecutionPolicy().finiteRequest(invocation.finiteShape(), engine,
-            presolveConfig = PresolveConfig.NONE, cancellation = Cancellation.after(1.seconds))
+            presolveConfig = PresolveConfig.NONE, cancellation = Cancellation.after(1.seconds),
+            toleranceCheck = if (floatPoints) null else exactPointsOnly(program.sourceProgram.problem))
 
         val result = FinitePipeline.solve(request, FiniteSolveCallbacks(onSample, {}))
 
@@ -128,6 +137,35 @@ class FiniteExecutionTest {
         val verdicts = solveSlackRelations(SemanticOverrides(feasibilityTolerance = SourceTolerance()))
 
         assertEquals(slackRelations.associate { it.second to FiniteSolveVerdict.UNSAT }, verdicts)
+    }
+
+    @Test
+    fun `incomplete engines should complete a real relation over a row that needs the slack`() {
+        val verdicts = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS).associateWith { engine ->
+            slackRelations.associate { (declarations, relation) ->
+                relation to solveFlatZinc(SemanticOverrides(), engine, declarations = declarations,
+                    constraints = relation)
+            }
+        }
+
+        assertEquals(listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS).associateWith {
+            slackRelations.associate { it.second to FiniteSolveVerdict.SAT }
+        }, verdicts)
+    }
+
+    // Source acceptance that refuses every floating point, so the search within tolerance decides each leaf.
+    private fun exactPointsOnly(source: Problem) = capturedRealAcceptance(source, Cancellation.Never)?.let { base ->
+        FiniteSourceAcceptance({ it.exactReals != null && base(it) }, permitsToleranceOptimum = true,
+            search = SourceToleranceSearch(source, checkNotNull(source.semantics.effective.feasibilityTolerance)))
+    }
+
+    @Test
+    fun `minimization should complete a real relation over a row that needs the slack`() {
+        val verdict = solveFlatZinc(SemanticOverrides(), floatPoints = false,
+            source = roundedBound("var 0.0..2.0: b; var 0..3: z;", "constraint float_abs(y, b);")
+                .replace("solve satisfy;", "solve minimize z;"))
+
+        assertEquals(FiniteSolveVerdict.OPTIMAL, verdict)
     }
 
     @Test

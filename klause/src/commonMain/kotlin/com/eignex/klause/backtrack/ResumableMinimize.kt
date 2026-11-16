@@ -74,9 +74,13 @@ import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SearchTraversalPolicy
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.search.completedSearchSample
+import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.solver.validation.checkPointRestrictions
+import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
+import com.eignex.klause.theory.AbsRealCompletion
+import com.eignex.klause.theory.requiresRealCompletionSearch
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
@@ -311,6 +315,47 @@ internal class ResumableMinimize(
                 pendingRealLeaf = null
                 cursor.close()
                 checkedLeafResult(sample, step.value).also { pendingRealResult = it }
+            }
+        }
+    }
+
+    // A leaf whose objective reads no real coordinate is completed the way a satisfaction leaf is: the search within
+    // the source tolerance decides a refused or refuted leaf, and an exact search completes a leaf with a disjunction
+    // the relaxation leaves undecided. Any completion of such a leaf attains its objective.
+    private val integralObjective = objective.realCoefficientValues.all { it == 0.0 }
+    private val leafToleranceSearch = params.toleranceCheck.toleranceSearch()?.takeIf { integralObjective }
+    private val leafSearch =
+        if (integralObjective && problem.requiresRealCompletionSearch()) AbsRealCompletion(problem) else null
+
+    private fun searchedLeaf(sample: Sample, real: LeafRealResult): LeafRealResult {
+        if (real.verdict != LpVerdict.INFEASIBLE && real.verdict != LpVerdict.INDETERMINATE &&
+            real.verdict != LpVerdict.CERTIFIED_BOUND
+        ) return real
+        val stop = runEndToken()
+        leafToleranceSearch?.let { search ->
+            return when (val found = search.complete(sample, stop, null, solver.lpSolveContext)) {
+                is ToleranceSearchResult.Refuted -> LeafRealResult(LpVerdict.INFEASIBLE, doubleArrayOf())
+                is ToleranceSearchResult.Undecided -> real
+                is ToleranceSearchResult.Witness -> {
+                    val reals = DoubleArray(found.reals.size) { found.reals[it].toDouble() }
+                    val completed = sample.copy(reals = reals, exactReals = found.reals)
+                    if (params.toleranceCheck?.invoke(completed) == true && !stop()) {
+                        LeafRealResult(LpVerdict.TOLERANCE_OPTIMUM, reals, found.reals)
+                    } else real
+                }
+            }
+        }
+        if (real.verdict == LpVerdict.INFEASIBLE) return real
+        val search = leafSearch ?: return real
+        return when (val result = search.complete(sample, stop, null, solver.lpSolveContext).result) {
+            AbsRealCompletion.Result.Refuted -> LeafRealResult(LpVerdict.INFEASIBLE, doubleArrayOf())
+            AbsRealCompletion.Result.Undecided -> real
+            is AbsRealCompletion.Result.Witness -> {
+                val reals = DoubleArray(result.reals.size) { result.reals[it].toDouble() }
+                val completed = sample.copy(reals = reals, exactReals = result.reals)
+                if (verifyRealCoordinates(problem, completed) is Verification.Accepted && !stop()) {
+                    LeafRealResult(LpVerdict.ATTAINED_OPTIMUM, reals, result.reals)
+                } else real
             }
         }
     }
@@ -1386,9 +1431,9 @@ internal class ResumableMinimize(
             val incumbent = if (problem.numRealVars == 0) {
                 recordIfImproving(sample, objective.evaluate(sample))
             } else {
-                val real = if (pausable) {
+                val real = searchedLeaf(sample, if (pausable) {
                     advanceRealLeaf(sample) ?: return SearchModelDisposition.Pause
-                } else completeLeaf(sample, runEndToken())
+                } else completeLeaf(sample, runEndToken()))
                 when (real.verdict) {
                     LpVerdict.INFEASIBLE -> null
 
