@@ -38,7 +38,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         data class Branches(val shape: SmtDatatypeShape, val cases: List<SmtDatatypeCase>) : Frame
         data class Coerce(val sort: SmtSort) : Frame
     }
-    private val scope = SmtLibScope(cancellation)
+    private val scope = SmtLibScope(cancellation, allowSolverSymbols = true)
     private val registry get() = scope.datatypes
     private val symbols = LinkedHashMap<String, Term>()
     private val functions = LinkedHashMap<String, Function>()

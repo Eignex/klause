@@ -171,20 +171,26 @@ internal class SmtFixedModel(
 
     override fun evaluate(term: SExpr): String {
         queryWork = 0
-        val query = prepareSmtSessionQueries(source, listOf(term), control, abstractValues())
+        val abstracts = abstractValues()
+        val query = prepareSmtSessionQueries(source, listOf(term), control, abstracts)
+        val scope = query.scope
         var expanded = query.terms.single()
         for (definition in query.definitions.asReversed()) {
             val binding = SExpr.SList(listOf(definition.items[1], definition.items[4]))
             expanded = list("let", SExpr.SList(listOf(binding)), expanded)
         }
-        var value = evaluateValue(expanded)
-        val type = smtSessionQuerySort(source, term, control, abstractValues())
+        expanded = specializeBody(expanded, emptyMap())
+        val resultSorts = HashMap<SmtExpressionIdentity, SmtSort>()
+        val type = scope.termSort(expanded, emptyMap(), resultSorts)
+            ?: unavailable("query is not a closed well-sorted term")
+        var value = evaluateValue(expanded, scope, resultSorts)
         if (type == SmtSort.Real && value is SmtValue.Integer) value = real(exact(value))
         queryValues += value
         return value.toSmtLib()
     }
 
-    private fun evaluateValue(term: SExpr): SmtValue {
+    private fun evaluateValue(term: SExpr, scope: SmtLibScope,
+        resultSorts: MutableMap<SmtExpressionIdentity, SmtSort>): SmtValue {
         val work = ArrayDeque<FixedFrame>()
         val stack = ArrayDeque<SmtValue>()
         fun take(count: Int): List<SmtValue> = List(count) { stack.removeLast() }.reversed()
@@ -204,6 +210,8 @@ internal class SmtFixedModel(
                     smtRankSubstitution(declaration, rank.first, rank.second, sourceScope.sortParameters, control)
                 val body = specializeBody(definition.body, substitution)
                 val selected = args.indices.map { coerce(args[it], rank.first[it]) }
+                if (scope.termSort(body, definition.parameters.zip(rank.first).toMap(), resultSorts) == null)
+                    unavailable("helper body is not a well-sorted term")
                 work += FixedFrame.Coerce(rank.second)
                 work += FixedFrame.Evaluate(body, definition.parameters.zip(selected).toMap())
             } else stack += operation(head, args)
@@ -211,7 +219,10 @@ internal class SmtFixedModel(
         work += FixedFrame.Evaluate(term, emptyMap())
         while (work.isNotEmpty()) {
             checkpoint()
-            when (val frame = work.removeLast()) {
+            val frame = work.removeLast()
+            if (frame is FixedFrame.Evaluate && resultSorts[SmtExpressionIdentity(frame.expression)] == SmtSort.Real)
+                work += FixedFrame.Coerce(SmtSort.Real)
+            when (frame) {
                 is FixedFrame.Evaluate -> when (val expression = frame.expression) {
                     is SExpr.Atom -> {
                         val literal = literalValue(expression.text)
@@ -230,8 +241,11 @@ internal class SmtFixedModel(
                             else -> stack += function(name, emptyList(), null)
                         }
                     }
-                    is SExpr.SList -> when (expression.syntaxHead().let {
-                        if (symbol(it) == "ite") "ite" else it
+                    is SExpr.SList -> when (expression.syntaxHead().let { syntax ->
+                        val qualified = (expression.items.firstOrNull() as? SExpr.SList)
+                            ?.takeIf { it.syntaxHead() == "as" }
+                        val selected = qualified?.items?.get(1) ?: expression.items.firstOrNull()
+                        if ((selected as? SExpr.Atom)?.text?.let(::symbol) == "ite") "ite" else syntax
                     }) {
                         "let" -> {
                             val bindings = (expression.items[1] as SExpr.SList).items.map { it as SExpr.SList }
@@ -401,7 +415,11 @@ internal class SmtFixedModel(
         val registry = sourceScope.datatypes
         val selected = registry.resolve(name, args.map(::valueSort), qualification)
             ?: unavailable("constructor rank is not determined")
-        return SmtValue.Application(registry.constructorName(selected.instance, selected.constructor), args)
+        val fields = args.indices.map {
+            checkpoint()
+            coerce(args[it], selected.arguments[it])
+        }
+        return SmtValue.Application(registry.constructorName(selected.instance, selected.constructor), fields)
     }
 
     private fun constructorSymbol(text: String): String = when (val identifier = SExprReader(text).readAll().single()) {
@@ -427,28 +445,39 @@ internal class SmtFixedModel(
     }
 
     private fun function(name: String, args: List<SmtValue>, result: SmtSort?): SmtValue {
+        val snapshot = originalSource
+        val schema = snapshot?.typed?.symbols?.firstOrNull {
+            checkpoint()
+            symbol(it.declaration.name) == name && it.definition == null
+        }?.declaration ?: sourceScope.declarations.firstOrNull {
+            checkpoint()
+            symbol(it.name) == name
+        }
+        val rank = schema?.let {
+            instantiateSmtRank(it.parameters, it.result, sourceScope.sortParameters, args.map(::valueSort),
+                result, control) ?: unavailable("function rank cannot be instantiated")
+        }
+        if (rank != null) {
+            for (sort in rank.first + rank.second) sort.checkpointStructure { checkpoint() }
+        }
         val candidates = model.values.filter { (declaration, _) ->
+            checkpoint()
+            if (rank != null) {
+                for (sort in declaration.parameters + declaration.result) sort.checkpointStructure { checkpoint() }
+            }
             symbol(declaration.name) == name && declaration.parameters.size == args.size &&
-                (result == null || declaration.result == result)
+                (result == null || declaration.result == result) &&
+                (rank == null || declaration.parameters == rank.first && declaration.result == rank.second)
         }
         for ((declaration, value) in candidates) {
             if (!declaration.parameters.indices.all { accepts(declaration.parameters[it], args[it]) }) continue
             if (value !is SmtValue.Function) return value
             return table(value, args)
         }
-        val snapshot = originalSource
-        val schema = snapshot?.typed?.symbols?.firstOrNull {
-            symbol(it.declaration.name) == name && it.definition == null
-        }?.declaration
-        if (schema != null) {
-            val parameters = args.map(::valueSort)
-            val rank = instantiateSmtRank(schema.parameters, schema.result,
-                snapshot.typed.sortParameters, parameters, result, control)
-            if (rank != null) {
-                val value = snapshot.polymorphicModel?.instantiate(name, rank.first, rank.second, values,
-                    ::familyPoint)
-                if (value != null) return if (value is SmtValue.Function) table(value, args) else value
-            }
+        if (snapshot != null && rank != null) {
+            val value = snapshot.polymorphicModel?.instantiate(name, rank.first, rank.second, values,
+                ::familyPoint)
+            if (value != null) return if (value is SmtValue.Function) table(value, args) else value
         }
         unavailable("the retained model has no interpretation for '$name'")
     }
@@ -485,7 +514,7 @@ internal class SmtFixedModel(
     }
 
     private fun specializeBody(root: SExpr, substitution: Map<String, SmtSort>): SExpr {
-        if (substitution.isEmpty()) return root
+        // Rank metadata must distinguish syntax occurrences shared across lexical scopes.
         val work = ArrayDeque<Pair<SExpr, Boolean>>()
         val expressions = ArrayDeque<SExpr>()
         work += root to false
@@ -493,7 +522,7 @@ internal class SmtFixedModel(
             checkpoint()
             val (expression, combine) = work.removeLast()
             when (expression) {
-                is SExpr.Atom -> expressions += expression
+                is SExpr.Atom -> expressions += SExpr.Atom(expression.text)
                 is SExpr.SList -> if (combine) {
                     val items = List(expression.items.size) { expressions.removeLast() }.reversed().toMutableList()
                     if (expression.syntaxHead() == "as") {

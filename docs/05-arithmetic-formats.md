@@ -191,6 +191,10 @@ scalar lowering. Builtin rewrites preserve selected numeric ranks through compos
 capture, including Real qualifications whose arguments are integer literals.
 Definition arguments and results retain declared Real ranks with explicit
 integer-to-real coercions, including later queries on the retained model.
+Retained query evaluation records source result ranks in one typed traversal per
+query or specialized definition body. Selected conditional and match branches
+retain their common rank before enclosing polymorphic function lookup; lookup
+selects the instantiated source rank before inspecting its fixed interpretation.
 Each ground application receives a private result and captured
 arguments. Pairwise congruence requires equal results whenever evaluated arguments
 are equal, including exact arithmetic arguments. Only free sort identities receive
