@@ -3,7 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.lowering.BitVectorCircuit
 import com.eignex.klause.lowering.BitVectorGates
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
@@ -21,10 +21,10 @@ internal data class SmtBitVectorReduction(
     val checks: List<SmtBitVectorCheck> = emptyList(),
 )
 
-internal fun reduceSmtBitVectors(commands: List<SExpr>, cancellation: Cancellation): SmtBitVectorReduction =
+internal fun reduceSmtBitVectors(commands: List<SExpr>, cancellation: ExecutionControl): SmtBitVectorReduction =
     SmtBitVectorReducer(commands, cancellation).reduce()
 
-internal fun lowerSmtBitVectors(source: SmtReduction, cancellation: Cancellation): SmtReduction {
+internal fun lowerSmtBitVectors(source: SmtReduction, cancellation: ExecutionControl): SmtReduction {
     val lowered = reduceSmtBitVectors(source.commands, cancellation)
     val recipes = lowered.bitNames.mapValues { SmtReconstruction.Bits(it.value) }
         .mapKeys { polynomialSymbol(it.key) }
@@ -39,7 +39,7 @@ internal fun lowerSmtBitVectors(source: SmtReduction, cancellation: Cancellation
         })
 }
 
-private class SmtBitVectorReducer(private val source: List<SExpr>, private val cancellation: Cancellation) {
+private class SmtBitVectorReducer(private val source: List<SExpr>, private val cancellation: ExecutionControl) {
     private sealed interface Type {
         data class Bits(val width: Int) : Type
         data class Scalar(val name: String) : Type

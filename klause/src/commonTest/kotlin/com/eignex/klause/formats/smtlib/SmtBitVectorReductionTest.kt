@@ -2,7 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -141,7 +141,7 @@ class SmtBitVectorReductionTest {
     }
 
     private fun lower(source: String): Pair<SmtBitVectorReduction, SmtLibProblem> {
-        val reduced = reduceSmtBitVectors(SExprReader(source).readAll(), Cancellation.Never)
+        val reduced = reduceSmtBitVectors(SExprReader(source).readAll(), ExecutionControl.Never)
         return reduced to SmtLib.parse(source)
     }
 }

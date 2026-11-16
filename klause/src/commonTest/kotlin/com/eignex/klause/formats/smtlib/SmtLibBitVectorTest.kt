@@ -20,6 +20,7 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
@@ -96,10 +97,7 @@ class SmtLibBitVectorTest {
             "(assert (= ((_ int_to_bv 1) x) #b1))")
         var work = 0L
         val meter = WorkMeter { work += it }
-        val cancellation = object : Cancellation {
-            override fun isCancelled(): Boolean = work >= 100_000
-            override fun workMeter(): WorkMeter = meter
-        }
+        val cancellation = ExecutionControl(Cancellation { work >= 100_000 }, meter)
 
         val result = BacktrackSolver.source(parsed.model).solve(
             FiniteEngine.BACKTRACK, cancellation = cancellation,
@@ -206,7 +204,7 @@ class SmtLibBitVectorTest {
     @Test
     fun `constant circuit construction should honor the containing cancellation token`() {
         var polls = 0
-        val cancellation = Cancellation { ++polls > 1000 }
+        val cancellation = ExecutionControl(Cancellation { ++polls > 1000 })
 
         assertFailsWith<CancellationException> {
             SmtLib.parse("(assert (= (bvmul #b${"0".repeat(256)} #b${"0".repeat(256)}) (_ bv0 256)))",
