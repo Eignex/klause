@@ -2,10 +2,10 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.arithmetic.real.ExactRealFunction
 import com.eignex.klause.arithmetic.real.ExactRealValue
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
@@ -295,6 +295,7 @@ internal class SmtFixedModel(
                 if (selected is SExpr.SList) return indexed(selected, args)
                 val name = symbol((selected as SExpr.Atom).text)
                 if (name in constructors) return constructorValue(name, args, qualification)
+                if (name in selectors) return selectorValue(name, args.single(), qualification)
                 return if (model.values.any { symbol(it.first.name) == name }) function(name, args, qualification)
                     else operation(selected, args).let {
                         if (qualification == SmtSort.Real && it is SmtValue.Integer) real(exact(it)) else it
@@ -352,14 +353,7 @@ internal class SmtFixedModel(
                 array.copy(entries = array.entries + (args[1] to args[2]))
             }
             in constructors -> constructorValue(name, args, null)
-            in selectors -> {
-                val application = args.single() as? SmtValue.Application
-                val selected = selectors.getValue(name).firstOrNull {
-                    application != null && constructorSymbol(application.constructor) == it.first
-                }
-                if (selected != null) requireNotNull(application).arguments[selected.second]
-                else underspecified("selector:$name", args)
-            }
+            in selectors -> selectorValue(name, args.single(), null)
             else -> null
         }
         if (result != null) return result
@@ -389,6 +383,23 @@ internal class SmtFixedModel(
     private fun constructorSymbol(text: String): String = when (val identifier = SExprReader(text).readAll().single()) {
         is SExpr.Atom -> symbol(identifier.text)
         is SExpr.SList -> symbol((identifier.items[1] as SExpr.Atom).text)
+    }
+
+    private fun selectorValue(name: String, argument: SmtValue, qualification: SmtSort?): SmtValue {
+        val registry = sourceScope.datatypes
+        val argumentSort = valueSort(argument)
+        val operator = registry.resolve(name, listOf(argumentSort), qualification)
+            ?.takeIf { it.selector != null } ?: unavailable("selector rank is not determined")
+        val constructor = operator.instance.constructors[operator.constructor]
+        if (argument is SmtValue.Application && constructorSymbol(argument.constructor) == symbol(constructor.name)) {
+            return argument.arguments[requireNotNull(operator.selector)]
+        }
+        val key = smtSelectorInterpretationKey(name, argumentSort, operator.result)
+        val retainedTable = retainedFunction(key)
+        val interpretation = retainedTable ?: smtUnobservedSelectorInterpretation(
+            registry, name, argumentSort, operator.result, values)
+            ?: unavailable("the retained model has no total '$name' interpretation at this rank")
+        return table(interpretation, listOf(argument))
     }
 
     private fun function(name: String, args: List<SmtValue>, result: SmtSort?): SmtValue {
@@ -490,11 +501,14 @@ internal class SmtFixedModel(
     }
 
     private fun underspecified(name: String, args: List<SmtValue>): SmtValue {
-        val key = if (name.startsWith("selector:")) "@$name" else "@operation:$name"
-        val interpretation = runCatching { retained.value(key) }.getOrNull() as? SmtValue.Function
+        val interpretation = retainedFunction("@operation:$name")
             ?: unavailable("the retained model has no total '$name' interpretation")
         return table(interpretation, args)
     }
+
+    private fun retainedFunction(key: String): SmtValue.Function? = try {
+        retained.value(key) as? SmtValue.Function
+    } catch (_: IllegalStateException) { null }
 
     private fun select(array: SmtValue.Array, index: SmtValue): SmtValue {
         for ((key, value) in array.entries.asReversed()) {

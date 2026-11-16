@@ -3,7 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.smtlib.SmtSessionModel
 import com.eignex.klause.formats.smtlib.SmtSessionResult
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.LinearOptimizationResult

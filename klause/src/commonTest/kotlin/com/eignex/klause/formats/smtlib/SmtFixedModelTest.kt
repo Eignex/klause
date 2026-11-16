@@ -112,6 +112,35 @@ class SmtFixedModelTest {
     }
 
     @Test
+    fun `wrong constructor selector queries retain distinct polymorphic rank tables`() {
+        val source = SExprReader("""
+            (declare-datatypes ((Box 1)) ((par (A) ((none) (some (value A))))))
+        """.trimIndent()).readAll()
+        val intBox = SmtSort.Uninterpreted("Box", listOf(SmtSort.Int))
+        val boolBox = SmtSort.Uninterpreted("Box", listOf(SmtSort.Bool))
+        val interpretations = mapOf(
+            smtSelectorInterpretationKey("value", intBox, SmtSort.Int) to
+                SmtValue.Function(listOf(intBox), emptyList(), SmtValue.Integer("7")),
+            smtSelectorInterpretationKey("value", boolBox, SmtSort.Bool) to
+                SmtValue.Function(listOf(boolBox), emptyList(), SmtValue.Boolean(true)),
+        )
+        val values = object : SmtModelValues {
+            override fun checkpoint(units: Long) = Unit
+            override fun boolean(name: String): Boolean = error(name)
+            override fun integer(name: String): String = error(name)
+            override fun real(name: String): String = error(name)
+            override fun value(name: String): SmtValue = interpretations[name] ?: error(name)
+        }
+        val model = SmtFixedModel(source, SmtSourceModel(emptyList()), values, ExecutionControl.Never)
+
+        val integer = model.evaluate(SExprReader("((as value Int) (as none (Box Int)))").readAll().single())
+        val boolean = model.evaluate(SExprReader("((as value Bool) (as none (Box Bool)))").readAll().single())
+
+        assertEquals("7", integer)
+        assertEquals("true", boolean)
+    }
+
+    @Test
     fun `bitvector queries preserve indexed wiring and overflow semantics`() {
         val parsed = SmtLib.parse("(declare-const x (_ BitVec 4))")
         val model = parsed.reconstructSessionModel(Sample(BooleanArray(4), longArrayOf()))
