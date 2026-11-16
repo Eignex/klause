@@ -391,3 +391,11 @@ internal data class SharedLearningReclamation(
     val scratchBytes: Long = 0L,
     val continuationPending: Boolean = false,
 )
+
+internal data class SearchLearningMemoryPosition(
+    val learning: Long,
+    val store: Long,
+    val watches: Long,
+    val trail: Long,
+    val pending: Long,
+)
