@@ -615,7 +615,8 @@ class CliModeOptionsTest {
     fun `smtlib should emit sat and a get-model block`() {
         val smt = File.createTempFile("cli", ".smt2").apply {
             writeText(
-                "(declare-const x Int)(assert (>= x 0))(assert (<= x 5))(check-sat)(get-model)",
+                "(set-option :produce-models true)" +
+                    "(declare-const x Int)(assert (>= x 0))(assert (<= x 5))(check-sat)(get-model)",
             )
             deleteOnExit()
         }
