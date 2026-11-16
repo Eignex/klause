@@ -46,6 +46,13 @@ if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
 // default repository set.
 allprojects {
     val targetProject = this
+    // KGP's shared metadata selection must use the same baseline as compilation classpaths.
+    configurations.matching { it.name == "kbuildPlatform" }.all {
+        val platform = this
+        configurations.matching { it.name == "allSourceSetsCompileDependenciesMetadata" }.configureEach {
+            extendsFrom(platform)
+        }
+    }
     // Direct consumers need platform constraints because timestamped KMP roots redirect to mutable snapshots.
     configurations.matching {
         it.name == "commonMainApi" || it.name == "commonMainImplementation" || it.name == "implementation"
