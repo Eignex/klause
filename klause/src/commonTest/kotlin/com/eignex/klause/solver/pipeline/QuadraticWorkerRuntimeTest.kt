@@ -26,7 +26,9 @@ class QuadraticWorkerRuntimeTest {
     @Test
     fun `closing a pending handle should prevent another slice and clean up once`() {
         val native = QuadraticNativeScope(PolynomialTheoryParams())
-        val partial = QuadraticOptimizationResult.Unknown(null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+        val partial = QuadraticOptimizationResult.Unknown(
+            null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY,
+        )
         var closed = 0
         val runtime = QuadraticWorkerRuntime(native, ObjectiveSense.MINIMIZE, { SolveStats.EMPTY }, { partial }) {
             closed++
@@ -44,7 +46,9 @@ class QuadraticWorkerRuntimeTest {
     @Test
     fun `terminal completion should stay readable after closing the handle`() {
         val native = QuadraticNativeScope(PolynomialTheoryParams())
-        val partial = QuadraticOptimizationResult.Unknown(null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+        val partial = QuadraticOptimizationResult.Unknown(
+            null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY,
+        )
         val runtime = QuadraticWorkerRuntime(native, ObjectiveSense.MINIMIZE, { SolveStats.EMPTY }, { partial }) {}
         val handle = runtime.completeHandle({ 7L }) { _, _, _ -> throw PolynomialInterrupted() }
         val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) {}
@@ -60,7 +64,9 @@ class QuadraticWorkerRuntimeTest {
     @Test
     fun `a resource decline should be visible when constructing the partial result`() {
         val native = QuadraticNativeScope(PolynomialTheoryParams())
-        val partial = QuadraticOptimizationResult.Unknown(null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+        val partial = QuadraticOptimizationResult.Unknown(
+            null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY,
+        )
         val runtime = QuadraticWorkerRuntime(native, ObjectiveSense.MINIMIZE, { SolveStats.EMPTY }, {
             assertEquals(PolynomialTheoryResource.MatrixCells, native.resource)
             partial
@@ -94,7 +100,9 @@ class QuadraticWorkerRuntimeTest {
     @Test
     fun `interrupted neighborhood preparation should retain its instruction charge`() {
         val native = QuadraticNativeScope(PolynomialTheoryParams())
-        val partial = QuadraticOptimizationResult.Unknown(null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+        val partial = QuadraticOptimizationResult.Unknown(
+            null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY,
+        )
         val runtime = QuadraticWorkerRuntime(native, ObjectiveSense.MINIMIZE, { SolveStats.EMPTY }, { partial }) {}
         val handle = runtime.neighborhoodHandle(Cancellation.Never, { null }) {
             native.polynomial.charge(5)
@@ -111,7 +119,9 @@ class QuadraticWorkerRuntimeTest {
     @Test
     fun `a failed publication callback should be removed before another slice`() {
         val native = QuadraticNativeScope(PolynomialTheoryParams())
-        val partial = QuadraticOptimizationResult.Unknown(null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+        val partial = QuadraticOptimizationResult.Unknown(
+            null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY,
+        )
         val runtime = QuadraticWorkerRuntime(native, ObjectiveSense.MINIMIZE, { SolveStats.EMPTY }, { partial }) {}
         val point = QuadraticIncumbent(Sample(booleanArrayOf(), longArrayOf()),
             AlgebraicArithmetic().rational(BigFraction.ZERO))
@@ -133,7 +143,9 @@ class QuadraticWorkerRuntimeTest {
     @Test
     fun `unexpected execution failures should release the worker without creating a terminal result`() {
         val native = QuadraticNativeScope(PolynomialTheoryParams())
-        val partial = QuadraticOptimizationResult.Unknown(null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY)
+        val partial = QuadraticOptimizationResult.Unknown(
+            null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY,
+        )
         val failure = IllegalArgumentException("failed execution")
         var closed = 0
         val runtime = QuadraticWorkerRuntime(native, ObjectiveSense.MINIMIZE, { SolveStats.EMPTY }, { partial }) {

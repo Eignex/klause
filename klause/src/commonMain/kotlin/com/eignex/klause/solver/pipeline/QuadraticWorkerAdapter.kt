@@ -226,7 +226,9 @@ internal class QuadraticWorkerAdapter(
         val worker = if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) {
             params.strategy.localSearch.cancellation
         } else params.strategy.backtrack.cancellation
-        val reason = if (!native.stopped && (runtime.interrupted || worker())) TerminationReason.Cancelled else native.reason()
+        val reason = if (!native.stopped && (runtime.interrupted || worker())) {
+            TerminationReason.Cancelled
+        } else native.reason()
         return incumbent?.let {
             QuadraticOptimizationResult.BestFound(it, rootBound, reason, sense, stats)
         } ?: QuadraticOptimizationResult.Unknown(rootBound, reason, sense, stats)
