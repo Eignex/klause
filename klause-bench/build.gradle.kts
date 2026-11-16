@@ -20,10 +20,10 @@ tasks.withType<org.jetbrains.dokka.gradle.tasks.DokkaGenerateTask>().configureEa
 }
 
 val labMacOs = System.getProperty("os.name").startsWith("Mac")
-val labBenchVersion = providers.gradleProperty("labBenchVersion").getOrElse("0.1.0")
+val labBenchVersion = providers.gradleProperty("labBenchVersion").getOrElse("0.1.1")
 
 val labBenchRepository = providers.gradleProperty("labBenchRepository").orNull?.let { uri(it) } ?: run {
-    require(labBenchVersion == "0.1.0") { "A different labBenchVersion requires an explicit labBenchRepository" }
+    require(labBenchVersion == "0.1.1") { "A different labBenchVersion requires an explicit labBenchRepository" }
     LabSdkRepository(downloaded = { logger.lifecycle("Verified lab SDK $it from the release-asset API") })
         .stage(gradle.gradleUserHomeDir.resolve("caches/eignex/lab-bench-sdk").toPath(), gradle.startParameter.isOffline)
         .toUri()

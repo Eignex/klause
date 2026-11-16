@@ -156,7 +156,8 @@ diagnosis; these observations do not retire the rebuilding objective.
 
 ## Build and run
 
-Gradle stages the checksum-pinned lab SDK through the public GitHub release-asset API using the JDK.
+Gradle stages the checksum-pinned Lab Bench SDK `0.1.1` through the public GitHub release-asset API using the JDK.
+The SDK supplies the shared workspace checksum cache used for input and build provenance.
 Verified artifacts are cached under `GRADLE_USER_HOME/caches/eignex/lab-bench-sdk`, shared across fresh
 checkouts and protected by a file lock. Checksums are verified before reuse. Transient download failures
 allow three attempts with one- and two-second backoffs, 10-second connection and 30-second read timeouts.

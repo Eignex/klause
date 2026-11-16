@@ -26,12 +26,12 @@ class LabSdkRepository(
     data class Asset(val extension: String, val id: Long, val sha256: String)
 
     fun stage(repository: Path, offline: Boolean = false): Path {
-        val directory = repository.resolve("lab-bench-v0.1.0")
+        val directory = repository.resolve("lab-bench-v0.1.1")
         Files.createDirectories(directory)
-        FileChannel.open(repository.resolve("lab-bench-v0.1.0.lock"), CREATE, WRITE).use { channel ->
+        FileChannel.open(repository.resolve("lab-bench-v0.1.1.lock"), CREATE, WRITE).use { channel ->
             lock(channel).use {
                 for (asset in assets) {
-                    val destination = directory.resolve("lab-bench-0.1.0.${asset.extension}")
+                    val destination = directory.resolve("lab-bench-0.1.1.${asset.extension}")
                     if (Files.isRegularFile(destination) && Files.size(destination) <= MAXIMUM_BYTES &&
                         digest(Files.readAllBytes(destination)) == asset.sha256) continue
                     check(!offline) { "Pinned lab SDK ${asset.extension} is absent or corrupt in the offline cache" }
@@ -124,9 +124,9 @@ class LabSdkRepository(
             "api.github.com", "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com",
         )
         private val PINNED_ASSETS = listOf(
-            Asset("module", 684339118, "2394bfcd15474a473cdf34827b99cb4a03dc3bdb270ebd705ef2dd2c8298a489"),
-            Asset("jar", 684339109, "53247d50debd77f6c1d7fa314ffa5ddb6c0fe0632c2d482b01c7704afe7beba4"),
-            Asset("pom", 684339115, "a25c59d8bd1520368789459fd42a64bb1a5c376762ea86ca1de6b86e4133f160"),
+            Asset("module", 754307582, "08fd66134b98b65bdf407b05dfa5eb477a8116123755a88f8fc3a5661a3ed6bf"),
+            Asset("jar", 754307577, "1cc796aae19c6fa08d6ada58617c44f4c930345fa332b29c1c8f5f9ab250ef81"),
+            Asset("pom", 754307580, "473b274356034bcb4ea5cf9a5b21f933c36b1da0ffb2a388e1dd494fc322ce95"),
         )
 
         private fun digest(bytes: ByteArray): String =

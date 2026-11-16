@@ -5,7 +5,7 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
-import com.eignex.klause.bench.source.WorkspaceChecksums
+import com.eignex.lab.bench.WorkspaceChecksums
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
 import com.eignex.lab.bench.BenchInput
