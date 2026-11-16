@@ -152,18 +152,17 @@ maps and the original objective and direction. Callers pass
 the frontend never classifies a source by the solver it will need. Interruption
 throws `CancellationException` before any source is published.
 
-The frontend admits ground free sorts and functions, quantifier-free bitvectors,
-and linear integer and real arithmetic with Boolean structure and supported
-`minimize`/`maximize` objectives, polynomial Int/Real/Bool satisfaction with products,
-integer exponentiation and fixed nonnegative real powers, and a real-function
-extension with unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
-`check-sat` or `check-sat-assuming` query is accepted, with Boolean literal
-assumptions conjoined to the assertions; `get-model` and `get-objectives` are
+The frontend admits quantifier-free Boolean structure, free sorts and functions,
+bitvectors, arrays, algebraic datatypes and exact integer and real arithmetic.
+Supported `minimize`/`maximize` objectives include affine and quadratic arithmetic.
+The real-function extension admits unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
+`check-sat` or `check-sat-assuming` query is accepted by `SmtLib.parse`, with Boolean
+formula assumptions conjoined to the assertions; `get-model` and `get-objectives` are
 accepted requests. Ground extensional arrays compose with admitted scalar sorts,
 including nested arrays and arrays used as indexes or function arguments and results.
-Strings, quantifiers, negative or noninteger real powers, multiple or nonquadratic objectives, incremental
-commands, multiple queries and `get-value` decline explicitly, even inside a
-constant Boolean branch.
+Floating point, strings, regular expressions, quantifiers and higher-order maps
+are outside the supported source language. Negative or noninteger real powers and
+multiple or nonquadratic objectives decline explicitly, including in constant branches.
 
 ### Bitvector lowering
 
@@ -253,6 +252,57 @@ Reconstruction tables are cached within one witness for mutually dependent
 instantiated sorts; nested parameters can therefore cross array fields without
 sharing a recursive table with a different instantiation. The retained typed
 registry supplies datatype cardinalities to extensional array value comparisons.
+
+### Command sessions
+
+`SmtLibSession` owns command-stream state separately from single-source admission.
+Each query rebuilds one active assertion snapshot; assumptions belong only to that
+query. Assertion levels scope declarations and definitions as well as assertions.
+Global declarations enter the base signature in source order and survive stack
+operations and `reset-assertions`; `reset`
+restores the initial state, including options. `:print-success` defaults to false,
+and model production must be enabled in start mode. Model queries inspect the same
+checked interpretation until the context changes. Assignment production returns
+the values of Boolean named terms. Enabling optional proof, core and
+unsat-assumption production responds `unsupported`; querying disabled production
+is a protocol error. Unsupported standard options retain their specified default
+in `get-option`.
+
+Each command validates syntax, declaration order and expression sorts before it
+changes the session. Protocol errors preserve the previous assertion context and
+checked model. `get-assertions` preserves original annotations. Regular and
+diagnostic channels route independently to stdout, stderr or append-file sinks;
+switching destinations closes the previous owned sink, and reset restores both defaults.
+
+Annotations normalize before typed capture. Closed `:named` subterms introduce
+nullary definitions in postorder, while other metadata leaves the term unchanged.
+The scope infers each named body's sort and registers its typed definition in one
+operation; the containing command still validates its own lexical context.
+Explicit binding entry and exit frames share counted lexical names, keeping live
+scope storage linear in nested bindings; annotation and closedness walks charge
+the same execution control.
+Literal tokens are classified before canonical term-name lookup. Qualified
+function names, sorts and indexes do not capture surrounding term binders.
+`define-const` abbreviates a nullary `define-fun`. Named definitions share the
+declaration lifetime, including names introduced by assumptions and value queries.
+
+`reconstructSessionModel` captures owned scalar values, composite recipes, native
+exact-real authorities and underspecified total-function tables while the checked
+assignment remains available. Later `get-value` terms evaluate in that fixed
+interpretation, including new polymorphic ranks. Evaluation shares the invocation
+control; an unavailable certificate or exhausted representation reports an explicit
+query error without replacing the retained model.
+
+Recursive command-session definitions use necessary ground equations for
+refutation. Initial instances use false or zero literals for Boolean, integer,
+real and bit-vector arguments, and fresh constants for other sorts. A satisfying
+result requires either a total interpretation whose equations pass a counterexample
+check, or a checked integer ranking that proves all recursive calls decrease for
+arbitrary inputs, followed by evaluation of the source assertions.
+Call collection expands parallel lets and substitutes typed match fields and
+constructor guards throughout definition bodies.
+Ground evaluation uses an explicit work stack and a resource allowance; exhausted
+work yields an inconclusive result and supplies no recursive completion claim.
 
 ### Declaration policy
 

@@ -121,7 +121,8 @@ class CliModeSmtTest {
     @Test
     fun `SMT function witness should use exact closed value constructors`() {
         val source = File.createTempFile("function-exp", ".smt2").apply {
-            writeText("(declare-const x Real) (assert (= (exp x) 2)) (check-sat)")
+            writeText("(set-option :produce-models true) (declare-const x Real) " +
+                "(assert (= (exp x) 2)) (check-sat) (get-model)")
             deleteOnExit()
         }
 
@@ -225,7 +226,8 @@ class CliModeSmtTest {
     @Test
     fun `SMT quadratic local search should preserve a wide integer objective without optimal status`() {
         val source = File.createTempFile("quad-wide", ".smt2").apply {
-            writeText("(declare-const i Int) (assert (= i 100000000000000000000)) (minimize (* i i))")
+            writeText("(set-option :produce-models true) (declare-const i Int) " +
+                "(assert (= i 100000000000000000000)) (minimize (* i i)) (check-sat) (get-model)")
             deleteOnExit()
         }
 
@@ -242,7 +244,7 @@ class CliModeSmtTest {
     @Test
     fun `SMT zero quadratic native allowance should publish unknown without a model`() {
         val source = File.createTempFile("quad-zero", ".smt2").apply {
-            writeText("(declare-const x Real) (minimize (* x x))")
+            writeText("(declare-const x Real) (minimize (* x x)) (check-sat)")
             deleteOnExit()
         }
 
@@ -280,7 +282,8 @@ class CliModeSmtTest {
     fun `SMT polynomial witnesses should render exact irrational roots under source names`() {
         val source = File.createTempFile("nra-root", ".smt2").apply {
             writeText(
-                "(declare-const |source x| Real) (assert (= (* |source x| |source x|) 2)) " +
+                "(set-option :produce-models true) (declare-const |source x| Real) " +
+                    "(assert (= (* |source x| |source x|) 2)) " +
                     "(assert (> |source x| 0)) (check-sat) (get-model)",
             )
             deleteOnExit()
@@ -296,8 +299,11 @@ class CliModeSmtTest {
     fun `SMT nonlinear integer witnesses should retain wide exact values on local search`() {
         val source = File.createTempFile("nia-wide", ".smt2").apply {
             writeText(
-                "(declare-const |source n| Int) (assert (= |source n| 100000000000000000000)) " +
-                    "(assert (= (* |source n| |source n|) 10000000000000000000000000000000000000000))",
+                "(set-option :produce-models true) (declare-const |source n| Int) " +
+                    "(declare-const q Int) (assert (= (* q q) 1)) " +
+                    "(assert (= |source n| 100000000000000000000)) " +
+                    "(assert (= (* |source n| |source n|) 10000000000000000000000000000000000000000)) " +
+                    "(check-sat) (get-model)",
             )
             deleteOnExit()
         }
@@ -313,7 +319,7 @@ class CliModeSmtTest {
     @Test
     fun `SMT incomplete integer candidate exhaustion should publish unknown`() {
         val source = File.createTempFile("nia-budget", ".smt2").apply {
-            writeText("(declare-const n Int) (assert (= (* n n) 2))")
+            writeText("(declare-const n Int) (assert (= (* n n) 2)) (check-sat)")
             deleteOnExit()
         }
 
@@ -494,7 +500,8 @@ class CliModeSmtTest {
     fun `SMT optimization should report an unbounded descent beside its witness`() {
         val smt = File.createTempFile("cliunbounded", ".smt2").apply {
             writeText(
-                "(declare-const x Int)\n(assert (<= x 9))\n(minimize x)\n(check-sat)\n",
+                "(set-option :produce-models true)\n(declare-const x Int)\n(assert (<= x 9))\n" +
+                    "(minimize x)\n(check-sat)\n(get-model)\n",
             )
             deleteOnExit()
         }

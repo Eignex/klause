@@ -1,7 +1,7 @@
 # 20. Command line
 
-The CLI parses one source, binds shared [source setup](19-api.md#source-setup) and
-renders its results. Common controls reach every mode; format frontends retain
+The CLI parses sources, binds shared [source setup](19-api.md#source-setup) and
+renders their results. Common controls reach every mode; format frontends retain
 parsing and output semantics. The CLI adds no solving policy.
 
 ## CLI module
@@ -23,7 +23,7 @@ the optimizing tier for long runs.
 |---|---|---|
 | `minizinc` | `.fzn` | FlatZinc solution separators and verdicts; `%%%mzn-stat` statistics |
 | `xcsp3` | `.xml`, `.xcsp`, `.xcsp3` | XCSP3 status, objective and named instantiation |
-| `smtlib` | `.smt2`, `.smt` | `sat` / `unsat` / `unknown` and model definitions |
+| `smtlib` | `.smt2`, `.smt` | Command responses, queried model values and `;` statistics |
 | `dimacs` | `.cnf` | SAT status and Boolean assignment |
 | `opb` | `.opb`, `.wbo` | Pseudo-Boolean status, objective and assignment |
 | `wcnf` | `.wcnf` | Weighted MaxSAT status, objective and assignment |
@@ -42,6 +42,16 @@ Each loader closes its input source when parsing returns or fails, including whe
 the parser stops before end of file. Compressed sources release their readers and
 decompressor processes with the same lifetime.
 
+SMT-LIB scripts execute commands in order. Every `check-sat` or
+`check-sat-assuming` receives an independent active assertion snapshot through
+the shared solve driver. Status responses belong to the check command; enabled
+`get-model` and `get-value` requests inspect its retained interpretation. Stack
+operations, resets, model-production options and optional capability responses
+belong to the [SMT session](05-arithmetic-formats.md#command-sessions). Regular and
+diagnostic output channels can append to files; the session closes its owned
+destinations when switching, resetting or exiting. A script without a check
+command emits no solver result.
+
 Exact objective and unattained-limit rendering follow the
 [arithmetic format contracts](05-arithmetic-formats.md#results-and-objectives);
 [FlatZinc](04-finite-formats.md#minizinc-output-rendering) defines its completion markers.
@@ -59,7 +69,8 @@ until the terminal status.
 
 `OutputProtocol.onArithmeticIncumbent` accepts an already checked source witness and
 its value in original objective units and direction; it carries no terminal claim.
-SMT precedes each model with `sat`, and MiniZinc keeps its solution separators.
+SMT retains the checked final interpretation for explicit model queries, and
+MiniZinc keeps its solution separators.
 `optimizationStatus` and checked bounds arrive separately at completion, so a
 terminal never repeats an emitted model and an incomplete result's incumbent keeps
 `best-found` status.

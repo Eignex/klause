@@ -74,9 +74,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     fun command(expression: SExpr): Boolean {
         val command = expression as? SExpr.SList ?: return false
         val head = command.polynomialHead()
-        if (exited || (querySeen && head !in setOf("get-model", "get-objectives", "exit", "set-info", "set-option"))) {
-            return false
-        }
+        if (!acceptsCommand(head)) return false
         return when (head) {
             "declare-datatype", "declare-datatypes" -> {
                 for ((spelling, arity) in datatypes.headers(command)) {
@@ -153,10 +151,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
             }
             "define-fun" -> {
                 command.polynomialSize(5)
-                val name = command.polynomialName(1)
-                if (name in globals || datatypes.hasOperator(name) || theoryFunction(name) || reservedName(name)) {
-                    return false
-                }
+                val label = command.items[1] as? SExpr.Atom ?: smtUnsupported("malformed polynomial symbol")
+                val name = definitionName(label) ?: return false
                 val parameters = command.items.getOrNull(2) as? SExpr.SList ?: return false
                 val names = ArrayList<String>()
                 val uniqueNames = HashSet<String>()
@@ -176,13 +172,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     names[index] to term("parameter:${symbolIdentity++}", emptyList(), sorts[index])
                 }
                 val body = sort(command.items.getOrNull(4) ?: return false, Locals(locals, null)) ?: return false
-                if (!accepts(result, nodes[body].sort)) return false
-                val identity = symbolIdentity++
-                globals[name] = Signature(sorts, result, identity)
-                typedSymbols += SmtTypedSymbol(identity,
-                    SmtSourceDeclaration((command.items[1] as SExpr.Atom).text, sorts, result),
-                    SmtTypedDefinition(names.map { locals.getValue(it) }, body))
-                true
+                registerDefinition(name, SmtSourceDeclaration(label.text, sorts, result),
+                    names.map { locals.getValue(it) }, body)
             }
             "assert", "minimize", "maximize" -> {
                 command.polynomialSize(2)
@@ -207,14 +198,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                 command.polynomialSize(2)
                 val assumptions = command.items[1] as? SExpr.SList ?: return false
                 for (assumption in assumptions.items) {
-                    val atom = if (assumption is SExpr.SList) {
-                        if (assumption.items.size != 2 || assumption.polynomialHead() != "not") return false
-                        assumption.items[1] as? SExpr.Atom ?: return false
-                    } else assumption as? SExpr.Atom ?: return false
-                    if (globals[polynomialSymbol(atom.text)]?.let {
-                            it.parameters.isEmpty() && it.result == SmtSort.Bool
-                        } != true) return false
                     val node = sort(assumption, null) ?: return false
+                    if (nodes[node].sort != SmtSort.Bool) return false
                     assertionNodes += node
                     sourceObligations += "assert" to node
                 }
@@ -236,6 +221,43 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
             }
             else -> smtUnsupported("unsupported command '$head'")
         }
+    }
+
+    private fun acceptsCommand(head: String): Boolean = !exited &&
+        (!querySeen || head in setOf("get-model", "get-objectives", "exit", "set-info", "set-option"))
+
+    private fun definitionName(label: SExpr.Atom): String? {
+        val name = SExpr.SList(listOf(label)).polynomialName(0)
+        return name.takeUnless {
+            it in globals || datatypes.hasOperator(it) || theoryFunction(it) || reservedName(it)
+        }
+    }
+
+    private fun registerDefinition(name: String, declaration: SmtSourceDeclaration,
+        parameters: List<Int>, body: Int): Boolean {
+        if (!accepts(declaration.result, nodes[body].sort)) return false
+        val identity = symbolIdentity++
+        globals[name] = Signature(declaration.parameters, declaration.result, identity)
+        typedSymbols += SmtTypedSymbol(identity, declaration, SmtTypedDefinition(parameters, body))
+        return true
+    }
+
+    internal fun defineClosedConstant(label: SExpr.Atom, body: SExpr): SmtSort? {
+        if (!acceptsCommand("define-fun")) return null
+        val name = definitionName(label) ?: return null
+        val node = sort(body, null) ?: return null
+        val result = nodes[node].sort
+        if (!registerDefinition(name, SmtSourceDeclaration(label.text, emptyList(), result), emptyList(), node)) {
+            return null
+        }
+        return result
+    }
+
+    internal fun termSort(expression: SExpr): SmtSort? = sort(expression, null)?.let { nodes[it].sort }
+
+    internal fun modelValue(name: String, sort: SmtSort) {
+        require(name.startsWith('@'))
+        globals[polynomialSymbol(name)] = Signature(emptyList(), sort, symbolIdentity++)
     }
 
     internal fun sourceSort(expression: SExpr, localParameters: Set<String> = emptySet(),
@@ -353,7 +375,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                 is Frame.Evaluate -> when (val node = frame.expression) {
                     is SExpr.Atom -> {
                         val name = polynomialSymbol(node.text)
-                        val result = literal(node.text)?.let {
+                        val result = literalSort(node.text)?.let {
                             term("literal:${if (it == SmtSort.Bool) name else node.text}", emptyList(), it)
                         }
                             ?: frame.locals?.get(name) ?: globals[name]?.takeIf { it.parameters.isEmpty() }
@@ -404,7 +426,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                                 instantiateSmtRank(it.parameters, it.result, globalSortParameters, emptyList(),
                                     sourceSort(node.items[2]), cancellation)?.second
                             }
-                                ?: literal(name)?.takeIf { name in setOf("true", "false") }
+                                ?: literalSort(name)?.takeIf { name == "true" || name == "false" }
                                 ?: datatypes.resolve(name, emptyList(), sourceSort(node.items[2]))?.result
                                 ?: if (name == "pi") SmtSort.Real else return null
                             if (result != sourceSort(node.items[2])) return null
@@ -520,8 +542,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
         return values.single()
     }
 
-    private fun literal(text: String): SmtSort? {
-        if (polynomialSymbol(text) in setOf("true", "false")) return SmtSort.Bool
+    internal fun literalSort(text: String): SmtSort? {
+        val name = polynomialSymbol(text)
+        if (name == "true" || name == "false") return SmtSort.Bool
         smtBitVectorLiteralSort(text)?.let { return it }
         if (text.isNotEmpty() && text.all { it in '0'..'9' }) return SmtSort.Int
         val dot = text.indexOf('.')
@@ -573,16 +596,18 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     private fun reservedName(name: String): Boolean = !allowSolverSymbols &&
         (name.startsWith('@') || name.startsWith('.'))
 
-    private fun theoryFunction(name: String): Boolean = name in setOf(
-        "true", "false", "not", "and", "or", "xor", "=>", "=", "distinct", "ite",
-        "+", "-", "*", "/", "div", "mod", "abs", "**", "<", "<=", ">", ">=", "to_real", "to_int", "is_int",
-        "select", "store", "concat", "bvnot", "bvneg", "bvand", "bvor", "bvxor", "bvxnor", "bvnand", "bvnor",
-        "bvcomp", "bvadd", "bvsub", "bvmul", "bvudiv", "bvurem", "bvsdiv", "bvsrem", "bvsmod", "bvshl",
-        "bvlshr", "bvashr", "bvult", "bvule", "bvugt", "bvuge", "bvslt", "bvsle", "bvsgt", "bvsge",
-        "ubv_to_int", "sbv_to_int", "bvnego", "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvusubo", "bvssubo",
-        "bvsdivo",
-    )
+    private fun theoryFunction(name: String): Boolean = name in smtReservedTheoryFunctions
 }
+
+private val smtReservedTheoryFunctions = setOf(
+    "true", "false", "not", "and", "or", "xor", "=>", "=", "distinct", "ite",
+    "+", "-", "*", "/", "div", "mod", "abs", "**", "<", "<=", ">", ">=", "to_real", "to_int", "is_int",
+    "select", "store", "concat", "bvnot", "bvneg", "bvand", "bvor", "bvxor", "bvxnor", "bvnand", "bvnor",
+    "bvcomp", "bvadd", "bvsub", "bvmul", "bvudiv", "bvurem", "bvsdiv", "bvsrem", "bvsmod", "bvshl",
+    "bvlshr", "bvashr", "bvult", "bvule", "bvugt", "bvuge", "bvslt", "bvsle", "bvsgt", "bvsge",
+    "ubv_to_int", "sbv_to_int", "bvnego", "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvusubo", "bvssubo",
+    "bvsdivo",
+)
 
 internal fun SExpr.factorSourceSymbols(cancellation: ExecutionControl): SExpr {
     val work = ArrayDeque<Pair<SExpr, Boolean>>()

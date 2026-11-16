@@ -33,7 +33,7 @@ class CliModeOpenTheoryTest {
             "(declare-const x Real) (assert (= (sin x) 0))",
         )) {
             val smt = File.createTempFile("cliunknownsource", ".smt2").apply {
-                writeText(source)
+                writeText("$source\n(check-sat)")
                 deleteOnExit()
             }
             var code = -1
@@ -80,7 +80,7 @@ class CliModeOpenTheoryTest {
             ))
         for ((extension, source) in sources) {
             val smt = File.createTempFile("clifixedcores", extension).apply {
-                writeText(source)
+                writeText(if (extension == ".smt2") "$source\n(check-sat)" else source)
                 deleteOnExit()
             }
             var code = -1
@@ -318,7 +318,7 @@ class CliModeOpenTheoryTest {
             "(assert (= 0.0 1.0))" to "unsat",
         )) {
             val smt = File.createTempFile("cliconstant", ".smt2").apply {
-                writeText(source)
+                writeText("$source\n(check-sat)")
                 deleteOnExit()
             }
             var code = -1
@@ -348,10 +348,12 @@ class CliModeOpenTheoryTest {
         val smt = File.createTempFile("clilra", ".smt2").apply {
             writeText(
                 """
+                (set-option :produce-models true)
                 (set-logic QF_LRA)
                 (declare-const x Real)
                 (assert (= x (/ 1.0 3.0)))
                 (check-sat)
+                (get-model)
                 """.trimIndent(),
             )
             deleteOnExit()
@@ -369,8 +371,8 @@ class CliModeOpenTheoryTest {
     fun `bounded SMT mixed model should preserve a nonterminating rational witness`() {
         val smt = File.createTempFile("clirational", ".smt2").apply {
             writeText(
-                """(set-logic QF_LIRA)
-(set-option :produce-models true)
+                """(set-option :produce-models true)
+(set-logic QF_LIRA)
 (declare-const x Real) (declare-const y Int) (assert (= (* 3 x) y)) (assert (> y 1)) (assert (< y 4)) (assert (distinct x 1))
 (check-sat)
 (get-model)
@@ -390,10 +392,12 @@ class CliModeOpenTheoryTest {
     private fun openSmt(): File = File.createTempFile("cliopenengine", ".smt2").apply {
         writeText(
             """
+            (set-option :produce-models true)
             (declare-const x Int)
             (declare-const y Int)
             (assert (<= (+ (* 2 x) y) 3))
             (check-sat)
+            (get-model)
             """.trimIndent(),
         )
         deleteOnExit()

@@ -93,6 +93,6 @@ private fun presolveSizeStatPairs(
     if (observed.isNotEmpty()) add(prefix + "Occurrences" to "${observed.sum()}")
 }
 
-internal fun printPresolveDiagnostics(stats: PresolveStats?) {
-    for ((key, value) in presolveStatPairs(SolveStats(presolve = stats))) printErrorLine("  $key=$value")
+internal fun printPresolveDiagnostics(stats: PresolveStats?, emit: (String) -> Unit = ::printErrorLine) {
+    for ((key, value) in presolveStatPairs(SolveStats(presolve = stats))) emit("  $key=$value")
 }

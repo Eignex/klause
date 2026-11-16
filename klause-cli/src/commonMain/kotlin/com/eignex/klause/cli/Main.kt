@@ -109,6 +109,7 @@ private fun run(args: Array<String>) {
     // the sampler cannot see backwards. Started only for that diagnostic, never on a solve path.
     if (EngineParams(common.engineParams).bool("dry-run-presolve") == true) startHeapPeakSampler()
     common.resetInvocationStatistics()
+    if (session.runCommands(path, common)) return
     val loadStart = nowMillis()
     val solvable = session.load(path, common)
     common.loadElapsedMs = nowMillis() - loadStart

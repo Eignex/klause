@@ -1,10 +1,14 @@
 package com.eignex.klause.cli
 
+import com.eignex.klause.formats.smtlib.SExprReader
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.smtlib.SmtLibSession
+import com.eignex.klause.formats.smtlib.SmtSessionModel
+import com.eignex.klause.formats.smtlib.reconstructSessionModel
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.formats.smtlib.smtRealTerm
 import com.eignex.klause.formats.smtlib.smtRealValue
-import com.eignex.klause.formats.smtlib.toSmtLib
+import com.eignex.klause.formats.smtlib.solveSmtRecursiveSession
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -15,6 +19,8 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.withBoundedPolling
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 import com.eignex.util.io.openTextFile
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.compareTo
@@ -25,9 +31,8 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeSource
 
 /**
- * SMT-LIB 2 front-end (`.smt2` / `.smt`; linear arithmetic and polynomial reals). Emits the SMT-LIB convention: a
- * `sat` / `unsat` / `unknown` status line, followed (when sat) by a `(get-model)`-style
- * `(define-fun …)` block. `-s` statistics are emitted as `;` comment lines.
+ * SMT-LIB command sessions (`.smt2` / `.smt`). Models require an explicit query
+ * solver statistics and objective observations use SMT-LIB comments.
  */
 internal object SmtLibMode : CliMode {
     override val names = listOf("smtlib", "smt", "smt2")
@@ -36,18 +41,67 @@ internal object SmtLibMode : CliMode {
 
     private class Session : ModeSession {
         private var latestSourceObjective: BigFraction? = null
+        private var latestInterpretation: SmtSessionModel? = null
 
         override fun flags(): List<FlagSpec> = emptyList()
 
-        override fun load(path: String, common: CommonOptions): Solvable {
+        override fun runCommands(path: String, common: CommonOptions): Boolean {
+            val source = openTextFile(path)
+            val stop = common.invocationCancellation().withBoundedPolling()
+            lateinit var session: SmtLibSession
+            var initialized = false
+            val previousDiagnostic = common.diagnostic
+            try {
+                session = SmtLibSession(
+                    solve = { text ->
+                        solveSmtRecursiveSession(text, solve = { snapshot ->
+                            common.resetInvocationStatistics()
+                            common.sourceSemantics = null
+                            val started = nowMillis()
+                            val solvable = loadSource({ StringCharSource(snapshot) }, path, common)
+                            common.loadElapsedMs = nowMillis() - started
+                            val observations = ArrayList<String>()
+                            val captured = SmtSessionOutput({ latestInterpretation }, observations::add,
+                                { latestSourceObjective })
+                            SolveCore.solve(solvable, common,
+                                captured.sourceQualified(common.sourceSemantics, ";", observations::add))
+                            captured.result().copy(observations = observations)
+                        }, cancellation = stop)
+                    },
+                    respond = ::println,
+                    cancellation = stop,
+                    diagnostic = previousDiagnostic,
+                    openAppend = ::openSmtSessionAppend,
+                    version = BuildInfo.VERSION,
+                )
+                initialized = true
+                common.diagnostic = session::diagnose
+                session.execute(SExprReader(source))
+            } catch (_: CancellationException) {
+                if (initialized) session.interrupt(
+                    if (common.timeLimitMs != null && stop()) "wall timeout" else "session interrupted",
+                )
+            } finally {
+                common.diagnostic = previousDiagnostic
+                if (initialized) session.close()
+                if (source is AutoCloseable) source.close()
+            }
+            return true
+        }
+
+        override fun load(path: String, common: CommonOptions): Solvable =
+            loadSource({ openTextFile(path) }, path, common)
+
+        private fun loadSource(openSource: () -> CharSource, path: String, common: CommonOptions): Solvable {
             val config = common.config
             val overrides = common.sourceOverrides(smtLibSemantics)
             latestSourceObjective = null
+            latestInterpretation = null
             val admissionStart = TimeSource.Monotonic.markNow()
             val stop = common.invocationCancellation().withBoundedPolling()
             val parsed = try {
                 SmtLib.parse(
-                    { openTextFile(path) },
+                    openSource,
                     settings = config.problemSettings(),
                     cancellation = stop,
                     semanticOverrides = overrides,
@@ -61,21 +115,23 @@ internal object SmtLibMode : CliMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
-            cliLogger(common.verbose).v {
+            cliLogger(common.verbose, common.diagnostic).v {
                 "parsed ${fileName(path)}: bool=${bools.size} int=${ints.size} real=${reals.size}"
             }
             val objective = parsed.objective?.toLinearObjective()
             return attachedSourceSolvable(
                 parsed.source,
                 common,
-                { assignment -> parsed.reconstructModel(assignment, stop).toSmtLib() },
+                { assignment ->
+                    parsed.reconstructSessionModel(assignment, stop).also { latestInterpretation = it }.render()
+                },
                 admissionStart.elapsedNow().inWholeMilliseconds,
                 parsed.quadraticObjective,
                 parsed.sense,
                 objective = objective,
                 renderFinite = { sample ->
                     latestSourceObjective = objective?.evaluateExact(sample)
-                    parsed.reconstructModel(sample, stop).toSmtLib()
+                    parsed.reconstructSessionModel(sample, stop).also { latestInterpretation = it }.render()
                 },
             )
         }

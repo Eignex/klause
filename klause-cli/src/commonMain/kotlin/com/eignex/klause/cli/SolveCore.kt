@@ -262,16 +262,17 @@ internal object SolveCore {
         elapsed: Duration,
         loadElapsedMs: Long?,
         constructionBakeElapsed: Duration,
+        emit: (String) -> Unit = ::printErrorLine,
     ) {
         val passes = stats?.passes.orEmpty()
-        printErrorLine("presolve dry-run:")
-        printPresolveDiagnostics(stats)
+        emit("presolve dry-run:")
+        printPresolveDiagnostics(stats, emit)
         // Heap after ingest, which is the quantity an OOM at `-Xmx` is about. Retained is what
         // the built problem holds; peak includes the transients the build passed through, so a large gap
         // points at a structure that is materialized and dropped rather than one that is kept.
         sampleHeap()?.let { heap ->
             val peak = heap.peakBytes?.let { "peak: ${it / MIB}MiB, " }.orEmpty()
-            printErrorLine(
+            emit(
                 "  heap retained: ${heap.retainedBytes / MIB}MiB, " +
                     "$peak" +
                     "committed: ${heap.committedBytes / MIB}MiB",
@@ -284,31 +285,31 @@ internal object SolveCore {
         val stepZeroBake = stats?.bakeElapsed ?: Duration.ZERO
         val bake = constructionBakeElapsed + stepZeroBake
         loadElapsedMs?.let { load ->
-            printErrorLine("  parse: ${(load - constructionBakeElapsed.inWholeMilliseconds).coerceAtLeast(0)}ms")
-            printErrorLine("  bake (step 0): $bake")
+            emit("  parse: ${(load - constructionBakeElapsed.inWholeMilliseconds).coerceAtLeast(0)}ms")
+            emit("  bake (step 0): $bake")
         }
         // Presolve passes alone (the step-0 bake is broken out above; for a deferred problem it is part
         // of the pipeline's wall time, so subtract it to leave the passes' own cost).
-        printErrorLine("  elapsed: ${elapsed - stepZeroBake}")
-        printErrorLine("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
-        printErrorLine("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
-        printErrorLine("  factors: ${original.factors.size} -> ${presolved.factors.size}")
-        printErrorLine("  int-domain span: ${spanText(original)} -> ${spanText(presolved)}")
-        printErrorLine("  open columns: ${openText(original)} -> ${openText(presolved)}")
-        printErrorLine("  theory-eligible columns: ${theoryText(original)} -> ${theoryText(presolved)}")
+        emit("  elapsed: ${elapsed - stepZeroBake}")
+        emit("  passes fired: ${if (passes.isEmpty()) "(none)" else passes.joinToString(", ")}")
+        emit("  bool vars: ${presolved.numBoolVars}, int vars: ${presolved.numIntVars}")
+        emit("  factors: ${original.factors.size} -> ${presolved.factors.size}")
+        emit("  int-domain span: ${spanText(original)} -> ${spanText(presolved)}")
+        emit("  open columns: ${openText(original)} -> ${openText(presolved)}")
+        emit("  theory-eligible columns: ${theoryText(original)} -> ${theoryText(presolved)}")
         val before = factorHistogram(original)
         val after = factorHistogram(presolved)
         for (kind in (before.keys + after.keys).sorted()) {
             val b = before[kind] ?: 0
             val a = after[kind] ?: 0
-            printErrorLine("  $kind: $b -> $a")
+            emit("  $kind: $b -> $a")
         }
         // The LP harvest's own contribution, isolated from the combinatorial passes whose net effect the
         // counts above conflate — the point of inspecting the LP presolve specifically.
         stats?.lpHarvest?.let { lp ->
             val dims = "relaxation ${lp.relaxationCols} cols / ${lp.relaxationRows} rows / ${lp.relaxationNnz} nnz"
             if (lp.skipped) {
-                printErrorLine("  lp-harvest: skipped ($dims over the size budget)")
+                emit("  lp-harvest: skipped ($dims over the size budget)")
             } else {
                 val parts = buildList {
                     if (lp.rootInfeasible) add("root-infeasible")
@@ -317,14 +318,14 @@ internal object SolveCore {
                     if (lp.constraintsRemoved > 0) add("removed ${lp.constraintsRemoved} redundant constraint(s)")
                     if (lp.equalitiesAdded > 0) add("added ${lp.equalitiesAdded} implied equality(ies)")
                 }
-                printErrorLine("  lp-harvest: ${parts.joinToString(", ")} ($dims)")
+                emit("  lp-harvest: ${parts.joinToString(", ")} ($dims)")
             }
         }
         // Read the verdict presolve already reached. Asking the problem for its own `baked` instead forces
         // a lazy that a rebuilt (already-folded) problem has never run, paying a fresh root fixpoint over
         // every factor after the summary has printed.
         if (stats?.infeasible == true) {
-            printErrorLine("  INFEASIBLE: presolve proved the problem unsatisfiable")
+            emit("  INFEASIBLE: presolve proved the problem unsatisfiable")
         }
     }
 
@@ -469,9 +470,9 @@ internal object SolveCore {
             allSolutions = common.allSolutions,
             solutionCap = common.solutionCap,
             deadlineExceeded = { fixed && deadline != null && nowMillis() > deadline },
-            onEvent = if (fixed) verboseListener(common.verbose) else null,
-            onPortfolioEvent = if (fixed) null else portfolioVerboseListener(common.verbose),
-            onPortfolioFault = if (fixed) null else ::warnPortfolioFault,
+            onEvent = if (fixed) verboseListener(common.verbose, common.diagnostic) else null,
+            onPortfolioEvent = if (fixed) null else portfolioVerboseListener(common.verbose, common.diagnostic),
+            onPortfolioFault = if (fixed) null else { fault -> warnPortfolioFault(fault, common.diagnostic) },
             toleranceCheck = toleranceCheck,
         )
     }
@@ -513,7 +514,7 @@ internal object SolveCore {
         }
         result.nativeGridOutcome?.let(output::onNativeGridOutcome)
         val preparation = result.preparation
-        cliLogger(common.verbose).v {
+        cliLogger(common.verbose, common.diagnostic).v {
             val p0 = solvable.finiteProblem
             val p1 = preparation.problem
             "presolve [${request.engine.id}]: factors ${p0.numFactors}→${p1.numFactors}, " +
@@ -529,14 +530,15 @@ internal object SolveCore {
                     result.preparationElapsed,
                     common.loadElapsedMs,
                     preparation.constructionBakeElapsed,
+                    common.diagnostic,
                 )
                 return
             }
 
             is FiniteSolveOutcome.DryRun -> {
                 output.begin(solvable.optimize, solvable.maximize)
-                printErrorLine(outcome.heading)
-                outcome.lines.forEach(::printErrorLine)
+                common.diagnostic(outcome.heading)
+                outcome.lines.forEach(common.diagnostic)
             }
 
             is FiniteSolveOutcome.Completed -> {
@@ -633,9 +635,9 @@ internal fun describeEvent(e: SearchEvent, t: Long, worker: String? = null): Str
 }
 
 /** Live-event listener for `-v`; null when not verbose so the engines skip observation. */
-internal fun verboseListener(verbose: Boolean): ((SearchEvent) -> Unit)? {
+internal fun verboseListener(verbose: Boolean, emit: (String) -> Unit = ::printErrorLine): ((SearchEvent) -> Unit)? {
     if (!verbose) return null
-    val log = cliLogger(verbose = true)
+    val log = cliLogger(verbose = true, emit = emit)
     val start = nowMillis()
     return { e -> log.v { describeEvent(e, nowMillis() - start) } }
 }
@@ -644,15 +646,17 @@ internal fun verboseListener(verbose: Boolean): ((SearchEvent) -> Unit)? {
  * Print a quarantined portfolio arm to stderr whatever the verbosity: an arm claiming a result the model refutes is a
  * bug in that arm's configuration, which the run survives but nobody should miss.
  */
-internal fun warnPortfolioFault(fault: ArmFault) {
-    printErrorLine("% WARNING: portfolio arm ${fault.workerLabel} quarantined: ${fault.reason}")
+internal fun warnPortfolioFault(fault: ArmFault, emit: (String) -> Unit = ::printErrorLine) {
+    emit("% WARNING: portfolio arm ${fault.workerLabel} quarantined: ${fault.reason}")
 }
 
 /** Per-worker `-v` listener for the portfolio paths. Workers run concurrently; the logger
  *  writes whole lines, which is the only shared state. */
-internal fun portfolioVerboseListener(verbose: Boolean): ((String, SearchEvent) -> Unit)? {
+internal fun portfolioVerboseListener(
+    verbose: Boolean, emit: (String) -> Unit = ::printErrorLine,
+): ((String, SearchEvent) -> Unit)? {
     if (!verbose) return null
-    val log = cliLogger(verbose = true)
+    val log = cliLogger(verbose = true, emit = emit)
     val start = nowMillis()
     return { worker, e -> log.v { describeEvent(e, nowMillis() - start, worker) } }
 }
