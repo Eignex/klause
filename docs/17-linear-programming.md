@@ -550,6 +550,12 @@ cancelled checks close nothing.
 A leaf relaxation and solve run under the search's cancellation and a work limit
 sized from the model, so a stopped leaf is indeterminate and a decided one keeps its
 verdict.
+For a positive-tolerance source, a request permitting tolerance acceptance can reject
+the leaf through `floatFarkasRay`, using the same numerical check as node pruning.
+The result carries numerical refutation separately from exact conflicts and certificates;
+an empty numerical ray rejects only the current leaf and supplies no learned clause.
+Fresh, retained and resumable leaf solves share this policy. Exact-only acceptance
+and exact repair requests require exact evidence.
 
 Finite optimization keeps a pinned real-leaf request across portfolio slices.
 The discrete assignment, assembled row authority, source encoding and required
@@ -790,8 +796,9 @@ owns these checks.
 LP results. The mode follows the format: the finite pipeline sets it only when the source
 declares a positive feasibility tolerance, which MPS and FlatZinc do by default. SMT-LIB, the
 other formats, sources without a declared tolerance and `--exact`, which zeroes the
-tolerance, keep exact certification. Open theories, source LP optimization and real leaf
-completion never read it; leaf witnesses follow the source tolerance.
+tolerance, keep exact certification. Real leaf completion reads it only when the caller
+also permits tolerance acceptance. Open theories and source LP optimization keep exact
+certification; leaf witnesses follow the source tolerance.
 
 Numerical deductions compute no certificate. `FloatDeductionCertificate` sums the
 Lagrangian `L(y)` from the float duals in binary64 and lowers it by that summation's
@@ -810,7 +817,7 @@ bounds. Each implying row is folded into the ray so its open column cancels, in 
 and then exactly on the rounded integer ray, slacks first. That ray must pass again against
 the box, each column at the side the exact sign of its combination meets, which is the side
 its clause cites; otherwise the node is refuted without a learned clause. It backs
-infeasibility pruning, learned conflicts and presolve root infeasibility. Mixed row
+infeasibility pruning, leaf refutation, learned conflicts and presolve root infeasibility. Mixed row
 projections, strict-row solves and component bounds have no numerical form and are skipped.
 Optimality, infeasibility and bound claims resting on these deductions are numerical. Under
 exact certification every deduction uses the packages below.

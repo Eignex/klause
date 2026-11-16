@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
+import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Power
 import com.eignex.klause.factor.arithmetic.RealProduct
@@ -10,6 +11,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceRealId
+import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.LpCertificationPolicy
 import com.eignex.klause.lp.engine.LpEngineFactory
 import com.eignex.klause.lp.engine.LpModel
@@ -22,8 +24,12 @@ import com.eignex.klause.lp.engine.ProductionLpEngineFactory
 import com.eignex.klause.lp.engine.solveAndCertify
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -32,6 +38,99 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
+    @Test
+    fun `numerical leaves should refute a wide row beyond exact certificate limits`() {
+        val scale = BIG_ONE shl 5000
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf<Factor>(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                    listOf(BigFraction.of(scale + BIG_ONE, BIG_ONE), BigFraction.of(scale, BIG_ONE)),
+                    LinearOp.EQ, BigFraction.ZERO),
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.EQ, 0L),
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(1), LinearOp.EQ, 1L),
+            ),
+            numRealVars = 2,
+            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY, Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
+        )
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val cases = listOf(false to LpVerdict.INDETERMINATE, true to LpVerdict.INFEASIBLE)
+        for ((numerical, verdict) in cases) {
+            val result = leafRealFeasibility(problem, null, sample,
+                context = LpSolveContext.finite(numerical), toleranceCheck = { true })
+
+            assertEquals(verdict, result.verdict)
+        }
+    }
+
+    @Test
+    fun `exact leaf requests should require exact infeasibility evidence`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.GE, 4L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val veto = LpCertificationPolicy { _, _ -> false }
+        val exact = LpSolveContext(certificationPolicy = veto)
+        val numerical = exact.copy(numericalDeductions = true)
+        val cases = listOf<Pair<LpSolveContext, ((Sample) -> Boolean)?>>(
+            exact to { true },
+            numerical to null,
+            numerical to FiniteSourceAcceptance({ true }, permitsToleranceOptimum = false),
+        )
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+
+        for ((context, check) in cases) {
+            assertEquals(LpVerdict.INDETERMINATE,
+                leafRealFeasibility(problem, null, sample, context = context, toleranceCheck = check).verdict)
+            LeafRealSolver(problem, null, context = context).use { owner ->
+                assertEquals(LpVerdict.INDETERMINATE, owner.solve(sample, toleranceCheck = check).verdict)
+                owner.openSolve(sample, toleranceCheck = check).use { cursor ->
+                    val step = assertIs<LpSolveStep.Completed<LeafRealResult>>(cursor.advance())
+                    assertEquals(LpVerdict.INDETERMINATE, step.value.verdict)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `numerical leaves should refute a checked float ray without exact evidence`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.GE, 4L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val context = LpSolveContext(
+            certificationPolicy = LpCertificationPolicy { _, _ -> false },
+            numericalDeductions = true,
+        )
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val objectives = listOf(null, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
+
+        for (objective in objectives) {
+            val fresh = leafRealFeasibility(problem, objective, sample, context = context, toleranceCheck = { true })
+            assertEquals(LpVerdict.INFEASIBLE, fresh.verdict)
+            LeafRealSolver(problem, objective, context = context).use { owner ->
+                assertEquals(LpVerdict.INFEASIBLE, owner.solve(sample, toleranceCheck = { true }).verdict)
+                owner.openSolve(sample, toleranceCheck = { true }).use { cursor ->
+                    var step = cursor.advance(1L)
+                    while (step is LpSolveStep.Paused) step = cursor.advance(1L)
+                    assertEquals(LpVerdict.INFEASIBLE,
+                        assertIs<LpSolveStep.Completed<LeafRealResult>>(step).value.verdict)
+                }
+            }
+        }
+    }
+
     @Test
     fun `releasing pending completion should permit fresh pins without stale coordinates`() {
         val problem = Problem(

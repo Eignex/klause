@@ -27,6 +27,7 @@ import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.floatingOptimumAcceptance
+import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.encodingSourceRealCount
 import com.eignex.klause.theory.finiteLinearModel
@@ -333,7 +334,8 @@ private class SampleDomains(private val sample: Sample) : RelaxationDomains {
  * [LpVerdict.UNBOUNDED] is an exact completion plus a ray of the reals along which [objective] descends
  * without limit, checked against the factors by [provesUnbounded]; a ray that check declines leaves the
  * completion as [LpVerdict.FEASIBLE];
- * [LpVerdict.INFEASIBLE] (exact Farkas) means no completion exists — the leaf must be rejected;
+ * [LpVerdict.INFEASIBLE] rejects the leaf by an exact conflict, or by the numerical ray check when the
+ * source and [toleranceCheck] permit numerical deductions;
  * [LpVerdict.INDETERMINATE] means neither could be certified within the 128-bit budget, so the leaf's
  * status is unknown and the terminal verdict must degrade to `unknown` rather than claim UNSAT/SAT.
  *
@@ -372,6 +374,7 @@ internal fun leafRealFeasibility(
         },
         floatOffset = relaxation.objectiveConstant.toDouble(),
         claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
+        acceptFloatInfeasibility = toleranceCheck.permitsToleranceOptimum(),
     )
     return relaxation.leafResult(certified, problem, objective, sample, sink)
         .checkedEncoding(encoded, sample, cancellation)
@@ -406,10 +409,11 @@ internal fun LpRelaxation.leafResult(
     } else exact
 }
 
-/** The factors behind the rows [certified]'s infeasibility proof combines: its exact conflict, else its Farkas ray. */
+/** The factors behind the rows [certified]'s conflict or citable ray combines. */
 internal fun LpRelaxation.factorsOf(certified: CertifiedLpResult): IntArray {
     val rows = certified.infeasibleRows
-        ?: certified.farkasRay?.let { ray -> ray.indices.filter { ray[it] != 0L }.toIntArray() }
+        ?: (certified.farkasRay ?: certified.floatInfeasibility)
+            ?.let { ray -> ray.indices.filter { ray[it] != 0L }.toIntArray() }
         ?: return emptyIntArray()
     val factors = IntArrayList()
     val seen = IntHashSet()

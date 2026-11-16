@@ -68,10 +68,13 @@ internal class CertifiedLpResult(
     // A float optimum accepted under tolerance semantics in place of exact evidence; its primal is not exact.
     val floatOptimum: FloatLpResult? = null,
     val certificationReused: Boolean = false,
+    // Numerical refutation only; an empty ray has no combination a learned clause can cite.
+    val floatInfeasibility: LongArray? = null,
 ) {
     val verdict: LpVerdict = when {
         floatOptimum != null -> LpVerdict.TOLERANCE_OPTIMUM
-        farkasRay != null || rationalConflict != null || boundConflict != null -> LpVerdict.INFEASIBLE
+        floatInfeasibility != null || farkasRay != null || rationalConflict != null || boundConflict != null ->
+            LpVerdict.INFEASIBLE
         unboundedness != null -> LpVerdict.UNBOUNDED
         witness != null && bound?.value == witness.objective -> LpVerdict.ATTAINED_OPTIMUM
         witness != null -> LpVerdict.FEASIBLE
@@ -176,13 +179,14 @@ internal fun solveAndCertify(
     floatAccept: ((FloatLpResult) -> Boolean)? = null,
     floatOffset: Double = 0.0,
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
+    acceptFloatInfeasibility: Boolean = false,
 ): CertifiedLpResult {
     if (claim == LpClaim.ATTAINED_OPTIMUM && floatAccept != null && workLimit == 0L &&
         model.exactState == null && model.floatProjectionAuthoritative()
     ) {
         return solveProjectedAndCertify(
             model, warm, cancellation, workLimit, componentSplit, observer, context, counterResults,
-            pricing, refinementLimits, floatAccept, floatOffset, claim,
+            pricing, refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility,
         )
     }
     val authoritative = if (model.exactState != null) {
@@ -207,7 +211,7 @@ internal fun solveAndCertify(
     val result = certifyAuthoritativeSolve(
         authoritative, warm, cancellation, workLimit, componentSplit, observer, context, counters, pricing,
         refinementLimits, floatAccept,
-        floatOffset, claim,
+        floatOffset, claim, acceptFloatInfeasibility,
     )
     return sourceCertifiedResult(
         model,
@@ -227,7 +231,7 @@ private fun sourceCertifiedResult(
     counterResults: LpCounterResults?,
     policy: LpCertificationPolicy,
 ): CertifiedLpResult {
-    if (result.floatOptimum != null) return result
+    if (result.floatOptimum != null || result.floatInfeasibility != null) return result
     if (authoritative !== model) {
         if ((result.witness?.let { checkedLpWitness(model, it.primal) } == null && result.witness != null) ||
             result.rationalConflict?.let { !checkedLpConflict(model, it) } == true || cancellation()
@@ -256,6 +260,7 @@ private fun solveProjectedAndCertify(
     floatAccept: (FloatLpResult) -> Boolean,
     floatOffset: Double,
     claim: LpClaim,
+    acceptFloatInfeasibility: Boolean,
 ): CertifiedLpResult = newLpSolver(
     model,
     cancellation,
@@ -271,6 +276,9 @@ private fun solveProjectedAndCertify(
         observer?.observeSolve(solver.lastMetrics, solver is ComponentLpSolverCapability)
     }
     if (cancellation()) return@use CertifiedLpResult(null, null, null, null, null, false, { null })
+    if (context.numericalDeductions && acceptFloatInfeasibility) {
+        numericalLpRefutation(model, solver, result, cancellation, observer)?.let { return@use it }
+    }
     var sourceRefused = false
     if (result != null && result.optimal) {
         val timer = LpPhaseTimer(observer, LpSolvePhase.SOURCE_FLOAT_ACCEPTANCE)
@@ -297,6 +305,7 @@ private fun solveProjectedAndCertify(
     val certified = certifyAuthoritativeSolve(
         authoritative, result?.basis ?: warm, cancellation, workLimit, componentSplit, observer, context, counters,
         pricing, refinementLimits, floatAccept.takeUnless { sourceRefused }, floatOffset, claim,
+        acceptFloatInfeasibility,
     )
     sourceCertifiedResult(model, authoritative, certified, cancellation, counterResults, context.certificationPolicy)
 }
@@ -315,6 +324,7 @@ private fun certifyAuthoritativeSolve(
     floatAccept: ((FloatLpResult) -> Boolean)?,
     floatOffset: Double,
     claim: LpClaim,
+    acceptFloatInfeasibility: Boolean,
 ): CertifiedLpResult = newLpSolver(
     model,
     cancellation,
@@ -332,7 +342,7 @@ private fun certifyAuthoritativeSolve(
     LpCertificationSession(context, pricing).use { certification ->
         certification.certify(
             model, solver, result, cancellation, observer, counterResults,
-            refinementLimits, floatAccept, floatOffset, claim,
+            refinementLimits, floatAccept, floatOffset, claim, acceptFloatInfeasibility,
         )
     }
 }
