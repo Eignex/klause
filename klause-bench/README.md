@@ -20,12 +20,6 @@ costs and report repeated infrastructure losses separately.
 Each requested selection must match at least one source. A selection with no matches
 fails preparation instead of publishing a reduced comparison plan.
 
-`bench.profile.ArithmeticCancellationProfile` runs deterministic arithmetic controls.
-Build its JVM classpath with `:klause:stageLpProfileJvm`, then invoke
-`com.eignex.klause.bench.profile.ArithmeticCancellationProfile` with `throughput`,
-`latency` or `overhead` through a lab profile command. It emits tab-separated work, output checksums,
-wall and thread CPU observations; retain the same harness, runtime and warmup in both arms.
-
 Planning stages every selected source before sealing include-directory identities.
 Execution verifies the planned file and directory identities before each solve.
 
@@ -105,14 +99,6 @@ retaining companion parameters. `verbose=true` requests logging; omission infers
 from those parameters. Quiet comparisons also use `debug=false`,
 `param.portfolio-progress=false` and `harness-jfr=false`. CLI statistics remain enabled.
 
-`bench.profile.LocalSearchTrajectory` accepts hash-pinned XCSP3 sources and
-`format=mps` for exactly retained pure-integer minimization sources.
-`preparationEngine=mixed|ls` selects the preparation route and `seed` its seed.
-`walkSeed` selects the private walk's seed, defaulting to `seed`; `moves`,
-`sliceMillis` and `sliceWork` bound the walk. Retain the emitted models,
-coordinate maps, completed moves and unfinished work when comparing slices.
-Profile timings and working-model checks do not qualify original-source performance.
-
 ## Private rebuild qualification capture
 
 Enable `param.root-simplification=true` and
@@ -130,21 +116,6 @@ Aggregated views can revisit the same facts. `ScratchBytes` is cumulative modele
 array allocation, not a peak; a view uses at most `18 * floor(visits / 10)` primitive
 bytes and retains no capture buffers. `CaptureWork` is included in root `Work` and
 worker work, not additional work to sum. Tiny grants may leave every scan partial.
-
-`deploy/lab cases ID --json | klause-bench/scripts/capture-private-rebuild.sh`
-extracts the source/build/resource identities, original outcomes/check receipts,
-existing P3 preparation and I2 lifecycle metrics, and a full-cost ledger. Keep the
-complete lab record and physical execution metadata beside the extracted view.
-No runtime rebuild is performed by capture. Unmeasured stages stay `null`, including
-reconstruction/source checks, lost warm state, import/publication and retirement;
-an absent consuming-worker count or memory peak is not zero. A replacement producer
-can supply `record.privateRebuildLifecycle` with disjoint `stageNs` in the named
-stages, modeled simultaneous owned/protected primitive bytes and reference slots,
-released obsolete generations and actual consuming workers. `totalNs` is withheld
-until all stages are observed; it excludes ordinary solve time, which remains
-separate. Do not sum overlapping preparation/inprocessing counters or sampled peaks.
-Whole-job active time must additionally include failed preparation, checking and
-artifact/retirement work from the lab job record.
 
 Qualification compares the same hashed source, seed, runtime, physical allocation
 and containing allowances with stable-ID work alone. Production activation requires
@@ -554,33 +525,7 @@ state without changing compiler flags or preparation resource caps.
 `lp-lifecycle-reuse-v1` selects the original mixed-integer `egout` MPS at the same
 pinned HiGHS revision, separately from the frozen overflow and held-out cohorts.
 
-`bench.profile.BooleanProofCoverageProfile` accepts `suite=ID problem=NAME sha256=HEX
-work=N seed=N splits=N` for one DIMACS source with at most 4,096 Boolean variables,
-one MiB of input and four partition variables. Submit it through the lab profile
-interface with `:klause-cli:installJvmDist` and `:klause-bench:installDist`, the JVM
-flags from the bench manifest and `-XX:ActiveProcessorCount=1`. Optional
-`cost-repeats=1..12` selects repeated cost captures. Set `slice-work` and
-`slice-max-work` explicitly when matching an invocation; their diagnostic defaults
-are 8 and 64.
-
-`bench.profile.BooleanProofSchedulerProfile` accepts
-`suite=ID problem=NAME sha256=HEX work=N seed=N splits=N repeats=N` with the same
-build and JVM settings. Optional `recipe=LABEL native=true|false` defaults to
-`input-order` and `false`. Select `driver=repair|satisfaction|portfolio|portfolio-probe`
-with default `repair`; `portfolio` requires `splits=2` and `portfolio-probe` requires
-`splits=1`. Use `control=tasks|replicas|paired` and `warmups=0|1` for separate controls;
-defaults are `paired` and `1`. `capture=overlap` requires a portfolio driver and
-`control=replicas`.
-
-For serial cold controls on Linux, submit `scripts/profile-boolean-proof-cold.sh`
-through a lab profile's `script` field with the same install build tasks and no
-main/classpath/jvmArgs. Pass the scheduler profile's source, work, driver, recipe
-and split arguments plus `seeds=1,3` and `cold-repeats=2`. Retain the output under
-`$OUT`; consult the lab's run guide for comparison and checking workflows.
-
-`lab/recipes/` contains the lab recipes. `scripts/convert-lab-recipe.sh`
-translates legacy experiments or schedules from stdin without submitting them;
-exact legacy confirmation lists require a newly pinned SDK plan and are refused.
+`lab/recipes/` contains the lab recipes.
 
 Profiles use `scripts/lab-profile.sh` with a main class as their first argument.
 The recipe declares build tasks; the script owns CLI paths, corpus properties and
@@ -759,36 +704,6 @@ separately from affine Table-column substitution and structural Table reduction.
 Use `portfolio-work` only for compatible mixed/LS worker comparisons, retain its
 logical trace, and distinguish emergency interruption from completed work.
 
-`bench.profile.RewriteStructureProfile` takes `suite=ID problem=NAME sha256=HEX
-presolve=CONFIG`. It captures each structure-control arm through production source
-and finite preparation, then reuses projected source hints, maintained definition
-networks and core/Table-hull LP assembly. Optional
-`orders=markowitz,rewrite_cost` compares those pivot policies with structure
-protection disabled instead of comparing blanket protection. At most two arms run.
-Optional `source64=BASE64` or `sourceGzip64=BASE64` supplies hash-checked source bytes
-through the existing trajectory input reader. The input receipt records source size,
-load time and cancellation before enforcing the capture's source bounds.
-Before/after model snapshots retain objective, domains, factor kinds, support and
-word-sized declared rows, charging the same consumer-diagnostic allowance without
-materializing structural keys.
-Each arm has a 30-second containing
-deadline, five million preparation work units and one million consumer-diagnostic
-units; the whole capture has 120 seconds. Sources, lowered coordinates and factors
-are capped before consumer preparation. The report retains actual maintained
-definitions/input edges/depth and emitted rows/columns/nonzeros. The forced LP
-views establish representation effects; ordinary worker admission and whole-source
-outcomes require separate adapter runs. Use `suite=rewrite-structure-v1` for the
-small affine Table control. The Element source under that identity retains a
-legacy start-index placement rejected by the independent checker; use
-`suite=rewrite-structure-canonical-v1 problem=element-cone` for its separately
-identified standard-list-index control.
-
-`bench.profile.AffineObjectiveProfile` accepts `batch64=` with a base64 JSON list
-of `suite=ID`, `problem=NAME`, `sha256=HEX` argument lists. Each list can add
-`presolve=CONFIG` and `pivotOrder=markowitz|rewrite_cost` to retain complete MPS
-residuals under those controls. Residual captures diagnose representation changes;
-they do not execute search or validate a source outcome.
-
 ## Corpus and build identity
 
 Compressed file inputs are staged with the corpus decoder by default.
@@ -830,25 +745,6 @@ the same source revision, seeds, resources and containing allowance. That contro
 retains delayed, unrefined core search. Keep actual admission/refinement consumption,
 checked outcomes and full preparation/checking/disposal costs; configured policy
 alone does not qualify production benefit.
-
-`bench.profile.WeightedSearchProfile` qualifies one hash-pinned WCNF/WBO source
-through ordinary finite preparation and retained core search. Arguments are
-`suite=ID problem=NAME sha256=HEX format=wcnf|wbo policy=ordinary|stratified|reasons|deletion
-timeout-ms=10000 work=250000 slice-work=200 seed=3`.
-Run it through the lab with a bounded profile allowance. It writes the original
-source, installed-build provenance, exact floor/core-weight/threshold and accepted
-incumbent trajectories, preparation/threshold/verification visits, query counts,
-traversal work and a summary including source preparation and disposal time.
-The summary retains slice count and final work after private retirement. Each
-accepted incumbent writes its reconstructed source and lowered Boolean values to
-`incumbent-N.json`, bound to the source hash and exact objective; array index `i`
-names source variable `i+1`. Capture admits at most 128 witnesses and two million
-Boolean values; exhaustion fails qualification instead of dropping witnesses.
-The timeout contains source preparation, native point checking and trajectory
-writing; these instrumented observations establish no throughput claim. Native
-Boolean point checks and native bound authority are separate from the lab's
-independent source checks and independently validated proofs. Use ordinary lab
-adapter runs for source-matched admission and primal controls.
 
 An adapter run requests `sourceValidation=true` and complete assignments; qualification
 requires an actual `VALID` receipt bound to the original source, witness, exact
@@ -923,32 +819,6 @@ source visits and invalidations, interval visits, retained declines and deductio
 LP work and certification counters and whole-process measurements retain the cost
 of numerical repair and final completion. The incremental route is the ordinary
 default; explicit false selects the comparison control.
-
-`LinearRootOpeningProfile` accepts `inspect=partial-row-activation` for a pinned
-SMT source. It compares the existing cached partial interval producer with the
-same producer plus literal-to-row assertion scheduling. Both arms use seed 1,
-one processor, a containing 100,000,000-unit open-work allowance and the same
-forty-second emergency deadline. This assertion-scheduling diagnostic uses
-individual-coordinate interval propagation in both arms; affine consequence
-delivery belongs to the ordinary combined-route controls. Fresh ordinary source
-preparation precedes each arm; exact prefix and continuation snapshots must agree. The profile reports row
-visits, literal touches, retracted assertions, compatible decline reuse, consumed
-guard implications, operation stops and producer/assertion/numerical time separately. These are
-direct library diagnostics; they supply neither a default CLI throughput claim nor
-independent whole-source proof validation. Run the main through the committed lab
-profile wrapper with CLI and bench installation tasks; retain pinned source bytes, preparation,
-build/runtime provenance and unsuccessful receipts beside the results.
-An optional `sourceGzip64` uses the existing 96 KiB encoded-input loader and the
-profile's 32 MiB source cap. Its decompressed bytes must match `sha256`; this lets
-a retained original source avoid a cold download of its entire catalog archive.
-`source-preparation.json` records that input mode and parsing cost. Packed source
-bytes and raw profile records belong in the external evidence directory.
-Failed child runs forward at most 16 KiB of their error stream to the parent log.
-Retained files and complete parent logs still require lab artifact publication.
-`inspect=partial-row-activation-control` runs the same cached producer in both
-arms with those limits and snapshot checks, isolating replay variation from row
-scheduling. Open-work units count policy decisions and checks; they do not count
-primitive arithmetic operations or replace preparation and numerical timings.
 
 `lp-component-split` supplies existing separable MPS and MiniZinc sources plus
 `mzn-linked-8x24` as a connected control. For immutable node lifecycle controls use
@@ -1086,15 +956,13 @@ Source optimization exposes the corresponding `CertificationCLAIM_*` stage entri
 
 ### LP lifecycle profiles
 
-Submit the scripts below as lab profile jobs using the
+Submit the script below as a lab profile job using the
 [eignex-lab run guide](https://github.com/Eignex/eignex-lab/blob/main/docs/runs.md).
 They require Linux x86_64; the lab supplies `LAB_WORKTREE` and `OUT`.
 
 | Script under `scripts/` | Arguments |
 |---|---|
 | `lp-lifecycle-profile.sh` | `mps-NAME [repeats] [jvm\|native\|both] [mode] [source-sha256 highs-revision]` |
-| `lp-lifecycle-qualification.sh` | `jvm\|native [repeats]` |
-| `lp-template-preparation-profile.sh` | `cover-2x3\|cover-3x3\|miplib3-p0033\|miplib3-mod008\|miplib3-p0201 [repeats] [steps] [standalone\|retained] [changes] [jfr\|none]` |
 
 Lifecycle repeats range from one to five and default to three. Available modes are
 `lifecycle`, `claims`, `precision`, `checkpoint`, `checkpoint-feasibility` and
@@ -1104,35 +972,7 @@ both their original SHA-256 and full HiGHS revision.
 For JVM profiles, request `:klause:stageLpProfileJvm` as the lab build task.
 For Native profiles, request `:klause:linkLpProfileReleaseExecutableLinuxX64`.
 Prepare only the target used by a separate runtime job. Combined preparation links
-Native before staging JVM profiles. Template preparation profiles use the JVM task.
-
-`DefinitionValuesProfile` compares the production definition cache's Boolean validity
-array with equivalent packed `Bits` storage. It runs three fresh JVMs, warms both
-arms, alternates their order across seven pairs, and verifies evaluation checksums,
-final values and pending definitions outside timing. Each pair uses identical inputs
-and operation counts. Sequential and random reads cover 64, 4,096 and 65,536 nodes
-with cached, mixed-invalidation and reset-heavy workloads. Flag byte counts exclude
-object headers and the unchanged values and pending-bit storage. These microbenchmarks
-do not establish solver throughput or Native performance.
-
-```sh
-deploy/lab profile --repo Eignex/klause --build :klause:stageLpProfileJvm \
-  --classpath klause/build/lp-profile/jvm/classes \
-  --classpath 'klause/build/lp-profile/jvm/lib/*' \
-  com.eignex.klause.bench.profile.DefinitionValuesProfile REF 'Definition cache flags'
-```
-
-MIPLIB template profiles also require `:klause-bench:installDist`.
-
-Template changes are comma-separated `cold,unchanged,bound,objective,row,cancel,affine,namespace,finite,origin,guard`;
-omitting them selects all changes. Recording defaults to `jfr`. Use `none` for
-uninstrumented preparation and consuming-LP measurements; `recording.txt` retains
-the choice, and allocation-sample extraction runs only with JFR. Direct lifecycle
-measurements do not establish ordinary CLI source performance or independent source proofs.
-
-The qualification script runs Afiro, Adlittle, Avgas and Blending sequentially in
-`checkpoint-feasibility` mode, retaining one output directory per source. Profile
-records are diagnostics; use ordinary source-validated lab runs for source results.
+Native before staging JVM profiles.
 
 ### Bounded sparse admission trials
 
