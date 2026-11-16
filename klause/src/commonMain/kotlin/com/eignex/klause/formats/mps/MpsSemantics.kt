@@ -7,17 +7,19 @@ import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
+import com.eignex.klause.ir.numericalOptimalityTolerance
 import com.eignex.klause.ir.numericalSourceTolerance
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 
-/** Decimal authority, wholly unranged declaration defaults and an absolute source feasibility slack. */
+/** Decimal authority, wholly unranged declaration defaults, an absolute feasibility slack and an optimality gap. */
 val mpsSemantics: SourceSemantics = SourceSemantics(
     format = SourceFormat.MPS,
     numericAuthority = NumericAuthority.DECIMAL_LITERALS,
     undeclaredIntegers = UndeclaredIntegerBounds(0, 1),
     undeclaredReals = UndeclaredRealBounds(lower = SemanticRational.ZERO),
     feasibilityTolerance = numericalSourceTolerance,
+    optimalityTolerance = numericalOptimalityTolerance,
 )
 
 internal fun MpsModel.effectiveVariableBounds(

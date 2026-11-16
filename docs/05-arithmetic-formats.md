@@ -36,7 +36,11 @@ defaults.
 MPS defaults to `SourceTolerance(absolute=1/10000000)`: an absolute slack with no
 relative component. Each component can be replaced independently. Zero in both requires
 exact checks and certificates, including exact finite LP certification; a positive
-component makes finite LP deductions numerical. `--exact` sets the tolerance to zero.
+component makes finite LP deductions numerical. MPS also declares
+`OptimalityTolerance(absolute=1/10000000, relative=1/10000)`: a relative gap of
+`1e-4`, the customary MIP gap, with the feasibility slack as its absolute floor,
+since an accepted point is uncertain by that slack already. `--exact` sets both
+tolerances to zero.
 The CLI captures one
 [linear source snapshot](#source-correspondence) and registers it with the common
 invocation, which owns preparation, validation and result qualification. Slack and
@@ -88,8 +92,11 @@ With positive feasibility tolerance, completed native optimization and refutatio
 report `OPTIMUM FOUND` and `UNSATISFIABLE` under numerical certification policy.
 They do not require a separate proof over the feasible set enlarged by tolerance.
 The final optimizing point must pass original-source checks, its objective must
-agree with the native value within captured source slack, and the native terminal
-must cover the unrestricted model. Interrupted search, rejected terminal witnesses
+agree with the native optimal value within the optimality gap, and the native
+terminal must cover the unrestricted model. The gap judges only that agreement, so
+two evaluations of one optimum that differ by rounding at a large objective
+magnitude still report the optimum; it never ends search or accepts an unproved
+bound. Interrupted search, rejected terminal witnesses
 and restricted acceptance filters cannot supply these native completion claims.
 
 `optimizationStatus=tolerance-optimum` identifies numerical optimality. An exact

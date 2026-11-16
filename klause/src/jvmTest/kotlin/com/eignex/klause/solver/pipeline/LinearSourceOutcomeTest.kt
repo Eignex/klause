@@ -5,6 +5,7 @@ import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.LinearSourceRow
 import com.eignex.klause.ir.LinearSourceTerm
 import com.eignex.klause.ir.LinearSourceVariable
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
@@ -34,6 +35,10 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
     private val tolerance = if (exact) SourceTolerance() else SourceTolerance(
         absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
     )
+    private val gap = if (exact) OptimalityTolerance() else OptimalityTolerance(
+        absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
+        relative = SemanticRational.of(BIG_ONE, bigIntOf(10_000)),
+    )
 
     @Test
     fun `a checked terminal optimum should retain its source units under the selected policy`() {
@@ -42,7 +47,7 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
             listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ofLong(2))),
             emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0,
                 SemanticRational.of(tenth.num, tenth.den)))),
-            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance, optimalityTolerance = gap).resolve(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
@@ -67,7 +72,7 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ofLong(2))),
             emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
-            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance, optimalityTolerance = gap).resolve(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
@@ -95,7 +100,7 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ofLong(2))),
             emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
-            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance, optimalityTolerance = gap).resolve(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
@@ -112,11 +117,48 @@ class LinearSourceOutcomeTest(private val exact: Boolean) {
     }
 
     @Test
+    fun `a large optimum differing from its incumbent by rounding should be optimal under the numerical gap`() {
+        val billion = BigFraction.ofLong(1_000_000_000)
+
+        val conclusion = nativeOptimumConclusion(billion + BigFraction.ofLong(1_000).reciprocal(), billion)
+
+        val expected = if (exact) LinearSourceConclusion.SATISFIABLE else LinearSourceConclusion.OPTIMAL
+        assertEquals(expected, conclusion)
+    }
+
+    @Test
+    fun `an incumbent worse than the native optimum beyond the gap should not be optimal`() {
+        val billion = BigFraction.ofLong(1_000_000_000)
+
+        val conclusion = nativeOptimumConclusion(BigFraction.ofLong(1_000_200_000), billion)
+
+        assertEquals(LinearSourceConclusion.SATISFIABLE, conclusion)
+    }
+
+    private fun nativeOptimumConclusion(value: BigFraction, optimum: BigFraction): LinearSourceConclusion {
+        val source = LinearSourceProblem(
+            listOf(LinearSourceVariable("x", false, SemanticRational.ofLong(1_000_000_000))),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance, optimalityTolerance = gap).resolve(),
+        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(value.toDouble(), optimum.toDouble()),
+            exactReals = listOf(value, optimum))
+        val native = OpenTheoryExecution.Optimize(OpenTheoryOptimum.Optimal(
+            OpenTheoryAssignment.Sampled(point), optimum, SolveStats.EMPTY))
+        val result = executeLinearSource(SourceExecutionRequest(invocation), SourceExecutionCallbacks()) { _, _, _ ->
+            SourceExecutionResult.Linear(invocation, native)
+        }
+        return assertNotNull(result.linearSource).conclusion
+    }
+
+    @Test
     fun `a source better incumbent should retain numerical optimality at a tied native cost`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ofLong(2))),
             emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
-            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance).resolve(),
+            SourceSemantics(SourceFormat.MPS, feasibilityTolerance = tolerance, optimalityTolerance = gap).resolve(),
         )
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))

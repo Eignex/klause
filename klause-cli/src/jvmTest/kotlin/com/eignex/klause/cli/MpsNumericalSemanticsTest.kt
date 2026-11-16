@@ -40,8 +40,8 @@ class MpsNumericalSemanticsTest {
 
         assertContains(exported, "\"schema\":\"mps-decimal-semantics-v1\"")
         assertContains(exported, "\"numericAuthority\":\"DECIMAL_LITERALS\"")
-        assertEquals(2, Regex("\"absolute\":\"1/10000000\"").findAll(exported).count())
-        assertEquals(2, Regex("\"relative\":\"0/1\"").findAll(exported).count())
+        val feasibility = "\"feasibilityTolerance\":{\"absolute\":\"1/10000000\",\"relative\":\"0/1\"}"
+        assertEquals(2, Regex.fromLiteral(feasibility).findAll(exported).count())
         assertContains(exported, "\"undeclaredIntegers\":{\"lower\":\"0\",\"upper\":\"1\"}")
         assertContains(exported, "\"undeclaredReals\":{\"lower\":\"0/1\",\"upper\":null}")
         assertContains(exported, "\"integrality\":\"exact\",\"objective\":\"exact\"")
@@ -53,8 +53,28 @@ class MpsNumericalSemanticsTest {
 
         val exported = mpsNumericalSemantics(policy)
 
-        assertEquals(1, Regex("\"absolute\":\"1/10000000\"").findAll(exported).count())
-        assertEquals(1, Regex("\"absolute\":\"0/1\"").findAll(exported).count())
-        assertContains(exported.substringAfter("\"effective\":"), "\"relative\":\"0/1\"")
+        assertContains(exported.substringBefore("\"effective\":"),
+            "\"feasibilityTolerance\":{\"absolute\":\"1/10000000\",\"relative\":\"0/1\"}")
+        assertContains(exported.substringAfter("\"effective\":"),
+            "\"feasibilityTolerance\":{\"absolute\":\"0/1\",\"relative\":\"0/1\"}")
+    }
+
+    @Test
+    fun `default MPS policy should declare a relative optimality gap with the feasibility floor`() {
+        val exported = mpsNumericalSemantics(mpsSemantics.resolve())
+
+        val gap = "\"optimalityTolerance\":{\"absolute\":\"1/10000000\",\"relative\":\"1/10000\"}"
+        assertEquals(2, Regex.fromLiteral(gap).findAll(exported).count())
+    }
+
+    @Test
+    fun `exact MPS loading should print a zero optimality gap`() {
+        val options = CommonOptions().apply { exact = true }
+
+        options.sourceOverrides(mpsSemantics)
+
+        val exported = mpsNumericalSemantics(checkNotNull(options.sourceSemantics))
+        assertContains(exported.substringAfter("\"effective\":"),
+            "\"optimalityTolerance\":{\"absolute\":\"0/1\",\"relative\":\"0/1\"}")
     }
 }

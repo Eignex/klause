@@ -9,10 +9,10 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
-import com.eignex.klause.solver.validation.capturedSourceSlack
 import com.eignex.klause.solver.validation.checkLinearSourceRecession
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.solver.validation.levelLinearSourceRay
+import com.eignex.klause.solver.validation.withinOptimalityGap
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -420,21 +420,8 @@ private fun PreparedLinearSource.matchesNativeObjective(
 ): Boolean {
     val value = point.objective ?: return false
     val native = nativeValue?.let { it * view.objectiveScale.reciprocal() } ?: return false
-    val difference = (value - native).magnitude()
-    if (difference.isZero) return !stop()
-    val objective = view.source.objective ?: return false
-    val policy = view.source.semantics.effective.feasibilityTolerance
-    if (policy == null || policy.isExact) return false
-    val values = point.values
-    var magnitude = native.magnitude() + BigFraction.of(objective.constant.numerator, objective.constant.denominator)
-        .magnitude()
-    for (term in objective.terms) {
-        stop.charge(1L)
-        if (stop()) return false
-        magnitude += (BigFraction.of(term.coefficient.numerator, term.coefficient.denominator) * values[term.column])
-            .magnitude()
-    }
-    return !stop() && difference <= capturedSourceSlack(policy, native, magnitude)
+    val policy = view.source.semantics.effective.optimalityTolerance
+    return withinOptimalityGap(policy, value, native) && !stop()
 }
 
 // A working ray proves the source unbounded as read, or once leveled onto the exact rows its projection keeps level.
@@ -447,5 +434,3 @@ private fun PreparedLinearSource.sourceRay(direction: List<BigFraction>): List<B
     if (direction.size != view.model.numRealVars) return null
     return view.columns.map { if (Term.isReal(it)) direction[Term.realVar(it)] else BigFraction.ZERO }
 }
-
-private fun BigFraction.magnitude(): BigFraction = if (signum() < 0) negated() else this

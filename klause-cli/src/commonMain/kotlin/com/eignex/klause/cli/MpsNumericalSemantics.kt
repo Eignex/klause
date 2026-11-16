@@ -16,9 +16,13 @@ private fun mpsPolicy(policy: SourceSemantics): String {
         "\"${it.numerator}/${it.denominator}\""
     } ?: "null"
     fun integer(value: Long?): String = value?.let { "\"$it\"" } ?: "null"
+    val gap = policy.optimalityTolerance?.let {
+        "{\"absolute\":${rational(it.absolute)},\"relative\":${rational(it.relative)}}"
+    } ?: "null"
     return "{\"numericAuthority\":\"${policy.numericAuthority}\"," +
         "\"feasibilityTolerance\":{\"absolute\":${rational(tolerance.absolute)}," +
         "\"relative\":${rational(tolerance.relative)}}," +
+        "\"optimalityTolerance\":$gap," +
         "\"undeclaredIntegers\":{\"lower\":${integer(integers.lower)},\"upper\":${integer(integers.upper)}}," +
         "\"undeclaredReals\":{\"lower\":${rational(reals.lower)},\"upper\":${rational(reals.upper)}}," +
         "\"integrality\":\"exact\",\"objective\":\"exact\"}"

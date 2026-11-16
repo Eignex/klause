@@ -5,6 +5,7 @@ import com.eignex.klause.ir.DomainStorageSettings
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.NumericAuthority
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
@@ -110,6 +111,7 @@ internal class SourceSemanticsDocument(
     val undeclaredReals: RationalRangeDocument? = null,
     val feasibilityTolerance: ToleranceDocument? = null,
     val pinAbsentOptionalValues: Boolean? = null,
+    val optimalityTolerance: ToleranceDocument? = null,
 ) {
     fun toSemantics(): SourceSemantics = SourceSemantics(
         format = format,
@@ -119,6 +121,7 @@ internal class SourceSemanticsDocument(
         undeclaredReals = undeclaredReals?.let { UndeclaredRealBounds(it.lower, it.upper) },
         feasibilityTolerance = feasibilityTolerance?.let { SourceTolerance(it.absolute, it.relative) },
         pinAbsentOptionalValues = pinAbsentOptionalValues,
+        optimalityTolerance = optimalityTolerance?.let { OptimalityTolerance(it.absolute, it.relative) },
     )
 
     companion object {
@@ -130,6 +133,7 @@ internal class SourceSemanticsDocument(
             undeclaredReals = semantics.undeclaredReals?.let { RationalRangeDocument(it.lower, it.upper) },
             feasibilityTolerance = semantics.feasibilityTolerance?.let { ToleranceDocument(it.absolute, it.relative) },
             pinAbsentOptionalValues = semantics.pinAbsentOptionalValues,
+            optimalityTolerance = semantics.optimalityTolerance?.let { ToleranceDocument(it.absolute, it.relative) },
         )
     }
 }

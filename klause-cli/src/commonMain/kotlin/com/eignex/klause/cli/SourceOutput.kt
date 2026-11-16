@@ -48,6 +48,10 @@ private fun sourcePolicyText(semantics: EffectiveSourceSemantics): String = buil
         add("absolute-tolerance=${it.absolute.policyText()}")
         add("relative-tolerance=${it.relative.policyText()}")
     }
+    source.optimalityTolerance?.let {
+        add("absolute-optimality-tolerance=${it.absolute.policyText()}")
+        add("relative-optimality-tolerance=${it.relative.policyText()}")
+    }
     source.pinAbsentOptionalValues?.let { add("pin-absent-optional-values=$it") }
 }.joinToString(" ")
 
