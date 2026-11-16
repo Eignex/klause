@@ -246,6 +246,31 @@ class SmtGroundFunctionsTest {
     }
 
     @Test
+    fun `ground function defaults remain coherent across independent retained interpretations`() {
+        val parsed = SmtLib.parse("""
+            (declare-fun f (Bool) Bool)
+            (declare-fun g (Bool) Bool)
+            (define-sort Flag () Bool)
+            (declare-fun unused (Flag) Flag)
+            (assert (f true))
+            (assert (not (g true)))
+        """.trimIndent())
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
+        val interpretations = parsed.reconstructModel(assignment).values.associate { it.first.name to it.second }
+        val model = parsed.reconstructSessionModel(assignment)
+
+        assertEquals("true", model.evaluate(SExprReader("(f true)").readAll().single()))
+        assertEquals("false", model.evaluate(SExprReader("(g true)").readAll().single()))
+        for (name in listOf("f", "g", "unused")) {
+            val function = assertIs<SmtValue.Function>(interpretations.getValue(name))
+            assertEquals(listOf(SmtSort.Bool), function.parameters)
+            val default = assertIs<SmtValue.Boolean>(function.default).toSmtLib()
+            assertEquals(default, model.evaluate(SExprReader("($name false)").readAll().single()))
+        }
+    }
+
+    @Test
     fun `macro expansion and parallel lets preserve their lexical bindings`() {
         val parsed = SmtLib.parse("""
             (declare-sort U 0)

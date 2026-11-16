@@ -201,6 +201,8 @@ are equal, including exact arithmetic arguments. Only free sort identities recei
 finite representative domains; interpreted arithmetic domains remain open. Model
 recipes restore original ranks, typed domain values, function entries and total
 defaults while public scalar maps retain original scalar sorts.
+Unobserved arguments share an observed result as the total default at the same
+function rank; functions without applications receive a fresh typed result.
 
 Global sort parameters retain their universal source obligations. Necessary ground
 instances can refute them; finite instance satisfaction alone supplies no SAT

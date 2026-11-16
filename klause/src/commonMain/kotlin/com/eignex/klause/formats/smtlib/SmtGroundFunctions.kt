@@ -34,7 +34,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
     private data class Application(val arguments: List<String>, val result: String)
     private data class Binding(val version: Int, val term: Term? = null, val function: Function? = null,
         val macro: Macro? = null)
-    private class Function(val id: Int, val declaration: SmtSourceDeclaration, val default: String) {
+    private class Function(val id: Int, val declaration: SmtSourceDeclaration, val declarationIndex: Int) {
         val applications = ArrayList<Application>()
     }
     private data class Macro(val parameters: List<String>, val sorts: List<SmtSort>, val result: SmtSort,
@@ -104,6 +104,22 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                 else -> output += expression
             }
         }
+        val deferredDeclarations = HashMap<Int, MutableList<SExpr>>()
+        val defaults = functions.values.associateWith { function ->
+            step()
+            // Congruence fixes observed tuples; every other tuple may share any result at this rank.
+            function.applications.firstOrNull()?.result ?: (freshValue(function.declaration.result,
+                deferredDeclarations.getOrPut(function.declarationIndex) { ArrayList() }).expression as SExpr.Atom).text
+        }
+        if (deferredDeclarations.isNotEmpty()) {
+            val commands = output.toList()
+            output.clear()
+            for (index in 0..commands.size) {
+                step()
+                deferredDeclarations[index]?.let(output::addAll)
+                if (index < commands.size) output += commands[index]
+            }
+        }
         val bounds = ArrayList<SExpr>()
         for ((_, names) in identities) {
             val upper = atom((names.size - 1).toString()).expression
@@ -124,7 +140,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
             val entries = function.applications.map { it.arguments.toList() to it.result }
             val original = sourceBindings[name]
             val recipe = GroundFunctionReconstruction((original?.declaration ?: declaration).parameters.toList(),
-                entries, function.default)
+                entries, defaults.getValue(function))
             if (original == null) privateBindings[declaration.name] = recipe
             else sourceBindings[name] = original.copy(reconstruction = recipe)
         }
@@ -154,8 +170,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         val declaration = SmtSourceDeclaration((command.items[1] as SExpr.Atom).text, parameters,
             sortScope.sourceSort(command.items.last()))
         if (declaration.parameters.isNotEmpty()) {
-            val default = (freshValue(declaration.result).expression as SExpr.Atom).text
-            val function = Function(functions.size, declaration, default)
+            val function = Function(functions.size, declaration, output.size)
             functions[name] = function
             bindings[name] = Binding(bindings.size, function = function)
             return
@@ -338,7 +353,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         return result
     }
 
-    private fun freshValue(sort: SmtSort): Term {
+    private fun freshValue(sort: SmtSort, declarations: MutableList<SExpr> = output): Term {
         step()
         var name: String
         do {
@@ -346,7 +361,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
             name = "@klause.uf.${nextName++}"
         } while (!usedNames.add(name))
         val encodedSort = if (encodeUninterpreted && sort is SmtSort.Uninterpreted) SmtSort.Int else sort
-        output += groundCommand("declare-const", SExpr.Atom(name), sortExpression(encodedSort))
+        declarations += groundCommand("declare-const", SExpr.Atom(name), sortExpression(encodedSort))
         privateBindings[name] = if (encodeUninterpreted && sort is SmtSort.Uninterpreted) {
             sort.checkpointStructure(cancellation)
             val names = identities.getOrPut(sort) { ArrayList() }
