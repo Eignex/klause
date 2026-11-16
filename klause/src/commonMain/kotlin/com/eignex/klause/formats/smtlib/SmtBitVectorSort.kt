@@ -49,7 +49,7 @@ internal fun smtBitVectorOperatorSort(operator: String, arguments: List<SmtSort>
 
 internal fun smtIndexedBitVectorSort(indexed: SExpr.SList, arguments: List<SmtSort>): SmtSort? {
     if ((indexed.items.firstOrNull() as? SExpr.Atom)?.text != "_") return null
-    val operator = (indexed.items.getOrNull(1) as? SExpr.Atom)?.text ?: return null
+    val operator = (indexed.items.getOrNull(1) as? SExpr.Atom)?.text?.let(::polynomialSymbol) ?: return null
     val indices = indexed.items.drop(2).map {
         val text = (it as? SExpr.Atom)?.text ?: return null
         if (text.isEmpty() || text.any { digit -> digit !in '0'..'9' }) return null

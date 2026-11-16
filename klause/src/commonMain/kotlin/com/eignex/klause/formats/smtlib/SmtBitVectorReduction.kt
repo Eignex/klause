@@ -137,13 +137,13 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             when (val expression = pending.removeLast()) {
                 is SExpr.Atom -> {
                     reserved.add(polynomialSymbol(expression.text))
-                    if (expression.text == "BitVec" || expression.text.startsWith("#b") ||
+                    if (polynomialSymbol(expression.text) == "BitVec" || expression.text.startsWith("#b") ||
                         expression.text.startsWith("#x")) active = true
                 }
                 is SExpr.SList -> {
                     pending.addAll(expression.items)
-                    if (head(expression) == "_" &&
-                        (expression.items.getOrNull(1) as? SExpr.Atom)?.text?.startsWith("bv") == true) active = true
+                    if (head(expression) == "_" && (expression.items.getOrNull(1) as? SExpr.Atom)
+                            ?.text?.let(::polynomialSymbol)?.startsWith("bv") == true) active = true
                 }
             }
         }
@@ -467,7 +467,7 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
 
     private fun indexedOperation(indexed: SExpr.SList, arguments: List<Value>): Value {
         if (head(indexed) != "_") smtUnsupported("malformed indexed operator")
-        val operator = symbol(indexed.items.getOrNull(1))
+        val operator = polynomialSymbol(symbol(indexed.items.getOrNull(1)))
         val rawIndices = indexed.items.drop(2)
         arity(arguments, 1)
         if (operator == "divisible") {
@@ -562,7 +562,7 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
 
     private fun indexedLiteral(expression: SExpr.SList): Value {
         if (expression.items.size != 3) smtUnsupported("invalid indexed bitvector literal")
-        val numeral = symbol(expression.items[1])
+        val numeral = polynomialSymbol(symbol(expression.items[1]))
         if (!numeral.startsWith("bv")) smtUnsupported("unknown indexed constant")
         val digits = numeral.drop(2)
         if (digits.isEmpty() || digits.any { it !in '0'..'9' }) smtUnsupported("invalid bitvector numeral")
@@ -579,9 +579,10 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
     }
 
     private fun type(expression: SExpr): Type = when (expression) {
-        is SExpr.Atom -> Type.Scalar(expression.text)
+        is SExpr.Atom -> Type.Scalar(polynomialSymbol(expression.text))
         is SExpr.SList -> {
-            if (expression.items.size != 3 || head(expression) != "_" || symbol(expression.items[1]) != "BitVec") {
+            if (expression.items.size != 3 || head(expression) != "_" ||
+                polynomialSymbol(symbol(expression.items[1])) != "BitVec") {
                 smtUnsupported("non-scalar sort must be reduced before bitvectors")
             }
             val width = index(expression.items[2])

@@ -141,6 +141,58 @@ class SmtLibBitVectorTest {
     }
 
     @Test
+    fun `quoted indexed bitvector symbols should preserve their bare meanings`() {
+        val parsed = SmtLib.parse("(declare-const b (_ |BitVec| 2)) (assert (= b (_ |bv1| 2))) " +
+            "(assert (= ((_ |extract| 0 0) b) #b1)) " +
+            "(assert (= ((_ |rotate_left| 1) b) #b10)) " +
+            "(assert (= ((_ |rotate_right| 1) b) #b10)) " +
+            "(assert (= ((_ |zero_extend| 1) b) #b001)) " +
+            "(assert (= ((_ |sign_extend| 1) b) #b001)) " +
+            "(assert (= ((_ |repeat| 2) b) #b0101)) " +
+            "(assert (= ((_ |int_to_bv| 2) 1) b))")
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
+
+        assertEquals(SmtValue.BitVector("01"), parsed.reconstructModel(assignment).values.single().second)
+    }
+
+    @Test
+    fun `quoted indexed extraction should refute contradictory source bits`() {
+        val parsed = SmtLib.parse("(declare-const b (_ |BitVec| 1)) (assert (= b (_ |bv1| 1))) " +
+            "(assert (= ((_ |extract| 0 0) b) #b0))")
+
+        assertIs<OpenTheoryResult.Unsat>(BacktrackSolver.source(parsed.model).solve())
+    }
+
+    @Test
+    fun `quoted bitvector syntax should activate reduction without bare bitvector tokens`() {
+        val sources = listOf(
+            "(declare-const b (_ |BitVec| 1))",
+            "(assert (= (_ |bv1| 1) (_ |bv1| 1)))",
+        )
+
+        for (source in sources) {
+            val parsed = SmtLib.parse(source)
+
+            assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve(), source)
+        }
+    }
+
+    @Test
+    fun `quoted numeral indexes should remain invalid bitvector syntax`() {
+        val sources = listOf(
+            "(declare-const b (_ |BitVec| |1|))",
+            "(assert (= (_ |bv1| |1|) #b1))",
+            "(assert (= ((_ |extract| |0| 0) #b1) #b1))",
+            "(assert (= ((_ |rotate_left| |1|) #b1) #b1))",
+            "(assert (= ((_ |zero_extend| |0|) #b1) #b1))",
+            "(assert (= ((_ |int_to_bv| |1|) 1) #b1))",
+        )
+
+        for (source in sources) assertFailsWith<UnsupportedSmtException>(source) { SmtLib.parse(source) }
+    }
+
+    @Test
     fun `bitvector helpers should retain unused scalar argument domains`() {
         val bodies = listOf(
             "(define-fun f ((x Real)) Bool true) (assert (f (log 0)))",
