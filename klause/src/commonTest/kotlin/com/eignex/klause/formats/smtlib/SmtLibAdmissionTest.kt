@@ -42,6 +42,26 @@ import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
     @Test
+    fun `scalar let sharing should keep the lowered model proportional to the source`() {
+        val levels = 4
+        val text = buildString {
+            append("(set-logic QF_IDL) (declare-const x Int) ")
+            repeat(levels) { append("(declare-const p$it Bool) ") }
+            append("(assert (let ((b0 (< x 1))) ")
+            for (level in 1..levels) {
+                append("(let ((b$level (ite p${level - 1} b${level - 1} (not b${level - 1})))) ")
+            }
+            append("b$levels")
+            repeat(levels + 2) { append(')') }
+        }
+
+        val source = SmtLib.parse(text)
+
+        assertTrue(source.model.numBoolVars <= levels * 8 + 2,
+            "Shared scalar source created ${source.model.numBoolVars} Boolean variables")
+    }
+
+    @Test
     fun `bounded polling should stop admission at its exact work allowance`() {
         val budget = PresolveBudget(1)
 
