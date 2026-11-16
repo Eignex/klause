@@ -122,7 +122,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
             step()
             val frame = work.removeLast()
             when (val expression = frame.expression) {
-                is SExpr.Atom -> values.addLast(symbols[polynomialSymbol(expression.text)] ?: literal(expression))
+                is SExpr.Atom -> values.addLast(if (arrayLexicalLiteral(expression.text)) literal(expression)
+                    else symbols[polynomialSymbol(expression.text)] ?: literal(expression))
                 is SExpr.SList -> if (expression.polynomialHead() == "_") {
                     val width = expression.polynomialAtom(2).toInt()
                     values.addLast(raw(expression, SmtSort.BitVector(width)))
@@ -139,22 +140,27 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     }
 
     private fun combine(head: SExpr, args: List<Term>): Term {
-        val name = (head as? SExpr.Atom)?.text
+        val resolved = arrayBuiltinIdentifier(head)
+        val name = (resolved as? SExpr.Atom)?.text
+        name?.let(symbols::get)?.let { binding ->
+            if (args.isEmpty()) return binding
+            smtUnsupported("a constant cannot be applied to arguments")
+        }
         return when {
             name == "select" -> read(args[0], capture(args[1]))
             name == "store" -> {
                 val index = capture(args[1])
                 registerIndex(index, args[0].sort as SmtSort.Array)
-                array(head, listOf(args[0], index, capture(args[2])), args[0].sort as SmtSort.Array, "store")
+                array(resolved, listOf(args[0], index, capture(args[2])), args[0].sort as SmtSort.Array, "store")
             }
-            name == "ite" && args[1].sort is SmtSort.Array -> array(head,
+            name == "ite" && args[1].sort is SmtSort.Array -> array(resolved,
                 listOf(capture(args[0]), args[1], args[2]), args[1].sort as SmtSort.Array, "ite")
             name in setOf("=", "distinct") && args[0].sort is SmtSort.Array -> {
                 val comparisons = if (name == "=") args.zipWithNext().map { equal(it.first, it.second) }
                     else args.indices.flatMap { i -> (i + 1 until args.size).map { j -> form("not", equal(args[i], args[j])) } }
                 intern(SExpr.Atom("and"), comparisons.map { raw(it, SmtSort.Bool) }, SmtSort.Bool)
             }
-            else -> intern(head, args, resultSort(head, args.map { it.sort }))
+            else -> intern(resolved, args, resultSort(resolved, args.map { it.sort }))
         }
     }
 
@@ -252,7 +258,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
 
     private fun capture(term: Term): Term {
         if (term.sort is SmtSort.Array || term.expression is SExpr.Atom &&
-            polynomialSymbol(term.expression.text) in symbols) return term
+            !arrayLexicalLiteral(term.expression.text) && polynomialSymbol(term.expression.text) in symbols) return term
         return captures.getOrPut(term.id) {
             fresh(term.sort).also { axioms += assertion(form("=", it.expression, term.expression)) }
         }
@@ -284,7 +290,9 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         return atom(text, sort)
     }
 
-    private fun atom(name: String, sort: SmtSort): Term = atoms.getOrPut(polynomialSymbol(name) to sort) {
+    private fun atom(name: String, sort: SmtSort): Term = atoms.getOrPut(
+        (if (arrayLexicalLiteral(name)) "literal:$name" else "symbol:${polynomialSymbol(name)}") to sort,
+    ) {
         raw(SExpr.Atom(name), sort)
     }
     private fun raw(expression: SExpr, sort: SmtSort): Term = Term(nextTerm++, sort, expression)
@@ -402,6 +410,18 @@ private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
         else -> if (SmtSort.Real in args) SmtSort.Real else args.firstOrNull() ?: SmtSort.Int
     }
 }
+
+private fun arrayLexicalLiteral(text: String): Boolean = text in setOf("true", "false") ||
+    text.isNotEmpty() && text[0] in '0'..'9' || text.startsWith('#')
+
+private fun arrayBuiltinIdentifier(head: SExpr): SExpr = when (head) {
+    is SExpr.Atom -> SExpr.Atom(polynomialSymbol(head.text))
+    is SExpr.SList -> if (head.polynomialHead() == "as") arrayBuiltinIdentifier(head.items[1])
+        else SExpr.SList(head.items.mapIndexed { index, part ->
+            if (index <= 1 && part is SExpr.Atom) SExpr.Atom(polynomialSymbol(part.text)) else part
+        })
+}
+
 private fun form(head: String, vararg args: SExpr): SExpr.SList = form(SExpr.Atom(head), *args)
 private fun form(head: SExpr, vararg args: SExpr): SExpr.SList = SExpr.SList(listOf(head) + args)
 private fun assertion(expression: SExpr): SExpr.SList = form("assert", expression)

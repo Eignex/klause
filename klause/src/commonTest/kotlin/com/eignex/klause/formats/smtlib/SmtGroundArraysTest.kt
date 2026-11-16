@@ -147,6 +147,68 @@ class SmtGroundArraysTest {
     }
 
     @Test
+    fun `quoted numeral symbols should remain distinct from literals`() {
+        val formulas = listOf(
+            "(assert (= (select a false) 0)) (assert (= (select a false) |0|))",
+            "(assert (= (select (store a false 0) false) |0|))",
+            "(assert (= 0 |0|))",
+        )
+        for (formula in formulas) {
+            val source = source("(declare-const a (Array Bool Int)) (declare-const |0| Int) " +
+                "(assert (= |0| 1)) $formula")
+
+            val result = BacktrackSolver.source(source.model).solve()
+
+            assertIs<OpenTheoryResult.Unsat>(result, formula)
+        }
+    }
+
+    @Test
+    fun `quoted numeral symbols should retain their values beside literal array stores`() {
+        val source = source("(declare-const a (Array Bool Int)) (declare-const |0| Int) " +
+            "(assert (= |0| 1)) (assert (= (select (store a false 0) false) 0))")
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve()).assignment
+        val model = source.reconstructModel(assignment)
+
+        assertEquals(SmtValue.Integer("1"), model.values.single { it.first.name == "|0|" }.second)
+    }
+
+    @Test
+    fun `quoted and qualified array builtins should preserve their resolved meanings`() {
+        val heads = listOf(
+            listOf("|select|", "|store|", "|ite|", "|=|"),
+            listOf("(as select Bool)", "(as store (Array Bool Bool))", "(as ite (Array Bool Bool))", "(as = Bool)"),
+        )
+        for ((select, store, ite, equality) in heads) {
+            val formulas = listOf(
+                "(not ($select ($ite true ($store a true true) a) true))",
+                "(not ($equality a a))",
+            )
+            for (formula in formulas) {
+                val source = source("(declare-const a (Array Bool Bool)) (assert $formula)")
+
+                val result = BacktrackSolver.source(source.model).solve()
+
+                assertIs<OpenTheoryResult.Unsat>(result, formula)
+            }
+        }
+    }
+
+    @Test
+    fun `qualified array conditionals should reconstruct productive source models`() {
+        val source = source("(declare-const a (Array Bool Bool)) (assert (not (select a true))) " +
+            "(assert ((as select Bool) ((as ite (Array Bool Bool)) true " +
+            "((as store (Array Bool Bool)) a true true) a) true))")
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve()).assignment
+        val model = source.reconstructModel(assignment)
+
+        val array = assertIs<SmtValue.Array>(model.values.single().second)
+        assertEquals(SmtValue.Boolean(false), array.entries.last { it.first == SmtValue.Boolean(true) }.second)
+    }
+
+    @Test
     fun `cancellation should interrupt array closure before publication`() {
         val input = captureSmtSource(SExprReader("(declare-const a (Array Bool Bool))").readAll(), Cancellation.Never)
 
