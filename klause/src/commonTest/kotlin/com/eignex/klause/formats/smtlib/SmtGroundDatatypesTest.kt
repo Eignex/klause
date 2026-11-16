@@ -81,7 +81,7 @@ class SmtGroundDatatypesTest {
     fun `mutually recursive cycles are refuted`() {
         val parsed = SmtLib.parse("""
             (declare-datatypes ((A 0) (B 0))
-                (((a0) (a (b B))) ((b0) (b (a A)))))
+                (((a0) (a (toB B))) ((b0) (b (toA A)))))
             (declare-const x A)
             (declare-const y B)
             (assert (= x (a y)))

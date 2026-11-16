@@ -310,7 +310,8 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     }
 
     private fun capture(term: Term): Term {
-        if (term.expression is SExpr.Atom && polynomialSymbol(term.expression.text) in symbols) return term
+        if (term.expression is SExpr.Atom && !lexicalLiteral(term.expression.text) &&
+            polynomialSymbol(term.expression.text) in symbols) return term
         return fresh(term.sort).also { axioms += form("assert", form("=", it.expression, term.expression)) }
     }
 
