@@ -25,8 +25,6 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import kotlin.time.TimeSource
 
-// Presolve reduces its source exactly, so a source the polynomial encoding widens by its slack enters the theory
-// unreduced: an exact reduction would refute or tighten what the slack admits.
 internal fun PolynomialTheoryRequest.prepareSource(
     config: PresolveConfig,
     objective: LinearObjective?,
@@ -34,9 +32,7 @@ internal fun PolynomialTheoryRequest.prepareSource(
     containingStop: ExecutionControl,
     budget: PresolveBudget?,
     solutionSetSensitive: Boolean = false,
-): PreparedSource = if (resolvedModel().tolerance != null) {
-    PreparedSource.unchanged(resolvedModel().source, budget)
-} else PresolvePipeline.prepareSource(
+): PreparedSource = PresolvePipeline.prepareSource(
     resolvedModel().source, config, objective, solutionSetSensitive, preparationStop or containingStop,
     presolveBudget = budget,
 )
@@ -114,50 +110,39 @@ internal fun PolynomialTheoryRequest.reconstructSource(
         } ?: return null
     }
     val tolerance = sourceTolerance ?: return lifted
-    // A rational point is judged by the source acceptance. An algebraic one is judged by the widened formula, whose
-    // region lies inside that acceptance relation by relation.
-    val rationals = lifted.exactReals ?: lifted.algebraicReals?.map { it.rational }
-    val accepted = if (rationals != null && rationals.none { it == null }) {
-        val exact = rationals.map { checkNotNull(it) }
-        val point = lifted.copy(reals = DoubleArray(exact.size) { exact[it].toDouble() }, exactReals = exact)
-        tolerance.accepts(point, verification) is Verification.Accepted
-    } else {
-        checkQuadraticSourceWitness(originalPlan, lifted, verification, limits) == SourceEvidenceCheck.Checked
-    }
-    return if (accepted) lifted.withNearestReals(verification, limits) else null
+    // A widened witness may use the slack, so the float point it publishes is the one the source acceptance judges.
+    val published = lifted.withNearestReals(verification, limits) ?: return null
+    return published.takeIf { tolerance.accepts(it, verification) is Verification.Accepted }
 }
 
-// This point with each algebraic real coordinate published as its nearest binary64 value. The isolating interval is
-// bisected until both endpoints round to one value, which the root between them then rounds to as well, and the
-// narrowed interval is kept so that every reader of the exact coordinate rounds it the same way. A stopped or
-// declined refinement keeps the captured approximation, since the exact coordinate remains the witness.
-private fun Sample.withNearestReals(cancellation: ExecutionControl, limits: PolynomialLimits): Sample {
-    val algebraic = algebraicReals?.toMutableList() ?: return this
-    if (algebraic.all { it.rational != null }) return this
-    val reals = DoubleArray(numRealVars) { approximateRealValue(it) }
+// This point with each real coordinate published as its nearest binary64 value and no rational authority, so that an
+// acceptance check reads exactly the floats a frontend prints. An algebraic interval is bisected until both endpoints
+// round to one value, which the root between them then rounds to as well; the narrowed interval is kept so every
+// reader rounds the coordinate the same way, and an interval still split after the step limit publishes its
+// midpoint. Null when refinement stops or declines, since no float point is then known.
+private fun Sample.withNearestReals(cancellation: ExecutionControl, limits: PolynomialLimits): Sample? {
+    val reals = DoubleArray(numRealVars) { id -> exactReals?.get(id)?.toDouble() ?: approximateRealValue(id) }
+    val algebraic = algebraicReals?.toMutableList() ?: return copy(reals = reals)
     try {
         val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation, limits))
         for (id in algebraic.indices) {
             var remaining = NEAREST_REAL_REFINEMENTS
-            while (remaining-- > 0) {
+            while (true) {
                 val current = algebraic[id]
                 val exact = current.rational
-                if (exact != null) {
-                    reals[id] = exact.toDouble()
-                    break
-                }
                 val lower = current.lowerBound.toDouble()
-                if (lower == current.upperBound.toDouble()) {
-                    reals[id] = lower
+                val upper = current.upperBound.toDouble()
+                if (exact != null || lower == upper || remaining-- == 0) {
+                    reals[id] = exact?.toDouble() ?: (lower / 2 + upper / 2)
                     break
                 }
                 algebraic[id] = arithmetic.refine(current)
             }
         }
     } catch (_: PolynomialInterrupted) {
-        return this
+        return null
     } catch (_: PolynomialResourceLimit) {
-        return this
+        return null
     }
     return copy(reals = reals, algebraicReals = algebraic)
 }

@@ -190,22 +190,42 @@ internal class RealToleranceScope private constructor(
     }
 }
 
-// Whether this relation over real coordinates has a tolerance reading, as [RealToleranceScope] defines it.
-internal fun Factor.hasToleranceReading(): Boolean = when (this) {
-    is LinearIndicator, is RealFiniteDomain, is RealAbs, is RealArrayMinMax, is RealElement, is RealProduct,
-    is ContinuousProduct, is Distinct -> true
-    is Power -> base is Power.Coordinate.Real
+// How [RealToleranceScope] reads a relation over real coordinates. A relation without a reading holds its component
+// exactly.
+internal enum class ToleranceReading {
+    // Active non-strict rows within the slack; strict rows, disequalities and false activators exactly.
+    ROWS,
+
+    // `r = f(x)` as the residual row `r - f(x) = 0`, or a finite membership within the slack of a member.
+    COORDINATES,
+
+    // Distinctness, held exactly.
+    EXACT,
+}
+
+internal fun Factor.toleranceReading(): ToleranceReading? = when (this) {
+    is Distinct -> ToleranceReading.EXACT
+    is RealFiniteDomain, is RealAbs, is RealArrayMinMax, is RealElement, is RealProduct, is ContinuousProduct ->
+        ToleranceReading.COORDINATES
+    is Power -> if (base is Power.Coordinate.Real) ToleranceReading.COORDINATES else null
+    is LinearIndicator -> ToleranceReading.ROWS
     else -> when (val form = linearForm) {
-        is LinearForm.Conjunction -> true
-        is LinearForm.Disjunction -> form.rows.count { it.relation == LinearOp.EQ } <= 1
-        else -> false
+        is LinearForm.Conjunction -> ToleranceReading.ROWS
+        is LinearForm.Disjunction ->
+            if (form.rows.count { it.relation == LinearOp.EQ } <= 1) ToleranceReading.ROWS else null
+        else -> null
     }
 }
 
-// The real coordinates a relation stated as `r = f(x)` reads within the slack, as [RealToleranceScope] defines it:
-// the result, and for a product with finite choices the operand that selects a member. Null for a relation read as
-// rows or held exactly, and for one whose read coordinate also states an operand.
+// Whether this relation over real coordinates has a tolerance reading, as [RealToleranceScope] defines it.
+internal fun Factor.hasToleranceReading(): Boolean = toleranceReading() != null
+
+// The coordinates a relation read through its coordinates holds within the slack, as [RealToleranceScope] defines it:
+// the result of `r = f(x)`, for a product with finite choices also the operand that selects a member, and the
+// coordinate of a finite membership. Null for any other reading, and for a relation whose read coordinate also states
+// an operand.
 internal fun Factor.slackCoordinates(): IntArray? {
+    if (toleranceReading() != ToleranceReading.COORDINATES) return null
     val (read, operands) = when (this) {
         is RealAbs -> intArrayOf(result) to intArrayOf(operand)
         is RealArrayMinMax -> intArrayOf(result) to xs
@@ -214,21 +234,12 @@ internal fun Factor.slackCoordinates(): IntArray? {
         is ContinuousProduct -> finiteChoices?.let { choices ->
             intArrayOf(result, choices.operand) to intArrayOf(if (choices.operand == a) b else a)
         } ?: (intArrayOf(result) to intArrayOf(a, b))
-        is Power -> if (base !is Power.Coordinate.Real) return null else {
-            intArrayOf((result as Power.Coordinate.Real).id.index) to intArrayOf(base.id.index)
-        }
+        is Power -> intArrayOf((result as Power.Coordinate.Real).id.index) to
+            intArrayOf((base as Power.Coordinate.Real).id.index)
         is RealFiniteDomain -> intArrayOf(variable) to intArrayOf()
         else -> return null
     }
     return read.takeIf { read.distinct().size == read.size && read.none { it in operands } }
-}
-
-// Whether [RealToleranceScope] reads this relation as rows, rather than as a membership, a distinctness or a relation
-// stated as `r = f(x)`.
-internal val Factor.readsAsRows: Boolean get() = when (this) {
-    is Distinct, is RealFiniteDomain, is RealAbs, is RealArrayMinMax, is RealElement, is RealProduct,
-    is ContinuousProduct, is Power -> false
-    else -> true
 }
 
 // Whether an active row reads the slack: a strict row and a disequality hold exactly.

@@ -403,13 +403,15 @@ reified row, whose false side is a strict complement), since leaf completion att
 no supremum, and when all solutions are requested. A source the finite lane cannot
 complete, such as one with an extremum or an open integer, routes to the linear theory
 and is decided exactly. A real product without finite choices or a power above one
-routes to the polynomial theory, which decides a
-[widened formula](16-nonlinear-arithmetic.md#tolerance-widened-formulas): every
-declaration and relation of a tolerance component holds within the absolute slack, and
-every other relation exactly. A relation whose result is also one of its operands, such
-as `float_times(x, z, z)`, keeps its exact encoding. The widened region lies inside what
-acceptance admits, so a refutation shows that no point holds every relation within the
-absolute slack; a relative tolerance widens acceptance but not that decision. Completed
+routes to the polynomial theory, which decides the exact formula first: its witness,
+optimum or unboundedness stands. Only an exact refutation hands the remaining budget to a
+[widened formula](16-nonlinear-arithmetic.md#tolerance-widened-formulas), which reads the
+slack where acceptance does with the slack acceptance grants at a zero bound; a relation
+whose result is also one of its operands, such as `float_times(x, z, z)`, stays exact
+there although acceptance reads it within the slack. A widened witness is published only
+when its printed floats pass acceptance, and a widened refutation is the verdict. When the
+widened decision reaches a limit, or finds no point whose floats acceptance admits, the
+exact refutation stands; that refutation is not proved under the tolerance. Completed
 search reports its optimum or refutation under this numerical policy.
 
 `--exact` zeroes the tolerance, so completion and LP certification are exact. It

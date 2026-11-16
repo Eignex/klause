@@ -91,7 +91,8 @@ internal class QuadraticWorkerAdapter(
         if (rootPrepared) return
         val before = native.work
         try {
-            quadraticBoxBound(model.source, objective, assumptions, sense,
+            // A widened formula admits points outside the declared box, which then bounds nothing.
+            if (model.tolerance == null) quadraticBoxBound(model.source, objective, assumptions, sense,
                 completion.algebraic.arithmetic::step)?.let {
                 val value = completion.algebraic.rational(it.first)
                 if (!native.stopped) rootBound = QuadraticObjectiveBound(value, false,

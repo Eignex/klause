@@ -531,6 +531,7 @@ internal fun Problem.preparePolynomialExecutionPlan(
     providers: FactorProjectionProviders = FactorProjectionProviders.Default,
     projections: PreparedFactorProjections = providers.prepare(this),
     cancellation: ExecutionControl = ExecutionControl.Never,
+    widening: PolynomialTolerance? = null,
 ): PreparedSourcePlan {
     projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
@@ -546,7 +547,7 @@ internal fun Problem.preparePolynomialExecutionPlan(
     val polynomial = if (openInteger) {
         null
     } else {
-        SharedPolynomialModel.lower(this, sourceFormula, projections, cancellation) { encodingDecline = it }
+        SharedPolynomialModel.lower(this, sourceFormula, projections, cancellation, widening) { encodingDecline = it }
     }
     val cause = when {
         cancellation() || encodingDecline == EncoderDecline.RESOURCE -> PreparedPlanDecline.RESOURCE

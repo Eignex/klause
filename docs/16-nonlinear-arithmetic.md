@@ -247,25 +247,30 @@ Rejected heuristic candidates never establish a global refutation.
 
 #### Tolerance-widened formulas
 
-A factor source that declares a positive absolute feasibility tolerance is lowered
-widened by `PolynomialTolerance`, following the readings of
-[source acceptance](04-finite-formats.md#flatzinc-floats). In each tolerance component,
-an active non-strict row becomes the band of the absolute slack around its right-hand
-side, while a false activator keeps the exact complement. A relation stated as
-`r = f(x)` keeps its exact encoding over a private `r'` and adds
-`abs(r - r') <= slack`; a product with finite choices also moves its selecting operand,
-and a membership its variable. Declarations widen by the same slack and leave the
-fixed-coordinate substitution. Strict rows, disequalities, distinctness, relations of
-exact components and a relation whose result is also an operand stay exact. SMT-LIB
-sources and a zero tolerance keep the exact formula.
+A factor source routed here decides its exact formula first, presolve included, and an
+exact witness, optimum or unboundedness is final. When that formula is refuted and the
+source declares a positive feasibility tolerance, `PolynomialTolerance` lowers the
+unpresolved source again, widened along the readings of
+[source acceptance](04-finite-formats.md#flatzinc-floats) by the slack acceptance grants
+at a zero bound. In each tolerance component an active non-strict row becomes a band of
+that slack around its right-hand side, while a false activator keeps the exact
+complement. A relation stated as `r = f(x)` keeps its exact encoding over a private `r'`
+and adds `abs(r - r') <= slack`; a product with finite choices also moves its selecting
+operand, and a membership its variable. Declarations widen by the same slack and leave
+the fixed-coordinate substitution. Strict rows, disequalities, distinctness, relations
+of exact components and a relation whose result is also an operand stay exact. Presolve
+does not run on the widened source, because its reductions are exact, and the root
+objective bound from the declared box is withheld. SMT-LIB and linear sources, quadratic
+objectives and a zero tolerance never widen.
 
-The procedure decides the widened formula exactly; its constants stay rational and its
-bands non-strict. Bands replace row equalities and fixed declarations by
-full-dimensional regions that equational reduction cannot eliminate, so projection and
-lifting grow, and optima lie on band boundaries. Presolve does not run on a widened
-source, because its reductions are exact. A witness with rational coordinates must pass
-the source acceptance; an algebraic witness must satisfy the widened formula, whose
-region lies inside that acceptance.
+The procedure decides the widened formula exactly in what remains of the invocation's
+budget. Bands replace row equalities and fixed declarations by full-dimensional regions
+that equational reduction cannot eliminate, so projection and lifting grow, and widened
+points lie on band boundaries. A widened witness is published at the nearest floats of
+its coordinates, and only when those floats pass the source acceptance. When every point
+found rounds outside it, a band shrunk by 2^-8 of the slack supplies the point; its
+optimum is published as the best point found. A widened refutation is the verdict. A
+widened decision that reaches a limit, or publishes no point, keeps the exact refutation.
 
 #### Conditioned theory service
 
