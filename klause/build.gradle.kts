@@ -7,8 +7,15 @@ eignexBuild { jvmToolchain.set(25) }
 
 tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
     testLogging.events = testLogging.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED
+    testLogging.info.events = testLogging.info.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED
     testLogging.showStandardStreams = true
     testLogging.exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest>().configureEach {
+    val repetitions = providers.gradleProperty("nativeTestRepeat").orNull?.toInt() ?: 1
+    require(repetitions in 1..5) { "nativeTestRepeat must be between 1 and 5" }
+    if (repetitions > 1) args = args + "--ktest_repeat=$repetitions"
 }
 
 // Coverage belongs to this solver; instrumenting dependencies adds startup work unrelated to its report.
