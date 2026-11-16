@@ -23,9 +23,18 @@ import com.eignex.util.collections.Bits
 internal fun Compiler.Builder.inferBounds() {
     if (intNames.isEmpty()) return
     // null = unbounded on that side (-inf for lo, +inf for hi); no sentinel magnitude.
-    val bounds = requireNotNull(semantics.effective.undeclaredIntegers)
-    val lo = Array<Long?>(nextInt) { bounds.lower }
-    val hi = Array<Long?>(nextInt) { bounds.upper }
+    val lo = Array<Long?>(nextInt) { v ->
+        when (val domain = intDomains[v]) {
+            is PresolveDomain.Finite -> domain.domain.min
+            is PresolveDomain.Open -> domain.lo
+        }
+    }
+    val hi = Array<Long?>(nextInt) { v ->
+        when (val domain = intDomains[v]) {
+            is PresolveDomain.Finite -> domain.domain.max
+            is PresolveDomain.Open -> domain.hi
+        }
+    }
     val relations = boundPremises.apply { clear() }
     inferringBounds = true
     try {

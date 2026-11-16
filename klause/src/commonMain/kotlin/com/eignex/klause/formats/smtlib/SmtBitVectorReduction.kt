@@ -9,6 +9,7 @@ import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.div
+import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.rem
 import com.eignex.util.numbers.shl
@@ -22,6 +23,21 @@ internal data class SmtBitVectorReduction(
 
 internal fun reduceSmtBitVectors(commands: List<SExpr>, cancellation: Cancellation): SmtBitVectorReduction =
     SmtBitVectorReducer(commands, cancellation).reduce()
+
+internal fun lowerSmtBitVectors(source: SmtReduction, cancellation: Cancellation): SmtReduction {
+    val lowered = reduceSmtBitVectors(source.commands, cancellation)
+    val recipes = lowered.bitNames.mapValues { SmtReconstruction.Bits(it.value) }
+        .mapKeys { polynomialSymbol(it.key) }
+    val bindings = source.bindings.map { binding ->
+        val recipe = recipes[polynomialSymbol(binding.declaration.name)]
+        if (recipe == null) binding else binding.copy(reconstruction = recipe)
+    }
+    return source.copy(commands = lowered.commands, bindings = bindings,
+        privateBindings = source.privateBindings + recipes,
+        checks = source.checks + lowered.checks.map { check ->
+            SmtSourceCheck { values -> check.check(values::boolean, values::integer, values::checkpoint) }
+        })
+}
 
 private class SmtBitVectorReducer(private val source: List<SExpr>, private val cancellation: Cancellation) {
     private sealed interface Type {
@@ -65,7 +81,7 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
     private val reserved = HashSet<String>()
     private var nextName = 0
     private var gateCount = 0
-    private var workCount = 0
+    private var workCount = 0L
     private val checks = ArrayList<SmtBitVectorCheck>()
     private val gateCache = HashMap<SExpr, SExpr>()
     private val zero = atom("false")
@@ -302,7 +318,8 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             "and", "or", "not", "xor", "=>", "=", "distinct", "<", "<=", ">", ">=", "is_int" -> boolType
             "to_int", "div", "mod", "abs", "ubv_to_int", "sbv_to_int" -> intType
             "to_real", "/", "exp", "log", "sin", "cos" -> realType
-            "ite" -> arguments.getOrNull(1)?.type as? Type.Scalar ?: smtUnsupported("malformed ite")
+            "ite" -> if (arguments.drop(1).any { it.type == realType }) realType
+                else arguments.getOrNull(1)?.type as? Type.Scalar ?: smtUnsupported("malformed ite")
             else -> if (arguments.any { it.type == realType }) realType else intType
         }
         return Value.Scalar(form(operator, *args.toTypedArray()), resultType)
@@ -317,7 +334,7 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         }
         val operands = arguments.map(::bits)
         val unary = operator in setOf("bvnot", "bvneg", "bvnego", "bvredor", "bvredand")
-        val associative = operator in setOf("bvand", "bvor", "bvadd", "bvmul")
+        val associative = operator in setOf("bvand", "bvor", "bvxor", "bvadd", "bvmul")
         if (unary) arity(arguments, 1) else if (associative) {
             if (arguments.size < 2) smtUnsupported("'$operator' requires at least two operands")
         } else arity(arguments, 2)
@@ -333,7 +350,7 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             "bvneg" -> circuit.negate(left)
             "bvand" -> operands.reduce(circuit::and)
             "bvor" -> operands.reduce(circuit::or)
-            "bvxor" -> circuit.xor(left, right)
+            "bvxor" -> operands.reduce(circuit::xor)
             "bvnand" -> circuit.not(circuit.and(left, right))
             "bvnor" -> circuit.not(circuit.or(left, right))
             "bvxnor" -> circuit.not(circuit.xor(left, right))
@@ -364,6 +381,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
                 "bvnego" -> circuit.negateOverflow(left)
                 "bvuaddo" -> circuit.unsignedAddOverflow(left, right)
                 "bvsaddo" -> circuit.signedAddOverflow(left, right)
+                "bvusubo" -> circuit.unsignedSubtractOverflow(left, right)
+                "bvssubo" -> circuit.signedSubtractOverflow(left, right)
+                "bvsdivo" -> circuit.signedDivideOverflow(left, right)
                 "bvumulo" -> circuit.unsignedMultiplyOverflow(left, right)
                 "bvsmulo" -> circuit.signedMultiplyOverflow(left, right)
                 else -> smtUnsupported("unknown bitvector operator '$operator'")
@@ -380,6 +400,10 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         val operator = symbol(indexed.items.getOrNull(1))
         val rawIndices = indexed.items.drop(2)
         arity(arguments, 1)
+        if (operator == "divisible") {
+            requireType(arguments[0], intType)
+            return Value.Scalar(SExpr.SList(listOf(indexed, scalar(arguments[0]))), boolType)
+        }
         val rotation = operator == "rotate_left" || operator == "rotate_right"
         val indices = if (rotation) {
             if (rawIndices.size != 1) smtUnsupported("invalid rotation index")
@@ -394,7 +418,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             val argument = observeScalar(arguments[0])
             val bits = List(indices[0]) { fresh("Bool") }
             val modulus = atom((BIG_ONE shl indices[0]).toString())
-            output.add(form("assert", form("=", integerValue(bits, false), form("mod", scalar(argument), modulus))))
+            val quotient = fresh("Int")
+            output.add(form("assert", form("=", scalar(argument),
+                form("+", integerValue(bits, false), form("*", modulus, quotient)))))
             return Value.Bits(bits).also { record(operator, indices, listOf(argument), it) }
         }
         val value = bits(arguments[0])
@@ -422,10 +448,11 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
     }
 
     private fun integerValue(bits: List<SExpr>, signed: Boolean): SExpr {
+        chargeEncodingWork(bits.size.toLong() * (bits.size + 1L) / 2)
         val summands = bits.mapIndexed { i, bit ->
             cancellation.polynomialSourceCheckpoint(1)
             val weight = atom((BIG_ONE shl i).toString())
-            val term = form("ite", bit, weight, atom("0"))
+            val term = form("*", weight, form("ite", bit, atom("1"), atom("0")))
             if (signed && i == bits.lastIndex) form("-", term) else term
         }
         return if (summands.size == 1) summands[0] else form("+", *summands.toTypedArray())
@@ -441,7 +468,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         }
         if (text.startsWith("#x")) {
             val digits = text.drop(2)
-            if (digits.isEmpty() || digits.any { it.digitToIntOrNull(16) == null }) smtUnsupported("invalid hexadecimal bitvector literal")
+            if (digits.isEmpty() || digits.any { it !in '0'..'9' && it !in 'a'..'f' && it !in 'A'..'F' }) {
+                smtUnsupported("invalid hexadecimal bitvector literal")
+            }
             checkWidth(digits.length.toLong() * 4)
             return Value.Bits(digits.reversed().flatMap { digit -> List(4) { if (digit.digitToInt(16) and (1 shl it) != 0) one else zero } })
         }
@@ -464,6 +493,7 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         val width = index(expression.items[2])
         checkWidth(width.toLong())
         var value = parseBigInt(digits)
+        if (value.magnitudeBitLength() > width) smtUnsupported("bitvector numeral exceeds its declared width")
         val two = bigIntOf(2)
         return Value.Bits(List(width) {
             val bit = if (value % two == BIG_ZERO) zero else one
@@ -496,9 +526,14 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
     }
 
     private fun checked(operation: () -> SExpr): SExpr {
-        cancellation.polynomialSourceCheckpoint(1)
-        if (++workCount > MAX_WORK) smtUnsupported("bitvector circuit exceeds the work budget")
+        chargeEncodingWork(1)
         return operation()
+    }
+
+    private fun chargeEncodingWork(units: Long) {
+        cancellation.polynomialSourceCheckpoint(units)
+        if (units > MAX_WORK - workCount) smtUnsupported("bitvector circuit exceeds the work budget")
+        workCount += units
     }
 
     private fun observeScalar(value: Value): Value.Scalar {

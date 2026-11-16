@@ -1,8 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
-import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
@@ -20,6 +18,7 @@ class SmtBitVectorReductionTest {
             "(bvand #b1010 #b1100 #b1111)" to "#b1000",
             "(bvor #b1010 #b1100 #b0001)" to "#b1111",
             "(bvxor #b1010 #b1100)" to "#b0110",
+            "(bvxor #b1010 #b1100 #b0011)" to "#b0101",
             "(bvnand #b1010 #b1100)" to "#b0111",
             "(bvnor #b1010 #b1100)" to "#b0001",
             "(bvxnor #b1010 #b1100)" to "#b1001",
@@ -50,8 +49,8 @@ class SmtBitVectorReductionTest {
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
         assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.boolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.intVarNames.getValue(it)) },
+            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
         ) })
     }
 
@@ -62,14 +61,15 @@ class SmtBitVectorReductionTest {
             "(bvslt #b1010 #b0011)", "(bvsle #b1010 #b1010)", "(bvsgt #b0011 #b1010)", "(bvsge #b1010 #b1010)",
             "(bvnego #b1000)", "(bvuaddo #b1111 #b0001)", "(bvsaddo #b0111 #b0001)",
             "(bvumulo #b1000 #b0010)", "(bvsmulo #b0100 #b0010)", "(distinct #b0000 #b0001 #b0010)",
+            "(bvusubo #b0000 #b0001)", "(bvssubo #b1000 #b0001)", "(bvsdivo #b1000 #b1111)",
         )
         val (reduced, parsed) = lower(predicates.joinToString("\n") { "(assert $it)" })
 
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
         assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.boolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.intVarNames.getValue(it)) },
+            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
         ) })
     }
 
@@ -85,10 +85,10 @@ class SmtBitVectorReductionTest {
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
         assertEquals(129, reduced.bitNames.getValue("x").size)
-        assertTrue(reduced.bitNames.getValue("x").all { assignment.boolValue(parsed.boolVarNames.getValue(it)) })
+        assertTrue(reduced.bitNames.getValue("x").all { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) })
         assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.boolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.intVarNames.getValue(it)) },
+            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
         ) })
     }
 
@@ -103,8 +103,8 @@ class SmtBitVectorReductionTest {
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
         assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.boolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.intVarNames.getValue(it)) },
+            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
         ) })
     }
 
@@ -117,8 +117,8 @@ class SmtBitVectorReductionTest {
         val flipped = reduced.bitNames.getValue("x")[0]
 
         val valid = reduced.checks.all { check -> check.check(
-            { name -> assignment.boolValue(parsed.boolVarNames.getValue(name)) != (name == flipped) },
-            { assignment.intValue(parsed.intVarNames.getValue(it)) },
+            { name -> assignment.boolValue(parsed.encodingBoolVarNames.getValue(name)) != (name == flipped) },
+            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
         ) }
 
         assertFalse(valid)
@@ -135,15 +135,13 @@ class SmtBitVectorReductionTest {
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
         assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.boolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.intVarNames.getValue(it)) },
+            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
         ) })
     }
 
     private fun lower(source: String): Pair<SmtBitVectorReduction, SmtLibProblem> {
         val reduced = reduceSmtBitVectors(SExprReader(source).readAll(), Cancellation.Never)
-        val builder = Compiler.Builder(DEFAULT_UNBOUNDED_INT_LO, DEFAULT_UNBOUNDED_INT_HI, strictBounds = false)
-        reduced.commands.forEach(builder::command)
-        return reduced to builder.build()
+        return reduced to SmtLib.parse(source)
     }
 }

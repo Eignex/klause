@@ -135,6 +135,18 @@ internal class BitVectorCircuit<T>(private val gates: BitVectorGates<T>) {
         return gates.and(gates.not(gates.xor(left.last(), right.last())), gates.xor(left.last(), sum.last()))
     }
 
+    fun unsignedSubtractOverflow(left: List<T>, right: List<T>): T = unsignedLess(left, right)
+
+    fun signedSubtractOverflow(left: List<T>, right: List<T>): T {
+        val difference = subtract(left, right)
+        return gates.and(gates.xor(left.last(), right.last()), gates.xor(left.last(), difference.last()))
+    }
+
+    fun signedDivideOverflow(left: List<T>, right: List<T>): T {
+        requireSameWidth(left, right)
+        return gates.and(negateOverflow(left), right.fold(one, gates::and))
+    }
+
     fun unsignedMultiplyOverflow(left: List<T>, right: List<T>): T {
         requireSameWidth(left, right)
         val product = multiply(extend(left, left.size, false), extend(right, right.size, false))
@@ -153,16 +165,19 @@ internal class BitVectorCircuit<T>(private val gates: BitVectorGates<T>) {
         requireSameWidth(value, amount)
         var result = value
         var distance = 1
-        for (bit in amount) {
-            val fill = if (signed) value.last() else zero
+        var index = 0
+        val fill = if (signed) value.last() else zero
+        while (index < amount.size && distance < value.size) {
+            val bit = amount[index++]
             val shifted = List(value.size) { i ->
                 val source = if (right) i.toLong() + distance else i.toLong() - distance
                 if (source in 0L until value.size.toLong()) result[source.toInt()] else fill
             }
             result = ite(bit, shifted, result)
-            if (distance < value.size) distance = minOf(value.size.toLong(), distance.toLong() * 2).toInt()
+            distance = minOf(value.size.toLong(), distance.toLong() * 2).toInt()
         }
-        return result
+        val oversized = amount.drop(index).fold(zero, gates::or)
+        return ite(oversized, List(value.size) { fill }, result)
     }
 
     private fun addWithCarry(left: List<T>, right: List<T>, initialCarry: T = zero): Pair<List<T>, T> {

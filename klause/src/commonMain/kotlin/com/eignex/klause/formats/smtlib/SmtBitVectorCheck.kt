@@ -34,7 +34,7 @@ internal class SmtBitVectorCheck(
     private val arguments: List<SmtBitVectorCoordinate>,
     private val result: SmtBitVectorCoordinate,
 ) {
-    fun check(boolean: (String) -> Boolean, integer: (String) -> String): Boolean {
+    fun check(boolean: (String) -> Boolean, integer: (String) -> String, checkpoint: (Long) -> Unit = {}): Boolean {
         fun bool(name: String): Boolean = when (name) {
             "true" -> true
             "false" -> false
@@ -45,12 +45,19 @@ internal class SmtBitVectorCheck(
             is SmtBitVectorCoordinate.Boolean -> SmtBitVectorValue.Boolean(bool(coordinate.name))
             is SmtBitVectorCoordinate.Integer -> SmtBitVectorValue.Integer(parseBigInt(integer(coordinate.name)))
         }
-        return value(result) == evaluateSmtBitVector(operator, indices, arguments.map(::value))
+        return value(result) == evaluateSmtBitVector(operator, indices, arguments.map(::value), checkpoint)
     }
 }
 
-internal fun evaluateSmtBitVector(operator: String, indices: List<Int>, arguments: List<SmtBitVectorValue>): SmtBitVectorValue {
+internal fun evaluateSmtBitVector(
+    operator: String,
+    indices: List<Int>,
+    arguments: List<SmtBitVectorValue>,
+    checkpoint: (Long) -> Unit = {},
+): SmtBitVectorValue {
+    checkpoint(1)
     fun number(value: List<Boolean>): BigInt = value.asReversed().fold(BIG_ZERO) { acc, bit ->
+        checkpoint(1)
         (acc shl 1) + if (bit) BIG_ONE else BIG_ZERO
     }
     val bitArguments = arguments.filterIsInstance<SmtBitVectorValue.Bits>().map { it.bits }
@@ -77,6 +84,9 @@ internal fun evaluateSmtBitVector(operator: String, indices: List<Int>, argument
         "bvnego" -> signed(left, leftBits) == -(modulus shr 1)
         "bvuaddo" -> left + right >= modulus
         "bvsaddo" -> signedOverflow(signed(left, leftBits) + signed(right, rightBits))
+        "bvusubo" -> left < right
+        "bvssubo" -> signedOverflow(signed(left, leftBits) - signed(right, rightBits))
+        "bvsdivo" -> signed(left, leftBits) == -(modulus shr 1) && signed(right, rightBits) == -BIG_ONE
         "bvumulo" -> left * right >= modulus
         "bvsmulo" -> signedOverflow(signed(left, leftBits) * signed(right, rightBits))
         else -> null
@@ -90,7 +100,7 @@ internal fun evaluateSmtBitVector(operator: String, indices: List<Int>, argument
         "bvneg" -> -left
         "bvand" -> number(leftBits.indices.map { bitArguments.all { bits -> bits[it] } })
         "bvor" -> number(leftBits.indices.map { bitArguments.any { bits -> bits[it] } })
-        "bvxor" -> bitwise { a, b -> a != b }
+        "bvxor" -> number(leftBits.indices.map { index -> bitArguments.count { it[index] } % 2 == 1 })
         "bvnand" -> modulus - BIG_ONE - bitwise { a, b -> a && b }
         "bvnor" -> modulus - BIG_ONE - bitwise { a, b -> a || b }
         "bvxnor" -> bitwise { a, b -> a == b }
@@ -125,7 +135,10 @@ internal fun evaluateSmtBitVector(operator: String, indices: List<Int>, argument
         "sign_extend" -> signed(left, leftBits)
         "repeat" -> {
             var value = BIG_ZERO
-            repeat(indices[0]) { value = (value shl width) + left }
+            repeat(indices[0]) {
+                checkpoint(1)
+                value = (value shl width) + left
+            }
             value
         }
         "rotate_left", "rotate_right" -> {
@@ -150,6 +163,7 @@ internal fun evaluateSmtBitVector(operator: String, indices: List<Int>, argument
     val remainder = expected % range
     var normalized = if (remainder < BIG_ZERO) remainder + range else remainder
     return SmtBitVectorValue.Bits(List(outputWidth) {
+        checkpoint(1)
         val bit = normalized % bigIntOf(2) != BIG_ZERO
         normalized /= bigIntOf(2)
         bit

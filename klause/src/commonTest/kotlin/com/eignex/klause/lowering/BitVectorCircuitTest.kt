@@ -15,6 +15,56 @@ class BitVectorCircuitTest {
     })
 
     @Test
+    fun `bitwise circuits should preserve every small word bit`() {
+        for (width in 1..4) {
+            val mask = (1 shl width) - 1
+            for (a in 0..mask) {
+                assertEquals(a xor mask, value(circuit.not(bits(a, width))))
+                assertEquals((-a) and mask, value(circuit.negate(bits(a, width))))
+                for (b in 0..mask) {
+                    assertEquals(a and b, value(circuit.and(bits(a, width), bits(b, width))))
+                    assertEquals(a or b, value(circuit.or(bits(a, width), bits(b, width))))
+                    assertEquals(a xor b, value(circuit.xor(bits(a, width), bits(b, width))))
+                    assertEquals(a, value(circuit.ite(true, bits(a, width), bits(b, width))))
+                    assertEquals(b, value(circuit.ite(false, bits(a, width), bits(b, width))))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `indexed wiring should agree with integer slices extensions and rotations`() {
+        for (width in 1..4) for (a in 0 until (1 shl width)) {
+            val word = bits(a, width)
+            for (low in 0 until width) for (high in low until width) {
+                assertEquals((a ushr low) and ((1 shl (high - low + 1)) - 1), value(circuit.extract(word, high, low)))
+            }
+            for (count in 0..3) {
+                assertEquals(a, value(circuit.extend(word, count, false)))
+                assertEquals(signed(a, width) and ((1 shl (width + count)) - 1), value(circuit.extend(word, count, true)))
+            }
+            for (count in 1..3) {
+                assertEquals((0 until count).sumOf { a shl (it * width) }, value(circuit.repeat(word, count)))
+            }
+            for (amount in 0..2 * width) {
+                val distance = amount % width
+                val mask = (1 shl width) - 1
+                assertEquals(((a shl distance) or (a ushr (width - distance))) and mask, value(circuit.rotate(word, amount, false)))
+                assertEquals(((a ushr distance) or (a shl (width - distance))) and mask, value(circuit.rotate(word, amount, true)))
+            }
+        }
+    }
+
+    @Test
+    fun `concatenation should retain unequal operand widths`() {
+        for (highWidth in 1..4) for (lowWidth in 1..4) {
+            for (high in 0 until (1 shl highWidth)) for (low in 0 until (1 shl lowWidth)) {
+                assertEquals((high shl lowWidth) + low, value(circuit.concat(bits(high, highWidth), bits(low, lowWidth))))
+            }
+        }
+    }
+
+    @Test
     fun `small unsigned arithmetic should agree with modular integers`() {
         for (width in 1..4) {
             val modulus = 1 shl width
@@ -100,10 +150,15 @@ class BitVectorCircuitTest {
                 for (b in 0 until modulus) {
                     val sum = signed(a, width) + signed(b, width)
                     val product = signed(a, width) * signed(b, width)
+                    val difference = signed(a, width) - signed(b, width)
                     assertEquals(a + b >= modulus, circuit.unsignedAddOverflow(bits(a, width), bits(b, width)))
                     assertEquals(sum !in minimum..maximum, circuit.signedAddOverflow(bits(a, width), bits(b, width)))
                     assertEquals(a * b >= modulus, circuit.unsignedMultiplyOverflow(bits(a, width), bits(b, width)))
                     assertEquals(product !in minimum..maximum, circuit.signedMultiplyOverflow(bits(a, width), bits(b, width)))
+                    assertEquals(a < b, circuit.unsignedSubtractOverflow(bits(a, width), bits(b, width)))
+                    assertEquals(difference !in minimum..maximum, circuit.signedSubtractOverflow(bits(a, width), bits(b, width)))
+                    assertEquals(signed(a, width) == minimum && signed(b, width) == -1,
+                        circuit.signedDivideOverflow(bits(a, width), bits(b, width)))
                 }
             }
         }
