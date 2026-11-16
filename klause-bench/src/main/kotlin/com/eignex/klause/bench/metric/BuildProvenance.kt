@@ -2,7 +2,7 @@ package com.eignex.klause.bench.metric
 
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.bench.source.CorpusFetcher
-import com.eignex.klause.bench.source.WorkspaceChecksums
+import com.eignex.lab.bench.WorkspaceChecksums
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString

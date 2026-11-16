@@ -3,7 +3,7 @@ package com.eignex.klause.bench.lab
 import com.eignex.klause.bench.metric.BuildProvenance
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
-import com.eignex.klause.bench.source.WorkspaceChecksums
+import com.eignex.lab.bench.WorkspaceChecksums
 import kotlinx.serialization.encodeToString
 import java.io.File
 import java.nio.file.Path

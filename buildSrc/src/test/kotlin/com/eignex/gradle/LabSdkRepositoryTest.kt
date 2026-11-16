@@ -122,7 +122,7 @@ class LabSdkRepositoryTest {
         assertEquals(repository, cache.stage(repository, offline = true))
     }
 
-    private fun artifact(repository: Path) = repository.resolve("lab-bench-v0.1.0/lab-bench-0.1.0.jar")
+    private fun artifact(repository: Path) = repository.resolve("lab-bench-v0.1.1/lab-bench-0.1.1.jar")
 
     private fun withRepository(test: (Path) -> Unit) {
         val repository = Files.createTempDirectory("lab-sdk-test")

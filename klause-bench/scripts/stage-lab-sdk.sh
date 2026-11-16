@@ -2,7 +2,7 @@
 set -euo pipefail
 
 sdk_root=${1:?SDK repository directory is required}
-sdk_version=0.1.0
+sdk_version=0.1.1
 mkdir -p "$sdk_root"
 sdk_stage=$(mktemp -d "$sdk_root/.lab-bench.XXXXXX")
 trap 'rm -rf -- "$sdk_stage"' EXIT
@@ -21,9 +21,9 @@ done
 (
     cd "$sdk_stage"
     sha256sum --check <<'CHECKSUMS'
-53247d50debd77f6c1d7fa314ffa5ddb6c0fe0632c2d482b01c7704afe7beba4  lab-bench-0.1.0.jar
-2394bfcd15474a473cdf34827b99cb4a03dc3bdb270ebd705ef2dd2c8298a489  lab-bench-0.1.0.module
-a25c59d8bd1520368789459fd42a64bb1a5c376762ea86ca1de6b86e4133f160  lab-bench-0.1.0.pom
+1cc796aae19c6fa08d6ada58617c44f4c930345fa332b29c1c8f5f9ab250ef81  lab-bench-0.1.1.jar
+08fd66134b98b65bdf407b05dfa5eb477a8116123755a88f8fc3a5661a3ed6bf  lab-bench-0.1.1.module
+473b274356034bcb4ea5cf9a5b21f933c36b1da0ffb2a388e1dd494fc322ce95  lab-bench-0.1.1.pom
 CHECKSUMS
 )
 mv -T -- "$sdk_stage" "$sdk_root/lab-bench-v$sdk_version"
