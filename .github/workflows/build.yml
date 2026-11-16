@@ -65,11 +65,9 @@ jobs:
 
       # Lint runs separately. Native tests have their own job because Kover instruments JVM tests.
       - name: Verify lab SDK caching and retry policy
-        run: ./gradlew -p buildSrc test
+        run: bash klause-bench/scripts/run-verified-gradle.sh -p buildSrc test
 
       - name: Run JVM tests with coverage
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: bash klause-bench/scripts/run-verified-gradle.sh --refresh-dependencies check -x :klause:linuxX64Test -x :klause-cli:linuxX64Test koverXmlReport :klause-cli:installJvmDist :klause:stageLpProfileJvm
 
       - name: Start the installed JVM CLI
