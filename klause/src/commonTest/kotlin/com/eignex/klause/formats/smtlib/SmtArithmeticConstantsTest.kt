@@ -11,14 +11,23 @@ import kotlin.test.assertFailsWith
 
 class SmtArithmeticConstantsTest {
     @Test
-    fun `deep rational operands should be recognized without a source depth limit`() {
+    fun `deep rational negations should be recognized without a source depth limit`() {
         val constants = SmtArithmeticConstants(ExecutionControl.Never)
-        val expressions = listOf("(- ".repeat(20000) + "1" + ")".repeat(20000),
-            "(/ ".repeat(20000) + "1" + " 1)".repeat(20000))
+        val expression = SExprReader("(- ".repeat(20000) + "1" + ")".repeat(20000)).readAll().single()
 
-        val recognized = expressions.map { constants.knownRational(SExprReader(it).readAll().single()) }
+        val recognized = constants.knownRational(expression)
 
-        assertEquals(listOf(BigFraction.ONE, BigFraction.ONE), recognized)
+        assertEquals(BigFraction.ONE, recognized)
+    }
+
+    @Test
+    fun `deep rational divisions should be recognized without a source depth limit`() {
+        val constants = SmtArithmeticConstants(ExecutionControl.Never)
+        val expression = SExprReader("(/ ".repeat(20000) + "1" + " 1)".repeat(20000)).readAll().single()
+
+        val recognized = constants.knownRational(expression)
+
+        assertEquals(BigFraction.ONE, recognized)
     }
 
     @Test
