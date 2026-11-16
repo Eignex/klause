@@ -23,6 +23,12 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
         class Qualified(val expected: SmtSort) : Frame
     }
     private val globals = HashMap<String, Signature>()
+    private val globalSortParameters = LinkedHashSet<String>()
+    val sortParameters: Set<String> get() = globalSortParameters.toSet()
+    private val typedSymbols = ArrayList<SmtTypedSymbol>()
+    val symbols: List<SmtTypedSymbol> get() = typedSymbols.toList()
+    private val sourceObligations = ArrayList<Pair<String, Int>>()
+    val obligations: List<Pair<String, Int>> get() = sourceObligations.toList()
     private val freeSorts = HashMap<String, Int>()
     private val freeSortNames = HashMap<String, String>()
     private data class SortAlias(val parameters: List<String>, val body: SmtSort)
@@ -54,11 +60,20 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
             return false
         }
         return when (head) {
+            "declare-sort-parameter" -> {
+                command.polynomialSize(2)
+                val name = command.polynomialName(1)
+                if (name in freeSorts || name in sortAliases || name in globalSortParameters ||
+                    theorySort(name) || reservedName(name)) return false
+                globalSortParameters += name
+                true
+            }
             "declare-sort" -> {
                 command.polynomialSize(3)
                 val name = command.polynomialName(1)
                 val arity = command.polynomialAtom(2).toIntOrNull() ?: return false
-                if (arity < 0 || name in freeSorts || name in sortAliases || theorySort(name) || reservedName(name)) {
+                if (arity < 0 || name in freeSorts || name in sortAliases ||
+                    name in globalSortParameters || theorySort(name) || reservedName(name)) {
                     false
                 } else {
                     freeSorts[name] = arity
@@ -69,14 +84,15 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
             "define-sort" -> {
                 command.polynomialSize(4)
                 val name = command.polynomialName(1)
-                if (name in freeSorts || name in sortAliases || theorySort(name) || reservedName(name)) return false
+                if (name in freeSorts || name in sortAliases || name in globalSortParameters ||
+                    theorySort(name) || reservedName(name)) return false
                 val parameters = (command.items[2] as? SExpr.SList)?.items?.map {
                     (it as? SExpr.Atom)?.text?.let(::polynomialSymbol) ?: return false
                 } ?: return false
                 if (parameters.toSet().size != parameters.size || parameters.any {
                         theorySort(it) || reservedName(it)
                     }) return false
-                val body = sourceSort(command.items[3], parameters.toSet())
+                val body = sourceSort(command.items[3], parameters.toSet(), allowGlobalParameters = false)
                 sortAliases[name] = SortAlias(parameters, body)
                 true
             }
@@ -93,7 +109,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                 } else {
                     globals[name] = Signature(parameters, result, symbolIdentity++)
                     val spelling = (command.items[1] as SExpr.Atom).text
-                    originalDeclarations += SmtSourceDeclaration(spelling, parameters, result)
+                    val declaration = SmtSourceDeclaration(spelling, parameters, result)
+                    originalDeclarations += declaration
+                    typedSymbols += SmtTypedSymbol(globals.getValue(name).identity, declaration)
                     true
                 }
             }
@@ -121,12 +139,17 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                 }
                 val body = sort(command.items.getOrNull(4) ?: return false, Locals(locals, null)) ?: return false
                 if (!accepts(result, nodes[body].sort)) return false
-                globals[name] = Signature(sorts, result, symbolIdentity++)
+                val identity = symbolIdentity++
+                globals[name] = Signature(sorts, result, identity)
+                typedSymbols += SmtTypedSymbol(identity,
+                    SmtSourceDeclaration((command.items[1] as SExpr.Atom).text, sorts, result),
+                    SmtTypedDefinition(names.map { locals.getValue(it) }, body))
                 true
             }
             "assert", "minimize", "maximize" -> {
                 command.polynomialSize(2)
                 val result = sort(command.items[1], null) ?: return false
+                sourceObligations += head to result
                 if (head == "assert") {
                     assertionNodes += result
                     nodes[result].sort == SmtSort.Bool
@@ -153,7 +176,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                     if (globals[polynomialSymbol(atom.text)]?.let {
                             it.parameters.isEmpty() && it.result == SmtSort.Bool
                         } != true) return false
-                    assertionNodes += sort(assumption, null) ?: return false
+                    val node = sort(assumption, null) ?: return false
+                    assertionNodes += node
+                    sourceObligations += "assert" to node
                 }
                 querySeen = true
                 true
@@ -175,7 +200,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
         }
     }
 
-    internal fun sourceSort(expression: SExpr, localParameters: Set<String> = emptySet()): SmtSort {
+    internal fun sourceSort(expression: SExpr, localParameters: Set<String> = emptySet(),
+        allowGlobalParameters: Boolean = true): SmtSort {
         val work = ArrayDeque<Pair<SExpr, Boolean>>()
         val values = ArrayDeque<SmtSort>()
         work.addLast(expression to false)
@@ -191,7 +217,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                         val name = polynomialSymbol(node.text)
                         val alias = sortAliases[name]
                         when {
-                            name in localParameters -> SmtSort.Uninterpreted(name)
+                            name in localParameters || allowGlobalParameters && name in globalSortParameters ->
+                                SmtSort.Uninterpreted(name)
                             alias != null && alias.parameters.isEmpty() -> alias.body
                             freeSorts[name] == 0 -> SmtSort.Uninterpreted(freeSortNames.getValue(name))
                             else -> smtUnsupported("unsupported sort '$name'")
@@ -308,7 +335,10 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                             }
                             val name = node.polynomialName(1)
                             val signature = globals[name]
-                            val result = signature?.takeIf { it.parameters.isEmpty() }?.result
+                            val result = signature?.takeIf { it.parameters.isEmpty() }?.let {
+                                instantiateSmtRank(it.parameters, it.result, globalSortParameters, emptyList(),
+                                    sourceSort(node.items[2]), cancellation)?.second
+                            }
                                 ?: literal(name)?.takeIf { name in setOf("true", "false") }
                                 ?: if (name == "pi") SmtSort.Real else return null
                             if (result != sourceSort(node.items[2])) return null
@@ -368,10 +398,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                     val signature = frame.signature
                     val result = if (frame.indexed != null) smtIndexedBitVectorSort(frame.indexed, args)
                     else if (signature == null) operator(polynomialSymbol(frame.head), args) else {
-                        if (args.size != signature.parameters.size || args.indices.any {
-                                !accepts(signature.parameters[it], args[it])
-                            }) return null
-                        signature.result
+                        instantiateSmtRank(signature.parameters, signature.result, globalSortParameters, args,
+                            frame.qualification, cancellation)?.second ?: return null
                     }
                     val inferred = result ?: return null
                     val type = if (signature == null && frame.qualification == SmtSort.Real &&
