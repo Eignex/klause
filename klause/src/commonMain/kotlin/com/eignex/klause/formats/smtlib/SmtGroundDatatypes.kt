@@ -404,6 +404,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private fun register(instance: SmtDatatypeInstance) {
         instance.sort.checkpointStructure(cancellation)
         if (!instances.add(instance.sort)) return
+        if (instance.constructors.size == 1) return
         for ((constructor, definition) in instance.constructors.withIndex()) {
             for ((field, selector) in definition.fields.withIndex()) {
                 step()
