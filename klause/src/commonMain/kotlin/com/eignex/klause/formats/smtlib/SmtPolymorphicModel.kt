@@ -160,7 +160,7 @@ private class SmtPolymorphicTransport(private val archetype: String,
 
 }
 
-private fun smtPolymorphicPoint(sort: SmtSort, second: Boolean, values: SmtModelValues,
+internal fun smtPolymorphicPoint(sort: SmtSort, second: Boolean, values: SmtModelValues,
     externalPoint: ((SmtSort, Boolean) -> SmtValue?)? = null): SmtValue {
     values.checkpoint()
     if (externalPoint != null) return externalPoint(sort, second) ?: throw SmtSourceCheckingUnavailable()

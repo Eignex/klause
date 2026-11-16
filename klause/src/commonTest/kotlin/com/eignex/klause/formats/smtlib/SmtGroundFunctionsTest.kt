@@ -23,6 +23,68 @@ import kotlin.test.assertTrue
 
 class SmtGroundFunctionsTest {
     @Test
+    fun `alias formals do not replace lexically captured free sorts`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort U 0)
+            (define-sort Captured () U)
+            (define-sort Alias (U) Captured)
+            (declare-const a (Alias Bool))
+            (declare-const b (Alias Bool))
+            (declare-const c (Alias Bool))
+            (assert (distinct a b c))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        val model = parsed.reconstructModel(assignment)
+        assertEquals(setOf(SmtSort.Uninterpreted("U")), model.values.map { it.first.result }.toSet())
+    }
+
+    @Test
+    fun `shadowing alias parameters preserve equality with captured source sorts`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort U 0)
+            (define-sort Captured () U)
+            (define-sort Alias (U) Captured)
+            (declare-const a (Alias Int))
+            (declare-const b U)
+            (assert (= a b))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `shadowing alias parameters cannot admit numeric terms at captured free sorts`() {
+        assertFailsWith<UnsupportedSmtException> {
+            SmtLib.parse("""
+                (declare-sort U 0)
+                (define-sort Captured () U)
+                (define-sort Alias (U) Captured)
+                (declare-const a (Alias Int))
+                (assert (= a 0))
+            """.trimIndent())
+        }
+    }
+
+    @Test
+    fun `quoted underscore sort constructors retain their declared rank`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort |_| 1)
+            (declare-const x (|_| Int))
+            (assert (= x x))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+
+    @Test
     fun `quoted grammar words remain ordinary declared function symbols`() {
         val parsed = SmtLib.parse("""
             (declare-fun |let| (Bool) Bool)

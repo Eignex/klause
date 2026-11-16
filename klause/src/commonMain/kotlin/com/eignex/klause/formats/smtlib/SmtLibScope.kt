@@ -33,6 +33,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     private val freeSortNames = HashMap<String, String>()
     private data class SortAlias(val parameters: List<String>, val body: SmtSort)
     private val sortAliases = HashMap<String, SortAlias>()
+    private var sortParameterIdentity = 0
     private val originalDeclarations = ArrayList<SmtSourceDeclaration>()
     val declarations: List<SmtSourceDeclaration> get() = originalDeclarations.toList()
     private val nodes = ArrayList<SmtTypedTerm>()
@@ -92,8 +93,10 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                 if (parameters.toSet().size != parameters.size || parameters.any {
                         theorySort(it) || reservedName(it)
                     }) return false
-                val body = sourceSort(command.items[3], parameters.toSet(), allowGlobalParameters = false)
-                sortAliases[name] = SortAlias(parameters, body)
+                val bindings = parameters.associateWith { aliasParameter() }
+                val body = sourceSort(command.items[3], parameters.toSet(),
+                    allowGlobalParameters = false, localBindings = bindings)
+                sortAliases[name] = SortAlias(bindings.values.map { it.name }, body)
                 true
             }
             "declare-const", "declare-fun" -> {
@@ -201,7 +204,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     }
 
     internal fun sourceSort(expression: SExpr, localParameters: Set<String> = emptySet(),
-        allowGlobalParameters: Boolean = true): SmtSort {
+        allowGlobalParameters: Boolean = true, localBindings: Map<String, SmtSort> = emptyMap()): SmtSort {
         val work = ArrayDeque<Pair<SExpr, Boolean>>()
         val values = ArrayDeque<SmtSort>()
         work.addLast(expression to false)
@@ -217,6 +220,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                         val name = polynomialSymbol(node.text)
                         val alias = sortAliases[name]
                         when {
+                            name in localBindings -> localBindings.getValue(name)
                             name in localParameters || (allowGlobalParameters && name in globalSortParameters) ->
                                 SmtSort.Uninterpreted(name)
                             alias != null && alias.parameters.isEmpty() -> alias.body
@@ -227,7 +231,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                 })
                 is SExpr.SList -> {
                     val head = node.polynomialHead()
-                    if (head == "_") {
+                    if ((node.items.firstOrNull() as? SExpr.Atom)?.text == "_") {
                         node.polynomialSize(3)
                         if (node.polynomialAtom(1) != "BitVec") smtUnsupported("unsupported indexed source sort")
                         val width = node.polynomialAtom(2).toIntOrNull()
@@ -242,7 +246,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                             else -> SmtSort.Uninterpreted(freeSortNames.getValue(polynomialSymbol(head)), args)
                         })
                     } else {
-                        if (head in localParameters) smtUnsupported("sort parameter '$head' takes no arguments")
+                        if (head in localParameters || head in localBindings) {
+                            smtUnsupported("sort parameter '$head' takes no arguments")
+                        }
                         val arity = if (head == "Array") 2 else sortAliases[head]?.parameters?.size ?: freeSorts[head]
                         if (arity == null || node.items.size != arity + 1) smtUnsupported("invalid source sort '$head'")
                         work.addLast(node to true)
@@ -252,6 +258,15 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
             }
         }
         return values.single()
+    }
+
+    private fun aliasParameter(): SmtSort.Uninterpreted {
+        var name: String
+        do {
+            cancellation.polynomialSourceCheckpoint(1)
+            name = ".klause.alias.parameter.${sortParameterIdentity++}"
+        } while (name in freeSorts || name in sortAliases || name in globalSortParameters)
+        return SmtSort.Uninterpreted(name)
     }
 
     private fun substituteSort(root: SmtSort, substitutions: Map<String, SmtSort>): SmtSort {
