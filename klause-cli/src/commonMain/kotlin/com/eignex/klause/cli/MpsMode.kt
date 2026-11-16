@@ -206,15 +206,9 @@ internal class MpsOutput(
                 else -> "s SATISFIABLE"
             }
 
-        Verdict.UNBOUNDED -> when {
-            exactSourceWitness() != false -> "s UNBOUNDED"
-            best != null -> "s SATISFIABLE"
-            else -> "s UNKNOWN"
-        }
-
         Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
 
-        Verdict.UNKNOWN -> "s UNKNOWN"
+        Verdict.UNBOUNDED, Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
     override fun lpStatisticPairs(stats: SolveStats): List<Pair<String, String>> {

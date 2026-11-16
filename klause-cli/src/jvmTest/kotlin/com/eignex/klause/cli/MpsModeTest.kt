@@ -84,6 +84,41 @@ class MpsModeTest {
     }
 
     @Test
+    fun `a finite decimal optimum should not be reported unbounded under either certification policy`() {
+        val source = File.createTempFile("mps-finite-decimal", ".mps").apply {
+            writeText("ROWS\n N COST\n L R\nCOLUMNS\n X COST -1 R 0.1\n Y COST 0 R 1\nRHS\n RHS R 0.3\nENDATA\n")
+            deleteOnExit()
+        }
+        for (exact in listOf(false, true)) {
+            val flags = if (exact) arrayOf("--exact") else emptyArray()
+            val text = captureStdout {
+                val arguments = arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=1000", *flags)
+                assertEquals(0, runCli(arrayOf(*arguments, source.absolutePath)))
+            }
+
+            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        }
+    }
+
+    @Test
+    fun `a ray whose decimal slope violates a row should leave a numerical point without unboundedness`() {
+        val source = File.createTempFile("mps-rounding-slope", ".mps").apply {
+            writeText(
+                "ROWS\n N COST\n G R\n E E1\n E E2\nCOLUMNS\n X R 0.1 E1 1\n Y R 0.2 E2 1\n" +
+                    " Z COST -1 R -0.30000000000000001 E1 -1 E2 -1\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+
+        val text = captureStdout {
+            val arguments = arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=1000", source.absolutePath)
+            assertEquals(0, runCli(arguments))
+        }
+
+        assertTrue("s SATISFIABLE" in text.lines(), text)
+    }
+
+    @Test
     fun `completed native refutations should report under the selected certification policy`() {
         val source = File.createTempFile("mps-tolerated-empty-row", ".mps").apply {
             writeText("ROWS\n N COST\n G R\nCOLUMNS\n X COST 0\nRHS\n RHS R 0.00000005\nENDATA\n")

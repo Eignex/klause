@@ -109,8 +109,9 @@ zero tolerance the lowered model must equal the source exactly and the base poin
 must pass without slack. With positive tolerance the base point passes the
 original-source checks within slack, and the native ray, read in the exact source
 coefficients, must strictly improve the objective, move no integer column, move
-no column towards a declared bound and keep every row active at the base point
-on its bounded sides. Such a ray keeps every residual of the base point from
+no column towards a declared bound, and keep the slope of every unguarded row and
+every row whose indicator guard holds at the base point on its bounded sides,
+whether or not that row is tight there. Such a ray keeps every residual of the base point from
 growing, so the ray's tail stays accepted. A slope that only binary64 rounding
 made zero is not trusted: a ray whose projection is level on a row whose exact
 slope is not is first moved onto the exact kernel of those rows, and the moved

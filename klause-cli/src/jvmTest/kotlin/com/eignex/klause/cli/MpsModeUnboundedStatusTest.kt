@@ -14,28 +14,25 @@ class MpsModeUnboundedStatusTest(
     private val name: String,
     private val coefficients: String,
     private val exact: Boolean,
-    private val status: String,
 ) {
     companion object {
-        private const val UNBOUNDED = " G R\nCOLUMNS\n X COST -1 R 0.1\n Y COST 0 R 1\nRHS\n RHS R 0.3\n"
+        private const val DECIMAL = " G R\nCOLUMNS\n X COST -1 R 0.1\n Y COST 0 R 1\nRHS\n RHS R 0.3\n"
         private const val DYADIC = " G R\nCOLUMNS\n X COST -1 R 0.5\n Y COST 0 R 1\nRHS\n RHS R 0.5\n"
         private const val LEVEL = " E R\nCOLUMNS\n X R 0.1\n Y R 0.2\n Z COST -1 R -0.3\n"
-        private const val BOUNDED = " L R\nCOLUMNS\n X COST -1 R 0.1\n Y COST 0 R 1\nRHS\n RHS R 0.3\n"
 
         @JvmStatic
         @Parameterized.Parameters(name = "{0}, exact={2}")
         fun models(): List<Array<Any>> = listOf(false, true).flatMap { exact ->
             listOf(
-                arrayOf<Any>("decimal ray", UNBOUNDED, exact, "s UNBOUNDED"),
-                arrayOf<Any>("dyadic ray", DYADIC, exact, "s UNBOUNDED"),
-                arrayOf<Any>("binary64 level ray", LEVEL, exact, "s UNBOUNDED"),
-                arrayOf<Any>("finite decimal optimum", BOUNDED, exact, "s OPTIMUM FOUND"),
+                arrayOf<Any>("decimal ray", DECIMAL, exact),
+                arrayOf<Any>("dyadic ray", DYADIC, exact),
+                arrayOf<Any>("binary64 level ray", LEVEL, exact),
             )
         }
     }
 
     @Test
-    fun `completed MPS optimization should report unboundedness only for a source ray`() {
+    fun `an MPS source with an exact improving ray should report unboundedness`() {
         val source = File.createTempFile("mps-unbounded-status", ".mps").apply {
             writeText("ROWS\n N COST\n${coefficients}ENDATA\n")
         }
@@ -46,7 +43,8 @@ class MpsModeUnboundedStatusTest(
 
         try {
             System.setOut(stream)
-            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
+            val arguments = arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=1000", *flags, source.absolutePath)
+            assertEquals(0, runCli(arguments))
         } finally {
             System.setOut(previous)
             stream.close()
@@ -54,6 +52,6 @@ class MpsModeUnboundedStatusTest(
         }
 
         val text = bytes.toString(Charsets.UTF_8.name())
-        assertTrue(status in text.lines(), text)
+        assertTrue("s UNBOUNDED" in text.lines(), text)
     }
 }
