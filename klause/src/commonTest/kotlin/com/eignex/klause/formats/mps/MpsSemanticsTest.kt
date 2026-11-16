@@ -332,6 +332,20 @@ class MpsSemanticsTest {
     }
 
     @Test
+    fun `default row slack should not grow with cancelling term magnitudes`() {
+        val source = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n X R 1\n Y R -1\nRHS\n RHS R 0\nENDATA")
+        val tenMillionth = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000))
+        val relative = SemanticOverrides(feasibilityTolerance = SourceTolerance(tenMillionth, tenMillionth))
+        val values = listOf(BigFraction.ofLong(1_000_000_000L), BigFraction.ofLong(999_999_850L))
+
+        for ((overrides, accepted) in listOf(SemanticOverrides() to false, relative to true)) {
+            val linear = assertNotNull(source.toLinearSourceProblem(overrides))
+
+            assertEquals(accepted, linear.checkMpsWitness(values) != null, "$overrides")
+        }
+    }
+
+    @Test
     fun `zero tolerance should retain decimals and reject a rounded equality point`() {
         val source = Mps.parse("ROWS\n N COST\n E R\nCOLUMNS\n X R 3.0000000000000001\nRHS\n RHS R 1\nENDATA")
         val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())

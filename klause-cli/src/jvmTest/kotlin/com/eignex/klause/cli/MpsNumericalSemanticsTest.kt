@@ -35,13 +35,13 @@ class MpsNumericalSemanticsTest {
     }
 
     @Test
-    fun `default MPS policy should declare exact rational tolerance components`() {
+    fun `default MPS policy should declare an absolute only rational tolerance`() {
         val exported = mpsNumericalSemantics(mpsSemantics.resolve())
 
         assertContains(exported, "\"schema\":\"mps-decimal-semantics-v1\"")
         assertContains(exported, "\"numericAuthority\":\"DECIMAL_LITERALS\"")
         assertEquals(2, Regex("\"absolute\":\"1/10000000\"").findAll(exported).count())
-        assertEquals(2, Regex("\"relative\":\"1/10000000\"").findAll(exported).count())
+        assertEquals(2, Regex("\"relative\":\"0/1\"").findAll(exported).count())
         assertContains(exported, "\"undeclaredIntegers\":{\"lower\":\"0\",\"upper\":\"1\"}")
         assertContains(exported, "\"undeclaredReals\":{\"lower\":\"0/1\",\"upper\":null}")
         assertContains(exported, "\"integrality\":\"exact\",\"objective\":\"exact\"")

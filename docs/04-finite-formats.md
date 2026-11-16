@@ -213,8 +213,9 @@ grid semantics; grid refutations and optima apply only to that finite interpreta
 
 `flatZincSemantics` declares binary64 literal authority, a default grid policy,
 `[-1000000, 1000000]` for unranged integer declarations, open endpoints for
-unranged floats and `SourceTolerance(absolute=1/10000000, relative=1/10000000)`. Parsing resolves `SemanticOverrides` before declaration planning
-and keeps both defaults and effective policy in `FlatZincProgram.semantics`.
+unranged floats and `SourceTolerance(absolute=1/10000000)`, an absolute slack with
+no relative component. Parsing resolves `SemanticOverrides` before declaration
+planning and keeps both defaults and effective policy in `FlatZincProgram.semantics`.
 
 Endpoint replacements apply only to unranged scalar and array declarations; an
 explicit source range or value set, including one introduced by a ranged alias,
@@ -359,7 +360,8 @@ disequalities and rows whose reifying Boolean is false hold exactly. A finite
 membership admits a value within the slack of a member, measured as a bound. Absolute
 value, minimum, maximum, selection, an integer times a real, a real product and a power
 state `r = f(x)` and read the slack as the row `r - f(x) = 0`: the residual
-`abs(r - f(x))` stays within `max(absolute, relative * (abs(r) + abs(f(x))))`. A power
+`abs(r - f(x))` stays within `max(absolute, relative * (abs(r) + abs(f(x))))`, which
+the default policy makes the absolute slack at every magnitude. A power
 too wide to form is decided from bit lengths where its magnitude settles the row.
 Selection from constants is
 the row `r = c`. A product whose operand has finite choices selects one member: the

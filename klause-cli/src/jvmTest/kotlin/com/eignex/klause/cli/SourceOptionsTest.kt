@@ -110,14 +110,15 @@ class SourceOptionsTest {
             "--source-absolute-tolerance" to true, "--source-relative-tolerance" to false,
         )) {
             val common = CommonOptions()
-            parseArgs(arrayOf(flag, "0"), commonFlagSpecs(common)) {}
+            parseArgs(arrayOf(flag, "1/10"), commonFlagSpecs(common)) {}
 
             common.sourceOverrides(mpsSemantics)
 
             val tolerance = assertNotNull(common.sourceSemantics?.effective?.feasibilityTolerance)
             val defaults = assertNotNull(mpsSemantics.feasibilityTolerance)
-            assertEquals(if (absolute) SemanticRational.ZERO else defaults.absolute, tolerance.absolute)
-            assertEquals(if (absolute) defaults.relative else SemanticRational.ZERO, tolerance.relative)
+            val tenth = SemanticRational.of(bigIntOf(1), bigIntOf(10))
+            assertEquals(if (absolute) tenth else defaults.absolute, tolerance.absolute)
+            assertEquals(if (absolute) defaults.relative else tenth, tolerance.relative)
         }
     }
 

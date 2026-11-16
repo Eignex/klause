@@ -271,6 +271,26 @@ class MpsModeTest {
     }
 
     @Test
+    fun `relative tolerance flag should accept a cancelling row the default refuses`() {
+        val source = File.createTempFile("mps-cancelling-row", ".mps").apply {
+            writeText("ROWS\n N COST\n E R\nCOLUMNS\n X R 1\n Y R -1\nRHS\n RHS R 0\nENDATA\n")
+            deleteOnExit()
+        }
+        val point = listOf(BigFraction.ofLong(1_000_000_000L), BigFraction.ofLong(999_999_850L))
+
+        for ((args, accepted) in listOf(emptyArray<String>() to false,
+            arrayOf("--source-relative-tolerance", "1e-7") to true)) {
+            val common = CommonOptions()
+            parseArgs(args, commonFlagSpecs(common)) {}
+            val loaded = MpsMode.newSession().load(source.absolutePath, common)
+            val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
+            val original = assertIs<LinearSourceProblem>(invocation.source.originalSource)
+
+            assertEquals(accepted, original.checkMpsWitness(point) != null, args.joinToString(" "))
+        }
+    }
+
+    @Test
     fun `MPS caller tolerance and objective publication should retain original source units`() {
         val source = File.createTempFile("mps-shared-source-units", ".mps").apply {
             writeText(
