@@ -98,10 +98,13 @@ class SmtAnnotationsTest {
         }
         val commands = SExprReader("(assert (! $body :named label))").readAll()
 
-        val result = captureSmtSource(commands, ExecutionControl.Never)
+        val result = normalizeSmtSourceCommands(commands, SmtLibScope(ExecutionControl.Never), ExecutionControl.Never)
 
-        assertEquals(2, result.commands.size)
-        assertEquals("label", result.original?.symbols?.single()?.declaration?.name)
+        assertEquals(2, result.size)
+        val definition = result.first() as SExpr.SList
+        assertEquals(SExpr.Atom("define-fun"), definition.items[0])
+        assertEquals(SExpr.Atom("label"), definition.items[1])
+        assertEquals(SExpr.Atom("Bool"), definition.items[3])
     }
 
     @Test

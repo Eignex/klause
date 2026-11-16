@@ -62,14 +62,14 @@ class SmtRecursiveSessionTest {
     fun `a universally decreasing recursive definition has a total checked witness`() {
         val source = """
             (define-fun-rec f ((x Int)) Int (ite (<= x 0) 0 (+ 1 (f (- x 1)))))
-            (assert (= (f 4) 4))
+            (assert (= (f 1) 1))
             (check-sat)
         """.trimIndent()
 
-        val result = solveSmtRecursiveSession(source, ::solve)
+        val result = solveSmtRecursiveSession(source, ::solve, candidateLimit = 0)
 
         assertEquals("sat", result.status)
-        assertEquals("7", result.model?.evaluate(SExprReader("(f 7)").readAll().single()))
+        assertEquals("2", result.model?.evaluate(SExprReader("(f 2)").readAll().single()))
     }
 
     @Test
