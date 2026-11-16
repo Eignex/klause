@@ -41,8 +41,8 @@ internal class SmtArithmeticConstants(private val control: ExecutionControl) {
                 is SExpr.Atom -> values.addLast(atomRational(node.text) ?: return null)
                 is SExpr.SList -> {
                     val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
-                    if (head != "-" && head != "/" || head == "-" && node.items.size != 2 ||
-                        head == "/" && node.items.size != 3) return null
+                    if ((head != "-" && head != "/") || (head == "-" && node.items.size != 2) ||
+                        (head == "/" && node.items.size != 3)) return null
                     if (!combine) {
                         work.addLast(node to true)
                         for (argument in node.items.drop(1).asReversed()) work.addLast(argument to false)
