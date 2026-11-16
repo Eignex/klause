@@ -36,7 +36,8 @@ internal fun parseSmtLibSource(
         val exposed = exposeSmtGroundFunctions(datatypes, cancellation)
         val arrays = reduceSmtGroundArrays(exposed, cancellation)
         val ground = reduceSmtGroundFunctions(finishSmtGroundDatatypes(arrays, cancellation), cancellation)
-        val reduction = lowerSmtBitVectors(ground, cancellation)
+        val arithmetic = reduceSmtArithmetic(ground, cancellation)
+        val reduction = lowerSmtBitVectors(arithmetic, cancellation)
         lowerSmtReduction(reduction, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics)
     } catch (_: PolynomialSourceInterrupted) {
         null

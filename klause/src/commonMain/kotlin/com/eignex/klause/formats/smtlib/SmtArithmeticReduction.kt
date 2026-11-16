@@ -34,6 +34,14 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
     private var identity = 0
 
     fun reduce(): SmtReduction {
+        for (declaration in input.declarations) {
+            step()
+            used += polynomialSymbol(declaration.name)
+        }
+        for (name in input.privateBindings.keys) {
+            step()
+            used += polynomialSymbol(name)
+        }
         val work = ArrayDeque<SExpr>()
         input.commands.forEach(work::addLast)
         while (work.isNotEmpty()) {

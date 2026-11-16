@@ -545,6 +545,12 @@ certification keep UNKNOWN. Exact special identities are supported; arbitrary
 function-root equalities can stay uncertified. Floating residuals and algebraic
 approximations never establish a transcendental equality.
 
+For positive rational `x` and a nonnegative integer `n`, the exact identity
+`exp(n*log(x)) = x^n` retains a rational coordinate. Repeated squaring charges the
+current arithmetic owner and applies its coefficient size limit before each
+allocation. This supports the SMT integer exponent reduction without introducing
+another theory or bounding the exponent's source domain.
+
 ### State and resources
 
 Each pipeline call creates fresh mutable theory and strategy state; no native

@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.util.numbers.BigFraction
+import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -53,6 +54,17 @@ class ExactRealArithmeticTest {
         val reconstructed = arithmetic.function(ExactRealFunction.EXP, multiple)
 
         assertNull(reconstructed.rational)
+    }
+
+    @Test
+    fun `integral log powers should respect coefficient resources before allocation`() {
+        val arithmetic = ExactRealArithmetic(TranscendentalArithmetic(maximumBits = 64), AlgebraicArithmetic())
+        val logarithm = arithmetic.function(ExactRealFunction.LOG, arithmetic.rational(q(2)))
+        val multiple = arithmetic.multiply(listOf(arithmetic.rational(q(1000000000)), logarithm))
+
+        assertFailsWith<TranscendentalResourceLimit> {
+            arithmetic.function(ExactRealFunction.EXP, multiple)
+        }
     }
 
     @Test
