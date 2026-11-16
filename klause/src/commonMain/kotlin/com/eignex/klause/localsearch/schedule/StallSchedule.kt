@@ -30,10 +30,7 @@ internal class StallSchedule(
         require(stallNoise in 0.0..1.0) { "stallNoise ∈ [0, 1], got $stallNoise" }
     }
 
-    private var lastSeenStep: Long = -1L
-    private var lastDropStep: Long = 0L
-    private var lastCost: Long = Long.MAX_VALUE
-    private var lastFraction: Double = 0.0
+    private val progress = ProgressWindow(trackFraction = true)
 
     /** Whether the search is currently stalled (set by [update]). */
     var stalled: Boolean = false
@@ -44,20 +41,8 @@ internal class StallSchedule(
 
     /** Advance the stall window to the engine's `(step, cost)`, recomputing [stalled] and [level]. */
     fun update(step: Long, cost: Long, fraction: Double = 0.0) {
-        if (step < lastSeenStep) {
-            lastDropStep = step
-            lastCost = cost
-            lastFraction = fraction
-            lastSeenStep = step
-        } else if (step != lastSeenStep) {
-            if (cost < lastCost || (cost == lastCost && fraction < lastFraction)) {
-                lastCost = cost
-                lastFraction = fraction
-                lastDropStep = step
-            }
-            lastSeenStep = step
-        }
-        stalled = afterStall > 0 && cost > 0L && step - lastDropStep >= afterStall
+        progress.observe(step, cost, fraction)
+        stalled = afterStall > 0 && cost > 0L && progress.elapsed(step) >= afterStall
         level = if (stalled) stallNoise else baseNoise
     }
 
@@ -68,10 +53,7 @@ internal class StallSchedule(
     override fun observe(round: RoundLog) = Unit
 
     override fun reset() {
-        lastSeenStep = -1L
-        lastDropStep = 0L
-        lastCost = Long.MAX_VALUE
-        lastFraction = 0.0
+        progress.reset()
         stalled = false
         level = baseNoise
     }

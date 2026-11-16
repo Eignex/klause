@@ -16,6 +16,20 @@ internal open class SuccessorCycleInvariant(
 
     protected val positionOfVar: IntIntMap = IntIntMap.build(succ, IntArray(n) { it }, absent = -1)
 
+    protected fun seedFullCycle(state: LocalSearchState): Boolean {
+        for (i in 0 until n) {
+            val target = (i + 1) % n
+            if (target.toLong() !in state.rootDomains[succ[i]]) return false
+            if (state.assumptions.isFrozenInt(succ[i]) && state.assignment.intValue(succ[i]) != target.toLong()) {
+                return false
+            }
+        }
+        for (i in 0 until n) {
+            if (!state.assumptions.isFrozenInt(succ[i])) state.assignment.setInt(succ[i], ((i + 1) % n).toLong())
+        }
+        return true
+    }
+
     override val providesImplicitNeighbourhood: Boolean get() = true
 
     override fun initialize(state: LocalSearchState, factorId: Int) {

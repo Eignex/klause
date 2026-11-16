@@ -18,6 +18,30 @@ import kotlin.test.assertNull
 class FeasibilityJumpTest {
 
     @Test
+    fun `successful perturbations should restart their window and re-anchor after rewind`() {
+        val problem = Problem(1, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, false)))))
+        for (targeted in listOf(false, true)) {
+            val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
+            state.assignment.setBool(0, true)
+            state.recompute()
+            val perturbation: (LocalSearchState) -> Move? =
+                if (targeted) StallKickPerturbation(2, 1) else StallPerturbation(2)
+            assertNull(perturbation(state))
+            state.tabu.step = 2L
+            assertEquals(Move.BoolFlip(0), perturbation(state))
+            state.tabu.step = 3L
+            assertNull(perturbation(state))
+            state.tabu.step = 0L
+            assertNull(perturbation(state))
+            state.tabu.step = 1L
+            assertNull(perturbation(state))
+            state.tabu.step = 2L
+
+            assertEquals(Move.BoolFlip(0), perturbation(state))
+        }
+    }
+
+    @Test
     fun `stall kicks should preserve maintained Boolean outputs`() {
         for (defined in listOf(false, true)) {
             val problem = Problem(

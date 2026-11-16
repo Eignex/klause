@@ -17,6 +17,7 @@ import com.eignex.klause.localsearch.movesource.SatisfiedStructured
 import com.eignex.klause.localsearch.movesource.StallKick
 import com.eignex.klause.localsearch.movesource.StallSwaps
 import com.eignex.klause.localsearch.movesource.ViolatedRepairs
+import com.eignex.klause.localsearch.schedule.ProgressWindow
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.StallSchedule
 import com.eignex.klause.localsearch.schedule.WeightSchedule
@@ -181,27 +182,15 @@ internal class StallKickPerturbation(private val after: Int, stallKickVars: Int)
 
     private val stallKick = StallKick(stallKickVars)
     private val kickSink = MoveSink()
-    private var lastSeenStep: Long = -1L
-    private var lastDropStep: Long = 0L
-    private var lastCost: Long = Long.MAX_VALUE
+    private val progress = ProgressWindow()
 
     override fun invoke(state: LocalSearchState): Move? {
-        if (state.step < lastSeenStep) {
-            lastDropStep = state.step
-            lastCost = state.cost
-            lastSeenStep = state.step
-        } else if (state.step != lastSeenStep) {
-            if (state.cost < lastCost) {
-                lastCost = state.cost
-                lastDropStep = state.step
-            }
-            lastSeenStep = state.step
-        }
-        if (state.cost <= 0L || state.step - lastDropStep < after) return null
+        progress.observe(state.step, state.cost)
+        if (state.cost <= 0L || progress.elapsed(state.step) < after) return null
         kickSink.clear()
         stallKick.generate(state, kickSink)
         val kick = kickSink.list.firstOrNull() ?: return null
-        lastDropStep = state.step // fresh window after the perturbation
+        progress.restartAt(state.step)
         return kick
     }
 }

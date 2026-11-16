@@ -4,6 +4,7 @@ import com.eignex.klause.factor.arithmetic.internals.collectHoleAndBoundAntecede
 import com.eignex.klause.factor.circuit.internals.buildSuccWatches
 import com.eignex.klause.factor.circuit.internals.circuitReachesAll
 import com.eignex.klause.factor.circuit.internals.cpGateShouldSkip
+import com.eignex.klause.factor.circuit.internals.excludeClaimedSuccessors
 import com.eignex.klause.factor.circuit.internals.tightenSuccToRange
 import com.eignex.klause.factor.circuit.internals.walkPredChain
 import com.eignex.klause.ir.Lit
@@ -244,26 +245,11 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         return true
     }
 
-    // A fixed incoming edge excludes every competing incoming edge, including interior domain values.
-    private fun excludeClaimed(state: PropagationState, claimed: IntArray): Boolean {
-        val targets = IntArrayList()
-        for (target in claimed.indices) if (claimed[target] >= 0) targets.add(target)
-        if (targets.isEmpty()) return true
-        for (i in succ.indices) {
-            val v = succ[i]
-            if (state.intDomains[v].min == state.intDomains[v].max) continue
-            for (k in 0 until targets.size) {
-                val target = targets[k]
-                val owner = claimed[target]
-                if (owner == i || target.toLong() !in state.intDomains[v]) continue
-                val reason = Reason(state).fixed(owner)
-                if (!state.excludeIntValue(v, target.toLong(), reason.build())) {
-                    return fail(reason.fixed(i))
-                }
-            }
+    private fun excludeClaimed(state: PropagationState, claimed: IntArray): Boolean =
+        excludeClaimedSuccessors(state, succ, claimed) { variable, target, owner, competitor ->
+            val reason = Reason(state).fixed(owner)
+            if (state.excludeIntValue(variable, target, reason.build())) true else fail(reason.fixed(competitor))
         }
-        return true
-    }
 
     /**
      * Dominator-based arc removal. Split node 0 into a virtual
