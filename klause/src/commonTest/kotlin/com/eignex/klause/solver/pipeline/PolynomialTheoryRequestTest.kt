@@ -197,7 +197,8 @@ class PolynomialTheoryRequestTest {
             PolynomialTheoryParams(maximumDenseCoefficients = 1),
         )
 
-        assertEquals(TerminationReason.RepresentationDeclined, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
+        val result = assertIs<OpenTheoryResult.Unknown>(execution.result)
+        assertEquals(TerminationReason.RepresentationDeclined, result.reason)
         assertEquals(PolynomialTheoryResource.DenseCoefficients, execution.resource)
     }
 }
