@@ -426,14 +426,7 @@ class SmtQfConformanceTest {
     @Test
     fun `sessions preserve composite models across query only assumptions`() {
         val replies = ArrayList<String>()
-        val session = SmtLibSession({ text ->
-            val parsed = SmtLib.parse(text)
-            when (val result = solve(parsed)) {
-                is OpenTheoryResult.Sat -> SmtSessionResult("sat", parsed.reconstructSessionModel(result.assignment))
-                is OpenTheoryResult.Unsat -> SmtSessionResult("unsat")
-                is OpenTheoryResult.Unknown -> error("inconclusive session conformance solve: ${result.reason}")
-            }
-        }, replies::add)
+        val session = SmtLibSession(::solveSession, replies::add)
 
         session.execute(SExprReader("""
             (set-option :produce-models true)
@@ -535,6 +528,64 @@ class SmtQfConformanceTest {
                 assignment::realValue, control) { values, _ ->
                 family.instantiate("a", emptyList(), sort, values)
             }
+        }
+    }
+
+    @Test
+    fun `mutual recursive definitions retain total interpretations at new arguments`() {
+        val source = """
+            (define-funs-rec
+                ((even ((n Int)) Bool) (odd ((n Int)) Bool))
+                ((ite (<= n 0) true (odd (- n 1)))
+                 (ite (<= n 0) false (even (- n 1)))))
+            (assert (even 2))
+            (check-sat)
+        """.trimIndent()
+
+        val result = solveSmtRecursiveSession(source, ::solveSession)
+
+        assertEquals("sat", result.status)
+        val model = requireNotNull(result.model)
+        assertEquals("false", model.evaluate(SExprReader("(even 3)").readAll().single()))
+        assertEquals("true", model.evaluate(SExprReader("(odd 3)").readAll().single()))
+    }
+
+    @Test
+    fun `mutual recursive equations refute inconsistent ground applications`() {
+        val source = """
+            (define-funs-rec
+                ((f ((n Int)) Int) (g ((n Int)) Int))
+                ((g n) (f n)))
+            (assert (distinct (f 0) (g 0)))
+            (check-sat)
+        """.trimIndent()
+
+        val result = solveSmtRecursiveSession(source, ::solveSession)
+
+        assertEquals("unsat", result.status)
+    }
+
+    @Test
+    fun `assignment queries evaluate true and false named terms in the checked model`() {
+        val replies = ArrayList<String>()
+        val session = SmtLibSession(::solveSession, replies::add)
+
+        session.execute(SExprReader("""
+            (set-option :produce-assignments true)
+            (assert (or (! true :named truth) (! false :named falsehood)))
+            (check-sat)
+            (get-assignment)
+        """.trimIndent()))
+
+        assertEquals(listOf("sat", "((truth true) (falsehood false))"), replies)
+    }
+
+    private fun solveSession(text: String): SmtSessionResult {
+        val parsed = SmtLib.parse(text)
+        return when (val result = solve(parsed)) {
+            is OpenTheoryResult.Sat -> SmtSessionResult("sat", parsed.reconstructSessionModel(result.assignment))
+            is OpenTheoryResult.Unsat -> SmtSessionResult("unsat")
+            is OpenTheoryResult.Unknown -> error("inconclusive session conformance solve: ${result.reason}")
         }
     }
 

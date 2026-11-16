@@ -12,7 +12,9 @@ The conformance additions below are pending execution on the assembled feature
 stack. Entries describe the required contract, not an assertion that untested
 draft implementations satisfy it. The flat per-symbol catalogue is
 [`coverage.tsv`](coverage.tsv); its references resolve to the fixture groups below
-and the focused test classes in this directory.
+and the focused test classes in this directory. A reference of the form
+`TestClass#test name` identifies one exact test; unqualified class references
+identify the associated focused family suite.
 
 ## Specification identity
 
@@ -138,10 +140,11 @@ that a required operator or command has been implemented.
 
 ## Combined fixture identities
 
-Each fixture uses the public source-solving path. SAT fixtures read reconstructed
-values directly and evaluate the relevant table/store lookup independently of
-the source lowerer; UNSAT fixtures assert a contradiction in an interaction
-between families.
+Solve fixtures use the public source-solving path. Model controls read
+reconstructed values directly and evaluate the relevant table/store lookup
+independently of the source lowerer; UNSAT fixtures assert a contradiction in an
+interaction between families. Native representation controls construct their
+exact authority explicitly, and rejection controls exercise publication gates.
 
 | ID | Test name | Independent expectation |
 | --- | --- | --- |
@@ -173,6 +176,9 @@ between families.
 | C26 | `qualified numeric aliases retain real array index values` | SAT; qualified builtin results preserve alias-resolved Real sorts during composite reconstruction |
 | C27 | `retained polymorphic families construct deep array ranks without recursion` | SAT; a later rank contains 4096 array layers and a correctly typed scalar default |
 | C28 | `retained deep rank construction observes its current witness allowance` | Later model-rank construction stops under its own current witness allowance |
+| C29 | `mutual recursive definitions retain total interpretations at new arguments` | SAT; mutually defined parity functions retain their total meaning on later inputs |
+| C30 | `mutual recursive equations refute inconsistent ground applications` | UNSAT; simultaneous recursive equations require both observed applications to agree |
+| C31 | `assignment queries evaluate true and false named terms in the checked model` | Actual SAT/assignment transcript reports both selected truth values |
 
 The V fixtures exercise typed `get-value` evaluation in a retained empty model,
 which still interprets every standard builtin. They complement source-lowering

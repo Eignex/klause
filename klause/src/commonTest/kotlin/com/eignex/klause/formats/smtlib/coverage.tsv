@@ -22,7 +22,7 @@ Ints	<	V02; SmtArithmeticReductionTest
 Ints	<=	V02; SmtArithmeticReductionTest
 Ints	>	V02; SmtArithmeticReductionTest
 Ints	>=	V02; SmtArithmeticReductionTest
-Ints	**	V03; C11; SmtArithmeticReductionTest
+Ints	**	V03; SmtArithmeticReductionTest#symbolic integer powers should have exact integer witnesses; SmtArithmeticReductionTest#symbolic integer powers should refute an incorrect value
 Ints	(_ divisible n)	V03; C11; SmtArithmeticReductionTest
 Reals	Real	V04; SmtLibRealTest; SmtArithmeticReductionTest
 Reals	NUMERAL	V04; SmtLibRealTest; SmtArithmeticReductionTest
@@ -91,19 +91,19 @@ FixedSizeBitVectors	(_ int_to_bv m)	V10; C07; SmtLibBitVectorTest
 ArraysEx	Array	C01; C02; C04; C05; C08; SmtGroundArraysTest
 ArraysEx	select	C01; C02; C04; C05; C08; SmtGroundArraysTest
 ArraysEx	store	C01; C02; C04; C05; C08; SmtGroundArraysTest
-ArraysEx	extensional equality	C01; C02; C04; C05; C08; SmtGroundArraysTest
-Datatypes	constructor	C03; C04; C05; C06; C13; C20; SmtGroundDatatypesTest
-Datatypes	selector	C03; C04; C05; C06; C13; C20; SmtGroundDatatypesTest
-Datatypes	(_ is constructor)	C03; C04; C05; C06; C13; C20; SmtGroundDatatypesTest
-Datatypes	match	C03; C04; C05; C06; C13; C20; SmtGroundDatatypesTest
-Datatypes	parametric datatype	C03; C04; C05; C06; C13; C20; SmtGroundDatatypesTest
-Datatypes	recursive datatype	C03; C04; C05; C06; C13; C20; SmtGroundDatatypesTest
-Datatypes	mutually recursive datatypes	C03; C04; C05; C06; C13; C20; SmtGroundDatatypesTest
+ArraysEx	extensional equality	SmtGroundArraysTest#array indexes should respect extensional equality; SmtGroundArraysTest#functions should agree on extensionally equal array arguments
+Datatypes	constructor	C03; C04; C05; C06; SmtGroundDatatypesTest#different enumeration constructors are distinct
+Datatypes	selector	C03; C20; SmtGroundDatatypesTest#testers and selectors constrain the original constructor
+Datatypes	(_ is constructor)	C13; SmtGroundDatatypesTest#polymorphic expansion preserves negative constructor testers
+Datatypes	match	SmtGroundDatatypesTest#match binds constructor fields lexically; SmtGroundDatatypesTest#polymorphic expansion preserves match constructor guards
+Datatypes	parametric datatype	C20; SmtGroundDatatypesTest#qualified parametric constructors retain their instantiation
+Datatypes	recursive datatype	SmtGroundDatatypesTest#recursive values cannot contain themselves; SmtGroundDatatypesTest#unconstrained recursive identities reconstruct distinct finite values
+Datatypes	mutually recursive datatypes	SmtGroundDatatypesTest#mutually recursive cycles are refuted
 Terms	simple symbol	C10; C13; C14; C15; SExprTest; SmtLibScopeTest
 Terms	quoted symbol	C10; C13; C14; C15; SExprTest; SmtLibScopeTest
 Terms	indexed identifier	C10; C13; C14; C15; SExprTest; SmtLibScopeTest
 Terms	qualified identifier	C10; C13; C14; C15; SExprTest; SmtLibScopeTest
-Terms	let	C15; SmtLibScopeTest; SmtGroundFunctionsTest
+Terms	let	SmtGroundFunctionsTest#macro expansion and parallel lets preserve their lexical bindings; SmtAnnotationsTest#named terms can contain their own closed let bindings
 Terms	!	C21; SmtAnnotationsTest; SmtSessionValidationTest
 Terms	attribute	C21; SmtAnnotationsTest; SmtSessionValidationTest
 Terms	:named	C21; SmtAnnotationsTest; SmtSessionValidationTest
@@ -114,33 +114,33 @@ Source model	abstract domain values	C24; SmtGroundFunctionsTest
 Source model	fresh model formals	C16; SmtSourceModelTest
 Source model	lazy polymorphic ranks	C17; C27; C28; SmtPolymorphismTest; SmtFixedModelTest
 Source model	original publication checks	C22; SourceWitnessValidationTest
-Resource	deep array sort	R01; R02; R03; R04
-Resource	deep applied sort	R01; R02; R03; R04
-Resource	current structural allowance	R01; R02; R03; R04
-Resource	borrowed sort arguments	R01; R02; R03; R04
+Resource	deep array sort	R01
+Resource	deep applied sort	R02
+Resource	current structural allowance	R03
+Resource	borrowed sort arguments	R04
 Resource	deep lazy model ranks	C27; C28
 Commands	assert	C23; SmtLibSessionTest; SmtSessionValidationTest
 Commands	check-sat	C23; SmtLibSessionTest; SmtSessionValidationTest
 Commands	check-sat-assuming	C23; SmtLibSessionTest; SmtSessionValidationTest
-Commands	get-model	C23; SmtLibSessionTest; SmtSessionValidationTest
+Commands	get-model	C16; SmtLibSessionTest#model queries require enabled production and a current sat result
 Commands	get-value	C23; SmtLibSessionTest; SmtSessionValidationTest
 Commands	declare-const	SmtGroundFunctionsTest; SmtLibSessionTest
 Commands	declare-fun	SmtGroundFunctionsTest; SmtLibSessionTest
 Commands	declare-sort	SmtGroundFunctionsTest; SmtLibSessionTest
 Commands	define-sort	SmtGroundFunctionsTest; SmtLibSessionTest
 Commands	declare-sort-parameter	C09; C17; SmtPolymorphismTest
-Commands	define-const	C15; SmtAnnotationsTest; SmtSessionValidationTest
+Commands	define-const	SmtAnnotationsTest#define const is a nullary function definition
 Commands	define-fun	C15; SmtAnnotationsTest; SmtSessionValidationTest
 Commands	define-fun-rec	SmtRecursiveSessionTest; SmtSessionValidationTest
-Commands	define-funs-rec	SmtRecursiveSessionTest; SmtSessionValidationTest
+Commands	define-funs-rec	C29; C30
 Commands	declare-datatype	C03; C04; C05; SmtGroundDatatypesTest
-Commands	declare-datatypes	C03; C04; C05; SmtGroundDatatypesTest
+Commands	declare-datatypes	C20; SmtGroundDatatypesTest#mutually recursive cycles are refuted
 Commands	push	SmtLibSessionTest; SmtSessionChannelsTest
 Commands	pop	SmtLibSessionTest; SmtSessionChannelsTest
 Commands	reset	SmtLibSessionTest; SmtSessionChannelsTest
 Commands	reset-assertions	SmtLibSessionTest; SmtSessionChannelsTest
 Commands	get-assertions	P01; SmtSessionValidationTest
-Commands	get-assignment	SmtSessionValidationTest
+Commands	get-assignment	C31; SmtSessionValidationTest#named Boolean and arithmetic terms keep their distinct assignment roles
 Commands	get-info	P03; P05; P06; SmtSessionValidationTest; SmtSessionChannelsTest; SmtLibSessionTest
 Commands	get-option	P04; P06; SmtSessionValidationTest; SmtSessionChannelsTest; SmtLibSessionTest
 Commands	set-info	SmtSessionValidationTest; SmtSessionChannelsTest; SmtLibSessionTest

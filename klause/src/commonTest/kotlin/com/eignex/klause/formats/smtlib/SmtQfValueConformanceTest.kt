@@ -12,12 +12,19 @@ class SmtQfValueConformanceTest {
             "false" to "false",
             "(not true)" to "false",
             "(=> false true false)" to "true",
+            "(=> true true false)" to "false",
             "(and true false true)" to "false",
+            "(and true true true)" to "true",
             "(or false true false)" to "true",
+            "(or false false false)" to "false",
             "(xor true true true)" to "true",
+            "(xor true false true)" to "false",
             "(= 7 7 7)" to "true",
+            "(= 7 7 8)" to "false",
             "(distinct 1 2 3)" to "true",
+            "(distinct 1 2 1)" to "false",
             "(ite false #b0 #b1)" to "#b1",
+            "(ite true #b0 #b1)" to "#b0",
         ))
     }
 
@@ -32,10 +39,19 @@ class SmtQfValueConformanceTest {
             "(abs (- 7))" to "7",
             "(div (- 7) (- 3))" to "3",
             "(mod (- 7) (- 3))" to "2",
+            "(div (- 7) 3)" to "(- 3)",
+            "(mod (- 7) 3)" to "2",
+            "(div 7 (- 3))" to "(- 2)",
+            "(mod 7 (- 3))" to "1",
+            "(div 25 2 3)" to "4",
             "(< (- 1) 0 1)" to "true",
+            "(< 0 0 1)" to "false",
             "(<= 0 0 1)" to "true",
+            "(<= 0 1 0)" to "false",
             "(> 1 0 (- 1))" to "true",
+            "(> 1 0 0)" to "false",
             "(>= 1 0 0)" to "true",
+            "(>= 1 0 1)" to "false",
         ))
     }
 
@@ -47,7 +63,10 @@ class SmtQfValueConformanceTest {
             "(** 0 (- 2))" to "0",
             "(** (- 2) (- 3))" to "0",
             "(** (- 1) (- 3))" to "(- 1)",
+            "(** (- 1) (- 2))" to "1",
             "((_ divisible 18446744073709551618) 36893488147419103236)" to "true",
+            "((_ divisible 3) 7)" to "false",
+            "((as (_ |divisible| 3) Bool) 6)" to "true",
         ))
     }
 
@@ -65,9 +84,13 @@ class SmtQfValueConformanceTest {
             "(is_int 2.0)" to "true",
             "(is_int 0.5)" to "false",
             "(< 0.25 0.5 1.0)" to "true",
+            "(< 0.25 0.25 1.0)" to "false",
             "(<= 0.25 0.25 1.0)" to "true",
+            "(<= 0.25 1.0 0.5)" to "false",
             "(> 1.0 0.5 0.25)" to "true",
+            "(> 1.0 0.25 0.25)" to "false",
             "(>= 1.0 0.25 0.25)" to "true",
+            "(>= 1.0 0.25 0.5)" to "false",
         ))
     }
 
@@ -85,6 +108,7 @@ class SmtQfValueConformanceTest {
             "(bvnor #b1010 #b1100)" to "#b0001",
             "(bvxnor #b1010 #b1100)" to "#b1001",
             "(bvcomp #b1010 #b1010)" to "#b1",
+            "(bvcomp #b1010 #b1011)" to "#b0",
         ))
     }
 
@@ -97,9 +121,16 @@ class SmtQfValueConformanceTest {
             "(bvmul #b1010 #b1100 #b0011)" to "#b1000",
             "(bvudiv #b1010 #b0011)" to "#b0011",
             "(bvurem #b1010 #b0011)" to "#b0001",
+            "(bvudiv #b0011 #b0000)" to "#b1111",
+            "(bvurem #b1010 #b0000)" to "#b1010",
             "(bvsdiv #b1010 #b0011)" to "#b1110",
+            "(bvsdiv #b1010 #b0000)" to "#b0001",
+            "(bvsdiv #b0011 #b0000)" to "#b1111",
+            "(bvsdiv #b1000 #b1111)" to "#b1000",
             "(bvsrem #b1010 #b0100)" to "#b1110",
+            "(bvsrem #b1010 #b0000)" to "#b1010",
             "(bvsmod #b1010 #b0100)" to "#b0010",
+            "(bvsmod #b1010 #b0000)" to "#b1010",
         ))
     }
 
@@ -116,8 +147,11 @@ class SmtQfValueConformanceTest {
             "((_ rotate_left 1) #b1010)" to "#b0101",
             "((_ rotate_right 100000000000000000001) #b1010)" to "#b0101",
             "(bvshl #b1010 #b0001)" to "#b0100",
+            "(bvshl #b1010 #b0100)" to "#b0000",
             "(bvlshr #b1010 #b0001)" to "#b0101",
+            "(bvlshr #b1010 #b0100)" to "#b0000",
             "(bvashr #b1010 #b0001)" to "#b1101",
+            "(bvashr #b1010 #b0100)" to "#b1111",
         ))
     }
 
