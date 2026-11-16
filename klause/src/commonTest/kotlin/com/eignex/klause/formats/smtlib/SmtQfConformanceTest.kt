@@ -554,6 +554,29 @@ class SmtQfConformanceTest {
     }
 
     @Test
+    fun `qualified unobserved function families retain their selected result rank`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-fun choose (Bool) A)
+            (assert true)
+        """.trimIndent())
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+        val model = parsed.reconstructSessionModel(assignment)
+        val expression = "((as choose Real) true)"
+
+        val value = model.evaluate(SExprReader(expression).readAll().single())
+
+        assertEquals(value, model.evaluate(SExprReader(expression).readAll().single()))
+        assertEquals("true", model.evaluate(SExprReader("(= $expression $value)").readAll().single()))
+        assertEquals("true", model.evaluate(SExprReader("""
+            (= ((as choose (Array Bool Real)) true) ((as choose (Array Bool Real)) true))
+        """.trimIndent()).readAll().single()))
+        assertFailsWith<UnsupportedSmtException> {
+            model.evaluate(SExprReader("((as choose Real) 3)").readAll().single())
+        }
+    }
+
+    @Test
     fun `retained polymorphic families construct deep array ranks without recursion`() {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)

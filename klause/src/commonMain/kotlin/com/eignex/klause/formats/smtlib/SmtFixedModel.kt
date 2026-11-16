@@ -325,7 +325,7 @@ internal class SmtFixedModel(
                 val name = symbol((selected as SExpr.Atom).text)
                 if (name in constructors) return constructorValue(name, args, qualification)
                 if (name in selectors) return selectorValue(name, args.single(), qualification)
-                return if (model.values.any { symbol(it.first.name) == name }) function(name, args, qualification)
+                return if (name in declaredNames) function(name, args, qualification)
                 else operation(selected, args).let {
                     if (qualification == SmtSort.Real && it is SmtValue.Integer) real(exact(it)) else it
                 }

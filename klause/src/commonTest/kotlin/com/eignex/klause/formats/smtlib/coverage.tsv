@@ -113,7 +113,7 @@ Source model	total arithmetic choices	C19; C34; SmtFixedModelTest; SmtArithmetic
 Source model	total selector choices	C20; SmtGroundDatatypesTest
 Source model	abstract domain values	C24; SmtGroundFunctionsTest
 Source model	fresh model formals	C16; SmtSourceModelTest
-Source model	lazy polymorphic ranks	C17; C27; C28; SmtPolymorphismTest; SmtFixedModelTest
+Source model	lazy polymorphic ranks	C17; C27; C28; C37; SmtPolymorphismTest; SmtFixedModelTest
 Source model	original publication checks	C22; SourceWitnessValidationTest
 Resource	deep array sort	R01
 Resource	deep applied sort	R02
