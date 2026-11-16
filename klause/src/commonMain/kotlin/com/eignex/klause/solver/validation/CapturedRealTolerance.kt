@@ -88,18 +88,21 @@ internal fun capturedSourceSlack(
     return if (absolute > scaled) absolute else scaled
 }
 
-// Whether [value] agrees with the proved [optimum] within the gap of [policy]; a missing or zero policy requires
-// equal values. The gap compares two objective evaluations and proves no bound of its own.
-internal fun withinOptimalityGap(policy: OptimalityTolerance?, value: BigFraction, optimum: BigFraction): Boolean {
+// Whether two evaluations `value` and `optimum` of one point's objective agree within the gap of `policy`:
+// `abs(value - optimum) <= max(absolute, relative * scale)`, where `scale` is the sum of the point's absolute objective
+// term activities. A missing or zero policy requires equal values. The gap proves no bound of its own.
+internal fun withinOptimalityGap(
+    policy: OptimalityTolerance?,
+    value: BigFraction,
+    optimum: BigFraction,
+    scale: BigFraction,
+): Boolean {
     val difference = (value - optimum).magnitude()
     if (difference.isZero) return true
     if (policy == null || policy.isExact) return false
     val absolute = BigFraction.of(policy.absolute.numerator, policy.absolute.denominator)
     val relative = BigFraction.of(policy.relative.numerator, policy.relative.denominator)
-    val valueMagnitude = value.magnitude()
-    val optimumMagnitude = optimum.magnitude()
-    val scale = if (valueMagnitude > optimumMagnitude) valueMagnitude else optimumMagnitude
-    return difference <= absolute || difference <= relative * scale
+    return difference <= absolute || difference <= relative * scale.magnitude()
 }
 
 // The tolerance verdict of a projected source point: every real declaration and every relation over a real

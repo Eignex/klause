@@ -43,11 +43,13 @@ declarations with an explicit range keep it (see
 `max(absolute, relative * scale)`, where a row's scale is the larger of its finite
 bound magnitude and the sum of absolute term activities. Zero components require
 exact checking, and integrality is always exact.
-`OptimalityTolerance` declares when two evaluations of an objective agree: an
-incumbent value `v` and a proved optimum `p` agree when
-`abs(v - p) <= max(absolute, relative * max(abs(v), abs(p)))`. It qualifies a
-reported optimum only; it bounds no search and makes no unproved bound an optimum.
-Zero components require equal values.
+`OptimalityTolerance` declares when two evaluations of one point's objective agree:
+a source value `v` and a native value `p` agree when
+`abs(v - p) <= max(absolute, relative * scale)`, where `scale` is the sum of the
+point's absolute objective term activities, constant excluded. It qualifies a
+reported optimum only; it bounds no search, makes no unproved bound an optimum and
+makes no other point optimal. Zero components require equal values, and an exact
+feasibility tolerance makes the effective gap zero.
 
 `EffectiveSourceSemantics` keeps both the defaults and the effective policy.
 `isApproximate` marks a grid or positive tolerance and `hasOverrides` records any

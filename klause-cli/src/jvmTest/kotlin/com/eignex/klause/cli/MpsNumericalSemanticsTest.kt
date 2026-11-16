@@ -44,7 +44,7 @@ class MpsNumericalSemanticsTest {
         assertEquals(2, Regex.fromLiteral(feasibility).findAll(exported).count())
         assertContains(exported, "\"undeclaredIntegers\":{\"lower\":\"0\",\"upper\":\"1\"}")
         assertContains(exported, "\"undeclaredReals\":{\"lower\":\"0/1\",\"upper\":null}")
-        assertContains(exported, "\"integrality\":\"exact\",\"objective\":\"exact\"")
+        assertContains(exported, "\"integrality\":\"exact\",\"objectiveEvaluation\":\"exact\"")
     }
 
     @Test

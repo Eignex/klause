@@ -9,6 +9,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
+import com.eignex.klause.solver.validation.capturedSourceSlack
 import com.eignex.klause.solver.validation.checkLinearSourceRecession
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.solver.validation.levelLinearSourceRay
@@ -363,8 +364,9 @@ internal fun executeLinearSource(
     val equivalent = prepared.view.exact && prepared.claimsCoverTolerance && nativeClaimsUnrestricted
     val acceptedOptimal = incumbent?.objective?.let { value -> value == prepared.acceptedObjectiveBound } == true
     val nativeOptimalAttained = nativeOptimum?.let { point ->
-        prepared.matchesNativeObjective(point, nativeOptimalValue, stop) && incumbent?.let {
-            prepared.matchesNativeObjective(it, nativeOptimalValue, stop)
+        prepared.matchesNativeObjective(point, nativeOptimalValue, samePoint = true, stop) && incumbent?.let {
+            val samePoint = it.values == point.values
+            prepared.matchesNativeObjective(it, nativeOptimalValue, samePoint, stop)
         } == true
     } == true
     val conclusion = when {
@@ -413,15 +415,37 @@ internal fun executeLinearSource(
     }.also { it.preparationStats = result.preparationStats }
 }
 
+// Whether `point`'s source objective agrees with the native optimal value. An objective over integer columns alone is
+// evaluated exactly on both sides, so it must agree exactly. The native optimal point's own value may differ by the
+// optimality gap, which scales with its objective term magnitudes because evaluation noise does; any other accepted
+// point must agree within the feasibility slack, so the gap never makes a different point optimal.
 private fun PreparedLinearSource.matchesNativeObjective(
     point: LinearSourceWitness,
     nativeValue: BigFraction?,
+    samePoint: Boolean,
     stop: ExecutionControl,
 ): Boolean {
     val value = point.objective ?: return false
     val native = nativeValue?.let { it * view.objectiveScale.reciprocal() } ?: return false
-    val policy = view.source.semantics.effective.optimalityTolerance
-    return withinOptimalityGap(policy, value, native) && !stop()
+    if (value == native) return !stop()
+    val objective = view.source.objective ?: return false
+    val semantics = view.source.semantics.effective
+    val feasibility = semantics.feasibilityTolerance
+    if (feasibility == null || feasibility.isExact || view.objective?.realCoefficientValues?.isEmpty() != false) {
+        return false
+    }
+    val values = point.values
+    var terms = BigFraction.ZERO
+    for (term in objective.termValues) {
+        stop.charge(1L)
+        if (stop()) return false
+        terms += (BigFraction.of(term.coefficient.numerator, term.coefficient.denominator) * values[term.column])
+            .magnitude()
+    }
+    if (samePoint) return withinOptimalityGap(semantics.optimalityTolerance, value, native, terms) && !stop()
+    val constant = BigFraction.of(objective.constant.numerator, objective.constant.denominator).magnitude()
+    val difference = (value - native).magnitude()
+    return difference <= capturedSourceSlack(feasibility, native, native.magnitude() + constant + terms) && !stop()
 }
 
 // A working ray proves the source unbounded as read, or once leveled onto the exact rows its projection keeps level.
@@ -434,3 +458,5 @@ private fun PreparedLinearSource.sourceRay(direction: List<BigFraction>): List<B
     if (direction.size != view.model.numRealVars) return null
     return view.columns.map { if (Term.isReal(it)) direction[Term.realVar(it)] else BigFraction.ZERO }
 }
+
+private fun BigFraction.magnitude(): BigFraction = if (signum() < 0) negated() else this

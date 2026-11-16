@@ -8,6 +8,7 @@ import com.eignex.klause.formats.opb.opbSemantics
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.formats.xcsp3.xcsp3Semantics
 import com.eignex.klause.ir.FloatSemantics
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
@@ -142,6 +143,16 @@ class SourceOptionsTest {
     }
 
     @Test
+    fun `a zero feasibility tolerance flag should make the optimality gap exact`() {
+        val common = CommonOptions()
+        parseArgs(arrayOf("--source-absolute-tolerance", "0"), commonFlagSpecs(common)) {}
+
+        common.sourceOverrides(mpsSemantics)
+
+        assertEquals(OptimalityTolerance(), common.sourceSemantics?.effective?.optimalityTolerance)
+    }
+
+    @Test
     fun `exact source controls should accept an explicit zero tolerance component`() {
         val common = CommonOptions()
         parseArgs(arrayOf("--exact", "--source-absolute-tolerance", "0"), commonFlagSpecs(common)) {}
@@ -175,6 +186,7 @@ class SourceOptionsTest {
             Xcsp3Mode to arrayOf("--unbounded-int-lo", "1"),
             SmtLibMode to arrayOf("--source-relative-tolerance", "0"),
             SmtLibMode to arrayOf("--source-relative-optimality-tolerance", "0"),
+            MiniZincMode to arrayOf("--source-relative-optimality-tolerance", "0"),
             MiniZincMode to arrayOf("--pin-absent-optional-values", "false"),
             MpsMode to arrayOf("--pin-absent-optional-values", "false"),
         )

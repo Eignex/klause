@@ -8,7 +8,6 @@ import com.eignex.klause.config.MINIZINC_UNBOUNDED_DEFAULT
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.NumericAuthority
-import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
@@ -16,7 +15,6 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
-import com.eignex.klause.ir.numericalOptimalityTolerance
 import com.eignex.klause.ir.numericalSourceTolerance
 import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.util.numbers.BIG_ONE
@@ -33,7 +31,6 @@ val flatZincSemantics: SourceSemantics = SourceSemantics(
     undeclaredIntegers = UndeclaredIntegerBounds(-MINIZINC_UNBOUNDED_DEFAULT, MINIZINC_UNBOUNDED_DEFAULT),
     undeclaredReals = UndeclaredRealBounds(),
     feasibilityTolerance = numericalSourceTolerance,
-    optimalityTolerance = numericalOptimalityTolerance,
 )
 
 internal class FlatZincSemantics(
@@ -54,7 +51,6 @@ internal class FlatZincSemantics(
                 ),
             ),
             feasibilityTolerance = if (exactFloats) SourceTolerance() else flatZincSemantics.feasibilityTolerance,
-            optimalityTolerance = if (exactFloats) OptimalityTolerance() else flatZincSemantics.optimalityTolerance,
             undeclaredIntegers = UndeclaredIntegerBounds(
                 unboundedIntLo ?: defaults.lower,
                 unboundedIntHi ?: defaults.upper,

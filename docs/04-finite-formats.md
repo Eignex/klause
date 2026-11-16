@@ -214,10 +214,7 @@ float grid only finds candidate points; its refutations and optima are not verdi
 `flatZincSemantics` declares binary64 literal authority, a default grid policy,
 `[-1000000, 1000000]` for unranged integer declarations, open endpoints for
 unranged floats and `SourceTolerance(absolute=1/10000000)`, an absolute slack with
-no relative component. It also declares the MPS optimality gap,
-`OptimalityTolerance(absolute=1/10000000, relative=1/10000)`, which `--exact` zeroes.
-The gap decides no FlatZinc verdict: its optima come from exhausted search, and the
-LP keeps its own fixed float optimality test. Parsing resolves `SemanticOverrides` before declaration
+no relative component. Parsing resolves `SemanticOverrides` before declaration
 planning and keeps both defaults and effective policy in `FlatZincProgram.semantics`.
 
 Endpoint replacements apply only to unranged scalar and array declarations; an
