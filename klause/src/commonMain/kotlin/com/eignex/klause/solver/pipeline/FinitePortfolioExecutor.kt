@@ -33,7 +33,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Materializes [scenario] over [problem] and schedules it on one lane per core, checking every result an arm
  *  claims against [problem] and reporting each arm quarantined for a refuted claim to [onFault]. */
@@ -47,7 +47,7 @@ fun FinitePipeline.portfolioExecutor(
     onFault: ((ArmFault) -> Unit)? = null,
 ): PortfolioExecutor = portfolioExecutor(
     problem, scenario, objective, lsObjective, definitionalSweep, onEvent, onFault,
-    problem.prepareExecutionPlan(objective = objective, preferFinite = true), Cancellation.Never,
+    problem.prepareExecutionPlan(objective = objective, preferFinite = true), ExecutionControl.Never,
 )
 
 internal fun FinitePipeline.portfolioExecutor(
@@ -59,7 +59,7 @@ internal fun FinitePipeline.portfolioExecutor(
     onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     onFault: ((ArmFault) -> Unit)?,
     preparedPlan: PreparedSourcePlan,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PortfolioExecutor = portfolioExecutor(
     problem, scenario, objective, lsObjective, definitionalSweep,
     onEvent, onFault, preparedPlan, cancellation, false,
@@ -74,12 +74,12 @@ internal fun FinitePipeline.portfolioExecutor(
     onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
     onFault: ((ArmFault) -> Unit)?,
     preparedPlan: PreparedSourcePlan,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     numericalCompletion: Boolean,
     sourceHints: ((Set<ExecutionStrategy>) -> PreparedSourceHints?)? = null,
     numericalCompanions: TheoryParams? = null,
     objectiveCoordinates: ObjectiveCoordinateView? = null,
-    incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
     improvementProofShare: Double = 0.5,
     deferLpProbes: Boolean = false,
     bufferedPublications: Boolean = false,

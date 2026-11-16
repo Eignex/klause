@@ -16,7 +16,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -57,7 +57,7 @@ class ComparisonClauseTest {
     fun `cancelled comparison view analysis should decline its replacement`() {
         val clause = ComparisonClause(intArrayOf(0), arrayOf(LinearOp.EQ), longArrayOf(0))
 
-        assertFalse(clause.canSubstituteAffine(0, 1, 1, Cancellation { true }))
+        assertFalse(clause.canSubstituteAffine(0, 1, 1, ExecutionControl { true }))
     }
 
     @Test

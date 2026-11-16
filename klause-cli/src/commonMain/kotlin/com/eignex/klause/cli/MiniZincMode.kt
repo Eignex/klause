@@ -23,7 +23,6 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.util.io.openTextFile
 import com.eignex.util.io.readTextFile
 import com.eignex.util.io.useSource
@@ -103,7 +102,8 @@ internal object MiniZincMode : CliMode {
             }
             val start = TimeSource.Monotonic.markNow()
             var lpStats = LpStats()
-            val invocation = common.routingPreparationCancellation().use { stop ->
+            val invocation = common.routingPreparationCancellation().use { scope ->
+                val stop = scope.control
                 program.prepareSourceExecution(
                     SourceSetupRequest(
                         program.sourceAttachment(),

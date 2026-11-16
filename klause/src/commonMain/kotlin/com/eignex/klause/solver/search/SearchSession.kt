@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.solver.result.OpenTheoryClauseStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 
 /**
@@ -15,7 +15,7 @@ import com.eignex.klause.util.SharingMemoryObservation
 class SearchSession(
     private val components: List<SearchComponent>,
     private val maxChecks: Long = Long.MAX_VALUE,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
     private val branchers: List<SearchBrancher> = emptyList(),
     private val atoms: SearchAtomRegistry? = null,
@@ -27,7 +27,7 @@ class SearchSession(
     constructor(
         components: List<SearchComponent>,
         maxChecks: Long = Long.MAX_VALUE,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         branchers: List<SearchBrancher> = emptyList(),
         atoms: SearchAtomRegistry? = null,
@@ -45,7 +45,7 @@ class SearchSession(
     constructor(
         components: List<SearchComponent>,
         maxChecks: Long = Long.MAX_VALUE,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         branchers: List<SearchBrancher> = emptyList(),
         atoms: SearchAtomRegistry? = null,

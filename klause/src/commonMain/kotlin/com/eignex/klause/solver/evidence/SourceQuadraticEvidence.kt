@@ -12,13 +12,13 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.evaluateExact
 import com.eignex.klause.solver.objective.intervalBounds
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Bind optional quadratic result capture to the actual original exact IR source and objective. */
 fun Problem.quadraticSourceResultCapture(
     scope: SourceScope,
     objective: QuadraticObjectiveSpec,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): SourceResultCapture? {
     val context = quadraticSourceProofContext(scope, objective, cancellation) ?: return null
     return SourceResultCapture.forQuadratic(context, this, objective)
@@ -28,7 +28,7 @@ fun Problem.quadraticSourceResultCapture(
 fun Problem.quadraticSourceProofContext(
     scope: SourceScope,
     objective: QuadraticObjectiveSpec,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): SourceProofContext? {
     if (scope.objective == null) return null
     for (term in objective.terms) for (variable in listOfNotNull(term.first, term.second)) {
@@ -43,14 +43,15 @@ fun Problem.quadraticSourceProofContext(
     val original = this
     val witnessChecker = checkNotNull(base.semanticsChecker)
     val checker = object : SourceSemanticsChecker {
-        override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
+        override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck =
             witnessChecker.witness(sample, scope, cancellation)
 
-        override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
+        override fun ray(claim: SourceClaim.Ray, scope: SourceScope,
+            cancellation: ExecutionControl): SourceEvidenceCheck =
             SourceEvidenceCheck.Unavailable("quadratic source recession derivation unavailable")
 
         override fun objectiveEquals(
-            sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
+            sample: Sample, value: SourceValue, scope: SourceScope, cancellation: ExecutionControl,
         ): SourceEvidenceCheck = checkedQuadratic(cancellation) { arithmetic ->
             val checked = witness(sample, scope, cancellation)
             if (checked != SourceEvidenceCheck.Checked) return@checkedQuadratic checked
@@ -63,7 +64,8 @@ fun Problem.quadraticSourceProofContext(
         }
 
         override fun derivation(
-            claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
+            claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope,
+                cancellation: ExecutionControl,
         ): SourceEvidenceCheck {
             if (derivation != SourceQuadraticBoxDerivation || claim !is SourceClaim.Bound) {
                 return SourceEvidenceCheck.Unavailable("quadratic source derivation checker unavailable")
@@ -132,7 +134,7 @@ private fun quadraticValue(value: SourceValue, arithmetic: AlgebraicArithmetic) 
 }
 
 private inline fun checkedQuadratic(
-    cancellation: Cancellation, block: (AlgebraicArithmetic) -> SourceEvidenceCheck,
+    cancellation: ExecutionControl, block: (AlgebraicArithmetic) -> SourceEvidenceCheck,
 ): SourceEvidenceCheck = try {
     val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
     arithmetic.arithmetic.step()

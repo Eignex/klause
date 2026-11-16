@@ -13,7 +13,7 @@ import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.lowerLinearSource
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -129,7 +129,8 @@ internal fun MpsModel.compileMpsView(
     val declarations = source.variables
     // Rational zero has one value; the fresh compatibility view retains explicit binary64 bound signs.
     val negativeZero = (-0.0).toRawBits()
-    val view = checkNotNull(lowerLinearSource(source, settings, allowProjection, Cancellation.Never) { index, upper ->
+    val view = checkNotNull(lowerLinearSource(source, settings, allowProjection,
+        ExecutionControl.Never) { index, upper ->
         val declaration = declarations[index]
         val literal = variables[index]
         if (upper) declaration.upper == SemanticRational.ZERO && literal.upper?.toRawBits() == negativeZero

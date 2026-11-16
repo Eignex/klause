@@ -18,18 +18,18 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.times
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class PreparedSourcePlanAdmissionTest(private val engine: FiniteEngine) {
@@ -61,7 +61,7 @@ class PreparedSourcePlanAdmissionTest(private val engine: FiniteEngine) {
                     componentPlan = assertNotNull(plan.componentPlan), preparedPlan = plan,
                 ),
                 engine = engine, presolveConfig = PresolveConfig.NONE, explicitPresolveConfig = true,
-                solutionSetSensitive = false, cancellation = Cancellation.Never, presolveBudget = null,
+                solutionSetSensitive = false, cancellation = ExecutionControl.Never, presolveBudget = null,
                 cores = 1, executionOptions = ExecutionOptions(), randomSeed = 17, defaultArms = 1,
                 lpConfig = LpConfig(), zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
                 nodeBudget = null, solveBudgetMillis = null, allSolutions = false, solutionCap = null,

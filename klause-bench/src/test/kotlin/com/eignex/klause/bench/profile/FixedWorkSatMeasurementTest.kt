@@ -1,7 +1,7 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
@@ -57,7 +57,8 @@ class FixedWorkSatMeasurementTest {
     @Test
     fun `a deadline during search reports interrupted partial work`() {
         var polls = 0
-        val record = measure(FixedWorkUnit.CONFLICTS, 1_000_000, deadline = Cancellation { ++polls > DEADLINE_POLLS })
+        val record = measure(FixedWorkUnit.CONFLICTS, 1_000_000, deadline =
+            ExecutionControl { ++polls > DEADLINE_POLLS })
 
         assertEquals("deadline", record.text("stop"))
         assertTrue(record.flag("interrupted"))
@@ -81,7 +82,7 @@ class FixedWorkSatMeasurementTest {
         limit: Long,
         index: Int = 0,
         traceRows: Int = 1024,
-        deadline: Cancellation? = null,
+        deadline: ExecutionControl? = null,
         source: ByteArray = pigeonhole(7, 6),
     ): JsonObject {
         val out = createTempDirectory("fixed-work-sat").toFile()

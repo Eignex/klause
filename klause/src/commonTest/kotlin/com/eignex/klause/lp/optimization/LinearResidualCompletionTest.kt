@@ -8,7 +8,7 @@ import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,11 +26,11 @@ class LinearResidualCompletionTest {
         funding.grant(100_000L)
 
         LinearResidualCompletion(budget, SparseSourceLpPolicy(), LpFloatAllowance(1L, 1)).use { completion ->
-            assertNull(completion.complete(rows, 2, Cancellation.Never, { _, _ -> },
+            assertNull(completion.complete(rows, 2, ExecutionControl.Never, { _, _ -> },
                 List(2) { BigFraction.ONE }, small = { null }))
             val work = budget.measuredFloatWork
             funding.grant(100_000L)
-            val repeated = completion.complete(rows, 2, Cancellation.Never, { _, _ -> },
+            val repeated = completion.complete(rows, 2, ExecutionControl.Never, { _, _ -> },
                 List(2) { BigFraction.ONE }, small = { error("retained lifetime") })
 
             assertNull(repeated)
@@ -48,9 +48,9 @@ class LinearResidualCompletionTest {
         )
 
         LinearResidualCompletion(SourceLpBudget(), SparseSourceLpPolicy()).use { completion ->
-            val minimum = completion.complete(rows, 1, Cancellation.Never, { _, _ -> },
+            val minimum = completion.complete(rows, 1, ExecutionControl.Never, { _, _ -> },
                 listOf(BigFraction.ONE), small = { null })
-            val maximum = completion.complete(rows, 1, Cancellation.Never, { _, _ -> },
+            val maximum = completion.complete(rows, 1, ExecutionControl.Never, { _, _ -> },
                 listOf(BigFraction.MINUS_ONE), small = { null })
 
             assertEquals(listOf(BigFraction.ONE), minimum)
@@ -70,7 +70,7 @@ class LinearResidualCompletionTest {
         funding.grant(1_000_000L)
 
         val point = LinearResidualCompletion(budget, policy).use {
-            it.complete(rows, 2, Cancellation.Never, { _, _ -> }, small = { null })
+            it.complete(rows, 2, ExecutionControl.Never, { _, _ -> }, small = { null })
         }
 
         assertTrue(assertNotNull(point).satisfiesSourceRows(rows))
@@ -86,7 +86,7 @@ class LinearResidualCompletionTest {
         )
 
         val point = LinearResidualCompletion(SourceLpBudget(), SparseSourceLpPolicy()).use {
-            it.complete(rows, 129, Cancellation.Never, { _, _ -> }, small = { null })
+            it.complete(rows, 129, ExecutionControl.Never, { _, _ -> }, small = { null })
         }
 
         assertEquals(129, assertNotNull(point).size)
@@ -99,7 +99,7 @@ class LinearResidualCompletionTest {
             BigFraction.ZERO, strict = true))
 
         val point = LinearResidualCompletion(SourceLpBudget(), SparseSourceLpPolicy()).use {
-            it.complete(rows, 1, Cancellation.Never, { _, _ -> }, small = { null })
+            it.complete(rows, 1, ExecutionControl.Never, { _, _ -> }, small = { null })
         }
 
         assertNull(point)
@@ -118,7 +118,7 @@ class LinearResidualCompletionTest {
         LinearResidualCompletion(budget, policy).use {
             repeat(2) { _ ->
                 val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE))
-                assertNull(it.complete(rows, 1, Cancellation.Never, observe, small = { attempts++; null }))
+                assertNull(it.complete(rows, 1, ExecutionControl.Never, observe, small = { attempts++; null }))
             }
         }
 
@@ -135,7 +135,7 @@ class LinearResidualCompletionTest {
         LinearResidualCompletion(SourceLpBudget(), policy).use { completion ->
             for (rhs in listOf(BigFraction.ZERO, BigFraction.ONE)) {
                 val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), rhs))
-                assertNull(completion.complete(rows, 1, Cancellation.Never, { _, _ -> },
+                assertNull(completion.complete(rows, 1, ExecutionControl.Never, { _, _ -> },
                     small = { attempts++; null }))
             }
         }
@@ -151,11 +151,11 @@ class LinearResidualCompletionTest {
         funding.grant(1024)
 
         LinearResidualCompletion(budget, SparseSourceLpPolicy()).use { completion ->
-            assertNull(completion.complete(rows, 1, Cancellation.Never, { _, _ -> }, small = { null }))
+            assertNull(completion.complete(rows, 1, ExecutionControl.Never, { _, _ -> }, small = { null }))
             assertTrue(completion.paused)
             val spent = funding.spent
             funding.grant(100_000)
-            val point = completion.complete(rows, 1, Cancellation.Never, { _, _ -> },
+            val point = completion.complete(rows, 1, ExecutionControl.Never, { _, _ -> },
                 small = { error("retained residual") })
 
             assertTrue(assertNotNull(point).satisfiesSourceRows(rows))

@@ -12,7 +12,7 @@ import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -38,7 +38,7 @@ class PrivateRebuildGenerationTest {
             val canonical = PropagationSession(source, nativeSat = native)
             val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val consumer = PropagationSession(generation.problem)
 
             assertIs<PropagationResult.Implied>(consumer.pinBool(3, false))
@@ -65,7 +65,7 @@ class PrivateRebuildGenerationTest {
             val canonical = PropagationSession(source, nativeSat = native)
             val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 30_000L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
 
             for (mask in 0 until 16) {
                 val consumer = PropagationSession(generation.problem)
@@ -104,7 +104,7 @@ class PrivateRebuildGenerationTest {
             val canonical = PropagationSession(source, nativeSat = native)
             val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val consumer = PropagationSession(generation.problem)
 
             for (variable in 0..65) assertIs<PropagationResult.Implied>(consumer.pinBool(variable, false))
@@ -133,7 +133,7 @@ class PrivateRebuildGenerationTest {
             val canonical = PropagationSession(source, nativeSat = native)
             val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val consumer = PropagationSession(generation.problem)
 
             assertIs<PropagationResult.Implied>(consumer.pinBool(1, false))
@@ -159,7 +159,7 @@ class PrivateRebuildGenerationTest {
             val canonical = PropagationSession(source, nativeSat = native)
             val captured = assertNotNull(PrivateRebuildParity.capture(canonical, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(canonical, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val consumer = PropagationSession(generation.problem)
 
             for ((variable, value) in listOf(1 to false, 2 to true, 3 to false, 4 to true)) {
@@ -185,7 +185,7 @@ class PrivateRebuildGenerationTest {
             val captured = assertNotNull(PrivateRebuildBinaryLearning.capture(session, longArrayOf(), 0) { true })
 
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, learnedBinary = captured))
+                ExecutionControl.Never, learnedBinary = captured))
             val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
                 BacktrackParams(nativeSat = native),
             ))
@@ -215,7 +215,7 @@ class PrivateRebuildGenerationTest {
             session.forgetLearnedClauses { _, _ -> false }
 
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, learnedBinary = captured))
+                ExecutionControl.Never, learnedBinary = captured))
             val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
                 BacktrackParams(nativeSat = native),
             ))
@@ -243,7 +243,7 @@ class PrivateRebuildGenerationTest {
         session.addLearnedClause(Clause(intArrayOf(0)), 1)
 
         val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L,
-            Cancellation.Never, learnedBinary = captured)
+            ExecutionControl.Never, learnedBinary = captured)
 
         assertNull(generation)
     }
@@ -259,7 +259,7 @@ class PrivateRebuildGenerationTest {
         val unrelated = Problem(3, 0, emptyArray(), source.factors.copyOf()).bake()
 
         val generation = PrivateRebuildGeneration.prepare(PropagationSession(unrelated), 1_048_576L,
-            Cancellation.Never, learnedBinary = captured)
+            ExecutionControl.Never, learnedBinary = captured)
 
         assertNull(generation)
     }
@@ -276,7 +276,8 @@ class PrivateRebuildGenerationTest {
             val session = PropagationSession(source, nativeSat = native)
             session.addRootDerivedClause(Clause(intArrayOf(6)), 1, OWN_ORIGIN, false)
 
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                ExecutionControl.Never))
             val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve())
             val point = generation.reconstruct(reduced.assignment)
 
@@ -305,7 +306,8 @@ class PrivateRebuildGenerationTest {
             val literals = unchanged.map { it.literals.copyOf() }
             val session = PropagationSession(source, nativeSat = native)
             session.addRootDerivedClause(Clause(intArrayOf(8)), 1, OWN_ORIGIN, false)
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                ExecutionControl.Never))
 
             val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
                 BacktrackParams(nativeSat = native),
@@ -335,7 +337,8 @@ class PrivateRebuildGenerationTest {
             session.addRootDerivedClause(Clause(intArrayOf(8)), 1, OWN_ORIGIN, false)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
 
-            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never))
+            val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
+                ExecutionControl.Never))
             val reduced = assertIs<SolveResult.Sat>(BacktrackSolver(generation.problem).solve(
                 BacktrackParams(nativeSat = native),
             ))
@@ -359,7 +362,7 @@ class PrivateRebuildGenerationTest {
             List(128) { Clause(intArrayOf(12, 4, 6)) }).bake()
 
         val generation = assertNotNull(PrivateRebuildGeneration.prepare(
-            PropagationSession(source), 1_048_576L, Cancellation.Never, passWork = { 17_000L },
+            PropagationSession(source), 1_048_576L, ExecutionControl.Never, passWork = { 17_000L },
         ))
         val point = generation.reconstruct(Sample(BooleanArray(7) { it == 2 || it == 3 }, longArrayOf()))
 
@@ -378,7 +381,7 @@ class PrivateRebuildGenerationTest {
             if (scoped) session.addLearnedClause(Clause(intArrayOf(1)), 1, permanent = true)
             else session.seed(Assumptions.None.withBool(0, false))
 
-            val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never)
+            val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, ExecutionControl.Never)
 
             assertNull(generation)
         }
@@ -386,7 +389,7 @@ class PrivateRebuildGenerationTest {
 
     @Test
     fun `insufficient memory or cancellation should retain the established source`() {
-        for ((bytes, cancellation) in listOf(0L to Cancellation.Never, 1_048_576L to Cancellation { true })) {
+        for ((bytes, cancellation) in listOf(0L to ExecutionControl.Never, 1_048_576L to ExecutionControl { true })) {
             val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
             val session = PropagationSession(source)
 
@@ -418,9 +421,9 @@ class PrivateRebuildGenerationTest {
                     if (!duringPropagation) stopped = true
                 }
             }
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = stopped
-                override fun workMeter(): RootWorkMeter = meter
+                override val accounting: RootWorkMeter get() = meter
             }
 
             val generation = PrivateRebuildGeneration.prepare(PropagationSession(source), 1_048_576L, token)
@@ -436,7 +439,7 @@ class PrivateRebuildGenerationTest {
     fun `matching dimensions should not grant another model reconstruction authority`() {
         val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
         val generation = assertNotNull(PrivateRebuildGeneration.prepare(
-            PropagationSession(source), 1_048_576L, Cancellation.Never,
+            PropagationSession(source), 1_048_576L, ExecutionControl.Never,
         ))
         val unrelated = Problem(2, 0, emptyArray(), emptyArray()).bake()
 

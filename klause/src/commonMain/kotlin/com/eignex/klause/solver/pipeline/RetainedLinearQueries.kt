@@ -32,7 +32,7 @@ import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.Vsids
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -42,13 +42,13 @@ internal class RetainedLinearQueries(
     private val model: Problem,
     private val params: TheoryParams,
     private val objective: LinearObjective?,
-    private val hints: (Cancellation, OpenTheorySolveState) -> SearchCandidateHints = { _, _ ->
+    private val hints: (ExecutionControl, OpenTheorySolveState) -> SearchCandidateHints = { _, _ ->
         SearchCandidateHints.None
     },
-    private val open: (Cancellation, OpenTheorySolveState) -> PlannedSearch?,
+    private val open: (ExecutionControl, OpenTheorySolveState) -> PlannedSearch?,
 ) : ExactNeighborhoodCompletion, AutoCloseable {
     private val state = OpenTheorySolveState(params)
-    private val scope = ConditionedQueryScope(params.timeout or params.cancellation)
+    private val scope = ConditionedQueryScope(params.timeout.withAccounting(params.cancellation) or params.cancellation)
     private var planned: PlannedSearch? = null
     private var sourceRefuted = false
     private var sourceDeclined = false
@@ -63,13 +63,13 @@ internal class RetainedLinearQueries(
     val exhausted: Boolean get() = sourceDeclined || !state.work.hasAllowance() ||
         state.work.acceptedChecks >= params.maxLeaves
 
-    fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T {
+    fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl, action: () -> T): T {
         check(!closed) { "conditioned query owner is closed" }
         validate(condition)
         return scope.withCondition(condition, cancellation) { action() }
     }
 
-    fun prepareBooleanCenter(cancellation: Cancellation): Boolean {
+    fun prepareBooleanCenter(cancellation: ExecutionControl): Boolean {
         check(!closed) { "conditioned query owner is closed" }
         check(!checking) { "a worker may execute one conditioned query at a time" }
         val empty = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
@@ -94,7 +94,7 @@ internal class RetainedLinearQueries(
         return session.boolValue(variable)
     }
 
-    override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult {
+    override fun check(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): ExactNeighborhoodResult {
         check(!closed) { "conditioned query owner is closed" }
         check(!checking) { "a worker may execute one conditioned query at a time" }
         validate(condition)

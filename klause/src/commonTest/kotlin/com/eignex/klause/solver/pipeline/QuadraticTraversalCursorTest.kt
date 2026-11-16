@@ -6,7 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -29,7 +29,7 @@ class QuadraticTraversalCursorTest {
         cursor.use {
             repeat(20) {
                 if (!cursor.isDone) {
-                    exhausted = cursor.advance(Cancellation.Never, Long.MAX_VALUE, 1) { true }
+                    exhausted = cursor.advance(ExecutionControl.Never, Long.MAX_VALUE, 1) { true }
                 }
             }
         }
@@ -52,15 +52,15 @@ class QuadraticTraversalCursorTest {
 
         cursor.use {
             repeat(10) {
-                if (completed.isEmpty()) cursor.advance(Cancellation.Never, Long.MAX_VALUE, 1) { true }
+                if (completed.isEmpty()) cursor.advance(ExecutionControl.Never, Long.MAX_VALUE, 1) { true }
             }
             assertEquals(1, completed.size)
             val before = cursor.work
-            assertNull(cursor.advance(Cancellation.Never, Long.MAX_VALUE, 1) { true })
+            assertNull(cursor.advance(ExecutionControl.Never, Long.MAX_VALUE, 1) { true })
             assertEquals(before, cursor.work)
             assertEquals(1, completed.size)
             repeat(30) {
-                if (!cursor.isDone) cursor.advance(Cancellation.Never, Long.MAX_VALUE, 1) { true }
+                if (!cursor.isDone) cursor.advance(ExecutionControl.Never, Long.MAX_VALUE, 1) { true }
             }
         }
 
@@ -76,13 +76,13 @@ class QuadraticTraversalCursorTest {
         val cursor = QuadraticTraversalCursor(source, BacktrackParams(), sink, { 0 }) { _, _ ->
             error("zero slice cannot complete a candidate")
         }
-        assertNull(cursor.advance(Cancellation.Never, Long.MAX_VALUE, 0) { true })
+        assertNull(cursor.advance(ExecutionControl.Never, Long.MAX_VALUE, 0) { true })
 
         cursor.close()
         cursor.close()
 
         assertFailsWith<IllegalStateException> {
-            cursor.advance(Cancellation.Never, Long.MAX_VALUE, 1) { true }
+            cursor.advance(ExecutionControl.Never, Long.MAX_VALUE, 1) { true }
         }
     }
 }

@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -27,7 +27,7 @@ class RevisedSimplexRecoveryTest {
         lateinit var solver: RevisedSimplex
         solver = RevisedSimplex(
             model,
-            cancellation = Cancellation { cancelled },
+            cancellation = ExecutionControl { cancelled },
             basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {

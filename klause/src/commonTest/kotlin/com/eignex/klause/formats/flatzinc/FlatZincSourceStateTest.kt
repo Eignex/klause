@@ -11,7 +11,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.shl
@@ -34,7 +34,7 @@ class FlatZincSourceStateTest {
             val original = program.sourceProgram.problem
 
             val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
-                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = Cancellation { stopped }))
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = ExecutionControl { stopped }))
 
             assertSame(original, invocation.source.originalSource)
             assertNull(invocation.floatProjection)
@@ -49,7 +49,7 @@ class FlatZincSourceStateTest {
             var 0.0..1.0: grid;
             constraint float_le(grid, 0.5);
             solve :: int_search([i, grid], input_order, indomain_max, complete) satisfy;
-        """.trimIndent(), floatBuckets = 3)
+            """.trimIndent(), floatBuckets = 3)
 
         val copied = program.copy()
 
@@ -81,7 +81,7 @@ class FlatZincSourceStateTest {
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-        """.trimIndent(), floatBuckets = 3)
+            """.trimIndent(), floatBuckets = 3)
 
         val source = program.sourceProgram
         val attachment = program.sourceAttachment()
@@ -101,7 +101,7 @@ class FlatZincSourceStateTest {
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-        """.trimIndent(), floatBuckets = 3)
+            """.trimIndent(), floatBuckets = 3)
         val source = program.sourceProgram.problem
         val legacy = program.problem
 
@@ -128,7 +128,7 @@ class FlatZincSourceStateTest {
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-        """.trimIndent(), floatBuckets = 3)
+            """.trimIndent(), floatBuckets = 3)
         val foreign = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), emptyArray())
 
         val copied = program.copy(problem = foreign)
@@ -145,7 +145,7 @@ class FlatZincSourceStateTest {
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-        """.trimIndent(), floatBuckets = 3)
+            """.trimIndent(), floatBuckets = 3)
 
         val invocation = assertNotNull(execution.sourceInvocation)
         val projection = assertNotNull(invocation.floatProjection)
@@ -164,10 +164,10 @@ class FlatZincSourceStateTest {
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-        """.trimIndent(), floatBuckets = 3)
+            """.trimIndent(), floatBuckets = 3)
 
         val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
-            ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH, cancellation = Cancellation { true }))
+            ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH, cancellation = ExecutionControl { true }))
 
         assertNull(invocation.floatProjection)
         assertFalse(assertNotNull(program.retainedSource).materialized)

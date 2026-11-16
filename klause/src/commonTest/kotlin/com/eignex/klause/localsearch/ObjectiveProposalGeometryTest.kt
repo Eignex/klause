@@ -10,7 +10,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -41,7 +41,7 @@ class ObjectiveProposalGeometryTest {
         solver.resumable(canonical, params).use { run ->
             val sliced = run as InstructionSlicedSearch
             repeat(5) {
-                if (!run.isDone) sliced.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1) {
+                if (!run.isDone) sliced.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) {
                     incumbents += it.sample
                 }
             }

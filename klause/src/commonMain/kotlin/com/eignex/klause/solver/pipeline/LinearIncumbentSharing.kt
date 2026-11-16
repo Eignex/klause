@@ -4,7 +4,7 @@ import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class LinearIncumbentSharing {
@@ -19,13 +19,13 @@ internal class LinearIncumbentSharing {
         val hasOriginalCheck: Boolean get() = originalChecker != null
 
         fun matches(source: SourceProofContext, offered: Sample, checker: Any?,
-            token: Cancellation, budget: SourceLpBudget): Boolean {
+            token: ExecutionControl, budget: SourceLpBudget): Boolean {
             budget.observe(preparation = offered.numBoolVars.toLong() + offered.numIntVars + offered.numRealVars)
             return !token() && originalChecker === checker && sameSource(source, token, budget) &&
                 samePoint(offered, offered.semantics, offered.coordinateFrame)
         }
 
-        fun matches(other: Key, token: Cancellation, budget: SourceLpBudget): Boolean {
+        fun matches(other: Key, token: ExecutionControl, budget: SourceLpBudget): Boolean {
             budget.observe(preparation =
                 other.seed.numBoolVars.toLong() + other.seed.numIntVars + other.seed.numRealVars)
             return !token() && originalChecker === other.originalChecker && sameSource(other.source, token, budget) &&
@@ -35,7 +35,7 @@ internal class LinearIncumbentSharing {
         private fun samePoint(offered: Sample, semantics: EffectiveSourceSemantics?, frame: Any?): Boolean =
             seed == offered && this.semantics == semantics && this.frame === frame
 
-        private fun sameSource(right: SourceProofContext, token: Cancellation, budget: SourceLpBudget): Boolean {
+        private fun sameSource(right: SourceProofContext, token: ExecutionControl, budget: SourceLpBudget): Boolean {
             val left = source
             if (left === right) return true
             budget.observe(preparation = 2L * left.coordinateCount + 2L * right.coordinateCount +
@@ -54,12 +54,12 @@ internal class LinearIncumbentSharing {
     private class Entry(val owner: Any, val key: Key, val point: Sample, val bytes: Long)
     private val entries = ArrayList<Entry>()
 
-    fun find(key: Key, budget: SourceLpBudget, token: Cancellation): Sample? {
+    fun find(key: Key, budget: SourceLpBudget, token: ExecutionControl): Sample? {
         val previous = entries.firstOrNull { it.key.matches(key, token, budget) } ?: return null
         return snapshot(previous.point, previous.bytes, budget, token)
     }
 
-    fun remember(owner: Any, key: Key, point: Sample, budget: SourceLpBudget, token: Cancellation): Boolean {
+    fun remember(owner: Any, key: Key, point: Sample, budget: SourceLpBudget, token: ExecutionControl): Boolean {
         if (!key.hasOriginalCheck || entries.size >= MAX_POINTS) return false
         val bytes = retainedBytes(point, budget, token) ?: return false
         val retained = snapshot(point, bytes, budget, token) ?: return false
@@ -73,7 +73,7 @@ internal class LinearIncumbentSharing {
         return work
     }
 
-    private fun retainedBytes(point: Sample, budget: SourceLpBudget, token: Cancellation): Long? {
+    private fun retainedBytes(point: Sample, budget: SourceLpBudget, token: ExecutionControl): Long? {
         var bytes = 256L + 16L * (point.numBoolVars.toLong() + point.numIntVars + point.numRealVars)
         for (value in point.exactInts.orEmpty()) {
             if (token()) return null
@@ -90,7 +90,7 @@ internal class LinearIncumbentSharing {
         return bytes.takeUnless { token() }
     }
 
-    private fun snapshot(point: Sample, bytes: Long, budget: SourceLpBudget, token: Cancellation): Sample? {
+    private fun snapshot(point: Sample, bytes: Long, budget: SourceLpBudget, token: ExecutionControl): Sample? {
         if (token()) return null
         val work = 1L + point.numBoolVars + point.numIntVars + point.numRealVars
         // Consumers can retain immutable scalar payloads after the producing owner has closed.

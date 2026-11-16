@@ -4,7 +4,6 @@ import com.eignex.klause.factor.DEFAULT_VIOLATION_SOFT_CAP
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.objective.ObjectiveBoundFactor
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
@@ -23,7 +22,7 @@ import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
@@ -236,7 +235,7 @@ class LocalSearchState private constructor(
     private var repairInitializing = false
     private var trackedMoveStarted = false
 
-    internal fun scoringPick(cancellation: Cancellation, pick: () -> Move?): Move? =
+    internal fun scoringPick(cancellation: ExecutionControl, pick: () -> Move?): Move? =
         probe.scoringPick(cancellation, pick)
 
     internal fun checkScoringWork() {

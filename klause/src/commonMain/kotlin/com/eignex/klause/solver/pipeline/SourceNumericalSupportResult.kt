@@ -6,7 +6,7 @@ import com.eignex.klause.lp.optimization.LinearPinnedRefutation
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal sealed interface SourceNumericalSupportResult {
     data class Available(
@@ -30,7 +30,7 @@ internal sealed interface SourceNumericalSupportResult {
 internal fun sourceNumericalRefutationSupport(
     feedback: SourceNumericalFeedbackResult.Available,
     funding: SourceLpFunding,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): SourceNumericalSupportResult {
     val query = feedback.query
     funding.charge(1L, 64L)

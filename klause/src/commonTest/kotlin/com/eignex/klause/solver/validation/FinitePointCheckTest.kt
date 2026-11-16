@@ -18,7 +18,7 @@ import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -33,7 +33,7 @@ class FinitePointCheckTest {
         ).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(3, 7)), Unit)
 
-        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, ExecutionControl.Never)
 
         assertEquals(candidate, assertIs<Verification.Accepted<Sample, Unit>>(result).candidate)
     }
@@ -46,7 +46,7 @@ class FinitePointCheckTest {
         ).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(3, 6)), Unit)
 
-        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(result)
     }
@@ -60,7 +60,7 @@ class FinitePointCheckTest {
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(3, 7)), Unit)
         val assumptions = Assumptions.None.withInt(0, 4)
 
-        val result = FinitePointCheck(model).check(candidate, Cancellation.Never, assumptions)
+        val result = FinitePointCheck(model).check(candidate, ExecutionControl.Never, assumptions)
 
         assertIs<Verification.Rejected>(result)
     }
@@ -71,7 +71,7 @@ class FinitePointCheckTest {
         val candidate = Candidate(Sample(booleanArrayOf(true), longArrayOf()), Unit)
         val assumptions = Assumptions.None.withBool(0, false)
 
-        val result = FinitePointCheck(model).check(candidate, Cancellation.Never, assumptions)
+        val result = FinitePointCheck(model).check(candidate, ExecutionControl.Never, assumptions)
 
         assertIs<Verification.Rejected>(result)
     }
@@ -81,7 +81,7 @@ class FinitePointCheckTest {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 0)), emptyArray()).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(1)), Unit)
 
-        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(result)
     }
@@ -96,7 +96,7 @@ class FinitePointCheckTest {
         val check = FinitePointCheck(model)
 
         val results = points.map {
-            check.check(Candidate(Sample(booleanArrayOf(), it), Unit), Cancellation.Never)
+            check.check(Candidate(Sample(booleanArrayOf(), it), Unit), ExecutionControl.Never)
         }
 
         for (result in results) assertIs<Verification.Accepted<*, *>>(result)
@@ -119,19 +119,18 @@ class FinitePointCheckTest {
         val model = source.bake(providers)
         val candidate = Candidate(Sample(booleanArrayOf(false, false), longArrayOf()), Unit)
 
-        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(result)
     }
 
     @Test
-    fun `cancelled point preparation should report zero work once`() {
+    fun `cancelled point checking should report zero work once`() {
         val model = Problem(0, 64, Array(64) { IntDomain(0, 1) }, emptyArray()).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), LongArray(64)), Unit)
-        var polls = 0
         var reports = 0
         var work = -1L
-        val cancellation = Cancellation { ++polls == 17 }
+        val cancellation = ExecutionControl { true }
 
         val result = FinitePointCheck(model).check(candidate, cancellation, onWork = {
             reports++
@@ -166,7 +165,7 @@ class FinitePointCheckTest {
         cancelled = false
         val candidate = Candidate(Sample(booleanArrayOf(true), longArrayOf()), Unit)
 
-        val result = FinitePointCheck(model).check(candidate, Cancellation { cancelled })
+        val result = FinitePointCheck(model).check(candidate, ExecutionControl { cancelled })
 
         assertIs<Verification.Indeterminate>(result)
     }
@@ -181,7 +180,7 @@ class FinitePointCheckTest {
         val candidate = Candidate(Sample(booleanArrayOf(), LongArray(columns) { (it % 2).toLong() }), Unit)
         var work = -1L
 
-        val result = FinitePointCheck(source).check(candidate, Cancellation.Never, onWork = { work = it })
+        val result = FinitePointCheck(source).check(candidate, ExecutionControl.Never, onWork = { work = it })
 
         assertIs<Verification.Accepted<*, *>>(result)
         assertTrue(work in 1L until 32L * columns, "propagation work was $work for $columns columns")

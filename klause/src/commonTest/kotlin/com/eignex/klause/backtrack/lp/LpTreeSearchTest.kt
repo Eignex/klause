@@ -29,7 +29,7 @@ import com.eignex.klause.lp.relaxation.LeafRealResult
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -59,7 +59,7 @@ class LpTreeSearchTest {
         )
         val obj = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
 
-        val seed = engine(p, obj).use { assertNotNull(it.lbTreeSearch(obj, Cancellation.Never)) }
+        val seed = engine(p, obj).use { assertNotNull(it.lbTreeSearch(obj, ExecutionControl.Never)) }
 
         assertTrue(seed.sample.reals.single() >= 0.0)
         assertTrue(seed.sample.ints.single() - seed.sample.reals.single() <= 1.0)
@@ -71,7 +71,7 @@ class LpTreeSearchTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newGeneralSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 workLimit: Long,
                 pricing: LpPricingOptions,
             ): LpSolver {
@@ -81,7 +81,7 @@ class LpTreeSearchTest {
 
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -107,7 +107,7 @@ class LpTreeSearchTest {
             arrayOf<Factor>(Linear(intArrayOf(2, 3), intArrayOf(0, 1), LinearOp.GE, 5)),
         )
         val obj = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
-        val run = Cancellation.until(TimeSource.Monotonic.markNow() + 1.hours)
+        val run = ExecutionControl.until(TimeSource.Monotonic.markNow() + 1.hours)
         val params = LpParams(lpPlan = LpPlan(bounding = true))
         val engine = LpEngine(problem, obj, params, SolveStatsSink(backend = "lbtree"), LpSolveContext(factory))
 
@@ -123,7 +123,7 @@ class LpTreeSearchTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(1L))
 
         val seed = engine(problem, obj).use {
-            assertNotNull(it.lbTreeSearch(obj, Cancellation.Never, Assumptions(ints = mapOf(0 to 2L))))
+            assertNotNull(it.lbTreeSearch(obj, ExecutionControl.Never, Assumptions(ints = mapOf(0 to 2L))))
         }
 
         assertEquals(2L, seed.sample.ints[0])
@@ -135,9 +135,9 @@ class LpTreeSearchTest {
         val positive = LinearObjective(intCoefficients = longArrayOf(1L))
         val negative = LinearObjective(intCoefficients = longArrayOf(-1L))
         engine(problem, positive).use { parent ->
-            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, Cancellation.Never)).sample.ints[0])
-            assertEquals(3L, assertNotNull(parent.lbTreeSearch(negative, Cancellation.Never)).sample.ints[0])
-            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, Cancellation.Never)).sample.ints[0])
+            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, ExecutionControl.Never)).sample.ints[0])
+            assertEquals(3L, assertNotNull(parent.lbTreeSearch(negative, ExecutionControl.Never)).sample.ints[0])
+            assertEquals(0L, assertNotNull(parent.lbTreeSearch(positive, ExecutionControl.Never)).sample.ints[0])
         }
     }
 
@@ -157,7 +157,7 @@ class LpTreeSearchTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1))
         val sink = SolveStatsSink(backend = "lbtree")
         val lp = LpEngine(p, obj, LpParams(lpPlan = LpPlan(bounding = true)), sink)
-        val sample = lp.lbTreeSearch(obj, Cancellation.Never)?.sample
+        val sample = lp.lbTreeSearch(obj, ExecutionControl.Never)?.sample
         assertTrue(sample != null)
         assertEquals(2.0, obj.evaluate(sample))
         assertTrue(sink.snapshot().lp.rootPasses.sum > 0.0)
@@ -186,7 +186,7 @@ class LpTreeSearchTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(2.0))
 
         val sample = engine(problem, objective).use {
-            assertNotNull(it.lbTreeSearch(objective, Cancellation.Never)).sample
+            assertNotNull(it.lbTreeSearch(objective, ExecutionControl.Never)).sample
         }
 
         assertEquals(1L, sample.ints[0])
@@ -199,7 +199,7 @@ class LpTreeSearchTest {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray(), openIntHi = booleanArrayOf(true))
         val objective = LinearObjective(intCoefficients = longArrayOf(-1L))
         engine(problem, objective).use { parent ->
-            assertNull(parent.lbTreeSearch(objective, Cancellation.Never))
+            assertNull(parent.lbTreeSearch(objective, ExecutionControl.Never))
             assertEquals(0L, parent.totalSolveWork())
         }
     }
@@ -219,7 +219,7 @@ class LpTreeSearchTest {
         var cancelled = false
         engine(problem, objective).use { parent ->
             assertNull(
-                parent.lbTreeSearch(objective, Cancellation { cancelled }, complete = { _, _, _ ->
+                parent.lbTreeSearch(objective, ExecutionControl { cancelled }, complete = { _, _, _ ->
                     cancelled = true
                     LeafRealResult(
                         LpVerdict.TOLERANCE_OPTIMUM,
@@ -246,7 +246,7 @@ class LpTreeSearchTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
 
         engine(problem, objective).use { parent ->
-            assertNull(parent.lbTreeSearch(objective, Cancellation.Never))
+            assertNull(parent.lbTreeSearch(objective, ExecutionControl.Never))
         }
     }
 
@@ -273,7 +273,7 @@ class LpTreeSearchTest {
 
         for (assumptions in listOf(Assumptions.None, Assumptions.None.withInt(0, 0L))) {
             val sample = engine(problem, objective).use {
-                assertNotNull(it.lbTreeSearch(objective, Cancellation.Never, assumptions)).sample
+                assertNotNull(it.lbTreeSearch(objective, ExecutionControl.Never, assumptions)).sample
             }
 
             assertEquals(5.25, objective.evaluate(sample))
@@ -316,7 +316,7 @@ class LpTreeSearchTest {
 
         parent.use {
             assertNull(
-                it.lbTreeSearch(objective, Cancellation { cancelled }, complete = { candidate, _, _ ->
+                it.lbTreeSearch(objective, ExecutionControl { cancelled }, complete = { candidate, _, _ ->
                     visited += candidate.ints.single()
                     cancelled = true
                     LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
@@ -344,7 +344,7 @@ class LpTreeSearchTest {
             parent.use {
                 it.lbTreeSearch(
                     fixture.objective,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     complete = { _, _, _ -> error("injected completion failure") },
                 )
             }
@@ -370,7 +370,7 @@ class LpTreeSearchTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(10.0))
 
         val sample = engine(problem, objective).use {
-            assertNotNull(it.lbTreeSearch(objective, Cancellation.Never)).sample
+            assertNotNull(it.lbTreeSearch(objective, ExecutionControl.Never)).sample
         }
 
         assertEquals(1L, sample.ints.single())

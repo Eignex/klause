@@ -3,7 +3,7 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -87,7 +87,7 @@ class PolynomialSignRefutationTest {
     fun `interruption withholds the sign refutation`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (< (* x x) 0))")
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-        val interrupted = PolynomialArithmetic(Cancellation { true })
+        val interrupted = PolynomialArithmetic(ExecutionControl { true })
 
         assertFailsWith<PolynomialInterrupted> { refutePolynomialSigns(formula, interrupted, 128, 2048) }
     }

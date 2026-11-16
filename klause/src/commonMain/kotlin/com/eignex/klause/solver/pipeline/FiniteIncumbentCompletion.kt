@@ -5,9 +5,9 @@ import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.validation.LinearSourceCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun FiniteExecutionRequest.incumbentCompletionCheck(): ((Sample, BigFraction, Cancellation) -> Boolean)? {
+internal fun FiniteExecutionRequest.incumbentCompletionCheck(): ((Sample, BigFraction, ExecutionControl) -> Boolean)? {
     if (numericalCompanionParams?.sourceIncumbentCompletion != true) return null
     val original = sourceInvocation?.linearSource ?: return null
     return original.incumbentCompletionCheck(sourceMapping)
@@ -15,8 +15,7 @@ internal fun FiniteExecutionRequest.incumbentCompletionCheck(): ((Sample, BigFra
 
 internal fun PreparedLinearSource.incumbentCompletionCheck(
     mapping: SourceMapping?,
-): (Sample, BigFraction, Cancellation) -> Boolean {
-    return { sample, value, token ->
+): (Sample, BigFraction, ExecutionControl) -> Boolean = { sample, value, token ->
         token.charge(sample.numBoolVars.toLong() + sample.numIntVars + sample.numRealVars +
             mapping?.stages.orEmpty().sumOf { it.rebuild.steps.size.toLong() })
         if (token()) false else {
@@ -30,4 +29,3 @@ internal fun PreparedLinearSource.incumbentCompletionCheck(
             !token() && sourceValue != null && sourceValue == expected
         }
     }
-}

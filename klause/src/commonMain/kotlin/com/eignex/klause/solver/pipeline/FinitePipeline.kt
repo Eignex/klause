@@ -25,7 +25,7 @@ import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.withRealDifferenceSystem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
@@ -43,14 +43,14 @@ class FinitePipelineRequest(
     val explicitPresolveConfig: Boolean = false,
     /** Whether the caller needs the exact solution set rather than only one solution or optimum. */
     val solutionSetSensitive: Boolean = false,
-    /** Cancellation shared by preparation and the eventual solve. */
-    val cancellation: Cancellation = Cancellation.Never,
+    /** ExecutionControl shared by preparation and the eventual solve. */
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     /**
      * The run's own stop, without the presolve allowance [cancellation] may carry. The bake that hands the
      * prepared model to the engine reads only this, so a spent allowance never leaves the engine a model
      * baked part way.
      */
-    val solveCancellation: Cancellation = cancellation,
+    val solveCancellation: ExecutionControl = cancellation,
     /** Optional budget allocated to the presolve phase. */
     val presolveBudget: PresolveBudget? = null,
     /** Entering-column policy used by zero-objective LP solves during finite presolve. */

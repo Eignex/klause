@@ -37,7 +37,7 @@ import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -72,8 +72,8 @@ class SparseLpAdmissionTest {
             projections = FactorProjectionProviders.Default.prepare(problem)).use { engine ->
             val paid = engine.totalSolveWork()
 
-            val readyInFirstSlice = engine.prepareRootLayout(Cancellation.Never,
-                Cancellation { engine.totalSolveWork() > paid })
+            val readyInFirstSlice = engine.prepareRootLayout(ExecutionControl.Never,
+                ExecutionControl { engine.totalSolveWork() > paid })
 
             assertFalse(readyInFirstSlice)
             assertTrue(paid > 0L)
@@ -95,9 +95,9 @@ class SparseLpAdmissionTest {
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")),
             SolveStatsSink("cancelled-sparse-source-adoption"), LpSolveContext(factory)).use { engine ->
             val paid = engine.totalSolveWork()
-            val cancelled = Cancellation { true }
+            val cancelled = ExecutionControl { true }
 
-            engine.prepareRootLayout(cancelled, Cancellation.Never)
+            engine.prepareRootLayout(cancelled, ExecutionControl.Never)
             val bound = engine.rootLpRelaxationBound(requireNotNull(engine.lpRelaxer), emptyList(), cancelled)
 
             assertTrue(paid > 0L)
@@ -132,7 +132,7 @@ class SparseLpAdmissionTest {
             var cancelled = false
             var interrupted: SparseLpAdmission? = null
             val preparation = sequence<Unit> {
-                interrupted = prepareSparseLpAdmission(problem, null, Cancellation { cancelled })
+                interrupted = prepareSparseLpAdmission(problem, null, ExecutionControl { cancelled })
             }.iterator()
             repeat(problem.factors.size / CONSTRUCTION_BATCH_SIZE + chunks) {
                 assertTrue(preparation.hasNext())
@@ -181,7 +181,7 @@ class SparseLpAdmissionTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     refactorUpdateLimit: Int,
                     iterationLimit: Int,
                     workLimit: Long,
@@ -282,7 +282,7 @@ class SparseLpAdmissionTest {
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
             settings = ProblemSettings(lpCeilingTableauCells = 1L))
         val sink = SolveStatsSink("checked-paused-sparse-root")
-        val stop = Cancellation { (sink.lp.sparseTrial["PausedCertifiedBounds"] ?: 0L) > 0L }
+        val stop = ExecutionControl { (sink.lp.sparseTrial["PausedCertifiedBounds"] ?: 0L) > 0L }
 
         val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
@@ -304,7 +304,7 @@ class SparseLpAdmissionTest {
             List(95) { Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.GE, 1) },
             settings = ProblemSettings(lpCeilingTableauCells = 1L))
         val sink = SolveStatsSink("cancelled-sparse-root")
-        val stop = Cancellation { (sink.lp.sparseTrial["RootPauses"] ?: 0L) > 0L }
+        val stop = ExecutionControl { (sink.lp.sparseTrial["RootPauses"] ?: 0L) > 0L }
 
         val (lower, work) = LpEngine(problem, LinearObjective(intCoefficients = LongArray(96) { 1L }),
             LpParams(lpConfig = LpConfig.parse("default,+sparse-trial")), sink).use { engine ->
@@ -481,7 +481,7 @@ class SparseLpAdmissionTest {
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)))
         var admission: SparseLpAdmission? = null
         sequence<Unit> {
-            admission = prepareSparseLpAdmission(problem, null, Cancellation { true })
+            admission = prepareSparseLpAdmission(problem, null, ExecutionControl { true })
         }.forEach { }
 
         assertFalse(requireNotNull(admission).admitted)

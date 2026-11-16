@@ -9,13 +9,11 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.ArithmeticCancellation
 import com.eignex.klause.util.ArithmeticWorkSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkCreditPool
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.WorkReservation
-import com.eignex.klause.util.arithmeticSource
 import com.eignex.klause.util.reserveWork
 import com.eignex.kumulant.core.Concurrency
 
@@ -163,24 +161,30 @@ internal class TranscendentalPortfolioInvocation(
 
 private class TranscendentalNativeScope(private val params: TranscendentalTheoryParams, cores: Int) {
     private val pool = WorkCreditPool(params.maximumWork, if (cores > 1) Concurrency.Relaxed else Concurrency.None)
-    private val external = params.timeout or params.cancellation
-    private val parentAccounting = external.arithmeticSource()
+    private val external = params.timeout.withAccounting(params.cancellation) or params.cancellation
     val work: Long get() = pool.spent
     private val meter = WorkMeter { units ->
         require(units >= 0)
         pool.debit(units)
         external.charge(units)
     }
-    val cancellation: Cancellation = object : ArithmeticCancellation {
+    val cancellation: ExecutionControl = object : ExecutionControl() {
         override fun isCancelled(): Boolean = external() || params.maximumWork?.let { work >= it } == true
         override fun deadline() = external.deadline()
-        override fun workMeter(): WorkMeter = meter
-        override fun arithmeticSource(): ArithmeticWorkSource? {
-            if (external.workMeter() != null && parentAccounting == null) return null
+        override val accounting: WorkMeter get() = meter
+        override val admission: ArithmeticWorkSource get() {
+            val parentAccounting = external.admission
+            val parentMeter = external.accounting
             return object : ArithmeticWorkSource {
-                override fun isCancelled(): Boolean = cancellation.isCancelled()
-                override fun reserve(maximum: Int): WorkReservation? =
-                    reserveWork(maximum, listOf(pool), parentAccounting) {}
+                override val quotaOwner get() = parentAccounting?.quotaOwner
+                override val quotaRemaining get() = parentAccounting?.quotaRemaining
+                override val quotaAvailable get() = parentAccounting?.quotaAvailable
+                override val exhausted get() = pool.exhausted || parentAccounting?.exhausted == true
+                override fun reserve(maximum: Int): WorkReservation? = reserveWork(
+                    maximum,
+                    listOf(pool),
+                    parentAccounting,
+                ) { if (parentAccounting?.metered != true) parentMeter?.charge(it.toLong()) }
             }
         }
     }

@@ -2,7 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -18,7 +18,7 @@ class QuadraticNeighborhoodCursorTest {
         val slicedAllowance = QuadraticNeighborhoodAllowance(4, 100, null)
         val completion = ExactNeighborhoodCompletion { _, _ -> ExactNeighborhoodResult.Refuted }
         val unpaused = QuadraticNeighborhoodCursor(
-            2, true, 7, wholeAllowance, Cancellation.Never, { 0 },
+            2, true, 7, wholeAllowance, ExecutionControl.Never, { 0 },
             { released, radius, random ->
                 ExactNeighborhoodCondition(
                     mapOf(0 to random.nextBoolean()),
@@ -29,7 +29,7 @@ class QuadraticNeighborhoodCursorTest {
             }, completion, { false },
         )
         val paused = QuadraticNeighborhoodCursor(
-            2, true, 7, slicedAllowance, Cancellation.Never, { 0 },
+            2, true, 7, slicedAllowance, ExecutionControl.Never, { 0 },
             { released, radius, random ->
                 ExactNeighborhoodCondition(
                     mapOf(0 to random.nextBoolean()),
@@ -40,12 +40,12 @@ class QuadraticNeighborhoodCursorTest {
             }, completion, { false },
         )
 
-        unpaused.use { assertTrue(it.advance(Cancellation.Never, Long.MAX_VALUE)) }
+        unpaused.use { assertTrue(it.advance(ExecutionControl.Never, Long.MAX_VALUE)) }
         paused.use {
-            assertFalse(it.advance(Cancellation.Never, 1))
-            assertFalse(it.advance(Cancellation { true }, 100))
-            assertFalse(it.advance(Cancellation.Never, 1))
-            assertTrue(it.advance(Cancellation.Never, 100))
+            assertFalse(it.advance(ExecutionControl.Never, 1))
+            assertFalse(it.advance(ExecutionControl { true }, 100))
+            assertFalse(it.advance(ExecutionControl.Never, 1))
+            assertTrue(it.advance(ExecutionControl.Never, 100))
         }
 
         assertEquals(whole, sliced)
@@ -62,18 +62,18 @@ class QuadraticNeighborhoodCursorTest {
         }
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         val first = QuadraticNeighborhoodCursor(
-            1, false, 1, allowance, Cancellation.Never, { 0 },
+            1, false, 1, allowance, ExecutionControl.Never, { 0 },
             { _, _, _ -> condition }, completion, { false },
         )
-        first.use { assertFalse(it.advance(Cancellation.Never, 1)) }
+        first.use { assertFalse(it.advance(ExecutionControl.Never, 1)) }
         val reopened = QuadraticNeighborhoodCursor(
-            1, false, 3, allowance, Cancellation.Never, { 0 },
+            1, false, 3, allowance, ExecutionControl.Never, { 0 },
             { _, _, _ -> condition }, completion, { false },
         )
 
         reopened.use {
             assertEquals(0L, it.work)
-            assertTrue(it.advance(Cancellation.Never, 100))
+            assertTrue(it.advance(ExecutionControl.Never, 100))
             assertEquals(1L, it.work)
         }
 
@@ -91,11 +91,11 @@ class QuadraticNeighborhoodCursorTest {
             ExactNeighborhoodResult.Undecided
         }
         val cursor = QuadraticNeighborhoodCursor(
-            1, true, 1, allowance, Cancellation.Never, { nativeWork },
+            1, true, 1, allowance, ExecutionControl.Never, { nativeWork },
             { _, _, _ -> ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()) }, completion, { false },
         )
 
-        cursor.use { assertTrue(it.advance(Cancellation.Never, 1)) }
+        cursor.use { assertTrue(it.advance(ExecutionControl.Never, 1)) }
 
         assertEquals(1L, allowance.moves)
         assertEquals(5L, allowance.instructions)
@@ -106,7 +106,7 @@ class QuadraticNeighborhoodCursorTest {
     fun `closed neighborhood should reject another segment without spending work`() {
         val allowance = QuadraticNeighborhoodAllowance(10, 100, null)
         val cursor = QuadraticNeighborhoodCursor(
-            1, true, 1, allowance, Cancellation.Never, { 0 },
+            1, true, 1, allowance, ExecutionControl.Never, { 0 },
             { _, _, _ -> error("closed cursor cannot propose") },
             ExactNeighborhoodCompletion { _, _ -> error("closed cursor cannot complete") }, { false },
         )
@@ -114,7 +114,7 @@ class QuadraticNeighborhoodCursorTest {
         cursor.close()
         cursor.close()
 
-        assertFailsWith<IllegalStateException> { cursor.advance(Cancellation.Never, 1) }
+        assertFailsWith<IllegalStateException> { cursor.advance(ExecutionControl.Never, 1) }
         assertEquals(0L, allowance.instructions)
     }
 
@@ -123,9 +123,9 @@ class QuadraticNeighborhoodCursorTest {
         val allowance = QuadraticNeighborhoodAllowance(10, 100, null)
         var cancelled = false
         var reached = false
-        val invocation = Cancellation { cancelled }
+        val invocation = ExecutionControl { cancelled }
         val cursor = QuadraticNeighborhoodCursor(
-            1, false, 1, allowance, Cancellation.Never, { 0 },
+            1, false, 1, allowance, ExecutionControl.Never, { 0 },
             { _, _, _ -> ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()) },
             ExactNeighborhoodCompletion { _, stop ->
                 assertFalse(stop())
@@ -136,7 +136,7 @@ class QuadraticNeighborhoodCursorTest {
             { false },
         )
 
-        cursor.use { it.advance(Cancellation.Never, 100, invocation) }
+        cursor.use { it.advance(ExecutionControl.Never, 100, invocation) }
 
         assertTrue(reached)
         assertEquals(1L, allowance.moves)

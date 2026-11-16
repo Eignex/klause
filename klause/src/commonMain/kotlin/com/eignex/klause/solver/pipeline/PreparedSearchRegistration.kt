@@ -18,12 +18,13 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceCoordinateAgreement
 import com.eignex.klause.solver.search.SourceCoordinateAgreementComponent
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.ScanMeter
 
 internal class SearchComponentOpening(
-    val cancellation: Cancellation,
+    val cancellation: ExecutionControl,
     val smtStats: SmtStatsSink?,
-    val theorySolveStop: Cancellation?,
+    val theorySolveStop: ExecutionControl?,
     private val resources: SearchInvocationResources,
     val openHintFlips: Long? = null,
 ) {
@@ -55,13 +56,15 @@ internal class SearchComponentOpening(
         if (source.numBoolVars == 0 || source.numIntVars != 0 || source.numRealVars == 0 ||
             source.factors.size > SourceConjunctionHints.MAX_INDEX_ENTRIES
         ) return false
-        if (cancellation()) return null
+        ScanMeter (cancellation).use { scan ->
+            if (!scan.check()) return null
         for (factor in source.factors) {
-            cancellation.charge(1)
-            if (cancellation()) return null
-            if (factor is Cardinality && factor.max == 1 && factor.literals.size > 2) return true
+            if (!scan.visit(1L)) return null
+            if (factor is Cardinality && factor.max == 1 &&
+                factor.literals.size > 2) return if (scan.check()) true else null
         }
-        return false
+        return if (scan.check()) false else null
+        }
     }
 
     fun candidateHints(source: Problem, defaultComponent: SearchComponent? = null): SearchCandidateHints {
@@ -171,10 +174,10 @@ internal class PreparedSearchRegistrations(
     @Suppress("TooGenericExceptionCaught") // Invocation cleanup preserves an arbitrary primary failure.
     fun open(
         maxChecks: Long,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         learnedDb: SearchLearnedDbParams,
         smtStats: SmtStatsSink?,
-        theorySolveStop: Cancellation?,
+        theorySolveStop: ExecutionControl?,
         openHintFlips: Long? = null,
     ): PlannedSearch {
         val resources = SearchInvocationResources()

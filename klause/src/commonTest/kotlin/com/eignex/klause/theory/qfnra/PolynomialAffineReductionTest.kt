@@ -5,7 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -114,7 +114,7 @@ class PolynomialAffineReductionTest {
     @Test
     fun `containing cancellation withholds a partially eliminated region`() {
         var stopped = false
-        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { stopped })
         val polynomial = arithmetic.subtract(Polynomial.variable(0), Polynomial.variable(1))
         val formula = PolynomialFormula.conjunction(listOf(
             PolynomialAtom(polynomial, PolynomialRelation.GE),

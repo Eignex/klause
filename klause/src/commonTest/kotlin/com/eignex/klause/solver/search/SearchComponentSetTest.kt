@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -19,7 +19,7 @@ class SearchComponentSetTest {
             }
             val components = SearchComponentSet(listOf(component))
             val session = if (explicitControls) {
-                components.session(executionControls = SearchExecutionControlAdapter(Cancellation.Never))
+                components.session(executionControls = SearchExecutionControlAdapter(ExecutionControl.Never))
             } else {
                 components.session()
             }
@@ -27,7 +27,7 @@ class SearchComponentSetTest {
 
             assertFailsWith<IllegalStateException> { components.session() }
             assertFailsWith<IllegalStateException> {
-                components.session(executionControls = SearchExecutionControlAdapter(Cancellation.Never))
+                components.session(executionControls = SearchExecutionControlAdapter(ExecutionControl.Never))
             }
 
             assertEquals(1, initializations)

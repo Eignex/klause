@@ -28,7 +28,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -151,7 +151,7 @@ class ResultSemanticsTest {
         val semantics = SourceSemantics(SourceFormat.DIMACS).resolve()
         val source = Problem(1, 0, emptyArray(), emptyArray(), semantics = semantics)
 
-        val result = BacktrackSolver.source(source).solve(BacktrackParams(cancellation = Cancellation { true }))
+        val result = BacktrackSolver.source(source).solve(BacktrackParams(cancellation = ExecutionControl { true }))
 
         assertSame(semantics, assertIs<OpenTheoryResult.Unknown>(result).semantics)
     }
@@ -197,8 +197,8 @@ class ResultSemanticsTest {
         val callbacks = mutableListOf<MinimizeResult.WithSample>()
         val search = BacktrackSolver(model).resumable(LinearObjective(longArrayOf(1)), BacktrackParams(randomSeed = 0))
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L, callbacks::add) }
-        val repeated = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("completed search") }
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L, callbacks::add) }
+        val repeated = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { error("completed search") }
 
         assertSame(semantics, assertIs<MinimizeResult.Optimal>(result).semantics)
         assertSame(result, repeated)
@@ -213,7 +213,7 @@ class ResultSemanticsTest {
         val callbacks = mutableListOf<MinimizeResult.WithSample>()
         val search = CoreGuidedSolver(model).resumable(LinearObjective(longArrayOf(1)), BacktrackParams())
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L, callbacks::add) }
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L, callbacks::add) }
 
         assertSame(semantics, assertIs<MinimizeResult.Optimal>(result).semantics)
         assertTrue(callbacks.isNotEmpty())
@@ -227,7 +227,7 @@ class ResultSemanticsTest {
         val solver = Alns(LocalSearchSolver(model), maxIterations = 0)
 
         val result = solver.minimize(
-            LinearObjective(longArrayOf(1)), LocalSearchParams(cancellation = Cancellation { true }),
+            LinearObjective(longArrayOf(1)), LocalSearchParams(cancellation = ExecutionControl { true }),
         )
 
         assertSame(semantics, assertIs<MinimizeResult.Unknown>(result).semantics)
@@ -240,7 +240,7 @@ class ResultSemanticsTest {
         val worker = PortfolioWorker.ofSolve("source", 0) { _, _ -> error("cancelled worker") }
             .bindEvidence(ModelIdentity.of(source))
 
-        val result = Portfolio.thompson(listOf(worker)).use { it.solve(Cancellation { true }) }
+        val result = Portfolio.thompson(listOf(worker)).use { it.solve(ExecutionControl { true }) }
 
         assertSame(semantics, assertIs<SolveResult.Unknown>(result).semantics)
     }
@@ -249,7 +249,7 @@ class ResultSemanticsTest {
     fun `a portfolio without source identity should leave an aggregate unbound`() {
         val worker = PortfolioWorker.ofSolve("unbound", 0) { _, _ -> error("cancelled worker") }
 
-        val result = Portfolio.thompson(listOf(worker)).use { it.solve(Cancellation { true }) }
+        val result = Portfolio.thompson(listOf(worker)).use { it.solve(ExecutionControl { true }) }
 
         assertNull(assertIs<SolveResult.Unknown>(result).semantics)
     }

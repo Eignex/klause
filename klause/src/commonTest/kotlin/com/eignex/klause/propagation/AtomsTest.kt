@@ -8,7 +8,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -28,13 +28,13 @@ class AtomsTest {
         }
         state.beginLevel(0, fid = -1)
         state.finiteMutationInterruptible = true
-        state.finiteWork.cancellation = Cancellation {
+        state.finiteWork.cancellation = ExecutionControl {
             state.pendingFiniteMutation != null && state.atoms.truth[thresholds[15] - 1] == 1
         }
 
         assertFailsWith<FinitePropagationInterrupted> { state.tightenIntMin(0, 129) }
         assertNotNull(state.pendingFiniteMutation)
-        state.finiteWork.cancellation = Cancellation.Never
+        state.finiteWork.cancellation = ExecutionControl.Never
         assertNull(state.runToFixpoint(allFactors = false))
 
         assertNull(state.pendingFiniteMutation)

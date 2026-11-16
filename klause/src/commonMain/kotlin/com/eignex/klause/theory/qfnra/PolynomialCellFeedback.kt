@@ -8,8 +8,9 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.serialArithmeticSource
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class PolynomialCellFeedbackStats(
@@ -62,19 +63,26 @@ internal class PolynomialCellFeedback(
     private var scopeDeclines = 0L
     private var metadataVisits = 0L
     private var candidateUses = 0L
-    private var candidateWork = 0L
+    private var completedCandidateWork = 0L
+    private var pendingCandidateWork: () -> Long = { 0L }
+    private val candidateWork get() = completedCandidateWork + pendingCandidateWork()
     private var candidateDeclines = 0L
     private var candidateParentStopped = false
     private val candidateArithmetic = parent?.let { caller ->
-        val meter = WorkMeter { units -> candidateWork += units; caller.charge(units) }
-        PolynomialArithmetic(object : Cancellation {
+        val meter = WorkMeter { units -> completedCandidateWork += units; caller.charge(units) }
+        PolynomialArithmetic(object : ExecutionControl() {
             override fun isCancelled(): Boolean {
                 if (caller()) candidateParentStopped = true
                 return candidateParentStopped || candidateWork >= maximumCandidateWork
             }
             override fun deadline() = caller.deadline()
-            override fun workMeter(): WorkMeter = meter
-        }, limits)
+            override val accounting: WorkMeter get() = meter
+                override val admission get() = serialArithmeticSource(
+                    caller,
+                    { maximumCandidateWork - candidateWork },
+                    { completedCandidateWork += it },
+                )
+        }, limits).also { pendingCandidateWork = { it.execution.admittedWork } }
     }
     private val candidateAlgebraic = candidateArithmetic?.let(::AlgebraicArithmetic)
     var firstCrossRegionUse: PolynomialCellFeedbackUse? = null
@@ -116,10 +124,12 @@ internal class PolynomialCellFeedback(
         val arithmetic = checkNotNull(candidateArithmetic)
         val algebraic = checkNotNull(candidateAlgebraic)
         return try {
+            arithmetic.execution.operation {
             step(arithmetic)
-            val cells = available()
+            val cells = arithmetic.execution.handoff(available)
             repeat(cells.size) { step(arithmetic) }
             rejection(required, scope, cells, arithmetic, algebraic, coordinates::get)?.also { candidateUses++ }
+        }
         } catch (stop: PolynomialInterrupted) {
             if (candidateParentStopped) throw stop
             candidateDeclines++

@@ -7,11 +7,11 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun polynomialWitnessVerifier(
     binding: EngineInvocation,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): CandidateVerifier<Sample, Double?> {
     val verifier = ModelEvidenceVerifier<Sample, Double?>(binding.model, CandidateVerifier.trusting())
     return CandidateVerifier { candidate ->

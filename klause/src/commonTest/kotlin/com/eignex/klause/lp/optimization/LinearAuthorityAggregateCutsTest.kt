@@ -19,7 +19,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.shl
@@ -56,8 +56,8 @@ class LinearAuthorityAggregateCutsTest {
             Triple(true, false, BigFraction.MINUS_ONE), Triple(true, true, BigFraction.MINUS_ONE),
         )) {
             LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = aggregate).use { authority ->
-                val result = if (selection) authority.advanceWithPointCuts(source, Cancellation.Never)
-                    else authority.advance(source, Cancellation.Never, cuts = true)
+                val result = if (selection) authority.advanceWithPointCuts(source, ExecutionControl.Never)
+                    else authority.advance(source, ExecutionControl.Never, cuts = true)
 
                 assertEquals(SourceValue.Rational(expected),
                     assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
@@ -73,11 +73,11 @@ class LinearAuthorityAggregateCutsTest {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
             setOf(x, y, real), mapOf("left" to SourcePremise(left), "right" to SourcePremise(right)),
             mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
-        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, ExecutionControl.Never)
 
         val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
             authority.capture = capture
-            authority.advanceWithPointCuts(source, Cancellation.Never)
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
         }
 
         assertTrue(capture.records.first().cuts.isEmpty())
@@ -94,7 +94,7 @@ class LinearAuthorityAggregateCutsTest {
                 "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ONE))),
             mapOf(x to BigFraction.MINUS_ONE))
         LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            val result = authority.advanceWithPointCuts(source, Cancellation.Never)
+            val result = authority.advanceWithPointCuts(source, ExecutionControl.Never)
 
             assertEquals(null, authority.cutObservations()["numericalCutAggregatePairAttempts"])
             assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
@@ -135,12 +135,12 @@ class LinearAuthorityAggregateCutsTest {
             })
 
             val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
-                val initial = authority.advanceWithPointCuts(source, Cancellation.Never, retainBasePoint = true)
+                val initial = authority.advanceWithPointCuts(source, ExecutionControl.Never, retainBasePoint = true)
                 if (pause) {
                     assertTrue(initial.paused)
                     assertNull(initial.advisoryPoint)
                     funding.grant(4_000_000L)
-                    authority.advanceWithPointCuts(source, Cancellation.Never, retainBasePoint = true)
+                    authority.advanceWithPointCuts(source, ExecutionControl.Never, retainBasePoint = true)
                 } else initial
             }
 
@@ -165,7 +165,7 @@ class LinearAuthorityAggregateCutsTest {
             mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
 
         val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advanceWithPointCuts(source, Cancellation.Never, retainBasePoint = true)
+            authority.advanceWithPointCuts(source, ExecutionControl.Never, retainBasePoint = true)
         }
 
         assertNull(result.advisoryPoint)
@@ -188,7 +188,7 @@ class LinearAuthorityAggregateCutsTest {
         })
 
         val result = LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advanceWithPointCuts(source, Cancellation { cancelled }, retainBasePoint = true)
+            authority.advanceWithPointCuts(source, ExecutionControl { cancelled }, retainBasePoint = true)
         }
 
         assertTrue(cancelled)
@@ -222,15 +222,15 @@ class LinearAuthorityAggregateCutsTest {
             (triangle + x + y).associateWith { BigFraction.ONE })
         val child = source.atScope(source.scope.copy(condition = SourceCondition(
             upper = mapOf(x to BigFraction.ZERO, y to BigFraction.ZERO))))
-        val capture = LinearAuthorityCapture(8, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(8, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
             authority.capture = capture
-            authority.advanceWithPointCuts(source, Cancellation.Never)
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
             val preparations = authority.preparations
-            repeat(3) { authority.advanceWithPointCuts(child, Cancellation.Never) }
+            repeat(3) { authority.advanceWithPointCuts(child, ExecutionControl.Never) }
             assertNull(authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
 
-            val result = authority.advanceWithPointCuts(child, Cancellation.Never)
+            val result = authority.advanceWithPointCuts(child, ExecutionControl.Never)
 
             assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
             assertEquals(preparations, authority.preparations)
@@ -273,13 +273,13 @@ class LinearAuthorityAggregateCutsTest {
             }
         })
         LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advanceWithPointCuts(source, Cancellation.Never)
-            repeat(3) { authority.advanceWithPointCuts(child, Cancellation.Never) }
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
+            repeat(3) { authority.advanceWithPointCuts(child, ExecutionControl.Never) }
             val operations = budget.operations
             pause = true
 
             repeat(2) {
-                val paused = authority.advanceWithPointCuts(child, Cancellation.Never)
+                val paused = authority.advanceWithPointCuts(child, ExecutionControl.Never)
 
                 assertTrue(paused.paused)
                 assertEquals(1L, authority.cutObservations()["numericalCutSelectionRetiredInstalled"])
@@ -290,7 +290,7 @@ class LinearAuthorityAggregateCutsTest {
             }
 
             funding.grant(4_000_000L)
-            val completed = authority.advanceWithPointCuts(child, Cancellation.Never)
+            val completed = authority.advanceWithPointCuts(child, ExecutionControl.Never)
 
             assertFalse(completed.paused)
             assertEquals(operations + 1, budget.operations)
@@ -323,10 +323,10 @@ class LinearAuthorityAggregateCutsTest {
         val child = source.atScope(source.scope.copy(condition = SourceCondition(
             upper = mapOf(x to BigFraction.ZERO, y to BigFraction.ZERO))))
         LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advanceWithPointCuts(source, Cancellation.Never)
-            authority.advanceWithPointCuts(child, Cancellation.Never)
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
+            authority.advanceWithPointCuts(child, ExecutionControl.Never)
 
-            val result = authority.advance(source, Cancellation.Never, cuts = true)
+            val result = authority.advance(source, ExecutionControl.Never, cuts = true)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(3)),
                 assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
@@ -353,16 +353,16 @@ class LinearAuthorityAggregateCutsTest {
             setOf(x, y, real, residual) + triangle, premises,
             (triangle + x + y).associateWith { BigFraction.MINUS_ONE } + (residual to BigFraction.ONE))
         val child = source.atScope(source.scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ZERO))))
-        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(4, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advance(source, Cancellation.Never, cuts = true)
+            authority.advance(source, ExecutionControl.Never, cuts = true)
             authority.capture = capture
-            authority.advanceWithPointCuts(source, Cancellation.Never)
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
             val attempts = assertNotNull(authority.cutObservations()["numericalCutAggregatePairAttempts"])
             assertEquals(1L, authority.cutObservations()["numericalCutSelectionAdoptedInstalled"])
             assertEquals(1, capture.records.size)
 
-            val result = authority.advanceWithPointCuts(child, Cancellation.Never)
+            val result = authority.advanceWithPointCuts(child, ExecutionControl.Never)
 
             assertEquals(attempts, authority.cutObservations()["numericalCutAggregatePairAttempts"])
             assertEquals(2, capture.records.size)
@@ -384,10 +384,10 @@ class LinearAuthorityAggregateCutsTest {
                 "right" to SourcePremise(right), "bound" to SourcePremise(bound)),
             mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE, residual to BigFraction.ONE))
         LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advanceWithPointCuts(source, Cancellation.Never)
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
             val attempts = assertNotNull(authority.cutObservations()["numericalCutAggregatePairAttempts"])
 
-            val result = authority.advanceWithPointCuts(source, Cancellation.Never)
+            val result = authority.advanceWithPointCuts(source, ExecutionControl.Never)
 
             assertEquals(attempts, authority.cutObservations()["numericalCutAggregatePairAttempts"])
             assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
@@ -408,12 +408,12 @@ class LinearAuthorityAggregateCutsTest {
         premises["upper"] = SourcePremise(upper)
         premises["lower"] = SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO))
         val source = SourceProofContext(scope, setOf(x, real), premises)
-        val ordinary = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val ordinary = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         val directed = assertNotNull(ordinary.atPoint(mapOf(x to 8.0 / 3.0, real to 7.0 / 3.0),
-            Cancellation.Never, {}, { _, _ -> }))
+            ExecutionControl.Never, {}, { _, _ -> }))
         val aggregate = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "row 0", premises.getValue("row 0").inequality),
-            LinearAuthorityAggregateTerm(64, "upper", upper)), Cancellation.Never))
+            LinearAuthorityAggregateTerm(64, "upper", upper)), ExecutionControl.Never))
         assertEquals(64, assertNotNull(directed.cuts).rows.size)
 
         for ((count, limit, expected) in listOf(
@@ -421,10 +421,10 @@ class LinearAuthorityAggregateCutsTest {
             Triple(1, Int.MAX_VALUE, 65), Triple(64, Int.MAX_VALUE, 128),
         )) {
             val template = if (limit == Int.MAX_VALUE) ordinary else directed
-            val appended = assertNotNull(template.withAdditional(List(count) { aggregate }, Cancellation.Never,
+            val appended = assertNotNull(template.withAdditional(List(count) { aggregate }, ExecutionControl.Never,
                 maximumCandidates = limit))
 
-            val checked = assertNotNull(LinearAuthorityQuery.prepare(source, appended, Cancellation.Never))
+            val checked = assertNotNull(LinearAuthorityQuery.prepare(source, appended, ExecutionControl.Never))
 
             assertEquals(expected, checked.checkedCuts.size)
             assertEquals(expected, checked.activeCuts)
@@ -446,11 +446,11 @@ class LinearAuthorityAggregateCutsTest {
         premises["lower"] = SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO))
         val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
             setOf(x, real), premises, mapOf(x to BigFraction.ONE))
-        val capture = LinearAuthorityCapture(4, 100_000L, 10_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(4, 100_000L, 10_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
             authority.capture = capture
 
-            val result = authority.advanceWithPointCuts(source, Cancellation.Never)
+            val result = authority.advanceWithPointCuts(source, ExecutionControl.Never)
 
             assertEquals(64L, authority.cutObservations()["numericalMaxRetainedCuts"])
             assertEquals(64L, authority.cutObservations()["numericalCutSelectionRetainedLayout"])
@@ -475,7 +475,7 @@ class LinearAuthorityAggregateCutsTest {
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(allocation = 45_500L)
         var allocation = 0L
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             { name, count -> if (name == "AggregateAllocation") allocation += count }, maximumCandidates = 1,
             limits = limits, point = coordinates.associateWith { 47.0 / 96.0 } + (real to 0.5)).single()
 
@@ -492,7 +492,7 @@ class LinearAuthorityAggregateCutsTest {
             linkedMapOf("left" to SourcePremise(left), "right" to SourcePremise(right)))
         val events = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             { name, count -> events[name] = (events[name] ?: 0L) + count },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.75, real to 1.5))
 
@@ -516,7 +516,7 @@ class LinearAuthorityAggregateCutsTest {
         var attempts = 0L
         var stopped = false
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 if (name == "AggregatePairAttempts") {
                     attempts += count
@@ -555,7 +555,7 @@ class LinearAuthorityAggregateCutsTest {
             val point = mapOf(a to 0.75, b to 0.75, continuous to 1.5,
                 x to sign.toDouble(), y to 0.5, real to 1.0)
 
-            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
                 point = point).single()
 
@@ -580,7 +580,7 @@ class LinearAuthorityAggregateCutsTest {
                 mapOf(b to BigFraction.ofLong(2), continuous to BigFraction.MINUS_ONE), BigFraction.ZERO)),
             "left" to SourcePremise(left), "right" to SourcePremise(right)))
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(a to 0.75, b to 0.75, continuous to 1.5, x to 0.75, y to 0.75, real to 1.5)).single()
 
@@ -600,7 +600,7 @@ class LinearAuthorityAggregateCutsTest {
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 events[name] = (events[name] ?: 0L) + count
                 if (name == "AggregatePointScopedRows") stopped = true
@@ -622,7 +622,7 @@ class LinearAuthorityAggregateCutsTest {
         var work = 0L
         val events = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 events[name] = (events[name] ?: 0L) + count
                 if (name == "AggregateWork") work += count
@@ -648,7 +648,7 @@ class LinearAuthorityAggregateCutsTest {
             "left" to SourcePremise(left), "right" to SourcePremise(right)))
         val point = mapOf(a to 0.0, b to 0.0, continuous to 0.0, x to 0.75, y to 0.75, real to 1.5)
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             maximumCandidates = 1, point = point).single()
 
         assertEquals(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), cut.inequality.coefficients)
@@ -675,7 +675,8 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val point = mapOf(x to 1.25, y to 1.25, real to 2.5, residual to 2.0, other to 0.0)
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never, point = point).single()
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never, point =
+            point).single()
 
         assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE,
             other to BigFraction.MINUS_ONE), BigFraction.ofLong(2)), cut.inequality)
@@ -698,7 +699,7 @@ class LinearAuthorityAggregateCutsTest {
                     if (sign < 0) BigFraction.ONE else BigFraction.ZERO)),
             ))
 
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 2),
                 point = mapOf(x to 1.88, y to 0.0, real to -0.6 * sign, otherReal to 0.0))
 
@@ -725,7 +726,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, _ -> if (name == "AggregatePreferredSideAttempts") stopped = true },
             maximumCandidates = 1, limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 2),
             point = mapOf(x to 1.88, y to 0.0, real to 0.6, otherReal to 0.0))
@@ -749,14 +750,14 @@ class LinearAuthorityAggregateCutsTest {
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 2)
         var work = 0L
         var beforePreferred = 0L
-        LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never, observe = { name, count ->
+        LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never, observe = { name, count ->
             if (name == "AggregateWork") work += count
             if (name == "AggregatePreferredSideAttempts") beforePreferred = work
         }, maximumCandidates = 1, limits = limits, point = point)
         assertTrue(beforePreferred > 0L)
         val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             maximumCandidates = 1, limits = limits.copy(work = beforePreferred), point = point)
 
@@ -781,7 +782,7 @@ class LinearAuthorityAggregateCutsTest {
                 setOf(x, y), premises, mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
             for (enabled in listOf(false, true)) {
                 val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = enabled).use {
-                    it.advanceWithPointCuts(source, Cancellation.Never)
+                    it.advanceWithPointCuts(source, ExecutionControl.Never)
                 }
 
                 val expected = if (enabled) BigFraction.MINUS_ONE else if (paired)
@@ -807,7 +808,7 @@ class LinearAuthorityAggregateCutsTest {
                     BigFraction.ZERO)),
             ))
 
-            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
                 point = mapOf(x to 0.75, y to 0.5 * sign)).single()
 
@@ -817,7 +818,7 @@ class LinearAuthorityAggregateCutsTest {
             assertEquals(CutFamily.AGGREGATION_MIR, cut.family)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
                 SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
-            assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never).isEmpty())
+            assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never).isEmpty())
         }
     }
 
@@ -833,7 +834,7 @@ class LinearAuthorityAggregateCutsTest {
                 "endpoint" to SourcePremise(SourceInequality(mapOf(x to sign.negated()), BigFraction.ZERO)),
             ))
 
-            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
                 point = mapOf(x to sign.toDouble(), y to 0.5)).single()
 
@@ -853,7 +854,7 @@ class LinearAuthorityAggregateCutsTest {
                     BigFraction.MINUS_ONE)),
             ))
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 1.0, y to 0.5)).single()
 
@@ -873,7 +874,7 @@ class LinearAuthorityAggregateCutsTest {
         val scoped = source.atScope(source.scope.copy(
             condition = SourceCondition(lower = mapOf(x to BigFraction.ONE)),
         ))
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(scoped, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(scoped, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 1.0, y to 0.5)).single()
         val weaker = source.atScope(source.scope.copy(
@@ -882,7 +883,7 @@ class LinearAuthorityAggregateCutsTest {
 
         val bounds = LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = listOf(cut)).use { authority ->
             listOf(scoped, weaker, source, scoped).map { current ->
-                val result = authority.advance(current, Cancellation.Never, cuts = true)
+                val result = authority.advance(current, ExecutionControl.Never, cuts = true)
                 val bound = assertNotNull(result.bound)
                 assertEquals(SourceEvidenceCheck.Checked,
                     SourceEvidenceVerifier(current.withLinearAuthority()).verify(bound))
@@ -900,7 +901,7 @@ class LinearAuthorityAggregateCutsTest {
                 y to BigFraction.ofLong(2)), BigFraction.ofLong(4)))))
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, _ -> if (name == "AggregateIntegerBoundScopedRetained") stopped = true },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 1.0, y to 0.5))
@@ -920,7 +921,7 @@ class LinearAuthorityAggregateCutsTest {
         ), mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
 
         val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advanceWithPointCuts(source, Cancellation.Never)
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
         }
 
         assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
@@ -949,7 +950,7 @@ class LinearAuthorityAggregateCutsTest {
             val observations = mutableMapOf<String, Long>()
             val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
                 limits = limits, point = mapOf(x to 0.75, y to 0.5)).single()
 
@@ -978,7 +979,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.6, y to 0.6))
 
@@ -1004,7 +1005,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, y to 0.5, a to 0.75, b to 0.5))
@@ -1028,7 +1029,7 @@ class LinearAuthorityAggregateCutsTest {
         var stopped = false
         val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
                 if (name == "AggregateIntegerBoundRetained") stopped = true
@@ -1064,7 +1065,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = limits, point = point).single()
 
@@ -1090,7 +1091,7 @@ class LinearAuthorityAggregateCutsTest {
             ))
             val observations = mutableMapOf<String, Long>()
 
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
                 limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 0.0))
 
@@ -1109,7 +1110,7 @@ class LinearAuthorityAggregateCutsTest {
             ))
             val observations = mutableMapOf<String, Long>()
 
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
                 limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 0.0))
 
@@ -1129,7 +1130,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, _ -> if (name == "AggregateHalfPreviewCoordinates") stopped = true },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 0.0))
 
@@ -1147,7 +1148,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.75, y to 0.5)).single()
 
@@ -1190,7 +1191,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = limits, point = point).single()
 
@@ -1216,7 +1217,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
                 if (name == "AggregateIntegerBoundSourceScanComplete") stopped = true
@@ -1259,7 +1260,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = limits, point = point)
 
@@ -1290,7 +1291,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
                 if (name == "AggregateIntegerBoundSnapshotReuseAttempts") stopped = true
@@ -1313,7 +1314,7 @@ class LinearAuthorityAggregateCutsTest {
             ))
             val observations = mutableMapOf<String, Long>()
 
-            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
                 limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 1.5)).single()
 
@@ -1334,7 +1335,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 1.25)).single()
 
@@ -1354,7 +1355,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, _ -> if (name == "AggregateUnitScaleNormalization") stopped = true },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = mapOf(x to 0.0, y to 1.5))
 
@@ -1371,7 +1372,7 @@ class LinearAuthorityAggregateCutsTest {
                 y to BigFraction.ofLong(2)), BigFraction.ofLong(2))),
         ))
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 2.0 / 3.0, y to 2.0 / 3.0)).single()
 
@@ -1389,7 +1390,7 @@ class LinearAuthorityAggregateCutsTest {
             setOf(x, y), mapOf("row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
                 y to BigFraction.ofLong(3)), BigFraction.ofLong(3)))))
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, y to 0.5)).single()
 
@@ -1401,7 +1402,7 @@ class LinearAuthorityAggregateCutsTest {
         val unscoped = source.atScope(scope)
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(unscoped).verify(
             SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
-        assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(unscoped, Cancellation.Never,
+        assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(unscoped, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, y to 0.5)).isEmpty())
     }
@@ -1418,7 +1419,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val established = SourceCondition(bools = mapOf(0 to true),
             lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, y to 0.5)).single()
 
@@ -1446,7 +1447,7 @@ class LinearAuthorityAggregateCutsTest {
                         BigFraction.ofLong(lower))),
                 ), mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
 
-                val result = authority.advanceWithPointCuts(source, Cancellation.Never)
+                val result = authority.advanceWithPointCuts(source, ExecutionControl.Never)
 
                 assertEquals(SourceValue.Rational(BigFraction.ofLong(if (lower == 0L) -1 else -2)),
                     assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
@@ -1465,7 +1466,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, _ -> if (name == "AggregateIntegerRowAttempts") stopped = true },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, y to 0.5))
@@ -1490,7 +1491,7 @@ class LinearAuthorityAggregateCutsTest {
         var allocation = 0L
         var beforeWork = 0L
         var beforeAllocation = 0L
-        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count ->
                 if (name == "AggregateWork") work += count
                 if (name == "AggregateAllocation") allocation += count
@@ -1504,7 +1505,7 @@ class LinearAuthorityAggregateCutsTest {
 
         for (limited in listOf(limits.copy(work = beforeWork), limits.copy(allocation = beforeAllocation))) {
             val observations = mutableMapOf<String, Long>()
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
                 limits = limited, point = point)
 
@@ -1530,7 +1531,7 @@ class LinearAuthorityAggregateCutsTest {
         }
         val source = SourceProofContext(scope, point.keys, premises)
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = point)
 
         assertEquals(16, cuts.size)
@@ -1556,7 +1557,7 @@ class LinearAuthorityAggregateCutsTest {
         val source = SourceProofContext(scope, point.keys, premises)
         val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count }, point = point)
 
@@ -1573,7 +1574,7 @@ class LinearAuthorityAggregateCutsTest {
                 bool to BigFraction.ofLong(3)), BigFraction.ofLong(3))),
         ))
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, bool to 0.5))
 
@@ -1594,7 +1595,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.0, y to 0.0, a to 0.75, b to 0.5)).single()
@@ -1613,7 +1614,7 @@ class LinearAuthorityAggregateCutsTest {
             BigFraction.ofLong(3))
 
         val cut = LinearAuthorityAggregateCuts.derive(listOf(LinearAuthorityAggregateTerm(0, "row", row)),
-            Cancellation.Never)
+            ExecutionControl.Never)
 
         assertNull(cut)
     }
@@ -1631,7 +1632,7 @@ class LinearAuthorityAggregateCutsTest {
             ), mapOf(x to BigFraction.ofLong(-2), y to BigFraction.MINUS_ONE))
 
         val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advanceWithPointCuts(source, Cancellation.Never)
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
         }
 
         assertEquals(SourceValue.Rational(BigFraction.ofLong(-2)),
@@ -1655,7 +1656,7 @@ class LinearAuthorityAggregateCutsTest {
                     BigFraction.ofLong(if (sign > 0) 1 else 0))),
             ))
 
-            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 point = mapOf(x to 0.75 * sign, y to (if (sign > 0) 0.875 else 0.375), real to -0.25)).single()
 
             assertEquals(SourceInequality(mapOf(x to BigFraction.ofLong(if (sign > 0) 2 else -1),
@@ -1680,7 +1681,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             point = mapOf(x to 3.5, y to -3.25, real to -8.5))
 
@@ -1704,7 +1705,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val established = SourceCondition(bools = mapOf(0 to true),
             lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             point = mapOf(x to 0.75, y to 0.875, real to -0.25)).single()
 
         for (condition in listOf(established, SourceCondition(lower = established.lower, upper = established.upper),
@@ -1732,7 +1733,7 @@ class LinearAuthorityAggregateCutsTest {
                 "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(3))),
             ))
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             point = mapOf(x to 2.75, y to -2.125, real to -6.25)).single()
 
         assertEquals(setOf(0, 1, 3), cut.owners)
@@ -1754,7 +1755,7 @@ class LinearAuthorityAggregateCutsTest {
                 "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ofLong(upper))),
             ))
 
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 point = mapOf(x to 0.75, y to 0.875, real to -0.25))
 
             if (upper == 1L) {
@@ -1778,7 +1779,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, _ -> if (name == "AggregateHalfSideAttempts") stopped = true },
             point = mapOf(x to 0.75, y to 0.875, real to -0.25))
 
@@ -1802,7 +1803,7 @@ class LinearAuthorityAggregateCutsTest {
         var allocation = 0L
         var beforeWork = 0L
         var beforeAllocation = 0L
-        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count ->
                 if (name == "AggregateWork") work += count
                 if (name == "AggregateAllocation") allocation += count
@@ -1816,7 +1817,7 @@ class LinearAuthorityAggregateCutsTest {
 
         for (limited in listOf(limits.copy(work = beforeWork), limits.copy(allocation = beforeAllocation))) {
             val observations = mutableMapOf<String, Long>()
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
                 limits = limited, point = point)
 
@@ -1841,7 +1842,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             point = mapOf(x to 0.8, y to 0.6, z to -0.1, real to -0.2)).single()
 
@@ -1871,7 +1872,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             maximumCandidates = 1, limits = limits, point = point).single()
 
@@ -1904,7 +1905,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
                 if (name == "AggregateHalfPointScans") stopped = true
@@ -1936,7 +1937,7 @@ class LinearAuthorityAggregateCutsTest {
         var allocation = 0L
         var beforeWork = 0L
         var beforeAllocation = 0L
-        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count ->
                 if (name == "AggregateWork") work += count
                 if (name == "AggregateAllocation") allocation += count
@@ -1950,7 +1951,7 @@ class LinearAuthorityAggregateCutsTest {
 
         for (limited in listOf(limits.copy(work = beforeWork), limits.copy(allocation = beforeAllocation))) {
             val observations = mutableMapOf<String, Long>()
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
                 limits = limited, point = point)
 
@@ -1975,7 +1976,8 @@ class LinearAuthorityAggregateCutsTest {
             ))
         val point = mapOf(x to 0.75, y to 0.75, z to 0.25, real to -0.75)
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never, point = point).single()
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never, point =
+            point).single()
 
         assertEquals(SourceInequality(mapOf(x to BigFraction.ofLong(2), y to BigFraction.ofLong(2),
             z to BigFraction.ONE), BigFraction.ofLong(3)), cut.inequality)
@@ -1985,7 +1987,7 @@ class LinearAuthorityAggregateCutsTest {
         val unscoped = source.atScope(scope)
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(unscoped).verify(
             SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
-        assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(unscoped, Cancellation.Never,
+        assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(unscoped, ExecutionControl.Never,
             point = point).isEmpty())
     }
 
@@ -2001,7 +2003,7 @@ class LinearAuthorityAggregateCutsTest {
             ), mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
 
         val result = LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = true).use { authority ->
-            authority.advanceWithPointCuts(source, Cancellation.Never)
+            authority.advanceWithPointCuts(source, ExecutionControl.Never)
         }
 
         assertEquals(SourceValue.Rational(BigFraction.MINUS_ONE),
@@ -2023,7 +2025,7 @@ class LinearAuthorityAggregateCutsTest {
                     BigFraction.ZERO)),
             ))
 
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = 2),
                 point = mapOf(x to 0.75, y to 0.5 * sign, real to -0.5))
 
@@ -2034,7 +2036,7 @@ class LinearAuthorityAggregateCutsTest {
             assertEquals(CutFamily.AGGREGATION_MIR, cut.family)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
                 SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
-            assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never).isEmpty())
+            assertTrue(LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never).isEmpty())
         }
     }
 
@@ -2048,7 +2050,7 @@ class LinearAuthorityAggregateCutsTest {
             ))
         val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             point = mapOf(x to 0.75, y to 0.5, real to -0.5))
 
@@ -2067,7 +2069,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, _ -> if (name == "AggregateHalfAttempts") stopped = true },
             point = mapOf(x to 0.75, y to 0.5, real to -0.5))
 
@@ -2090,7 +2092,7 @@ class LinearAuthorityAggregateCutsTest {
         var allocation = 0L
         var beforeWork = 0L
         var beforeAllocation = 0L
-        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val complete = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count ->
                 if (name == "AggregateWork") work += count
                 if (name == "AggregateAllocation") allocation += count
@@ -2104,7 +2106,7 @@ class LinearAuthorityAggregateCutsTest {
 
         for (limited in listOf(limits.copy(work = beforeWork), limits.copy(allocation = beforeAllocation))) {
             val observations = mutableMapOf<String, Long>()
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
                 limits = limited, point = point)
 
@@ -2126,7 +2128,7 @@ class LinearAuthorityAggregateCutsTest {
                     BigFraction.ofLong(rhs))),
             ))
 
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 point = mapOf(x to 0.75, y to 0.5, real to -0.5))
 
             if (rhs == 0L) {
@@ -2152,7 +2154,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val established = SourceCondition(bools = mapOf(0 to true),
             lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             point = mapOf(x to 0.75, y to 0.5, real to -0.5)).single()
 
         for (condition in listOf(established, SourceCondition(lower = established.lower, upper = established.upper),
@@ -2177,7 +2179,7 @@ class LinearAuthorityAggregateCutsTest {
                 BigFraction.MINUS_ONE, strict = true)),
         ))
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             point = mapOf(x to -0.75, y to 1.5, real to 2.5)).single()
 
         assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ZERO),
@@ -2206,7 +2208,7 @@ class LinearAuthorityAggregateCutsTest {
             source.premises.filterKeys { it != "lower" && it != "other lower" })
         for (context in listOf(source, unbounded)) {
             for (rows in listOf(2, 3, 4)) {
-                val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(context, Cancellation.Never,
+                val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(context, ExecutionControl.Never,
                     maximumCandidates = 1,
                     limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = rows), point = point)
 
@@ -2240,7 +2242,7 @@ class LinearAuthorityAggregateCutsTest {
             val observations = mutableMapOf<String, Long>()
             val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
                 maximumCandidates = 1, limits = limits,
                 point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 0.0)).single()
@@ -2269,7 +2271,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
                 if (name == "AggregateIncidenceReferences") stopped = true
@@ -2300,7 +2302,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = limits, point = mapOf(x to 0.75, y to 0.75, z to 0.5,
                 real to 1.5, otherReal to 1.5, firstReal to 1.0))
@@ -2329,7 +2331,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = limits, point = mapOf(x to 0.75, y to 0.75, real to 1.5, residual to 0.0)).single()
 
@@ -2355,7 +2357,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5)).single()
@@ -2394,7 +2396,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count }, limits = limits,
             point = mapOf(x to 0.75, y to 0.75, z to 0.5, real to 1.5, bridge to 1.5,
                 otherReal to 1.5, firstReal to 1.0))
@@ -2441,7 +2443,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(support = 5)
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count }, limits = limits,
             point = mapOf(x to 0.75, y to 0.75, z to 0.5, real to 1.5, bridge to 1.5,
                 otherReal to 1.5, firstReal to 1.0, extra to 0.0, otherExtra to 0.0))
@@ -2482,7 +2484,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(support = 4)
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count }, limits = limits,
             point = mapOf(x to 0.75, y to 0.75, z to 0.5, real to 1.5, bridge to 1.5,
                 otherReal to 1.5, firstReal to 1.0)).single()
@@ -2519,7 +2521,7 @@ class LinearAuthorityAggregateCutsTest {
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(support = 4)
         var stopped = false
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
                 if (name == "AggregateContinuationSupportSkipped") stopped = true
@@ -2556,7 +2558,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, y to 1.25, z to 0.5, real to 0.75, bridge to 0.75, firstReal to 1.0))
@@ -2596,7 +2598,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         var stopped = false
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
                 if (name == "AggregateContinuationInverseSkipped") stopped = true
@@ -2629,7 +2631,7 @@ class LinearAuthorityAggregateCutsTest {
                 otherReal to BigFraction.ONE), BigFraction.ofLong(3))),
         ))
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5, firstReal to 1.5))
 
@@ -2660,7 +2662,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
                 if (name == "AggregateContinuationScored") stopped = true
@@ -2695,7 +2697,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         val observations = mutableMapOf<String, Long>()
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             maximumCandidates = 1, point = mapOf(x to 0.75, y to 0.75, z to 0.5,
                 real to 1.5, otherReal to 1.5, firstReal to 1.0))
@@ -2725,7 +2727,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         val limits = LinearAuthorityAggregateCuts.pointSourcePairLimits
 
-        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             maximumCandidates = 1, limits = limits,
             point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5)).single()
@@ -2756,7 +2758,7 @@ class LinearAuthorityAggregateCutsTest {
         val observations = mutableMapOf<String, Long>()
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, count ->
                 observations[name] = (observations[name] ?: 0L) + count
                 if (name == "AggregateContinuationScored") stopped = true
@@ -2788,7 +2790,7 @@ class LinearAuthorityAggregateCutsTest {
             real to 5.0 / 3, otherReal to 5.0 / 3, lastReal to 5.0 / 3)
 
         for (rows in listOf(2, 3, 4)) {
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 maximumCandidates = 1,
                 limits = LinearAuthorityAggregateCuts.pointSourcePairLimits.copy(rows = rows), point = point)
 
@@ -2819,7 +2821,7 @@ class LinearAuthorityAggregateCutsTest {
         ))
         var stopped = false
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation { stopped },
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl { stopped },
             observe = { name, _ -> if (name == "AggregateExtendedAttempts") stopped = true },
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = mapOf(x to 0.75, y to 0.75, real to 1.5, otherReal to 1.5))
@@ -2841,7 +2843,7 @@ class LinearAuthorityAggregateCutsTest {
             "left" to SourcePremise(weightedLeft), "right" to SourcePremise(weightedRight),
             "other" to SourcePremise(otherRight)))
 
-        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never)
+        val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never)
 
         assertEquals(setOf(
             SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(3)), BigFraction.ONE),
@@ -2859,7 +2861,7 @@ class LinearAuthorityAggregateCutsTest {
             "left" to SourcePremise(left), "right" to SourcePremise(right)))
         val observations = mutableMapOf<String, Long>()
 
-        LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+        LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
             observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count },
             point = mapOf(x to 0.75, real to 1.5))
 
@@ -2874,7 +2876,7 @@ class LinearAuthorityAggregateCutsTest {
         for (limits in listOf(LinearAuthorityAggregateLimits(work = 1),
             LinearAuthorityAggregateLimits(allocation = 1))) {
             val observations = mutableMapOf<String, Long>()
-            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, Cancellation.Never,
+            val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
                 observe = { name, count -> observations[name] = (observations[name] ?: 0L) + count }, limits = limits)
 
             assertTrue(cuts.isEmpty())
@@ -2900,7 +2902,7 @@ class LinearAuthorityAggregateCutsTest {
         for ((aggregate, expected) in listOf(false to (BigFraction.ofLong(-3) *
             BigFraction.ofLong(2).reciprocal()), true to BigFraction.MINUS_ONE)) {
             LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = aggregate).use { authority ->
-                val result = authority.advance(source, Cancellation.Never, cuts = true)
+                val result = authority.advance(source, ExecutionControl.Never, cuts = true)
 
                 assertEquals(SourceValue.Rational(expected),
                     assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
@@ -2917,11 +2919,11 @@ class LinearAuthorityAggregateCutsTest {
             mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
         val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
-        ), Cancellation.Never))
+        ), ExecutionControl.Never))
         val funding = SourceLpFunding(1_000_000L, 1L).apply { grant(1_000_000L) }
         LinearAuthority(SourceLpBudget(funding = funding), retainLp = true,
             additionalCuts = listOf(cut)).use { authority ->
-            val result = authority.advance(source, Cancellation.Never, cuts = true)
+            val result = authority.advance(source, ExecutionControl.Never, cuts = true)
 
             assertTrue(funding.exhausted)
             assertTrue(funding.allocated > 0L)
@@ -2936,10 +2938,10 @@ class LinearAuthorityAggregateCutsTest {
             "left" to SourcePremise(left), "right" to SourcePremise(right)))
         val falseCut = LinearAuthorityCut(0, SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO),
             SourceDerivation.Premise("left"), owners = setOf(0, 1))
-        val template = assertNotNull(assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never,
-            cuts = true)).withAdditional(listOf(falseCut), Cancellation.Never))
+        val template = assertNotNull(assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never,
+            cuts = true)).withAdditional(listOf(falseCut), ExecutionControl.Never))
 
-        val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never))
+        val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never))
 
         assertEquals(0, query.activeCuts)
         assertTrue(query.checkedCuts.isEmpty())
@@ -2956,13 +2958,13 @@ class LinearAuthorityAggregateCutsTest {
             mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE, residual to BigFraction.ONE))
         val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
-        ), Cancellation.Never, allowMixed = true, continuousBounds = mapOf(
+        ), ExecutionControl.Never, allowMixed = true, continuousBounds = mapOf(
             (residual to false) to LinearAuthorityAggregateTerm(2, "bound", bound))))
-        assertTrue(assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never)).rows.isEmpty())
+        assertTrue(assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never)).rows.isEmpty())
         for ((additional, expected) in listOf(emptyList<LinearAuthorityCut>() to
             (BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()), listOf(cut) to BigFraction.MINUS_ONE)) {
             LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = additional).use { authority ->
-                val result = authority.advance(source, Cancellation.Never, cuts = true)
+                val result = authority.advance(source, ExecutionControl.Never, cuts = true)
 
                 assertEquals(SourceValue.Rational(expected),
                     assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
@@ -2980,7 +2982,7 @@ class LinearAuthorityAggregateCutsTest {
         val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
             LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ONE),
-        ), Cancellation.Never))
+        ), ExecutionControl.Never))
 
         assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE),
             cut.inequality)
@@ -3001,7 +3003,7 @@ class LinearAuthorityAggregateCutsTest {
         val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", weightedLeft, BigFraction.ofLong(2)),
             LinearAuthorityAggregateTerm(1, "right", weightedRight, BigFraction.ofLong(3)),
-        ), Cancellation.Never))
+        ), ExecutionControl.Never))
 
         assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ofLong(3)), BigFraction.ONE),
             cut.inequality)
@@ -3019,7 +3021,7 @@ class LinearAuthorityAggregateCutsTest {
         val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
             LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ONE),
-        ), Cancellation.Never))
+        ), ExecutionControl.Never))
         val established = SourceCondition(bools = mapOf(0 to true),
             lower = mapOf(pin to BigFraction.ONE), upper = mapOf(pin to BigFraction.ONE))
         for (condition in listOf(established, SourceCondition(lower = established.lower, upper = established.upper),
@@ -3043,7 +3045,7 @@ class LinearAuthorityAggregateCutsTest {
             val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
                 LinearAuthorityAggregateTerm(0, "left", strictLeft, BigFraction.ONE),
                 LinearAuthorityAggregateTerm(1, "right", strictRight, BigFraction.ONE),
-            ), Cancellation.Never))
+            ), ExecutionControl.Never))
 
             assertEquals(BigFraction.ONE, cut.inequality.rhs)
         }
@@ -3055,7 +3057,7 @@ class LinearAuthorityAggregateCutsTest {
             val cut = LinearAuthorityAggregateCuts.derive(listOf(
                 LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
                 LinearAuthorityAggregateTerm(1, "right", right, weight),
-            ), Cancellation.Never)
+            ), ExecutionControl.Never)
 
             assertNull(cut)
         }
@@ -3066,7 +3068,7 @@ class LinearAuthorityAggregateCutsTest {
         val cut = LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
             LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ofLong(2)),
-        ), Cancellation.Never)
+        ), ExecutionControl.Never)
 
         assertNull(cut)
     }
@@ -3079,13 +3081,13 @@ class LinearAuthorityAggregateCutsTest {
             LinearAuthorityAggregateTerm(2, "third",
                 SourceInequality(mapOf(x to BigFraction.ofLong(2)), BigFraction.ZERO), BigFraction.ONE),
         )
-        assertNotNull(LinearAuthorityAggregateCuts.derive(terms, Cancellation.Never))
+        assertNotNull(LinearAuthorityAggregateCuts.derive(terms, ExecutionControl.Never))
         for (limits in listOf(LinearAuthorityAggregateLimits(rows = 2),
             LinearAuthorityAggregateLimits(support = 1), LinearAuthorityAggregateLimits(support = 2),
             LinearAuthorityAggregateLimits(proofBytes = 1),
             LinearAuthorityAggregateLimits(work = 1),
             LinearAuthorityAggregateLimits(allocation = 1))) {
-            val cut = LinearAuthorityAggregateCuts.derive(terms, Cancellation.Never, limits = limits)
+            val cut = LinearAuthorityAggregateCuts.derive(terms, ExecutionControl.Never, limits = limits)
 
             assertNull(cut)
         }
@@ -3100,7 +3102,7 @@ class LinearAuthorityAggregateCutsTest {
         val cut = LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", row, large),
             LinearAuthorityAggregateTerm(1, "right", row, BigFraction.ONE),
-        ), Cancellation.Never, { key, value -> observations[key] = (observations[key] ?: 0L) + value },
+        ), ExecutionControl.Never, { key, value -> observations[key] = (observations[key] ?: 0L) + value },
             LinearAuthorityAggregateLimits(scalarBits = 128))
 
         assertNull(cut)
@@ -3120,7 +3122,7 @@ class LinearAuthorityAggregateCutsTest {
         val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", largeLeft, BigFraction.ONE),
             LinearAuthorityAggregateTerm(1, "right", largeRight, BigFraction.ONE),
-        ), Cancellation.Never))
+        ), ExecutionControl.Never))
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
             SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
@@ -3133,11 +3135,11 @@ class LinearAuthorityAggregateCutsTest {
             LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
             LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ofLong(2)),
         )
-        LinearAuthorityAggregateCuts.derive(terms, Cancellation.Never,
+        LinearAuthorityAggregateCuts.derive(terms, ExecutionControl.Never,
             { key, value -> observations[key] = (observations[key] ?: 0L) + value })
         val first = observations.toMap()
 
-        val cut = LinearAuthorityAggregateCuts.derive(terms, Cancellation.Never,
+        val cut = LinearAuthorityAggregateCuts.derive(terms, ExecutionControl.Never,
             { key, value -> observations[key] = (observations[key] ?: 0L) + value })
 
         assertNull(cut)
@@ -3153,7 +3155,7 @@ class LinearAuthorityAggregateCutsTest {
         val cut = LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
             LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ONE),
-        ), Cancellation { ++polls > 8 },
+        ), ExecutionControl { ++polls > 8 },
             { key, value -> observations[key] = (observations[key] ?: 0L) + value })
 
         assertNull(cut)
@@ -3169,7 +3171,7 @@ class LinearAuthorityAggregateCutsTest {
             LinearAuthorityAggregateTerm(0, "left", left, BigFraction.ONE),
             LinearAuthorityAggregateTerm(1, "right", right, BigFraction.ONE),
         )
-        val stop = Cancellation { funding.paused }
+        val stop = ExecutionControl { funding.paused }
         val observe: (String, Long) -> Unit = { stage, count ->
             if (stage == "AggregateWork") budget.observe(preparation = count)
             if (stage == "AggregateAllocation") funding.charge(0L, count)
@@ -3195,7 +3197,7 @@ class LinearAuthorityAggregateCutsTest {
 
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
-        ), emptySet(), point, Cancellation.Never)
+        ), emptySet(), point, ExecutionControl.Never)
 
         assertTrue(result.complete)
         assertEquals(true, result.activeSourceRowsSatisfied)
@@ -3219,7 +3221,7 @@ class LinearAuthorityAggregateCutsTest {
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "mixed", mixed),
             LinearAuthorityAggregateTerm(1, "continuous", continuous),
-        ), emptySet(), point, Cancellation.Never)
+        ), emptySet(), point, ExecutionControl.Never)
 
         assertTrue(result.complete)
         assertEquals(true, result.activeSourceRowsSatisfied)
@@ -3241,7 +3243,7 @@ class LinearAuthorityAggregateCutsTest {
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "wide", wide), LinearAuthorityAggregateTerm(1, "left", left),
             LinearAuthorityAggregateTerm(2, "right", right),
-        ), emptySet(), point, Cancellation.Never, limits = LinearAuthorityAggregateLimits(support = 4))
+        ), emptySet(), point, ExecutionControl.Never, limits = LinearAuthorityAggregateLimits(support = 4))
 
         val cut = result.candidates.single()
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
@@ -3254,7 +3256,8 @@ class LinearAuthorityAggregateCutsTest {
     fun `pair inspection should distinguish source residuals from aggregate violations`() {
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
-        ), emptySet(), mapOf(x to BigFraction.ONE, y to BigFraction.ONE, real to BigFraction.ZERO), Cancellation.Never)
+        ), emptySet(), mapOf(x to BigFraction.ONE, y to BigFraction.ONE, real to BigFraction.ZERO),
+            ExecutionControl.Never)
 
         assertTrue(result.complete)
         assertEquals(false, result.activeSourceRowsSatisfied)
@@ -3266,7 +3269,8 @@ class LinearAuthorityAggregateCutsTest {
     fun `pair inspection should not combine inactive source rows`() {
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
-        ), setOf(1), mapOf(x to BigFraction.ONE, y to BigFraction.ONE, real to BigFraction.ZERO), Cancellation.Never)
+        ), setOf(1), mapOf(x to BigFraction.ONE, y to BigFraction.ONE, real to BigFraction.ZERO),
+            ExecutionControl.Never)
 
         assertTrue(result.complete)
         assertTrue(result.candidates.isEmpty())
@@ -3282,7 +3286,7 @@ class LinearAuthorityAggregateCutsTest {
             LinearAuthorityAggregateTerm(1, "right", right))
         for (limits in listOf(LinearAuthorityAggregateLimits(work = 1),
             LinearAuthorityAggregateLimits(allocation = 1))) {
-            val result = LinearAuthorityAggregateCuts.inspectPairs(rows, emptySet(), point, Cancellation.Never,
+            val result = LinearAuthorityAggregateCuts.inspectPairs(rows, emptySet(), point, ExecutionControl.Never,
                 limits = limits)
 
             assertFalse(result.complete)
@@ -3298,7 +3302,7 @@ class LinearAuthorityAggregateCutsTest {
 
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
-        ), emptySet(), point, Cancellation.Never, maximumCandidates = 0)
+        ), emptySet(), point, ExecutionControl.Never, maximumCandidates = 0)
 
         assertFalse(result.complete)
         assertTrue(result.candidates.isEmpty())
@@ -3309,7 +3313,8 @@ class LinearAuthorityAggregateCutsTest {
     fun `pair inspection should complete when the aggregate is satisfied at the point`() {
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
-        ), emptySet(), mapOf(x to BigFraction.ONE, y to BigFraction.ZERO, real to BigFraction.ONE), Cancellation.Never)
+        ), emptySet(), mapOf(x to BigFraction.ONE, y to BigFraction.ZERO, real to BigFraction.ONE),
+            ExecutionControl.Never)
 
         assertTrue(result.complete)
         assertTrue(result.candidates.isEmpty())
@@ -3320,7 +3325,7 @@ class LinearAuthorityAggregateCutsTest {
     fun `pair inspection should retain unknown efficacy when a point coordinate is missing`() {
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", left), LinearAuthorityAggregateTerm(1, "right", right),
-        ), emptySet(), mapOf(x to BigFraction.ONE, real to BigFraction.ZERO), Cancellation.Never)
+        ), emptySet(), mapOf(x to BigFraction.ONE, real to BigFraction.ZERO), ExecutionControl.Never)
 
         assertFalse(result.complete)
         assertTrue(result.candidates.isEmpty())
@@ -3332,9 +3337,9 @@ class LinearAuthorityAggregateCutsTest {
         var charged = 0L
         var observed = 0L
         val meter = WorkMeter { charged += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         val quarter = BigFraction.ofLong(4).reciprocal()
         val point = mapOf(x to quarter * BigFraction.ofLong(3), y to quarter * BigFraction.ofLong(3),
@@ -3363,14 +3368,14 @@ class LinearAuthorityAggregateCutsTest {
                 val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
                     LinearAuthorityAggregateTerm(0, "left", mixed),
                     LinearAuthorityAggregateTerm(1, "right", right),
-                ), Cancellation.Never, allowMixed = true, continuousBounds = mapOf(
+                ), ExecutionControl.Never, allowMixed = true, continuousBounds = mapOf(
                     (residual to (sign > BigFraction.ZERO)) to LinearAuthorityAggregateTerm(2, "bound", bound))))
 
                 assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE, residual to sign),
                     BigFraction.ONE), cut.inequality)
                 assertTrue(cut.mixed)
                 assertEquals(setOf(0, 1, 2), cut.owners)
-                assertTrue(assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never)).rows.isEmpty())
+                assertTrue(assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never)).rows.isEmpty())
                 assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
                     SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
             }
@@ -3385,7 +3390,7 @@ class LinearAuthorityAggregateCutsTest {
 
         val cut = LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
-        ), Cancellation.Never, { key, value -> observations[key] = (observations[key] ?: 0L) + value },
+        ), ExecutionControl.Never, { key, value -> observations[key] = (observations[key] ?: 0L) + value },
             allowMixed = true)
 
         assertNull(cut)
@@ -3403,16 +3408,16 @@ class LinearAuthorityAggregateCutsTest {
             "bound" to SourcePremise(bound, mapOf(0 to true))))
         val cut = assertNotNull(LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
-        ), Cancellation.Never, allowMixed = true, continuousBounds = mapOf(
+        ), ExecutionControl.Never, allowMixed = true, continuousBounds = mapOf(
             (residual to false) to LinearAuthorityAggregateTerm(2, "bound", bound))))
-        val template = assertNotNull(assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never,
-            cuts = true)).withAdditional(listOf(cut), Cancellation.Never))
+        val template = assertNotNull(assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never,
+            cuts = true)).withAdditional(listOf(cut), ExecutionControl.Never))
         for (enabled in listOf(true, false, true)) {
             val context = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to enabled))))
 
             val check = SourceEvidenceVerifier(context).verify(
                 SourceEvidence(context.scope, SourceClaim.Consequence(cut.inequality), cut.derivation))
-            val query = assertNotNull(LinearAuthorityQuery.prepare(context, template, Cancellation.Never))
+            val query = assertNotNull(LinearAuthorityQuery.prepare(context, template, ExecutionControl.Never))
 
             assertEquals(if (enabled) 1 else 0, query.activeCuts)
             if (enabled) assertEquals(SourceEvidenceCheck.Checked, check)
@@ -3430,7 +3435,7 @@ class LinearAuthorityAggregateCutsTest {
 
         val cut = LinearAuthorityAggregateCuts.derive(listOf(
             LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
-        ), Cancellation.Never, { key, value -> observations[key] = (observations[key] ?: 0L) + value },
+        ), ExecutionControl.Never, { key, value -> observations[key] = (observations[key] ?: 0L) + value },
             LinearAuthorityAggregateLimits(scalarBits = 128), allowMixed = true, continuousBounds = mapOf(
                 (residual to false) to LinearAuthorityAggregateTerm(2, "bound", bound)))
 
@@ -3453,7 +3458,7 @@ class LinearAuthorityAggregateCutsTest {
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
             LinearAuthorityAggregateTerm(2, "bound", bound),
-        ), emptySet(), point, Cancellation.Never, allowMixed = true)
+        ), emptySet(), point, ExecutionControl.Never, allowMixed = true)
 
         assertTrue(result.complete)
         assertEquals(true, result.activeSourceRowsSatisfied)
@@ -3476,7 +3481,7 @@ class LinearAuthorityAggregateCutsTest {
             val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
                 LinearAuthorityAggregateTerm(0, "left", mixed), LinearAuthorityAggregateTerm(1, "right", right),
                 LinearAuthorityAggregateTerm(2, "bound", bound),
-            ), inactive, point, Cancellation.Never, allowMixed = true)
+            ), inactive, point, ExecutionControl.Never, allowMixed = true)
 
             assertTrue(result.complete)
             assertEquals(if (inactive.isEmpty()) 1 else 0, result.candidates.size)
@@ -3492,7 +3497,7 @@ class LinearAuthorityAggregateCutsTest {
 
         val result = LinearAuthorityAggregateCuts.inspectPairs(listOf(
             LinearAuthorityAggregateTerm(0, "left", largeLeft), LinearAuthorityAggregateTerm(1, "right", largeRight),
-        ), emptySet(), point, Cancellation.Never,
+        ), emptySet(), point, ExecutionControl.Never,
             limits = LinearAuthorityAggregateLimits(scalarBits = 128))
 
         assertFalse(result.complete)

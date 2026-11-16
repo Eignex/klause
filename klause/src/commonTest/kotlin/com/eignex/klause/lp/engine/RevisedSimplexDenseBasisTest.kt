@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -61,7 +61,7 @@ class RevisedSimplexDenseBasisTest {
         val model = builder.build(Sense.MINIMIZE)
         var cancelled = false
         var denseAttempts = 0L
-        val token = Cancellation { cancelled }
+        val token = ExecutionControl { cancelled }
         RevisedSimplex(model, cancellation = token, basisSolverFactory = { matrix ->
             val delegate = KotlinBasisSolver(matrix)
             object : BasisSolver by delegate {

@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.random.Random
 import kotlin.test.Test
@@ -245,7 +245,7 @@ class LpReplayTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     refactorUpdateLimit: Int,
                     iterationLimit: Int,
                     workLimit: Long,
@@ -262,7 +262,7 @@ class LpReplayTest {
                         pricing,
                     )
                     return object : PersistentLpSolver by delegate {
-                        override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                        override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
                             attempts++
                             return attempts > 1 && delegate.adopt(state, token)
                         }

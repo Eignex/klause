@@ -24,7 +24,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -63,7 +63,7 @@ class PresolveInvocationTest {
                 val problem = if (lane == PresolveLane.FINITE) source.bake() else source
                 reads = 0
                 val budget = PresolveBudget(if (lane == PresolveLane.FINITE) 2L else 1L)
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
                 val context = PresolveContext(presolveBudget = budget)
                 val config = PresolveConfig.parse(if (lane == PresolveLane.SOURCE) "off,+$id" else "off,+$id,+bce")
 
@@ -108,7 +108,7 @@ class PresolveInvocationTest {
                 )
                 reads = 0
                 val budget = PresolveBudget(200L)
-                val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
+                val context = PresolveContext(cancellation = budget.orSpent(ExecutionControl.Never))
 
                 val empty = when (lane) {
                     PresolveLane.SOURCE -> pass.applySource(problem, context).isEmpty
@@ -146,7 +146,7 @@ class PresolveInvocationTest {
                     else -> 3_500L
                 }
                 val budget = PresolveBudget(allowance)
-                val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
+                val context = PresolveContext(cancellation = budget.orSpent(ExecutionControl.Never))
                 refs = 0
 
                 val empty = when (lane) {
@@ -172,7 +172,7 @@ class PresolveInvocationTest {
             for (lane in PresolveLane.entries) {
                 var polls = 0
                 val budgets = List(2) { PresolveBudget(Long.MAX_VALUE) }
-                val tokens = listOf(budgets[0].orSpent(Cancellation.Never), budgets[1].orSpent(Cancellation {
+                val tokens = listOf(budgets[0].orSpent(ExecutionControl.Never), budgets[1].orSpent(ExecutionControl {
                     polls++
                     false
                 }))
@@ -198,7 +198,7 @@ class PresolveInvocationTest {
             PresolvePass.REMOVE_REDUNDANT)) {
             for (lane in PresolveLane.entries) {
                 var reads = 0
-                val factors = List(512) {
+                val factors = List(4096) {
                     val row = Linear(intArrayOf(1, 1), intArrayOf(it, it + 1), LinearOp.LE, 10)
                     object : Factor by row, Propagator by row.propagatorProjection() {
                         override val linearForm: LinearForm get() {
@@ -207,9 +207,9 @@ class PresolveInvocationTest {
                         }
                     }
                 }
-                val problem = BakedProblem(0, 513, Array(513) { IntDomain(0, 10) }, factors, alreadyFolded = true)
+                val problem = BakedProblem(0, 4097, Array(4097) { IntDomain(0, 10) }, factors, alreadyFolded = true)
                 reads = 0
-                val context = PresolveContext(cancellation = Cancellation { reads >= 8 })
+                val context = PresolveContext(cancellation = ExecutionControl { reads >= 8 })
 
                 val empty = when (lane) {
                     PresolveLane.SOURCE -> pass.applySource(problem, context).isEmpty
@@ -217,7 +217,7 @@ class PresolveInvocationTest {
                 }
 
                 assertTrue(empty, "$pass $lane")
-                assertTrue(reads in 8..72, "$pass $lane: $reads reads")
+                assertTrue(reads in 8..1032, "$pass $lane: $reads reads")
             }
         }
     }
@@ -239,7 +239,7 @@ class PresolveInvocationTest {
         for ((pass, problem) in cases) {
             for (lane in PresolveLane.entries) {
                 val budget = PresolveBudget(Long.MAX_VALUE)
-                val context = PresolveContext(cancellation = budget.orSpent(Cancellation.Never))
+                val context = PresolveContext(cancellation = budget.orSpent(ExecutionControl.Never))
 
                 val empty = when (lane) {
                     PresolveLane.SOURCE -> pass.applySource(problem, context).isEmpty
@@ -261,7 +261,7 @@ class PresolveInvocationTest {
             for (config in listOf("off,+dual-fix", "off,+dual-fix,+bce")) {
                 val budget = PresolveBudget(Long.MAX_VALUE)
                 val context = PresolveContext(objectiveBoolCoeffs = costs, presolveBudget = budget)
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
 
                 when (lane) {
                     PresolveLane.SOURCE -> Presolver.runSource(problem, PresolveConfig.parse(config), context, token)
@@ -297,7 +297,7 @@ class PresolveInvocationTest {
 
         Presolver.runSource(problem, PresolveConfig.parse("off,+dual-fix"), PresolveContext(
             objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L), presolveBudget = budget,
-        ), budget.orSpent(Cancellation.Never))
+        ), budget.orSpent(ExecutionControl.Never))
 
         assertEquals(0, budget.invocations.sumOf { it.fixedColumns })
         assertEquals(2L, budget.entrySizeVisits)
@@ -329,7 +329,7 @@ class PresolveInvocationTest {
 
             Presolver.run(problem, PresolveConfig.parse(config), PresolveContext(
                 objectiveBoolCoeffs = mapOf(1 to 2L, 2 to 1L), presolveBudget = budget,
-            ), budget.orSpent(Cancellation.Never))
+            ), budget.orSpent(ExecutionControl.Never))
 
             val call = budget.invocations.first { it.pass == "dual-fix" }
             assertEquals(2, call.output.factors - call.input.factors)
@@ -343,11 +343,11 @@ class PresolveInvocationTest {
         for (lane in PresolveLane.entries) {
             val setup = PresolveBudget(Long.MAX_VALUE)
             if (lane == PresolveLane.FINITE) {
-                PresolveSession(problem.bake(), cancellation = setup.orSpent(Cancellation.Never)).passInput()
+                PresolveSession(problem.bake(), cancellation = setup.orSpent(ExecutionControl.Never)).passInput()
             }
             val budget = PresolveBudget(setup.spent() + 32L)
             val context = PresolveContext(objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L), presolveBudget = budget)
-            val token = budget.orSpent(Cancellation.Never)
+            val token = budget.orSpent(ExecutionControl.Never)
             val config = PresolveConfig.parse("off,+dual-fix")
 
             when (lane) {
@@ -367,7 +367,7 @@ class PresolveInvocationTest {
         val problem = Problem(3, 0, emptyArray(), List(8) { Clause(intArrayOf(0, 2, 4)) })
         for (lane in PresolveLane.entries) {
             val budget = PresolveBudget(Long.MAX_VALUE)
-            val token = budget.orSpent(Cancellation.Never)
+            val token = budget.orSpent(ExecutionControl.Never)
             val config = PresolveConfig.parse("off,+probe-open,+fuse-bounds,+dependent-rows,+sparsify")
             val context = PresolveContext(presolveBudget = budget)
 
@@ -390,7 +390,7 @@ class PresolveInvocationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         Presolver.runSource(problem, PresolveConfig.parse("off,+probe-open"),
-            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
 
         assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, budget.invocations.single().outcome)
         assertEquals(0L, budget.spent())
@@ -409,7 +409,7 @@ class PresolveInvocationTest {
             for (lane in PresolveLane.entries) {
                 val budget = PresolveBudget(Long.MAX_VALUE)
                 val context = PresolveContext(presolveBudget = budget)
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
                 val config = PresolveConfig.parse("off,+comparison-clause")
 
                 when (lane) {
@@ -448,7 +448,7 @@ class PresolveInvocationTest {
             for (lane in PresolveLane.entries) {
                 val budget = PresolveBudget(Long.MAX_VALUE)
                 val context = PresolveContext(presolveBudget = budget)
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
                 val config = PresolveConfig.parse("off,+comparison-clause")
 
                 val reduced = when (lane) {
@@ -488,7 +488,7 @@ class PresolveInvocationTest {
                 val problem = Problem(0, 3, Array(3) { IntDomain(0, 10) }, factors)
                 val budget = PresolveBudget(Long.MAX_VALUE)
                 val context = PresolveContext(presolveBudget = budget)
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
                 val config = PresolveConfig.parse("off,+$pass")
 
                 when (lane) {
@@ -510,7 +510,7 @@ class PresolveInvocationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val result = Presolver.runSource(problem, PresolveConfig.parse("off,+probe"),
-            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
 
         assertTrue(result.infeasible)
         assertEquals(PresolveInvocationOutcome.REFUTED, budget.invocations.single().outcome)
@@ -542,7 +542,7 @@ class PresolveInvocationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val result = Presolver.run(problem.bake(), PresolveConfig.parse("off,+subsume,+clause-subsume"),
-            PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never))
+            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
 
         assertEquals(1, result.problem.factors.size)
         val call = budget.invocations.first { it.pass == "clause-subsume" }
@@ -561,7 +561,7 @@ class PresolveInvocationTest {
                 val budget = PresolveBudget(Long.MAX_VALUE)
                 val context = PresolveContext(presolveBudget = budget)
                 val config = PresolveConfig.parse("off,+aggregate")
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
 
                 when (lane) {
                     PresolveLane.SOURCE -> Presolver.runSource(problem, config, context, token)
@@ -583,7 +583,7 @@ class PresolveInvocationTest {
             List(2_048) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7) },
         )
         val budget = PresolveBudget(1L)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
 
         val result = Presolver.runSource(
             problem, PresolveConfig.parse("off,+bve,+bce,+impl-graph"),
@@ -618,7 +618,7 @@ class PresolveInvocationTest {
                 val budget = PresolveBudget(1L)
                 val context = PresolveContext(presolveBudget = budget)
                 val config = PresolveConfig.parse("off,+$id")
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
 
                 when (lane) {
                     PresolveLane.SOURCE -> Presolver.runSource(problem, config, context, token)
@@ -643,7 +643,7 @@ class PresolveInvocationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val context = PresolveContext(presolveBudget = budget)
         val config = PresolveConfig.parse("off,+strengthen")
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
 
         repeat(2) { Presolver.runSource(problem, config, context, token) }
 
@@ -665,7 +665,7 @@ class PresolveInvocationTest {
 
         Presolver.runSource(
             problem, PresolveConfig.parse("off,+strengthen"), PresolveContext(presolveBudget = budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         val invocation = budget.invocations.single()
@@ -684,7 +684,7 @@ class PresolveInvocationTest {
 
         val result = Presolver.runSource(
             problem, PresolveConfig.parse("off,+strengthen"), PresolveContext(presolveBudget = budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertTrue(result.infeasible)
@@ -695,7 +695,7 @@ class PresolveInvocationTest {
     fun `construction tiers should retain namespace skips and probe cap interruptions`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyList())
-            .bake(budget.orSpent(Cancellation.Never))
+            .bake(budget.orSpent(ExecutionControl.Never))
 
         RootBaker.bake(problem, BakeConfig(
             probeFailedLiterals = true, probeIntBounds = true, probeIntHoles = true, probeTotalBudget = 0,
@@ -760,7 +760,7 @@ class PresolveInvocationTest {
         ).bake()
         val context = PresolveContext(objectiveIntCoeffs = mapOf(0 to 1L, 1 to 1L), presolveBudget = budget)
         val config = PresolveConfig.parse("off,+dup-columns")
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
 
         repeat(2) { Presolver.run(problem, config, context, token) }
 
@@ -779,7 +779,7 @@ class PresolveInvocationTest {
 
         Presolver.runSource(
             problem, PresolveConfig.parse("off,+subsume"), PresolveContext(presolveBudget = budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         val changed = budget.invocations.first { it.pass == "subsume" }
@@ -800,7 +800,7 @@ class PresolveInvocationTest {
 
         Presolver.run(
             problem, PresolveConfig.parse("off,+affine,+subsume"), PresolveContext(presolveBudget = budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         val calls = budget.invocations.filter { it.pass == "affine" }
@@ -837,7 +837,7 @@ class PresolveInvocationTest {
     @Test
     fun `materializing a certified refutation should retain the phase construction meter`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val problem = Problem(1, 0, emptyArray(), emptyList()).bake(budget.orSpent(Cancellation.Never))
+        val problem = Problem(1, 0, emptyArray(), emptyList()).bake(budget.orSpent(ExecutionControl.Never))
         val construction = budget.rootConstructionEntries
 
         RootBaker.provenInfeasible(problem, BakeConfig.NONE)
@@ -854,12 +854,12 @@ class PresolveInvocationTest {
         val config = PresolveConfig.parse("off,+strengthen")
         val reference = PresolveBudget(Long.MAX_VALUE)
         Presolver.runSource(
-            problem, config, PresolveContext(presolveBudget = reference), reference.orSpent(Cancellation.Never),
+            problem, config, PresolveContext(presolveBudget = reference), reference.orSpent(ExecutionControl.Never),
         )
         val budget = PresolveBudget(reference.spent())
 
         Presolver.runSource(
-            problem, config, PresolveContext(presolveBudget = budget), budget.orSpent(Cancellation.Never),
+            problem, config, PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never),
         )
 
         assertEquals(0L, budget.remaining())

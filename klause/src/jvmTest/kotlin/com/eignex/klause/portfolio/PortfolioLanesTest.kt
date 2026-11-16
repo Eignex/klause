@@ -29,7 +29,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.MinimizeResult.WithSample
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
@@ -83,8 +83,8 @@ class PortfolioLanesTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
         val deadline = TimeSource.Monotonic.markNow() + Duration.parse("1h")
         val runs = listOf<(Portfolio) -> Unit>(
-            { it.solve(Cancellation.until(deadline)) },
-            { it.minimize(Cancellation.until(deadline)) },
+            { it.solve(ExecutionControl.until(deadline)) },
+            { it.minimize(ExecutionControl.until(deadline)) },
         )
         for (run in runs) {
             val seen = ArrayList<ComparableTimeMark?>()
@@ -104,7 +104,7 @@ class PortfolioLanesTest {
                 override fun resumableSolve(params: BacktrackParams): ResumableSolve {
                     val handle = bt.resumableSolve(params)
                     return object : ResumableSolve by handle {
-                        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long) =
+                        override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long) =
                             handle.runSlice(global, sliceMillis, sliceNodes).also { seen += global.deadline() }
                     }
                 }
@@ -113,7 +113,7 @@ class PortfolioLanesTest {
                     val handle = bt.resumable(objective, params)
                     return object : ResumableSearch by handle {
                         override fun runSlice(
-                            global: Cancellation,
+                            global: ExecutionControl,
                             sliceMillis: Long,
                             sliceNodes: Long,
                             onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -335,7 +335,7 @@ class PortfolioLanesTest {
             ),
         ).use { p ->
             val fallback = TimeSource.Monotonic.markNow() + Duration.parse("30s")
-            val r = p.minimize(cancellation = { sawOptimum.load() || fallback.hasPassedNow() })
+            val r = p.minimize(cancellation = ExecutionControl { sawOptimum.load() || fallback.hasPassedNow() })
             assertEquals(3.0, assertIs<WithSample>(r).objectiveValue)
         }
     }
@@ -506,7 +506,8 @@ class PortfolioLanesTest {
         }
         val stop = TimeSource.Monotonic.markNow() + Duration.parse("100ms")
 
-        val r = Portfolio.thompson(arms, lanes = 2).use { it.minimize(cancellation = { stop.hasPassedNow() }) }
+        val r = Portfolio.thompson(arms, lanes = 2).use { it.minimize(cancellation =
+            ExecutionControl { stop.hasPassedNow() }) }
 
         assertEquals(listOf(1L, 1L), r.stats.portfolio.arms.map { it.segments })
     }

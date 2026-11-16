@@ -10,7 +10,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
@@ -98,7 +98,7 @@ class MaxSdTest {
         var cancelled = false
         val session = PropagationSession(
             Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray<Factor>()),
-            cancellation = Cancellation { cancelled },
+            cancellation = ExecutionControl { cancelled },
         )
         cancelled = true
 
@@ -125,9 +125,9 @@ class MaxSdTest {
     @Test
     fun `support discovery should observe cancellation before an unsupported fallback`() {
         var cancelled = false
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled() = cancelled
-            override fun workMeter(): WorkMeter = WorkMeter { }
+            override val accounting: WorkMeter get() = WorkMeter { }
         }
         val problem = Problem(
             0, 2, Array(2) { IntDomain(0, 2) },

@@ -5,7 +5,7 @@ import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -37,11 +37,11 @@ internal class BoundedCompanionSearch(
             completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages))
     }
 
-    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
         advance(sliceMillis) { millis -> search.runSlice(global, millis, boundedWork(sliceNodes), onIncumbent) }
 
-    override fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
+    override fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = advance(sliceMillis) { millis ->
         val instructions = search as? InstructionSlicedSearch
         if (instructions == null) search.runSlice(global, millis, boundedWork(sliceInstructions), onIncumbent)

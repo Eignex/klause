@@ -10,7 +10,7 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.MutableIntIntMap
 
@@ -19,7 +19,7 @@ import com.eignex.util.collections.MutableIntIntMap
 internal class LinearInputRevision(
     problem: Problem,
     private val pass: PresolvePass,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
 ) {
     private val columns = MutableIntIntMap()
     private val ranges = HashMap<Int, Pair<Long?, Long?>>()

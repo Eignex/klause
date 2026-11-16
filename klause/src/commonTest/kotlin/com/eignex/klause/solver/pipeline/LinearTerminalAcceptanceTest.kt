@@ -14,7 +14,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -46,7 +46,7 @@ class LinearTerminalAcceptanceTest {
         }
 
         for (steps in listOf(1, sufficient)) {
-            val checked = result.verifyTerminal(source, Cancellation.Never,
+            val checked = result.verifyTerminal(source, ExecutionControl.Never,
                 SourceEvidenceVerifier(captured, maximumSteps = steps))
 
             if (steps == sufficient) assertIs<Verification.Accepted<Unit, Unit>>(checked)
@@ -58,7 +58,7 @@ class LinearTerminalAcceptanceTest {
     fun `a checked strict limit should be accepted in its original invocation`() {
         val result = OpenTheoryPipeline.optimizeLinear(source)
 
-        val checked = result.verifyTerminal(source, Cancellation.Never)
+        val checked = result.verifyTerminal(source, ExecutionControl.Never)
 
         assertIs<Verification.Accepted<Unit, Unit>>(checked)
     }
@@ -77,7 +77,7 @@ class LinearTerminalAcceptanceTest {
         )
         val result = OpenTheoryPipeline.optimizeLinear(restricted)
 
-        val checked = result.verifyTerminal(source, Cancellation.Never)
+        val checked = result.verifyTerminal(source, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(checked)
     }
@@ -97,7 +97,7 @@ class LinearTerminalAcceptanceTest {
         )
         val result = OpenTheoryPipeline.optimizeLinear(source)
 
-        val checked = result.verifyTerminal(changed, Cancellation.Never)
+        val checked = result.verifyTerminal(changed, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(checked)
     }
@@ -106,7 +106,7 @@ class LinearTerminalAcceptanceTest {
     fun `cancelled terminal verification should withhold acceptance`() {
         val result = OpenTheoryPipeline.optimizeLinear(source)
 
-        val checked = result.verifyTerminal(source, Cancellation { true })
+        val checked = result.verifyTerminal(source, ExecutionControl { true })
 
         assertIs<Verification.Indeterminate>(checked)
     }
@@ -125,7 +125,7 @@ class LinearTerminalAcceptanceTest {
         )
         val result = OpenTheoryPipeline.optimizeLinear(restricted)
 
-        val checked = result.verifyTerminal(source, Cancellation.Never)
+        val checked = result.verifyTerminal(source, ExecutionControl.Never)
 
         assertIs<Verification.Rejected>(checked)
     }

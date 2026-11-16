@@ -72,7 +72,8 @@ import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.theory.requiresRealCompletionSearch
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.arrays.emptyIntArray
@@ -177,7 +178,7 @@ internal class CpSatisfactionTraversal(
     private val params: BacktrackParams,
     private val sink: SolveStatsSink?,
     solveContext: LpSolveContext,
-    propagationCancellation: Cancellation = params.cancellation,
+    propagationCancellation: ExecutionControl = params.cancellation,
     private val slice: TraversalSlice? = null,
     projection: PropagationProblem = PropagationProblem(problem),
     private val deferredInitialization: Boolean = false,
@@ -292,7 +293,9 @@ internal class CpSatisfactionTraversal(
                 (preparedSession != null || components.any { it is PreparingSearchComponent })
             val sharedCancellation = if (deferredRoot) cancelledWhen({
                 if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
-            }, { params.cancellation.workScheduled() }) {
+            }, { params.cancellation.workScheduled() }, {
+                    if (run == null) propagationCancellation.stopPolling else params.cancellation.stopPolling
+                }) {
                 if (run == null) propagationCancellation() else params.cancellation()
             } else params.cancellation
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
@@ -1006,9 +1009,10 @@ private class LpFeasibilityComponent(
     sink: SolveStatsSink?,
     solveContext: LpSolveContext,
 ) : LpSearchResource {
-    private var preparationToken: Cancellation? = null
+    private var preparationToken: ExecutionControl? = null
     private val cancellation = cancelledWhen(
         { params.cancellation.deadline() }, { params.cancellation.workScheduled() },
+        { params.cancellation.stopPolling },
     ) {
         params.cancellation() || preparationToken?.invoke() == true
     }
@@ -1044,13 +1048,13 @@ private class LpFeasibilityComponent(
         val millis = remaining?.let { minOf((it * plan.rootBudgetFraction).toLong(), plan.rootBudgetMillis) }
             ?: plan.rootBudgetMillis
         val before = engine.totalSolveWork()
-        val token = params.cancellation or Cancellation {
+        val token = params.cancellation or ExecutionControl {
             (plan.rootMaxWork > 0L && engine.totalSolveWork() - before >= plan.rootMaxWork) ||
                 engine.lpWorkAllowanceSpent()
         } or if (plan.rootBudgetFraction > 0.0 && !params.cancellation.workScheduled()) {
-            Cancellation.after(millis.coerceAtLeast(0L).milliseconds)
+            ExecutionControl.after(millis.coerceAtLeast(0L).milliseconds)
         } else {
-            Cancellation.Never
+            ExecutionControl.Never
         }
         preparationToken = token
         try {

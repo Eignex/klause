@@ -22,7 +22,7 @@ import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 import kotlin.random.Random
 import kotlin.test.Test
@@ -190,12 +190,12 @@ class TablePropagatorTest {
             state.beginRootFixpoint().forEach { }
             var polls = 0
 
-            assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= limit }))
+            assertNull(state.advanceRootFixpoint(ExecutionControl { ++polls >= limit }))
 
             assertTrue(state.rootFixpointPending)
             assertFalse(state.runCancelled)
             assertEquals(limit, polls)
-            while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+            while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(ExecutionControl.Never))
             for (col in 0..1) assertEquals(256L, state.intDomains[col].valueCount)
         }
     }
@@ -208,14 +208,14 @@ class TablePropagatorTest {
         )
         val state = PropagationState(problem, Assumptions.None)
         state.beginRootFixpoint().forEach { }
-        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(ExecutionControl.Never))
         state.undoLogging = true
         val root = state.mark()
         state.currentLevel = 1
         check(state.tightenIntMax(0, 63))
         state.beginSeedFixpoint().forEach { }
         var polls = 0
-        assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= 5 }))
+        assertNull(state.advanceRootFixpoint(ExecutionControl { ++polls >= 5 }))
         assertTrue(state.rootFixpointPending)
         state.undoTo(root)
         state.currentLevel = 1
@@ -249,7 +249,7 @@ class TablePropagatorTest {
         assertNull(state.runToFixpoint(allFactors = false))
         val reason = assertNotNull(state.intMaxAntecedents[1])
         var polls = 0
-        state.finiteWork.cancellation = Cancellation { ++polls >= 2 }
+        state.finiteWork.cancellation = ExecutionControl { ++polls >= 2 }
 
         assertNull(state.reasonOf(reason))
 

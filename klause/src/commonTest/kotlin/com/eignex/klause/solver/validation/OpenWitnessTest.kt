@@ -18,7 +18,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -112,7 +112,7 @@ class OpenWitnessTest {
         val point = Sample(booleanArrayOf(), longArrayOf(2, 3, 6), reals = doubleArrayOf(0.0, 1.0, 1.0),
             exactReals = listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ONE))
 
-        val checked = verifyOpenWitness(source, point, Cancellation.Never, PropagationProblem(source, captured))
+        val checked = verifyOpenWitness(source, point, ExecutionControl.Never, PropagationProblem(source, captured))
 
         assertIs<Verification.Accepted<*, *>>(checked)
     }
@@ -154,7 +154,7 @@ class OpenWitnessTest {
         val valid = Sample(booleanArrayOf(), longArrayOf(2, 3, 6))
         val invalid = Sample(booleanArrayOf(), longArrayOf(2, 3, 5))
 
-        assertIs<Verification.Indeterminate>(verifyOpenWitness(source, valid, Cancellation { true }))
+        assertIs<Verification.Indeterminate>(verifyOpenWitness(source, valid, ExecutionControl { true }))
         assertIs<Verification.Rejected>(verifyOpenWitness(source, invalid))
         assertIs<Verification.Accepted<*, *>>(verifyOpenWitness(source, valid))
     }

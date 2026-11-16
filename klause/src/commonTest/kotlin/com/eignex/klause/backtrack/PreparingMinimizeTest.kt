@@ -19,7 +19,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -38,7 +38,7 @@ class PreparingMinimizeTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
                 workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 constructions++
@@ -49,7 +49,7 @@ class PreparingMinimizeTest {
                     override val lastMetrics get() = delegate.lastMetrics.copy(
                         workOps = delegate.lastMetrics.workOps + preparationWork,
                     )
-                    override fun prepareLogicals(token: Cancellation): Basis? =
+                    override fun prepareLogicals(token: ExecutionControl): Basis? =
                         delegate.prepareLogicals(token).also { preparationWork = 5_000L * LP_WORK_PER_NODE }
 
                     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? {
@@ -63,7 +63,7 @@ class PreparingMinimizeTest {
         val params = BacktrackParams(maxDecisions = 0L,
             lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
         val samples = mutableListOf<MinimizeResult.WithSample>()
-        val stopAtWitness = Cancellation { samples.isNotEmpty() }
+        val stopAtWitness = ExecutionControl { samples.isNotEmpty() }
         PreparingMinimize(BacktrackSolver(problem, LpSolveContext(factory)), objective, params).use { search ->
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L, samples::add)
 
@@ -86,14 +86,14 @@ class PreparingMinimizeTest {
         val fixture = FiniteCutoffKnapsackFixture
         val samples = mutableListOf<MinimizeResult.WithSample>()
         PreparingMinimize(BacktrackSolver(fixture.problem), fixture.objective, fixture.params).use { search ->
-            val paused = search.runSlice(Cancellation.Never, 0L, 100L, samples::add)
+            val paused = search.runSlice(ExecutionControl.Never, 0L, 100L, samples::add)
 
             assertNull(paused)
             assertTrue(search.preparationPending)
             assertFalse(search.canReseed)
             assertTrue(samples.isEmpty())
             val result = assertIs<MinimizeResult.Optimal>(
-                search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L, samples::add),
+                search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L, samples::add),
             )
             assertEquals(-4.0, result.objective)
             assertFalse(search.preparationPending)
@@ -113,7 +113,7 @@ class PreparingMinimizeTest {
         val params = BacktrackParams(randomSeed = 0L, lpPlan = LpPlan())
         val solver = BacktrackSolver(problem)
         val whole = solver.resumable(objective, params).use {
-            assertIs<MinimizeResult.Optimal>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+            assertIs<MinimizeResult.Optimal>(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
         }
         solver.resumable(objective, params).use { search ->
             var terminal: MinimizeResult? = null
@@ -121,7 +121,7 @@ class PreparingMinimizeTest {
             var slices = 0
             while (terminal == null && slices++ < 100) {
                 val before = search.work
-                terminal = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {}
+                terminal = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) {}
                 assertTrue(search.work >= before)
                 if (search.preparationPending && search.work > 0L) preparationPauses++
             }
@@ -142,12 +142,12 @@ class PreparingMinimizeTest {
         )
 
         assertFailsWith<IndexOutOfBoundsException> {
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
+            search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { }
         }
 
         assertFalse(search.preparationPending)
         assertFailsWith<IllegalStateException> {
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
+            search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { }
         }
         search.close()
     }
@@ -163,7 +163,7 @@ class PreparingMinimizeTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
         val params = BacktrackParams(objectiveBoundSupplier = { 0.0 })
         PreparingMinimize(BacktrackSolver(problem), objective, params).use { search ->
-            val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { }
+            val result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { }
 
             assertEquals(TerminationReason.SearchExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
             assertTrue(search.isDone)
@@ -175,7 +175,7 @@ class PreparingMinimizeTest {
         val fixture = FiniteCutoffKnapsackFixture
         PreparingMinimize(BacktrackSolver(fixture.problem), fixture.objective, fixture.params).use { search ->
             val samples = mutableListOf<MinimizeResult.WithSample>()
-            val token = Cancellation { !search.preparationPending }
+            val token = ExecutionControl { !search.preparationPending }
 
             val paused = search.runSlice(token, Long.MAX_VALUE, -1L, samples::add)
 
@@ -185,7 +185,7 @@ class PreparingMinimizeTest {
             assertEquals(0.0, search.stats.lp.solves.sum)
             assertTrue(samples.isEmpty())
             val result = assertIs<MinimizeResult.Optimal>(
-                search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L, samples::add),
+                search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L, samples::add),
             )
             assertEquals(-4.0, result.objective)
         }

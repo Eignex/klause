@@ -5,7 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 
 internal class ElementResultDefinition(val factor: Element) : SweepNode {
@@ -49,7 +49,7 @@ internal class ElementResultDefinition(val factor: Element) : SweepNode {
 internal fun elementResultDefinitions(
     problem: Problem,
     hints: IntArray,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): List<SweepNode> {
     if (cancellation()) return emptyList()
     val hinted = BooleanArray(problem.numIntVars)

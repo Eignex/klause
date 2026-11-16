@@ -24,7 +24,7 @@ import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.skema.SchemaDef
 import kotlin.test.Test
@@ -62,7 +62,8 @@ class SharedPolynomialModelTest {
                     }
                 }).prepare(source)
 
-                val model = SharedPolynomialModel.lower(source, null, projections, Cancellation.Never) { decline = it }
+                val model = SharedPolynomialModel.lower(source, null, projections,
+                    ExecutionControl.Never) { decline = it }
 
                 assertNull(model)
                 assertEquals(if (support == EncoderSupport.CONDITIONED) EncoderDecline.CONDITIONS
@@ -79,9 +80,9 @@ class SharedPolynomialModelTest {
         }, numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         var installed = 0
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val projections = FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
             Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
@@ -106,7 +107,7 @@ class SharedPolynomialModelTest {
         val source = Problem(0, 0, emptyArray(), arrayOf(row), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         var stopNext = false
-        val stop = Cancellation { stopNext.also { stopNext = false } }
+        val stop = ExecutionControl { stopNext.also { stopNext = false } }
         val projections = FactorProjectionProviders(encoder = EncoderProvider { _, _ ->
             Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->
                 encoding.polynomial(PolynomialRealFormula.Constant(true))
@@ -137,7 +138,7 @@ class SharedPolynomialModelTest {
             }
         }).prepare(source)
 
-        val model = SharedPolynomialModel.lower(source, null, projections, Cancellation.Never) { decline = it }
+        val model = SharedPolynomialModel.lower(source, null, projections, ExecutionControl.Never) { decline = it }
 
         assertNull(model)
         assertEquals(EncoderDecline.UNSUPPORTED, decline)
@@ -155,7 +156,7 @@ class SharedPolynomialModelTest {
             Encoder(EncoderSupport.EQUIVALENT) { _, _ -> null }
         }).prepare(source)
 
-        val model = SharedPolynomialModel.lower(source, null, projections, Cancellation.Never) { decline = it }
+        val model = SharedPolynomialModel.lower(source, null, projections, ExecutionControl.Never) { decline = it }
 
         assertNull(model)
         assertEquals(EncoderDecline.UNSUPPORTED, decline)
@@ -179,7 +180,7 @@ class SharedPolynomialModelTest {
         }).prepare(foreign)
 
         assertFailsWith<IllegalArgumentException> {
-            SharedPolynomialModel.lower(source, null, projections, Cancellation.Never) { }
+            SharedPolynomialModel.lower(source, null, projections, ExecutionControl.Never) { }
         }
         assertEquals(0, installed)
     }
@@ -220,18 +221,18 @@ class SharedPolynomialModelTest {
         val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
             .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
 
-        val first = model.finitePointCheck(null, Cancellation.Never)
+        val first = model.finitePointCheck(null, ExecutionControl.Never)
 
-        assertSame(first, model.finitePointCheck(null, Cancellation.Never))
+        assertSame(first, model.finitePointCheck(null, ExecutionControl.Never))
     }
 
     @Test
     fun `another finite projection should bake its own witness checker`() {
         val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
             .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
-        val first = model.finitePointCheck(null, Cancellation.Never)
+        val first = model.finitePointCheck(null, ExecutionControl.Never)
 
-        val other = model.finitePointCheck(FactorProjectionProviders().prepare(model.finite), Cancellation.Never)
+        val other = model.finitePointCheck(FactorProjectionProviders().prepare(model.finite), ExecutionControl.Never)
 
         assertNotSame(first, other)
     }
@@ -240,8 +241,8 @@ class SharedPolynomialModelTest {
     fun `a bake cut short by cancellation should not be retained`() {
         val model = assertNotNull(Problem(0, 0, emptyArray(), emptyArray())
             .preparePolynomialExecutionPlan(PolynomialRealFormula.Constant(true)).polynomialModel)
-        val interrupted = model.finitePointCheck(null, Cancellation { true })
+        val interrupted = model.finitePointCheck(null, ExecutionControl { true })
 
-        assertNotSame(interrupted, model.finitePointCheck(null, Cancellation.Never))
+        assertNotSame(interrupted, model.finitePointCheck(null, ExecutionControl.Never))
     }
 }

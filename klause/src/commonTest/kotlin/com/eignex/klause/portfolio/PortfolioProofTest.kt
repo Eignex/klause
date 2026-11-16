@@ -5,7 +5,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,7 +26,7 @@ class PortfolioProofTest {
         val proofBase = ScriptedSearch({ false }) { proofVisits++ }
         val proof = object : ResumableSearch by proofBase {
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -47,7 +47,7 @@ class PortfolioProofTest {
         Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).also {
             it.runTimeSource = TestTimeSource()
         }.use {
-            it.minimize(Cancellation { proofVisits >= 3 || ordinaryVisits >= 32 })
+            it.minimize(ExecutionControl { proofVisits >= 3 || ordinaryVisits >= 32 })
         }
 
         assertEquals(3, proofVisits)
@@ -70,7 +70,7 @@ class PortfolioProofTest {
         val proofBase = ScriptedSearch({ false }) {}
         val proof = object : ResumableSearch by proofBase {
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -86,7 +86,8 @@ class PortfolioProofTest {
         }
 
         Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-            it.minimize(Cancellation.after(1.seconds) or Cancellation { offers.size >= 2 || ordinaryVisits >= 16 })
+            it.minimize(ExecutionControl.after(1.seconds) or ExecutionControl { offers.size >= 2 ||
+                ordinaryVisits >= 16 })
         }
 
         assertEquals(2, offers.size)
@@ -108,7 +109,7 @@ class PortfolioProofTest {
             }
             val proof = object : ResumableSearch by proofBase {
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -127,7 +128,7 @@ class PortfolioProofTest {
             )
 
             Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-                it.minimize(Cancellation { proofVisits >= 3 || completeVisits >= 8 })
+                it.minimize(ExecutionControl { proofVisits >= 3 || completeVisits >= 8 })
             }
 
             assertEquals(3, proofVisits)
@@ -145,7 +146,7 @@ class PortfolioProofTest {
         }
         val proof = object : ResumableSearch by proofBase {
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -163,7 +164,7 @@ class PortfolioProofTest {
         )
 
         Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-            it.minimize(Cancellation { proofVisits > 0 })
+            it.minimize(ExecutionControl { proofVisits > 0 })
         }
 
         assertEquals(1, proofVisits)
@@ -184,7 +185,7 @@ class PortfolioProofTest {
         )
 
         Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-            it.minimize(Cancellation { completeVisits >= 8 })
+            it.minimize(ExecutionControl { completeVisits >= 8 })
         }
 
         assertEquals(8, completeVisits)
@@ -214,7 +215,7 @@ class PortfolioProofTest {
                 }
 
             Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-                it.minimize(Cancellation { proofVisits > 0 || visits.sum() >= 8 })
+                it.minimize(ExecutionControl { proofVisits > 0 || visits.sum() >= 8 })
             }
 
             assertEquals(1, proofVisits)
@@ -238,7 +239,7 @@ class PortfolioProofTest {
         }
         val proof = object : ResumableSearch by proofBase {
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -257,7 +258,7 @@ class PortfolioProofTest {
         )
 
         Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-            it.minimize(Cancellation { proofVisits > 0 })
+            it.minimize(ExecutionControl { proofVisits > 0 })
         }
 
         assertEquals(1, proofVisits)
@@ -270,7 +271,7 @@ class PortfolioProofTest {
             val finderBase = ScriptedSearch({ it == 0 }) {}
             val finder = object : ResumableSearch by finderBase {
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -282,7 +283,7 @@ class PortfolioProofTest {
             val retainedBase = ScriptedSearch({ false }) {}
             val retained = object : ResumableSearch by retainedBase {
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -299,7 +300,7 @@ class PortfolioProofTest {
                     search = SearchStats(glueClauses = SumResult(visits * 1_000.0)),
                 )
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -322,7 +323,7 @@ class PortfolioProofTest {
             val result = Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).also {
                 it.runTimeSource = TestTimeSource()
             }.use {
-                it.minimize(Cancellation { reached.size >= 16 })
+                it.minimize(ExecutionControl { reached.size >= 16 })
             }
 
             if (auxiliary) {

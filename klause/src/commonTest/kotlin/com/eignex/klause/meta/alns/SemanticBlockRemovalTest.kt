@@ -17,7 +17,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -61,7 +61,7 @@ class SemanticBlockRemovalTest {
         val selector = SemanticBlockRemoval(SemanticBlockRemoval.Kind.Assignment)
 
         val freed = selector.destroy(Random(7), problem, Sample(booleanArrayOf(), longArrayOf(0, 1, 2)),
-            LinearObjective(), 1.0, Assumptions(ints = mapOf(1 to 1L)), Cancellation.Never)
+            LinearObjective(), 1.0, Assumptions(ints = mapOf(1 to 1L)), ExecutionControl.Never)
 
         assertTrue(freed.isEmpty)
         assertEquals(RepairBlockDecline.BlockedPin, selector.lastDecline)
@@ -90,7 +90,7 @@ class SemanticBlockRemovalTest {
         val center = Sample(booleanArrayOf(), longArrayOf(0, 1))
 
         val declined = selector.destroy(random, problem, center, LinearObjective(), 1.0,
-            Assumptions.None, Cancellation { true })
+            Assumptions.None, ExecutionControl { true })
 
         assertTrue(declined.isEmpty)
         assertEquals(RepairBlockDecline.Cancelled, selector.lastDecline)
@@ -179,7 +179,7 @@ class SemanticBlockRemovalTest {
 
             val expected = selector.destroy(direct, problem, center, LinearObjective(), 0.5)
             val actual = selector.destroy(conditioned, problem, center, LinearObjective(), 0.5,
-                Assumptions.None, Cancellation.Never)
+                Assumptions.None, ExecutionControl.Never)
 
             assertEquals(expected, actual)
             assertEquals(direct.nextInt(), conditioned.nextInt())

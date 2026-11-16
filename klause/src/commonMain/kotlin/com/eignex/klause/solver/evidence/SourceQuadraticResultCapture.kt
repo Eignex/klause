@@ -5,7 +5,7 @@ import com.eignex.klause.solver.result.QuadraticCertificate
 import com.eignex.klause.solver.result.QuadraticClaim
 import com.eignex.klause.solver.result.QuadraticObjectiveBound
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class SourceQuadraticResultCapture(
     private val context: SourceProofContext,
@@ -112,7 +112,7 @@ internal class SourceQuadraticResultCapture(
 /** Check the completed quadratic result's actual coordinates, values, strictness and source direction. */
 fun QuadraticOptimizationResult.verifySourceEvidence(
     context: SourceProofContext,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): SourceEvidenceCheck {
     if (capturedScopes().any { it != context.scope }) {
         return SourceEvidenceCheck.Rejected("quadratic result contains a foreign source invocation")

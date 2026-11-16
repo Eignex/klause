@@ -52,8 +52,11 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ArithmeticWorkSource
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkCreditPool
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.reserveWork
 
 /**
  * Source-aware strategy selected by [BacktrackSolver.source] or [LocalSearchSolver.source].
@@ -87,14 +90,16 @@ class SourceStrategy internal constructor(
         engine: FiniteEngine,
         executionOptions: ExecutionOptions = ExecutionOptions(),
         cores: Int = 1,
-        timeout: Cancellation = Cancellation.Never,
-        cancellation: Cancellation = Cancellation.Never,
+        timeout: ExecutionControl = ExecutionControl.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         nodeBudget: NodeBudget? = null,
     ): OpenTheoryResult {
-        val stop = timeout or cancellation
+        val stop = timeout.withAccounting(cancellation) or cancellation
         fun stopped(stats: SolveStats = SolveStats.EMPTY): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(
-            if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
-            else TerminationReason.Cancelled, stats,
+            if (timeout() || stop.deadline()?.hasPassedNow() == true)
+                TerminationReason.Timeout
+            else
+                TerminationReason.Cancelled, stats,
         )
         val invocation = SourceSetup.prepareWithGrid(SourceSetupRequest(
             sourceAttachment(), ExecutionOperation.SATISFY, engine,
@@ -125,9 +130,12 @@ class SourceStrategy internal constructor(
                     FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
                     else -> OpenTheoryResult.Unknown(
                         (execution.result.nativeSourceResult as? SolveResult.Unknown)?.reason
-                            ?: if (stop()) stopped().reason
-                            else if (invocation.floatGrid != null) TerminationReason.Unsupported
-                            else TerminationReason.BudgetExhausted,
+                            ?: if (stop())
+                                stopped().reason
+                            else if (invocation.floatGrid != null)
+                                TerminationReason.Unsupported
+                            else
+                                TerminationReason.BudgetExhausted,
                         outcome.stats,
                     )
                 }
@@ -146,10 +154,12 @@ class SourceStrategy internal constructor(
         val bound = if (sample != null && compiledSchema != null) {
             compiledSchema.sourceBinding.bindOriginalSample(sample, stop)
                 ?: return stopped(result.stats).withSourceSemantics(source.semantics)
-        } else null
+        } else
+            null
         return (if (bound != null && result is OpenTheoryResult.Sat) {
             result.copy(assignment = OpenTheoryAssignment.Sampled(bound))
-        } else result).withSourceSemantics(source.semantics)
+        } else
+                result).withSourceSemantics(source.semantics)
     }
 
     /** Optimize an affine source objective with an explicit engine and common execution controls. */
@@ -159,8 +169,8 @@ class SourceStrategy internal constructor(
         executionOptions: ExecutionOptions = ExecutionOptions(),
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
         cores: Int = 1,
-        timeout: Cancellation = Cancellation.Never,
-        cancellation: Cancellation = Cancellation.Never,
+        timeout: ExecutionControl = ExecutionControl.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         nodeBudget: NodeBudget? = null,
     ): QuadraticOptimizationExecution {
         val original = compiledSchema?.sourceBinding?.originalObjective(objective) ?: run {
@@ -179,11 +189,11 @@ class SourceStrategy internal constructor(
         executionOptions: ExecutionOptions = ExecutionOptions(),
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
         cores: Int = 1,
-        timeout: Cancellation = Cancellation.Never,
-        cancellation: Cancellation = Cancellation.Never,
+        timeout: ExecutionControl = ExecutionControl.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         nodeBudget: NodeBudget? = null,
     ): QuadraticOptimizationExecution {
-        val stop = timeout or cancellation
+        val stop = timeout.withAccounting(cancellation) or cancellation
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             sourceAttachment(), engine, objective, sense, projectionProviders, stop, stop,
             requiresQuadraticCompletion = true,
@@ -194,8 +204,10 @@ class SourceStrategy internal constructor(
         ))
         return when (execution) {
             is SourceExecutionResult.Quadratic -> compiledSchema?.sourceBinding?.bindResult(execution) {
-                if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
-                else TerminationReason.Cancelled
+                if (timeout() || stop.deadline()?.hasPassedNow() == true)
+                    TerminationReason.Timeout
+                else
+                    TerminationReason.Cancelled
             } ?: execution.result
             is SourceExecutionResult.Declined -> unsupportedQuadratic(sense, execution.reason)
             else -> unsupportedQuadratic(sense)
@@ -414,7 +426,9 @@ class SourceStrategy internal constructor(
             "compiled helper objective requires its compiled source strategy"
         }
         val sourceObjective = compiledSchema?.sourceBinding?.openObjective(objective)
-            ?: if (compiledSchema == null) objective else return OpenTheoryExecution.Optimize(
+            ?: if (compiledSchema == null)
+                objective else
+                return OpenTheoryExecution.Optimize(
                 OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY),
             )
         val scope = scope(polynomial, theory)
@@ -499,9 +513,12 @@ class SourceStrategy internal constructor(
             FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
             FiniteSolveVerdict.UNKNOWN -> OpenTheoryResult.Unknown(
                 (result.nativeSourceResult as? SolveResult.Unknown)?.reason
-                    ?: if (scope.stop()) scope.unknown().reason
-                    else if (invocation.floatGrid != null) TerminationReason.Unsupported
-                    else TerminationReason.BudgetExhausted,
+                    ?: if (scope.stop())
+                        scope.unknown().reason
+                    else if (invocation.floatGrid != null)
+                        TerminationReason.Unsupported
+                    else
+                        TerminationReason.BudgetExhausted,
                 outcome.stats,
             )
             else -> error("source satisfaction returned an optimization verdict")
@@ -536,9 +553,12 @@ class SourceStrategy internal constructor(
             is MinimizeResult.Unknown -> native.reason
             is MinimizeResult.BestFound -> native.reason
             is MinimizeResult.Unbounded -> TerminationReason.Unsupported
-            else -> if (scope.stop()) scope.unknown().reason
-                else if (invocation.floatGrid != null) TerminationReason.Unsupported
-                else TerminationReason.BudgetExhausted
+            else -> if (scope.stop())
+                scope.unknown().reason
+                else if (invocation.floatGrid != null)
+                TerminationReason.Unsupported
+                else
+                TerminationReason.BudgetExhausted
         }
         val optimum = when (outcome.verdict) {
             FiniteSolveVerdict.OPTIMAL -> OpenTheoryOptimum.Optimal(
@@ -575,8 +595,11 @@ class SourceStrategy internal constructor(
         } else {
             polynomial.strategy.localSearch.cancellation
         }
-        val stop = polynomial.timeout or polynomial.cancellation or
-            theory.timeout or theory.cancellation or selectedStop
+        val combined = polynomial.timeout.withAccounting(polynomial.cancellation) or polynomial.cancellation or
+            theory.timeout.withAccounting(theory.cancellation) or theory.cancellation or selectedStop
+        val owner = listOf(polynomial.cancellation, theory.cancellation, selectedStop)
+            .firstOrNull { it.accounting != null }
+        val stop = if (combined.accounting != null || owner == null) combined else combined.withAccounting(owner)
         val selectedBudget = if (engine == FiniteEngine.BACKTRACK) {
             polynomial.strategy.backtrack.nodeBudget
         } else {
@@ -637,29 +660,43 @@ class SourceStrategy internal constructor(
 
     private class SourceInvocation(
         val assumptions: Assumptions,
-        val stop: Cancellation,
-        val timeout: Cancellation,
+        val stop: ExecutionControl,
+        val timeout: ExecutionControl,
         val backtrack: BacktrackParams,
         val localSearch: LocalSearchParams,
         val theory: TheoryParams,
         private val originalPolynomial: PolynomialTheoryParams,
     ) {
-        private var preparationWork = 0L
+        private val preparationPool = WorkCreditPool(originalPolynomial.maximumWork)
+        private val preparationPools = listOf(preparationPool)
+        private val preparationWork: Long get() = preparationPool.spent
         val polynomial: PolynomialTheoryParams get() = originalPolynomial.copy(
             maximumWork = originalPolynomial.maximumWork?.let { (it - preparationWork).coerceAtLeast(0) },
         )
-        fun polynomialPreparation(): Cancellation = object : Cancellation {
+        fun polynomialPreparation(): ExecutionControl {
+            if (originalPolynomial.maximumWork == null) return stop
+            return object : ExecutionControl() {
             override fun isCancelled(): Boolean = stop() ||
-                originalPolynomial.maximumWork?.let { preparationWork >= it } == true
+                preparationPool.exhausted
             override fun deadline() = stop.deadline()
-            override fun workMeter(): WorkMeter = WorkMeter { units ->
-                require(units >= 0)
-                preparationWork = if (units > Long.MAX_VALUE - preparationWork) {
-                    Long.MAX_VALUE
-                } else {
-                    preparationWork + units
+            override val accounting: WorkMeter = WorkMeter { units ->
+                preparationPool.debit(units)
+                stop.charge (units)
                 }
-                stop.charge(units)
+                override val admission: ArithmeticWorkSource get() {
+                    val parent = stop.admission
+                    val sink =
+                stop.accounting
+                    return object : ArithmeticWorkSource {
+                        override val quotaOwner get() = parent?.quotaOwner
+                        override val quotaRemaining get() = parent?.quotaRemaining
+                        override val quotaAvailable get() = parent?.quotaAvailable
+                        override val exhausted get() = preparationPool.exhausted || parent?.exhausted == true
+                        override fun reserve(maximum: Int) = reserveWork(maximum, preparationPools, parent) {
+                            if (parent?.metered != true) sink?.charge(it.toLong())
+            }
+        }
+                }
             }
         }
         fun unknown(stats: SolveStats = SolveStats.EMPTY): OpenTheoryResult.Unknown = OpenTheoryResult.Unknown(

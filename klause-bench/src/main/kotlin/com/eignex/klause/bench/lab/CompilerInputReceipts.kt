@@ -1,11 +1,11 @@
 package com.eignex.klause.bench.lab
 
 import com.eignex.klause.bench.metric.sha256
-import java.io.IOException
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.LinkOption.NOFOLLOW_LINKS
 import java.nio.file.Path

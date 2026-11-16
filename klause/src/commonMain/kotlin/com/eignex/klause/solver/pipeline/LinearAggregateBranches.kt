@@ -6,7 +6,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.adjacentIntegerAbove
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.abs
@@ -43,7 +43,7 @@ internal class LinearAggregateBranches(private val budget: SourceLpBudget) {
         return budget.funding?.paused != true
     }
 
-    fun propose(source: SourceProofContext, cancellation: Cancellation): SourceInequality? {
+    fun propose(source: SourceProofContext, cancellation: ExecutionControl): SourceInequality? {
         if (cancellation() || attempts >= 32 || source.scope.condition.integerRows.size >= 8) return null
         if (source.premiseCount > 128) {
             spend(1L)

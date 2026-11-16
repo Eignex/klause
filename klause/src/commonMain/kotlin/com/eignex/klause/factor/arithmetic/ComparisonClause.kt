@@ -12,7 +12,7 @@ import com.eignex.klause.ir.VarList
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.hashRemappedKey
 import com.eignex.klause.ir.materializeKey
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.subExact
@@ -39,9 +39,9 @@ class ComparisonClause(val vars: IntArray, val ops: Array<LinearOp>, val consts:
     override fun remap(mapping: VarRemap): Factor = ComparisonClause(mapping.ints(vars), ops, consts)
 
     override fun canSubstituteAffine(x: Int, scale: Int, offset: Int, replacement: Int): Boolean =
-        canSubstituteAffine(x, scale, offset, Cancellation.Never)
+        canSubstituteAffine(x, scale, offset, ExecutionControl.Never)
 
-    internal fun canSubstituteAffine(x: Int, scale: Int, offset: Int, cancellation: Cancellation): Boolean {
+    internal fun canSubstituteAffine(x: Int, scale: Int, offset: Int, cancellation: ExecutionControl): Boolean {
         if (scale != 1 && scale != -1) return false
         for (i in vars.indices) {
             // Include the later validation and materialization scans in the accepted view's allowance.

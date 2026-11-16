@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.CheckedLongOverflowException
@@ -40,10 +40,10 @@ internal class SemanticBlockRemoval(
 
     override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample,
         objective: LinearObjective, fraction: Double,
-    ): FreedVars = destroy(rng, problem, incumbent, objective, fraction, Assumptions.None, Cancellation.Never)
+    ): FreedVars = destroy(rng, problem, incumbent, objective, fraction, Assumptions.None, ExecutionControl.Never)
 
     override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample,
-        objective: LinearObjective, fraction: Double, assumptions: Assumptions, cancellation: Cancellation,
+        objective: LinearObjective, fraction: Double, assumptions: Assumptions, cancellation: ExecutionControl,
     ): FreedVars = observed(cancellation) { work ->
         if (incumbent.numBoolVars != problem.numBoolVars || incumbent.numIntVars != problem.numIntVars ||
             incumbent.numRealVars != problem.numRealVars || problem.numRealVars != 0 ||
@@ -93,7 +93,7 @@ internal class SemanticBlockRemoval(
     }
 
     fun closeControl(problem: BakedProblem, requested: FreedVars, assumptions: Assumptions,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): FreedVars = observed(cancellation) { work ->
         val closed = RepairBlockClosure.close(problem, requested, definitions, assumptions,
             maxInputs, maxVariables, work)
@@ -103,7 +103,7 @@ internal class SemanticBlockRemoval(
         closed.freed
     }
 
-    private inline fun observed(cancellation: Cancellation, action: (RepairBlockWork) -> FreedVars): FreedVars {
+    private inline fun observed(cancellation: ExecutionControl, action: (RepairBlockWork) -> FreedVars): FreedVars {
         lastDecline = null
         lastSearchedInputs = 0
         lastRequested = null

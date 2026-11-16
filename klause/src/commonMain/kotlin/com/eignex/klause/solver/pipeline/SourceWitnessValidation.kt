@@ -5,7 +5,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.coroutines.cancellation.CancellationException
@@ -13,18 +13,18 @@ import kotlin.coroutines.cancellation.CancellationException
 /** An additional exact original-source check in retained source coordinates. */
 fun interface SourceWitnessValidator {
     /** Check one complete candidate; unavailable checking cannot justify a witness or terminal claim. */
-    fun validate(assignment: OpenTheoryAssignment, cancellation: Cancellation): SourceEvidenceCheck
+    fun validate(assignment: OpenTheoryAssignment, cancellation: ExecutionControl): SourceEvidenceCheck
 }
 
 @OptIn(ExperimentalAtomicApi::class)
 internal class SourceWitnessPublication(
     private val source: SourceAttachment,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
 ) {
     private val failure = AtomicReference<TerminationReason?>(null)
     private val accepted = AtomicReference(false)
     val failed: Boolean get() = failure.load() != null
-    val stop: Cancellation = Cancellation { failed }
+    val stop: ExecutionControl = ExecutionControl { failed }
     val reason: TerminationReason get() = failure.load() ?: TerminationReason.RepresentationDeclined
 
     fun accept(sample: Sample): Boolean = accept(OpenTheoryAssignment.Sampled(sample))

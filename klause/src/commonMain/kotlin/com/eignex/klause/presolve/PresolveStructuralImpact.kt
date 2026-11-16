@@ -8,12 +8,12 @@ import com.eignex.klause.ir.IntegerConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.impliedLinearRows
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun Factor.retainsStructure(problem: Problem, token: Cancellation): Boolean =
+internal fun Factor.retainsStructure(problem: Problem, token: ExecutionControl): Boolean =
     (this !is Linear && this !is Clause) || isBinaryPartition(problem, token)
 
-internal fun protectedStructureColumns(problem: Problem, token: Cancellation): Set<Int>? {
+internal fun protectedStructureColumns(problem: Problem, token: ExecutionControl): Set<Int>? {
     val protected = HashSet<Int>()
     for (factor in problem.factors) {
         token.charge(1)
@@ -28,7 +28,7 @@ internal fun protectedStructureColumns(problem: Problem, token: Cancellation): S
     return if (token()) null else protected
 }
 
-private fun Factor.isBinaryPartition(problem: Problem, token: Cancellation): Boolean {
+private fun Factor.isBinaryPartition(problem: Problem, token: ExecutionControl): Boolean {
     val row = this as? Linear ?: return false
     if (row.op != LinearOp.EQ || row.vars.size < 2) return false
     val constants = row.integerConstants ?: return false
@@ -51,7 +51,7 @@ internal fun PresolveInvocation?.recordStructuralImpact(
     added: List<Factor>,
     rebuild: SourceRebuilds,
     limit: Int,
-    token: Cancellation,
+    token: ExecutionControl,
 ) {
     if (this == null || limit == 0 || (pass != "affine" && pass != "structural" && pass != "extensional")) return
     val view = StructuralImpactView(limit, token)
@@ -65,7 +65,7 @@ internal fun PresolveInvocation?.recordStructuralImpact(
     structuralImpact = view.snapshot()
 }
 
-private class StructuralImpactView(private val limit: Int, private val token: Cancellation) {
+private class StructuralImpactView(private val limit: Int, private val token: ExecutionControl) {
     private val counts = LinkedHashMap<String, Long>()
     private var visits = 0L
     var stopped = false

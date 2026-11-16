@@ -15,7 +15,7 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceIntegerRowAssumption
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.integerPinBounds
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 internal class LinearAuthorityQuery private constructor(
     private val source: SourceProofContext,
     val coordinates: List<SourceCoordinate>,
@@ -55,7 +55,7 @@ internal class LinearAuthorityQuery private constructor(
 
     companion object {
         fun prepare(
-            source: SourceProofContext, template: LinearAuthorityTemplate?, cancellation: Cancellation,
+            source: SourceProofContext, template: LinearAuthorityTemplate?, cancellation: ExecutionControl,
             maximumCutProofSteps: Int = 100_000,
             onCutWork: (Long) -> Unit = {},
             cutMask: Set<Int>? = null,
@@ -98,7 +98,7 @@ internal class LinearAuthorityQuery private constructor(
                     .verifyAll(active.map { id ->
                         val cut = cuts[id]
                         SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
-                    }, Cancellation {
+                    }, ExecutionControl {
                         cutVerificationWork++
                         cancellation()
                     })

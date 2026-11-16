@@ -9,7 +9,7 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -33,12 +33,12 @@ class PolynomialWitnessVerifierTest {
         val producer = EngineInvocation(plan, ModelIdentity.of(source), sourceAssumptions = params.assumptions)
         val point = model.service.invocation().use { native ->
             assertIs<SolveResult.Sat>(
-                PolynomialWorkerAdapter(model, native, params, producer, Cancellation.Never)
+                PolynomialWorkerAdapter(model, native, params, producer, ExecutionControl.Never)
                     .solve(FiniteEngine.BACKTRACK),
             ).assignment
         }
 
-        val checked = polynomialWitnessVerifier(containing, Cancellation.Never).verify(Candidate(point, null))
+        val checked = polynomialWitnessVerifier(containing, ExecutionControl.Never).verify(Candidate(point, null))
 
         assertIs<Verification.Accepted<*, *>>(checked)
     }
@@ -64,13 +64,13 @@ class PolynomialWitnessVerifierTest {
                     native,
                     PolynomialStrategyParams(),
                     producer,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ).solve(FiniteEngine.BACKTRACK),
             ).assignment
         }
         val consumer = EngineInvocation(source.prepareExecutionPlan(), ModelIdentity.of(source))
 
-        val checked = polynomialWitnessVerifier(consumer, Cancellation.Never).verify(Candidate(point, null))
+        val checked = polynomialWitnessVerifier(consumer, ExecutionControl.Never).verify(Candidate(point, null))
 
         assertIs<Verification.Rejected>(checked)
     }
@@ -96,7 +96,7 @@ class PolynomialWitnessVerifierTest {
                     native,
                     PolynomialStrategyParams(),
                     producer,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ).solve(FiniteEngine.BACKTRACK),
             ).assignment
         }
@@ -106,7 +106,7 @@ class PolynomialWitnessVerifierTest {
             sourceAssumptions = Assumptions(ints = mapOf(0 to 0L)),
         )
 
-        val checked = polynomialWitnessVerifier(consumer, Cancellation.Never).verify(Candidate(point, null))
+        val checked = polynomialWitnessVerifier(consumer, ExecutionControl.Never).verify(Candidate(point, null))
 
         assertIs<Verification.Rejected>(checked)
     }

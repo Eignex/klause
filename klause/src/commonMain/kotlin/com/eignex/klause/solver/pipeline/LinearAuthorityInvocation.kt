@@ -28,7 +28,7 @@ import com.eignex.klause.solver.search.SearchFrontierRun
 import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.Vsids
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -64,7 +64,7 @@ internal class LinearAuthorityInvocation(
     private val onIncumbentUse: (() -> Unit)? = null,
     private val observeExternalIncumbents: Boolean = false,
     sharedCompletions: LinearIncumbentSharing? = null,
-    incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
     repairGuidance: LinearRepairGuidance? = null,
 ) : AutoCloseable {
     init {
@@ -74,11 +74,12 @@ internal class LinearAuthorityInvocation(
     }
     private val started = TimeSource.Monotonic.markNow()
     private var closed = false
-    private var currentStop = params.timeout or params.cancellation
-    private val stop = object : Cancellation {
+    private var currentStop = params.timeout.withAccounting(params.cancellation) or params.cancellation
+    private val stop = object : ExecutionControl() {
         override fun isCancelled(): Boolean = closed || currentStop()
         override fun deadline() = currentStop.deadline()
-        override fun workMeter() = currentStop.workMeter()
+        override val accounting get() = currentStop.accounting
+        override val admission get() = admissionFrom(currentStop)
     }
     private var sliceEnd: ComparableTimeMark? = null
     private var endWork = Long.MAX_VALUE
@@ -164,20 +165,20 @@ internal class LinearAuthorityInvocation(
 
     fun run(onIncumbent: (Sample, BigFraction) -> Unit): LinearInvocationResult {
         while (true) {
-            runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent)?.let { return it }
+            runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1, onIncumbent)?.let { return it }
         }
     }
 
     @Suppress("TooGenericExceptionCaught") // Callback failure retires the invocation and preserves cleanup failures.
     fun runSlice(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         millis: Long,
         work: Long,
         onIncumbent: (Sample, BigFraction) -> Unit,
     ): LinearInvocationResult? {
         result?.let { return it }
         check(!closed)
-        currentStop = params.timeout or params.cancellation or cancellation
+        currentStop = params.timeout.withAccounting(params.cancellation) or params.cancellation or cancellation
         sliceEnd = if (millis == Long.MAX_VALUE) null else TimeSource.Monotonic.markNow() + millis.milliseconds
         startWork = this.work
         endWork = if (work < 0) Long.MAX_VALUE else this.work + minOf(work, Long.MAX_VALUE - this.work)
@@ -238,7 +239,7 @@ internal class LinearAuthorityInvocation(
             throw failure
         } finally {
             callback = { _, _ -> }
-            currentStop = params.timeout or params.cancellation
+            currentStop = params.timeout.withAccounting(params.cancellation) or params.cancellation
         }
     }
 

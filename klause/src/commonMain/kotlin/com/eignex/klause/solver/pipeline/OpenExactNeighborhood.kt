@@ -22,7 +22,7 @@ import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.EncodedTheoryFactor
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
@@ -43,13 +43,13 @@ internal class OpenExactNeighborhood(
     private var components: PreparedSearchComponents? = null
     private var encodingPreparationWork = 0L
 
-    private fun prepare(stop: Cancellation): PreparedSearchComponents? {
+    private fun prepare(stop: ExecutionControl): PreparedSearchComponents? {
         components?.let { return it }
         if (stop()) return null
-        val construction = object : Cancellation {
+        val construction = object : ExecutionControl() {
             override fun isCancelled(): Boolean = stop()
             override fun deadline() = stop.deadline()
-            override fun workMeter(): WorkMeter = WorkMeter { units ->
+            override val accounting: WorkMeter = WorkMeter { units ->
                 encodingPreparationWork += units
                 stop.charge(units)
             }
@@ -89,7 +89,7 @@ internal class OpenExactNeighborhood(
         }
     }
 
-    private fun open(stop: Cancellation, state: OpenTheorySolveState): PlannedSearch? {
+    private fun open(stop: ExecutionControl, state: OpenTheorySolveState): PlannedSearch? {
         val source = prepare(stop) ?: return null
         if (!source.prepareSource(stop)) return null
         return source.open(maxChecks = params.maxLeaves, cancellation = stop,
@@ -97,30 +97,36 @@ internal class OpenExactNeighborhood(
             smtStats = state.smt, theorySolveStop = stop, openHintFlips = params.openHintFlips)
     }
 
-    fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: Cancellation, action: () -> T): T =
+    fun <T> withCondition(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl, action: () -> T): T =
         queries.withCondition(condition, cancellation, action)
 
     override fun check(
         condition: ExactNeighborhoodCondition,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): ExactNeighborhoodResult {
         val result = queries.check(condition, cancellation)
         if (result !is ExactNeighborhoodResult.Witness) return result
-        if ((params.timeout or params.cancellation or cancellation)()) return ExactNeighborhoodResult.Undecided
+        if ((params.timeout.withAccounting(
+                    cancellation,
+                ) or params.cancellation or cancellation)()) return ExactNeighborhoodResult.Undecided
         val sample = result.sample
         val checked = try {
             if (sample.exactInts?.any { !it.fitsLong() } == true ||
                 model.factors.any { it is ExactSearchRow || it is EncodedTheoryFactor }
             ) {
-                verifyRealCoordinates(model, sample, params.timeout or params.cancellation or cancellation)
+                verifyRealCoordinates(model, sample,
+                    params.timeout.withAccounting(cancellation) or params.cancellation or cancellation)
             } else {
                 verifyOpenWitness(model, sample,
-                    params.timeout or params.cancellation or cancellation, witnessProjection)
+                    params.timeout.withAccounting(cancellation) or params.cancellation or cancellation,
+                        witnessProjection)
             }
         } catch (_: CancellationException) {
             return ExactNeighborhoodResult.Undecided
         }
-        if (checked !is Verification.Accepted || (params.timeout or params.cancellation or cancellation)()) {
+        if (checked !is Verification.Accepted || (params.timeout.withAccounting(
+                    cancellation,
+                ) or params.cancellation or cancellation)()) {
             return ExactNeighborhoodResult.Undecided
         }
         sample.witnessCertificate = invocation()?.let { binding ->

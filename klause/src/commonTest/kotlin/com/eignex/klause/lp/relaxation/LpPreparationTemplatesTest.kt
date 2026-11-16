@@ -19,7 +19,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -58,7 +58,7 @@ class LpPreparationTemplatesTest {
                 reuseTemplateMetadata = true, omitBoundRows = true).build(RootDomains(problem))
             val fresh = CpToLpRelaxation(problem, cost, reuseSourceTemplates = false).build(RootDomains(problem))
 
-            val reused = solveAndCertify(assertNotNull(prepared.authoritativeWithTemplates(Cancellation.Never)))
+            val reused = solveAndCertify(assertNotNull(prepared.authoritativeWithTemplates(ExecutionControl.Never)))
             val original = solveAndCertify(assertNotNull(fresh.model.authoritativeModel()))
 
             assertEquals(0, prepared.model.m)
@@ -77,14 +77,14 @@ class LpPreparationTemplatesTest {
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)))
             val cost = LinearObjective(intCoefficients = longArrayOf(1L, 1L))
             val captured = FactorProjectionProviders.Default.prepare(problem)
-            val before = assertNotNull(captured.prepareLpTemplates(cost, Cancellation.Never,
+            val before = assertNotNull(captured.prepareLpTemplates(cost, ExecutionControl.Never,
                 reuseMetadata = metadata))
             val consumer = CpToLpRelaxation(problem, cost, projections = captured,
                 reuseTemplateMetadata = true, omitBoundRows = true)
 
             val prepared = consumer.build(RootDomains(problem))
             val fresh = CpToLpRelaxation(problem, cost, reuseSourceTemplates = false).build(RootDomains(problem))
-            val reused = solveAndCertify(assertNotNull(prepared.authoritativeWithTemplates(Cancellation.Never)))
+            val reused = solveAndCertify(assertNotNull(prepared.authoritativeWithTemplates(ExecutionControl.Never)))
             val original = solveAndCertify(assertNotNull(fresh.model.authoritativeModel()))
 
             assertEquals(1, prepared.model.m)
@@ -100,16 +100,16 @@ class LpPreparationTemplatesTest {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), arrayOf<Factor>(
             Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 10)))
         val captured = FactorProjectionProviders.Default.prepare(problem)
-        val before = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never, reuseMetadata = true))
+        val before = assertNotNull(captured.prepareLpTemplates(null, ExecutionControl.Never, reuseMetadata = true))
         var work = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             private val meter = WorkMeter { work += it }
             override fun isCancelled(): Boolean = work >= 3L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         val stopped = captured.prepareLpTemplates(null, token, reuseMetadata = true, compileBoundRows = true)
-        val after = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never, reuseMetadata = true))
+        val after = assertNotNull(captured.prepareLpTemplates(null, ExecutionControl.Never, reuseMetadata = true))
 
         assertNull(stopped)
         assertTrue(work >= 3L)
@@ -136,7 +136,7 @@ class LpPreparationTemplatesTest {
             val fresh = CpToLpRelaxation(problem, cost, reuseSourceTemplates = false).build(wider)
 
             assertEquals(1, restored.model.m)
-            assertTrue(assertNotNull(restored.authoritativeWithTemplates(Cancellation.Never))
+            assertTrue(assertNotNull(restored.authoritativeWithTemplates(ExecutionControl.Never))
                 .sameAuthority(assertNotNull(fresh.model.authoritativeModel())))
         }
     }
@@ -190,7 +190,7 @@ class LpPreparationTemplatesTest {
             val fresh = CpToLpRelaxation(problem, cost, reuseSourceTemplates = false).build(RootDomains(problem))
 
             assertEquals(1, prepared.model.m)
-            assertTrue(assertNotNull(prepared.authoritativeWithTemplates(Cancellation.Never))
+            assertTrue(assertNotNull(prepared.authoritativeWithTemplates(ExecutionControl.Never))
                 .sameAuthority(assertNotNull(fresh.model.authoritativeModel())))
         }
     }
@@ -207,7 +207,7 @@ class LpPreparationTemplatesTest {
         val fresh = CpToLpRelaxation(problem, cost, reuseSourceTemplates = false).build(RootDomains(problem))
 
         assertEquals(1, prepared.model.m)
-        assertTrue(assertNotNull(prepared.authoritativeWithTemplates(Cancellation.Never))
+        assertTrue(assertNotNull(prepared.authoritativeWithTemplates(ExecutionControl.Never))
             .sameAuthority(assertNotNull(fresh.model.authoritativeModel())))
     }
 
@@ -227,7 +227,7 @@ class LpPreparationTemplatesTest {
 
         assertEquals(1, restored.model.m)
         assertEquals(listOf(0), restored.rowFactorIds.toList())
-        assertTrue(assertNotNull(restored.authoritativeWithTemplates(Cancellation.Never))
+        assertTrue(assertNotNull(restored.authoritativeWithTemplates(ExecutionControl.Never))
             .sameAuthority(assertNotNull(fresh.model.authoritativeModel())))
     }
 
@@ -248,7 +248,7 @@ class LpPreparationTemplatesTest {
 
         assertEquals(1, restored.model.m)
         assertEquals(listOf(0), restored.rowFactorIds.toList())
-        assertTrue(assertNotNull(restored.authoritativeWithTemplates(Cancellation.Never))
+        assertTrue(assertNotNull(restored.authoritativeWithTemplates(ExecutionControl.Never))
             .sameAuthority(assertNotNull(fresh.model.authoritativeModel())))
     }
 
@@ -273,7 +273,7 @@ class LpPreparationTemplatesTest {
                 reuseTemplateMetadata = true, omitBoundRows = true).build(domains)
             val fresh = CpToLpRelaxation(problem, cost, reuseSourceTemplates = false).build(domains)
 
-            assertTrue(assertNotNull(prepared.authoritativeWithTemplates(Cancellation.Never))
+            assertTrue(assertNotNull(prepared.authoritativeWithTemplates(ExecutionControl.Never))
                 .sameAuthority(assertNotNull(fresh.model.authoritativeModel())))
         }
     }
@@ -306,9 +306,9 @@ class LpPreparationTemplatesTest {
         var cancelled = false
         var work = 0L
         val meter = WorkMeter { work += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = cancelled
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         val root = RootDomains(problem)
         val domains = object : RelaxationDomains by root {
@@ -352,13 +352,13 @@ class LpPreparationTemplatesTest {
     fun `earned preparation should admit a fully funded inspection`() {
         var inspectionWork = 0L
         assertNotNull(FactorProjectionProviders.Default.prepare(source).prepareLpTemplates(objective,
-            Cancellation.Never, reuseMetadata = true, onWork = { inspectionWork += it }))
+            ExecutionControl.Never, reuseMetadata = true, onWork = { inspectionWork += it }))
         val funding = inspectionWork + 1L
-        selection.recordLpConstruction(1L, Cancellation.Never) {}
-        selection.recordLpConstruction(funding, Cancellation.Never) {}
+        selection.recordLpConstruction(1L, ExecutionControl.Never) {}
+        selection.recordLpConstruction(funding, ExecutionControl.Never) {}
         var charged = 0L
 
-        val prepared = selection.prepareLpTemplates(objective, Cancellation.Never,
+        val prepared = selection.prepareLpTemplates(objective, ExecutionControl.Never,
             reuseMetadata = true, earned = true, onWork = { charged += it })
 
         assertNotNull(prepared)
@@ -388,7 +388,7 @@ class LpPreparationTemplatesTest {
 
         val reused = assertNotNull(CpToLpRelaxation(source, changed, projections = selection,
             reuseTemplateMetadata = true, earnTemplatePreparation = true).build(RootDomains(source))
-            .authoritativeWithTemplates(Cancellation.Never))
+            .authoritativeWithTemplates(ExecutionControl.Never))
         val fresh = assertNotNull(CpToLpRelaxation(source, changed, projections = null)
             .build(RootDomains(source)).model.authoritativeModel())
 
@@ -397,13 +397,13 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `post debit cancellation should withhold completed construction admission`() {
-        selection.recordLpConstruction(1L, Cancellation.Never) {}
+        selection.recordLpConstruction(1L, ExecutionControl.Never) {}
         var cancelled = false
-        selection.recordLpConstruction(LpPreparationTemplates.MAX_UNITS, Cancellation { cancelled }) {
+        selection.recordLpConstruction(LpPreparationTemplates.MAX_UNITS, ExecutionControl { cancelled }) {
             cancelled = true
         }
 
-        val prepared = selection.prepareLpTemplates(objective, Cancellation.Never,
+        val prepared = selection.prepareLpTemplates(objective, ExecutionControl.Never,
             reuseMetadata = true, earned = true)
 
         assertNull(prepared)
@@ -412,14 +412,14 @@ class LpPreparationTemplatesTest {
     @Test
     fun `foreign source scopes should not spend prior construction admission`() {
         repeat(2) {
-            selection.recordLpConstruction(LpPreparationTemplates.MAX_UNITS, Cancellation.Never) {}
+            selection.recordLpConstruction(LpPreparationTemplates.MAX_UNITS, ExecutionControl.Never) {}
         }
         val finite = source.bake(selection)
         val remapped = selection.projected(source, IntArray(source.numFactors) { it },
             VarRemap(intArrayOf(0), IntArray(source.numIntVars) { it }))
 
         val prepared = listOf(assertNotNull(finite.factorProjections), remapped).map { selected ->
-            selected.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true, earned = true)
+            selected.prepareLpTemplates(objective, ExecutionControl.Never, reuseMetadata = true, earned = true)
         }
 
         assertTrue(prepared.all { it == null })
@@ -432,7 +432,7 @@ class LpPreparationTemplatesTest {
         ))
         val captured = FactorProjectionProviders.Default.prepare(problem)
 
-        val templates = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never))
+        val templates = assertNotNull(captured.prepareLpTemplates(null, ExecutionControl.Never))
 
         assertEquals(listOf(Term.ofIntVar(0)), templates.components.single().references.toList())
         assertEquals(setOf(0), templates.bounds.keys)
@@ -446,17 +446,17 @@ class LpPreparationTemplatesTest {
         ))
         val captured = FactorProjectionProviders.Default.prepare(problem)
 
-        val templates = assertNotNull(captured.prepareLpTemplates(null, Cancellation.Never))
+        val templates = assertNotNull(captured.prepareLpTemplates(null, ExecutionControl.Never))
 
         assertEquals(2, templates.components.size)
     }
 
     @Test
     fun `candidate preparation should reserve less storage than complete component snapshots`() {
-        val ordinary = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val ordinary = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val captured = FactorProjectionProviders.Default.prepare(source)
 
-        val candidate = assertNotNull(captured.prepareLpTemplates(objective, Cancellation.Never,
+        val candidate = assertNotNull(captured.prepareLpTemplates(objective, ExecutionControl.Never,
             reuseMetadata = true))
 
         assertTrue(candidate.storageUnits < ordinary.storageUnits)
@@ -464,16 +464,16 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `ordinary preparation should restore component scopes after candidate preparation`() {
-        assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
+        assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never, reuseMetadata = true))
 
-        val ordinary = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val ordinary = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
 
         assertEquals(3, ordinary.components.size)
     }
 
     @Test
     fun `objective metadata refresh should retain row and bound indexes and match fresh authority`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val revised = objective.copy(intCoefficients = longArrayOf(2, 1, 1, 1, 1, 1))
         val consumer = CpToLpRelaxation(source, revised, projections = selection, reuseTemplateMetadata = true)
 
@@ -489,7 +489,7 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `bound metadata refresh should retain unrelated definitions and match fresh authority`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val view = Problem(1, 6, Array(6) { IntDomain(if (it == 0) 1 else 0, 10) }, source.factors)
         val consumer = CpToLpRelaxation(view, objective, projections = selection.forEngineView(view),
             reuseTemplateMetadata = true)
@@ -507,18 +507,18 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `interrupted metadata refresh should preserve the last complete snapshot`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val revised = objective.copy(intCoefficients = longArrayOf(2, 1, 1, 1, 1, 1))
         val view = Problem(1, 6, Array(6) { IntDomain(if (it == 0) 1 else 0, 10) }, source.factors)
         var work = 0L
         val meter = WorkMeter { work += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 12L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         val stopped = selection.forEngineView(view).prepareLpTemplates(revised, token, reuseMetadata = true)
-        val after = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
+        val after = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never, reuseMetadata = true))
 
         assertNull(stopped)
         assertTrue(work >= 12L)
@@ -528,7 +528,7 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `metadata refresh should read objective translations outside source templates`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val revised = objective.copy(constant = 7L)
         val consumer = CpToLpRelaxation(source, revised, projections = selection, reuseTemplateMetadata = true)
 
@@ -548,7 +548,7 @@ class LpPreparationTemplatesTest {
     fun `metadata refresh should recheck bounds in a shared finite view`() {
         val finite = source.bake(selection)
         val captured = assertNotNull(finite.factorProjections)
-        val before = assertNotNull(captured.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(captured.prepareLpTemplates(objective, ExecutionControl.Never))
         finite.rootIntDomainsInPlace[0] = IntDomain(1, 10)
         val consumer = CpToLpRelaxation(finite, objective, projections = captured, reuseTemplateMetadata = true)
 
@@ -564,16 +564,17 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `immutable source domain handoffs should avoid repeated endpoint preparation`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never,
+            reuseMetadata = true))
         val view = source.withFactors(source.factors.copyOf())
         var retainedWork = 0L
 
         val retained = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective,
-            Cancellation.Never, reuseMetadata = true) { retainedWork = it })
+            ExecutionControl.Never, reuseMetadata = true) { retainedWork = it })
         val rebound = Problem(1, 6, Array(6) { IntDomain(0, 10) }, source.factors)
         var reboundWork = 0L
         selection.forEngineView(rebound).prepareLpTemplates(objective,
-            Cancellation.Never, reuseMetadata = true) { reboundWork = it }
+            ExecutionControl.Never, reuseMetadata = true) { reboundWork = it }
 
         assertSame(before.bounds, retained.bounds)
         assertTrue(retainedWork < reboundWork)
@@ -584,7 +585,7 @@ class LpPreparationTemplatesTest {
         val finite = source.bake(selection)
         val view = finite.withFactors(finite.factors.copyOf())
         val captured = FactorProjectionProviders.Default.prepare(view)
-        val before = assertNotNull(captured.prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
+        val before = assertNotNull(captured.prepareLpTemplates(objective, ExecutionControl.Never, reuseMetadata = true))
         finite.rootIntDomainsInPlace[0] = IntDomain(1, 10)
         val consumer = CpToLpRelaxation(view, objective, projections = captured, reuseTemplateMetadata = true)
 
@@ -617,7 +618,7 @@ class LpPreparationTemplatesTest {
         val relaxation = consumer.build(RootDomains(source))
         var adopted = 0
 
-        val reused = assertNotNull(relaxation.authoritativeWithTemplates(Cancellation.Never) { adopted = it })
+        val reused = assertNotNull(relaxation.authoritativeWithTemplates(ExecutionControl.Never) { adopted = it })
         val fresh = assertNotNull(CpToLpRelaxation(source, objective, projections = null)
             .build(RootDomains(source)).model.authoritativeModel())
 
@@ -646,9 +647,9 @@ class LpPreparationTemplatesTest {
         val relaxation = consumer.build(RootDomains(source))
         var work = 0L
         val meter = WorkMeter { work += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 2L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         var published = false
@@ -666,13 +667,13 @@ class LpPreparationTemplatesTest {
         val relaxation = consumer.build(RootDomains(source))
         var work = 0L
         val meter = WorkMeter { work += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 2L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         assertNull(relaxation.authoritativeWithTemplates(token))
 
-        val recovered = assertNotNull(relaxation.authoritativeWithTemplates(Cancellation.Never))
+        val recovered = assertNotNull(relaxation.authoritativeWithTemplates(ExecutionControl.Never))
         val ordinary = assertNotNull(relaxation.model.authoritativeModel())
 
         assertTrue(recovered.sameAuthority(ordinary))
@@ -685,9 +686,9 @@ class LpPreparationTemplatesTest {
             val relaxation = CpToLpRelaxation(source, objective, projections = captured).build(RootDomains(source))
             var charged = 0L
             val meter = WorkMeter { charged += it }
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = charged >= limit
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
             }
             val reported = ArrayList<Long>()
 
@@ -704,7 +705,7 @@ class LpPreparationTemplatesTest {
         val relaxation = CpToLpRelaxation(source, objective, projections = selection).build(RootDomains(source))
         var stopped = false
         var published = false
-        val token = Cancellation { stopped }
+        val token = ExecutionControl { stopped }
 
         val imported = relaxation.authoritativeWithTemplates(token, onWork = { stopped = it > 0L }) {
             published = true
@@ -723,7 +724,7 @@ class LpPreparationTemplatesTest {
         for (clamped in listOf(false, true, false)) {
             relaxation.model.probeClampedHi[0] = clamped
 
-            val imported = assertNotNull(relaxation.authoritativeWithTemplates(Cancellation.Never))
+            val imported = assertNotNull(relaxation.authoritativeWithTemplates(ExecutionControl.Never))
             val ordinary = assertNotNull(relaxation.model.authoritativeModel())
 
             assertTrue(imported.sameAuthority(ordinary))
@@ -737,23 +738,23 @@ class LpPreparationTemplatesTest {
         val consumer = CpToLpRelaxation(problem, null, projections = captured, reuseTemplateMetadata = true)
         val relaxation = consumer.build(RootDomains(problem))
 
-        val result = relaxation.authoritativeWithTemplates(Cancellation { true })
+        val result = relaxation.authoritativeWithTemplates(ExecutionControl { true })
 
         assertNull(result)
     }
 
     @Test
     fun `unchanged consumers should reuse completed indexes with less preparation work`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         var reusedWork = 0L
         val view = source.withFactors(source.factors.copyOf())
         val captured = selection.forEngineView(view)
 
-        val after = assertNotNull(captured.prepareLpTemplates(objective.copy(), Cancellation.Never) {
+        val after = assertNotNull(captured.prepareLpTemplates(objective.copy(), ExecutionControl.Never) {
             reusedWork = it
         })
         var rebuiltWork = 0L
-        captured.prepareLpTemplates(objective, Cancellation.Never, reuseIndexes = false) { rebuiltWork = it }
+        captured.prepareLpTemplates(objective, ExecutionControl.Never, reuseIndexes = false) { rebuiltWork = it }
 
         assertTrue(after.reusedIndexes)
         assertSame(before.factors, after.factors)
@@ -769,7 +770,7 @@ class LpPreparationTemplatesTest {
         ))
         val captured = FactorProjectionProviders.Default.prepare(problem)
         val original = LinearObjective(boolWeights = LongArray(7) { 1L })
-        captured.prepareLpTemplates(original, Cancellation.Never)
+        captured.prepareLpTemplates(original, ExecutionControl.Never)
         val changed = original.copy(boolWeights = LongArray(7) { if (it == 4) 3L else 1L })
         val consumer = CpToLpRelaxation(problem, changed, projections = captured, reuseTemplateMetadata = true)
 
@@ -824,9 +825,9 @@ class LpPreparationTemplatesTest {
                 reuseTemplateIndexes = reuseIndexes).build(RootDomains(source))
             var work = 0L
             val meter = WorkMeter { work += it }
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = false
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
             }
             assertNotNull(first.authoritativeWithTemplates(token))
             val constructionWork = work
@@ -845,7 +846,7 @@ class LpPreparationTemplatesTest {
         val relaxation = CpToLpRelaxation(source, objective, projections = selection).build(RootDomains(source))
         var reused = 0
 
-        val exact = assertNotNull(relaxation.authoritativeWithTemplates(Cancellation.Never) { reused = it })
+        val exact = assertNotNull(relaxation.authoritativeWithTemplates(ExecutionControl.Never) { reused = it })
 
         assertTrue(relaxation.persistentEligible)
         assertEquals(6, reused)
@@ -896,10 +897,10 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `bound revisions should invalidate only their component metadata`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val view = Problem(1, 6, Array(6) { IntDomain(if (it == 0) 1 else 0, 10) }, source.factors)
 
-        val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, Cancellation.Never))
+        val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, ExecutionControl.Never))
 
         assertNotSame(before.bounds[0], after.bounds[0])
         assertTrue(!after.reusedIndexes)
@@ -910,11 +911,11 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `changed stated upper side should invalidate indexes with equal finite endpoints`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val view = Problem(1, 6, Array(6) { IntDomain(0, 10) }, source.factors,
             openIntHi = BooleanArray(6) { it == 5 })
 
-        val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, Cancellation.Never))
+        val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, ExecutionControl.Never))
 
         assertTrue(!after.reusedIndexes)
         assertNotSame(before.bounds[5], after.bounds[5])
@@ -923,10 +924,10 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `objective revisions should invalidate only components with changed costs`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val revised = LinearObjective(intCoefficients = longArrayOf(2, 1, 1, 1, 1, 1))
 
-        val after = assertNotNull(selection.prepareLpTemplates(revised, Cancellation.Never))
+        val after = assertNotNull(selection.prepareLpTemplates(revised, ExecutionControl.Never))
 
         assertNotSame(before.components[0], after.components[0])
         assertTrue(!after.reusedIndexes)
@@ -936,9 +937,9 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `objective translation should invalidate component objective scopes`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
 
-        val after = assertNotNull(selection.prepareLpTemplates(objective.copy(constant = 7), Cancellation.Never))
+        val after = assertNotNull(selection.prepareLpTemplates(objective.copy(constant = 7), ExecutionControl.Never))
 
         assertEquals(0, after.reusedComponents)
         assertTrue(!after.reusedIndexes)
@@ -947,12 +948,12 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `rewritten rows should preserve unaffected component templates`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val view = source.withFactors(arrayOf(
             Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.GE, 4), source.factors[1], source.factors[2],
         ))
 
-        val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, Cancellation.Never))
+        val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, ExecutionControl.Never))
 
         assertNotSame(before.factors[0], after.factors[0])
         assertSame(before.components[1], after.components[1])
@@ -960,10 +961,10 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `component merging should retire the merged scopes and preserve unrelated templates`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         val view = source.withFactors(source.factors + Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 2))
 
-        val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, Cancellation.Never))
+        val after = assertNotNull(selection.forEngineView(view).prepareLpTemplates(objective, ExecutionControl.Never))
 
         assertEquals(2, after.components.size)
         assertEquals(1, after.reusedComponents)
@@ -972,12 +973,12 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `explicit namespace remaps should reject all prior templates`() {
-        selection.prepareLpTemplates(objective, Cancellation.Never)
+        selection.prepareLpTemplates(objective, ExecutionControl.Never)
         val remap = VarRemap(intArrayOf(0), intArrayOf(1, 0, 2, 3, 4, 5))
         val view = source.withFactors(source.factors.map { it.remap(remap) }.toTypedArray())
 
         val after = assertNotNull(selection.projected(view, intArrayOf(0, 1, 2), remap)
-            .prepareLpTemplates(objective, Cancellation.Never, reuseMetadata = true))
+            .prepareLpTemplates(objective, ExecutionControl.Never, reuseMetadata = true))
 
         assertEquals(0, after.reusedFactors)
         assertEquals(0, after.reusedBounds)
@@ -985,10 +986,10 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `finite preparation should reject source scope templates`() {
-        selection.prepareLpTemplates(objective, Cancellation.Never)
+        selection.prepareLpTemplates(objective, ExecutionControl.Never)
         val finite = source.bake(selection)
 
-        val after = assertNotNull(finite.factorProjections?.prepareLpTemplates(objective, Cancellation.Never,
+        val after = assertNotNull(finite.factorProjections?.prepareLpTemplates(objective, ExecutionControl.Never,
             reuseMetadata = true))
 
         assertEquals(0, after.reusedFactors)
@@ -998,11 +999,11 @@ class LpPreparationTemplatesTest {
     @Test
     fun `temporary source preparation should retain the completed finite snapshot`() {
         val first = source.bake(selection)
-        val before = assertNotNull(first.factorProjections?.prepareLpTemplates(objective, Cancellation.Never))
-        selection.prepareLpTemplates(objective, Cancellation.Never)
+        val before = assertNotNull(first.factorProjections?.prepareLpTemplates(objective, ExecutionControl.Never))
+        selection.prepareLpTemplates(objective, ExecutionControl.Never)
         val next = source.bake(selection)
 
-        val after = assertNotNull(next.factorProjections?.prepareLpTemplates(objective, Cancellation.Never))
+        val after = assertNotNull(next.factorProjections?.prepareLpTemplates(objective, ExecutionControl.Never))
 
         assertSame(before.factors[0], after.factors[0])
         assertSame(before.bounds[0], after.bounds[0])
@@ -1044,7 +1045,8 @@ class LpPreparationTemplatesTest {
         val captured = FactorProjectionProviders.Default.prepare(problem)
         val relaxer = CpToLpRelaxation(problem, null, projections = captured, reuseTemplateMetadata = true)
 
-        val reused = assertNotNull(relaxer.build(RootDomains(problem)).authoritativeWithTemplates(Cancellation.Never))
+        val reused = assertNotNull(relaxer.build(RootDomains(problem))
+            .authoritativeWithTemplates(ExecutionControl.Never))
         val fresh = assertNotNull(CpToLpRelaxation(problem, null, projections = null)
             .build(RootDomains(problem)).model.authoritativeModel())
 
@@ -1075,16 +1077,16 @@ class LpPreparationTemplatesTest {
 
     @Test
     fun `interrupted preparation should charge work and retain the last complete snapshot`() {
-        val before = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val before = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
         var work = 0L
         val meter = WorkMeter { work += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 3L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         val stopped = selection.prepareLpTemplates(objective, token)
-        val after = assertNotNull(selection.prepareLpTemplates(objective, Cancellation.Never))
+        val after = assertNotNull(selection.prepareLpTemplates(objective, ExecutionControl.Never))
 
         assertNull(stopped)
         assertTrue(work >= 3L)
@@ -1100,7 +1102,7 @@ class LpPreparationTemplatesTest {
         val captured = FactorProjectionProviders.Default.prepare(problem)
         var work = 0L
 
-        val result = captured.prepareLpTemplates(null, Cancellation.Never) { work = it }
+        val result = captured.prepareLpTemplates(null, ExecutionControl.Never) { work = it }
 
         assertNull(result)
         assertTrue(work < 262_144L)
@@ -1120,7 +1122,7 @@ class LpPreparationTemplatesTest {
         val captured = FactorProjectionProviders.Default.prepare(problem)
         payloadRead = false
 
-        val result = captured.prepareLpTemplates(objective, Cancellation.Never)
+        val result = captured.prepareLpTemplates(objective, ExecutionControl.Never)
 
         assertNull(result)
         assertTrue(!payloadRead)

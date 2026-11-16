@@ -6,7 +6,7 @@ import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,7 +30,7 @@ class LpScopedSolverTest {
             }
         }
         val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
-        LpScopedSolver(LpExactState(lowerBoundModel()), Cancellation { cancelled }).use { owner ->
+        LpScopedSolver(LpExactState(lowerBoundModel()), ExecutionControl { cancelled }).use { owner ->
             assertTrue(owner.assertBound(0, false, ExactLpSide(huge), 17L))
 
             val result = owner.solve(observer = observer)
@@ -92,7 +92,7 @@ class LpScopedSolverTest {
         var bytes: ByteArray? = null
         val context = LpSolveContext(onQuery = { query ->
             observed = query
-            bytes = query.captureExactWithin("scoped", 4096, 65_536, 64, Cancellation.Never)
+            bytes = query.captureExactWithin("scoped", 4096, 65_536, 64, ExecutionControl.Never)
         })
         LpScopedSolver(LpExactState(lowerBoundModel()), context = context,
             refactorUpdateLimit = 7, trackDegeneracy = true, pricing = LpPricingOptions(tieSeed = 43L)).use { owner ->
@@ -162,7 +162,7 @@ class LpScopedSolverTest {
                 var decline: LpProbeDecline? = null
 
                 val gains = owner.directionalGains(point, intArrayOf(0, 1), longArrayOf(0, 0),
-                    1_000_000L, Cancellation.Never) {
+                    1_000_000L, ExecutionControl.Never) {
                     work += it.work
                     completed += it.completed
                     decline = it.decline
@@ -198,7 +198,8 @@ class LpScopedSolverTest {
             var work = 0L
             var decline: LpProbeDecline? = null
 
-            val gains = owner.directionalGains(point, intArrayOf(0), longArrayOf(0), 1_000_000L, Cancellation.Never) {
+            val gains = owner.directionalGains(point, intArrayOf(0), longArrayOf(0), 1_000_000L,
+                ExecutionControl.Never) {
                 completed += it.completed
                 work += it.work
                 decline = it.decline
@@ -225,9 +226,9 @@ class LpScopedSolverTest {
                     val source = LpProbeSource(point, Basis(IntArray(0), emptyArray()))
                     val gains = if (valueMode) {
                         owner.directionalValues(source, intArrayOf(0), longArrayOf(0), 1000L,
-                            Cancellation { cancelled }) { metrics = it }
+                            ExecutionControl { cancelled }) { metrics = it }
                     } else owner.directionalGains(point, intArrayOf(0), longArrayOf(0), 1000L,
-                        Cancellation { cancelled }) { metrics = it }
+                        ExecutionControl { cancelled }) { metrics = it }
 
                     assertNull(gains)
                     assertTrue(factory.calls.isEmpty())
@@ -243,7 +244,7 @@ class LpScopedSolverTest {
         val factory = RecordingLpEngineFactory()
         LpScopedSolver(LpExactState(lowerBoundModel()), context = LpSolveContext(factory)).use { owner ->
 
-            val proposal = owner.pausedDualProposal(Cancellation.Never)
+            val proposal = owner.pausedDualProposal(ExecutionControl.Never)
 
             assertNull(proposal)
             assertTrue(factory.calls.isEmpty())
@@ -263,7 +264,7 @@ class LpScopedSolverTest {
             repeat(8) {
                 if (proposal == null) {
                     assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
-                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                    proposal = owner.pausedDualProposal(ExecutionControl.Never)
                 }
             }
             val first = assertNotNull(proposal)
@@ -294,14 +295,14 @@ class LpScopedSolverTest {
             repeat(8) {
                 if (proposal == null) {
                     assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
-                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                    proposal = owner.pausedDualProposal(ExecutionControl.Never)
                 }
             }
             val first = assertNotNull(proposal)
             val expected = first.toList()
             first.fill(0.0)
 
-            val next = assertNotNull(owner.pausedDualProposal(Cancellation.Never))
+            val next = assertNotNull(owner.pausedDualProposal(ExecutionControl.Never))
 
             assertEquals(expected, next.toList())
         }
@@ -320,14 +321,14 @@ class LpScopedSolverTest {
             repeat(8) {
                 if (proposal == null) {
                     assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
-                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                    proposal = owner.pausedDualProposal(ExecutionControl.Never)
                 }
             }
             assertNotNull(proposal)
 
             assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
 
-            assertNull(owner.pausedDualProposal(Cancellation.Never))
+            assertNull(owner.pausedDualProposal(ExecutionControl.Never))
             assertFalse(owner.floatPaused)
         }
     }
@@ -345,14 +346,14 @@ class LpScopedSolverTest {
             repeat(8) {
                 if (proposal == null) {
                     assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
-                    proposal = owner.pausedDualProposal(Cancellation.Never)
+                    proposal = owner.pausedDualProposal(ExecutionControl.Never)
                 }
             }
             assertNotNull(proposal)
             for (stopAt in listOf(1, 4)) {
                 var polls = 0
 
-                val declined = owner.pausedDualProposal(Cancellation { ++polls >= stopAt })
+                val declined = owner.pausedDualProposal(ExecutionControl { ++polls >= stopAt })
 
                 assertNull(declined)
             }
@@ -374,7 +375,7 @@ class LpScopedSolverTest {
             val paid = owner.lastMetrics
             val queries = factory.floatAllowances.size
 
-            val guidance = assertNotNull(owner.partialPrimalGuidance(Cancellation.Never))
+            val guidance = assertNotNull(owner.partialPrimalGuidance(ExecutionControl.Never))
 
             assertEquals(listOf(true, false, false), guidance.known.toList())
             assertEquals(0.5, guidance.coordinates[0])
@@ -396,11 +397,11 @@ class LpScopedSolverTest {
         LpScopedSolver(LpExactState(source), context = LpSolveContext(RecordingLpEngineFactory()),
             componentSplit = true).use { owner ->
             assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
-            assertNotNull(owner.partialPrimalGuidance(Cancellation.Never))
+            assertNotNull(owner.partialPrimalGuidance(ExecutionControl.Never))
 
             assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L)), 7L))
 
-            assertNull(owner.partialPrimalGuidance(Cancellation.Never))
+            assertNull(owner.partialPrimalGuidance(ExecutionControl.Never))
             assertFalse(owner.floatPaused)
         }
     }
@@ -416,14 +417,15 @@ class LpScopedSolverTest {
         val pointModel = assertNotNull(state.ownerWorkingModel())
         LpScopedSolver(state).use { owner ->
             assertNotNull(owner.solveFloat()?.second)
-            assertNotNull(owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, Cancellation.Never) {
+            assertNotNull(owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, ExecutionControl.Never) {
                 assertTrue(it > 0L)
             })
             assertTrue(owner.push())
             assertTrue(owner.assertBound(x, true, ExactLpSide(ExactLpNumber.of(0L)), 1L))
             var work = 0L
 
-            val costs = owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, Cancellation.Never) { work += it }
+            val costs = owner.directionalCosts(pointModel, intArrayOf(x), 100_000L,
+                ExecutionControl.Never) { work += it }
 
             assertNull(costs)
             assertEquals(0L, work)
@@ -444,8 +446,8 @@ class LpScopedSolverTest {
             LpScopedSolver(state, context = LpSolveContext(factory), componentSplit = true).use { owner ->
 
                 val guidance = if (directional) {
-                    owner.directionalCosts(point, intArrayOf(column), 100_000L, Cancellation.Never) { work += it }
-                } else owner.partialPrimalGuidance(Cancellation.Never)
+                    owner.directionalCosts(point, intArrayOf(column), 100_000L, ExecutionControl.Never) { work += it }
+                } else owner.partialPrimalGuidance(ExecutionControl.Never)
 
                 assertNull(guidance)
                 assertTrue(factory.calls.isEmpty())
@@ -463,10 +465,10 @@ class LpScopedSolverTest {
         val state = LpExactState(source)
         assertNotNull(state.ownerWorkingModel())
         LpScopedSolver(state).use { owner ->
-            assertFalse(owner.prepare(Cancellation.Never, 1L))
+            assertFalse(owner.prepare(ExecutionControl.Never, 1L))
             val paid = owner.metrics.preparationWork
 
-            val ready = owner.prepare(Cancellation.Never, 0L)
+            val ready = owner.prepare(ExecutionControl.Never, 0L)
 
             assertFalse(ready)
             assertTrue(paid > 0L)
@@ -484,13 +486,13 @@ class LpScopedSolverTest {
         val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         for (components in listOf(false, true)) {
             var expired = false
-            val firstToken = Cancellation { expired }
+            val firstToken = ExecutionControl { expired }
             LpScopedSolver(LpExactState(source), componentSplit = components).use { owner ->
                 val first = owner.solveFloat(token = firstToken, allowance = LpFloatAllowance(1L, 0))
                 assertFalse(first?.second?.optimal == true)
                 expired = true
 
-                val completed = assertNotNull(owner.solveFloat(token = Cancellation.Never))
+                val completed = assertNotNull(owner.solveFloat(token = ExecutionControl.Never))
 
                 val point = assertNotNull(completed.second)
                 assertTrue(point.optimal)
@@ -548,7 +550,7 @@ class LpScopedSolverTest {
             val limits = ArrayList<Long>()
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
-                    model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
                     iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
                 ): PersistentLpSolver {
                     limits += pricing.basisEntryLimit
@@ -701,7 +703,7 @@ class LpScopedSolverTest {
             override fun observeExactInput(accepted: Boolean) = Unit
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         }
-        LpScopedSolver(LpExactState(lowerBoundModel()), Cancellation { cancelled }).use { owner ->
+        LpScopedSolver(LpExactState(lowerBoundModel()), ExecutionControl { cancelled }).use { owner ->
             val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits(),
                 observer = observer)
 
@@ -832,7 +834,7 @@ class LpScopedSolverTest {
         var expired = false
         LpScopedSolver(state).use { owner ->
             val allowance = LpFloatAllowance(100_000L, 100)
-            assertNull(owner.advanceFloat(1L, allowance, Cancellation { expired }))
+            assertNull(owner.advanceFloat(1L, allowance, ExecutionControl { expired }))
             var work = owner.lastMetrics
             assertTrue(owner.floatPaused)
             expired = true
@@ -840,7 +842,7 @@ class LpScopedSolverTest {
             var attempts = 0
 
             while (result == null && attempts++ < 64) {
-                result = owner.advanceFloat(1L, allowance, Cancellation.Never)?.second
+                result = owner.advanceFloat(1L, allowance, ExecutionControl.Never)?.second
                 work += owner.lastMetrics
             }
 
@@ -921,7 +923,7 @@ class LpScopedSolverTest {
     @Test
     fun `global cancellation should retire a paused owner without a result`() {
         var cancelled = false
-        val owner = LpScopedSolver(LpExactState(lowerBoundModel()), Cancellation { cancelled })
+        val owner = LpScopedSolver(LpExactState(lowerBoundModel()), ExecutionControl { cancelled })
         owner.use {
             assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
             cancelled = true
@@ -939,7 +941,7 @@ class LpScopedSolverTest {
         LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
             assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
             var polls = 0
-            val token = Cancellation { ++polls >= 2 }
+            val token = ExecutionControl { ++polls >= 2 }
 
             assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100), token))
 
@@ -1130,7 +1132,7 @@ class LpScopedSolverTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -1147,7 +1149,7 @@ class LpScopedSolverTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
-                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean =
                         !reject && delegate.adopt(state, token)
                 }
             }
@@ -1268,7 +1270,7 @@ class LpScopedSolverTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -1443,7 +1445,7 @@ class LpScopedSolverTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     refactorUpdateLimit: Int,
                     iterationLimit: Int,
                     workLimit: Long,
@@ -1520,7 +1522,7 @@ class LpScopedSolverTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     refactorUpdateLimit: Int,
                     iterationLimit: Int,
                     workLimit: Long,
@@ -1529,7 +1531,7 @@ class LpScopedSolverTest {
                 ): PersistentLpSolver {
                     val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                     return object : PersistentLpSolver by delegate {
-                        override fun prepareLogicals(token: Cancellation): Basis? =
+                        override fun prepareLogicals(token: ExecutionControl): Basis? =
                             if (++builds == failAt) null else delegate.prepareLogicals(token)
                     }
                 }
@@ -1570,7 +1572,7 @@ class LpScopedSolverTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -1579,7 +1581,7 @@ class LpScopedSolverTest {
             ): PersistentLpSolver {
                 val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                 return object : PersistentLpSolver by delegate {
-                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean =
                         !reject && delegate.adopt(state, token)
                 }
             }
@@ -1600,7 +1602,7 @@ class LpScopedSolverTest {
             reject = false
             assertTrue(solver.assertBound(0, false, ExactLpSide(one), 1))
 
-            assertNull(solver.solve(token = Cancellation { true }))
+            assertNull(solver.solve(token = ExecutionControl { true }))
 
             assertNull(solver.lastResult)
             assertEquals(1L, solver.state.assertions.single().witness)

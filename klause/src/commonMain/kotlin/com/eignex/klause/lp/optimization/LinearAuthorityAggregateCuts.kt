@@ -10,7 +10,7 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRoundingLimit
 import com.eignex.klause.solver.evidence.mixedIntegerRounding
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.abs
@@ -55,7 +55,7 @@ internal object LinearAuthorityAggregateCuts {
     val pointSourcePairLimits = LinearAuthorityAggregateLimits()
 
     fun prepareSourcePairs(
-        source: SourceProofContext, cancellation: Cancellation,
+        source: SourceProofContext, cancellation: ExecutionControl,
         observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
         limits: LinearAuthorityAggregateLimits = sourcePairLimits,
         point: Map<SourceCoordinate, Double>? = null,
@@ -133,7 +133,7 @@ internal object LinearAuthorityAggregateCuts {
                     }
                 }
             }
-            val derivedStop = object : Cancellation {
+            val derivedStop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = cancellation()
                 override fun deadline() = cancellation.deadline()
             }
@@ -510,7 +510,7 @@ internal object LinearAuthorityAggregateCuts {
     private fun halfIntegerCut(
         aggregate: IntegerAggregate,
         bounds: IntegerBoundIndex,
-        cancellation: Cancellation, observe: (String, Long) -> Unit, limits: LinearAuthorityAggregateLimits,
+        cancellation: ExecutionControl, observe: (String, Long) -> Unit, limits: LinearAuthorityAggregateLimits,
         upperChoices: Set<SourceCoordinate> = emptySet(),
     ): HalfIntegerCut? {
         val meter = AggregateMeter(limits, cancellation, observe)
@@ -713,7 +713,7 @@ internal object LinearAuthorityAggregateCuts {
         private val point: Map<SourceCoordinate, Double>,
         private val meter: AggregateMeter,
         private val limits: LinearAuthorityAggregateLimits,
-        private val cancellation: Cancellation,
+        private val cancellation: ExecutionControl,
         private val observe: (String, Long) -> Unit,
         private val integerBounds: IntegerBoundIndex,
     ) {
@@ -1085,7 +1085,7 @@ internal object LinearAuthorityAggregateCuts {
 
     fun inspectPairs(
         rows: List<LinearAuthorityAggregateTerm>, inactive: Set<Int>,
-        point: Map<SourceCoordinate, BigFraction>, cancellation: Cancellation,
+        point: Map<SourceCoordinate, BigFraction>, cancellation: ExecutionControl,
         observe: (String, Long) -> Unit = { _, _ -> },
         limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(),
         maximumCandidates: Int = 64,
@@ -1162,7 +1162,7 @@ internal object LinearAuthorityAggregateCuts {
                 }
             }
             // Nested charges reach the containing work meter through charge.
-            val derivedStop = object : Cancellation {
+            val derivedStop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = cancellation()
                 override fun deadline() = cancellation.deadline()
             }
@@ -1218,7 +1218,7 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     fun derive(
-        terms: List<LinearAuthorityAggregateTerm>, cancellation: Cancellation,
+        terms: List<LinearAuthorityAggregateTerm>, cancellation: ExecutionControl,
         observe: (String, Long) -> Unit = { _, _ -> },
         limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(),
         allowMixed: Boolean = false,
@@ -1227,7 +1227,7 @@ internal object LinearAuthorityAggregateCuts {
         continuousBounds, coefficientSnapshots = null)
 
     private fun deriveWithCoefficients(
-        terms: List<LinearAuthorityAggregateTerm>, cancellation: Cancellation,
+        terms: List<LinearAuthorityAggregateTerm>, cancellation: ExecutionControl,
         observe: (String, Long) -> Unit,
         limits: LinearAuthorityAggregateLimits,
         allowMixed: Boolean,
@@ -1321,7 +1321,8 @@ internal object LinearAuthorityAggregateCuts {
                     bound
                 }
                 val conclusion = mixedIntegerRounding(SourceInequality(normalized, scaledRhs, strict),
-                    sides.map { it.inequality }, Cancellation { meter.reserve(1L); cancellation() }) { left, right ->
+                    sides.map { it.inequality },
+                        ExecutionControl { meter.reserve(1L); cancellation() }) { left, right ->
                     meter.number(left)
                     meter.number(right)
                     meter.arithmetic(left, right)
@@ -1364,7 +1365,7 @@ internal object LinearAuthorityAggregateCuts {
 
 private class AggregateMeter(
     private val limits: LinearAuthorityAggregateLimits,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val observe: (String, Long) -> Unit,
 ) {
     private var work = 0L

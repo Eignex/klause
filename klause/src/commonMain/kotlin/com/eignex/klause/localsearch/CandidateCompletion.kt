@@ -1,7 +1,7 @@
 package com.eignex.klause.localsearch
 
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 
 /**
@@ -18,7 +18,7 @@ import com.eignex.util.arrays.emptyIntArray
 fun interface CandidateCompletion {
     /** Decide [candidate] under the search's [cancellation]: a [Completion.Witness] is a solution of the model,
      *  anything else is not. */
-    fun complete(candidate: Sample, cancellation: Cancellation): Completion
+    fun complete(candidate: Sample, cancellation: ExecutionControl): Completion
 }
 
 /**

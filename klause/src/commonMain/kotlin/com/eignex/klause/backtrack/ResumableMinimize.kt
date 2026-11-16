@@ -12,7 +12,6 @@ import com.eignex.klause.backtrack.lp.prepareRootComponentTrial
 import com.eignex.klause.backtrack.selector.IndomainBest
 import com.eignex.klause.backtrack.selector.SolutionGuided
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.harvestRootRelaxation
 import com.eignex.klause.lp.bounding.rootLpRelaxationBound
@@ -81,7 +80,8 @@ import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.theory.requiresRealCompletionSearch
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import kotlin.coroutines.cancellation.CancellationException
@@ -162,15 +162,15 @@ internal class ResumableMinimize(
     // cancellation and the Hamming/recent-window knobs are fixed here; the per-slice deadline is re-armed in
     // runSlice.
     // One-shot calls retain their invocation token. Resumed calls replace it while keeping a bound lifetime scope.
-    private val baseCancellation: Cancellation = params0.cancellation
+    private val baseCancellation: ExecutionControl = params0.cancellation
     private var params: BacktrackParams = params0.copy(
-        cancellation = cancelledWhen(::runDeadline, { params0.cancellation.workScheduled() }) { sliceCancelled() },
+        cancellation = runToken(includeSlice = true),
         minHammingDistance = 0,
         recentWindow = 0,
     )
 
     // Slice control without a coroutine: a re-armable deadline plus the current global token.
-    private var globalToken: Cancellation = params0.cancellation
+    private var globalToken: ExecutionControl = params0.cancellation
 
     // Wall-clock anchor for sizing the LP sub-budgets against [BacktrackParams.solveBudgetMillis] on the
     // non-pausable one-shot path, where no slice deadline is armed. Captured at construction,
@@ -206,9 +206,14 @@ internal class ResumableMinimize(
     private fun solveCancelled(): Boolean = if (pausable) globalToken() else baseCancellation()
 
     // solveCancelled as a token that also states the run's deadline, so a phase it is handed can budget a share of
-    // the time left (Cancellation.shorten) rather than read a bare predicate as having no time limit at all.
-    private fun runEndToken(): Cancellation = cancelledWhen(::runDeadline, { baseCancellation.workScheduled() }) {
-        solveCancelled()
+    // the time left (ExecutionControl.shorten) rather than read a bare predicate as having no time limit at all.
+    private fun runEndToken(): ExecutionControl = runToken(includeSlice = false)
+
+    private fun runToken(includeSlice: Boolean): ExecutionControl = object : ExecutionControl() {
+        override fun isCancelled(): Boolean = if (includeSlice) sliceCancelled() else solveCancelled()
+        override fun deadline() = runDeadline()
+        override val workScheduled get() = baseCancellation.workScheduled()
+        override val stopPolling get() = (if(pausable) globalToken else baseCancellation).stopPolling
     }
 
     private fun runDeadline(): ComparableTimeMark? = (if (pausable) globalToken else baseCancellation).deadline()
@@ -282,7 +287,7 @@ internal class ResumableMinimize(
 
     private fun completeLeaf(
         sample: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long = 0L,
     ): LeafRealResult {
         val result = realLeafOwner().solve(sample, cancellation, completionToleranceCheck(), workLimit)
@@ -391,12 +396,15 @@ internal class ResumableMinimize(
         if (problem.factorProjections?.requiresRealSourceCheck != true || result.verdict !in setOf(
                 LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.TOLERANCE_OPTIMUM, LpVerdict.UNBOUNDED,
             )
-        ) return result
+        )
+            return result
         val completed = sample.copy(reals = result.reals, exactReals = result.exactReals)
         val tolerated = result.verdict == LpVerdict.TOLERANCE_OPTIMUM &&
             completionToleranceCheck()?.invoke(completed) == true
-        return if (tolerated || verifyRealCoordinates(problem, completed) is Verification.Accepted) result
-        else LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
+        return if (tolerated || verifyRealCoordinates(problem, completed) is Verification.Accepted)
+            result
+        else
+            LeafRealResult(LpVerdict.INDETERMINATE, doubleArrayOf())
     }
 
     // LP-guided branching hints (search-only): owned here so the engine depends only on the record sink.
@@ -405,7 +413,8 @@ internal class ResumableMinimize(
         if (params.lpPlan.branching) {
             LpHints(problem.numIntVars, problem.numBoolVars, params.lpDirectionalGains,
                 sink.lp::observeDirectionalBranch, charge = { lpEngine.noteNodeOverhead(it) })
-        } else null
+        } else
+            null
 
     private lateinit var cp: CpSearchComponent
     private val session: PropagationSession get() = cp.session
@@ -477,7 +486,7 @@ internal class ResumableMinimize(
         cp = CpSearchComponent(
             (preparedSession ?: PropagationSession(
                 solver.propagationProjection(params.nativeSat ?: true, problem),
-                cancelledWhen(::runDeadline, { baseCancellation.workScheduled() }) { solveCancelled() },
+                runEndToken(),
                 params.propagationCancelFloor,
                 nativeSat = params.nativeSat ?: true,
                 pbLearning = params.pbLearning ?: (problem.numIntVars == 0),
@@ -522,7 +531,8 @@ internal class ResumableMinimize(
                 nodeWorkAllowance = {
                     if (pausable && !preparationPending && externalCutoff().isFinite()) {
                         slice.remainingLpWork()
-                    } else null
+                    } else
+                        null
                 },
             ),
         )
@@ -641,7 +651,7 @@ internal class ResumableMinimize(
     }
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -649,7 +659,7 @@ internal class ResumableMinimize(
         repaidWork = 0L
         done?.let { return it }
         check(!closed) { "search is closed" }
-        globalToken = baseCancellation.lifetimeCancellation() or global
+        globalToken = ( baseCancellation.lifetimeCancellation() or global).bindStopControl()
         if (!run.learnedPropagationPending) guideByClausePrimalCandidate()
         if (!rootIsExhausted) {
             val admitted = slice.begin(sliceMillis, sliceNodes)
@@ -672,8 +682,10 @@ internal class ResumableMinimize(
 
                     StepEvent.Paused -> {
                         if (!clauseExchangeEnded) {
-                            if (sliceCancelled()) params.clauseExchange?.onSearchEnd(session)
-                            else params.clauseExchange?.onSearchPause(session)
+                            if (sliceCancelled())
+                                params.clauseExchange?.onSearchEnd(session)
+                            else
+                                params.clauseExchange?.onSearchPause(session)
                         }
                         slice.noteOverspend()
                         // Restarts sample root fixings too, but an arm that restarts rarely would show none of its own.
@@ -887,8 +899,10 @@ internal class ResumableMinimize(
                 sawIndeterminateLeaf -> {
                     val incumbent = pendingIncumbent
                     pendingIncumbent = null
-                    if (incumbent != null) StepEvent.Incumbent(incumbent.withSourceSemantics(problem.semantics))
-                    else terminal(terminalExhausted(null))
+                    if (incumbent != null)
+                        StepEvent.Incumbent(incumbent.withSourceSemantics(problem.semantics))
+                    else
+                        terminal(terminalExhausted(null))
                 }
 
                 pausable && sliceCancelled() -> StepEvent.Paused
@@ -1077,7 +1091,8 @@ internal class ResumableMinimize(
     private fun guideBy(proposal: Sample): Boolean {
         if (!::brancher.isInitialized || proposal.numBoolVars != problem.numBoolVars ||
             proposal.numIntVars != problem.numIntVars
-        ) return false
+        )
+            return false
         brancher.importPooledSolution(proposal, guideValues = true, replay = true)
         return true
     }
@@ -1098,8 +1113,9 @@ internal class ResumableMinimize(
     private fun revalidateInitialCandidate(): MinimizeResult.WithSample? {
         val sample = initialCandidate ?: return null
         initialCandidate = null
-        val token = if (params.cancellation.workScheduled()) params.cancellation else
-            params.cancellation or Cancellation.after(LP_VERIFY_BUDGET)
+        val token = if (params.cancellation.workScheduled())
+            params.cancellation else
+            params.cancellation or ExecutionControl.after(LP_VERIFY_BUDGET)
         // A pooled point this run cannot adopt still guides its first dive.
         val accepted = engineLeaf(sample, token) ?: return null.also { if (!token()) guideBy(sample) }
         return recordIfImproving(accepted, objective.evaluate(accepted), startingWitness = !rebindable)
@@ -1110,7 +1126,7 @@ internal class ResumableMinimize(
      * assumptions: only those pins and the real completion remain. A checked ray is kept in [unboundedLeaf].
      * Null, with the reason given to [onDecline], when either refuses it or [token] stops it.
      */
-    private fun engineLeaf(sample: Sample, token: Cancellation, onDecline: (String) -> Unit = {}): Sample? {
+    private fun engineLeaf(sample: Sample, token: ExecutionControl, onDecline: (String) -> Unit = {}): Sample? {
         fun decline(outcome: String): Sample? {
             onDecline(if (token()) "CANCELLED" else outcome)
             return null
@@ -1121,7 +1137,8 @@ internal class ResumableMinimize(
             return decline("INVALID_COORDINATES")
         }
         if (checkPointRestrictions(sample, params.assumptions, token) != null) return decline("PINS_REJECTED")
-        val leaf = if (problem.numRealVars == 0) sample else {
+        val leaf = if (problem.numRealVars == 0)
+            sample else {
             val real = completeLeaf(sample, token)
             val completed = sample.copy(reals = real.reals, exactReals = real.exactReals)
             when (real.verdict) {
@@ -1153,12 +1170,13 @@ internal class ResumableMinimize(
         }
         if (unboundedLeaf != null) return null
         rootLayoutPending = !lpEngine.prepareRootLayout(runEndToken(),
-            if (pausable) params.cancellation else Cancellation.Never)
+            if (pausable) params.cancellation else ExecutionControl.Never)
         if (rootLayoutPending) return null
         val rootToken = rootLpBudget()
         val admissionStarted = if (lpEngine.lpRelaxer != null || lpEngine.retainedRootEnabled) {
             TimeSource.Monotonic.markNow()
-        } else null
+        } else
+            null
         var admissionOutcome = "DUTY_SKIPPED"
         if (rootLpDutyCycle.allows(lpEngine.totalSolveWork())) {
             val before = lpEngine.totalSolveWork()
@@ -1191,8 +1209,10 @@ internal class ResumableMinimize(
         singleObj?.let { obj ->
             lpEngine.stripEnergyFloor(session)?.let { floor ->
                 if (floor.value > session.intDomain(obj.varId).min) {
-                    if (session.decisionLevel == 0) session.implyIntAtLeast(obj.varId, floor.value)
-                    else session.implyIntAtLeastWithReason(obj.varId, floor.value, floor.reason)
+                    if (session.decisionLevel == 0)
+                        session.implyIntAtLeast(obj.varId, floor.value)
+                    else
+                        session.implyIntAtLeastWithReason(obj.varId, floor.value, floor.reason)
                 }
             }
         }
@@ -1217,7 +1237,7 @@ internal class ResumableMinimize(
         return null
     }
 
-    private fun rootPrimalWork(rootToken: Cancellation): MinimizeResult.WithSample? {
+    private fun rootPrimalWork(rootToken: ExecutionControl): MinimizeResult.WithSample? {
         rootRoundingAttempted = true
         if (!lpEngine.params.lpPlan.probe || lpEngine.lpRelaxer == null) {
             rootRoundingPending = false
@@ -1248,11 +1268,12 @@ internal class ResumableMinimize(
         return installed
     }
 
-    private fun handoffRootTargets(rootToken: Cancellation): Boolean {
+    private fun handoffRootTargets(rootToken: ExecutionControl): Boolean {
         val plan = lpEngine.params.lpPlan
         if (!pausable || decisionLimit <= 0L || problem.numRealVars != 0 ||
             !plan.branching || plan.lbTreeSearch || !lpEngine.retainedRootEnabled
-        ) return false
+        )
+            return false
         val pending = lpEngine.rootRoundingWarmStart ?: return false
         if (pending.primal == null) {
             lpEngine.retainRootPartialPrimalGuidance(pending.relaxation, rootToken)
@@ -1261,7 +1282,8 @@ internal class ResumableMinimize(
         if (guide.primal == null || rootToken()) return false
         if (lpEngine.rootPrimalTargets?.coordinates !== guide.primal &&
             !lpEngine.retainRootPrimalTargets(rootToken)
-        ) return false
+        )
+            return false
         if (lpEngine.prepareRootComponentTrial(objective, rootToken) || rootToken()) return false
         rootRoundingPending = false
         lpEngine.rootRoundingInterrupted = false
@@ -1291,7 +1313,7 @@ internal class ResumableMinimize(
      * capture). [token] is the shared root-LP budget — the slice/global cancellation time-boxed to
      * `LpPlan.rootBudgetFraction`.
      */
-    private fun initRootLp(token: Cancellation): Boolean {
+    private fun initRootLp(token: ExecutionControl): Boolean {
         val relaxer = lpEngine.harvestRootRelaxation(token) ?: return false
         val rootBound = lpEngine.rootLpRelaxationBound(relaxer, lpEngine.lpGlobalCuts, token,
             preparationCancellation = rootLpPreparationBudget())
@@ -1315,7 +1337,7 @@ internal class ResumableMinimize(
      * `LpPlan.rootMaxWork` or the LP work allowance the node solves share. A non-positive fraction
      * disables the cap.
      */
-    private fun rootLpBudget(): Cancellation {
+    private fun rootLpBudget(): ExecutionControl {
         val fraction = params.lpPlan.rootBudgetFraction
         if (fraction <= 0.0) return params.cancellation
         val cap = params.lpPlan.rootBudgetMillis
@@ -1326,15 +1348,16 @@ internal class ResumableMinimize(
         // by work makes the harvest a property of the model. The deadline stays as the backstop for
         // cost the meter cannot see.
         return rootLpPreparationBudget() or
-            if (params.cancellation.workScheduled()) Cancellation.Never else
-                Cancellation.after(budgetMillis.coerceAtLeast(0).milliseconds)
+            if (params.cancellation.workScheduled())
+                ExecutionControl.Never else
+                ExecutionControl.after(budgetMillis.coerceAtLeast(0).milliseconds)
     }
 
-    private fun rootLpPreparationBudget(): Cancellation {
+    private fun rootLpPreparationBudget(): ExecutionControl {
         if (params.lpPlan.rootBudgetFraction <= 0.0) return params.cancellation
         val opsBudget = lpEngine.params.lpPlan.rootMaxWork
         return params.cancellation or
-            Cancellation { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
+            ExecutionControl { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
                 lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) }
     }
 
@@ -1410,8 +1433,10 @@ internal class ResumableMinimize(
                     localExact == null || externalExact < localExact -> externalExact
                     else -> localExact
                 }
-                val dominated = if (exactBound != null) lpEngine.linearBoundDominates(session, exactBound)
-                    else lpEngine.linearBoundDominates(session, effectiveBound)
+                val dominated = if (exactBound != null)
+                    lpEngine.linearBoundDominates(session, exactBound)
+                    else
+                    lpEngine.linearBoundDominates(session, effectiveBound)
                 if (dominated) return SearchNodeDisposition.Prune
             }
             // Persistent LP fixings may use only a cutoff that survives every later repair.
@@ -1470,8 +1495,10 @@ internal class ResumableMinimize(
                         val accepted = witness != null && !params.cancellation() &&
                             params.toleranceCheck?.invoke(witness) == true && !params.cancellation()
                         if (pausable && params.cancellation()) return SearchModelDisposition.Pause
-                        val published = if (accepted) recordIfImproving(checkNotNull(witness),
-                            objective.evaluate(witness)) else null
+                        val published = if (accepted)
+                            recordIfImproving(checkNotNull(witness),
+                            objective.evaluate(witness)) else
+                            null
                         incomplete = published != null && !rebindable
                         unresolved = published == null
                         published

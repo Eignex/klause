@@ -22,7 +22,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -144,7 +144,7 @@ class RootInprocessingSearchTest {
                 solver.resumable(objective, configured).use { search ->
                     var result: MinimizeResult? = null
                     repeat(100) {
-                        if (result == null) result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) { }
+                        if (result == null) result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) { }
                     }
                     assertNotNull(result)
                 }
@@ -199,7 +199,7 @@ class RootInprocessingSearchTest {
             }
             val search = BacktrackSolver(problem().bake()).resumableSolve(params(native, exchange))
             val result = search.use {
-                assertNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L))
+                assertNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0L))
                 finish(it)
             }
 
@@ -340,7 +340,7 @@ class RootInprocessingSearchTest {
             val search = BacktrackSolver(source.bake()).resumableSolve(configured)
 
             val result = search.use {
-                assertNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, Long.MAX_VALUE))
+                assertNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, Long.MAX_VALUE))
                 val session = assertNotNull(retained)
                 assertTrue(session.isLearnedClause(target))
                 assertEquals(0, session.decisionLevel)
@@ -376,7 +376,7 @@ class RootInprocessingSearchTest {
 
     private fun finish(search: ResumableSolve): SolveResult {
         repeat(100) {
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L)?.let { return it }
+            search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L)?.let { return it }
         }
         error("small root inprocessing fixture did not finish")
     }

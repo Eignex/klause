@@ -3,18 +3,18 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.collections.IntArrayList
 
-internal fun Problem.freeBooleanProbeCandidates(maxCandidates: Int, cancellation: Cancellation): IntArray {
+internal fun Problem.freeBooleanProbeCandidates(maxCandidates: Int, cancellation: ExecutionControl): IntArray {
     if (maxCandidates <= 0 || cancellation()) return intArrayOf()
     val live = BooleanArray(numBoolVars)
     val pinned = BooleanArray(numBoolVars)
     val poll = PollStride()
     fun stopped(): Boolean {
         cancellation.charge(10L)
-        return (cancellation.workMeter() != null || poll.due()) && cancellation()
+        return poll.due() && cancellation()
     }
     for (factor in factors) {
         if (stopped()) return intArrayOf()

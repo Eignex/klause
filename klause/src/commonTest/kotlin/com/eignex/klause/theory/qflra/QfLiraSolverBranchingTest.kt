@@ -26,7 +26,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
@@ -46,7 +46,7 @@ class QfLiraSolverBranchingTest {
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0)),
         )
-        val controls = SearchExecutionControlAdapter(allowance = { Cancellation { true } })
+        val controls = SearchExecutionControlAdapter(allowance = { ExecutionControl { true } })
         val context = object : SearchContext by SearchSession(emptyList()) {
             override val executionControls = controls
         }
@@ -70,7 +70,7 @@ class QfLiraSolverBranchingTest {
         val context = SearchSession(emptyList())
 
         ExactLiraSearchComponent(model).use { component ->
-            component.useOperationAllowance { parent -> Cancellation { parent() || spent } }
+            component.useOperationAllowance { parent -> ExecutionControl { parent() || spent } }
             assertIs<ComponentResult.Consistent>(component.initialize(context))
             spent = true
 
@@ -95,7 +95,7 @@ class QfLiraSolverBranchingTest {
         ExactLiraSearchComponent(model).use { component ->
             component.useOperationAllowance { parent ->
                 val attempt = ++attempts
-                Cancellation { parent() || (attempt == 1 && firstSpent) }
+                ExecutionControl { parent() || (attempt == 1 && firstSpent) }
             }
             assertIs<ComponentResult.Consistent>(component.initialize(context))
             firstSpent = true
@@ -217,7 +217,7 @@ class QfLiraSolverBranchingTest {
             source,
             emptyMap(),
             Long.MAX_VALUE,
-            Cancellation.Never,
+            ExecutionControl.Never,
             SearchLearnedDbParams(),
             null,
         ).use { planned ->

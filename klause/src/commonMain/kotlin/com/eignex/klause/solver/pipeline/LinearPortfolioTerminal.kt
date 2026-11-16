@@ -11,7 +11,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -29,7 +29,7 @@ internal class LinearPortfolioSearch(
     private val snapshot = AtomicReference<LinearOptimizationResult?>(null)
     val result: LinearOptimizationResult? get() = snapshot.load()
 
-    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
         descent.runSlice(global, sliceMillis, sliceNodes, onIncumbent).also {
             snapshot.store(descent.linearSnapshot())
@@ -39,7 +39,7 @@ internal class LinearPortfolioSearch(
 internal class LinearPortfolioTerminal(
     private val invocation: EngineInvocation,
     private val original: SourceProofContext,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val accepted: (LinearOptimizationResult) -> Unit,
 ) : PortfolioTerminalCheck {
     override fun check(worker: PortfolioWorker, search: ResumableSearch?): PortfolioTerminalPublication? {

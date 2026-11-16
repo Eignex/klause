@@ -8,7 +8,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -40,7 +40,7 @@ class SourceIncumbentPublicationTest {
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(0.1))
-        val base = assertNotNull(OpenTheoryRequest(model, objective).linearAuthorityContext(Cancellation.Never))
+        val base = assertNotNull(OpenTheoryRequest(model, objective).linearAuthorityContext(ExecutionControl.Never))
         val tenth = BigFraction.ofLong(10).reciprocal()
         val context = SourceProofContext(
             base.scope,

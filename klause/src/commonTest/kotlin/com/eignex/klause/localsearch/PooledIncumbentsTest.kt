@@ -3,7 +3,7 @@ package com.eignex.klause.localsearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -21,7 +21,7 @@ class PooledIncumbentsTest {
         })
         val port = PooledIncumbents(exchange, true, { 1.0 }, timer)
 
-        exchange.withBufferedOffers(Cancellation.Never, {}, { it() }) {
+        exchange.withBufferedOffers(ExecutionControl.Never, {}, { it() }) {
             timer.resume()
             port.publish(sample, 3.0)
             port.publish(sample, 1.0)

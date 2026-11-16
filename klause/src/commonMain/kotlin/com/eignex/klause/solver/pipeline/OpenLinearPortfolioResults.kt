@@ -17,7 +17,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -26,8 +26,8 @@ internal class OpenLinearPortfolioResults(
     private val original: SourceProofContext,
     private val values: OpenSourceObjective,
     private val incumbents: PortfolioIncumbents<OpenIncumbentValue>,
-    private val cancellation: Cancellation,
-    private val timeout: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl,
+    private val timeout: ExecutionControl = ExecutionControl.Never,
 ) : PortfolioTerminalCheck {
     private data class Accepted(val result: LinearOptimizationResult, val rayValue: BigFraction?)
     private val accepted = AtomicReference<Accepted?>(null)

@@ -31,7 +31,7 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
@@ -43,7 +43,7 @@ class ExecutionSemanticsTest {
     @Test
     fun `cancelled source optimization should retain its interpretation across entry points`() {
         val source = Problem(0, 0, emptyArray(), emptyArray())
-        val polynomial = PolynomialTheoryParams(cancellation = Cancellation { true })
+        val polynomial = PolynomialTheoryParams(cancellation = ExecutionControl { true })
         val affine = LinearObjective()
         val quadratic = QuadraticObjectiveSpec(emptyList())
 
@@ -66,7 +66,7 @@ class ExecutionSemanticsTest {
         )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val request = OpenTheoryRequest(source, objective)
-        val params = TheoryParams(cancellation = Cancellation { true })
+        val params = TheoryParams(cancellation = ExecutionControl { true })
 
         val results = listOf(
             OpenTheoryPipeline.execute(request, params),
@@ -149,7 +149,7 @@ class ExecutionSemanticsTest {
         ).model
         val engine = OpenTheoryEngine(source, source.componentPlan().theoryPipeline)
 
-        val result = engine.solve(TheoryParams(cancellation = Cancellation { true }))
+        val result = engine.solve(TheoryParams(cancellation = ExecutionControl { true }))
 
         assertIs<OpenTheoryResult.Unknown>(result)
         assertSame(source.semantics, result.semantics)
@@ -165,7 +165,7 @@ class ExecutionSemanticsTest {
         ).model
         val minimizer = OpenTheoryMinimizer(source, LinearObjective(intCoefficients = longArrayOf(1, 0)))
 
-        val result = minimizer.minimize(TheoryParams(cancellation = Cancellation { true }))
+        val result = minimizer.minimize(TheoryParams(cancellation = ExecutionControl { true }))
 
         assertIs<OpenTheoryOptimum.Bounded>(result)
         assertSame(source.semantics, result.semantics)
@@ -203,7 +203,7 @@ class ExecutionSemanticsTest {
         val context = assertNotNull(source.sourceProofContext(scope,
             LinearObjective(intCoefficients = longArrayOf(1, 0)))).withLinearAuthority()
 
-        val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = Cancellation { true }))
+        val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = ExecutionControl { true }))
 
         assertSame(source.semantics, result.semantics)
         assertSame(scope, result.scope)
@@ -221,7 +221,7 @@ class ExecutionSemanticsTest {
             setOf(coordinate), emptyMap(), mapOf(coordinate to BigFraction.ONE),
         )
 
-        val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = Cancellation { true }))
+        val result = OpenTheoryPipeline.optimizeLinear(context, TheoryParams(cancellation = ExecutionControl { true }))
 
         assertNull(context.semantics)
         assertNull(result.semantics)

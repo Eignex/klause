@@ -22,7 +22,7 @@ import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -58,7 +58,7 @@ class LpShavingTest {
             LpParams(lpPlan = LpPlan(bounding = true)),
             SolveStatsSink(backend = "shave"),
         )
-        assertEquals(listOf(0), engine.redundantConstraints(Cancellation.Never))
+        assertEquals(listOf(0), engine.redundantConstraints(ExecutionControl.Never))
     }
 
     @Test
@@ -76,7 +76,7 @@ class LpShavingTest {
         )
         val worker = config.materialize(executable, 0, 0, 1L, 1.0, objective, null, null, null, pools)
 
-        val result = worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+        val result = worker.use { it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last() }
 
         val completed = assertIs<MinimizeResult.BestFound>(result)
         assertEquals(2.0, completed.objective)
@@ -109,7 +109,7 @@ class LpShavingTest {
                 )
             }
 
-        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last() }
 
         assertEquals(2.0, bounds.current())
     }
@@ -174,7 +174,7 @@ class LpShavingTest {
         )
         val worker = config.materialize(executable, 0, 0, 1L, 1.0, objective, null, null, null, pools)
 
-        val result = worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+        val result = worker.use { it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last() }
 
         val completed = assertIs<MinimizeResult.BestFound>(result)
         assertEquals(2.0, completed.objective)
@@ -207,7 +207,7 @@ class LpShavingTest {
                 )
             }
 
-        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).last() }
+        worker.use { it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last() }
 
         assertEquals(2L, bounds.lowerOf(3))
     }

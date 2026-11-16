@@ -55,11 +55,11 @@ internal class PolynomialFormula private constructor(
     private fun sharePredicates(
         arithmetic: PolynomialArithmetic,
         definitions: Map<Int, PolynomialBooleanDefinition> = emptyMap(),
-    ): PolynomialFormula {
+    ): PolynomialFormula = arithmetic.execution.operation {
         val sharing = PolynomialPredicateSharing(nodes, atoms, arithmetic, definitions)
         val rewrittenRoot = sharing.rewrite(root)
         val sharedRoot = sharing.compact(rewrittenRoot)
-        return PolynomialFormula(sharing.nodes, sharedRoot, sharing.atoms, sharing.booleanVariables())
+        PolynomialFormula(sharing.nodes, sharedRoot, sharing.atoms, sharing.booleanVariables())
     }
 
     fun forcedAtoms(arithmetic: PolynomialArithmetic): List<PolynomialAtom>? {
@@ -81,7 +81,9 @@ internal class PolynomialFormula private constructor(
             val value = state.value(index)
             if (value == UNASSIGNED) continue
             val atom = atoms[node.atom]
-            result.add(if (value == TRUE) atom else PolynomialAtom(atom.polynomial, when (atom.relation) {
+            result.add(if (value == TRUE)
+                    atom else
+                    PolynomialAtom(atom.polynomial, when (atom.relation) {
                 PolynomialRelation.EQ -> PolynomialRelation.NE
                 PolynomialRelation.NE -> PolynomialRelation.EQ
                 PolynomialRelation.LT -> PolynomialRelation.GE

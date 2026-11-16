@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.basis.RationalBasisStats
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.magnitudeBitLength
@@ -11,7 +11,7 @@ import kotlin.time.TimeSource
 
 internal class ExactBasisStop(val reason: ExactBasisDecline) : RuntimeException()
 
-internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancellation: Cancellation) {
+internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancellation: ExecutionControl) {
     private val started = TimeSource.Monotonic.markNow()
     private val work = LongArray(ExactBasisPhase.entries.size)
     private val allocation = LongArray(ExactBasisPhase.entries.size)
@@ -34,7 +34,7 @@ internal class ExactBasisMeter(val limits: ExactBasisLimits, private val cancell
     val token = if (limits.factor.time.isInfinite()) {
         cancellation
     } else {
-        cancellation or Cancellation.until(started + limits.factor.time)
+        cancellation or ExecutionControl.until(started + limits.factor.time)
     }
     private val stride = PollStride()
 

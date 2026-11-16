@@ -6,7 +6,7 @@ import com.eignex.klause.lp.exactColumnUpper
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.shl
@@ -38,7 +38,7 @@ class MixedPointCompletionTest {
                 1,
                 doubleArrayOf(0.5, 0.5, 1.0, 1.0),
                 rows,
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -62,7 +62,7 @@ class MixedPointCompletionTest {
                 1,
                 doubleArrayOf(1.0 / 3, 1.0 / 3, 1.0 / 3, 1.0),
                 rows,
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -96,7 +96,7 @@ class MixedPointCompletionTest {
                 1,
                 doubleArrayOf(1.0 / 3, 1.0 / 3, 0.7, 1.0),
                 rows,
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -129,7 +129,7 @@ class MixedPointCompletionTest {
                 1,
                 doubleArrayOf(0.0, 0.0, 0.0, 1.0),
                 rows,
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -168,7 +168,7 @@ class MixedPointCompletionTest {
                 1,
                 doubleArrayOf(0.0, 0.0, 0.0, 0.0, 1.0),
                 rows,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 realCompletion = { columns, residual, stop ->
                     completeMixedRealComponents(columns, residual, budget, stop)
                 },
@@ -198,7 +198,7 @@ class MixedPointCompletionTest {
             ExactRationalInequality(intArrayOf(2), listOf(BigFraction.ONE), BigFraction.ONE, strict = true),
         )
 
-        val point = completeMixedPoint(3, 1, doubleArrayOf(1.0, 1.0, 0.7, 1.0), rows, Cancellation.Never)
+        val point = completeMixedPoint(3, 1, doubleArrayOf(1.0, 1.0, 0.7, 1.0), rows, ExecutionControl.Never)
 
         assertNull(point)
     }
@@ -224,7 +224,7 @@ class MixedPointCompletionTest {
                 1,
                 doubleArrayOf(0.0, 0.0, 1.0),
                 rows,
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -248,7 +248,7 @@ class MixedPointCompletionTest {
             2,
             doubleArrayOf(0.0, Double.MAX_VALUE, Double.MAX_VALUE),
             rows,
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
 
         assertNull(point)
@@ -258,7 +258,7 @@ class MixedPointCompletionTest {
     fun `rounded integers should not escape current branch bounds`() {
         val rows = listOf(exactColumnLower(1, BigFraction.ONE), exactColumnUpper(1, BigFraction.ONE))
         for (value in listOf(1.6, -0.6)) {
-            val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, value), rows, Cancellation.Never)
+            val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, value), rows, ExecutionControl.Never)
 
             assertNull(point)
         }
@@ -274,7 +274,7 @@ class MixedPointCompletionTest {
             ),
         )
 
-        val point = completeMixedPoint(2, 1, doubleArrayOf(2.0, 2.0, 1.0), rows, Cancellation.Never)
+        val point = completeMixedPoint(2, 1, doubleArrayOf(2.0, 2.0, 1.0), rows, ExecutionControl.Never)
 
         assertNull(point)
     }
@@ -283,7 +283,7 @@ class MixedPointCompletionTest {
     fun `inconsistent real residuals should not produce a witness`() {
         val rows = listOf(exactColumnLower(0, BigFraction.ONE), exactColumnUpper(0, BigFraction.ZERO))
 
-        val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, 1.0), rows, Cancellation.Never)
+        val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, 1.0), rows, ExecutionControl.Never)
 
         assertNull(point)
     }
@@ -291,9 +291,9 @@ class MixedPointCompletionTest {
     @Test
     fun `stopped completion should retain caller work without publishing a point`() {
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged > 0L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val point = completeMixedPoint(1, 1, doubleArrayOf(0.0, 1.0), emptyList(), stop)

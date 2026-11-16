@@ -33,7 +33,7 @@ import com.eignex.klause.theory.TheoryRealId
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
@@ -127,7 +127,7 @@ class FactorPolynomialProjectionTest {
         assertEquals(parseBigInt("9223372036854775808"), point.sample.exactIntValue(0))
         assertNotNull(point.sample.witnessCertificate?.quadraticPublication)
         assertIs<SourceEvidenceCheck.Checked>(checkQuadraticSourceWitness(
-            assertNotNull(invocation.preparedPlan), point.sample, Cancellation.Never, PolynomialLimits()))
+            assertNotNull(invocation.preparedPlan), point.sample, ExecutionControl.Never, PolynomialLimits()))
     }
 
     @Test
@@ -170,7 +170,7 @@ class FactorPolynomialProjectionTest {
         val point = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(1.0, 3.0),
             exactReals = listOf(BigFraction.ONE, BigFraction.ofLong(3)))
 
-        val checked = checkQuadraticSourceWitness(plan, point, Cancellation.Never, PolynomialLimits())
+        val checked = checkQuadraticSourceWitness(plan, point, ExecutionControl.Never, PolynomialLimits())
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
@@ -180,7 +180,8 @@ class FactorPolynomialProjectionTest {
         val source = Problem(0, 2, arrayOf(IntDomain(0, 0), IntDomain(0, 2).excludeValue(1)), emptyArray(),
             openIntLo = booleanArrayOf(true, false), openIntHi = booleanArrayOf(true, false))
         val projections = FactorProjectionProviders.Default.prepare(source)
-        val projection = assertNotNull(source.integerPolynomialProjection(source, projections, Cancellation.Never) {})
+        val projection = assertNotNull(source.integerPolynomialProjection(source, projections,
+            ExecutionControl.Never) {})
         val formula = projection.formula
 
         PolynomialTheoryService(formula.formula, formula.boolCount, formula.numericCount).invocation().use { query ->
@@ -204,13 +205,13 @@ class FactorPolynomialProjectionTest {
             val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
                 if (target != EncodingTarget.POLYNOMIAL) BuiltInEncoderProvider.select(factor, target)
                 else Encoder(if (factor === unsupported) EncoderSupport.UNSUPPORTED else EncoderSupport.EQUIVALENT) {
-                    _, encoding -> installs++; encoding.polynomial(PolynomialRealFormula.Constant(true)); null
+                    _, encoding, -> installs++; encoding.polynomial(PolynomialRealFormula.Constant(true)); null
                 }
             })
             val declines = ArrayList<EncoderDecline>()
 
             val projection = source.integerPolynomialProjection(source, providers.prepare(source),
-                Cancellation.Never, declines::add)
+                ExecutionControl.Never, declines::add)
 
             assertNull(projection)
             assertEquals(0, installs)
@@ -237,7 +238,7 @@ class FactorPolynomialProjectionTest {
             val declines = ArrayList<EncoderDecline>()
 
             val projection = source.integerPolynomialProjection(source, providers.prepare(source),
-                Cancellation.Never, declines::add)
+                ExecutionControl.Never, declines::add)
 
             assertEquals(if (fixed) 1 else 0, installs)
             if (fixed) assertEquals(mapOf(SourceIntId(0) to bigIntOf(2)),
@@ -255,7 +256,7 @@ class FactorPolynomialProjectionTest {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 0)), arrayOf(row),
             openIntLo = booleanArrayOf(true), openIntHi = booleanArrayOf(true))
         var interrupted = false
-        val stop = Cancellation { interrupted.also { interrupted = false } }
+        val stop = ExecutionControl { interrupted.also { interrupted = false } }
         val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
             if (target != EncodingTarget.POLYNOMIAL) BuiltInEncoderProvider.select(factor, target)
             else Encoder(EncoderSupport.EQUIVALENT) { _, encoding ->

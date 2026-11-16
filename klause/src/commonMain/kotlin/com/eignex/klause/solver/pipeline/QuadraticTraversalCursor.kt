@@ -10,7 +10,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.cancelledWhen
 
 internal class QuadraticTraversalCursor(
@@ -18,7 +18,7 @@ internal class QuadraticTraversalCursor(
     params: BacktrackParams,
     private val sink: SolveStatsSink,
     private val nativeWork: () -> Long,
-    private val complete: (Sample, Cancellation) -> QuadraticBranchResult,
+    private val complete: (Sample, ExecutionControl) -> QuadraticBranchResult,
 ) : AutoCloseable {
     private val lifetime = params.cancellation
     private var global = lifetime
@@ -35,7 +35,7 @@ internal class QuadraticTraversalCursor(
             listOfNotNull(global.deadline(), slice.deadline).minOrNull()
         }) { global() || slice.expired() }),
         sink, LpSolveContext.Production,
-        propagationCancellation = Cancellation { global() },
+        propagationCancellation = ExecutionControl { global() },
         slice = TraversalSlice(pauses = { !global() }, beforeBranch = {
             slice.charge()
             slice.workExpired()
@@ -45,7 +45,7 @@ internal class QuadraticTraversalCursor(
     val isDone: Boolean get() = terminal != null
 
     fun advance(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onBranch: (QuadraticBranchResult) -> Boolean,

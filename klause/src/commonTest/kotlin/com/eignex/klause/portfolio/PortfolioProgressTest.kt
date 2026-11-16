@@ -8,7 +8,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -28,7 +28,7 @@ class PortfolioProgressTest {
             Portfolio.thompson(listOf(worker), baseSliceWork = 1,
                 diagnostics = PortfolioDiagnostics(1), onProgress = events::add).also {
                 it.workerExitReporting = reporting
-            }.use { it.minimize(Cancellation.Never) }
+            }.use { it.minimize(ExecutionControl.Never) }
 
             assertTrue(events.any { it is PortfolioEvent.Progressed })
             assertEquals(reporting, events.any { it is PortfolioEvent.WorkerExit })
@@ -45,7 +45,7 @@ class PortfolioProgressTest {
             val worker = trackingWorker("proof", 0, search).also { it.controlsObjectiveCutoff = true }
 
             val result = Portfolio.thompson(listOf(worker),
-                onProgress = events::add).use { it.minimize(Cancellation.Never) }
+                onProgress = events::add).use { it.minimize(ExecutionControl.Never) }
 
             if (native is MinimizeResult.Unknown) assertIs<MinimizeResult.Infeasible>(result)
             else assertIs<MinimizeResult.Optimal>(result)
@@ -70,7 +70,7 @@ class PortfolioProgressTest {
         Portfolio.thompson(listOf(worker), baseSliceWork = 1, maxSliceWork = 1,
             sliceGrowth = 1.0, reseedStaleThreshold = 0,
             diagnostics = PortfolioDiagnostics(6), onProgress = events::add).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         assertEquals(listOf(Double.POSITIVE_INFINITY, 998.0), reads)
@@ -94,7 +94,7 @@ class PortfolioProgressTest {
 
         Portfolio.thompson(listOf(reader, unread), baseSliceWork = 1, maxSliceWork = 1,
             diagnostics = PortfolioDiagnostics(2),
-            onProgress = events::add).use { it.minimize(Cancellation.Never) }
+            onProgress = events::add).use { it.minimize(ExecutionControl.Never) }
 
         val exits = events.filterIsInstance<PortfolioEvent.WorkerExit>().sortedBy { it.arm }
         assertEquals(listOf("reader", "unread"), exits.map { it.worker })
@@ -108,7 +108,7 @@ class PortfolioProgressTest {
         val search = TrackingResumableSearch(null, onRun = { error("worker failed") })
 
         Portfolio.thompson(listOf(trackingWorker("failing", 0, search)),
-            onProgress = events::add).use { it.minimize(Cancellation.Never) }
+            onProgress = events::add).use { it.minimize(ExecutionControl.Never) }
 
         val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
         assertEquals("failure", exit.cause)
@@ -125,7 +125,7 @@ class PortfolioProgressTest {
         }) { _, _, _, _ -> error("opening must not fall back") }
 
         Portfolio.thompson(listOf(worker), onProgress = events::add).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
@@ -143,7 +143,7 @@ class PortfolioProgressTest {
         }
 
         Portfolio.thompson(listOf(worker), baseSliceWork = 1, diagnostics = PortfolioDiagnostics(1),
-            onProgress = events::add).use { it.solve(Cancellation.Never) }
+            onProgress = events::add).use { it.solve(ExecutionControl.Never) }
 
         val exit = events.filterIsInstance<PortfolioEvent.WorkerExit>().single()
         assertEquals("invocation-close", exit.cause)
@@ -162,7 +162,7 @@ class PortfolioProgressTest {
             Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1,
                 diagnostics = PortfolioDiagnostics(2), onProgress = {
                 if (it is PortfolioEvent.WorkerExit) error("sink failed")
-            }).use { it.minimize(Cancellation.Never) }
+            }).use { it.minimize(ExecutionControl.Never) }
         }
 
         assertEquals(listOf(1, 1), searches.map { it.closes })
@@ -175,7 +175,7 @@ class PortfolioProgressTest {
         var slices = 0
         val search = object : ResumableSearch by base, SliceWorkAccounting {
             override var repaidWork: Long = 0L
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                 repaidWork = if (slices++ == 1) sliceNodes else 0L
                 return if (repaidWork > 0L) null else
@@ -186,7 +186,7 @@ class PortfolioProgressTest {
         val result = Portfolio.thompson(listOf(trackingWorker("producer", 0, search)),
             baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0, reseedStaleThreshold = 0,
             diagnostics = PortfolioDiagnostics(5), onProgress = events::add).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         val observed = events.filterIsInstance<PortfolioEvent.Continuation>().single()
@@ -209,7 +209,7 @@ class PortfolioProgressTest {
 
         val result = Portfolio.thompson(listOf(trackingWorker("producer", 0, search)),
             baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0, reseedStaleThreshold = 0,
-            diagnostics = PortfolioDiagnostics(5)).use { it.minimize(Cancellation.Never) }
+            diagnostics = PortfolioDiagnostics(5)).use { it.minimize(ExecutionControl.Never) }
 
         assertTrue(result.stats.portfolio.arms.single().work > 1L)
     }
@@ -224,7 +224,7 @@ class PortfolioProgressTest {
                 baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
                 diagnostics = PortfolioDiagnostics(10), onProgress = {
                     if (it is PortfolioEvent.Continuation) error("sink failed")
-                }).use { it.minimize(Cancellation.Never) }
+                }).use { it.minimize(ExecutionControl.Never) }
         }
 
         assertEquals(1, search.closes)
@@ -237,7 +237,7 @@ class PortfolioProgressTest {
 
         Portfolio.thompson(listOf(worker), baseSliceWork = 1,
             diagnostics = PortfolioDiagnostics(1), onProgress = events::add).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         val available = events.filterIsInstance<PortfolioEvent.Lifecycle>()
@@ -256,7 +256,7 @@ class PortfolioProgressTest {
             it.runTimeSource = clock
             it.invocationStarted = clock.markNow()
         }.use {
-            it.minimize(Cancellation.Never, onImprovement = { clock += 1.nanoseconds })
+            it.minimize(ExecutionControl.Never, onImprovement = { clock += 1.nanoseconds })
         }
 
         assertEquals(10L, result.stats.portfolio.arms.single().lifecycle.incumbentAvailableNanos)
@@ -271,7 +271,7 @@ class PortfolioProgressTest {
         val result = Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
             diagnostics = PortfolioDiagnostics(80), rewardPolicy = PortfolioRewardPolicy { 1.0 }).also {
             it.incumbentProbeArms = setOf(1)
-        }.use { it.minimize(Cancellation.Never) }
+        }.use { it.minimize(ExecutionControl.Never) }
 
         assertEquals(12L, result.stats.portfolio.arms[1].work)
     }
@@ -291,7 +291,7 @@ class PortfolioProgressTest {
         val result = Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
             diagnostics = PortfolioDiagnostics(3),
             rewardPolicy = PortfolioRewardPolicy { observed += it; it.ordinaryReward }).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         val idle = observed.single { it.idleCredit }
@@ -309,7 +309,7 @@ class PortfolioProgressTest {
         assertFailsWith<IllegalStateException> {
             Portfolio.thompson(listOf(worker), diagnostics = PortfolioDiagnostics(1), onProgress = {
                 if (it is PortfolioEvent.Lifecycle && it.kind == PortfolioLifecycleKind.RETIRED) error("sink failed")
-            }).use { it.minimize(Cancellation.Never) }
+            }).use { it.minimize(ExecutionControl.Never) }
         }
 
         assertEquals(1, search.closes)
@@ -324,7 +324,7 @@ class PortfolioProgressTest {
         val result = Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
             reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(80),
             rewardPolicy = PortfolioRewardPolicy { if (it.arm == 0) 1.0 else 0.0 }).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         val work = result.stats.portfolio.arms.map { it.work }
@@ -337,7 +337,7 @@ class PortfolioProgressTest {
         var slices = 0
         val base = ScriptedSearch({ it < 2 }) { }
         val search = object : ResumableSearch by base {
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                 base.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
                 return if (++slices == 3) MinimizeResult.Optimal(Sample(BooleanArray(0), LongArray(0)), 998.0)
@@ -348,7 +348,7 @@ class PortfolioProgressTest {
             baseSliceWork = 1, sliceGrowth = 1.0, reseedStaleThreshold = 0,
             diagnostics = PortfolioDiagnostics(10),
             rewardPolicy = PortfolioRewardPolicy { observations += it; it.ordinaryReward }).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         assertEquals(PortfolioPhase.entries, observations.map { it.phase })
@@ -365,7 +365,7 @@ class PortfolioProgressTest {
             witnessCheck = WitnessCheck { _, _ -> "invalid fixture witness" },
             diagnostics = PortfolioDiagnostics(10), onProgress = events::add,
             rewardPolicy = PortfolioRewardPolicy { error("refuted claims must not earn rewards") }).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         val progress = events.filterIsInstance<PortfolioEvent.Progressed>().single().progress
@@ -397,7 +397,7 @@ class PortfolioProgressTest {
                 reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(24),
                 witnessCheck = WitnessCheck { _, value ->
                     if (rejected && value == 998.0) "rejected improvement" else null
-                }).use { it.minimize(Cancellation.Never) { accepted++ } }
+                }).use { it.minimize(ExecutionControl.Never) { accepted++ } }
 
             assertEquals(improves && !rejected, queries > 0)
         }
@@ -412,7 +412,7 @@ class PortfolioProgressTest {
         )
         Portfolio.thompson(workers, baseSliceWork = 1, sliceGrowth = 1.0,
             diagnostics = PortfolioDiagnostics(10), onProgress = events::add).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         val life = events.filterIsInstance<PortfolioEvent.Lifecycle>().filter { it.arm == 1 }
@@ -441,7 +441,7 @@ class PortfolioProgressTest {
 
             Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
                 reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
-                it.minimize(Cancellation.Never, { accepted++ }, incumbents)
+                it.minimize(ExecutionControl.Never, { accepted++ }, incumbents)
             }
 
             assertEquals(improves, queries > 0)
@@ -455,7 +455,7 @@ class PortfolioProgressTest {
             var offers = 0
             var queries = 0
             val search = object : ResumableSearch by base {
-                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
                     base.runSlice(global, sliceMillis, sliceNodes) {
                         val value = if (offers++ > 0 && unpublished) Double.NaN else 999.0
@@ -470,7 +470,7 @@ class PortfolioProgressTest {
 
             Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
                 reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
-                it.minimize(Cancellation.Never)
+                it.minimize(ExecutionControl.Never)
             }
 
             assertTrue(offers > 1)
@@ -490,7 +490,7 @@ class PortfolioProgressTest {
 
         Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
             reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(12)).use {
-            it.minimize(Cancellation { accepted == 2 }) { accepted++ }
+            it.minimize(ExecutionControl { accepted == 2 }) { accepted++ }
         }
 
         assertEquals(2, accepted)
@@ -503,7 +503,7 @@ class PortfolioProgressTest {
 
         assertFailsWith<IllegalArgumentException> {
             Portfolio.thompson(listOf(worker), diagnostics = PortfolioDiagnostics(1),
-                rewardPolicy = PortfolioRewardPolicy { Double.NaN }).use { it.minimize(Cancellation.Never) }
+                rewardPolicy = PortfolioRewardPolicy { Double.NaN }).use { it.minimize(ExecutionControl.Never) }
         }
     }
 }

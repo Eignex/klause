@@ -9,7 +9,7 @@ import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -32,7 +32,7 @@ class PrivateRebuildWarmClausesTest {
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session,
                 SourceRebuilds(listOf(RebuildStep.CopyLiteral(1, replacement))), arrayOfNulls(3),
-                1_048_576L, 65_536L, Cancellation.Never))
+                1_048_576L, 65_536L, ExecutionControl.Never))
 
             assertContentEquals(intArrayOf(if (variable == 0) 0 else replacement, 4),
                 (warm.clauses.single() as Clause).literals)
@@ -51,7 +51,7 @@ class PrivateRebuildWarmClausesTest {
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session,
                 SourceRebuilds(listOf(RebuildStep.CopyLiteral(0, replacement))), arrayOfNulls(3),
-                1_048_576L, 65_536L, Cancellation.Never))
+                1_048_576L, 65_536L, ExecutionControl.Never))
 
             assertContentEquals(intArrayOf(Lit.negate(replacement), 4), (warm.clauses.single() as Clause).literals)
             assertEquals(1, warm.translated)
@@ -81,7 +81,7 @@ class PrivateRebuildWarmClausesTest {
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(listOf(
                 RebuildStep.SatisfyClauses(0, listOf(intArrayOf(0, 2), intArrayOf(1, 2))),
-            )), arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
+            )), arrayOfNulls(4), 1_048_576L, 65_536L, ExecutionControl.Never))
 
             assertEquals(2, warm.clauses.size)
             val copied = warm.clauses.first() as Clause
@@ -105,7 +105,7 @@ class PrivateRebuildWarmClausesTest {
             session.forgetLearnedClauses { index, _ -> index == 1 }
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
-                arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
+                arrayOfNulls(4), 1_048_576L, 65_536L, ExecutionControl.Never))
 
             assertContentEquals(intArrayOf(4, 6), (warm.clauses.single() as Clause).literals)
         }
@@ -123,7 +123,7 @@ class PrivateRebuildWarmClausesTest {
             assertEquals(1, session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { it == 1 })
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
-                arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
+                arrayOfNulls(4), 1_048_576L, 65_536L, ExecutionControl.Never))
 
             assertEquals(2, session.learnedClauseCount)
             assertContentEquals(intArrayOf(4, 6), (warm.clauses.single() as Clause).literals)
@@ -137,7 +137,7 @@ class PrivateRebuildWarmClausesTest {
             val session = PropagationSession(source, nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
-                arrayOfNulls(2), 1_048_576L, 65_536L, Cancellation.Never))
+                arrayOfNulls(2), 1_048_576L, 65_536L, ExecutionControl.Never))
 
             session.forgetLearnedClauses { _, _ -> false }
 
@@ -158,7 +158,7 @@ class PrivateRebuildWarmClausesTest {
             session.addLearnedClause(Clause(intArrayOf(Lit.negate(pivot), 6)), 2)
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
-                arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
+                arrayOfNulls(4), 1_048_576L, 65_536L, ExecutionControl.Never))
 
             assertContentEquals(intArrayOf(6, 2), (warm.clauses.single() as Clause).literals)
             assertEquals(1, warm.translated)
@@ -187,7 +187,7 @@ class PrivateRebuildWarmClausesTest {
             session.addLearnedClause(Clause(intArrayOf(pivot, 2, 4)), 2)
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
-                arrayOfNulls(3), 1_048_576L, 65_536L, Cancellation.Never))
+                arrayOfNulls(3), 1_048_576L, 65_536L, ExecutionControl.Never))
 
             assertContentEquals(intArrayOf(3, 4), (warm.clauses.single() as Clause).literals)
             assertEquals(1, warm.translated)
@@ -205,7 +205,7 @@ class PrivateRebuildWarmClausesTest {
         session.addLearnedClause(Clause(intArrayOf(1, 6)), 2)
 
         val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
-            arrayOfNulls(4), 1_048_576L, 65_536L, Cancellation.Never))
+            arrayOfNulls(4), 1_048_576L, 65_536L, ExecutionControl.Never))
 
         assertEquals(2, delta.rebuild.steps.size)
         assertContentEquals(intArrayOf(6), (warm.clauses.single() as Clause).literals)
@@ -231,7 +231,7 @@ class PrivateRebuildWarmClausesTest {
         session.addLearnedClause(Clause(intArrayOf(0, 2, 5)), 2)
 
         val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
-            arrayOfNulls(3), 1_048_576L, 65_536L, Cancellation.Never))
+            arrayOfNulls(3), 1_048_576L, 65_536L, ExecutionControl.Never))
 
         assertTrue(warm.clauses.isEmpty())
         assertEquals(0, warm.translated)
@@ -248,7 +248,7 @@ class PrivateRebuildWarmClausesTest {
         session.addLearnedClause(Clause(intArrayOf(2, 6)), 2)
 
         val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
-            arrayOfNulls(4), 2048L, 65_536L, Cancellation.Never))
+            arrayOfNulls(4), 2048L, 65_536L, ExecutionControl.Never))
 
         assertContentEquals(intArrayOf(2, 6), (warm.clauses.single() as Clause).literals)
         assertEquals(0L, warm.projectionScratchBytes)
@@ -267,7 +267,7 @@ class PrivateRebuildWarmClausesTest {
         session.addLearnedClause(Clause(retained), 2)
 
         val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
-            arrayOfNulls(66), 1_048_576L, 65_536L, Cancellation.Never))
+            arrayOfNulls(66), 1_048_576L, 65_536L, ExecutionControl.Never))
 
         assertContentEquals(retained, (warm.clauses.single() as Clause).literals)
         assertEquals(0, warm.translated)
@@ -283,9 +283,9 @@ class PrivateRebuildWarmClausesTest {
         session.addLearnedClause(Clause(intArrayOf(1, 6)), 2)
         var spent = 0L
         val meter = WorkMeter { spent += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= 40L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         val warm = PrivateRebuildWarmClauses.capture(session, delta.rebuild, arrayOfNulls(4),
@@ -305,7 +305,7 @@ class PrivateRebuildWarmClausesTest {
             session.addLearnedClause(Clause(intArrayOf(1, 2, 4)), 2)
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
-                Array(3) { session.boolValue(it) }, 1_048_576L, 65_536L, Cancellation.Never))
+                Array(3) { session.boolValue(it) }, 1_048_576L, 65_536L, ExecutionControl.Never))
 
             assertContentEquals(intArrayOf(2, 4), (warm.clauses.single() as Clause).literals)
             assertEquals(2L, warm.literals)
@@ -321,7 +321,7 @@ class PrivateRebuildWarmClausesTest {
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
 
             val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, SourceRebuilds(emptyList()),
-                arrayOfNulls(2), bytes, work, Cancellation.Never))
+                arrayOfNulls(2), bytes, work, ExecutionControl.Never))
 
             assertEquals(0, warm.clauses.size)
             assertEquals(0L, warm.modeledBytes)
@@ -333,7 +333,7 @@ class PrivateRebuildWarmClausesTest {
         val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
 
         val warm = PrivateRebuildWarmClauses.capture(PropagationSession(source), SourceRebuilds(emptyList()),
-            arrayOfNulls(2), 1_048_576L, 65_536L, Cancellation { true })
+            arrayOfNulls(2), 1_048_576L, 65_536L, ExecutionControl { true })
 
         assertNull(warm)
     }

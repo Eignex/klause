@@ -16,7 +16,7 @@ import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.validation.LinearSourceCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
@@ -41,10 +41,10 @@ class FiniteIncumbentCompletionTest {
         val point = Sample(booleanArrayOf(), LongArray(original.view.model.numIntVars),
             doubleArrayOf(value.toDouble()), exactReals = listOf(value))
 
-        val tolerated = assertIs<LinearSourceCheck.Accepted>(original.check(point, Cancellation.Never))
+        val tolerated = assertIs<LinearSourceCheck.Accepted>(original.check(point, ExecutionControl.Never))
 
         assertFalse(tolerated.witness.exact)
-        assertFalse(original.incumbentCompletionCheck(null)(point, value, Cancellation.Never))
+        assertFalse(original.incumbentCompletionCheck(null)(point, value, ExecutionControl.Never))
     }
 
     @Test
@@ -66,8 +66,8 @@ class FiniteIncumbentCompletionTest {
                 objectiveAdjustment = ObjectiveAdjustment(BigFraction.ofLong(2), adjusted))
             val check = original.incumbentCompletionCheck(mapping)
 
-            assertTrue(check(point, adjusted, Cancellation.Never))
-            assertFalse(check(point, adjusted + BigFraction.ONE, Cancellation.Never))
+            assertTrue(check(point, adjusted, ExecutionControl.Never))
+            assertFalse(check(point, adjusted + BigFraction.ONE, ExecutionControl.Never))
         }
     }
 
@@ -83,7 +83,7 @@ class FiniteIncumbentCompletionTest {
         val point = Sample(booleanArrayOf(), LongArray(original.view.model.numIntVars), doubleArrayOf(2.0),
             exactReals = listOf(two))
 
-        assertFalse(original.incumbentCompletionCheck(null)(point, two, Cancellation.Never))
+        assertFalse(original.incumbentCompletionCheck(null)(point, two, ExecutionControl.Never))
     }
 
     @Test
@@ -98,9 +98,9 @@ class FiniteIncumbentCompletionTest {
         val point = Sample(booleanArrayOf(), LongArray(original.view.model.numIntVars), doubleArrayOf(0.5),
             exactReals = listOf(half))
         var work = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled() = work > 0L
-            override fun workMeter() = WorkMeter { work += it }
+            override val accounting get() = WorkMeter { work += it }
         }
 
         assertFalse(original.incumbentCompletionCheck(null)(point, half, token))

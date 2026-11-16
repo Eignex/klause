@@ -20,15 +20,15 @@ import com.eignex.klause.solver.ResumableSolver
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.StatelessSession
-import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.IncumbentExchange
+import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.random.Random
 import kotlin.test.Test
@@ -38,8 +38,8 @@ import kotlin.test.assertTrue
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TimeSource
 import kotlin.time.TestTimeSource
+import kotlin.time.TimeSource
 
 class PortfolioWorkAccountingTest {
     @Test
@@ -68,7 +68,7 @@ class PortfolioWorkAccountingTest {
         }))
 
         val result = Portfolio.thompson(listOf(worker, sibling)).apply { runTimeSource = clock }.use {
-            it.minimize(Cancellation { finished })
+            it.minimize(ExecutionControl { finished })
         }
 
         val arm = result.stats.portfolio.arms.first()
@@ -88,15 +88,15 @@ class PortfolioWorkAccountingTest {
                 override val isDone: Boolean get() = false
                 override val stats: SolveStats get() = SolveStats.EMPTY
                 override fun runSlice(
-                    global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
                 ): MinimizeResult? = error("scheduled slice required")
                 override fun runInstructionSlice(
-                    global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
+                    global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
                 ): MinimizeResult? = error("scheduled slice required")
                 override fun runScheduledSlice(
-                    global: Cancellation, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
+                    global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
                     instructionsPerWork: Double, onIncumbent: (MinimizeResult.WithSample) -> Unit,
                 ): MinimizeResult? {
                     offers += sliceInstructions to sliceWork
@@ -122,7 +122,7 @@ class PortfolioWorkAccountingTest {
 
             val result = Portfolio(
                 arms, fixedBandit(2, arm = 0), baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
-            ).use { it.minimize(Cancellation { offers.isNotEmpty() }) }
+            ).use { it.minimize(ExecutionControl { offers.isNotEmpty() }) }
 
             assertEquals(listOf(10L to 7L), offers)
             assertEquals(13L, result.stats.portfolio.arms[0].work)
@@ -139,13 +139,13 @@ class PortfolioWorkAccountingTest {
             override val stats: SolveStats get() = SolveStats(
                 ls = LocalSearchStats(moves = SumResult(if (auxiliary == 0L) 0.0 else 3.0)),
             )
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? =
                 error("scheduled slice required")
             override fun runInstructionSlice(
-                global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
+                global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long,
             ): SolveResult? = error("scheduled slice required")
             override fun runScheduledSlice(
-                global: Cancellation, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
+                global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
                 instructionsPerWork: Double,
             ): SolveResult? {
                 offers += sliceInstructions to sliceWork
@@ -167,7 +167,7 @@ class PortfolioWorkAccountingTest {
 
         val result = Portfolio(
             arms, fixedBandit(2, arm = 0), baseSliceWork = 7L, lsInstructionsPerWork = 1.5,
-        ).use { it.solve(Cancellation { offers.isNotEmpty() }) }
+        ).use { it.solve(ExecutionControl { offers.isNotEmpty() }) }
 
         assertEquals(listOf(10L to 7L), offers)
         assertEquals(13L, result.stats.portfolio.arms[0].work)
@@ -194,7 +194,7 @@ class PortfolioWorkAccountingTest {
                 }
 
                 val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = threshold).use {
-                    it.minimize(Cancellation { slices >= 13 })
+                    it.minimize(ExecutionControl { slices >= 13 })
                 }
 
                 assertEquals(threshold, result.stats.portfolio.reseedStaleThreshold)
@@ -212,7 +212,7 @@ class PortfolioWorkAccountingTest {
             val handle = object : ResumableSearch by source {
                 override val work: Long get() = slices * 5_000L / divisor
                 override fun runSlice(
-                    global: Cancellation,
+                    global: ExecutionControl,
                     sliceMillis: Long,
                     sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -234,7 +234,7 @@ class PortfolioWorkAccountingTest {
                 maxSliceWork = 20_000L,
                 sliceGrowth = growth,
             ).use {
-                it.minimize(Cancellation { slices >= 1 + 3 * divisor })
+                it.minimize(ExecutionControl { slices >= 1 + 3 * divisor })
             }
 
             assertEquals(1L, result.stats.portfolio.arms.first().reseeds)
@@ -261,7 +261,7 @@ class PortfolioWorkAccountingTest {
             }
 
             val result = Portfolio.thompson(listOf(worker), reseedStaleThreshold = 1).use {
-                it.minimize(Cancellation { slices >= 6 })
+                it.minimize(ExecutionControl { slices >= 6 })
             }
 
             assertEquals(0L, result.stats.portfolio.arms.single().reseeds)
@@ -366,13 +366,13 @@ class PortfolioWorkAccountingTest {
             override val isDone: Boolean get() = false
             override val stats: SolveStats get() = SolveStats.EMPTY
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
             ): MinimizeResult? = error("instruction slice required")
             override fun runInstructionSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceInstructions: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -442,7 +442,7 @@ class PortfolioWorkAccountingTest {
         }
 
         Portfolio.thompson(arms, baseSliceWork = 7L).use {
-            it.minimize(Cancellation { allowances.size >= arms.size })
+            it.minimize(ExecutionControl { allowances.size >= arms.size })
         }
 
         assertEquals(List(3) { (7 * LS_INSTRUCTIONS_PER_WORK).toLong() }, allowances)
@@ -454,7 +454,7 @@ class PortfolioWorkAccountingTest {
         val fallback = TimeSource.Monotonic.markNow() + 10.seconds
 
         endlessCountedPortfolio(reached, sliceMillis = 60_000L).use {
-            it.minimize(Cancellation { reached.size >= 2 || fallback.hasPassedNow() })
+            it.minimize(ExecutionControl { reached.size >= 2 || fallback.hasPassedNow() })
         }
 
         assertEquals(listOf(0, 1), reached)
@@ -466,7 +466,7 @@ class PortfolioWorkAccountingTest {
         val fallback = TimeSource.Monotonic.markNow() + 10.seconds
 
         endlessCountedPortfolio(reached, sliceMillis = 20L).use {
-            it.minimize(Cancellation { reached.size >= 4 || fallback.hasPassedNow() })
+            it.minimize(ExecutionControl { reached.size >= 4 || fallback.hasPassedNow() })
         }
 
         assertEquals(4, reached.size)
@@ -475,10 +475,10 @@ class PortfolioWorkAccountingTest {
     @Test
     fun `a short budget should still split into segments however long the slices are`() {
         val reached = ArrayList<Int>()
-        val deadline = Cancellation.until(TimeSource.Monotonic.markNow() + 200.milliseconds)
+        val deadline = ExecutionControl.until(TimeSource.Monotonic.markNow() + 200.milliseconds)
 
         endlessCountedPortfolio(reached, sliceMillis = 60_000L, probeMillis = 60_000L).use {
-            it.minimize(deadline or Cancellation { reached.size >= 4 })
+            it.minimize(deadline or ExecutionControl { reached.size >= 4 })
         }
 
         assertEquals(4, reached.size)
@@ -513,7 +513,7 @@ class PortfolioWorkAccountingTest {
         val worker = trackingWorker("initialized", 0, handle)
 
         val result = Portfolio.thompson(listOf(worker)).use {
-            it.minimize(Cancellation { slices >= 2 })
+            it.minimize(ExecutionControl { slices >= 2 })
         }
 
         assertEquals(handle.work, result.stats.portfolio.arms.single().work)
@@ -528,7 +528,7 @@ class PortfolioWorkAccountingTest {
         var slices = 0
         val handle = object : ResumableSearch by TrackingResumableSearch(null) {
             override fun runSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -561,7 +561,7 @@ class PortfolioWorkAccountingTest {
             ),
         )
 
-        Portfolio.thompson(workers).use { it.minimize(Cancellation.after(10.seconds)) }
+        Portfolio.thompson(workers).use { it.minimize(ExecutionControl.after(10.seconds)) }
 
         assertEquals(1, slices)
         assertTrue(checkNotNull(requestedMillis) <= checkNotNull(remainingMillis) + 1L)

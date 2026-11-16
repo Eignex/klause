@@ -14,7 +14,7 @@ import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
@@ -81,7 +81,7 @@ internal object DuplicateColumns {
         objectiveIntVars: Set<Int> = emptySet(),
         sharedIntOcc: SharedIntOccurrence? = null,
         incrementalTouchedVars: IntArray? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta {
         val scan = ScanMeter(cancellation)
         return try {
@@ -198,7 +198,7 @@ internal object DuplicateColumns {
     fun mergeSourceDuplicateColumns(
         problem: Problem,
         objectiveIntVars: Set<Int>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceDelta {
         val scan = ScanMeter(cancellation)
         return try {

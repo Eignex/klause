@@ -4,7 +4,7 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.SearchExecutionControls
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class FiniteSourceAcceptance(
     private val accepts: (Sample) -> Boolean,
@@ -23,7 +23,7 @@ internal class FiniteSourceAcceptance(
 internal interface ToleranceRealSearch {
     fun complete(
         discrete: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         controls: SearchExecutionControls?,
         context: LpSolveContext,
     ): ToleranceSearchResult

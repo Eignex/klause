@@ -16,7 +16,7 @@ import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -48,7 +48,7 @@ class LpAutoConfigTest {
             val relaxation = assertNotNull(engine.lpRelaxer).build(PropagationSession(problem))
             assertEquals(setOf(0, 1, 4), relaxation.hullFactorIds.toSet())
             assertEquals(3, relaxation.colReq.count { it?.size == 2 })
-            engine.forObjective(objective.negated(), Cancellation.Never).use { alternate ->
+            engine.forObjective(objective.negated(), ExecutionControl.Never).use { alternate ->
                 val rebuilt = assertNotNull(alternate.lpRelaxer).build(PropagationSession(problem))
                 assertEquals(relaxation.hullFactorIds.toSet(), rebuilt.hullFactorIds.toSet())
             }
@@ -220,7 +220,7 @@ class LpAutoConfigTest {
         val sink = SolveStatsSink("cuts")
         LpEngine(p, objective, LpParams(lpConfig = LpConfig.parse("default,+cuts")), sink).use { engine ->
             assertTrue(engine.harvestRootCuts(relaxer, session, emptyList(), true, true).isEmpty())
-            engine.forObjective(objective, Cancellation.Never).use {
+            engine.forObjective(objective, ExecutionControl.Never).use {
                 assertTrue(it.harvestRootCuts(relaxer, session, emptyList(), true, true).isEmpty())
             }
         }

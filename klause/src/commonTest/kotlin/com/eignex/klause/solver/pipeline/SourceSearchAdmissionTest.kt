@@ -19,7 +19,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -46,7 +46,7 @@ class SourceSearchAdmissionTest {
         val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(
             SourceExecutionRequest(invocation, finiteRequest = { shape ->
                 FiniteSolveRequest(
-                    shape, FiniteEngine.MIXED, PresolveConfig.parse("affine"), true, false, Cancellation.Never,
+                    shape, FiniteEngine.MIXED, PresolveConfig.parse("affine"), true, false, ExecutionControl.Never,
                     presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                     randomSeed = 1, defaultArms = PortfolioScenario.DEFAULT_ARMS, lpConfig = LpConfig.OFF,
                     zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -90,7 +90,7 @@ class SourceSearchAdmissionTest {
                 explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
             ))
             val hints = assertNotNull(assertNotNull(shape.searchHints)
-                .remapped(assertNotNull(preparation.sourceMapping), Cancellation.Never))
+                .remapped(assertNotNull(preparation.sourceMapping), ExecutionControl.Never))
             val annotation = hints.toBacktrackParams(preparation.problem.numBoolVars, preparation.problem.numIntVars)
 
             val workers = PortfolioBuilder.build(preparation.executableProblem(),

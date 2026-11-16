@@ -7,8 +7,7 @@ import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.simplex.exact.Frac128
 import com.eignex.klause.simplex.exact.Frac128Ops
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.PollStride
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
@@ -18,6 +17,7 @@ import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.shr
 import com.eignex.util.numbers.toLong
 import com.eignex.util.numbers.toLongExact
+import kotlin.jvm.JvmField
 
 internal data class ReconstructionLimits(
     val maxCoordinates: Int = 4096,
@@ -115,7 +115,7 @@ private class ReconstructionLayoutStop(val reason: LogicalBasisLayoutDecline) : 
 
 internal class ReconstructionMeter(
     val limits: ReconstructionLimits = ReconstructionLimits(),
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
 ) {
     var phase = ReconstructionPhase.INPUT
     var attempts = 0
@@ -134,16 +134,24 @@ internal class ReconstructionMeter(
     var basisWork = 0L
     var basisDualRejection: ReconstructionDualRejection? = null
     val spentWork: Long get() = work
-    private var work = 0L
+    @JvmField var work = 0L
     private var allocation = 0L
     private var maxBits = 0
-    private val stride = PollStride()
-    private val meteredCancellation = cancellation.workMeter() != null
+    @JvmField val workLimit = limits.maxWork
+    @JvmField var admittedUntil = 0L
+
+    @Suppress("NOTHING_TO_INLINE") // The admitted work total also schedules the cold stop path.
+    inline
 
     fun step(units: Long = 1L) {
-        if (meteredCancellation || stride.due(units)) poll()
-        if (units > limits.maxWork - work) throw ReconstructionStop(ReconstructionDecline.WORK)
+        if (units > admittedUntil - work) admit(units)
         work += units
+    }
+
+    private fun admit(units: Long) { poll()
+        if (units > workLimit - work) throw ReconstructionStop(ReconstructionDecline.WORK)
+        if (units > admittedUntil - work) admittedUntil =
+        work + units
     }
 
     fun require(condition: Boolean, reason: ReconstructionDecline) {
@@ -152,6 +160,7 @@ internal class ReconstructionMeter(
 
     fun poll() {
         if (cancellation()) throw ReconstructionStop(ReconstructionDecline.CANCELLED)
+        admittedUntil = work + minOf(4096L, workLimit - work)
     }
 
     fun storage(bytes: Long) {
@@ -165,6 +174,9 @@ internal class ReconstructionMeter(
         val bits = value.magnitudeBitLength()
         maxBits = maxOf(maxBits, bits)
         if (bits > limits.maxBits) throw ReconstructionStop(ReconstructionDecline.BITS)
+        if (bits > 128) {
+            admittedUntil -= bits.toLong() / Long.SIZE_BITS
+        }
         storage(32L + (bits.toLong() + 7L) / 8L)
         return value
     }
@@ -744,7 +756,7 @@ internal fun reconstructCertificate(
     duals: DoubleArray? = null,
     basis: Basis? = null,
     ray: DoubleArray? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ReconstructionLimits = ReconstructionLimits(),
     claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
 ): ReconstructedCertificate = reconstructCandidates(
@@ -770,7 +782,7 @@ internal fun reconstructRationalCertificate(
     duals: List<BigFraction>? = null,
     basis: Basis? = null,
     ray: List<BigFraction>? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ReconstructionLimits = ReconstructionLimits(),
 ): ReconstructedCertificate = reconstructCandidates(
     model, primal?.size ?: 0, duals?.size ?: 0, ray?.size ?: 0,
@@ -818,7 +830,7 @@ private fun reconstructCandidates(
     duals: ((ReconstructionMeter) -> List<BigFraction>)?,
     ray: ((ReconstructionMeter) -> List<BigFraction>)?,
     basis: Basis?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     limits: ReconstructionLimits,
     goal: ReconstructionGoal = ReconstructionGoal.ATTAINMENT,
     inputObserver: LpCertificationObserver? = null,
@@ -1047,7 +1059,7 @@ internal fun verifyRationalCertificate(
     duals: List<BigFraction>? = null,
     ray: List<BigFraction>? = null,
     basis: Basis? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ReconstructionLimits = ReconstructionLimits(),
 ): ReconstructedCertificate {
     val meter = ReconstructionMeter(limits, cancellation)
@@ -1105,7 +1117,7 @@ internal fun certifyLpConflictOnly(
     model: LpModel,
     ray: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
@@ -1122,7 +1134,7 @@ private fun certifyLpConflictOnlyWithin(
     model: LpModel,
     ray: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
@@ -1142,7 +1154,7 @@ internal fun certifyLpIntegerBoundOnly(
     model: LpModel,
     duals: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
 ): ReconstructedCertificate {
@@ -1181,7 +1193,7 @@ private fun certifyLpIntegerBoundWithin(
     model: LpModel,
     duals: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     observer: LpCertificationObserver?,
     policy: LpCertificationPolicy,
 ): ReconstructedCertificate {
@@ -1224,7 +1236,7 @@ internal fun certifyLpBoundOnly(
     model: LpModel,
     duals: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     basis: Basis? = null,
@@ -1242,7 +1254,7 @@ private fun certifyLpBoundOnlyWithin(
     model: LpModel,
     duals: DoubleArray,
     limits: ReconstructionLimits,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     basis: Basis? = null,

@@ -308,7 +308,7 @@ internal class LearnedRetirementRequests {
 
     private fun terminal(status: LearnedRetirementStatus): Boolean = when (status) {
         LearnedRetirementStatus.Retired, LearnedRetirementStatus.AlreadyGone,
-        LearnedRetirementStatus.Cancelled, LearnedRetirementStatus.ScopeReleased -> true
+        LearnedRetirementStatus.Cancelled, LearnedRetirementStatus.ScopeReleased, -> true
         else -> false
     }
 }

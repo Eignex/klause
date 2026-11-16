@@ -2,7 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
@@ -18,11 +18,11 @@ import com.eignex.util.collections.LongArrayList
 internal fun runRootPropagation(
     problem: Problem,
     assumptions: Assumptions,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     skipExpensiveBake: Boolean,
 ): PropagationResult {
     val state = PropagationState(PropagationProblem(problem), assumptions, nativeSat = true)
-    if (cancellation.workMeter() !is RootWorkMeter) {
+    if (cancellation.accounting !is RootWorkMeter) {
         return collectRootPropagation(assumptions, state, cancellation, skipExpensiveBake)
     }
     val accounting = RootWorkAccounting(cancellation, state)
@@ -36,7 +36,7 @@ internal fun runRootPropagation(
 private fun collectRootPropagation(
     assumptions: Assumptions,
     state: PropagationState,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     skipExpensiveBake: Boolean,
 ): PropagationResult {
     if (!state.seeded) {
@@ -154,7 +154,7 @@ internal fun PropagationState.rootDeductions(assumptions: Assumptions): Propagat
 internal fun rootBake(
     problem: Problem,
     seedDeductions: PropagationResult,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PropagationResult {
     val base = runRootPropagation(
         problem,

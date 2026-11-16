@@ -28,7 +28,7 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -92,7 +92,7 @@ internal class RationalTheoryDescent(
     override val work: Long get() = linear?.work ?: state.work.spent
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -113,7 +113,8 @@ internal class RationalTheoryDescent(
                 BigFraction.ONE
             }
             val completed = invocation.runSlice(global, sliceMillis, sliceNodes) { sample, exact ->
-                attestWitness(sample, global or params.timeout or params.cancellation)
+                attestWitness(sample,
+                    global or params.timeout.withAccounting(params.cancellation) or params.cancellation)
                 onIncumbent(
                     MinimizeResult.BestFound(
                     sample,
@@ -185,7 +186,8 @@ internal class RationalTheoryDescent(
             if (advanced && (work >= endWork || deadline?.hasPassedNow() == true)) return null
             val current = round ?: run {
                 external()?.let { (sample, _) ->
-                    if (!proofDeclined || retainChecked(sample, global or params.timeout or params.cancellation)) {
+                    if (!proofDeclined || retainChecked(sample,
+                        global or params.timeout.withAccounting(params.cancellation) or params.cancellation)) {
                         val exact = objective.evaluateExact(sample)
                         if (value == null || exact < requireNotNull(value)) {
                             incumbent = sample
@@ -204,7 +206,7 @@ internal class RationalTheoryDescent(
                 if (route == ProblemPipeline.UNSUPPORTED_OPEN || route == ProblemPipeline.FINITE_CP) {
                     return finish(TerminationReason.Unsupported)
                 }
-                val engine = OpenTheoryEngine(model, route, PresolveConfig.NONE, true, Cancellation.Never, null)
+                val engine = OpenTheoryEngine(model, route, PresolveConfig.NONE, true, ExecutionControl.Never, null)
                 ResumableOpenTheory(
                     engine,
                     params.copy(
@@ -229,7 +231,8 @@ internal class RationalTheoryDescent(
                     val exact = objective.evaluateExact(sample)
                     check(value == null || exact < requireNotNull(value))
                     val standing = checkedIncumbent
-                    if (proofDeclined && !retainChecked(sample, global or params.timeout or params.cancellation)) {
+                    if (proofDeclined && !retainChecked(sample,
+                        global or params.timeout.withAccounting(params.cancellation) or params.cancellation)) {
                         return finish(
                             if (params.timeout()) {
                                 TerminationReason.Timeout
@@ -242,7 +245,8 @@ internal class RationalTheoryDescent(
                     }
                     incumbent = sample
                     value = exact
-                    attestWitness(sample, global or params.timeout or params.cancellation)
+                    attestWitness(sample,
+                        global or params.timeout.withAccounting(params.cancellation) or params.cancellation)
                     if (proofDeclined) linearResult = partial(TerminationReason.BudgetExhausted)
                     if (!proofDeclined || checkedIncumbent !== standing) {
                         publish(
@@ -293,7 +297,7 @@ internal class RationalTheoryDescent(
         invocation.scope == context?.scope &&
         context?.scope?.condition?.implies(invocation.executionCondition) == true
 
-    private fun attestWitness(sample: Sample, cancellation: Cancellation) {
+    private fun attestWitness(sample: Sample, cancellation: ExecutionControl) {
         val original = witnessContext ?: source.linearAuthorityContext(
             LinearObjective(),
             ObjectiveSense.MINIMIZE,
@@ -317,7 +321,7 @@ internal class RationalTheoryDescent(
         }
     }
 
-    private fun retainChecked(sample: Sample, cancellation: Cancellation): Boolean {
+    private fun retainChecked(sample: Sample, cancellation: ExecutionControl): Boolean {
         val original = requireNotNull(context)
         val evidence = SourceEvidence(original.scope, SourceClaim.Witness(sample), SourceDerivation.SourceWitness)
         if (SourceEvidenceVerifier(original.withLinearAuthority()).verify(evidence, cancellation) !=

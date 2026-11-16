@@ -28,7 +28,7 @@ import com.eignex.klause.theory.linearTheoryModel
 import com.eignex.klause.theory.qflra.supportsExactLira
 import com.eignex.klause.theory.qflra.supportsExactLra
 import com.eignex.klause.theory.rebindEncoding
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Ownership of an integer column selected once before a search begins. */
 enum class IntVariableOwner {
@@ -226,7 +226,7 @@ class ComponentPlan internal constructor(
     internal fun forObjectiveRound(
         spec: Problem,
         appended: Boolean,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): ComponentPlan {
         val prefix = factorOwners.size - if (appended) 1 else 0
         requireSamePrefix(spec, prefix)
@@ -291,7 +291,7 @@ class ComponentPlan internal constructor(
     internal fun forLinearConditions(
         spec: Problem,
         retainEmptyTheory: Boolean = false,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): ComponentPlan? {
         requireBelongsTo(spec)
         if (unplaceable != null || cancellation()) return null
@@ -358,16 +358,16 @@ class CpProblemProjection internal constructor(
 
 /** Select component ownership from the source model. */
 fun Problem.componentPlan(preferFinite: Boolean = false): ComponentPlan =
-    componentPlan(preferFinite, Cancellation.Never)
+    componentPlan(preferFinite, ExecutionControl.Never)
 
 /** Select component ownership using the descriptors captured for this canonical source. */
 fun Problem.componentPlan(projections: PreparedFactorProjections, preferFinite: Boolean = false): ComponentPlan =
-    componentPlan(projections, preferFinite, Cancellation.Never)
+    componentPlan(projections, preferFinite, ExecutionControl.Never)
 
 /** Select component ownership from the source model. */
 fun Problem.componentPlan(
     preferFinite: Boolean = false,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): ComponentPlan = componentPlan(
     (this as? BakedProblem)?.factorProjections ?: FactorProjectionProviders.Default.prepare(this),
     preferFinite, cancellation,
@@ -377,13 +377,13 @@ fun Problem.componentPlan(
 fun Problem.componentPlan(
     projections: PreparedFactorProjections,
     preferFinite: Boolean = false,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): ComponentPlan = buildComponentPlan(projections, preferFinite, cancellation)
 
 internal fun Problem.buildComponentPlan(
     projections: PreparedFactorProjections,
     preferFinite: Boolean = false,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     retained: RetainedLinearEncoding? = null,
     preparationBudget: PresolveBudget? = null,
 ): ComponentPlan {
@@ -407,7 +407,7 @@ internal fun Problem.buildComponentPlan(
     val stop = cancellation.encodingPreparationScope()
     fun install(target: EncodingTarget, indices: List<Int>, onDecline: (EncoderDecline) -> Unit): Problem? =
         preparationBudget.observePreparation(PresolvePreparationStage.SOURCE_ROWS, PresolveLane.SOURCE, this, stop) {
-                token, _ ->
+                token, _, ->
             retained?.model(target, indices, token) ?: projections.requestEncoders(
                 target, indices, cancellation = token, completeFiniteConditions = true, onDecline = onDecline,
             )?.let {

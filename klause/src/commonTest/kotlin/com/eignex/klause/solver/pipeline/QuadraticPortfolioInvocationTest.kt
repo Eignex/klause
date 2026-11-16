@@ -27,7 +27,7 @@ import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -215,7 +215,7 @@ class QuadraticPortfolioInvocationTest {
                         override val isDone: Boolean get() = done
                         override val stats: SolveStats get() = SolveStats.EMPTY
                         override fun runSlice(
-                            global: Cancellation,
+                            global: ExecutionControl,
                             sliceMillis: Long,
                             sliceNodes: Long,
                             onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -293,7 +293,7 @@ class QuadraticPortfolioInvocationTest {
                     override val isDone: Boolean get() = done
                     override val stats: SolveStats get() = SolveStats.EMPTY
                     override fun runSlice(
-                        global: Cancellation,
+                        global: ExecutionControl,
                         sliceMillis: Long,
                         sliceNodes: Long,
                         onIncumbent: (MinimizeResult.WithSample) -> Unit,

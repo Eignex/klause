@@ -19,7 +19,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -42,8 +42,8 @@ class BacktrackSolverRepairTest {
             for (offset in listOf(-1L, 0L, 1L)) {
                 val cutoff = value + epsilon * BigFraction.ofLong(offset)
                 BacktrackSolver(problem).openRepair(objective, params).use { repair ->
-                    repair.beginExact(Assumptions.None, 100L, cutoff, Cancellation.Never)
-                    val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+                    repair.beginExact(Assumptions.None, 100L, cutoff, ExecutionControl.Never)
+                    val result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
                     assertEquals(TerminationReason.SearchExhausted, result.reason)
                     if (offset > 0L) {
@@ -62,8 +62,8 @@ class BacktrackSolverRepairTest {
         val cutoff = BigFraction.ofLong(value + 1L)
 
         BacktrackSolver(problem).openRepair(objective, BacktrackParams()).use { repair ->
-            repair.beginExact(Assumptions.None, 100L, cutoff, Cancellation.Never)
-            val result = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            repair.beginExact(Assumptions.None, 100L, cutoff, ExecutionControl.Never)
+            val result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
             assertEquals(value, assertNotNull(result.sample).ints.single())
             assertEquals(TerminationReason.SearchExhausted, result.reason)
@@ -76,10 +76,10 @@ class BacktrackSolverRepairTest {
         val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
         val solver = BacktrackSolver(Problem(0, 0, emptyArray(), emptyArray()).bake())
         solver.openRepair(LinearObjective(), BacktrackParams()).use { repair ->
-            repair.beginExact(Assumptions.None, 100L, third, Cancellation.Never)
+            repair.beginExact(Assumptions.None, 100L, third, ExecutionControl.Never)
 
             assertFailsWith<IllegalArgumentException> {
-                repair.beginExact(Assumptions.None, 100L, third + epsilon, Cancellation.Never)
+                repair.beginExact(Assumptions.None, 100L, third + epsilon, ExecutionControl.Never)
             }
         }
     }
@@ -104,10 +104,10 @@ class BacktrackSolverRepairTest {
             BacktrackSolver(compiled.model.bake()).openRepair(objective, BacktrackParams()).use { repair ->
                 val cutoff = if (compiled.maximize) BigFraction.ofLong(-2L) + epsilon
                     else BigFraction.ofLong(3L) + epsilon
-                repair.beginExact(Assumptions(ints = mapOf(0 to first)), 100L, cutoff, Cancellation.Never)
-                val a = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
-                repair.beginExact(Assumptions(ints = mapOf(0 to second)), 100L, cutoff, Cancellation.Never)
-                val b = assertNotNull(repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L).sample)
+                repair.beginExact(Assumptions(ints = mapOf(0 to first)), 100L, cutoff, ExecutionControl.Never)
+                val a = assertNotNull(repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L).sample)
+                repair.beginExact(Assumptions(ints = mapOf(0 to second)), 100L, cutoff, ExecutionControl.Never)
+                val b = assertNotNull(repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L).sample)
 
                 val (aValues, bValues) = listOf(a, b).map { sample ->
                     val reals = assertNotNull(sample.exactReals)
@@ -128,7 +128,7 @@ class BacktrackSolverRepairTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
         BacktrackSolver(model).openRepair(objective, BacktrackParams()).use { repair ->
-            val step = repair.repairStep(Assumptions.None, 100L, -1.0, Cancellation.Never)
+            val step = repair.repairStep(Assumptions.None, 100L, -1.0, ExecutionControl.Never)
 
             assertEquals(TerminationReason.Unsupported, step.reason)
         }
@@ -139,12 +139,12 @@ class BacktrackSolverRepairTest {
         val objective = LinearObjective(boolWeights = longArrayOf(-1L, -2L))
         val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
         solver.openRepair(objective, BacktrackParams()).use { repair ->
-            repair.begin(Assumptions.None, 100L, 0.0, Cancellation.Never)
+            repair.begin(Assumptions.None, 100L, 0.0, ExecutionControl.Never)
 
-            val paused = repair.runSlice(Cancellation { true }, Long.MAX_VALUE, 1L)
+            val paused = repair.runSlice(ExecutionControl { true }, Long.MAX_VALUE, 1L)
             var completed = paused
             repeat(32) {
-                if (completed.reason == null) completed = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                if (completed.reason == null) completed = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L)
             }
 
             assertNull(paused.reason)
@@ -159,13 +159,13 @@ class BacktrackSolverRepairTest {
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
         var cancelled = false
         solver.openRepair(objective, BacktrackParams()).use { repair ->
-            repair.begin(Assumptions.None, 100L, 0.0, Cancellation { cancelled })
+            repair.begin(Assumptions.None, 100L, 0.0, ExecutionControl { cancelled })
             cancelled = true
 
-            val stopped = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            val stopped = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
             cancelled = false
-            val retained = repair.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
-            val next = repair.repair(Assumptions.None, 100L, 0.0, Cancellation.Never)
+            val retained = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
+            val next = repair.repair(Assumptions.None, 100L, 0.0, ExecutionControl.Never)
 
             assertEquals(TerminationReason.Cancelled, stopped.reason)
             assertEquals(stopped, retained)
@@ -178,10 +178,10 @@ class BacktrackSolverRepairTest {
         val objective = LinearObjective(boolWeights = longArrayOf(-1L, -2L))
         val solver = BacktrackSolver(Problem(2, 0, emptyArray(), emptyArray()).bake())
         solver.openRepair(objective, BacktrackParams()).use { repair ->
-            repair.begin(Assumptions(mapOf(0 to false), emptyMap()), 100L, 0.0, Cancellation.Never)
-            repair.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L)
+            repair.begin(Assumptions(mapOf(0 to false), emptyMap()), 100L, 0.0, ExecutionControl.Never)
+            repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0L)
 
-            val next = repair.repair(Assumptions(mapOf(1 to false), emptyMap()), 100L, 0.0, Cancellation.Never)
+            val next = repair.repair(Assumptions(mapOf(1 to false), emptyMap()), 100L, 0.0, ExecutionControl.Never)
 
             assertEquals(true, assertNotNull(next).boolValue(0))
             assertEquals(false, next.boolValue(1))
@@ -195,9 +195,9 @@ class BacktrackSolverRepairTest {
 
         for (invalid in listOf(1.0, Double.NaN)) {
             solver.openRepair(objective, BacktrackParams()).use { repair ->
-                assertNotNull(repair.repair(Assumptions.None, 100L, 0.0, Cancellation.Never))
+                assertNotNull(repair.repair(Assumptions.None, 100L, 0.0, ExecutionControl.Never))
                 assertFailsWith<IllegalArgumentException> {
-                    repair.repair(Assumptions.None, 100L, invalid, Cancellation.Never)
+                    repair.repair(Assumptions.None, 100L, invalid, ExecutionControl.Never)
                 }
             }
         }
@@ -213,7 +213,7 @@ class BacktrackSolverRepairTest {
             val objective = LinearObjective(boolWeights = longArrayOf(weight))
             val improvingSourceValues = listOf(0L, weight).filter { it < cutoffAsLong }
             solver.openRepair(objective, BacktrackParams()).use { repair ->
-                val sample = repair.repair(Assumptions.None, 100L, cutoff, Cancellation.Never)
+                val sample = repair.repair(Assumptions.None, 100L, cutoff, ExecutionControl.Never)
                 if (improvingSourceValues.isEmpty()) {
                     assertNull(sample)
                 } else {
@@ -237,7 +237,7 @@ class BacktrackSolverRepairTest {
 
         BacktrackSolver(problem).openRepair(objective, params).use { repair ->
             val best = assertNotNull(
-                repair.repair(Assumptions.None, 100L, Double.POSITIVE_INFINITY, Cancellation.Never),
+                repair.repair(Assumptions.None, 100L, Double.POSITIVE_INFINITY, ExecutionControl.Never),
             )
             assertEquals(values.min(), best.ints.single())
             assertEquals(values, offers)
@@ -257,7 +257,7 @@ class BacktrackSolverRepairTest {
             Assumptions(mapOf(2 to false, 3 to false), emptyMap()),
             2_000L,
             Double.POSITIVE_INFINITY,
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
         assertNotNull(a)
         assertEquals(5.0, objective.evaluate(a))
@@ -266,7 +266,7 @@ class BacktrackSolverRepairTest {
             Assumptions(mapOf(0 to false, 1 to false), emptyMap()),
             2_000L,
             Double.POSITIVE_INFINITY,
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
         assertNotNull(b)
         assertEquals(3.0, objective.evaluate(b))

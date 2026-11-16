@@ -5,8 +5,8 @@ import com.eignex.klause.factor.PropagationReasonOracle
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationProblem
@@ -19,7 +19,7 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
@@ -181,15 +181,15 @@ class CumulativePropagatorTest {
         val state = PropagationState(problem, Assumptions.None)
         state.cumulativeUnarySubsets = true
         state.beginRootFixpoint().forEach { }
-        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(ExecutionControl.Never))
         state.undoLogging = true
         val root = state.mark()
         state.currentLevel = 1
         check((0 until 3).all { state.tightenIntMax(it, 4) })
         state.beginSeedFixpoint().forEach { }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = state.intDomains[3].min == 6L
-            override fun workMeter(): WorkMeter = WorkMeter { }
+            override val accounting: WorkMeter get() = WorkMeter { }
         }
 
         assertNull(state.advanceRootFixpoint(token))
@@ -245,12 +245,12 @@ class CumulativePropagatorTest {
             state.beginRootFixpoint().forEach { }
             var polls = 0
 
-            assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= limit }))
+            assertNull(state.advanceRootFixpoint(ExecutionControl { ++polls >= limit }))
 
             assertTrue(state.rootFixpointPending)
             assertFalse(state.runCancelled)
             assertEquals(limit, polls)
-            while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+            while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(ExecutionControl.Never))
             for (v in 0 until n) assertEquals(IntDomain(0, 100L + v), state.intDomains[v])
         }
     }
@@ -262,16 +262,16 @@ class CumulativePropagatorTest {
         ))
         val state = PropagationState(problem, Assumptions.None)
         state.beginRootFixpoint().forEach { }
-        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(ExecutionControl.Never))
         state.undoLogging = true
         val root = state.mark()
         state.currentLevel = 1
         check(state.tightenIntMax(0, 0))
         check(state.tightenIntMax(1, 0))
         state.beginSeedFixpoint().forEach { }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = state.intDomains[2].min == 2L
-            override fun workMeter(): WorkMeter = WorkMeter { }
+            override val accounting: WorkMeter get() = WorkMeter { }
         }
 
         assertNull(state.advanceRootFixpoint(token))

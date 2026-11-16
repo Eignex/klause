@@ -11,7 +11,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lowering.LinRelation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -44,7 +44,7 @@ class Xcsp3AffineDistinctnessTest {
             <var id="z">0..2</var></variables><constraints>
             <intension>ne(dist(x,y),1)</intension><intension>ne(dist(x,z),2)</intension>
             <intension>ne(dist(y,z),1)</intension></constraints></instance>"""
-        val pairwise = PropagationSession(Xcsp3.parse(source, recoveryCancellation = Cancellation { true }).problem)
+        val pairwise = PropagationSession(Xcsp3.parse(source, recoveryCancellation = ExecutionControl { true }).problem)
         val collective = PropagationSession(Xcsp3.parse(source).problem)
 
         assertEquals(0L, pairwise.intDomain(2).min)
@@ -59,7 +59,8 @@ class Xcsp3AffineDistinctnessTest {
             <intension>ne(add(y,1),sub(z,1))</intension></constraints></instance>"""
 
         assertFalse(
-            PropagationSession(Xcsp3.parse(source, recoveryCancellation = Cancellation { true }).problem).isUnsatAtRoot,
+            PropagationSession(Xcsp3.parse(source, recoveryCancellation =
+                ExecutionControl { true }).problem).isUnsatAtRoot,
         )
         assertTrue(PropagationSession(Xcsp3.parse(source).problem).isUnsatAtRoot)
     }
@@ -91,7 +92,7 @@ class Xcsp3AffineDistinctnessTest {
             <var id="z">-1..1</var></variables><constraints>
             <intension>ne(x,add(y,1))</intension><intension>ne(x,add(z,2))</intension>
             <intension>ne(add(y,1),add(z,2))</intension></constraints></instance>"""
-        val pairwise = PropagationSession(Xcsp3.parse(source, recoveryCancellation = Cancellation { true }).problem)
+        val pairwise = PropagationSession(Xcsp3.parse(source, recoveryCancellation = ExecutionControl { true }).problem)
         val collective = PropagationSession(Xcsp3.parse(source).problem)
 
         assertEquals(-1L, pairwise.intDomain(2).min)
@@ -191,7 +192,7 @@ class Xcsp3AffineDistinctnessTest {
             val parsed = Xcsp3.parse(source)
             val actual = BruteForceSolver(parsed.problem.bake()).enumerate(BruteForceParams(randomSeed = 0L))
                 .map { it.ints.take(3) }.toSet()
-            val pairwise = Xcsp3.parse(source, recoveryCancellation = Cancellation { true })
+            val pairwise = Xcsp3.parse(source, recoveryCancellation = ExecutionControl { true })
             val expected = BruteForceSolver(pairwise.problem.bake()).enumerate(BruteForceParams(randomSeed = 0L))
                 .map { it.ints.toList() }.toSet()
 
@@ -314,7 +315,7 @@ class Xcsp3AffineDistinctnessTest {
             index.record(LinRelation.LongRel(intArrayOf(a, b), longArrayOf(1, -1), bound), LinearOp.NE, a)
         }
 
-        assertTrue(index.groups(Cancellation.Never).isEmpty())
+        assertTrue(index.groups(ExecutionControl.Never).isEmpty())
     }
 
     @Test
@@ -341,7 +342,7 @@ class Xcsp3AffineDistinctnessTest {
             }
         }
 
-        val groups = index.groups(Cancellation.Never)
+        val groups = index.groups(ExecutionControl.Never)
 
         assertEquals(1, groups.size)
         assertContentEquals(longArrayOf(0, 1, 2), groups.single().offsets)
@@ -356,7 +357,7 @@ class Xcsp3AffineDistinctnessTest {
             <intension>ne(sub(x[1],x[2]),1)</intension>
             <intension>ne(sub(x[1],x[2]),0)</intension></constraints></instance>"""
         val parsed = Xcsp3.parse(source).problem
-        val pairwise = Xcsp3.parse(source, recoveryCancellation = Cancellation { true }).problem
+        val pairwise = Xcsp3.parse(source, recoveryCancellation = ExecutionControl { true }).problem
         val actual = BruteForceSolver(parsed.bake()).enumerate(BruteForceParams(randomSeed = 0L))
             .map { it.ints.toList() }.toSet()
         val expected = BruteForceSolver(pairwise.bake()).enumerate(BruteForceParams(randomSeed = 0L))
@@ -380,7 +381,7 @@ class Xcsp3AffineDistinctnessTest {
         }
         val uncommitted = builder.factors.takeLast(3)
 
-        builder.recoverAffineDistinctness(index, Cancellation { builder.factors.size > 6 })
+        builder.recoverAffineDistinctness(index, ExecutionControl { builder.factors.size > 6 })
 
         assertEquals(1, builder.factors.count { it is Distinct })
         assertEquals(uncommitted, builder.factors.filterIsInstance<Linear>())
@@ -397,7 +398,7 @@ class Xcsp3AffineDistinctnessTest {
         }
         val original = builder.factors.toList()
 
-        builder.recoverAffineDistinctness(index, Cancellation { true })
+        builder.recoverAffineDistinctness(index, ExecutionControl { true })
 
         assertEquals(original, builder.factors)
     }

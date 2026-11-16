@@ -9,7 +9,9 @@ internal fun prepareSourceExecution(request: SourceExecutionRequest): SourceExec
     val stop = invocation.cancellation or request.theory.cancellation or request.theory.timeout
     val preparation = original.withPresolve(
         request.presolveConfig ?: original.presolveConfig,
-        cancellation = original.presolveCancellation or request.presolveCancellation or stop,
+        cancellation = original.presolveCancellation.withAccounting(
+            if (request.presolveBudget != null) request.presolveCancellation else original.presolveCancellation,
+        ) or request.presolveCancellation or stop,
         budget = request.presolveBudget ?: original.presolveBudget,
     )
     val mark = TimeSource.Monotonic.markNow()

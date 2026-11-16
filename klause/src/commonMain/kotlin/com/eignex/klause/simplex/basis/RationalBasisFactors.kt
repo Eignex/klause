@@ -3,7 +3,7 @@ package com.eignex.klause.simplex.basis
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.Frac128
 import com.eignex.klause.simplex.exact.Frac128Ops
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
@@ -81,7 +81,7 @@ internal class RationalBasisFactors private constructor(
         rhs: List<BigFraction>,
         transpose: Boolean = false,
         limits: RationalBasisLimits = RationalBasisLimits(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): RationalBasisSolve {
         val meter = RationalMeter(limits, cancellation)
         return try {
@@ -125,7 +125,7 @@ internal class RationalBasisFactors private constructor(
             matrix: List<List<BigFraction>>,
             proposed: RationalBasisOrder? = null,
             limits: RationalBasisLimits = RationalBasisLimits(),
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): RationalBasisBuild {
             val meter = RationalMeter(limits, cancellation)
             return try {
@@ -162,7 +162,7 @@ private class RationalOverflow : RuntimeException()
 private class RationalHintFailure : RuntimeException()
 private class RationalRank(val rank: Int) : RuntimeException()
 
-private class RationalMeter(val limits: RationalBasisLimits, private val cancellation: Cancellation) {
+private class RationalMeter(val limits: RationalBasisLimits, private val cancellation: ExecutionControl) {
     private val start = TimeSource.Monotonic.markNow()
     private var work = 0L
     private var allocation = 0L

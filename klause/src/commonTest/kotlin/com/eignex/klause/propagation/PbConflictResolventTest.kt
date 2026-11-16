@@ -18,7 +18,7 @@ import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -32,7 +32,7 @@ class PbConflictResolventTest {
         state.currentLevel = 1
         state.pinBool(0, true)
         state.pinBool(1, true)
-        state.finiteWork.cancellation = Cancellation { true }
+        state.finiteWork.cancellation = ExecutionControl { true }
 
         val result = state.conflictAnalyzer.analyzeConflictClause(intArrayOf(Lit.make(0, false), Lit.make(1, false)))
 

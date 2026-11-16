@@ -17,7 +17,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import java.lang.reflect.Constructor
 import java.util.IdentityHashMap
 import kotlinx.serialization.json.JsonArray
@@ -28,7 +28,7 @@ import kotlinx.serialization.json.put
 
 internal class NumericalFrontierSnapshot(
     private val context: SourceProofContext,
-    private val stop: Cancellation,
+    private val stop: ExecutionControl,
     private val objectiveScale: BigFraction = BigFraction.ONE,
 ) {
     private val checked = IdentityHashMap<SourceEvidence, JsonObject>()
@@ -245,7 +245,7 @@ internal class NumericalFrontierSnapshot(
         ): Any {
             val advance = invocation.javaClass.methods.single { it.name == "runSlice" && it.parameterCount == 4 }
             while (true) {
-                val result = advance.invoke(invocation, Cancellation.Never, Long.MAX_VALUE, 64L, onIncumbent)
+                val result = advance.invoke(invocation, ExecutionControl.Never, Long.MAX_VALUE, 64L, onIncumbent)
                 onProgress(invocation)
                 if (result != null) return result
             }

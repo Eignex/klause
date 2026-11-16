@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.Int128
 import com.eignex.util.numbers.abs
@@ -427,7 +427,7 @@ internal fun integerFarkasRay(
     basisRow: Int = -1,
     onRoute: ((FarkasRoute) -> Unit)? = null,
     observer: LpCertificationObserver? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     scans: LpScanCount? = null,
 ): LongArray? {
     fun certifies(rho: LongArray): Boolean {

@@ -8,7 +8,7 @@ import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
@@ -28,15 +28,15 @@ class SmtLibPolynomialTest {
             override fun next(): String? = error("cancelled source must not be read")
         }
 
-        assertFailsWith<PolynomialSourceInterrupted> { SmtLibPolynomial.parse(source, Cancellation { true }) }
+        assertFailsWith<PolynomialSourceInterrupted> { SmtLibPolynomial.parse(source, ExecutionControl { true }) }
     }
 
     @Test
     fun `coefficient work exhaustion should interrupt without publishing a formula`() {
         var charged = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         assertFailsWith<PolynomialSourceInterrupted> {
@@ -48,9 +48,9 @@ class SmtLibPolynomialTest {
     @Test
     fun `constant powers should honor the caller coefficient work allowance`() {
         var charged = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 3
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         assertFailsWith<PolynomialSourceInterrupted> {
@@ -285,9 +285,9 @@ class SmtLibPolynomialTest {
     fun `retained helper expansion should honor cancellation during lowering`() {
         var charged = 0L
         var limited = false
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = limited && charged >= 1
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val compiler = SmtLibPolynomialCompiler(cancellation)
         val reader = SExprReader(

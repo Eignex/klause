@@ -1,6 +1,8 @@
 package com.eignex.klause.bench.source
 
 import com.eignex.klause.bench.catalog.FetchMethod
+import org.apache.commons.compress.archivers.zip.ZipFile
+import org.tukaani.xz.XZInputStream
 import java.io.File
 import java.io.InputStream
 import java.net.URI
@@ -12,8 +14,6 @@ import java.security.MessageDigest
 import java.util.HexFormat
 import java.util.zip.CRC32
 import java.util.zip.CheckedInputStream
-import org.apache.commons.compress.archivers.zip.ZipFile
-import org.tukaani.xz.XZInputStream
 
 internal class CorpusZipSelection(private val downloads: CorpusDownload) {
     fun fetch(uri: URI, member: FetchMethod.ZipMember, directory: File) {

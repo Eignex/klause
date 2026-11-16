@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.presolve.asSampleLift
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertNotNull
@@ -24,7 +24,7 @@ class PrivateRebuildAliasTest {
                 Clause(intArrayOf(0, 4)), Clause(intArrayOf(2, 6)), premises[0], premises[1],
             ))
 
-            val delta = PrivateRebuildAlias.reduce(source, premises, Cancellation.Never)
+            val delta = PrivateRebuildAlias.reduce(source, premises, ExecutionControl.Never)
             val reduced = assertNotNull(source.withSourcePassDelta(delta))
             val lift = assertNotNull(delta.rebuild.asSampleLift())
 
@@ -50,7 +50,7 @@ class PrivateRebuildAliasTest {
         val source = Problem(4, 0, emptyArray(), arrayOf(unchanged, premises[0], premises[1]))
 
         val reduced = assertNotNull(source.withSourcePassDelta(
-            PrivateRebuildAlias.reduce(source, premises, Cancellation.Never),
+            PrivateRebuildAlias.reduce(source, premises, ExecutionControl.Never),
         ))
 
         assertSame(unchanged, reduced.factors.single())
@@ -61,7 +61,7 @@ class PrivateRebuildAliasTest {
         val premises = arrayOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3)))
         val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3))))
 
-        val delta = PrivateRebuildAlias.reduce(source, premises, Cancellation.Never)
+        val delta = PrivateRebuildAlias.reduce(source, premises, ExecutionControl.Never)
 
         assertTrue(delta.isEmpty)
     }
@@ -75,9 +75,9 @@ class PrivateRebuildAliasTest {
             ))
             var spent = 0L
             val meter = WorkMeter { spent += it }
-            val cancellation = object : Cancellation {
+            val cancellation = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = spent >= allowance
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
             }
 
             val delta = PrivateRebuildAlias.reduce(source, premises, cancellation)

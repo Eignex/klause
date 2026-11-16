@@ -412,7 +412,7 @@ internal class LearnedPolicyRows(
         }
         primary?.let { observe(0, it) }
         val retained = directory.protectedCapacity({ units -> repeat(units.toInt()) { sample.step() } }) {
-            index, page -> observe(index, page)
+            index, page, -> observe(index, page)
         }
         sample.owned(this, 25L, protectedRows)
         sample.ownedReferences(this, 12L + chunkSize, protectedRows)

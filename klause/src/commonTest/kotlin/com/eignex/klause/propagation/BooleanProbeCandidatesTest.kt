@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveBudget
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -16,7 +16,7 @@ class BooleanProbeCandidatesTest {
         for (problem in listOf(source, source.bake())) {
             val budget = PresolveBudget(Long.MAX_VALUE)
 
-            val graph = problem.propagatedImplicationGraph(4, budget.orSpent(Cancellation.Never))
+            val graph = problem.propagatedImplicationGraph(4, budget.orSpent(ExecutionControl.Never))
 
             assertTrue(graph.all { it.isEmpty() })
             assertEquals(0L, budget.rootConstructionEntries)

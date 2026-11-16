@@ -2,7 +2,7 @@ package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ArithmeticExecution
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class PolynomialInterrupted : RuntimeException()
@@ -19,7 +19,7 @@ internal data class PolynomialLimits(val maxDenseCoefficients: Int? = 65536, val
 }
 
 internal class PolynomialArithmetic(
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     private val limits: PolynomialLimits = PolynomialLimits(),
 ) {
     val execution = ArithmeticExecution(cancellation) { throw PolynomialInterrupted() }
@@ -33,7 +33,8 @@ internal class PolynomialArithmetic(
         if (!execution.batching) return
         val leftBits = maxOf(left.num.magnitudeBitLength(), left.den.magnitudeBitLength()).toLong()
         val rightBits = maxOf(right.num.magnitudeBitLength(), right.den.magnitudeBitLength()).toLong()
-        if (leftBits + rightBits > 4096) execution.boundary()
+        val bits =leftBits + rightBits
+        if (bits > 4096) execution.boundary() else execution.pollingCost((bits / Long.SIZE_BITS).toInt())
     }
 
     fun checkpoint() = execution.checkpoint()
@@ -103,8 +104,7 @@ internal class PolynomialArithmetic(
     private fun prepareDivision(dividend: Polynomial, divisor: Polynomial): Iterator<Polynomial?> =
         execution.iterator(sequence {
         require(!divisor.isZero)
-        execution.boundary()
-        divisionObserver?.invoke(dividend, divisor)
+        divisionObserver?.let { observer -> execution.handoff { observer(dividend, divisor) } }
         val terms = divisor.terms
         scalarQuotient(dividend, terms.singleOrNull())?.let {
             yield(it)
@@ -201,8 +201,7 @@ internal class PolynomialArithmetic(
 
     fun divideExact(dividend: Polynomial, divisor: Polynomial): Polynomial = execution.operation {
         require(!divisor.isZero)
-        execution.boundary()
-        divisionObserver?.invoke(dividend, divisor)
+        divisionObserver?.let { observer -> execution.handoff { observer(dividend, divisor) } }
         val terms = divisor.terms
         scalarQuotient(dividend, terms.singleOrNull())?.let { return@operation it }
         val lead = terms.last()
@@ -243,21 +242,18 @@ internal class PolynomialArithmetic(
 
     fun principalSubresultants(left: Polynomial, right: Polynomial, variable: Int): List<Polynomial> =
         execution.operation {
-        execution.boundary()
-        subresultantObserver?.invoke(left, right, variable, null)
+        subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, null) } }
         step()
         val a = coefficients(left, variable)
         val b = coefficients(right, variable)
         val m = a.lastIndex
         val n = b.lastIndex
         if (m == 1 && n == 1) {
-            execution.boundary()
-            subresultantObserver?.invoke(left, right, variable, 0)
+            subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, 0) } }
             return@operation listOf(subtract(multiply(a[1], b[0]), multiply(a[0], b[1])))
         }
         return@operation (0 until minOf(m, n)).map { index ->
-            execution.boundary()
-            subresultantObserver?.invoke(left, right, variable, index)
+            subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, index) } }
             val matrix = matrix(m.toLong() + n - 2L * index)
             val size = matrix.size
             for (row in 0 until n - index) {
@@ -281,16 +277,14 @@ internal class PolynomialArithmetic(
         right: Polynomial,
         variable: Int,
     ): Iterator<List<Polynomial>?> = execution.iterator(sequence {
-        execution.boundary()
-        subresultantObserver?.invoke(left, right, variable, null)
+        subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, null) } }
         step()
         val a = coefficients(left, variable)
         val b = coefficients(right, variable)
         val m = a.lastIndex
         val n = b.lastIndex
         if (m == 1 && n == 1) {
-            execution.boundary()
-            subresultantObserver?.invoke(left, right, variable, 0)
+            subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, 0) } }
             val first = prepareMultiply(a[1], b[0])
             var ad: Polynomial? = null
             while (ad == null) {
@@ -308,8 +302,7 @@ internal class PolynomialArithmetic(
         }
         val result = ArrayList<Polynomial>()
         for (index in 0 until minOf(m, n)) {
-            execution.boundary()
-            subresultantObserver?.invoke(left, right, variable, index)
+            subresultantObserver?.let { observer -> execution.handoff { observer(left, right, variable, index) } }
             val matrix = matrix(m.toLong() + n - 2L * index)
             val size = matrix.size
             for (row in 0 until n - index) {

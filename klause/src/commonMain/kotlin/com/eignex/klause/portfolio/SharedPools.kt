@@ -15,7 +15,7 @@ import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Publication
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * The cross-arm sharing channels handed to every arm of one portfolio: the learned-clause pool ([clauses],
@@ -45,7 +45,7 @@ internal class SharedPools(
         value: Double,
         certificate: EvidenceCertificate?,
         invocation: EngineInvocation? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): Publication<Sample, Double> {
         val exchange = solutions ?: return Publication.Indeterminate("there is no solution exchange")
         if (certificate?.publication != null && invocation == null) {

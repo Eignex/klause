@@ -6,8 +6,10 @@ import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.followStopControl
 import kotlin.math.ceil
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -22,8 +24,8 @@ internal fun interface LocalSearchCheckpoint : WorkMeter {
     val repairWork: WorkMeter get() = this
 }
 
-internal class LocalSearchRunControl(private val lifetime: Cancellation) : LocalSearchCheckpoint {
-    var token: Cancellation = Cancellation.Never
+internal class LocalSearchRunControl(private val lifetime: ExecutionControl) : LocalSearchCheckpoint {
+    var token: ExecutionControl = ExecutionControl.Never
         private set
     var instructions: Long = 0L
         private set
@@ -51,7 +53,7 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
     )
     var hasSliceAllowance: Boolean = true
         private set
-    val cancellation: Cancellation = Cancellation { token() }
+    val cancellation: ExecutionControl = followStopControl { token }
     val work: Long get() = slice.spent()
     val auxiliaryWork: Long get() = pricedInspections / PROPAGATION_WORK_PER_NODE
 
@@ -66,18 +68,19 @@ internal class LocalSearchRunControl(private val lifetime: Cancellation) : Local
     }
 
     fun offer(
-        global: Cancellation, millis: Long, instructions: Long, available: Long, sliceNodes: Long = -1L,
+        global: ExecutionControl, millis: Long, instructions: Long, available: Long, sliceNodes: Long = -1L,
         instructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
     ) {
         slice.noteOverspend()
         this.instructionsPerWork = instructionsPerWork
         hasSliceAllowance = slice.begin(millis, sliceNodes)
-        token = if (millis == Long.MAX_VALUE) {
+        token = ( if (millis == Long.MAX_VALUE) {
             lifetime.lifetimeCancellation() or global
         } else {
             lifetime.lifetimeCancellation() or global or
-                Cancellation.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
+                ExecutionControl.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
         }
+            ).bindStopControl()
         limit = this.instructions + minOf(instructions, available, Long.MAX_VALUE - this.instructions)
     }
 

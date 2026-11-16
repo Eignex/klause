@@ -14,7 +14,7 @@ import com.eignex.klause.solver.evidence.absSourceWitnessContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.toSample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
@@ -51,7 +51,7 @@ class AffineAbsTest {
                 "(assert (= (abs (+ 9223372036854775808 x)) 18446744073709551616))",
         )
         val source = input.model
-        val context = assertNotNull(source.absSourceWitnessContext(LinearObjective(), Cancellation.Never))
+        val context = assertNotNull(source.absSourceWitnessContext(LinearObjective(), ExecutionControl.Never))
 
         val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source).solve())
         val sample = result.assignment.toSample(source)
@@ -61,7 +61,7 @@ class AffineAbsTest {
         assertTrue(source.factors.filterIsInstance<AffineAbs>().single().isSatisfied(sample::exactIntValue))
         assertEquals(
             SourceEvidenceCheck.Checked,
-            assertNotNull(context.semanticsChecker).witness(sample, context.scope, Cancellation.Never),
+            assertNotNull(context.semanticsChecker).witness(sample, context.scope, ExecutionControl.Never),
         )
     }
 

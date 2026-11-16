@@ -23,7 +23,7 @@ import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.theory.requiresRealCompletionSearch
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.ceil
 
 /**
@@ -56,7 +56,7 @@ internal class LeafRealCompletion(
     var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
     var observeFloat: ((Sample) -> Unit)? = null
 
-    override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
+    override fun complete(candidate: Sample, cancellation: ExecutionControl): Completion {
         val realObjective = objective != null && objective.realCoefficientValues.any { it != 0.0 }
         val search = toleranceSearch?.takeIf { !realObjective }
             ?: return absCompletion?.takeIf { !realObjective }?.let { exactSearch(it, candidate, cancellation, 0L) }
@@ -93,7 +93,7 @@ internal class LeafRealCompletion(
     private fun exactSearch(
         search: AbsRealCompletion,
         candidate: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         spent: Long,
     ): Completion {
         val checked = search.complete(candidate, cancellation)
@@ -110,7 +110,7 @@ internal class LeafRealCompletion(
         }
     }
 
-    private fun linearCompletion(candidate: Sample, cancellation: Cancellation): Completion {
+    private fun linearCompletion(candidate: Sample, cancellation: ExecutionControl): Completion {
         val encoded = encoding.modelFor(candidate, cancellation) ?: return Completion.Undecided(movesFor(0.0))
         val sink = LpStatsSink(LpRoute.STANDALONE)
         val check = if (observeFloat == null) toleranceCheck else FiniteSourceAcceptance(

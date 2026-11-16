@@ -12,17 +12,17 @@ import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
-import kotlin.random.Random
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.ValueSource
+import kotlin.random.Random
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 
 class ChannelTrajectoryTest {
     @Test
@@ -49,7 +49,7 @@ class ChannelTrajectoryTest {
         val sweep = assertNotNull(DefinitionalSweep.fromSource(problem,
             listOf(DefinitionHint.BooleanValue(0, Lit.make(0, true)))))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        state.invariants = ChannelView.SearchedValues.sweep(sweep, Cancellation.Never)
+        state.invariants = ChannelView.SearchedValues.sweep(sweep, ExecutionControl.Never)
             ?.network(problem.numIntVars, problem.numBoolVars)
         val coordinates = VarRemap(intArrayOf(0), intArrayOf(0))
         val searched = TrajectoryView("searched", state, coordinates)

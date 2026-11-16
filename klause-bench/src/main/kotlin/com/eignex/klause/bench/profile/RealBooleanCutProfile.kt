@@ -40,15 +40,15 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import kotlin.time.Duration.Companion.seconds
 
 internal object RealBooleanCutProfile {
     private const val PREFIX = "com.eignex.klause.lp.optimization."
@@ -144,7 +144,7 @@ internal object RealBooleanCutProfile {
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0, 1.0))
         val scope = SourceScope(SourceRevision("coupled-real-$refutation", "klause-ir-exact-v1"),
             objective = SourceObjective("difference", ObjectiveSense.MINIMIZE))
-        val stop = Cancellation.after(3.seconds)
+        val stop = ExecutionControl.after(3.seconds)
         val started = System.nanoTime()
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(model), ExecutionOperation.OPTIMIZE,
             FiniteEngine.BACKTRACK, objective, cancellation = stop))
@@ -178,7 +178,7 @@ internal object RealBooleanCutProfile {
     }
 
     private fun replay(source: SourceProofContext, composed: Boolean, alternatives: Int): Any {
-        val stop = Cancellation.after(3.seconds)
+        val stop = ExecutionControl.after(3.seconds)
         val captureType = Class.forName(PREFIX + "LinearAuthorityCapture")
         val capture = captureType.declaredConstructors.single { it.parameterCount == 4 }
             .newInstance(1, 1_000_000L, 16_777_216L, stop)
@@ -200,7 +200,7 @@ internal object RealBooleanCutProfile {
         val consequences = field(result, "consequences") as List<SourceEvidence>
         val rounding = Class.forName(PREFIX + "LinearAuthorityCuts").getField("Companion").get(null)
         val installed = rounding.javaClass.declaredMethods.single { it.name == "prepare" }
-            .invoke(rounding, source, Cancellation.after(3.seconds), false, { _: Long -> })
+            .invoke(rounding, source, ExecutionControl.after(3.seconds), false, { _: Long -> })
         val quarter = BigFraction.ofLong(4).reciprocal()
         val common = consequences.single { it.claim == SourceClaim.Consequence(
             SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE), quarter)) }
@@ -235,7 +235,7 @@ internal object RealBooleanCutProfile {
         val type = Class.forName(PREFIX + "LinearBooleanCutPreparation")
         val limits = Class.forName(PREFIX + "LinearBooleanCutLimits").getDeclaredConstructor().newInstance()
         return type.declaredMethods.single { it.name == "prepare" }
-            .invoke(type.getField("INSTANCE").get(null), source, Cancellation.after(3.seconds), cost, limits)
+            .invoke(type.getField("INSTANCE").get(null), source, ExecutionControl.after(3.seconds), cost, limits)
     }
 
     private fun proof(value: SourceDerivation): JsonObject = buildJsonObject {

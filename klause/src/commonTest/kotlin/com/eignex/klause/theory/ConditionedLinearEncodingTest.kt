@@ -5,7 +5,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -87,7 +87,7 @@ class ConditionedLinearEncodingTest {
 
         val relation = providers.prepare(source).linearTheoryModel(
             EncodingTarget.LINEAR,
-            cancellation = Cancellation { stopped },
+            cancellation = ExecutionControl { stopped },
             onDecline = { decline = it },
             completeFiniteConditions = true,
         )

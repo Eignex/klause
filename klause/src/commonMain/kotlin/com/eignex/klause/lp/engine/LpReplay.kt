@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration
 import kotlin.time.TimeSource.Monotonic
 
@@ -100,7 +100,7 @@ internal object LpReplay {
         validateForReplay(capture)
         var model = capture.model.toModel()
         val settings = capture.settings
-        var cancellation: Cancellation = PollBudgetCancellation(settings.cancellationPollLimit)
+        var cancellation: ExecutionControl = PollBudgetCancellation(settings.cancellationPollLimit)
         val boundUpdates = if (capture.events.any { it is LpReplayEvent.Rebind }) ReplayBoundUpdates(model) else null
         val solver = newSolver(boundUpdates?.working ?: model, settings, cancellation, context)
         val steps = ArrayList<LpReplayStep>(capture.events.size)
@@ -198,7 +198,7 @@ internal object LpReplay {
         operation: LpReplayOperation,
         model: LpModel,
         solver: LpSolver,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         context: LpSolveContext,
         strict: ReplayStrictCertification?,
         continuationBudget: ReplayContinuationBudget,
@@ -331,7 +331,7 @@ private class ReplayBoundUpdates(model: LpModel) {
     var working: LpModel = requireNotNull(full.toWorkingModel())
         private set
 
-    fun replace(model: LpModel, solver: LpSolver, token: Cancellation) {
+    fun replace(model: LpModel, solver: LpSolver, token: ExecutionControl) {
         val next = state(
             requireNotNull(model.authoritativeModel()) {
                 "replay bound updates require valid exact source authority"
@@ -343,7 +343,7 @@ private class ReplayBoundUpdates(model: LpModel) {
         adopt(next, solver, token)
     }
 
-    fun restore(solver: LpSolver, token: Cancellation): Boolean {
+    fun restore(solver: LpSolver, token: ExecutionControl): Boolean {
         if (!available || !masked) return available
         val next = state(full.baseModel)
         next.inheritProjection(full)
@@ -352,7 +352,7 @@ private class ReplayBoundUpdates(model: LpModel) {
         return adopt(next, solver, token)
     }
 
-    fun mask(enforced: BooleanArray, solver: LpSolver, token: Cancellation): Boolean {
+    fun mask(enforced: BooleanArray, solver: LpSolver, token: ExecutionControl): Boolean {
         if (!available) return false
         val rows = full.rows.deactivate(enforced.indices.filterTo(HashSet()) { !enforced[it] })
         val next = state(full.baseModel, rows)
@@ -372,7 +372,7 @@ private class ReplayBoundUpdates(model: LpModel) {
         )
     }
 
-    private fun adopt(state: LpExactState, solver: LpSolver, token: Cancellation): Boolean {
+    private fun adopt(state: LpExactState, solver: LpSolver, token: ExecutionControl): Boolean {
         // A rejected transition leaves the donor's result slots intact; none belong to the requested state.
         available = false
         if (!(solver as PersistentLpSolver).adopt(state, token)) return false
@@ -410,7 +410,7 @@ private class ReplayStrictCertification(
         direct: CertifiedLpResult,
         proposal: FloatLpResult?,
         solver: LpSolver,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         observer: LpCertificationObserver,
         elapsed: Duration,
     ): CertifiedLpResult {
@@ -473,7 +473,7 @@ private class ReplayStrictCertification(
         current?.close()
     }
 
-    private fun prepare(cancellation: Cancellation): Boolean {
+    private fun prepare(cancellation: ExecutionControl): Boolean {
         if (capability != LpStrictReplayCapability.PENDING) return capability == LpStrictReplayCapability.ELIGIBLE
         capability = LpStrictReplayCapability.ADMISSION_DECLINED
         val started = Monotonic.markNow()
@@ -517,7 +517,7 @@ private class ReplayStrictCertification(
 private fun newSolver(
     model: LpModel,
     settings: LpReplaySettings,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     context: LpSolveContext,
 ): LpSolver = when (settings.solverKind) {
     LpReplaySolverKind.GENERAL -> newLpSolver(model, cancellation, settings.componentSplit, context.engineFactory)
@@ -613,7 +613,7 @@ private fun validateForReplay(capture: LpCapture) {
 private fun unsupported(index: Int, operation: String): Nothing =
     error("LP replay event $index ($operation) has no production engine seam")
 
-private class PollBudgetCancellation(private val pollLimit: Int) : Cancellation {
+private class PollBudgetCancellation(private val pollLimit: Int) : ExecutionControl() {
     private var polls = 0
     var cancelled: Boolean = false
         private set

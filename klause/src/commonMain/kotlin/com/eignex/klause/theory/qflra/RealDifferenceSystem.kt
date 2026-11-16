@@ -16,7 +16,7 @@ import com.eignex.klause.lp.asFraction
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.theory.EncodedTheoryFactor
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.toLong
@@ -28,7 +28,7 @@ internal class RealDifferenceSystem private constructor(
 ) {
     private var potentials: LongArray? = null
 
-    fun check(bools: IntArray, stop: Cancellation, onWork: ((Long) -> Unit)? = null): Result {
+    fun check(bools: IntArray, stop: ExecutionControl, onWork: ((Long) -> Unit)? = null): Result {
         onWork?.invoke(guards.size.toLong() + graph.numVars)
         val active = BooleanArray(guards.size) { index ->
             val guard = guards[index]
@@ -74,7 +74,7 @@ internal class RealDifferenceSystem private constructor(
         fun prepare(
             model: Problem,
             forms: List<List<ExactRowForm>>,
-            stop: Cancellation = Cancellation.Never,
+            stop: ExecutionControl = ExecutionControl.Never,
         ): RealDifferenceSystem? {
             if (stop()) return null
             if (model.numIntVars != 0 || model.numRealVars == 0 || model.numRealVars > 10000) return null
@@ -115,7 +115,7 @@ internal class RealDifferenceSystem private constructor(
         fun prepareRows(
             realColumns: Int,
             rows: List<ExactRationalInequality>,
-            stop: Cancellation,
+            stop: ExecutionControl,
         ): RealDifferenceSystem? {
             if (realColumns !in 1..10000 || rows.size > 100000 || stop()) return null
             val edges = ArrayList<Edge>()
@@ -127,7 +127,7 @@ internal class RealDifferenceSystem private constructor(
             return build(realColumns, edges, stop)
         }
 
-        private fun build(zero: Int, edges: List<Edge>, stop: Cancellation): RealDifferenceSystem? {
+        private fun build(zero: Int, edges: List<Edge>, stop: ExecutionControl): RealDifferenceSystem? {
             if (edges.isEmpty() || edges.size > 100000) return null
             var denominator = 1L
             for (edge in edges) {
@@ -177,7 +177,7 @@ internal class RealDifferenceSystem private constructor(
             guard: Int,
             zero: Int,
             edges: MutableList<Edge>,
-            stop: Cancellation,
+            stop: ExecutionControl,
         ): Boolean {
             stop.charge(1)
             if (stop()) return false

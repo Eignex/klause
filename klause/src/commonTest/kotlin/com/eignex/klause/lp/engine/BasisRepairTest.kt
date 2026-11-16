@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.basis.BasisRepair
 import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.koblas.SparseMatrix
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -22,7 +22,7 @@ class BasisRepairTest {
         val primary = BasisArithmeticException("preparation callback")
         var armed = false
         var factorCalls = 0
-        val cancellation = Cancellation { if (armed) throw primary else false }
+        val cancellation = ExecutionControl { if (armed) throw primary else false }
         RevisedSimplex(
             model,
             basisSolverFactory = { matrix ->
@@ -89,7 +89,7 @@ class BasisRepairTest {
             var fallbacks = 0
             var armed = false
             val failure = BasisArithmeticException("callback")
-            val control = BasisRepairControl(Cancellation { if (armed) throw failure else false }, limit)
+            val control = BasisRepairControl(ExecutionControl { if (armed) throw failure else false }, limit)
             val solver = object : BasisSolver by delegate {
                 override fun refactorizeRepairing(basicIndex: IntArray, control: BasisRepairControl): BasisRepair? {
                     armed = true
@@ -235,7 +235,7 @@ class BasisRepairTest {
         )
         assertEquals(
             ExactBasisRankEvidence.CANCELLED,
-            exactBasisRankEvidence(model, intArrayOf(0, 1), cancellation = Cancellation { true }),
+            exactBasisRankEvidence(model, intArrayOf(0, 1), cancellation = ExecutionControl { true }),
         )
     }
 

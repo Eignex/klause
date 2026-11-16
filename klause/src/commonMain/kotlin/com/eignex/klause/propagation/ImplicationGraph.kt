@@ -2,7 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
 /**
@@ -13,7 +13,7 @@ import com.eignex.util.collections.IntArrayList
  */
 internal fun Problem.propagatedImplicationGraph(
     maxCandidates: Int,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): Array<IntArray> {
     val adjacency = Array(2 * numBoolVars) { IntArrayList() }
     for (variable in freeBooleanProbeCandidates(maxCandidates, cancellation)) {
@@ -28,7 +28,7 @@ private fun Problem.recordImplications(
     variable: Int,
     value: Boolean,
     adjacency: Array<IntArrayList>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ) {
     if (cancellation()) return
     val implied = propagate(Assumptions.None.withBool(variable, value), cancellation)

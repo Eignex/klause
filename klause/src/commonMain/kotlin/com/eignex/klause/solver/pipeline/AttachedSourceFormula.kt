@@ -6,7 +6,7 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.ir.TranscendentalProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal sealed interface AttachedSourceFormula {
     val source: SourceSemanticsOwner
@@ -47,7 +47,7 @@ internal sealed interface NativeSourceExecution {
 internal fun prepareNativeSource(
     request: SourceSetupRequest,
     formula: AttachedSourceFormula,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): SourceProblemRoute.NativeFormula {
     if (stop()) return SourceProblemRoute.NativeFormula(null)
     val visits = when (formula) {

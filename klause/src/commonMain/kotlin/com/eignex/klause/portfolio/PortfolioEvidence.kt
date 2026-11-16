@@ -6,41 +6,45 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
 import com.eignex.klause.solver.incumbent.CompletedEngineResult
+import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.klause.solver.incumbent.EvidenceKind
-import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelEvidence
 import com.eignex.klause.solver.incumbent.ModelEvidenceVerifier
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PortfolioEvidence(
     private val model: ModelIdentity,
     private val witnessVerifier: CandidateVerifier<Sample, Double?>,
 ) {
     private var sourceScope: SourceScope? = null
-    private var scopeCancellation: Cancellation = Cancellation.Never
+    private var scopeCancellation: ExecutionControl = ExecutionControl.Never
     private var invocation: EngineInvocation? = null
 
     fun bindInvocation(
-        binding: EngineInvocation, cancellation: Cancellation = Cancellation.Never,
+        binding: EngineInvocation, cancellation: ExecutionControl = ExecutionControl.Never,
     ): PortfolioEvidence = also {
         require(model.matches(binding.model)) { "runtime invocation differs from the portfolio model" }
         require(invocation?.matches(binding) != false) { "portfolio cannot change its runtime invocation" }
         require(sourceScope == null || sourceScope == binding.scope) { "portfolio has another capture scope" }
         invocation = binding
-        scopeCancellation = scopeCancellation or cancellation
+        scopeCancellation = scopeCancellation.withAccounting(
+            if (scopeCancellation.accounting != null) scopeCancellation else cancellation,
+        ) or cancellation
         binding.scope?.let { bindSourceScope(it, cancellation) }
     }
 
     fun bindSourceScope(
-        scope: SourceScope, cancellation: Cancellation = Cancellation.Never,
+        scope: SourceScope, cancellation: ExecutionControl = ExecutionControl.Never,
     ): PortfolioEvidence = also {
         require(sourceScope == null || sourceScope == scope) { "portfolio cannot change its source invocation" }
         require(invocation == null || invocation?.scope == scope) { "portfolio has another runtime capture scope" }
         sourceScope = scope
-        scopeCancellation = scopeCancellation or cancellation
+        scopeCancellation = scopeCancellation.withAccounting(
+            if (scopeCancellation.accounting != null) scopeCancellation else cancellation,
+        ) or cancellation
     }
 
     private val verifier = ModelEvidenceVerifier(model, witnessVerifier)

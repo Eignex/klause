@@ -19,14 +19,14 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import kotlin.time.Duration.Companion.seconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import kotlin.time.Duration.Companion.seconds
 
 internal object RewriteStructureProfile {
     @JvmStatic
@@ -44,7 +44,7 @@ internal object RewriteStructureProfile {
         )
         require(arms.size in 1..2 && arms.distinct().size == arms.size)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
-        val containing = Cancellation.after(120.seconds)
+        val containing = ExecutionControl.after(120.seconds)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
         out.resolve("request.txt").writeText(args.joinToString("\n"))
         val sourceStarted = System.nanoTime()
@@ -60,7 +60,7 @@ internal object RewriteStructureProfile {
         out.resolve("source.xml").writeBytes(bytes)
         for ((label, preserve, order) in arms) {
             val started = System.nanoTime()
-            val stop = containing or Cancellation.after(30.seconds)
+            val stop = containing or ExecutionControl.after(30.seconds)
             val parsed = Xcsp3.parse(bytes.decodeToString(), recoveryCancellation = stop)
             require(parsed.problem.numIntVars + parsed.problem.numBoolVars <= 4096 &&
                 parsed.problem.numFactors <= 4096)
@@ -164,7 +164,7 @@ internal object RewriteStructureProfile {
         }
     }
 
-    private fun writeModel(file: File, problem: Problem, objective: LinearObjective?, stop: Cancellation) {
+    private fun writeModel(file: File, problem: Problem, objective: LinearObjective?, stop: ExecutionControl) {
         val snapshot = buildJsonObject {
             put("objective", objective.toString())
             put("booleans", problem.numBoolVars)

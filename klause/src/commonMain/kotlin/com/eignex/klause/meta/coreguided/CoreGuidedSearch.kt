@@ -32,8 +32,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.SchedulingCancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.BIG_ONE
@@ -104,7 +103,7 @@ internal class CoreGuidedSearch(
     private var corePreparation: Iterator<Unit>? = null
     private var queryPreparation: Iterator<Unit>? = null
     private var transitionPreparation: Iterator<Unit>? = null
-    private var preparationToken: Cancellation = Cancellation.Never
+    private var preparationToken: ExecutionControl = ExecutionControl.Never
     private var preparationVisits = factors.size.toLong() + objectiveTerms
     internal val preparationWork: Long get() = preparationVisits
     internal var thresholdVisits = 0L
@@ -164,7 +163,7 @@ internal class CoreGuidedSearch(
             ((queryPreparation != null || queryModel != null || queryPins != null) && query == null))
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -182,7 +181,7 @@ internal class CoreGuidedSearch(
         } ?: sliceMillis
         val sliceDuration = minOf(sliceMillis, remainingMillis).milliseconds
         val deadline = TimeSource.Monotonic.markNow() + sliceDuration
-        val segment = object : SchedulingCancellation {
+        val segment = object : ExecutionControl() {
             override val workScheduled: Boolean get() = token.workScheduled()
             override fun isCancelled(): Boolean = !workScheduled &&
                 (deadline.hasPassedNow() || (activeSlice?.elapsedNow() ?: Duration.ZERO) >= sliceDuration)
@@ -196,7 +195,7 @@ internal class CoreGuidedSearch(
         val allowance = if (remainingWork == null) offered else if (offered < 0L) remainingWork
         else minOf(offered, remainingWork)
         if (allowance == 0L) return null
-        val preparation = object : SchedulingCancellation {
+        val preparation = object : ExecutionControl() {
             override val workScheduled: Boolean get() = token.workScheduled()
             private val meter = object : RootWorkMeter {
                 override fun construction(entries: Long) = charge(entries)
@@ -206,7 +205,7 @@ internal class CoreGuidedSearch(
             override fun isCancelled(): Boolean = token() || segment() || allowanceExhausted ||
                 (allowance >= 0L && work - start >= allowance)
             override fun deadline() = listOfNotNull(token.deadline(), deadline).minOrNull()
-            override fun workMeter(): RootWorkMeter = meter
+            override val accounting: RootWorkMeter get() = meter
         }
         activeSlice = timeSource.markNow()
         preparationToken = preparation
@@ -215,15 +214,15 @@ internal class CoreGuidedSearch(
         } finally {
             activeTime += checkNotNull(activeSlice).elapsedNow()
             activeSlice = null
-            preparationToken = Cancellation.Never
+            preparationToken = ExecutionControl.Never
             if (offered >= 0L) workDebt = addWork(workDebt, (work - start - offered).coerceAtLeast(0L))
         }
     }
 
     private fun advance(
-        token: Cancellation,
-        preparation: Cancellation,
-        segment: Cancellation,
+        token: ExecutionControl,
+        preparation: ExecutionControl,
+        segment: ExecutionControl,
         start: Long,
         allowance: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -278,7 +277,8 @@ internal class CoreGuidedSearch(
             }
             val remaining = if (allowance < 0L) -1L else (allowance - (work - start)).coerceAtLeast(0L)
             val millis = (deadline - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
-            val traversalToken = token or Cancellation.until(deadline) or segment or Cancellation { allowanceExhausted }
+            val traversalToken =
+                token or ExecutionControl.until(deadline) or segment or ExecutionControl { allowanceExhausted }
             val result = try {
                 handle.runSlice(traversalToken.withLifetime(lifetime), millis, remaining)
             } catch (failure: SearchInitializationCancelled) {
@@ -474,7 +474,7 @@ internal class CoreGuidedSearch(
         return maximum
     }
 
-    private fun advancePreparation(builder: Iterator<Unit>, token: Cancellation): Boolean {
+    private fun advancePreparation(builder: Iterator<Unit>, token: ExecutionControl): Boolean {
         while (!token()) {
             if (!builder.hasNext()) return true
             builder.next()
@@ -511,7 +511,7 @@ internal class CoreGuidedSearch(
         }
     }.iterator()
 
-    private fun openQuery(token: Cancellation): ResumableSolve {
+    private fun openQuery(token: ExecutionControl): ResumableSolve {
         val baked = queryModel ?: bakeQuery().also { queryModel = it }
         return try {
             val queryParams = params.copy(

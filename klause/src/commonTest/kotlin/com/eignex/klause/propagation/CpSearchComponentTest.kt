@@ -26,7 +26,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -148,7 +148,7 @@ class CpSearchComponentTest {
         val thresholds = IntArray(128) { state.atomVarGe(0, it.toLong() + 1) }
         var armed = false
         val cp = CpSearchComponent(native)
-        val shared = SearchSession(listOf(cp), cancellation = Cancellation {
+        val shared = SearchSession(listOf(cp), cancellation = ExecutionControl {
             armed && state.atoms.truth[state.atomIdOf(thresholds[15])] == 1
         })
         assertIs<ComponentResult.Consistent>(shared.initialize())
@@ -176,7 +176,7 @@ class CpSearchComponentTest {
         val cp = CpSearchComponent(native)
         var armed = false
         var start = 0L
-        val shared = SearchSession(listOf(cp), cancellation = Cancellation { armed && native.work - start >= 128L })
+        val shared = SearchSession(listOf(cp), cancellation = ExecutionControl { armed && native.work - start >= 128L })
         assertIs<ComponentResult.Consistent>(shared.initialize())
         start = native.work
         armed = true
@@ -200,7 +200,7 @@ class CpSearchComponentTest {
             var cancelled = false
             val native = PropagationSession(
                 Problem(512, 0, emptyArray(), Array(512) { Clause(intArrayOf(Lit.make(it, true))) }),
-                cancellation = Cancellation { cancelled },
+                cancellation = ExecutionControl { cancelled },
             )
             val cp = CpSearchComponent(native)
             var publications = 0
@@ -536,7 +536,7 @@ class CpSearchComponentTest {
         var armed = false
         val propagation = PropagationSession(
             Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))))),
-            Cancellation { armed },
+            ExecutionControl { armed },
             propagationCancelFloor = 0,
         )
         val session = SearchSession(listOf(CpSearchComponent(propagation)))
@@ -552,7 +552,7 @@ class CpSearchComponentTest {
         var armed = false
         val propagation = PropagationSession(
             Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))))),
-            Cancellation { armed },
+            ExecutionControl { armed },
             propagationCancelFloor = 0,
         )
         val session = SearchSession(listOf(CpSearchComponent(propagation)))

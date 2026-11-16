@@ -26,7 +26,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntDisjointSet
 import com.eignex.util.numbers.BIG_ONE
@@ -63,7 +63,7 @@ internal fun verifyCapturedRealTolerance(
     source: Problem,
     sample: Sample,
     policy: SourceTolerance,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<Sample, Unit> =
     RealToleranceScope.of(source).verify(source, sample, policy, cancellation, integerRows = true)
 
@@ -74,7 +74,7 @@ internal fun verifyCapturedRealTolerance(
 // coordinates that share a relation form a component, and a component that contains a relation without one holds
 // exactly, declarations included, so such a relation never decides how an unrelated component is judged. Factors
 // over integers and Booleans alone are left to the engine that enforces them.
-internal fun capturedRealAcceptance(source: Problem, cancellation: Cancellation): FiniteSourceAcceptance? {
+internal fun capturedRealAcceptance(source: Problem, cancellation: ExecutionControl): FiniteSourceAcceptance? {
     val policy = source.semantics.effective.feasibilityTolerance
     if (policy == null || policy.isExact || source.numRealVars == 0) return null
     val scope = RealToleranceScope.of(source)
@@ -117,7 +117,7 @@ internal class RealToleranceScope private constructor(
         source: Problem,
         sample: Sample,
         policy: SourceTolerance,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         integerRows: Boolean,
     ): Verification<Sample, Unit> {
         if (sample.numRealVars != source.numRealVars || sample.numIntVars != source.numIntVars ||
@@ -205,7 +205,7 @@ internal fun Factor.hasToleranceReading(): Boolean = when (this) {
 private class ToleranceWitness(
     private val exactPoint: ExactRealPoint,
     private val policy: SourceTolerance,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
 ) {
     private val point = exactPoint.sample
     private val reals = exactPoint.reals
@@ -384,7 +384,7 @@ private class ToleranceWitness(
 }
 
 // `value^exponent` by repeated squaring, charging each product by its operand width; null when cancelled.
-private fun rationalPower(value: BigFraction, exponent: Int, cancellation: Cancellation): BigFraction? {
+private fun rationalPower(value: BigFraction, exponent: Int, cancellation: ExecutionControl): BigFraction? {
     var remaining = exponent
     var base = value
     var result = BigFraction.ONE
@@ -412,7 +412,7 @@ private fun powerBracket(
     magnitude: BigFraction,
     exponent: Int,
     bits: Int,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Pair<BigFraction, BigFraction>? {
     fun round(value: Dyadic, up: Boolean): Dyadic {
         val excess = value.mantissa.magnitudeBitLength() - bits
@@ -469,7 +469,7 @@ private fun slackedRow(
     row: LinearRow,
     sample: Sample,
     policy: SourceTolerance,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean? {
     val constants = row.constants
     val bound = when (constants) {

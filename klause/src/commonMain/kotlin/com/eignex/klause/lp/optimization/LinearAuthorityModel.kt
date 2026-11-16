@@ -8,7 +8,7 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LinearAuthorityModel private constructor(
     private val original: List<ExactRationalInequality>,
@@ -51,7 +51,7 @@ internal class LinearAuthorityModel private constructor(
     fun lift(
         multipliers: List<BigFraction>,
         target: List<BigFraction>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): List<BigFraction>? {
         if (multipliers.size != rows.size || target.size != columns.size ||
             !multipliers.admittedSourcePoint() || !target.admittedSourcePoint()) return null
@@ -85,7 +85,7 @@ internal class LinearAuthorityModel private constructor(
         fun prepare(
             rows: List<ExactRationalInequality>,
             variables: Int,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             inactive: Set<Int> = emptySet(),
         ): LinearAuthorityModel? {
             fun identity(conflict: List<BigFraction>? = null) = LinearAuthorityModel(

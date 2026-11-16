@@ -14,7 +14,12 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
 import com.eignex.klause.solver.search.SearchNodePolicy
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
@@ -22,11 +27,6 @@ import java.util.Base64
 import java.util.HexFormat
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 internal object LinearRootOpeningProfile {
     @JvmStatic
@@ -71,7 +71,7 @@ internal object LinearRootOpeningProfile {
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
         val parsingStarted = System.nanoTime()
-        val parsingStop = Cancellation.after(OPENING_BUDGET_MS.milliseconds)
+        val parsingStop = ExecutionControl.after(OPENING_BUDGET_MS.milliseconds)
         val admitted = SmtLib.parse(bytes.decodeToString(), cancellation = parsingStop)
         val compiled = admitted
         val parsingNs = System.nanoTime() - parsingStarted
@@ -97,7 +97,7 @@ internal object LinearRootOpeningProfile {
             return
         }
         val deadlineStarted = System.nanoTime()
-        val stop = Cancellation.after(OPENING_BUDGET_MS.milliseconds)
+        val stop = ExecutionControl.after(OPENING_BUDGET_MS.milliseconds)
         val params = TheoryParams(timeout = stop, randomSeed = SEED)
         // Reflection keeps internal root inspection out of the published solver API.
         val factory = OpenTheoryPipeline.javaClass.declaredMethods.single {

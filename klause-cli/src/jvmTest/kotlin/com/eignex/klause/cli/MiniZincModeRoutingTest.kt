@@ -4,13 +4,13 @@ import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.solver.result.SolveStats
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class MiniZincModeRoutingTest(private val engine: String, private val sourceText: String) {

@@ -8,7 +8,7 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PolynomialCondition(
     bools: Map<Int, Boolean> = emptyMap(),
@@ -91,7 +91,7 @@ internal class PolynomialTheoryInvocation(
 
     fun check(
         condition: PolynomialCondition = PolynomialCondition(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): QfNraResult {
         val query = prepareCheck(condition, cancellation)
         while (true) query.next()?.let { return it }
@@ -99,14 +99,14 @@ internal class PolynomialTheoryInvocation(
 
     fun prepareCheck(
         condition: PolynomialCondition = PolynomialCondition(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): Iterator<QfNraResult?> {
         check(!closed) { "polynomial invocation is closed" }
         check(!active) { "polynomial invocation has an active query" }
         active = true
         val remaining = params.maximumWork?.let { (it - completedStats.workSpent).coerceAtLeast(0) }
         val query = PolynomialRetainedQuery(formula, boolCount, realCount,
-            params.copy(cancellation = params.cancellation or cancellation, maximumWork = remaining),
+            params.copy(cancellation = queryControls( cancellation), maximumWork = remaining),
             PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper),
             witness.takeIf { condition.lower.isEmpty() && condition.upper.isEmpty() }, checkedCellObserver)
         pending = query
@@ -140,11 +140,11 @@ internal class PolynomialTheoryInvocation(
         }
     }
 
-    fun preferredBool(variable: Int, cancellation: Cancellation): Boolean? {
+    fun preferredBool(variable: Int, cancellation: ExecutionControl): Boolean? {
         if (closed || active || variable !in 0 until boolCount) return null
         val point = witness ?: return null
         val remaining = params.maximumWork?.let { (it - completedStats.workSpent).coerceAtLeast(0) }
-        val work = QfNraWork(params.copy(cancellation = params.cancellation or cancellation, maximumWork = remaining))
+        val work = QfNraWork(params.copy(cancellation = queryControls( cancellation), maximumWork = remaining))
         return try {
             PolynomialArithmetic(work, params.polynomialLimits).step()
             point.boolValue(variable)
@@ -153,6 +153,11 @@ internal class PolynomialTheoryInvocation(
         } finally {
             completedStats = combine(completedStats, work.snapshot())
         }
+    }
+
+    private fun queryControls(cancellation: ExecutionControl): ExecutionControl {
+        val owner = if (params.cancellation.accounting != null) params.cancellation else cancellation
+        return params.cancellation.withAccounting(owner) or cancellation
     }
 
     override fun close() {

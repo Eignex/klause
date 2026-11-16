@@ -8,7 +8,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -90,7 +90,7 @@ class SourceResultCaptureTest {
             result,
             objective,
             "fixture-engine",
-            cancellation = Cancellation { true },
+            cancellation = ExecutionControl { true },
         )
 
         assertEquals(result, captured)

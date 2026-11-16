@@ -5,11 +5,11 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun PreparedFactorProjections.finiteLinearModel(
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Problem? = linearTheoryModel(EncodingTarget.LINEAR,
     problem.factors.indices.filter { problem.factors[it].variables.reals.isNotEmpty() },
     (0 until problem.numIntVars).associate { SourceIntId(it) to sample.exactIntValue(it) }, cancellation,

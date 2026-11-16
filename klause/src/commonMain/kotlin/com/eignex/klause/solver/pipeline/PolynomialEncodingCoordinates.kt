@@ -5,21 +5,23 @@ import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.ScanMeter
 
 internal fun validatePolynomialEncodingCoordinates(
     formula: PolynomialRealFormula?,
     expression: PolynomialExpression?,
     realIds: Set<Int>,
     booleanIds: Set<Int>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ) {
+    ScanMeter(cancellation,
+).use { scan ->
+        if (!scan.check()) throw PolynomialSourceInterrupted()
     val pending = ArrayDeque<Any>()
     formula?.let(pending::addLast)
     expression?.let(pending::addLast)
-    while (pending.isNotEmpty()) {
-        if (cancellation()) throw PolynomialSourceInterrupted()
-        cancellation.charge(1)
+    while (pending.isNotEmpty()&& scan.visit(1L)) {
         when (val node = pending.removeLast()) {
             is PolynomialRealFormula.Constant, is PolynomialExpression.Constant -> Unit
             is PolynomialRealFormula.BooleanVariable -> require(node.id.index in booleanIds) {
@@ -47,5 +49,6 @@ internal fun validatePolynomialEncodingCoordinates(
             is PolynomialExpression.Product -> node.operands.forEach(pending::addLast)
         }
     }
-    if (cancellation()) throw PolynomialSourceInterrupted()
+    if (pending.isNotEmpty() || !scan.check()) throw PolynomialSourceInterrupted()
+}
 }

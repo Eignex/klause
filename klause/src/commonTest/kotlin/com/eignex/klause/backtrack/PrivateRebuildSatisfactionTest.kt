@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.withLifetime
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -279,9 +279,9 @@ class PrivateRebuildSatisfactionTest {
         var result: SolveResult? = null
 
         search.use {
-            assertNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L))
+            assertNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0L))
             repeat(16) {
-                if (result == null) result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L)
+                if (result == null) result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L)
             }
         }
 
@@ -326,7 +326,7 @@ class PrivateRebuildSatisfactionTest {
             val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake()
 
             val result = BacktrackSolver(source).solve(BacktrackParams(
-                nativeSat = native, privateRebuildWork = 65_536L, cancellation = Cancellation { true },
+                nativeSat = native, privateRebuildWork = 65_536L, cancellation = ExecutionControl { true },
             ))
 
             assertIs<SolveResult.Unknown>(result)
@@ -342,7 +342,7 @@ class PrivateRebuildSatisfactionTest {
             )).bake()
 
             val result = BacktrackSolver(source).solve(BacktrackParams(
-                privateRebuildWork = work, cancellation = Cancellation { true },
+                privateRebuildWork = work, cancellation = ExecutionControl { true },
             ))
 
             assertIs<SolveResult.Unsat>(result)
@@ -358,12 +358,12 @@ class PrivateRebuildSatisfactionTest {
         )).bake()
         var openingEnded = false
         val search = BacktrackSolver(source).resumableSolve(BacktrackParams(
-            privateRebuildWork = 65_536L, cancellation = Cancellation { openingEnded },
+            privateRebuildWork = 65_536L, cancellation = ExecutionControl { openingEnded },
             variableSelector = InputOrder, valueSelector = IndomainMin,
         ))
         openingEnded = true
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) }
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) }
 
         val accepted = assertIs<SolveResult.Sat>(result)
         assertEquals(1L, accepted.stats.search.learning["privateRebuildSourceAccepted"])
@@ -377,7 +377,7 @@ class PrivateRebuildSatisfactionTest {
                 Clause(intArrayOf(4, 6)), Clause(intArrayOf(5, 7)),
             )).bake()
             var live: ResumableSolve? = null
-            val cancellation = Cancellation {
+            val cancellation = ExecutionControl {
                 (live?.stats?.search?.learning?.get("privateRebuildSourceCheckWork") ?: 0L) > 0L
             }
             val search = BacktrackSolver(source).resumableSolve(BacktrackParams(
@@ -403,24 +403,25 @@ class PrivateRebuildSatisfactionTest {
                 Clause(intArrayOf(4, 6)), Clause(intArrayOf(5, 7)),
             )).bake()
             var live: ResumableSolve? = null
-            val cancellation = Cancellation {
+            val cancellation = ExecutionControl {
                 (live?.stats?.search?.learning?.get("privateRebuildConsumers") ?: 0L) > 0L
             }
             val params = BacktrackParams(privateRebuildWork = 65_536L,
                 variableSelector = InputOrder, valueSelector = IndomainMin,
-                cancellation = if (lifetime) Cancellation.Never.withLifetime(cancellation) else Cancellation.Never)
+                cancellation = if (lifetime) ExecutionControl.Never
+                    .withLifetime(cancellation) else ExecutionControl.Never)
             val search = BacktrackSolver(source).resumableSolve(params)
             live = search
 
             val result = search.use {
-                it.runSlice(if (lifetime) Cancellation.Never else cancellation, Long.MAX_VALUE, -1L)
+                it.runSlice(if (lifetime) ExecutionControl.Never else cancellation, Long.MAX_VALUE, -1L)
             }
 
             val stopped = assertIs<SolveResult.Unknown>(result)
             assertEquals(1L, stopped.stats.search.learning["privateRebuildConsumers"])
             assertEquals(1L, stopped.stats.search.learning["privateRebuildRetired"])
             assertNull(stopped.stats.search.learning["privateRebuildSourceAccepted"])
-            assertEquals(stopped, search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            assertEquals(stopped, search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
         }
     }
 

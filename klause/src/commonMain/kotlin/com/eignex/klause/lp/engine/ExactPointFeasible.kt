@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -53,7 +53,7 @@ internal fun recoverExactPointWitness(
     model: LpModel,
     primal: DoubleArray,
     request: LpRefinementRequest,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     observer: LpCertificationObserver? = null,
 ): ExactPointRecovery {
     val meter = RefinementMeter(request.effectiveLimits(), request.pointCache, cancellation, perAttempt = true)

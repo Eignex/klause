@@ -18,7 +18,7 @@ import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.verifyOpenWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 
@@ -33,7 +33,7 @@ fun Assumptions.sourceCondition(): SourceCondition {
 fun Problem.sourceProofContext(
     scope: SourceScope,
     objective: LinearObjective? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): SourceProofContext? {
     if (scope.revision.semantics != "klause-ir-exact-v1" || cancellation()) return null
     val coordinates = buildSet {
@@ -128,7 +128,7 @@ fun Problem.sourceProofContext(
     }
     val completeAbsSource = source.hasCompleteAbsSource()
     val checker = object : SourceSemanticsChecker {
-        override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
+        override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck {
             val pins = restrictionChecker.witness(sample, scope, cancellation)
             if (pins != SourceEvidenceCheck.Checked) return pins
             if (completeAffine || completeAbsSource) {
@@ -162,10 +162,11 @@ fun Problem.sourceProofContext(
         }
 
         override fun objectiveEquals(
-            sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
+            sample: Sample, value: SourceValue, scope: SourceScope, cancellation: ExecutionControl,
         ): SourceEvidenceCheck = restrictionChecker.objectiveEquals(sample, value, scope, cancellation)
 
-        override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
+        override fun ray(claim: SourceClaim.Ray, scope: SourceScope,
+            cancellation: ExecutionControl): SourceEvidenceCheck {
             if (!completeAffine) {
                 return SourceEvidenceCheck.Unavailable("original source recession derivation unavailable")
             }

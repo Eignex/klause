@@ -2,7 +2,7 @@ package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.abs
@@ -28,7 +28,7 @@ internal class LinearToleranceQualification(
     private val objectiveConstant: BigFraction,
     private val minimize: Boolean,
     tolerance: SourceTolerance,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
 ) {
     private val absolute = BigFraction.of(tolerance.absolute.numerator, tolerance.absolute.denominator)
     private val relative = BigFraction.of(tolerance.relative.numerator, tolerance.relative.denominator)

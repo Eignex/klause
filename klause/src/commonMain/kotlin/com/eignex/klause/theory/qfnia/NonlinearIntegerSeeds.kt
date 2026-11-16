@@ -7,11 +7,11 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.lowering.polynomialSelectionEncoding
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 internal fun NonlinearIntegerProblem.integerSeeds(
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     step: () -> Unit = {},
 ): List<BigFraction> {
     val values = integerCoordinates.associateWith { BigFraction.ZERO }.toMutableMap()

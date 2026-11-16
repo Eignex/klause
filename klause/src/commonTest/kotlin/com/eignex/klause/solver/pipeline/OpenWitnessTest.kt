@@ -24,7 +24,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.refuteOpenWitness
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.minus
@@ -143,7 +143,7 @@ class OpenWitnessTest {
         assertNull(publication.value)
         assertEquals(
             SourceEvidenceCheck.Checked,
-            publication.invocation.checkWitness(publication.sample, Cancellation.Never),
+            publication.invocation.checkWitness(publication.sample, ExecutionControl.Never),
         )
     }
 

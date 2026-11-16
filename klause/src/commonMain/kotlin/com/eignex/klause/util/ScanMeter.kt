@@ -1,32 +1,90 @@
 package com.eignex.klause.util
 
-// Charges a scan's visits to its token's meter and polls the token in strides. Reading a composite token can read
-// the clock, which costs more than a visit, so visits accumulate locally and every due poll flushes them first:
-// each performed visit is charged exactly once, through the meter the token held when the scan began, and a stop is
-// seen at most one stride of work late. [check] flushes and polls at once, for entry and for the boundaries where a
-// scan publishes its result or hands its token to nested work.
-internal class ScanMeter(private val cancellation: Cancellation) {
-    private val stride = PollStride()
-    private val meter = cancellation.workMeter()
-    private var pending = 0L
+import kotlin.jvm.JvmField
+
+// Clock cadence counts visits independently of their work prices. Native allowances admit credit before a scan
+// advances; other sinks accumulate completed debits. A boundary settles credit and observes the containing stop.
+internal class ScanMeter(private val cancellation: ExecutionControl) : AutoCloseable {
+    @JvmField var remaining = 0
+    @JvmField val polling = cancellation.stopPolling
+    private val meter = cancellation.accounting
+    private val source = cancellation.admission
+    @JvmField val native = source?.takeIf { it.metered }
+    @JvmField var reservation: WorkReservation? = null
+    @JvmField var used = 0
+    @JvmField var pending = 0L
+    @JvmField
     var stopped = false
-        private set
+        @Suppress("NOTHING_TO_INLINE") // Scalar scans keep only their local counters in the loop.
+    inline
 
     fun visit(units: Long): Boolean {
         if (stopped) return false
-        pending += units
-        return !stride.due(units) || check()
+        if ((polling?.due(1) ?: (remaining-- <= 0)) && !poll()) return false
+        if (native == null) {
+        pending += minOf( units, Long.MAX_VALUE - pending)
+        return true
+        }
+        val held = reservation
+        if (held != null && units <= held.capacity - used) {
+            used += units.toInt()
+            if (used == held.capacity) flush()
+            return !stopped
+        }
+        return admit(units) }
+
+    private fun admit(units: Long): Boolean {
+        var left = units
+        var grants = 0
+        while (left > 0L) {
+            if (reservation == null) {
+                while (reservation == null) {
+                    reservation = checkNotNull(native).reserve(65536)
+                    if (reservation == null && ! check()) return false
+                }
+                if (++grants == 64) {
+                    if (!check()) return false
+                    grants = 0
+                    continue
+                }
+            }
+            val held = checkNotNull(reservation)
+            val count = minOf(left, (held.capacity - used).toLong()).toInt()
+            used += count
+            left -= count
+            if (used == held.capacity) {
+                flush()
+                if (stopped) return false
+            }
+        }
+        return true
     }
 
     fun check(): Boolean {
         flush()
-        if (!stopped && cancellation()) stopped = true
+        return if (polling?.due(1) != false) poll() else !stopped
+    }
+
+    private fun poll(): Boolean {
+        remaining = 1023
+        if (native == null) flush()
+        if (!stopped && ( cancellation() || source?.exhausted == true)) stopped = true
+        if (stopped) flush()
         return !stopped
     }
 
     fun flush() {
-        if (pending == 0L) return
-        meter?.charge(pending)
+        val held = reservation
+        val consumed = used
+        reservation = null
+        used = 0
+        held?.settle (consumed)
+        val completed =pending
         pending = 0L
+        if (completed > 0L)
+        meter?.charge(completed)
+        if (source?.exhausted == true) stopped = true
     }
+
+    override fun close() = flush()
 }

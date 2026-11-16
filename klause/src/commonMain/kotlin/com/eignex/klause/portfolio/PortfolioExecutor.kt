@@ -3,7 +3,7 @@ package com.eignex.klause.portfolio
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration
 
 /**
@@ -12,7 +12,7 @@ import kotlin.time.Duration
  */
 interface PortfolioExecutor : AutoCloseable {
     /** Solve (satisfaction), honouring [cancellation]. */
-    fun solve(cancellation: Cancellation = Cancellation.Never): SolveResult
+    fun solve(cancellation: ExecutionControl = ExecutionControl.Never): SolveResult
 
     /**
      * Branch-and-bound minimisation, honouring [cancellation]. When [onImprovement] is set it fires
@@ -24,7 +24,7 @@ interface PortfolioExecutor : AutoCloseable {
      * such ordering; see it.
      */
     fun minimize(
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         onImprovement: ((AttributedImprovement) -> Unit)? = null,
     ): MinimizeResult
 }

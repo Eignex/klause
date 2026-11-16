@@ -42,7 +42,7 @@ import com.eignex.klause.solver.pipeline.PortfolioPlan
 import com.eignex.klause.solver.pipeline.PortfolioPlanRequest
 import com.eignex.klause.solver.pipeline.planPortfolio
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -76,7 +76,7 @@ class PortfolioBuilderTest {
             acceptedIncumbents = IncumbentSource { reads++; canonical.current() }).single()
 
         val first = factory.materialize(0, 0L, null).use {
-            it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never).first()
+            it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).first()
         }
 
         assertTrue(reads > 0)
@@ -92,7 +92,7 @@ class PortfolioBuilderTest {
             val workers = PortfolioBuilder.build(problem, scenario)
 
             try {
-                workers.forEach { it.solve(Cancellation.Never) }
+                workers.forEach { it.solve(ExecutionControl.Never) }
 
                 val expected = if (integerCount == 0) 1L else 0L
                 assertTrue(workers.all {
@@ -115,7 +115,7 @@ class PortfolioBuilderTest {
         val workers = PortfolioBuilder.build(problem, scenario)
 
         try {
-            workers.forEach { it.solve(Cancellation.Never) }
+            workers.forEach { it.solve(ExecutionControl.Never) }
             val samples = workers.map { requireNotNull(it.sharingMeter).snapshot().clauses }
             assertTrue(samples.any { (it["seenDeclined"] ?: 0L) + (it["poolDeclined"] ?: 0L) > 0L })
             assertTrue(samples.all { it.getValue("peakPoolOwnedBytes") == 0L })
@@ -134,7 +134,7 @@ class PortfolioBuilderTest {
 
             try {
                 for (worker in workers) {
-                    worker.solve(Cancellation.Never)
+                    worker.solve(ExecutionControl.Never)
                     val stats = requireNotNull(worker.sharingMeter).snapshot().clauses
                     if (enabled) {
                         assertTrue(stats.getValue("accountingWork") > 0L)
@@ -184,7 +184,7 @@ class PortfolioBuilderTest {
 
         try {
             val core = workers.single { it.label == "bt/core-guided" }
-            requireNotNull(core.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never)).use {
+            requireNotNull(core.newResumableSearch({ Double.POSITIVE_INFINITY }, ExecutionControl.Never)).use {
                 assertEquals(2_000L, it.stats.coreGuided.activeMillisLimit)
             }
         } finally {
@@ -209,7 +209,8 @@ class PortfolioBuilderTest {
             ))
         }
         val canonical = preparations[0]
-        val view = assertNotNull(ObjectiveCoordinateView.create(canonical, preparations[1], null, Cancellation.Never))
+        val view = assertNotNull(ObjectiveCoordinateView.create(canonical, preparations[1], null,
+            ExecutionControl.Never))
         val problem = canonical.executableProblem()
         val scenario = PortfolioScenario.sequential(Kind.COP)
         val profile = ProblemProfile.of(problem, true)
@@ -347,7 +348,7 @@ class PortfolioBuilderTest {
             val worker = factory.materialize(0, 3L, null)
 
             worker.use {
-                val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+                val result = worker.solve(ExecutionControl.Never, maxInstructions = 10_000)
 
                 assertFalse("exact-neighborhood" in worker.label)
                 assertNotNull(assertIs<SolveResult.Sat>(result).assignment.exactReals)
@@ -389,7 +390,7 @@ class PortfolioBuilderTest {
             val worker = factory.materialize(0, 3L, NodeBudget(10_000))
 
             worker.use {
-                val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+                val result = worker.solve(ExecutionControl.Never, maxInstructions = 10_000)
 
                 val sample = assertIs<SolveResult.Sat>(result).assignment
                 assertNull(sample.exactReals)
@@ -433,7 +434,7 @@ class PortfolioBuilderTest {
         val worker = factory.materialize(0, 3L, NodeBudget(0))
 
         worker.use {
-            val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+            val result = worker.solve(ExecutionControl.Never, maxInstructions = 10_000)
 
             assertIs<SolveResult.Unknown>(result)
             assertEquals(0, checks)
@@ -511,7 +512,8 @@ class PortfolioBuilderTest {
         val worker = PortfolioBuilder.build(problem, scenario, objective = LinearObjective()).single()
 
         worker.use {
-            val result = it.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never, maxInstructions = 0).last()
+            val result = it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never,
+                maxInstructions = 0).last()
 
             assertEquals(
                 setOf("preparation", "seeding", "selection", "application", "publication", "other"),
@@ -639,7 +641,7 @@ class PortfolioBuilderTest {
         val scenario = PortfolioScenario(cores = 1, arms = 1, kind = Kind.CSP, engine = EngineMix.LOCAL_SEARCH)
         val worker = PortfolioBuilder.build(continuous, scenario).single()
 
-        val result = worker.solve(Cancellation.Never, maxInstructions = 10_000)
+        val result = worker.solve(ExecutionControl.Never, maxInstructions = 10_000)
 
         assertNotNull(assertIs<SolveResult.Sat>(result).assignment.exactReals)
     }

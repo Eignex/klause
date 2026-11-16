@@ -9,7 +9,7 @@ import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Capture an algebraic scalar as an exact real coordinate. */
 fun AlgebraicReal.toExactRealValue(): ExactRealValue = ExactRealValue(ExactRealExpression.Algebraic(this))
@@ -21,7 +21,7 @@ fun BigFraction.toExactRealValue(): ExactRealValue = AlgebraicArithmetic().ratio
 fun ExactRealValue.approximate(): Double {
     rational?.let { return it.toDouble() }
     var polls = 0
-    val stop = Cancellation { ++polls > 100000 }
+    val stop = ExecutionControl { ++polls > 100000 }
     return try {
         val arithmetic = ExactRealArithmetic(
             TranscendentalArithmetic(stop, maximumWork = 100000),
@@ -45,7 +45,7 @@ fun ExactRealValue.approximate(): Double {
 /** Certified comparison; null means the available exact identities and enclosures did not decide it. */
 fun ExactRealValue.compareExactly(other: ExactRealValue): Int? {
     var polls = 0
-    val stop = Cancellation { ++polls > 100000 }
+    val stop = ExecutionControl { ++polls > 100000 }
     return try {
         ExactRealArithmetic(
             TranscendentalArithmetic(stop, maximumWork = 100000),

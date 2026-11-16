@@ -14,8 +14,7 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.remap
 import com.eignex.klause.ir.requireVariableCounts
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.ArithmeticBudget
 
 internal class PolynomialObjectiveEvidence(
     val formula: PolynomialRealFormula,
@@ -69,7 +68,9 @@ internal fun solvePolynomialObjectiveImage(
     condition: PolynomialCondition = PolynomialCondition(),
 ): PolynomialObjectiveResult {
     val work = ObjectiveImageWork(params)
-    val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
+    val arithmetic = PolynomialArithmetic(work, params.polynomialLimits).also {
+        work.execution = it.execution
+    }
     val algebraic = AlgebraicArithmetic(arithmetic)
     return try {
         arithmetic.step()
@@ -107,7 +108,9 @@ internal fun solvePolynomialObjectiveImage(
         for (cell in 0..2L * roots.size) {
             arithmetic.step()
             val root = (cell / 2).toInt()
-            val value = if (cell and 1L != 0L) roots[root] else algebraic.rational(
+            val value = if (cell and 1L != 0L)
+                roots[root] else
+                algebraic.rational(
                 algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)),
             )
             val query = PolynomialRealFormula.And(listOf(
@@ -141,7 +144,8 @@ internal fun solvePolynomialObjectiveImage(
                         val atom = original.atoms[index]
                         if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates)))) {
                             PolynomialFormula.TRUE
-                        } else PolynomialFormula.FALSE
+                        } else
+                            PolynomialFormula.FALSE
                     }
                     val sourceBools = IntArray(boolCount) {
                         arithmetic.step()
@@ -224,19 +228,9 @@ internal fun algebraicFixing(
     ))
 }
 
-private class ObjectiveImageWork(private val params: QfNraParams) : Cancellation, WorkMeter {
+private class ObjectiveImageWork(params: QfNraParams) : ArithmeticBudget(params.cancellation, params.maximumWork) {
     var projected: Long = 0
     var lifted: Long = 0
-    private var spent: Long = 0
-    val limitReached: Boolean get() = params.maximumWork?.let { spent >= it } == true
-    override fun isCancelled(): Boolean = limitReached || params.cancellation()
-    override fun deadline() = params.cancellation.deadline()
-    override fun workMeter(): WorkMeter = this
-    override fun charge(units: Long) {
-        require(units >= 0)
-        spent = sum(spent, units)
-        params.cancellation.charge(units)
-    }
     fun snapshot(): QfNraStats = QfNraStats(projected, lifted, spent)
 }
 

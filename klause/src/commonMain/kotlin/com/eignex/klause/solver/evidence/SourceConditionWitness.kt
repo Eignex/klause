@@ -7,11 +7,11 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 internal fun SourceCondition.checkWitness(
-    sample: Sample, cancellation: Cancellation = Cancellation.Never,
+    sample: Sample, cancellation: ExecutionControl = ExecutionControl.Never,
 ): SourceEvidenceCheck = try {
     val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
     arithmetic.arithmetic.step()

@@ -11,7 +11,7 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.encodingPreparationScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class FloatGridColumn(
     val source: SourceRealId,
@@ -45,7 +45,7 @@ internal class FloatGridDefinition(
 
     fun retainedReal(source: Int): Int = retained[source]
 
-    fun bind(owner: Any, cancellation: Cancellation): FloatGridPreparation {
+    fun bind(owner: Any, cancellation: ExecutionControl): FloatGridPreparation {
         val stop = cancellation.encodingPreparationScope()
         stop.charge(columns.size.toLong() + retained.size + origins.size)
         if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
@@ -62,7 +62,7 @@ internal class FloatGridMapping(
     retainedReals: IntArray,
     factorOrigins: IntArray,
     private val owner: Any,
-    private val containingCancellation: Cancellation,
+    private val containingCancellation: ExecutionControl,
 ) {
     private val capturedColumns = columns.toList()
     private val retainedReals = retainedReals.copyOf()
@@ -115,10 +115,10 @@ internal class FloatGridMapping(
 
     fun definition(): FloatGridDefinition = FloatGridDefinition(source, target, capturedColumns, retainedReals, origins)
 
-    fun guardedCancellation(cancellation: Cancellation): Cancellation =
+    fun guardedCancellation(cancellation: ExecutionControl): ExecutionControl =
         (cancellation or containingCancellation).encodingPreparationScope()
 
-    fun reconstruct(problem: Problem, sample: Sample, cancellation: Cancellation): Sample? {
+    fun reconstruct(problem: Problem, sample: Sample, cancellation: ExecutionControl): Sample? {
         requireTarget(problem)
         require(sample.coordinateFrame == null || sample.coordinateFrame === target) {
             "float reconstruction belongs to a different coordinate frame"

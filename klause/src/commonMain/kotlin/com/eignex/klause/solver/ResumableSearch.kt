@@ -6,7 +6,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -37,7 +37,7 @@ interface ResumableSearch : AutoCloseable {
      * `true` and further calls return that same verdict without doing work.
      */
     fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? = runSlice(global, sliceMillis, sliceNodes = -1L, onIncumbent)
@@ -54,10 +54,10 @@ interface ResumableSearch : AutoCloseable {
      * So with a node budget armed, [sliceMillis] is only an outer bound: pass [Long.MAX_VALUE] for a slice that is
      * reproducible whatever it costs, or a finite time for one that must not run long when its nodes turn out to
      * be expensive. Either way the pause lands where a node budget would land it. [global] still carries the
-     * whole-solve deadline. Cancellation is cooperative; atomic engine work can overrun a slice.
+     * whole-solve deadline. ExecutionControl is cooperative; atomic engine work can overrun a slice.
      */
     fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -125,7 +125,7 @@ interface ResumableSolve : AutoCloseable {
      * verdict once the search has one, else null with the search paused for the next call. After a verdict,
      * [isDone] is true and further calls return that verdict without doing work.
      */
-    fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult?
+    fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult?
 
     /** True once [runSlice] has returned a verdict. */
     val isDone: Boolean
@@ -146,10 +146,10 @@ interface ResumableSolve : AutoCloseable {
 internal interface InstructionSlicedSolve : ResumableSolve {
     val auxiliaryWork: Long get() = 0L
 
-    fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long): SolveResult?
+    fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long): SolveResult?
 
     fun runScheduledSlice(
-        global: Cancellation, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
+        global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
         instructionsPerWork: Double,
     ): SolveResult? = runInstructionSlice(global, sliceMillis, sliceInstructions)
 }
@@ -164,7 +164,7 @@ internal interface InstructionSlicedSearch : ResumableSearch {
     val auxiliaryWork: Long get() = 0L
 
     fun runScheduledSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         sliceWork: Long,
@@ -173,7 +173,7 @@ internal interface InstructionSlicedSearch : ResumableSearch {
     ): MinimizeResult? = runInstructionSlice(global, sliceMillis, sliceInstructions, onIncumbent)
 
     fun runInstructionSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceInstructions: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -198,13 +198,13 @@ internal interface RepairSearch : AutoCloseable {
     val stats: SolveStats get() = SolveStats.EMPTY
     val work: Long get() = stats.search.nodes.sum.toLong()
 
-    fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation)
+    fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: ExecutionControl)
 
-    fun beginExact(assumptions: Assumptions, decisionBudget: Long, cutoff: BigFraction, cancellation: Cancellation) {
+    fun beginExact(assumptions: Assumptions, decisionBudget: Long, cutoff: BigFraction,
+        cancellation: ExecutionControl) : Unit =
         throw UnsupportedOperationException("exact repair cutoffs are unavailable")
-    }
 
-    fun runSlice(cancellation: Cancellation, millis: Long, work: Long): RepairSearchStep
+    fun runSlice(cancellation: ExecutionControl, millis: Long, work: Long): RepairSearchStep
 
     /**
      * Solve the fragment pinned by [assumptions] under a [decisionBudget] (decisions), pruning against
@@ -213,16 +213,15 @@ internal interface RepairSearch : AutoCloseable {
      * monotone cutoff keeps every stale bound looser than the current one (never a wrong prune). Returns
      * the best strictly-better completion found, or null.
      */
-    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation): Sample? {
-        return repairStep(assumptions, decisionBudget, cutoff, cancellation).sample
-    }
+    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double,
+        cancellation: ExecutionControl): Sample? = repairStep(assumptions, decisionBudget, cutoff, cancellation).sample
 
     fun repairStep(
-        assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: Cancellation,
+        assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: ExecutionControl,
     ): RepairSearchStep {
         begin(assumptions, decisionBudget, cutoff, cancellation)
         while (true) {
-            val step = runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            val step = runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
             if (step.reason != null) return step
         }
     }

@@ -5,7 +5,7 @@ import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_HI
 import com.eignex.klause.config.DEFAULT_UNBOUNDED_INT_LO
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -17,7 +17,7 @@ class SmtLibBooleanDefinitionsTest {
     fun `cancelled empty Boolean definitions should not emit a constant`() {
         for (conjunction in listOf(false, true)) {
             val builder = Compiler.Builder(DEFAULT_UNBOUNDED_INT_LO, DEFAULT_UNBOUNDED_INT_HI,
-                strictBounds = false, sourceCancellation = Cancellation { true })
+                strictBounds = false, sourceCancellation = ExecutionControl { true })
 
             assertFailsWith<PolynomialSourceInterrupted> {
                 if (conjunction) builder.reifyAnd(emptyList()) else builder.reifyOr(emptyList())

@@ -12,7 +12,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 /** Optional claim capture over independently supplied original-source verification data. */
@@ -49,7 +49,7 @@ class SourceResultCapture private constructor(
         producer: String,
         derivation: SourceDerivation? = null,
         boundDerivation: SourceDerivation? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): QuadraticOptimizationResult {
         require(context.scope.objective?.sense == result.sense) {
             "quadratic capture requires the source objective direction"
@@ -95,7 +95,7 @@ class SourceResultCapture private constructor(
         objective: LinearObjective,
         producer: String,
         derivation: SourceDerivation? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): MinimizeResult {
         require(context.scope.objective != null) { "objective result capture requires an objective scope" }
         if (cancellation() || result is MinimizeResult.Unknown ||
@@ -147,7 +147,7 @@ class SourceResultCapture private constructor(
     }
 
     private fun exactValue(
-        objective: LinearObjective, sample: Sample, cancellation: Cancellation,
+        objective: LinearObjective, sample: Sample, cancellation: ExecutionControl,
     ): SourceValue {
         if (sample.algebraicReals == null) return SourceValue.Rational(objective.evaluateExact(sample))
         val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))

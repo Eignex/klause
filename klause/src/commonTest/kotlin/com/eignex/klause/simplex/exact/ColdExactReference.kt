@@ -2,7 +2,7 @@
 
 package com.eignex.klause.simplex.exact
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.BIG_ONE
@@ -91,7 +91,7 @@ internal class ExactRationalFeasibilityModel(
 
 internal fun bigRationalOutcome(
     model: ExactSimplexModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     maxPivots: Int = defaultRationalPivotCap(model),
 ): BigRationalOutcome {
     if (model.m == 0) {
@@ -131,7 +131,7 @@ internal fun bigRationalOutcome(
 internal fun bigRationalMinimum(
     model: ExactSimplexModel,
     costs: List<BigFraction>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     maxPivots: Int = Int.MAX_VALUE,
 ): BigRationalOptimizationOutcome {
     require(costs.size == model.n) { "exact objective has ${costs.size} columns, expected ${model.n}" }

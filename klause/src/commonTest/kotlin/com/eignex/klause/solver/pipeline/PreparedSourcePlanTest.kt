@@ -44,7 +44,7 @@ import com.eignex.klause.theory.EncodingAffineExpression
 import com.eignex.klause.theory.EncodingLinearTerm
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.LinearEncodingFormula
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.toLongExact
@@ -257,9 +257,9 @@ class PreparedSourcePlanTest {
             var cancelled = false
             var charged = 0L
             var limit = Long.MAX_VALUE
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = cancelled || charged >= limit
-                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
             val providers = FactorProjectionProviders(
                 encoder = EncoderProvider { factor, target ->
@@ -342,7 +342,7 @@ class PreparedSourcePlanTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
         var boundsComplete = false
         var stopObserved = false
-        val stop = Cancellation {
+        val stop = ExecutionControl {
             if (boundsComplete) {
                 stopObserved = true
                 true
@@ -375,9 +375,9 @@ class PreparedSourcePlanTest {
         )
         val installations = mutableMapOf<EncodingTarget, Int>()
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
@@ -603,9 +603,9 @@ class PreparedSourcePlanTest {
                 var charged = 0L
                 var pendingStop = false
                 val stopAt = if (sharedClause) completedWork else completedWork - 1
-                val stop = object : Cancellation {
+                val stop = object : ExecutionControl() {
                     override fun isCancelled(): Boolean = pendingStop.also { pendingStop = false }
-                    override fun workMeter(): WorkMeter = WorkMeter {
+                    override val accounting: WorkMeter get() = WorkMeter {
                         charged += it
                         if (limited && charged >= stopAt) pendingStop = true
                     }
@@ -657,9 +657,9 @@ class PreparedSourcePlanTest {
             var charged = 0L
             var completedWork = 0L
             var completedInstallations = 0
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = false
-                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
             val providers = FactorProjectionProviders(
                 encoder = EncoderProvider { factor, target ->

@@ -6,16 +6,16 @@ import com.eignex.klause.portfolio.ArmFamily
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioIncumbents
+import com.eignex.klause.portfolio.PortfolioLifecycleKind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.portfolio.PortfolioWorker
-import com.eignex.klause.portfolio.PortfolioLifecycleKind
+import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.WorkerConstructionCost
 import com.eignex.klause.portfolio.WorkerEligibility
 import com.eignex.klause.portfolio.WorkerFragment
 import com.eignex.klause.portfolio.WorkerObjectiveView
 import com.eignex.klause.portfolio.WorkerProofAuthority
 import com.eignex.klause.portfolio.WorkerRequirements
-import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.difference.DifferenceSystem
@@ -34,7 +34,7 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -85,10 +85,10 @@ internal class FiniteNumericalCompanions private constructor(
     private val objective: LinearObjective,
     private val context: SourceProofContext?,
     private val params: TheoryParams,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val cost: WorkerConstructionCost,
     private val afterIncumbent: Boolean,
-    private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
+    private val incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)?,
     private val admission: FiniteCompanionAdmission? = null,
     private val afterImprovement: Boolean = false,
     private val adaptiveRepair: Boolean = false,
@@ -231,7 +231,7 @@ internal class FiniteNumericalCompanions private constructor(
             override val stats get() = search.stats
             override val work: Long get() = search.work
 
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                 result?.let { return it }
                 val finished = search.runSlice(global, sliceMillis, sliceNodes) { sample, value ->
@@ -253,14 +253,14 @@ internal class FiniteNumericalCompanions private constructor(
         }
 
     companion object {
-        fun admission(model: BakedProblem, objective: LinearObjective, cancellation: Cancellation,
+        fun admission(model: BakedProblem, objective: LinearObjective, cancellation: ExecutionControl,
             cost: WorkerConstructionCost): FiniteCompanionAdmission = FiniteCompanionAdmission(
             cancellation, requireNotNull(cost.activeMillis), requireNotNull(cost.sliceMillis),
             capture = { captureContext(model, objective, it) })
 
         fun deferred(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
-            cancellation: Cancellation, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
-            incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)?,
+            cancellation: ExecutionControl, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
+            incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)?,
             afterImprovement: Boolean = false, adaptiveRepair: Boolean = false,
             onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
             onObservation: ((Long, JointRepairObservation) -> Unit)? = null): FiniteNumericalCompanions =
@@ -268,9 +268,9 @@ internal class FiniteNumericalCompanions private constructor(
                 incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, onComparison, onObservation)
 
         fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
-            cancellation: Cancellation, cost: WorkerConstructionCost,
+            cancellation: ExecutionControl, cost: WorkerConstructionCost,
             afterIncumbent: Boolean = false,
-            incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+            incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
             clock: TimeSource = TimeSource.Monotonic,
             adaptiveRepair: Boolean = false,
             onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
@@ -287,7 +287,7 @@ internal class FiniteNumericalCompanions private constructor(
         }
 
         private fun captureContext(model: BakedProblem, objective: LinearObjective,
-            cancellation: Cancellation): SourceProofContext? {
+            cancellation: ExecutionControl): SourceProofContext? {
             // The propagated difference graph duplicates affine rows and bounds in these coordinates.
             val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())
             return affine.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,
@@ -297,7 +297,7 @@ internal class FiniteNumericalCompanions private constructor(
 }
 
 internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context: SourceProofContext,
-    cancellation: Cancellation): MinimizeResult {
+    cancellation: ExecutionControl): MinimizeResult {
     // A verified relaxation proof uses the finite working coordinates and objective.
     if (result.verifyTerminal(context, cancellation) is Verification.Accepted) {
         when (val claim = result.terminal?.claim) {

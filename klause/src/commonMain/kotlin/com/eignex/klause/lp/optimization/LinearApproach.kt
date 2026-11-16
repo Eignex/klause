@@ -16,7 +16,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceSemanticsChecker
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** A checked affine path `endpoint + t * (base - endpoint)` for rational `0 < t <= 1`. */
 class LinearApproach(
@@ -45,25 +45,25 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
     private val exact = LinearSourceSemanticsChecker(source.coordinates, source.premises.values.toList(),
         source.objective, source.objectiveConstant)
 
-    override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
+    override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck =
         exact.witness(sample, scope, cancellation).let { checked ->
             if (checked != SourceEvidenceCheck.Checked) checked
             else source.semanticsChecker?.witness(sample, scope, cancellation) ?: checked
         }
 
     override fun objectiveEquals(
-        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
+        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: ExecutionControl,
     ): SourceEvidenceCheck = if (source.affineObjectiveAvailable) {
         exact.objectiveEquals(sample, value, scope, cancellation)
     } else SourceEvidenceCheck.Unavailable("exact affine objective unavailable")
 
-    override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck {
+    override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck {
         val base = witness(claim.sample, scope, cancellation)
         return if (base == SourceEvidenceCheck.Checked) exact.ray(claim, scope, cancellation) else base
     }
 
     override fun derivation(
-        claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
+        claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: ExecutionControl,
     ): SourceEvidenceCheck {
         if (derivation is LinearActiveRefutation) {
             if (!compatible(scope) || (claim != SourceClaim.Refutation && claim !is SourceClaim.Bound) ||
@@ -162,7 +162,7 @@ internal fun SourceProofContext.numericCoordinates(): List<SourceCoordinate> = c
     .filter { it.kind != SourceCoordinate.Kind.Boolean }.sortedWith(compareBy({ it.kind.ordinal }, { it.id }))
 
 internal fun SourceProofContext.pinnedConstant(): BigFraction = objective.entries.fold(objectiveConstant) {
-        sum, (id, value) ->
+        sum, (id, value), ->
     if (id.kind == SourceCoordinate.Kind.Boolean) {
         sum + if (scope.condition.bools.getValue(id.id)) value else BigFraction.ZERO
     } else sum

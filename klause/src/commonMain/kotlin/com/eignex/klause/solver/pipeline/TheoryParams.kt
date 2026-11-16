@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Which Boolean branching a complete open-model traversal uses. */
 enum class OpenBranching(
@@ -82,9 +82,9 @@ data class TheoryParams(
      */
     val openHintMinSplits: Long = DEFAULT_HINT_MIN_SPLITS,
     /** Wall-clock timeout token, kept separate from external cancellation for result reporting. */
-    val timeout: Cancellation = Cancellation.Never,
+    val timeout: ExecutionControl = ExecutionControl.Never,
     /** Cooperative cancellation token. */
-    val cancellation: Cancellation = Cancellation.Never,
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     /** Solve-wide allowance shared by committed open decisions and heuristic moves, or null for none. */
     val nodeBudget: NodeBudget? = null,
     /** Destroy/repair proposal cap for an explicit open ALNS invocation. */

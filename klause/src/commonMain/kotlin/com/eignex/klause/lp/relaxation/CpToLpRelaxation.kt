@@ -5,9 +5,6 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearIndicator
 import com.eignex.klause.factor.arithmetic.Product
-import com.eignex.klause.factor.arithmetic.RealAbs
-import com.eignex.klause.factor.arithmetic.RealArrayMinMax
-import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.factor.arithmetic.ReifiedCardinality
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.arithmetic.ReifiedPseudoBoolean
@@ -76,7 +73,7 @@ import com.eignex.klause.theory.encodingSourceRealCount
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.theory.privateLinearCompletion
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
@@ -394,7 +391,7 @@ internal fun leafRealFeasibility(
     problem: Problem,
     objective: LinearObjective?,
     sample: Sample,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     componentSplit: Boolean = true,
     sink: LpStatsSink? = null,
     context: LpSolveContext = LpSolveContext.Production,
@@ -683,7 +680,7 @@ internal class CpToLpRelaxation(
     elementIndexes: Set<Int>? = null,
     private val templateStats: LpStatsSink? = null,
     private val reuseSourceTemplates: Boolean = true,
-    private val preparationCancellation: Cancellation = Cancellation.Never,
+    private val preparationCancellation: ExecutionControl = ExecutionControl.Never,
     private val reuseTemplateIndexes: Boolean = true,
     private val reuseTemplateMetadata: Boolean = false,
     private val earnTemplatePreparation: Boolean = false,
@@ -703,7 +700,7 @@ internal class CpToLpRelaxation(
         onTemplateWork(work)
     }
 
-    private fun prepareTemplates(cancellation: Cancellation) {
+    private fun prepareTemplates(cancellation: ExecutionControl) {
         if (!reuseSourceTemplates || projections == null) return
         preparationTemplates = null
         val start = TimeSource.Monotonic.markNow()
@@ -731,7 +728,7 @@ internal class CpToLpRelaxation(
         if (cancellation()) throw LpAssemblyCancelled()
     }
 
-    private fun recordConstruction(relaxation: LpRelaxation, cancellation: Cancellation) {
+    private fun recordConstruction(relaxation: LpRelaxation, cancellation: ExecutionControl) {
         if (!reuseSourceTemplates || !earnTemplatePreparation || projections == null ||
             preparationTemplates != null
         ) return
@@ -833,7 +830,7 @@ internal class CpToLpRelaxation(
     fun build(
         session: PropagationSession,
         extraCuts: List<Cut> = emptyList(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): LpRelaxation = build(SessionDomains(session), extraCuts, cancellation)
 
     /** Build the relaxation over [domains], optionally appending separator-produced [extraCuts] as extra
@@ -841,13 +838,13 @@ internal class CpToLpRelaxation(
     fun build(
         domains: RelaxationDomains,
         extraCuts: List<Cut> = emptyList(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): LpRelaxation = build(domains, extraCuts, cancellation, null)
 
     fun build(
         domains: RelaxationDomains,
         extraCuts: List<Cut>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onDiscardedAssembly: ((Long) -> Unit)?,
     ): LpRelaxation {
         val token = cancellation or preparationCancellation
@@ -866,7 +863,7 @@ internal class CpToLpRelaxation(
 
     fun prepareBuild(
         domains: RelaxationDomains,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onWork: (Long) -> Unit,
         onComplete: (LpRelaxation) -> Unit,
     ): Iterator<Unit> = sequence {
@@ -913,13 +910,13 @@ internal class CpToLpRelaxation(
     fun emitRegion(
         region: LpEmissionRegion,
         domains: RelaxationDomains,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): LpEmission = emitRegion(region, domains, cancellation, null)
 
     fun emitRegion(
         region: LpEmissionRegion,
         domains: RelaxationDomains,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onWork: ((Long) -> Unit)?,
     ): LpEmission {
         if (preparationTemplates == null) prepareTemplates(cancellation or preparationCancellation)
@@ -951,7 +948,7 @@ internal class CpToLpRelaxation(
      * the result is independent of any session. This is the float filter's persistent model; exact
      * certificates keep running on the per-node pin-consulting [build], whose magnitudes rationalize.
      */
-    fun buildGatedResidual(cancellation: Cancellation = Cancellation.Never): LpRelaxation? {
+    fun buildGatedResidual(cancellation: ExecutionControl = ExecutionControl.Never): LpRelaxation? {
         if (!realResidual || problem.numIntVars > 0 || problem.factors.any { it is ContinuousProduct }) return null
         return Assembler(RootDomains(problem), gated = true, cancellation = cancellation).assemble(emptyList())
     }
@@ -969,7 +966,7 @@ internal class CpToLpRelaxation(
     private inner class Assembler(
         private val domains: RelaxationDomains,
         private val gated: Boolean = false,
-        private val cancellation: Cancellation = Cancellation.Never,
+        private val cancellation: ExecutionControl = ExecutionControl.Never,
         private val region: LpEmissionRegion? = null,
         private val columnDomains: RelaxationDomains = domains,
     ) : ExactRelaxationBuilder, SharedIndexChoices, LpBoundRowBuilder {
@@ -1964,7 +1961,7 @@ internal class CpToLpRelaxation(
 internal fun LeafRealResult.checkedEncoding(
     encoded: Problem,
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): LeafRealResult {
     if (exactReals == null || verdict == LpVerdict.INFEASIBLE) return this
     val point = sample.copy(reals = reals, exactReals = exactReals)

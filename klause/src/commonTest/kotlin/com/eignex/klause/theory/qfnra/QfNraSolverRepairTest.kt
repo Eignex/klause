@@ -7,7 +7,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -261,7 +261,7 @@ class QfNraSolverRepairTest {
         val guides = requireNotNull(formula.conjunctiveAtoms(PolynomialArithmetic(), 128))
         val counts = guides.map { it.polynomial.terms.size }
         lateinit var work: QfNraWork
-        work = QfNraWork(QfNraParams(Cancellation { work.dyadicPreExtraction }))
+        work = QfNraWork(QfNraParams(ExecutionControl { work.dyadicPreExtraction }))
         val arithmetic = PolynomialArithmetic(work)
         val probe = WitnessProbe(formula, source.boolCount, arithmetic, AlgebraicArithmetic(arithmetic), work)
 
@@ -526,9 +526,9 @@ class QfNraSolverRepairTest {
 
             assertEquals(listOf(77), indices)
             var spent = 0L
-            val cancellation = object : Cancellation {
+            val cancellation = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = spent >= 5
-                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+                override val accounting: WorkMeter get() = WorkMeter { spent += it }
             }
             assertFailsWith<PolynomialInterrupted> {
                 formula.conjunctiveAtoms(PolynomialArithmetic(cancellation), 128, indices)

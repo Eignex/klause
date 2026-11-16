@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 
 internal class LiteralIntDefinition(override val out: Int, val literal: Int) : SweepNode {
@@ -53,7 +53,7 @@ internal fun literalDefinitions(
     problem: Problem,
     hints: IntArray,
     nodes: List<SweepNode>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): List<SweepNode> {
     if (cancellation()) return emptyList()
     val hinted = BooleanArray(problem.numIntVars)
@@ -125,4 +125,3 @@ internal fun literalDefinitions(
     }
     return orderedDefinitions(problem, nodes + predicates + channels, cancellation)
 }
-

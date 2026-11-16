@@ -26,7 +26,7 @@ import com.eignex.klause.presolve.equivalentLinear
 import com.eignex.klause.presolve.protectedStructureColumns
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
@@ -72,7 +72,7 @@ internal object AffineSingletons {
     fun eliminateAffineSingletons(
         problem: BakedProblem,
         objectiveIntVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         sharedIntOcc: SharedIntOccurrence? = null,
         capWide: Boolean = false,
         incrementalTouchedVars: IntArray? = null,
@@ -120,7 +120,7 @@ internal object AffineSingletons {
     fun eliminateSourceAffineSingletons(
         problem: Problem,
         objectiveIntVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         maxFactors: Int = AFFINE_MAX_FACTORS,
         pivotOrder: AffinePivotOrder = AffinePivotOrder.MARKOWITZ,
         objective: LinearObjective? = null,
@@ -153,7 +153,7 @@ internal object AffineSingletons {
         ranges: ColumnRanges,
         domains: Array<IntDomain>?,
         objectiveIntVars: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         sharedIntOcc: SharedIntOccurrence?,
         capWide: Boolean,
         incrementalTouchedVars: IntArray?,
@@ -368,7 +368,7 @@ internal object AffineSingletons {
         eliminated: BooleanArray,
         objectiveIntVars: IntHashSet,
         domains: Array<IntDomain>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): ResidueCandidate? {
         var polled = 0
         var di = ws.nextEqId(0)
@@ -488,7 +488,7 @@ internal object AffineSingletons {
         objectiveIntVars: IntHashSet,
         capWide: Boolean,
         pivotable: ((Linear, Int) -> Boolean)? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): AffineCandidate? {
         // The scan walks the live factors in stable-id order — the same order a fresh compacted list would
         // present — so it picks candidates in the identical sequence a full rebuild would. Give up after
@@ -540,7 +540,7 @@ internal object AffineSingletons {
         capWide: Boolean,
         // Whether the definition admits this pivot; null admits every column.
         pivotable: ((Linear, Int) -> Boolean)?,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         minimizeRewrite: Boolean = false,
     ): AffineCandidate? {
         val f = ws.factorAt(di)?.equivalentLinear() ?: return null
@@ -665,7 +665,7 @@ internal object AffineSingletons {
         // eliminated at all — so there is no residue candidate to look for either.
         domains: Array<IntDomain>?,
         pivotable: ((Linear, Int) -> Boolean)?,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): Boolean {
         val checked = IntHashSet()
         var polled = 0
@@ -723,7 +723,7 @@ internal object AffineSingletons {
         fun degreeOf(x: Int): Int
         fun occurrenceAt(x: Int, k: Int): Int
 
-        fun rewriteWeight(defIdx: Int, x: Int, cancellation: Cancellation): Long {
+        fun rewriteWeight(defIdx: Int, x: Int, cancellation: ExecutionControl): Long {
             var weight = 0L
             for (k in 0 until degreeOf(x)) {
                 cancellation.charge(AFFINE_WORK_WEIGHT)
@@ -741,7 +741,7 @@ internal object AffineSingletons {
             scale: Int,
             offset: Int,
             replacement: Int,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): Boolean
 
         /** Whether any [Linear] factor other than [defIdx] that mentions [x] has already absorbed
@@ -767,7 +767,7 @@ internal object AffineSingletons {
             termVars: IntArray,
             termCoeffs: LongArray,
             constTerm: Long,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): Boolean
 
         /** Whether renaming [x] to [replacement] would coalesce an integer linear row past [Long]. */
@@ -864,7 +864,7 @@ internal object AffineSingletons {
             termVars: IntArray,
             termCoeffs: LongArray,
             constTerm: Long,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): Boolean {
             var polled = 0
             val termsSmall = termsFitHalfLong(constTerm, termCoeffs)
@@ -904,7 +904,7 @@ internal object AffineSingletons {
             scale: Int,
             offset: Int,
             replacement: Int,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): Boolean {
             for (k in occ.offsets[x] until occ.offsets[x + 1]) {
                 cancellation.charge(AFFINE_WORK_WEIGHT)
@@ -1071,7 +1071,7 @@ internal object AffineSingletons {
             termVars: IntArray,
             termCoeffs: LongArray,
             constTerm: Long,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): Boolean {
             val occ = intOcc[x]
             var polled = 0
@@ -1116,7 +1116,7 @@ internal object AffineSingletons {
             scale: Int,
             offset: Int,
             replacement: Int,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): Boolean {
             val occ = intOcc[x]
             for (k in 0 until occ.size) {
@@ -1368,7 +1368,7 @@ private fun affineConsumerAccepts(
     scale: Int,
     offset: Int,
     replacement: Int,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean {
     if (affineFoldRow(factor, rewriteStructured) != null) return true
     if (factor is ComparisonClause) {

@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -15,7 +16,7 @@ class LocalSearchSolverCancellationTest {
         val params = LocalSearchParams(
             maxFlips = 10_000L,
             randomSeed = 1L,
-            cancellation = { cancelled },
+            cancellation = ExecutionControl { cancelled },
         )
         val solver = LocalSearchSolver(problem.bake())
 

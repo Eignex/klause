@@ -23,7 +23,7 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceSemanticsChecker
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -104,11 +104,11 @@ class LinearAuthorityTest {
         val budget = SourceLpBudget(maxOperations = 1)
 
         LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
-            var result = authority.advance(source, Cancellation.Never)
+            var result = authority.advance(source, ExecutionControl.Never)
             assertTrue(result.paused)
             assertEquals(null, result.evidence)
             repeat(64) {
-                if (result.paused) result = authority.advance(source, Cancellation.Never)
+                if (result.paused) result = authority.advance(source, ExecutionControl.Never)
             }
 
             val evidence = assertNotNull(result.evidence)
@@ -119,7 +119,7 @@ class LinearAuthorityTest {
             val certificateWork = budget.measuredConflictCertificationWork
             val floatWork = budget.measuredFloatWork
             assertTrue(certificateWork > 0L)
-            assertEquals(SourceClaim.Refutation, authority.advance(source, Cancellation.Never).evidence?.claim)
+            assertEquals(SourceClaim.Refutation, authority.advance(source, ExecutionControl.Never).evidence?.claim)
             assertEquals(certificateWork, budget.measuredConflictCertificationWork)
             assertEquals(floatWork, budget.measuredFloatWork)
             assertEquals(1, budget.operations)
@@ -141,14 +141,14 @@ class LinearAuthorityTest {
         val budget = SourceLpBudget(maxOperations = 2)
 
         LinearAuthority(budget, retainLp = true).use { authority ->
-            val evidence = assertNotNull(authority.advance(restricted, Cancellation.Never).evidence)
+            val evidence = assertNotNull(authority.advance(restricted, ExecutionControl.Never).evidence)
             assertEquals(SourceClaim.Refutation, evidence.claim)
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(evidence))
             val globalCheck = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence)
             assertTrue(globalCheck != SourceEvidenceCheck.Checked)
 
-            val retracted = authority.advance(source, Cancellation.Never)
+            val retracted = authority.advance(source, ExecutionControl.Never)
             assertIs<SourceClaim.Optimal>(assertNotNull(retracted.evidence).claim)
             assertEquals(2, budget.operations)
         }
@@ -167,7 +167,7 @@ class LinearAuthorityTest {
 
         LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true,
             guidancePolicy = SparseSourceLpPolicy(certificate = ReconstructionLimits(maxWork = 0L))).use { authority ->
-            val result = authority.advance(source, Cancellation.Never)
+            val result = authority.advance(source, ExecutionControl.Never)
 
             assertNull(result.evidence)
             assertNull(result.bound)
@@ -190,9 +190,9 @@ class LinearAuthorityTest {
         val disabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))))
 
         LinearAuthority(SourceLpBudget(maxOperations = 2), retainLp = true).use { authority ->
-            val conflict = assertNotNull(authority.advance(enabled, Cancellation.Never).evidence)
+            val conflict = assertNotNull(authority.advance(enabled, ExecutionControl.Never).evidence)
             assertEquals(SourceClaim.Refutation, conflict.claim)
-            val result = authority.advance(disabled, Cancellation.Never)
+            val result = authority.advance(disabled, ExecutionControl.Never)
 
             val evidence = assertNotNull(result.evidence)
             assertIs<SourceClaim.Optimal>(evidence.claim)
@@ -218,7 +218,7 @@ class LinearAuthorityTest {
             LinearAuthority(SourceLpBudget(maxOperations = 1), shapes::add, retainLp = true,
                 guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES))
                 .use { authority ->
-                    val result = authority.advance(source, Cancellation.Never)
+                    val result = authority.advance(source, ExecutionControl.Never)
 
                     val evidence = assertNotNull(result.evidence)
                     assertEquals(SourceClaim.Refutation, evidence.claim)
@@ -246,7 +246,7 @@ class LinearAuthorityTest {
             LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true,
                 guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES))
                 .use { authority ->
-                    val result = authority.advance(source, Cancellation.Never)
+                    val result = authority.advance(source, ExecutionControl.Never)
 
                     val evidence = assertNotNull(result.evidence)
                     val optimum = assertIs<SourceClaim.Optimal>(evidence.claim)
@@ -277,7 +277,7 @@ class LinearAuthorityTest {
             .use { authority ->
                 for (enabled in listOf(true, false)) {
                     val branch = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to enabled))))
-                    val result = authority.advance(branch, Cancellation.Never)
+                    val result = authority.advance(branch, ExecutionControl.Never)
 
                     val evidence = assertNotNull(result.evidence)
                     val expected = if (enabled) BigFraction.ONE else BigFraction.ZERO
@@ -301,12 +301,12 @@ class LinearAuthorityTest {
         val budget = SourceLpBudget(maxOperations = 1)
 
         LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
-            var result = authority.advance(source, Cancellation.Never)
+            var result = authority.advance(source, ExecutionControl.Never)
             assertTrue(result.paused)
             assertNull(result.bound)
             assertTrue(result.relaxedPoint.isEmpty())
             repeat(32) {
-                if (result.paused) result = authority.advance(source, Cancellation.Never)
+                if (result.paused) result = authority.advance(source, ExecutionControl.Never)
             }
 
             val terminal = assertNotNull(result.evidence)
@@ -316,7 +316,7 @@ class LinearAuthorityTest {
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
             val floatWork = budget.measuredFloatWork
             val certificateWork = budget.measuredBoundCertificationWork
-            authority.advance(source, Cancellation.Never)
+            authority.advance(source, ExecutionControl.Never)
             assertEquals(1, budget.operations)
             assertEquals(1L, authority.preparations)
             assertEquals(floatWork, budget.measuredFloatWork)
@@ -335,7 +335,7 @@ class LinearAuthorityTest {
             coordinates.associateWith { BigFraction.ONE })
 
         LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use { authority ->
-            val result = authority.advance(source, Cancellation.Never)
+            val result = authority.advance(source, ExecutionControl.Never)
 
             val terminal = assertNotNull(result.evidence)
             assertEquals(SourceValue.Rational(BigFraction.ONE), assertIs<SourceClaim.Optimal>(terminal.claim).value)
@@ -354,7 +354,7 @@ class LinearAuthorityTest {
         ), mapOf(real to BigFraction.ONE))
 
         LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use { authority ->
-            val result = authority.advance(source, Cancellation.Never)
+            val result = authority.advance(source, ExecutionControl.Never)
 
             val terminal = assertNotNull(result.evidence)
             assertEquals(SourceValue.Rational(value), assertIs<SourceClaim.Optimal>(terminal.claim).value)
@@ -378,7 +378,7 @@ class LinearAuthorityTest {
         val budget = SourceLpBudget(maxOperations = 2)
 
         LinearAuthority(budget, retainLp = true).use { authority ->
-            val result = authority.advance(source, Cancellation.Never)
+            val result = authority.advance(source, ExecutionControl.Never)
 
             val sample = assertNotNull(result.incumbent)
             assertEquals(value.num, sample.exactIntValue(0))
@@ -387,7 +387,7 @@ class LinearAuthorityTest {
             assertEquals(SourceEvidenceCheck.Checked,
                 SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.evidence)))
             val operations = budget.operations
-            val repeated = authority.advance(source, Cancellation.Never)
+            val repeated = authority.advance(source, ExecutionControl.Never)
             assertNotNull(repeated.incumbent)
             assertEquals(1L, repeated.primalStages["PrimalRecoveryReused"])
             assertEquals(operations, budget.operations)
@@ -403,7 +403,7 @@ class LinearAuthorityTest {
         ), emptyMap())
 
         val result = LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use {
-            it.advance(source, Cancellation.Never)
+            it.advance(source, ExecutionControl.Never)
         }
 
         assertNull(result.incumbent)
@@ -432,12 +432,12 @@ class LinearAuthorityTest {
         funding.grant(100_000_000L)
 
         LinearAuthority(budget, retainLp = true).use { authority ->
-            val paused = authority.advance(source, Cancellation.Never)
+            val paused = authority.advance(source, ExecutionControl.Never)
             assertTrue(paused.paused)
             assertNull(paused.incumbent)
             val allocation = funding.allocated
             funding.grant(100_000_000L)
-            val resumed = authority.advance(source, Cancellation.Never)
+            val resumed = authority.advance(source, ExecutionControl.Never)
 
             assertNotNull(resumed.incumbent)
             assertEquals(1L, resumed.primalStages["PrimalRecoverySourceChecked"])
@@ -457,16 +457,16 @@ class LinearAuthorityTest {
                 BigFraction.ZERO, strict = true)),
         ), emptyMap(), semanticsChecker = object : SourceSemanticsChecker {
             override fun witness(
-                sample: Sample, scope: SourceScope, cancellation: Cancellation,
+                sample: Sample, scope: SourceScope, cancellation: ExecutionControl,
             ): SourceEvidenceCheck = SourceEvidenceCheck.Rejected("source restriction")
 
             override fun ray(
-                claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation,
+                claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl,
             ): SourceEvidenceCheck = SourceEvidenceCheck.Unavailable("no source ray")
         })
 
         val result = LinearAuthority(SourceLpBudget(), retainLp = true).use {
-            it.advance(source, Cancellation.Never)
+            it.advance(source, ExecutionControl.Never)
         }
 
         assertEquals(1L, result.primalStages["PrimalRecoveryResidual"])
@@ -487,7 +487,7 @@ class LinearAuthorityTest {
         ), coefficients)
         val budget = SourceLpBudget()
 
-        val result = LinearAuthority(budget, retainLp = true).use { it.advance(source, Cancellation.Never) }
+        val result = LinearAuthority(budget, retainLp = true).use { it.advance(source, ExecutionControl.Never) }
 
         assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(1, budget.operations)
@@ -502,7 +502,7 @@ class LinearAuthorityTest {
         ), mapOf(real to BigFraction.ONE))
 
         val result = LinearAuthority(SourceLpBudget(), retainLp = true).use {
-            it.advance(source, Cancellation.Never)
+            it.advance(source, ExecutionControl.Never)
         }
 
         assertTrue(assertNotNull(assertNotNull(result.incumbent).exactReals).first() > BigFraction.ZERO)
@@ -525,10 +525,10 @@ class LinearAuthorityTest {
         val budget = SourceLpBudget(maxOperations = 2)
 
         LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
-            assertTrue(authority.advance(source, Cancellation.Never).paused)
-            var result = authority.advance(changed, Cancellation.Never)
+            assertTrue(authority.advance(source, ExecutionControl.Never).paused)
+            var result = authority.advance(changed, ExecutionControl.Never)
             repeat(32) {
-                if (result.paused) result = authority.advance(changed, Cancellation.Never)
+                if (result.paused) result = authority.advance(changed, ExecutionControl.Never)
             }
 
             val terminal = assertNotNull(result.evidence)
@@ -546,8 +546,8 @@ class LinearAuthorityTest {
         val unavailable = SourceProofContext(scope, setOf(real), emptyMap())
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
-            assertNotNull(authority.check(source, Cancellation.Never).evidence)
-            val result = authority.check(unavailable, Cancellation.Never)
+            assertNotNull(authority.check(source, ExecutionControl.Never).evidence)
+            val result = authority.check(unavailable, ExecutionControl.Never)
 
             assertNull(result.evidence)
             assertNull(result.bound)
@@ -570,8 +570,8 @@ class LinearAuthorityTest {
         LinearAuthority(SourceLpBudget(), retainLp = true).use { retained ->
             for (condition in conditions) {
                 val branch = source.atScope(scope.copy(condition = condition))
-                val cold = LinearAuthority(SourceLpBudget()).use { it.check(branch, Cancellation.Never) }
-                val result = retained.check(branch, Cancellation.Never)
+                val cold = LinearAuthority(SourceLpBudget()).use { it.check(branch, ExecutionControl.Never) }
+                val result = retained.check(branch, ExecutionControl.Never)
 
                 assertEquals(assertIs<SourceClaim.Optimal>(assertNotNull(cold.evidence).claim).value,
                     assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value)
@@ -598,7 +598,7 @@ class LinearAuthorityTest {
             for (pin in listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ZERO)) {
                 val condition = SourceCondition(lower = mapOf(integer to pin), upper = mapOf(integer to pin))
                 val branch = source.atScope(scope.copy(condition = condition))
-                val result = retained.check(branch, Cancellation.Never)
+                val result = retained.check(branch, ExecutionControl.Never)
 
                 assertEquals(SourceValue.Rational(if (pin.isZero) BigFraction.ofLong(3) else BigFraction.ZERO),
                     assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value)
@@ -620,8 +620,8 @@ class LinearAuthorityTest {
             source.coordinates, source.premises, mapOf(real to BigFraction.MINUS_ONE))
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { retained ->
-            retained.check(source, Cancellation.Never)
-            val result = retained.check(changed, Cancellation.Never)
+            retained.check(source, ExecutionControl.Never)
+            val result = retained.check(changed, ExecutionControl.Never)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(-3)),
                 assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value)
@@ -639,7 +639,7 @@ class LinearAuthorityTest {
             "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), half.negated())),
         ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
         assertEquals(listOf(integer to half.negated(), other to half), result.fractional)
         assertEquals(integer to BigFraction.MINUS_ONE, result.split)
@@ -650,7 +650,7 @@ class LinearAuthorityTest {
     fun `free real objective should have a checked improving ray`() {
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
 
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
         assertIs<SourceClaim.Ray>(assertNotNull(result.evidence).claim)
         assertEquals(
@@ -672,7 +672,7 @@ class LinearAuthorityTest {
             mapOf(real to BigFraction.ONE),
         )
 
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
         val claim = assertIs<SourceClaim.Limit>(assertNotNull(result.evidence).claim)
         assertEquals(SourceValue.Rational(BigFraction.ZERO), claim.value)
@@ -695,7 +695,7 @@ class LinearAuthorityTest {
             mapOf(real to BigFraction.ONE),
         )
 
-        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, ExecutionControl.Never)
 
         val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(SourceValue.Rational(BigFraction.ONE), claim.value)
@@ -717,7 +717,7 @@ class LinearAuthorityTest {
         val source = SourceProofContext(scope, coordinates.toSet(), premises,
             coordinates.associateWith { BigFraction.ONE })
 
-        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, ExecutionControl.Never)
 
         val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(SourceValue.Rational(BigFraction.ZERO), claim.value)
@@ -732,7 +732,7 @@ class LinearAuthorityTest {
                 SourceInequality(mapOf(real to BigFraction.ofLong(3)), BigFraction.ofLong(2)))),
             mapOf(real to BigFraction.ofLong(6)), objectiveConstant = BigFraction.ONE)
 
-        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, ExecutionControl.Never)
 
         val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(SourceValue.Rational(BigFraction.ofLong(5)), claim.value)
@@ -750,7 +750,7 @@ class LinearAuthorityTest {
                 BigFraction.MINUS_ONE)),
         ), mapOf(real to BigFraction.ONE))
 
-        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, ExecutionControl.Never)
 
         assertEquals(SourceClaim.Refutation, assertNotNull(result.evidence).claim)
         assertEquals(SourceEvidenceCheck.Checked,
@@ -770,7 +770,7 @@ class LinearAuthorityTest {
             mapOf(real to BigFraction.ONE),
         )
 
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
         assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(
@@ -792,7 +792,7 @@ class LinearAuthorityTest {
             mapOf(integer to BigFraction.ONE),
         )
 
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
         assertNull(result.evidence)
         assertNotNull(result.split)
@@ -813,7 +813,7 @@ class LinearAuthorityTest {
             mapOf(real to BigFraction.ONE),
         )
 
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
         assertEquals(SourceClaim.Refutation, assertNotNull(result.evidence).claim)
         assertEquals(
@@ -826,7 +826,7 @@ class LinearAuthorityTest {
     fun `exhausted numerical allowance should withhold global claims`() {
         val source = SourceProofContext(scope, setOf(real), emptyMap(), mapOf(real to BigFraction.ONE))
 
-        val result = LinearAuthority(SourceLpBudget(maxOperations = 0)).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 0)).check(source, ExecutionControl.Never)
 
         assertNull(result.evidence)
         assertNull(result.bound)
@@ -845,7 +845,7 @@ class LinearAuthorityTest {
             mapOf(real to BigFraction.ONE),
         )
 
-        val result = LinearAuthority(SourceLpBudget(maxOperations = 2)).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget(maxOperations = 2)).check(source, ExecutionControl.Never)
 
         assertNull(result.evidence)
         assertNotNull(result.bound)
@@ -869,7 +869,7 @@ class LinearAuthorityTest {
             mapOf(real to BigFraction.ONE),
         )
 
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
         val optimum = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(SourceValue.Rational(value), optimum.value)
@@ -892,7 +892,7 @@ class LinearAuthorityTest {
             mapOf(bool to BigFraction.ofLong(2), real to BigFraction.ONE),
         )
 
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
         val optimum = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(SourceValue.Rational(BigFraction.ofLong(3)), optimum.value)
@@ -914,7 +914,7 @@ class LinearAuthorityTest {
             ),
             mapOf(real to BigFraction.ONE),
         )
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
         val replacement = scope.copy(objective = SourceObjective("replacement", ObjectiveSense.MINIMIZE))
         val changed = SourceProofContext(
             replacement,
@@ -939,7 +939,7 @@ class LinearAuthorityTest {
         var polls = 0
 
         val result = LinearAuthority(budget, retainLp = true).use { authority ->
-            authority.advance(source, Cancellation { ++polls >= 3 })
+            authority.advance(source, ExecutionControl { ++polls >= 3 })
         }
 
         assertNull(result.evidence)
@@ -960,7 +960,7 @@ class LinearAuthorityTest {
             mapOf(real to BigFraction.ONE),
         )
 
-        val result = LinearAuthority(SourceLpBudget()).check(source, Cancellation.Never)
+        val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
         assertNull(result.evidence)
         assertNull(result.bound)

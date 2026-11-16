@@ -16,7 +16,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -44,7 +44,7 @@ class ProblemPipelineTest {
                     source.pipelineRoute(routePureRealToTheory = real, routeLinearToTheory = linear, onLpStats = {}),
                     source.pipelineRoute(FactorProjectionProviders.Default,
                         routePureRealToTheory = real, routeLinearToTheory = linear),
-                    source.pipelineRoute(Cancellation.Never, Cancellation.Never,
+                    source.pipelineRoute(ExecutionControl.Never, ExecutionControl.Never,
                         routePureRealToTheory = real, routeLinearToTheory = linear),
                 )
 
@@ -101,7 +101,7 @@ class ProblemPipelineTest {
         val routes = listOf(
             source.pipelineRoute(),
             source.pipelineRoute(onLpStats = {}),
-            source.pipelineRoute(Cancellation.Never, Cancellation.Never),
+            source.pipelineRoute(ExecutionControl.Never, ExecutionControl.Never),
         )
 
         for (route in routes) {
@@ -175,7 +175,7 @@ class ProblemPipelineTest {
                         objective = objective,
                         maximize = maximize,
                         routePureRealToTheory = true,
-                        boundCancellation = Cancellation {
+                        boundCancellation = ExecutionControl {
                             val answer = stopped
                             if (answer) stopObserved = true
                             if (once) stopped = false
@@ -202,11 +202,11 @@ class ProblemPipelineTest {
             factors = arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
         val budget = PresolveBudget(1)
-        val optional = budget.orSpent(Cancellation.Never)
+        val optional = budget.orSpent(ExecutionControl.Never)
 
         val route = assertIs<SourceProblemRoute.OpenTheory>(model.pipelineRoute(
             boundCancellation = optional,
-            preparationCancellation = Cancellation.Never,
+            preparationCancellation = ExecutionControl.Never,
         ))
 
         assertTrue(optional())
@@ -226,7 +226,7 @@ class ProblemPipelineTest {
             factors = arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
         val budget = PresolveBudget(1)
-        val containing = Cancellation { budget.spent() > 0 }
+        val containing = ExecutionControl { budget.spent() > 0 }
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
             boundCancellation = budget.orSpent(containing),
@@ -244,8 +244,8 @@ class ProblemPipelineTest {
         val budget = PresolveBudget(0)
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
-            boundCancellation = budget.orSpent(Cancellation.Never),
-            preparationCancellation = Cancellation.Never,
+            boundCancellation = budget.orSpent(ExecutionControl.Never),
+            preparationCancellation = ExecutionControl.Never,
         ))
 
         assertEquals(1, assertNotNull(route.unplaceable).column)
@@ -263,11 +263,11 @@ class ProblemPipelineTest {
             factors = arrayOf(Linear(longArrayOf(2), intArrayOf(0), LinearOp.LE, 10)),
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val optional = budget.orSpent(Cancellation.Never)
+        val optional = budget.orSpent(ExecutionControl.Never)
 
         val route = assertIs<SourceProblemRoute.Finite>(model.pipelineRoute(
             boundCancellation = optional,
-            preparationCancellation = Cancellation.Never,
+            preparationCancellation = ExecutionControl.Never,
             onLpStats = { budget.charge(budget.remaining()) },
         ))
 
@@ -288,11 +288,11 @@ class ProblemPipelineTest {
             ),
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val optional = budget.orSpent(Cancellation.Never)
+        val optional = budget.orSpent(ExecutionControl.Never)
 
         val route = assertIs<SourceProblemRoute.OpenTheory>(model.pipelineRoute(
             boundCancellation = optional,
-            preparationCancellation = Cancellation.Never,
+            preparationCancellation = ExecutionControl.Never,
             onLpStats = { budget.charge(budget.remaining()) },
         ))
 
@@ -320,7 +320,7 @@ class ProblemPipelineTest {
             var stopped = false
 
             val route = model.pipelineRoute(
-                boundCancellation = Cancellation { stopped },
+                boundCancellation = ExecutionControl { stopped },
                 onLpStats = { stopped = stopAfterBounds },
             )
 
@@ -379,7 +379,7 @@ class ProblemPipelineTest {
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(
             model.pipelineRoute(
-                boundCancellation = Cancellation { stopped },
+                boundCancellation = ExecutionControl { stopped },
                 onLpStats = { stopped = true },
             ),
         )

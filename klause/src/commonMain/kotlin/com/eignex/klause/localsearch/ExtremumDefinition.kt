@@ -5,7 +5,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.StructuralKey
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class ExtremumDefinition(val variable: Int, val factor: Factor, val outputIndex: Int)
 
@@ -13,7 +13,7 @@ internal fun extremumDefinitions(
     factors: Array<Factor>,
     numIntVars: Int,
     hints: IntArray,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): List<ExtremumDefinition> {
     if (cancellation()) return emptyList()
     val hinted = BooleanArray(numIntVars)

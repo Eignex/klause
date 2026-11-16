@@ -11,8 +11,8 @@ import com.eignex.klause.lowering.PolynomialConditional
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.lowerQuadraticObjective
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.util.ExecutionControl
 
 internal object SmtLibQuadraticObjective {
     fun capture(
@@ -22,7 +22,7 @@ internal object SmtLibQuadraticObjective {
         boolCount: Int,
         numericCount: Int,
         conditionals: List<PolynomialConditional>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): QuadraticObjectiveSpec {
         val variables = mutableMapOf<Int, QuadraticVariable>()
         for ((index, coordinate) in integers.values.withIndex()) {

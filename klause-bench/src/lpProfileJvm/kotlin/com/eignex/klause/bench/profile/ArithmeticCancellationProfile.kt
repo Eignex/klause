@@ -17,10 +17,27 @@ import com.eignex.klause.arithmetic.quadratic.QuadraticRowRelation
 import com.eignex.klause.arithmetic.transcendental.RationalEnclosure
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.factor.arithmetic.ExactLinear
+import com.eignex.klause.factor.bool.Clause
+import com.eignex.klause.ir.Factor
+import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
+import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.Term
+import com.eignex.klause.localsearch.LocalSearchParams
+import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.solver.SearchInitializationCancelled
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
 import com.eignex.klause.solver.pipeline.QuadraticNativeScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.solver.search.SearchResult
+import com.eignex.klause.solver.search.SearchSession
+import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.parseBigInt
 import java.lang.management.ManagementFactory
@@ -37,6 +54,7 @@ internal object ArithmeticCancellationProfile {
     private val workloads = listOf("float1", "float16", "float64", "float256", "exact8", "exact16",
         "polynomial8", "polynomial24", "rational16", "rational64", "exp4", "exp12",
         "large-exact", "large-quadratic")
+
     @Volatile private var sink = 0
 
     @JvmStatic
@@ -44,30 +62,80 @@ internal object ArithmeticCancellationProfile {
         cpu.isThreadCpuTimeEnabled = true
         when (args.singleOrNull() ?: "throughput") {
             "throughput" -> {
-                for (name in workloads) for (mode in listOf("none", "deadline", "owned", "nested", "opaque")) {
-                    measure(name, mode)
+                for (name in workloads) {
+                    for (mode in listOf("none", "deadline", "owned", "nested", "opaque")) {
+                        measure(name, mode)
+                    }
                 }
                 for (name in listOf("float64", "float256", "polynomial24", "exp12")) measureParallel(name)
             }
+
             "latency" -> latency()
-            else -> error("expected throughput or latency")
+
+            "overhead" -> overhead()
+
+            else -> error("expected throughput, latency or overhead")
         }
         println("sink\t$sink")
     }
 
-    private class Accounting(mode: String, cancellation: Cancellation = Cancellation.Never) {
+    private fun overhead() {
+        for (name in workloads + listOf("linear64", "finite-search", "finite-local-search")) {
+            for (mode in listOf("owned", "nested", "opaque")) {
+                val deadline = ExecutionControl.after(86_400_000_000_000.nanoseconds)
+                val flag = AtomicBoolean()
+                val enabled = ExecutionControl { flag.get() || deadline() }
+                val accounts = listOf(Accounting(mode), Accounting(mode, enabled))
+                val runs = accounts.map { latencyKernel(name, it.token) }
+                val expected = runs.first()()
+                val count = if (name in workloads) repetitions(name) else 1
+                for (arm in runs.indices) {
+                    val until = cpu.currentThreadCpuTime + 500_000_000L
+                    do {
+                        repeat(count) { check(runs[arm]() == expected) }
+                    } while (cpu.currentThreadCpuTime < until)
+                }
+                repeat(12) { repetition ->
+                    var pairedWork: Long? = null
+                    for (arm in if (repetition % 2 == 0) listOf(0, 1) else listOf(1, 0)) {
+                        val beforeWork = accounts[arm].work
+                        val beforeCpu = cpu.currentThreadCpuTime
+                        val beforeWall = System.nanoTime()
+                        repeat(count) {
+                            val result = runs[arm]()
+                            check(result == expected)
+                            sink = sink xor result
+                        }
+                        val wall = System.nanoTime() - beforeWall
+                        val nanos = cpu.currentThreadCpuTime - beforeCpu
+                        val spent = accounts[arm].work - beforeWork
+                        accounts[arm].verify()
+                        check(pairedWork == null || pairedWork == spent)
+                        pairedWork = spent
+                        println("overhead\t$name\t$mode\t$repetition\t$arm\t$count\t$wall\t$nanos\t$spent\t$expected")
+                    }
+                }
+            }
+        }
+    }
+
+    private class Accounting(mode: String, cancellation: ExecutionControl = ExecutionControl.Never) {
         private var charged = 0L
         private val parent = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = Long.MAX_VALUE), false)
         private val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = Long.MAX_VALUE,
             cancellation = if (mode == "nested") parent.polynomial or cancellation else cancellation), false)
-        val token: Cancellation = when (mode) {
-            "none" -> Cancellation.Never
-            "deadline" -> Cancellation.after(60_000_000_000.nanoseconds)
+        val token: ExecutionControl = when (mode) {
+            "none" -> ExecutionControl.Never
+
+            "deadline" -> ExecutionControl.after(60_000_000_000.nanoseconds)
+
             "owned", "nested" -> scope.worker(0).polynomial
-            "opaque" -> object : Cancellation {
+
+            "opaque" -> object : ExecutionControl() {
                 override fun isCancelled(): Boolean = cancellation()
-                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
+
             else -> error("unknown mode")
         }
         val work: Long get() = if (modeIsOpaque) charged else scope.work
@@ -77,7 +145,7 @@ internal object ArithmeticCancellationProfile {
         }
     }
 
-    private fun kernel(name: String, token: Cancellation): () -> Int = when {
+    private fun kernel(name: String, token: ExecutionControl): () -> Int = when {
         name.startsWith("large-") -> latencyKernel(name, token)
         name.startsWith("float") -> {
             val n = name.removePrefix("float").toInt()
@@ -140,7 +208,7 @@ internal object ArithmeticCancellationProfile {
         val setup = System.nanoTime()
         val accounting = Accounting(mode)
         val run = kernel(name, accounting.token)
-        val expected = kernel(name, Cancellation.Never).invoke()
+        val expected = kernel(name, ExecutionControl.Never).invoke()
         val setupNanos = System.nanoTime() - setup
         val count = repetitions(name)
         repeat(4) { repeat(count) { check(run() == expected) } }
@@ -162,7 +230,7 @@ internal object ArithmeticCancellationProfile {
     private fun measureParallel(name: String) {
         val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = Long.MAX_VALUE))
         val runs = List(2) { kernel(name, scope.worker(it).polynomial) }
-        val expected = kernel(name, Cancellation.Never).invoke()
+        val expected = kernel(name, ExecutionControl.Never).invoke()
         val count = repetitions(name)
         repeat(4) { runs.forEach { run -> repeat(count) { check(run() == expected) } } }
         repeat(5) { sample ->
@@ -185,63 +253,86 @@ internal object ArithmeticCancellationProfile {
     }
 
     private fun latency() {
-        for (family in listOf("float256", "polynomial24", "exp12", "large-exact", "large-quadratic")) {
-            val warm = latencyKernel(family, Cancellation.Never)
+        for (family in listOf(
+            "float256",
+            "polynomial24",
+            "exp12",
+            "large-exact",
+            "large-quadratic",
+            "linear64",
+            "finite-search",
+            "finite-local-search",
+        )) {
+            val warm = latencyKernel(family, ExecutionControl.Never)
             repeat(16) { sink = warm() }
-            for (kind in listOf("flag", "deadline")) repeat(120) { attempt ->
-                val trial = attempt - 20
-                val flag = AtomicBoolean()
-                val ready = CountDownLatch(1)
-                val start = CountDownLatch(1)
-                val request = AtomicLong()
-                val requestCpu = AtomicLong()
-                val observed = AtomicLong()
-                val observedCpu = AtomicLong()
-                val offset = 250_000L * (1 + attempt % 8)
-                val liveDeadline = AtomicReference(Cancellation.Never)
-                val token = Cancellation { flag.get() || liveDeadline.get()() }
-                val accounting = Accounting("owned", token)
-                val run = latencyKernel(family, accounting.token)
-                val worker = thread {
-                    ready.countDown()
-                    start.await()
-                    try {
-                        while (true) sink = run()
-                    } catch (_: QuadraticInterrupted) {
-                        observed.set(System.nanoTime())
-                    } catch (_: PolynomialInterrupted) {
-                        observed.set(System.nanoTime())
-                    } catch (_: TranscendentalInterrupted) {
-                        observed.set(System.nanoTime())
-                    } finally {
-                        observedCpu.set(cpu.currentThreadCpuTime)
+            for (kind in listOf("flag", "deadline")) {
+                repeat(120) { attempt ->
+                    val trial = attempt - 20
+                    val flag = AtomicBoolean()
+                    val ready = CountDownLatch(1)
+                    val start = CountDownLatch(1)
+                    val request = AtomicLong()
+                    val requestCpu = AtomicLong()
+                    val observed = AtomicLong()
+                    val observedCpu = AtomicLong()
+                    val offset = 250_000L * (1 + attempt % 8)
+                    val liveDeadline = AtomicReference(ExecutionControl.Never)
+                    val token = ExecutionControl { flag.get() || liveDeadline.get()() }
+                    val accounting = Accounting("owned", token)
+                    val run = latencyKernel(family, accounting.token)
+                    val worker = thread {
+                        ready.countDown()
+                        start.await()
+                        try {
+                            while (true) sink = run()
+                        } catch (_: QuadraticInterrupted) {
+                            observed.set(System.nanoTime())
+                        } catch (_: PolynomialInterrupted) {
+                            observed.set(System.nanoTime())
+                        } catch (_: TranscendentalInterrupted) {
+                            observed.set(System.nanoTime())
+                        } catch (_: ProfileInterrupted) {
+                            observed.set(System.nanoTime())
+                        } catch (_: SearchInitializationCancelled) {
+                            check(token())
+                            observed.set(System.nanoTime())
+                        } finally {
+                            observedCpu.set(cpu.currentThreadCpuTime)
+                        }
                     }
-                }
-                ready.await()
-                if (kind == "deadline") {
-                    request.set(System.nanoTime() + offset)
-                    liveDeadline.set(Cancellation.after(offset.nanoseconds))
-                }
-                start.countDown()
-                if (kind == "flag") {
-                    LockSupport.parkNanos(offset)
-                    requestCpu.set(cpu.getThreadCpuTime(worker.threadId()))
-                    request.set(System.nanoTime())
-                    flag.set(true)
-                }
-                worker.join(10_000)
-                check(!worker.isAlive && observed.get() != 0L)
-                val wall = (observed.get() - request.get()).coerceAtLeast(0)
-                val consumedCpu = if (kind == "flag") {
+                    ready.await()
+                    if (kind == "deadline") {
+                        request.set(System.nanoTime() + offset)
+                        liveDeadline.set(ExecutionControl.after(offset.nanoseconds))
+                    }
+                    start.countDown()
+                    if (kind == "flag") {
+                        LockSupport.parkNanos(offset)
+                        requestCpu.set(cpu.getThreadCpuTime(worker.threadId()))
+                        request.set(System.nanoTime())
+                        flag.set(true)
+                    }
+                    worker.join(10_000)
+                    check(!worker.isAlive && observed.get() != 0L)
+                    val wall = (observed.get() - request.get()).coerceAtLeast(0)
+                    val consumedCpu = if (kind == "flag") {
                     (observedCpu.get() - requestCpu.get()).coerceAtLeast(0)
                 } else -1
-                if (trial >= 0) println("latency\t$family\t$kind\t$trial\t$wall\t$consumedCpu\t${accounting.work}")
+                    if (trial >= 0) println("latency\t$family\t$kind\t$trial\t$wall\t$consumedCpu\t${accounting.work}")
+                }
             }
         }
     }
 
-    private fun latencyKernel(family: String, token: Cancellation): () -> Int = when (family) {
+    private fun latencyKernel(family: String, token: ExecutionControl): () -> Int = when (family) {
+        "finite-search" -> finite(token, localSearch = false)
+
+        "finite-local-search" -> finite(token, localSearch = true)
+
+        "linear64" -> linear(token)
+
         "large-exact" -> largeExact(token)
+
         "large-quadratic" -> {
             val numerator = parseBigInt("9".repeat(2048))
             val denominator = parseBigInt("1" + "0".repeat(2048) + "7")
@@ -251,10 +342,93 @@ internal object ArithmeticCancellationProfile {
             val checker = QuadraticCertification(QuadraticControl(token))
             ({ checker.evaluate(model, point).hashCode() })
         }
+
         else -> kernel(family, token)
     }
 
-    private fun largeExact(token: Cancellation): () -> Int {
+    private class ProfileInterrupted : RuntimeException()
+
+    private fun finite(token: ExecutionControl, localSearch: Boolean): () -> Int {
+        val pigeons = 8
+        val holes = 7
+        val clauses = ArrayList<Factor>()
+        repeat(pigeons) { pigeon -> clauses += Clause(IntArray(holes) { Lit.make(pigeon * holes + it, true) }) }
+        repeat(holes) { hole ->
+            repeat(pigeons) { first ->
+                for (second in first + 1 until pigeons) {
+                    clauses += Clause(
+                        intArrayOf(
+                            Lit.make(first * holes + hole, false),
+                            Lit.make(second * holes + hole, false),
+                        ),
+                    )
+                }
+            }
+        }
+        val model = Problem(pigeons * holes, 0, emptyArray(), clauses.toTypedArray()).bake()
+        return if (localSearch) {
+            val solver = LocalSearchSolver(model, greedyRepairOnRestart = false)
+            (
+                {
+                    solver.resumableSolve(LocalSearchParams(randomSeed = 1L)).use { handle ->
+                        handle.runSlice(token, Long.MAX_VALUE, 64L)
+                    }
+                    if (token()) throw ProfileInterrupted()
+                    0
+                }
+                )
+        } else {
+            val solver = BacktrackSolver(model)
+            val objective = LinearObjective(boolWeights = LongArray(pigeons * holes))
+            (
+                {
+                    solver.resumable(objective, BacktrackParams(randomSeed = 1L)).use { handle ->
+                        handle.runSlice(token, Long.MAX_VALUE, 64L) { }
+                    }
+                    if (token()) throw ProfileInterrupted()
+                    0
+                }
+                )
+        }
+    }
+
+    private fun linear(token: ExecutionControl): () -> Int {
+        val dimension = 64
+        val references = IntArray(dimension) { Term.ofRealVar(it) }
+        val rows = Array<Factor>(96) { row ->
+            ExactLinear.of(
+                references,
+                List(dimension) { column -> q(((row + column * 3) % 7 - 3).toLong()) },
+                LinearOp.LE,
+                q(64),
+            )
+        }
+        val model = Problem(
+            0,
+            0,
+            emptyArray(),
+            rows,
+            numRealVars = dimension,
+            realLower = DoubleArray(dimension) { -10.0 },
+            realUpper = DoubleArray(dimension) { 10.0 },
+        )
+        return {
+            val result = ExactLiraSearchComponent(model).use { component ->
+                val session = SearchSession(listOf(component), cancellation = token)
+                session.initialize()
+                if (token()) throw ProfileInterrupted()
+                session.solve(0)
+            }
+            if (token()) throw ProfileInterrupted()
+            when (result) {
+                is SearchResult.Satisfied -> 1
+                SearchResult.Exhausted -> 2
+                SearchResult.Indeterminate -> 3
+            }
+        }
+    }
+
+    private fun largeExact(token: ExecutionControl): () -> Int {
         val numerator = parseBigInt("9".repeat(2048))
         val denominator = parseBigInt("1" + "0".repeat(2048) + "7")
         val value = BigFraction.of(numerator, denominator)

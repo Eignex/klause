@@ -34,7 +34,7 @@ internal class AllDifferentTuplesPayload(val tuples: List<IntArray>)
 @Serializable
 internal class DistinctOperandPayload(
     val terms: IntArray,
-    val coefficients: List<@Serializable(with = BigFractionSerializer::class) BigFraction>,
+    val coefficients: List<@Serializable(with = BigFractionSerializer::class) BigFraction,>,
     @Serializable(with = BigFractionSerializer::class) val constant: BigFraction = BigFraction.ZERO,
 )
 

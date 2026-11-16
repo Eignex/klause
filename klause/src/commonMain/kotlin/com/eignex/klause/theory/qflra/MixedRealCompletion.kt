@@ -5,14 +5,14 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntDisjointSet
 
 internal fun completeMixedRealComponents(
     columns: Int,
     rows: List<ExactRationalInequality>,
     budget: SourceLpBudget,
-    stop: Cancellation,
+    stop: ExecutionControl,
     onStage: ((String) -> Unit)? = null,
 ): List<BigFraction>? {
     if (columns <= 0 || columns.toLong() * columns > 65536L) return null

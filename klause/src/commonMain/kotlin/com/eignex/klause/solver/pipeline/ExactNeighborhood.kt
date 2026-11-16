@@ -1,15 +1,16 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.solver.resources.NodeAllowance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.resources.NodeAllowance
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import kotlin.math.ceil
 import kotlin.random.Random
 
@@ -28,7 +29,7 @@ internal sealed interface ExactNeighborhoodResult {
 }
 
 internal fun interface ExactNeighborhoodCompletion {
-    fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult
+    fun check(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): ExactNeighborhoodResult
 }
 
 internal fun interface ExactNeighborhoodProposal {
@@ -53,7 +54,7 @@ internal class ExactNeighborhood(
     private val nativeWork: () -> Long = { 0 },
     private val completionStats: () -> SolveStats = { SolveStats.EMPTY },
     private val onClose: () -> Unit = {},
-    private val prepareBooleanCenter: ((Cancellation) -> Boolean)? = null,
+    private val prepareBooleanCenter: ((ExecutionControl) -> Boolean)? = null,
     private val rootBooleanValue: (Int) -> Boolean? = { null },
     private val rootCoordinateValue: ((Int) -> BigFraction?)? = null,
     private val proposal: ExactNeighborhoodProposal? = null,
@@ -61,7 +62,7 @@ internal class ExactNeighborhood(
     private val centerPreparationPending: () -> Boolean = { false },
     private val onProposalOperator: ((Int, Long) -> Unit)? = null,
     private val reviseRefutedCenter: ((MutableList<BigFraction>, BooleanArray,
-        ExactNeighborhoodCondition, Cancellation) -> Unit)? = null,
+        ExactNeighborhoodCondition, ExecutionControl) -> Unit)? = null,
 ) : AutoCloseable {
     private val random = Random(seed)
     private var centers = centers.toMutableList()
@@ -99,7 +100,7 @@ internal class ExactNeighborhood(
     }
 
     fun advance(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         allowance: Long,
         onIncumbent: (Sample, BigFraction?) -> Unit = { _, _ -> },
     ): Boolean {
@@ -124,14 +125,14 @@ internal class ExactNeighborhood(
                     continue
                 }
                 while (nextCenterBoolean < boolCount) {
-                    if (cancellation() || charged >= end || charged >= maximumInstructions ||
+                    if (cancellation.pollStop() || charged >= end || charged >= maximumInstructions ||
                         nodeBudget?.exhausted() == true || completionExhausted()) return searchAllowanceSpent()
                     rootBooleanValue(nextCenterBoolean)?.let { bools[nextCenterBoolean] = it }
                     nextCenterBoolean++
                     charge(1)
                 }
                 while (rootCoordinateValue != null && nextCenterCoordinate < centers.size) {
-                    if (cancellation() || charged >= end || charged >= maximumInstructions ||
+                    if (cancellation.pollStop() || charged >= end || charged >= maximumInstructions ||
                         nodeBudget?.exhausted() == true || completionExhausted()) return searchAllowanceSpent()
                     val coordinate = nextCenterCoordinate++
                     rootCoordinateValue.invoke(coordinate)?.let { centers[coordinate] = it }

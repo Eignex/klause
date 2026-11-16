@@ -4,7 +4,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RetainedFactors
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration
 
 /**
@@ -47,7 +47,7 @@ internal class PreparedSource(
     /** Whether preparation rewrote the model. */
     val changed: Boolean get() = problem !== source
 
-    internal fun retainedFactors(cancellation: Cancellation): RetainedFactors? =
+    internal fun retainedFactors(cancellation: ExecutionControl): RetainedFactors? =
         if (infeasible || !rebuild.isEmpty || passesFired.isEmpty()) null
         else RetainedFactors.between(source, problem, cancellation)
 

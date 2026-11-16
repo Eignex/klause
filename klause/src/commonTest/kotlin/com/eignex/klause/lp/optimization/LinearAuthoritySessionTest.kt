@@ -19,7 +19,7 @@ import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -45,9 +45,9 @@ class LinearAuthoritySessionTest {
             ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
             ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
         )
-        val root = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never))
+        val root = assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never))
         val extended = assertNotNull(LinearAuthorityModel.prepare(rows + ExactRationalInequality(
-            intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.ofLong(-2)), 2, Cancellation.Never))
+            intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.ofLong(-2)), 2, ExecutionControl.Never))
         val costs = List(2) { BigFraction.ONE }
         val funding = SourceLpFunding(100_000_000L, 100_000_000L)
         val budget = SourceLpBudget(maxOperations = 2, funding = funding)
@@ -56,11 +56,11 @@ class LinearAuthoritySessionTest {
         LinearAuthoritySession(budget, { name, _ ->
             if (pause && name == "OwnerAppendInspectionWork") funding.grant(0L)
         }).use { session ->
-            session.advance(root, costs, BigFraction.ZERO, scope, Cancellation.Never,
+            session.advance(root, costs, BigFraction.ZERO, scope, ExecutionControl.Never,
                 SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance }
             pause = true
 
-            val stopped = session.advance(extended, costs, BigFraction.ZERO, scope, Cancellation.Never,
+            val stopped = session.advance(extended, costs, BigFraction.ZERO, scope, ExecutionControl.Never,
                 SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance }
 
             assertNull(stopped)
@@ -68,7 +68,7 @@ class LinearAuthoritySessionTest {
             pause = false
             funding.grant(100_000_000L)
             val resumed = assertNotNull(session.advance(extended, costs, BigFraction.ZERO, scope,
-                Cancellation.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
+                ExecutionControl.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
             assertEquals(BigFraction.ofLong(2), assertNotNull(resumed.bound).value)
             assertEquals(2, budget.operations)
             assertEquals(1L, session.preparations)
@@ -87,12 +87,13 @@ class LinearAuthoritySessionTest {
         val costs = List(2) { BigFraction.ONE }
         LinearAuthoritySession(SourceLpBudget()).use { session ->
             val first = assertNotNull(session.advance(
-                assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never)), costs, BigFraction.ZERO,
-                scope, Cancellation.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
+                assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never)), costs, BigFraction.ZERO,
+                scope, ExecutionControl.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
 
             val changed = assertNotNull(session.advance(
-                assertNotNull(LinearAuthorityModel.prepare(extended, 2, Cancellation.Never)), costs, BigFraction.ZERO,
-                scope, Cancellation.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
+                assertNotNull(LinearAuthorityModel.prepare(extended, 2, ExecutionControl.Never)), costs,
+                    BigFraction.ZERO,
+                scope, ExecutionControl.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
 
             assertEquals(BigFraction.ONE, assertNotNull(first.bound).value)
             assertEquals(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal(), assertNotNull(changed.bound).value)
@@ -118,8 +119,8 @@ class LinearAuthoritySessionTest {
                 Triple(extended, emptySet(), BigFraction.ofLong(2)),
             )) {
                 val result = assertNotNull(session.advance(
-                    assertNotNull(LinearAuthorityModel.prepare(input, 2, Cancellation.Never, inactive)),
-                    costs, BigFraction.ZERO, scope, Cancellation.Never, SparseSourceLpPolicy(), observer,
+                    assertNotNull(LinearAuthorityModel.prepare(input, 2, ExecutionControl.Never, inactive)),
+                    costs, BigFraction.ZERO, scope, ExecutionControl.Never, SparseSourceLpPolicy(), observer,
                 ) { guidance, _, _ -> guidance })
                 assertEquals(expected, assertNotNull(result.bound).value)
             }
@@ -139,12 +140,12 @@ class LinearAuthoritySessionTest {
         val policy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES)
         val costs = List(2) { BigFraction.MINUS_ONE }
         LinearAuthoritySession(SourceLpBudget()).use { session ->
-            session.advance(assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never)),
-                costs, BigFraction.ZERO, scope, Cancellation.Never, policy, observer) { guidance, _, _ -> guidance }
+            session.advance(assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never)),
+                costs, BigFraction.ZERO, scope, ExecutionControl.Never, policy, observer) { guidance, _, _ -> guidance }
 
             val changed = assertNotNull(session.advance(
-                assertNotNull(LinearAuthorityModel.prepare(extended, 2, Cancellation.Never)),
-                costs, BigFraction.ZERO, scope, Cancellation.Never, policy, observer,
+                assertNotNull(LinearAuthorityModel.prepare(extended, 2, ExecutionControl.Never)),
+                costs, BigFraction.ZERO, scope, ExecutionControl.Never, policy, observer,
             ) { guidance, _, _ -> guidance })
 
             assertEquals(BigFraction.ofLong(-2), assertNotNull(changed.bound).value)
@@ -166,14 +167,14 @@ class LinearAuthoritySessionTest {
         var stopped = false
         LinearAuthoritySession(budget, { name, _ -> if (name == "OwnerAppendInspectionWork") stopped = true })
             .use { session ->
-                session.advance(assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never)),
-                    costs, BigFraction.ZERO, scope, Cancellation.Never, SparseSourceLpPolicy(), observer,
+                session.advance(assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never)),
+                    costs, BigFraction.ZERO, scope, ExecutionControl.Never, SparseSourceLpPolicy(), observer,
                 ) { guidance, _, _ -> guidance }
                 val before = budget.measuredPreparationWork
 
                 val cancelled = session.advance(
-                    assertNotNull(LinearAuthorityModel.prepare(extended, 2, Cancellation.Never)),
-                    costs, BigFraction.ZERO, scope, Cancellation { stopped }, SparseSourceLpPolicy(), observer,
+                    assertNotNull(LinearAuthorityModel.prepare(extended, 2, ExecutionControl.Never)),
+                    costs, BigFraction.ZERO, scope, ExecutionControl { stopped }, SparseSourceLpPolicy(), observer,
                 ) { guidance, _, _ -> guidance }
 
                 assertNull(cancelled)
@@ -181,8 +182,8 @@ class LinearAuthoritySessionTest {
                 assertTrue(budget.measuredPreparationWork > before)
                 stopped = false
                 val restored = assertNotNull(session.advance(
-                    assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never)),
-                    costs, BigFraction.ZERO, scope, Cancellation.Never, SparseSourceLpPolicy(), observer,
+                    assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never)),
+                    costs, BigFraction.ZERO, scope, ExecutionControl.Never, SparseSourceLpPolicy(), observer,
                 ) { guidance, _, _ -> guidance })
                 assertEquals(BigFraction.ONE, assertNotNull(restored.bound).value)
             }
@@ -199,19 +200,19 @@ class LinearAuthoritySessionTest {
             ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
             ExactRationalInequality(intArrayOf(0, 1), listOf(BigFraction.ONE, BigFraction.MINUS_ONE), BigFraction.ZERO),
         )
-        val root = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never))
-        val retired = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never, setOf(6)))
+        val root = assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never))
+        val retired = assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never, setOf(6)))
         val costs = listOf(BigFraction.MINUS_ONE, BigFraction.ZERO)
         val policy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES)
         LinearAuthoritySession(SourceLpBudget()).use { session ->
             val first = assertNotNull(session.advance(root, costs, BigFraction.ZERO, scope,
-                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance })
+                ExecutionControl.Never, policy, observer) { guidance, _, _ -> guidance })
             assertEquals(BigFraction.ofLong(2).reciprocal().negated(), assertNotNull(first.bound).value)
 
             val changed = assertNotNull(session.advance(retired, costs, BigFraction.ZERO, scope,
-                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance })
+                ExecutionControl.Never, policy, observer) { guidance, _, _ -> guidance })
             val restored = assertNotNull(session.advance(root, costs, BigFraction.ZERO, scope,
-                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance })
+                ExecutionControl.Never, policy, observer) { guidance, _, _ -> guidance })
 
             assertEquals(BigFraction.MINUS_ONE, assertNotNull(changed.bound).value)
             assertEquals(assertNotNull(first.bound).value, assertNotNull(restored.bound).value)
@@ -229,20 +230,20 @@ class LinearAuthoritySessionTest {
             ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.ONE }, BigFraction.ofLong(9), true),
         )
         val costs = List(2) { BigFraction.ONE }
-        val packed = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never))
+        val packed = assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never))
         val child = assertNotNull(LinearAuthorityModel.prepare(rows + ExactRationalInequality(intArrayOf(0),
-            listOf(BigFraction.MINUS_ONE), BigFraction.ofLong(-2)), 2, Cancellation.Never))
+            listOf(BigFraction.MINUS_ONE), BigFraction.ofLong(-2)), 2, ExecutionControl.Never))
         val model = assertNotNull(SparseSourceLp.prepare(packed.rows,
             packed.columns.map { it.copy(bounds = ExactLpBounds()) }, costs, BigFraction.ZERO,
-            SparseSourceLpPolicy(), Cancellation.Never).prepared).model
+            SparseSourceLpPolicy(), ExecutionControl.Never).prepared).model
         LinearAuthoritySession(SourceLpBudget()).use { session ->
-            val owner = assertNotNull(session.bind(packed, model.objective, Cancellation.Never, { model }, scope))
+            val owner = assertNotNull(session.bind(packed, model.objective, ExecutionControl.Never, { model }, scope))
             val restricted = scope.copy(condition = SourceCondition(lower = mapOf(
                 SourceCoordinate(SourceCoordinate.Kind.Real, 0) to BigFraction.ofLong(2))))
-            assertSame(owner, session.bind(child, model.objective, Cancellation.Never, { model }, restricted))
+            assertSame(owner, session.bind(child, model.objective, ExecutionControl.Never, { model }, restricted))
             assertEquals(BigFraction.ofLong(2), owner.state.activeSide(0, false)?.side?.number?.value)
 
-            assertSame(owner, session.bind(packed, model.objective, Cancellation.Never, { model }, scope))
+            assertSame(owner, session.bind(packed, model.objective, ExecutionControl.Never, { model }, scope))
 
             assertEquals(BigFraction.ZERO, owner.state.activeSide(0, false)?.side?.number?.value)
             assertEquals(listOf(0L, 1L, 2L, 3L), owner.state.assertions.map { it.witness })
@@ -260,13 +261,13 @@ class LinearAuthoritySessionTest {
             ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
             ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
         )
-        val packed = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never))
+        val packed = assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never))
         val costs = List(2) { BigFraction.ONE }
         val budget = SourceLpBudget(maxOperations = 1)
         val policy = SparseSourceLpPolicy(floating = LpFloatAllowance(100_000L, 1), quantum = 100_000L)
         LinearAuthoritySession(budget).use { session ->
             fun advance(policy: SparseSourceLpPolicy): LpRootGuidance = assertNotNull(session.advance(
-                packed, costs, BigFraction.ZERO, scope, Cancellation.Never, policy, observer,
+                packed, costs, BigFraction.ZERO, scope, ExecutionControl.Never, policy, observer,
             ) { guidance, _, _ -> guidance })
             val stopped = advance(policy)
             val work = budget.measuredFloatWork
@@ -290,7 +291,7 @@ class LinearAuthoritySessionTest {
     fun `funding spent during preparation should preserve its admission before binding`() {
         val packed = assertNotNull(LinearAuthorityModel.prepare(listOf(
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
-        ), 1, Cancellation.Never))
+        ), 1, ExecutionControl.Never))
         val funding = SourceLpFunding(1_000_000L, 1_000_000L)
         var interrupt = true
         val budget = SourceLpBudget(maxOperations = 1, funding = funding, onWork = { work ->
@@ -303,14 +304,14 @@ class LinearAuthoritySessionTest {
         LinearAuthoritySession(budget).use { session ->
             funding.grant(100_000L)
             val stopped = session.advance(packed, listOf(BigFraction.ONE), BigFraction.ZERO, scope,
-                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance }
+                ExecutionControl.Never, policy, observer) { guidance, _, _ -> guidance }
             val preparation = budget.measuredPreparationWork
 
             assertNull(stopped)
             assertTrue(funding.paused)
             funding.grant(100_000L)
             val resumed = session.advance(packed, listOf(BigFraction.ONE), BigFraction.ZERO, scope,
-                Cancellation.Never, policy, observer) { guidance, _, _ -> guidance }
+                ExecutionControl.Never, policy, observer) { guidance, _, _ -> guidance }
 
             assertNotNull(assertNotNull(resumed).primal)
             assertTrue(preparation > 0L)
@@ -326,7 +327,7 @@ class LinearAuthoritySessionTest {
             ExactRationalInequality(intArrayOf(1), listOf(BigFraction.MINUS_ONE), BigFraction.ZERO),
             ExactRationalInequality(intArrayOf(0, 1), List(2) { BigFraction.MINUS_ONE }, BigFraction.MINUS_ONE),
         )
-        val packed = assertNotNull(LinearAuthorityModel.prepare(rows, 2, Cancellation.Never))
+        val packed = assertNotNull(LinearAuthorityModel.prepare(rows, 2, ExecutionControl.Never))
         val funding = SourceLpFunding(1_000_000L, 1_000_000L)
         val budget = SourceLpBudget(maxOperations = 1, funding = funding)
         val policy = SparseSourceLpPolicy(floating = LpFloatAllowance(100_000L, 1), quantum = 1L)
@@ -336,7 +337,7 @@ class LinearAuthoritySessionTest {
             repeat(16) {
                 if (result?.primal == null) {
                     result = session.advance(packed, List(2) { BigFraction.ONE }, BigFraction.ZERO, scope,
-                        Cancellation.Never, policy, observer) { guidance, _, _ -> guidance }
+                        ExecutionControl.Never, policy, observer) { guidance, _, _ -> guidance }
                     funding.grant(100_000L)
                 }
             }

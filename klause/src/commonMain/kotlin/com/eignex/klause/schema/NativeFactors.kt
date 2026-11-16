@@ -29,8 +29,8 @@ import com.eignex.klause.model.NValueMode
 import com.eignex.klause.model.PbOp
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BigInt
-import kotlin.jvm.JvmName
 import kotlinx.serialization.json.JsonElement
+import kotlin.jvm.JvmName
 
 // Native factors bind declared variables by name: a factor built over local ids `0 until n` of each
 // namespace reads its Boolean id `i` as `bools[i]`, its integer id `i` as `ints[i]` and its real id `i`

@@ -3,7 +3,7 @@ package com.eignex.klause.lp.bounding
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -23,7 +23,7 @@ class LpProofRowsTest {
         val index = LpProofRowIndex.create(
             model,
             LpProofRowShape(0, 2, 76),
-            Cancellation {
+            ExecutionControl {
                 if (++visits == 5) model.csc.colVal[0] = 2
                 false
             },
@@ -48,7 +48,7 @@ class LpProofRowsTest {
                 LpProofRowIndex.create(
                     model,
                     shape,
-                    Cancellation {
+                    ExecutionControl {
                         if (!changed) {
                             changed = true
                             if (change == "pointer") model.csc.colPtr[1] = 0 else model.csc.rowIdx[0] = 1
@@ -59,7 +59,7 @@ class LpProofRowsTest {
             }
             model.csc.colPtr[1] = 1
             model.csc.rowIdx[0] = 0
-            assertTrue(LpProofRows.create(model, model, Cancellation.Never).unchanged(Cancellation.Never))
+            assertTrue(LpProofRows.create(model, model, ExecutionControl.Never).unchanged(ExecutionControl.Never))
         }
     }
 
@@ -72,7 +72,7 @@ class LpProofRowsTest {
         intArrayOf(1, 4, 4, 8).copyInto(model.csc.colPtr)
         intArrayOf(-1, 2, 0, 2, 1, 0, 0, 2, -1).copyInto(model.csc.rowIdx)
         longArrayOf(99, 7, 3, 0, 4, 2, 0, 8, 99).copyInto(model.csc.colVal)
-        val rows = LpProofRows.create(model, model, Cancellation.Never)
+        val rows = LpProofRows.create(model, model, ExecutionControl.Never)
         val index = assertNotNull(rows.source)
 
         for (row in 0 until model.m) {
@@ -82,10 +82,10 @@ class LpProofRowsTest {
                     if (entryRow == row) expected[column] = value
                 }
             }
-            assertEquals(expected, index.coefficients(row, Cancellation.Never))
+            assertEquals(expected, index.coefficients(row, ExecutionControl.Never))
             val visited = ArrayList<Pair<Int, Long>>()
             assertTrue(
-                index.forEachCoefficient(row, Cancellation.Never) { column, value ->
+                index.forEachCoefficient(row, ExecutionControl.Never) { column, value ->
                     visited.add(column to value)
                     true
                 },
@@ -94,7 +94,7 @@ class LpProofRowsTest {
         }
         model.csc.colVal[0]++
         model.csc.rowIdx[8]--
-        assertTrue(rows.unchanged(Cancellation.Never))
+        assertTrue(rows.unchanged(ExecutionControl.Never))
     }
 
     @Test
@@ -106,13 +106,13 @@ class LpProofRowsTest {
 
         for (pointer in listOf(-1, 2)) {
             model.csc.colPtr[1] = pointer
-            val rows = LpProofRows.create(model, model, Cancellation.Never)
+            val rows = LpProofRows.create(model, model, ExecutionControl.Never)
             assertNull(rows.source)
             assertNull(rows.transformed)
         }
         model.csc.colPtr[1] = 1
         model.csc.rowIdx[0] = 1
-        assertNull(LpProofRows.create(model, model, Cancellation.Never).source)
+        assertNull(LpProofRows.create(model, model, ExecutionControl.Never).source)
     }
 
     @Test
@@ -123,9 +123,9 @@ class LpProofRowsTest {
         val model = builder.build(Sense.MINIMIZE)
 
         for (change in listOf("value", "support", "pointer")) {
-            val rows = LpProofRows.create(model, model, Cancellation.Never)
+            val rows = LpProofRows.create(model, model, ExecutionControl.Never)
             assertTrue(
-                assertNotNull(rows.source).forEachCoefficient(0, Cancellation.Never) { _, _ ->
+                assertNotNull(rows.source).forEachCoefficient(0, ExecutionControl.Never) { _, _ ->
                     when (change) {
                         "value" -> model.csc.colVal[0] = 3
                         "support" -> model.csc.rowIdx[0] = 1
@@ -134,18 +134,18 @@ class LpProofRowsTest {
                     true
                 },
             )
-            assertFalse(rows.unchanged(Cancellation.Never), change)
+            assertFalse(rows.unchanged(ExecutionControl.Never), change)
             model.csc.colVal[0] = 2
             model.csc.rowIdx[0] = 0
             model.csc.colPtr[1] = 1
-            assertTrue(rows.unchanged(Cancellation.Never), change)
+            assertTrue(rows.unchanged(ExecutionControl.Never), change)
         }
         model.csc.colVal[0] = 7
-        val fresh = LpProofRows.create(model, model, Cancellation.Never)
-        val coefficients = assertNotNull(fresh.source).coefficients(0, Cancellation.Never).toMutableMap()
+        val fresh = LpProofRows.create(model, model, ExecutionControl.Never)
+        val coefficients = assertNotNull(fresh.source).coefficients(0, ExecutionControl.Never).toMutableMap()
         assertEquals(mapOf(0 to 7L), coefficients)
         coefficients[0] = 99
-        assertEquals(mapOf(0 to 7L), fresh.source.coefficients(0, Cancellation.Never))
+        assertEquals(mapOf(0 to 7L), fresh.source.coefficients(0, ExecutionControl.Never))
     }
 
     @Test
@@ -158,7 +158,7 @@ class LpProofRowsTest {
         LpProofRows.create(
             model,
             model,
-            Cancellation {
+            ExecutionControl {
                 calls++
                 false
             },
@@ -167,9 +167,9 @@ class LpProofRowsTest {
         for (stop in 1..calls) {
             var seen = 0
             assertFailsWith<LpProofRowsCancelled> {
-                LpProofRows.create(model, model, Cancellation { ++seen >= stop })
+                LpProofRows.create(model, model, ExecutionControl { ++seen >= stop })
             }
         }
-        assertTrue(LpProofRows.create(model, model, Cancellation.Never).unchanged(Cancellation.Never))
+        assertTrue(LpProofRows.create(model, model, ExecutionControl.Never).unchanged(ExecutionControl.Never))
     }
 }

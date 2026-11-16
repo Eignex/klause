@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.concurrent.Mutex
 
 /**
@@ -37,7 +37,7 @@ class SearchComponentSet(
     /** Claim this set and create its session with cancellation-only controls. */
     fun session(
         maxChecks: Long = Long.MAX_VALUE,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         atoms: SearchAtomRegistry? = null,
     ): SearchSession = session(maxChecks, cancellation, learnedDb, atoms, SearchExecutionControlAdapter(cancellation))
@@ -50,7 +50,7 @@ class SearchComponentSet(
      */
     fun session(
         maxChecks: Long = Long.MAX_VALUE,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         learnedDb: SearchLearnedDbParams = SearchLearnedDbParams(),
         atoms: SearchAtomRegistry? = null,
         executionControls: SearchExecutionControls,

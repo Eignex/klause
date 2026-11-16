@@ -17,7 +17,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -38,10 +38,10 @@ class LinearAuthorityCutsTest {
             "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
                 y to BigFraction.ofLong(2)), BigFraction.ONE)),
         ), emptyMap())
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
 
         for (checkUnselected in listOf(true, false)) {
-            val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+            val query = assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never,
                 maximumCutProofSteps = 1, cutMask = setOf(0), checkUnselectedCuts = checkUnselected))
 
             assertTrue(1 in query.inactive)
@@ -55,13 +55,13 @@ class LinearAuthorityCutsTest {
             "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
                 y to BigFraction.ofLong(2)), BigFraction.ONE)),
         ), emptyMap())
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         var ordinaryWork = 0L
         var retiredWork = 0L
-        assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+        assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never,
             cutMask = emptySet(), onCutWork = { ordinaryWork += it }))
 
-        assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+        assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never,
             cutMask = emptySet(), checkUnselectedCuts = false, onCutWork = { retiredWork += it }))
 
         assertTrue(ordinaryWork > 0L)
@@ -74,8 +74,8 @@ class LinearAuthorityCutsTest {
             "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
                 y to BigFraction.ofLong(2)), BigFraction.ONE)),
         ), emptyMap())
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
-        val retired = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never,
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
+        val retired = assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never,
             cutMask = emptySet(), checkUnselectedCuts = false))
 
         assertFalse(retired.matches(source, cuts = true, cutMask = emptySet()))
@@ -94,7 +94,7 @@ class LinearAuthorityCutsTest {
                 "row" to SourcePremise(SourceInequality(mapOf(x to half, y to BigFraction.ONE), rhs, strict)),
             ), emptyMap())
 
-            val cut = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never)).rows.single()
+            val cut = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never)).rows.single()
 
             assertEquals(expected, cut.inequality.rhs)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,
@@ -112,8 +112,8 @@ class LinearAuthorityCutsTest {
         ), mapOf(x to BigFraction.ONE, y to BigFraction.ONE))
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
-            val baseline = authority.advance(source, Cancellation.Never)
-            val result = authority.advance(source, Cancellation.Never, cuts = true)
+            val baseline = authority.advance(source, ExecutionControl.Never)
+            val result = authority.advance(source, ExecutionControl.Never, cuts = true)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
                 assertIs<SourceClaim.Bound>(assertNotNull(baseline.bound).claim).value)
@@ -131,13 +131,13 @@ class LinearAuthorityCutsTest {
             "guarded" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2)),
                 BigFraction.ofLong(3)), emptyMap(), mapOf(y to BigFraction.ONE)),
         ), mapOf(x to BigFraction.MINUS_ONE))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         val enabled = source.atScope(scope.copy(condition = SourceCondition(
             lower = mapOf(y to BigFraction.ONE), upper = mapOf(y to BigFraction.ONE))))
 
-        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
-        val sibling = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never))
-        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
+        val sibling = assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never))
+        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
 
         assertEquals(1, first.activeCuts)
         assertEquals(0, sibling.activeCuts)
@@ -158,7 +158,7 @@ class LinearAuthorityCutsTest {
                 real to BigFraction.ONE), BigFraction.ofLong(3))),
         ), mapOf(x to BigFraction.ONE))
 
-        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never))
 
         assertTrue(cuts.rows.isEmpty())
         assertEquals(1L, cuts.observations["MixedMissingBounds"])
@@ -180,7 +180,7 @@ class LinearAuthorityCutsTest {
         )))
         val conclusion = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE)
 
-        val individual = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never))
+        val individual = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never))
         val check = SourceEvidenceVerifier(source).verify(
             SourceEvidence(scope, SourceClaim.Consequence(conclusion), proof))
 
@@ -282,7 +282,7 @@ class LinearAuthorityCutsTest {
             "x" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
             "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         ), mapOf(x to BigFraction.ONE, real to BigFraction.ONE))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         val cut = assertNotNull(template.cuts).rows.single()
         assertEquals(SourceInequality(mapOf(x to BigFraction.MINUS_ONE, real to BigFraction.MINUS_ONE),
             BigFraction.ofLong(-2)), cut.inequality)
@@ -290,9 +290,9 @@ class LinearAuthorityCutsTest {
             SourceClaim.Consequence(cut.inequality), cut.derivation)))
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { authority ->
-            val baseline = authority.advance(source, Cancellation.Never)
+            val baseline = authority.advance(source, ExecutionControl.Never)
             val baselineObservations = authority.cutObservations()
-            val result = authority.advance(source, Cancellation.Never, cuts = true)
+            val result = authority.advance(source, ExecutionControl.Never, cuts = true)
 
             assertEquals(SourceValue.Rational(BigFraction.ofLong(3) * BigFraction.ofLong(2).reciprocal()),
                 assertIs<SourceClaim.Bound>(assertNotNull(baseline.bound).claim).value)
@@ -320,7 +320,7 @@ class LinearAuthorityCutsTest {
             "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
         ))
 
-        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never, complementary = true))
+        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never, complementary = true))
         val complementary = cuts.rows.single { it.inequality.coefficients == mapOf(x to BigFraction.ONE) }
 
         assertEquals(BigFraction.ofLong(2), complementary.inequality.rhs)
@@ -340,7 +340,7 @@ class LinearAuthorityCutsTest {
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         ))
 
-        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never, complementary = true))
+        val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never, complementary = true))
 
         assertEquals(1, cuts.rows.size)
         assertEquals(null, cuts.observations["MixedComplementaryRetained"])
@@ -359,7 +359,7 @@ class LinearAuthorityCutsTest {
             "other upper" to SourcePremise(SourceInequality(mapOf(other to BigFraction.ONE), BigFraction.ofLong(2))),
         ))
 
-        val cuts = assertNotNull(LinearAuthorityCuts.prepareAtPoint(source, Cancellation.Never,
+        val cuts = assertNotNull(LinearAuthorityCuts.prepareAtPoint(source, ExecutionControl.Never,
             mapOf(real to 2.0, other to 0.0), 65_536L))
         val directed = cuts.rows.single { it.inequality.coefficients ==
             mapOf(x to BigFraction.ONE, other to BigFraction.MINUS_ONE) }
@@ -382,7 +382,7 @@ class LinearAuthorityCutsTest {
         val source = SourceProofContext(scope, setOf(x, real), premises)
 
         for (complementary in listOf(false, true)) {
-            val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, Cancellation.Never, complementary))
+            val cuts = assertNotNull(LinearAuthorityCuts.prepare(source, ExecutionControl.Never, complementary))
 
             assertEquals(64, cuts.rows.size)
             assertTrue(cuts.work <= 65_536L)
@@ -398,13 +398,13 @@ class LinearAuthorityCutsTest {
                 real to BigFraction.MINUS_ONE), BigFraction.ofLong(-3)), mapOf(0 to true)),
             "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         ), mapOf(x to BigFraction.ONE, real to BigFraction.ONE))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         val enabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))))
         val disabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))))
 
-        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
-        val sibling = assertNotNull(LinearAuthorityQuery.prepare(disabled, template, Cancellation.Never))
-        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
+        val sibling = assertNotNull(LinearAuthorityQuery.prepare(disabled, template, ExecutionControl.Never))
+        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
 
         assertEquals(1, first.activeMixedCuts)
         assertEquals(0, sibling.activeMixedCuts)
@@ -423,13 +423,13 @@ class LinearAuthorityCutsTest {
                 real to BigFraction.MINUS_ONE), BigFraction.ofLong(3)), emptyMap(), mapOf(y to BigFraction.ONE)),
             "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         ), mapOf(x to BigFraction.MINUS_ONE))
-        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, Cancellation.Never, cuts = true))
+        val template = assertNotNull(LinearAuthorityTemplate.prepare(source, ExecutionControl.Never, cuts = true))
         val enabled = source.atScope(scope.copy(condition = SourceCondition(
             lower = mapOf(y to BigFraction.ONE), upper = mapOf(y to BigFraction.ONE))))
 
-        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
-        val sibling = assertNotNull(LinearAuthorityQuery.prepare(source, template, Cancellation.Never))
-        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, Cancellation.Never))
+        val first = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
+        val sibling = assertNotNull(LinearAuthorityQuery.prepare(source, template, ExecutionControl.Never))
+        val restored = assertNotNull(LinearAuthorityQuery.prepare(enabled, template, ExecutionControl.Never))
 
         assertEquals(1, first.activeMixedCuts)
         assertEquals(0, sibling.activeMixedCuts)
@@ -444,7 +444,7 @@ class LinearAuthorityCutsTest {
     fun `cancelled separation should publish no retained rows`() {
         val source = SourceProofContext(scope, setOf(x), emptyMap(), emptyMap())
 
-        val cuts = LinearAuthorityCuts.prepare(source, Cancellation { true })
+        val cuts = LinearAuthorityCuts.prepare(source, ExecutionControl { true })
 
         assertNull(cuts)
     }
@@ -457,7 +457,7 @@ class LinearAuthorityCutsTest {
         var polls = 0
         var work = 0L
 
-        val cuts = LinearAuthorityCuts.prepare(source, Cancellation { ++polls > 2 }) { work += it }
+        val cuts = LinearAuthorityCuts.prepare(source, ExecutionControl { ++polls > 2 }) { work += it }
 
         assertNull(cuts)
         assertTrue(work > 0)

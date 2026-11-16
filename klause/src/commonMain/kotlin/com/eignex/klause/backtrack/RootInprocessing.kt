@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.OWN_ORIGIN
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.result.SearchStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.collections.IntArrayList
 
@@ -601,7 +601,7 @@ internal class RootProbingPass : InprocessingPass {
         crossinline action: () -> PropagationResult?,
     ): PropagationResult? {
         val start = session.work
-        val token = Cancellation { session.work - start >= limit }
+        val token = ExecutionControl { session.work - start >= limit }
         val retracting = session.retractingListener
         // Speculative retractions must not overwrite phases saved by ordinary search.
         session.retractingListener = null

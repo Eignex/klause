@@ -33,7 +33,7 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -259,7 +259,7 @@ class BinaryObjectiveViewTest {
         }
         val core = CoreGuidedSearch(problem, objective, BacktrackParams())
         val result = try {
-            assertIs<MinimizeResult.Optimal>(core.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+            assertIs<MinimizeResult.Optimal>(core.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
         } finally {
             core.close()
         }

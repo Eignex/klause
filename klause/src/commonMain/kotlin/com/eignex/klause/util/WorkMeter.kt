@@ -1,12 +1,10 @@
 package com.eignex.klause.util
 
 /**
- * A budget counted in deterministic work units rather than elapsed time.
+ * A sink for completed deterministic work, independent of cancellation and time.
  *
- * An engine charges the work it does at the points where it already polls its [Cancellation], so a stop
- * keyed on the meter falls at the same point of the same run however loaded the machine is. A unit is
- * the engine's own proxy for cost — entries touched, not seconds — so it is reproducible where a clock
- * is not.
+ * The owner defines a unit, such as a coefficient visit or elimination update. Exact allowances
+ * admit work separately; recording completed units neither grants work nor evaluates a stop predicate.
  */
 fun interface WorkMeter {
     /** Record [units] of work done. */

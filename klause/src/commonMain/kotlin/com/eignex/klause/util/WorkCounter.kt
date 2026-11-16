@@ -1,4 +1,4 @@
-package com.eignex.klause.solver.resources
+package com.eignex.klause.util
 
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.AtomicCells

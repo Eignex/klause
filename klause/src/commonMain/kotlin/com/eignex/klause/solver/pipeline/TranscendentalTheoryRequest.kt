@@ -2,11 +2,10 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.ir.TranscendentalProblem
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Original exact real function source shared by traversal and heuristic neighborhood execution. */
 class TranscendentalTheoryRequest internal constructor(
@@ -43,9 +42,9 @@ data class TranscendentalTheoryParams(
     /** Polynomial relaxation matrix cell cap. */
     val maximumMatrixCells: Long? = 262144,
     /** Whole-invocation wall-time token. */
-    val timeout: Cancellation = Cancellation.Never,
+    val timeout: ExecutionControl = ExecutionControl.Never,
     /** External cooperative token, forwarding observed native charges once. */
-    val cancellation: Cancellation = Cancellation.Never,
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     /** Shared backtracking, local-search, ALNS and finite pin controls. */
     val strategy: PolynomialStrategyParams = PolynomialStrategyParams(),
     /** Solve-wide node and heuristic instruction allowance. */

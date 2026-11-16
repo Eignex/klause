@@ -11,12 +11,12 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Caller choices for the numerical traversal and joint repair arms of a finite linear-source portfolio. */
 internal class FiniteCompanionControls(
     val params: TheoryParams? = null,
-    val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    val incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
     val funded: Boolean = false,
     val waitForImprovement: Boolean = false,
     val adaptiveRepair: Boolean = false,
@@ -82,7 +82,7 @@ internal class FiniteCompanionArms private constructor(
             scenario: PortfolioScenario,
             objective: LinearObjective?,
             controls: FiniteCompanionControls,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         ): FiniteCompanionArms {
             val params = controls.params

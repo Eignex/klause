@@ -9,25 +9,28 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.Duration.Companion.milliseconds
 
 internal fun exactNeighborhoodWorker(
     label: String,
     armId: Int,
     objective: LinearObjective?,
-    lifetime: Cancellation,
-    timeout: Cancellation = Cancellation.Never,
+    lifetime: ExecutionControl,
+    timeout: ExecutionControl = ExecutionControl.Never,
     exhausted: () -> Boolean,
     declined: () -> Boolean = { false },
     pendingIncumbentTrial: () -> Boolean = { false },
     open: () -> ExactNeighborhood,
 ): PortfolioWorker {
-    fun stop(global: Cancellation) = lifetime or global or Cancellation(exhausted)
-    fun slice(global: Cancellation, millis: Long) = stop(global) or
-        if (millis == Long.MAX_VALUE) Cancellation.Never else Cancellation.after(millis.milliseconds)
-    fun reason(global: Cancellation) = if (timeout()) TerminationReason.Timeout
-        else if ((lifetime or global)()) TerminationReason.Cancelled
+    fun stop(global: ExecutionControl) = lifetime .includingStop( global) or ExecutionControl(exhausted)
+    fun slice(global: ExecutionControl, millis: Long) = ( stop(global) or
+        if (millis == Long.MAX_VALUE) ExecutionControl.Never else ExecutionControl.after(millis.milliseconds)
+        ).bindStopControl()
+    fun reason(global: ExecutionControl) = if (timeout()) TerminationReason.Timeout
+        else if (lifetime .includingStop( global)()) TerminationReason.Cancelled
         else if (declined()) TerminationReason.RepresentationDeclined
         else TerminationReason.BudgetExhausted
     if (objective == null) return PortfolioWorker.ofSolve(label, armId, countsInstructions = true,
@@ -40,10 +43,10 @@ internal fun exactNeighborhoodWorker(
                 override val isDone: Boolean get() = result != null
                 override val stats get() = search.stats
                 override val work get() = search.work
-                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+                override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? =
                     runInstructionSlice(global, sliceMillis, sliceNodes)
                 override fun runInstructionSlice(
-                    global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
+                    global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long,
                 ): SolveResult? {
                     result?.let { return it }
                     check(!closed)
@@ -60,7 +63,7 @@ internal fun exactNeighborhoodWorker(
             }
         }, solve = { global, budget ->
             open().use { search ->
-                search.advance(stop(global), budget ?: Long.MAX_VALUE)
+                search.advance(stop(global).bindStopControl(), budget ?: Long.MAX_VALUE)
                 search.solveResult(reason(global))
             }
         }).also { if (label.startsWith("alns")) it.family = ArmFamily.Lns }
@@ -76,10 +79,10 @@ internal fun exactNeighborhoodWorker(
                 override val stats get() = search.stats
                 override val work get() = search.work
                 override val chargedInstructions get() = search.work
-                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
                     runInstructionSlice(global, sliceMillis, sliceNodes, onIncumbent)
-                override fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
+                override fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                     result?.let { return it }
                     check(!closed)
@@ -99,7 +102,7 @@ internal fun exactNeighborhoodWorker(
             }
         }, improvements = { _, _, global, budget ->
             open().use { search ->
-                search.advance(stop(global), budget ?: Long.MAX_VALUE)
+                search.advance(stop(global).bindStopControl(), budget ?: Long.MAX_VALUE)
                 sequenceOf(search.minimizeResult(reason(global)))
             }
         }).also { if (label.startsWith("alns")) it.family = ArmFamily.Lns }

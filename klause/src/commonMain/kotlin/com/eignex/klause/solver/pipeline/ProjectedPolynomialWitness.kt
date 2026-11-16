@@ -18,12 +18,12 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.solveQfNra
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun checkProjectedPolynomialWitness(
     source: PolynomialRealProblem,
     point: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     limits: PolynomialLimits = PolynomialLimits(),
 ): SourceEvidenceCheck = try {
     val arithmetic = PolynomialArithmetic(cancellation, limits)
@@ -44,7 +44,7 @@ internal fun checkProjectedPolynomialWitness(
 private fun projectedPolynomialPoint(
     source: PolynomialRealProblem,
     point: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     arithmetic: PolynomialArithmetic,
     limits: PolynomialLimits,
 ): SourceEvidenceCheck {
@@ -63,7 +63,7 @@ internal fun checkProjectedPolynomialFormula(
     realCount: Int,
     booleans: BooleanArray,
     values: Map<Int, AlgebraicReal>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     arithmetic: PolynomialArithmetic,
     limits: PolynomialLimits,
 ): SourceEvidenceCheck {

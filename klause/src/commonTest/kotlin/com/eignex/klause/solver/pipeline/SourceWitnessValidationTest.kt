@@ -10,7 +10,8 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,6 +20,31 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class SourceWitnessValidationTest {
+    @Test
+    fun `source checking should charge the solve accounting owner`() {
+        for (text in listOf("(declare-const b Bool) (assert b)",
+            "(declare-const x Real) (assert (> x 0.0))")) {
+            var charged = 0L
+            var checked = 0L
+            val control = ExecutionControl(accounting = WorkMeter { charged += it })
+            val source = SmtLib.parse(text).source.withWitnessValidator { _, cancellation ->
+                val before = charged
+                cancellation.charge(7L)
+                checked = charged - before
+                SourceEvidenceCheck.Checked
+            }
+            val invocation = SourceSetup.prepare(SourceSetupRequest(source,
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
+
+            SourceSetup.execute(SourceExecutionRequest(invocation,
+                finiteRequest = { FiniteSolveRequest(it,
+                    SourceFiniteControls.Backtrack(BacktrackParams(cancellation = control))) },
+                theory = TheoryParams(cancellation = control), presolveConfig = PresolveConfig.NONE))
+
+            assertEquals(7L, checked)
+        }
+    }
+
     @Test
     fun `rejecting source checks should withhold finite open and native witnesses`() {
         for (text in listOf("(declare-const b Bool) (assert b)",
@@ -132,7 +158,7 @@ class SourceWitnessValidationTest {
             ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
 
         val result = FinitePipeline.solve(FiniteSolveRequest(invocation.finiteShape(),
-            SourceFiniteControls.Backtrack(BacktrackParams(cancellation = Cancellation { stopped }))),
+            SourceFiniteControls.Backtrack(BacktrackParams(cancellation = ExecutionControl { stopped }))),
             FiniteSolveCallbacks({}, {}))
 
         assertTrue(stopped)

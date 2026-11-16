@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SmtStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -33,7 +33,7 @@ class SourceLpTest {
         for ((reason, input) in cases) {
             val declines = mutableListOf<String>()
 
-            val result = SourceLpBudget().runPrepared(Cancellation.Never, prepare = { input },
+            val result = SourceLpBudget().runPrepared(ExecutionControl.Never, prepare = { input },
                 onDecline = { declines += it }) { error("declined input") }
 
             assertNull(result)
@@ -48,7 +48,7 @@ class SourceLpTest {
         funding.grant(300_000)
 
         repeat(257) {
-            budget.runPrepared(Cancellation.Never, prepare = { null }) { true }
+            budget.runPrepared(ExecutionControl.Never, prepare = { null }) { true }
         }
 
         assertEquals(257, budget.operations)
@@ -61,7 +61,7 @@ class SourceLpTest {
         val funding = SourceLpFunding(10_000, 10_000)
         val budget = SourceLpBudget(maxOperations = Int.MAX_VALUE, funding = funding)
         var prepared = 0
-        fun attempt() = budget.runPrepared(Cancellation.Never, prepare = {
+        fun attempt() = budget.runPrepared(ExecutionControl.Never, prepare = {
             prepared++
             null
         }) { true }
@@ -83,7 +83,7 @@ class SourceLpTest {
         val budget = SourceLpBudget(maxOperations = 0)
         var prepared = false
 
-        val result = budget.runPrepared(Cancellation.Never, prepare = {
+        val result = budget.runPrepared(ExecutionControl.Never, prepare = {
             prepared = true
             SourceLpInput(emptyList(), 0, emptyList())
         }) { true }
@@ -99,7 +99,7 @@ class SourceLpTest {
         var cancelled = false
         var entered = false
 
-        val result = budget.runPrepared(Cancellation { cancelled }, prepare = {
+        val result = budget.runPrepared(ExecutionControl { cancelled }, prepare = {
             cancelled = true
             SourceLpInput(emptyList(), 0, emptyList())
         }) {
@@ -118,7 +118,7 @@ class SourceLpTest {
         val caller = TimeSource.Monotonic.markNow() + 1.hours
         val cases = listOf(SourceLpBudget() to true, SourceLpBudget(maxActiveNanos = 1_000_000_000L) to false)
         for ((budget, callerBinds) in cases) {
-            val stated = assertNotNull(budget.run(rows, 1, Cancellation.until(caller)) { it.deadline() })
+            val stated = assertNotNull(budget.run(rows, 1, ExecutionControl.until(caller)) { it.deadline() })
 
             assertEquals(callerBinds, stated == caller)
             assertTrue(stated <= caller)
@@ -135,7 +135,7 @@ class SourceLpTest {
                 exactColumnUpper(1, BigFraction.ONE),
             )
 
-            val subset = assertNotNull(sourceEqualityRows(rows, 2, SourceLpBudget(), Cancellation.Never))
+            val subset = assertNotNull(sourceEqualityRows(rows, 2, SourceLpBudget(), ExecutionControl.Never))
 
             assertEquals(2, subset.size)
             assertSame(rows[0], subset[0])
@@ -151,7 +151,7 @@ class SourceLpTest {
             ExactRationalInequality(intArrayOf(), emptyList(), BigFraction.MINUS_ONE),
         )
 
-        val subset = assertNotNull(sourceEqualityRows(rows, 1, SourceLpBudget(), Cancellation.Never))
+        val subset = assertNotNull(sourceEqualityRows(rows, 1, SourceLpBudget(), ExecutionControl.Never))
 
         assertEquals(2, subset.size)
         assertTrue(listOf(BigFraction.ZERO).satisfiesSourceRows(subset))
@@ -162,7 +162,7 @@ class SourceLpTest {
     fun `unequal opposing rows should not become an equality subset`() {
         val rows = listOf(exactColumnUpper(0, BigFraction.ONE), exactColumnLower(0, BigFraction.ZERO))
 
-        assertTrue(assertNotNull(sourceEqualityRows(rows, 1, SourceLpBudget(), Cancellation.Never)).isEmpty())
+        assertTrue(assertNotNull(sourceEqualityRows(rows, 1, SourceLpBudget(), ExecutionControl.Never)).isEmpty())
     }
 
     @Test
@@ -171,7 +171,7 @@ class SourceLpTest {
             var cancelled = false
             val rows = listOf(exactColumnUpper(0, BigFraction.ONE), exactColumnLower(0, BigFraction.ONE))
             val budget = SourceLpBudget(maxOperations = if (cancel) 4 else 1, onWork = { cancelled = cancel })
-            val token = Cancellation { cancelled }
+            val token = ExecutionControl { cancelled }
             val subset = assertNotNull(sourceEqualityRows(rows, 1, budget, token))
             val spent = budget.reservedWork
             val allocated = budget.reservedAllocation
@@ -191,7 +191,7 @@ class SourceLpTest {
         val rows = listOf(exactColumnUpper(0, BigFraction.ZERO), exactColumnLower(0, BigFraction.ONE))
 
         assertIs<ExactDoubleBoundedSplit.Unknown>(
-            sourceDoubleBoundedSplit(rows, 1, SourceLpBudget(), Cancellation.Never),
+            sourceDoubleBoundedSplit(rows, 1, SourceLpBudget(), ExecutionControl.Never),
         )
     }
 
@@ -201,7 +201,7 @@ class SourceLpTest {
             val row = ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ZERO), BigFraction.ZERO, strict)
 
             val split = assertIs<ExactDoubleBoundedSplit.Split>(
-                sourceDoubleBoundedSplit(listOf(row), 1, SourceLpBudget(), Cancellation.Never),
+                sourceDoubleBoundedSplit(listOf(row), 1, SourceLpBudget(), ExecutionControl.Never),
             )
 
             assertSame(row, split.bounded.single().inequality)
@@ -216,7 +216,7 @@ class SourceLpTest {
             val budget = SourceLpBudget(onWork = sink::observeSourceLp)
             var cancelled = false
             runCatching {
-                budget.run(emptyList(), 1, Cancellation { cancelled }) {
+                budget.run(emptyList(), 1, ExecutionControl { cancelled }) {
                     budget.observe(preparation = 7L, floatWork = 11L, continuation = 13L, refinement = 17L)
                     if (throws) error("source operation")
                     cancelled = true
@@ -243,11 +243,11 @@ class SourceLpTest {
         val coefficients = mutableListOf(BigFraction.ONE)
         val row = ExactRationalInequality(intArrayOf(0), coefficients, BigFraction.ONE)
         SourceLp(listOf(row), 1, SourceLpBudget()).use { owner ->
-            assertNotNull(owner.solve(Cancellation.Never, activity = 0))
+            assertNotNull(owner.solve(ExecutionControl.Never, activity = 0))
             coefficients[0] = BigFraction.MINUS_ONE
 
             val result = assertNotNull(
-                owner.solve(Cancellation.Never, branches = listOf(exactColumnLower(0, BigFraction.ofLong(2L)))),
+                owner.solve(ExecutionControl.Never, branches = listOf(exactColumnLower(0, BigFraction.ofLong(2L)))),
             )
 
             assertEquals(LpVerdict.INFEASIBLE, result.verdict)
@@ -263,10 +263,10 @@ class SourceLpTest {
             BigFraction.ONE,
         )
         SourceLp(rows, 2, SourceLpBudget()).use { owner ->
-            repeat(3) { assertNotNull(owner.solve(Cancellation.Never, branches = listOf(branch))) }
+            repeat(3) { assertNotNull(owner.solve(ExecutionControl.Never, branches = listOf(branch))) }
 
             val result = assertNotNull(
-                owner.solve(Cancellation.Never, branches = listOf(exactColumnLower(0, BigFraction.ofLong(2L)))),
+                owner.solve(ExecutionControl.Never, branches = listOf(exactColumnLower(0, BigFraction.ofLong(2L)))),
             )
 
             assertTrue(assertNotNull(result.exactPrimal).first() >= BigFraction.ofLong(2L))
@@ -276,9 +276,9 @@ class SourceLpTest {
     @Test
     fun `source family reservations should survive replacement owners`() {
         val budget = SourceLpBudget(maxOperations = 1)
-        SourceLp(emptyList(), 1, budget).use { assertNotNull(it.solve(Cancellation.Never)) }
+        SourceLp(emptyList(), 1, budget).use { assertNotNull(it.solve(ExecutionControl.Never)) }
 
-        SourceLp(emptyList(), 1, budget).use { assertNull(it.solve(Cancellation.Never)) }
+        SourceLp(emptyList(), 1, budget).use { assertNull(it.solve(ExecutionControl.Never)) }
 
         assertEquals(1, budget.operations)
         assertTrue(budget.reservedWork > 0L)

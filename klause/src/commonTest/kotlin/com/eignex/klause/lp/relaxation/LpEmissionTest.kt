@@ -12,7 +12,7 @@ import com.eignex.klause.lp.RelaxationProjectionProvider
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.RelaxationCapability
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -40,7 +40,7 @@ class LpEmissionTest {
         var work = 0L
 
         assertFailsWith<LpAssemblyCancelled> {
-            cache.prepare(RootDomains(problem), 0, Cancellation { cancelled }) { work += it }
+            cache.prepare(RootDomains(problem), 0, ExecutionControl { cancelled }) { work += it }
         }
 
         assertEquals(3L, work)
@@ -228,7 +228,7 @@ class LpEmissionTest {
         val cache = LpEmissionCache(CpToLpRelaxation(problem, null))
         val root = cache.refresh(domains, 0)
         pin = true
-        assertFailsWith<LpAssemblyCancelled> { cache.refresh(domains, 1, Cancellation { true }) }
+        assertFailsWith<LpAssemblyCancelled> { cache.refresh(domains, 1, ExecutionControl { true }) }
         pin = null
 
         val unchanged = cache.refresh(domains, 0)

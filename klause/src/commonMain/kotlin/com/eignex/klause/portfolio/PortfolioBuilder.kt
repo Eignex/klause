@@ -23,7 +23,6 @@ import com.eignex.klause.solver.pipeline.ObjectiveCoordinateView
 import com.eignex.klause.solver.pipeline.PreparedSourceHints
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.Mutex
 
 /**

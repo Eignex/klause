@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -167,7 +167,7 @@ class LpWorkingModelTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     refactorUpdateLimit: Int,
                     iterationLimit: Int,
                     workLimit: Long,
@@ -177,7 +177,7 @@ class LpWorkingModelTest {
                     val working = ++created == 2
                     val delegate = RevisedSimplex(model, cancellation, pricing = pricing)
                     return object : PersistentLpSolver by delegate {
-                        override fun prepareLogicals(token: Cancellation): Basis? {
+                        override fun prepareLogicals(token: ExecutionControl): Basis? {
                             if (working && preparation) throw primary
                             return delegate.prepareLogicals(token)
                         }
@@ -254,7 +254,7 @@ class LpWorkingModelTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,

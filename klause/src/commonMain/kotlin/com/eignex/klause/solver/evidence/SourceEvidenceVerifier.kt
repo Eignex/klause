@@ -8,7 +8,7 @@ import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
 
@@ -42,20 +42,20 @@ class SourcePremise(
 /** Source-specific complete assignment and recession checks; unsupported semantics must decline. */
 interface SourceSemanticsChecker {
     /** Check all declarations, constraints and invocation restrictions using exact coordinates. */
-    fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck
+    fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck
 
     /** Check an exact objective value using the original source objective. */
     fun objectiveEquals(
-        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
+        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: ExecutionControl,
     ): SourceEvidenceCheck = SourceEvidenceCheck.Unavailable("original-source objective checker unavailable")
 
     /** Check typed source-specific derivation data against original semantics. */
     fun derivation(
-        claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: Cancellation,
+        claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: ExecutionControl,
     ): SourceEvidenceCheck = SourceEvidenceCheck.Unavailable("source-specific derivation checker unavailable")
 
     /** Check a feasible base, all recession conditions and exact objective improvement. */
-    fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck
+    fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck
 }
 
 /** Immutable consumer-owned original-source premises and objective, independent of a proof producer. */
@@ -124,15 +124,15 @@ class SourceEvidenceVerifier(
     init { require(maximumSteps > 0 && maximumDepth > 0) }
 
     /** Verify scope, premises, imports, branch coverage and the mathematical claim. */
-    fun verify(evidence: SourceEvidence, cancellation: Cancellation = Cancellation.Never): SourceEvidenceCheck =
+    fun verify(evidence: SourceEvidence, cancellation: ExecutionControl = ExecutionControl.Never): SourceEvidenceCheck =
         verify(evidence, cancellation, SourceProofAllowance(maximumSteps, maximumDepth))
 
     internal fun verify(
-        evidence: SourceEvidence, cancellation: Cancellation, allowance: SourceProofAllowance,
+        evidence: SourceEvidence, cancellation: ExecutionControl, allowance: SourceProofAllowance,
     ): SourceEvidenceCheck = checked { Run(cancellation, allowance).verify(evidence, context.scope, 0) }
 
     internal fun verifyAll(
-        evidence: List<SourceEvidence>, cancellation: Cancellation,
+        evidence: List<SourceEvidence>, cancellation: ExecutionControl,
     ): List<SourceEvidenceCheck> {
         val run = Run(cancellation, SourceProofAllowance(maximumSteps, maximumDepth))
         return evidence.map { checked { run.verify(it, context.scope, 0) } }
@@ -151,7 +151,7 @@ class SourceEvidenceVerifier(
     }
 
     private inner class Run(
-        private val cancellation: Cancellation,
+        private val cancellation: ExecutionControl,
         private val allowance: SourceProofAllowance,
     ) {
         private val integerScopes = mutableMapOf<SourceCondition, SourceIntegerBounds>()
@@ -200,7 +200,7 @@ class SourceEvidenceVerifier(
                     else -> null
                 }
                 if (sample != null) {
-                    val checked = scope.condition.checkWitness(sample, Cancellation { step(depth); cancellation() })
+                    val checked = scope.condition.checkWitness(sample, ExecutionControl { step(depth); cancellation() })
                     if (checked != SourceEvidenceCheck.Checked) return checked
                 }
                 if (claim is SourceClaim.Ray) {
@@ -232,7 +232,7 @@ class SourceEvidenceVerifier(
                         context.semanticsChecker !is SourceIntegerAggregateSemantics) {
                         return SourceEvidenceCheck.Unavailable("source-specific checker has no aggregate scope support")
                     }
-                    val token = if (scope.condition.integerRows.isEmpty()) cancellation else Cancellation {
+                    val token = if (scope.condition.integerRows.isEmpty()) cancellation else ExecutionControl {
                         step(depth)
                         false
                     }
@@ -386,7 +386,8 @@ class SourceEvidenceVerifier(
                     }
                     if (premise.integerPins.isNotEmpty()) {
                         val bounds = integerScopes[scope.condition] ?: context.integerPinBounds(scope.condition,
-                            Cancellation { step(depth); cancellation() })?.also { integerScopes[scope.condition] = it }
+                            ExecutionControl { step(depth); cancellation() })?.also { integerScopes[scope
+                                .condition] = it }
                             ?: throw ProofStop(SourceEvidenceCheck.Unavailable("integer premise scope check stopped"))
                         if (bounds.status(premise.integerPins) != IntegerPinStatus.Established) {
                             rejectProof("original-source integer premise guard is not established")
@@ -440,7 +441,7 @@ class SourceEvidenceVerifier(
                     if (row.coefficients.keys.any { it !in coordinates }) {
                         rejectProof("mixed integer rounding references an undeclared coordinate")
                     }
-                    mixedIntegerRounding(row, bounds, Cancellation { step(depth); cancellation() })
+                    mixedIntegerRounding(row, bounds, ExecutionControl { step(depth); cancellation() })
                         ?: rejectProof("mixed integer rounding requires integral activity and continuous bounds")
                 }
                 is SourceDerivation.Import -> {

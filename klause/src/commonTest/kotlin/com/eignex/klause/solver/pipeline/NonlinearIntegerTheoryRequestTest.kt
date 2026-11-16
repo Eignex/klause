@@ -11,7 +11,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.times
@@ -143,7 +143,7 @@ class NonlinearIntegerTheoryRequestTest {
         val invocation = NonlinearIntegerInvocation(request, params, FiniteEngine.LOCAL_SEARCH, binding)
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
 
-        val result = invocation.check(condition, Cancellation.Never)
+        val result = invocation.check(condition, ExecutionControl.Never)
 
         val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
         val publication = assertIs<CompletedEnginePublication.Witness>(sample.witnessCertificate?.publication)
@@ -151,7 +151,7 @@ class NonlinearIntegerTheoryRequestTest {
         assertEquals("2", publication.sample.exactIntValue(0).toString())
         assertNotNull(publication.sample.algebraicReals?.get(0))
         assertIs<Verification.Accepted<*, *>>(
-            polynomialWitnessVerifier(binding, Cancellation.Never)
+            polynomialWitnessVerifier(binding, ExecutionControl.Never)
                 .verify(Candidate(sample, null)),
         )
     }
@@ -218,9 +218,9 @@ class NonlinearIntegerTheoryRequestTest {
                 "(declare-const n Int) (assert (= (* n n) 2))",
             )).source.originalSource)
         var charged = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val execution = OpenTheoryPipeline.execute(

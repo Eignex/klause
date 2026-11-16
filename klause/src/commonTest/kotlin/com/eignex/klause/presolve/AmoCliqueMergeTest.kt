@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -63,7 +63,7 @@ class AmoCliqueMergeTest {
         )
         var polls = 0
 
-        val delta = AmoCliqueMerge.mergeAmoCliques(problem, Cancellation { ++polls > 1 })
+        val delta = AmoCliqueMerge.mergeAmoCliques(problem, ExecutionControl { ++polls > 1 })
 
         assertTrue(delta.isEmpty)
     }

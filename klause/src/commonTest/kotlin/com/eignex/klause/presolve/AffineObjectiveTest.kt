@@ -11,9 +11,9 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -30,7 +30,7 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -383,7 +383,7 @@ class AffineObjectiveTest {
                 objective,
                 PresolveConfig.parse("affine"),
                 false,
-                Cancellation { polls++ >= limit },
+                ExecutionControl { polls++ >= limit },
             )
 
             val values = BacktrackSolver(outcome.problem.bake()).enumerate().map { reduced ->

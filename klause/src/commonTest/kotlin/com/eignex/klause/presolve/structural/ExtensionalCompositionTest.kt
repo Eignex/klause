@@ -13,7 +13,7 @@ import com.eignex.klause.presolve.PresolvePass
 import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFalse
@@ -45,7 +45,7 @@ class ExtensionalCompositionTest {
             Table(intArrayOf(3, 1, 0), longArrayOf(4, 0, 0, 5, 1, 1)),
         )
 
-        val delta = ExtensionalComposition.reduce(factors, Cancellation.Never)
+        val delta = ExtensionalComposition.reduce(factors, ExecutionControl.Never)
 
         assertContentEquals(intArrayOf(0), delta.droppedIndices)
         assertContentEquals(longArrayOf(0, 0, 7, 1, 1, 9), assertIs<Table>(delta.addedFactors.single()).tuples)
@@ -59,7 +59,7 @@ class ExtensionalCompositionTest {
         )) {
             val factors = arrayOf<Factor>(table, Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)))
 
-            val delta = ExtensionalComposition.reduce(factors, Cancellation.Never)
+            val delta = ExtensionalComposition.reduce(factors, ExecutionControl.Never)
 
             assertTrue(delta.isEmpty)
         }
@@ -76,7 +76,7 @@ class ExtensionalCompositionTest {
             ExtensionalComposition.Limits(pairWork = 4),
             ExtensionalComposition.Limits(retainedCells = 0),
         )) {
-            val delta = ExtensionalComposition.reduce(factors, Cancellation.Never, limits)
+            val delta = ExtensionalComposition.reduce(factors, ExecutionControl.Never, limits)
 
             assertTrue(delta.isEmpty)
             assertFalse(delta.infeasible)
@@ -90,7 +90,7 @@ class ExtensionalCompositionTest {
         val factors = arrayOf<Factor>(left, right)
         val budget = PresolveBudget(32)
 
-        val delta = ExtensionalComposition.reduce(factors, budget.orSpent(Cancellation.Never))
+        val delta = ExtensionalComposition.reduce(factors, budget.orSpent(ExecutionControl.Never))
 
         assertContentEquals(intArrayOf(0), delta.droppedIndices)
         assertContentEquals(right.tuples, assertIs<Table>(delta.addedFactors.single()).tuples)
@@ -131,7 +131,7 @@ class ExtensionalCompositionTest {
 
         val result = Presolver.runSource(
             problem, PresolveConfig.parse("off,+extensional"), PresolveContext(presolveBudget = budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertTrue(result.infeasible)
@@ -151,7 +151,7 @@ class ExtensionalCompositionTest {
 
         val result = Presolver.runSource(
             problem, PresolveConfig.parse("off,+extensional"), PresolveContext(presolveBudget = budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertSame(problem, result.problem)

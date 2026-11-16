@@ -1,8 +1,8 @@
 package com.eignex.klause.propagation
 
-import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.selector.VariableSelector
+import com.eignex.klause.backtrack.toBacktrackParams
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -30,7 +30,7 @@ import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -146,7 +146,7 @@ class IntegerConflictLearnerTest {
                 int_search([z],input_order,indomain_min,complete),
                 int_search([x,y],input_order,indomain_max,complete)
             ]) maximize x;
-        """.trimIndent())
+            """.trimIndent())
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
             program.problem, FiniteEngine.BACKTRACK, program.linearObjective(), randomSeed = 3L,
         ))
@@ -183,7 +183,7 @@ class IntegerConflictLearnerTest {
                 int_search([z],input_order,indomain_min,complete),
                 int_search([x,y],input_order,indomain_max,complete)
             ]) satisfy;
-        """.trimIndent())
+            """.trimIndent())
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(
             program.problem, FiniteEngine.BACKTRACK, solutionSetSensitive = true, randomSeed = 3L,
         ))
@@ -456,7 +456,7 @@ class IntegerConflictLearnerTest {
         state.runToFixpoint(allFactors = true)
         assertTrue(state.setIntMinAsDecision(0, 2))
         assertNotNull(state.runToFixpoint(allFactors = false))
-        state.finiteWork.cancellation = Cancellation { true }
+        state.finiteWork.cancellation = ExecutionControl { true }
 
         val result = state.conflictAnalyzer.analyze(1)
 

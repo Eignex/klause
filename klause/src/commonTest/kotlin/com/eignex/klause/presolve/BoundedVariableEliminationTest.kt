@@ -13,7 +13,7 @@ import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
@@ -82,7 +82,7 @@ class BoundedVariableEliminationTest {
             val budget = PresolveBudget(Long.MAX_VALUE)
             val prepared = Presolver.runSource(
                 problem, PresolveConfig.parse("off,+bve"), PresolveContext(presolveBudget = budget),
-                budget.orSpent(Cancellation.Never),
+                budget.orSpent(ExecutionControl.Never),
             )
             assertTrue(prepared.infeasible)
             assertEquals(PresolveInvocationOutcome.REFUTED, budget.invocations.single().outcome)
@@ -94,10 +94,10 @@ class BoundedVariableEliminationTest {
     fun `a completed empty resolvent should survive cancellation at the next poll`() {
         val problem = Problem(1, 0, emptyArray(), listOf(clause(pos(0)), clause(neg(0))))
         val setup = PresolveBudget(Long.MAX_VALUE)
-        assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(Cancellation.Never)))
+        assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(ExecutionControl.Never)))
         for (finite in listOf(false, true)) {
             val budget = PresolveBudget(setup.spent() + 10L + 60L)
-            val token = budget.orSpent(Cancellation.Never)
+            val token = budget.orSpent(ExecutionControl.Never)
 
             val infeasible = if (finite) {
                 BoundedVariableElimination.eliminate(problem, cancellation = token).infeasible
@@ -112,7 +112,7 @@ class BoundedVariableEliminationTest {
         val entryWork = problem.factors.size +
             passBaseUnits(problem.factors) * PresolvePass.ELIMINATE_BOOL_VARS.baseWorkWeight
         val budget = PresolveBudget(entryWork + setup.spent() + 10L + 60L)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
 
         val prepared = Presolver.runSource(
             problem, PresolveConfig.parse("off,+bve"), PresolveContext(presolveBudget = budget), token,
@@ -128,10 +128,10 @@ class BoundedVariableEliminationTest {
         val clauses = listOf(clause(pos(0))) + List(251) { clause(neg(0)) }
         val problem = Problem(1, 0, emptyArray(), clauses)
         val setup = PresolveBudget(Long.MAX_VALUE)
-        assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(Cancellation.Never)))
+        assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(ExecutionControl.Never)))
         for (finite in listOf(false, true)) {
             val budget = PresolveBudget(setup.spent() + 10L + 2_540L)
-            val token = budget.orSpent(Cancellation.Never)
+            val token = budget.orSpent(ExecutionControl.Never)
 
             val delta = if (finite) {
                 BoundedVariableElimination.eliminate(problem, cancellation = token).let {
@@ -241,16 +241,16 @@ class BoundedVariableEliminationTest {
         val negative = Clause(intArrayOf(neg(0)) + (33..64).map(::pos))
         val problem = Problem(65, 0, emptyArray(), List(32) { positive } + List(32) { negative })
         var charged = 0L
-        val meter = object : Cancellation {
+        val meter = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val delta = BoundedVariableElimination.eliminateSource(problem, (1..64).toSet(), meter)
 
         assertTrue(delta.isEmpty)
         val setup = PresolveBudget(Long.MAX_VALUE)
-        assertNotNull(SatClauseDb.build(problem, (1..64).toSet(), setup.orSpent(Cancellation.Never)))
+        assertNotNull(SatClauseDb.build(problem, (1..64).toSet(), setup.orSpent(ExecutionControl.Never)))
         assertEquals(655_360L + setup.spent() + 650L, charged)
     }
 
@@ -258,9 +258,9 @@ class BoundedVariableEliminationTest {
     fun `unused candidates should charge work and stop on the phase allowance`() {
         val problem = Problem(64, 0, emptyArray(), emptyArray())
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 30L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val delta = BoundedVariableElimination.eliminateSource(problem, cancellation = stop)
@@ -273,13 +273,13 @@ class BoundedVariableEliminationTest {
     fun `candidate collection and sorting should stop before eliminating any clause`() {
         val problem = Problem(4, 0, emptyArray(), listOf(clause(pos(0))))
         val setup = PresolveBudget(Long.MAX_VALUE)
-        assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(Cancellation.Never)))
+        assertNotNull(SatClauseDb.build(problem, emptySet(), setup.orSpent(ExecutionControl.Never)))
         for (extra in listOf(10L, 50L, 100L)) {
             val budget = PresolveBudget(setup.spent() + extra)
 
             val delta = BoundedVariableElimination.eliminateSource(
                 problem,
-                cancellation = budget.orSpent(Cancellation.Never),
+                cancellation = budget.orSpent(ExecutionControl.Never),
             )
 
             assertTrue(delta.isEmpty)
@@ -330,12 +330,12 @@ class BoundedVariableEliminationTest {
             listOf(clause(pos(0))) + List(16) { positive } + List(16) { negative },
         )
         val setup = PresolveBudget(Long.MAX_VALUE)
-        assertNotNull(SatClauseDb.build(problem, (2..5).toSet(), setup.orSpent(Cancellation.Never)))
+        assertNotNull(SatClauseDb.build(problem, (2..5).toSet(), setup.orSpent(ExecutionControl.Never)))
         val preparation = setup.spent() + 80L
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= preparation + 2_000L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val delta = BoundedVariableElimination.eliminateSource(problem, (2..5).toSet(), stop)
@@ -356,12 +356,12 @@ class BoundedVariableEliminationTest {
     fun `cancellation after pivot analysis should decline the complete uncommitted pivot`() {
         val problem = Problem(2, 0, emptyArray(), listOf(clause(pos(0), pos(1))))
         val setup = PresolveBudget(Long.MAX_VALUE)
-        assertNotNull(SatClauseDb.build(problem, setOf(1), setup.orSpent(Cancellation.Never)))
+        assertNotNull(SatClauseDb.build(problem, setOf(1), setup.orSpent(ExecutionControl.Never)))
         val preparation = setup.spent() + 20L
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged > preparation
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val delta = BoundedVariableElimination.eliminateSource(problem, setOf(1), stop)
@@ -396,7 +396,7 @@ class BoundedVariableEliminationTest {
             ),
         )
 
-        val delta = Presolve.eliminateSourceBoolVars(problem, emptySet(), Cancellation.Never)
+        val delta = Presolve.eliminateSourceBoolVars(problem, emptySet(), ExecutionControl.Never)
 
         val reduced = assertNotNull(problem.withSourcePassDelta(delta))
         assertTrue(!delta.rebuild.isEmpty)
@@ -420,7 +420,7 @@ class BoundedVariableEliminationTest {
             ),
         )
 
-        val delta = Presolve.eliminateSourceBoolVars(problem, emptySet(), Cancellation.Never)
+        val delta = Presolve.eliminateSourceBoolVars(problem, emptySet(), ExecutionControl.Never)
 
         val reduced = assertNotNull(problem.withSourcePassDelta(delta))
         assertTrue(reduced.factors.any { f -> f.boolVars.any { it == 0 } })

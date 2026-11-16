@@ -4,7 +4,6 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TEN
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BIG_ZERO
-import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.fitsLong
@@ -12,7 +11,6 @@ import com.eignex.util.numbers.floorBigInt
 import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.parseBigInt
-import com.eignex.util.numbers.remainderOf as remainderOf
 import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.shr
 import com.eignex.util.numbers.toDouble
@@ -23,6 +21,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import com.eignex.util.numbers.remainderOf as remainderOf
 
 class BigIntTest {
 

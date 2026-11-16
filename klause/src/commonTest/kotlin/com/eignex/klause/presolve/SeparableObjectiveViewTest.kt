@@ -22,7 +22,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -100,7 +100,7 @@ class SeparableObjectiveViewTest {
         val search = CoreGuidedSearch(problem, authority, BacktrackParams(objectiveLowerBoundSink = { floors += it }))
 
         val result = search.use {
-            assertIs<MinimizeResult.Optimal>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+            assertIs<MinimizeResult.Optimal>(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
         }
 
         assertEquals(original, authority)
@@ -128,7 +128,7 @@ class SeparableObjectiveViewTest {
             ))
 
             val result = search.use {
-                assertIs<MinimizeResult.Optimal>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+                assertIs<MinimizeResult.Optimal>(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
             }
 
             assertEquals(if (scale > 0) 13L else -5L, objective.evaluateLong(result.sample))
@@ -170,7 +170,7 @@ class SeparableObjectiveViewTest {
             BacktrackParams(objectiveLowerBoundSink = { floors += it }))
 
         val result = search.use {
-            assertIs<MinimizeResult.Optimal>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+            assertIs<MinimizeResult.Optimal>(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
         }
 
         assertEquals(original, objective)
@@ -277,12 +277,10 @@ class SeparableObjectiveViewTest {
     @Test
     fun `stopped expansion should retain charged work and decline`() {
         var charged = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2
-            override fun workMeter(): WorkMeter = object : WorkMeter {
-                override fun charge(units: Long) { charged += units }
+            override val accounting = WorkMeter {units-> charged += units }
             }
-        }
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
         ).bake()

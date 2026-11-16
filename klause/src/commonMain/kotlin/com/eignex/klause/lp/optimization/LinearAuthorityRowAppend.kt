@@ -7,12 +7,12 @@ import com.eignex.klause.lp.engine.ExactLpNumber
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.LpScopedSolver
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class LinearAuthorityRowAppend(
     private val budget: SourceLpBudget,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val observe: (String, Long) -> Unit,
 ) {
     private var work = 0L

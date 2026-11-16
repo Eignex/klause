@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.basis.BasisRepair
 import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -22,7 +22,7 @@ class RevisedSimplexRepairTest {
         var closes = 0
         RevisedSimplex(
             model(),
-            cancellation = Cancellation { if (armed) throw primary else false },
+            cancellation = ExecutionControl { if (armed) throw primary else false },
             basisSolverFactory = { matrix ->
                 val delegate = KotlinBasisSolver(matrix)
                 object : BasisSolver by delegate {
@@ -65,7 +65,7 @@ class RevisedSimplexRepairTest {
                 RevisedSimplex(
                     model,
                     workLimit = 10000,
-                    cancellation = Cancellation { cancelled },
+                    cancellation = ExecutionControl { cancelled },
                     basisSolverFactory = { matrix ->
                         owners++
                         val delegate = KotlinBasisSolver(matrix)

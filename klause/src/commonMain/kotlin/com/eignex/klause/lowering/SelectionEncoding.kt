@@ -11,7 +11,7 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.WideConsts
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong
@@ -22,7 +22,7 @@ import com.eignex.util.numbers.unaryMinus
 
 internal fun <T> minMaxEncoding(
     factor: ArrayMinMax,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -41,7 +41,7 @@ internal fun <T> minMaxEncoding(
 
 internal fun <T> realMinMaxEncoding(
     factor: RealArrayMinMax,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -62,7 +62,7 @@ internal fun <T> realMinMaxEncoding(
 
 internal fun <T> gridMinMaxEncoding(
     factor: GridArrayMinMax,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -79,7 +79,7 @@ internal fun <T> gridMinMaxEncoding(
 
 internal fun <T> elementEncoding(
     factor: Element,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -126,7 +126,7 @@ private fun binaryElementRow(factor: Element): LinearRow {
 
 internal fun <T> realElementEncoding(
     factor: RealElement,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     row: (LinearRow) -> T,
     all: (List<T>) -> T,
     any: (List<T>) -> T,
@@ -151,7 +151,7 @@ internal fun <T> realElementEncoding(
     return all(relations)
 }
 
-private fun selectionCheckpoint(cancellation: Cancellation) {
+private fun selectionCheckpoint(cancellation: ExecutionControl) {
     cancellation.charge(1)
     if (cancellation()) throw SelectionEncodingInterrupted()
 }

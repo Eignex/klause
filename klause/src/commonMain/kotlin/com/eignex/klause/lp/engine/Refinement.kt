@@ -6,7 +6,7 @@ import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.compareTo
@@ -191,7 +191,7 @@ internal class RefinementStop(val reason: LpRefinementDecline) : RuntimeExceptio
 internal class RefinementMeter(
     val limits: LpRefinementLimits,
     private val cache: LpRefinementCache,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val onBasisVerification: ((ExactBasisMetrics) -> Unit)? = null,
     private val perAttempt: Boolean = false,
     val diagnostic: LpRefinementPath? = null,
@@ -203,14 +203,13 @@ internal class RefinementMeter(
     private var directWork = 0L
     private var directAllocation = 0L
     private val stride = PollStride()
-    private val meteredCancellation = cancellation.workMeter() != null
     var metrics = LpRefinementMetrics()
 
     // A finite time limit is a deadline, so a phase handed this token can budget a share of what is left of it.
     val token = if (limits.time.isInfinite()) {
         cancellation
     } else {
-        cancellation or Cancellation.until(started + (limits.time - elapsedForLimit()))
+        cancellation or ExecutionControl.until(started + (limits.time - elapsedForLimit()))
     }
     val spentWork: Long get() = cache.work
     val remainingWork: Long get() = minOf(
@@ -239,7 +238,7 @@ internal class RefinementMeter(
         if (perAttempt) Duration.ZERO else cache.elapsed
 
     fun charge(work: Long = 1L, bytes: Long = 0L) {
-        if (meteredCancellation || stride.due(work)) poll()
+        if ( stride.due(work)) poll()
         if (work > remainingWork) stop(LpRefinementDecline.WORK)
         if (bytes > remainingAllocation) stop(LpRefinementDecline.ALLOCATION)
         cache.work = addSaturated(cache.work, work)
@@ -1337,7 +1336,7 @@ internal fun refineLp(
     duals: DoubleArray? = null,
     basis: Basis? = null,
     witness: ExactLpWitness? = null,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     directWork: Long = 0L,
     directAllocation: Long = 0L,
     needPoint: Boolean = true,

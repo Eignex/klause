@@ -12,7 +12,7 @@ import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.argsortBy
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntHashSet
@@ -86,7 +86,7 @@ object RootBaker {
      * Run the [config]-enabled probing tiers against the base-baked [problem] and return the resulting
      * deductions — the base bake merged with every probing finding, ready for a rebuilt [BakedProblem].
      * Returns [problem]'s existing bake unchanged when no tier is enabled or the base bake is already
-     * `Unsat`. Cancellation is polled between phases and probes; a fired deadline yields a sound partial
+     * `Unsat`. ExecutionControl is polled between phases and probes; a fired deadline yields a sound partial
      * bake (probing only ever tightens).
      */
     fun bake(problem: BakedProblem, config: BakeConfig): PropagationResult {
@@ -121,7 +121,7 @@ object RootBaker {
         problem: BakedProblem,
         pass: PresolvePass,
         base: PropagationResult,
-        action: (PropagationResult.Implied, Cancellation) -> PropagationResult,
+        action: (PropagationResult.Implied, ExecutionControl) -> PropagationResult,
     ): PropagationResult {
         val budget = problem.cancellation.presolveBudget()
         val token = budget?.observeStops(problem.cancellation) ?: problem.cancellation
@@ -186,7 +186,7 @@ object RootBaker {
         config: BakeConfig,
         factorWeights: DoubleArray,
         rng: Random,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): PropagationResult {
         var acc: PropagationResult.Implied = base
         val perVarCalls = IntArray(problem.numIntVars)
@@ -261,7 +261,7 @@ object RootBaker {
         acc: PropagationResult.Implied,
         factorWeights: DoubleArray,
         rng: Random,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): IntArray {
         val numIntVars = problem.numIntVars
         val intOccurrences by lazy { PropagationProblem(problem).intOccurrences }
@@ -312,7 +312,7 @@ object RootBaker {
         config: BakeConfig,
         factorWeights: DoubleArray,
         rng: Random,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): PropagationResult {
         var acc: PropagationResult.Implied = base
         val perVarCalls = IntArray(problem.numIntVars)
@@ -394,7 +394,7 @@ object RootBaker {
     private fun probeFreeBools(
         problem: BakedProblem,
         initial: PropagationResult.Implied,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): PropagationResult {
         var acc = initial
         var changed = true

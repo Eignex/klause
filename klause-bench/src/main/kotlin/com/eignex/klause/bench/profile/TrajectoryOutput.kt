@@ -1,10 +1,10 @@
 package com.eignex.klause.bench.profile
 
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.lang.Boolean.getBoolean
 import java.util.zip.GZIPOutputStream
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 internal fun compressTrajectoryOutput(out: File) {
     if (!getBoolean("klause.bench.trajectory.compress")) return

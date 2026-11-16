@@ -25,16 +25,16 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.executionKind
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.util.IdentityHashMap
-import kotlin.time.Duration.Companion.milliseconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.util.IdentityHashMap
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object FinitePortfolioLpCapture {
     @JvmStatic
@@ -115,7 +115,7 @@ internal object FinitePortfolioLpCapture {
         out.resolve("source.mps").writeBytes(bytes)
         val sourceHash = sha256(bytes)
         val executionStarted = System.nanoTime()
-        val stop = Cancellation.after(timeout.milliseconds)
+        val stop = ExecutionControl.after(timeout.milliseconds)
         val original = requireNotNull(Mps.parse(bytes.decodeToString()).toLinearSourceProblem(cancellation = stop))
         require(original.variables.size <= 4096 && original.rows.size <= 4096)
         val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(original, ProblemSettings()),
@@ -446,7 +446,7 @@ internal object FinitePortfolioLpCapture {
         data class Observation(val owner: Int, val capture: Boolean)
     }
 
-    internal fun capture(query: Any, stop: Cancellation): ByteArray? {
+    internal fun capture(query: Any, stop: ExecutionControl): ByteArray? {
         val model = get(query, "Model")
         if ((get(model, "M") as Int) > 4096 ||
             (get(model, "N") as Int).toLong() + (get(model, "M") as Int) > 8192) return null

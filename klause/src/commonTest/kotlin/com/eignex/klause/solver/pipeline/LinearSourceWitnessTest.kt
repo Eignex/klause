@@ -15,7 +15,7 @@ import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertIs
 
@@ -39,7 +39,7 @@ class LinearSourceWitnessTest {
         )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
         val result = RationalTheoryDescent(weak, objective, TheoryParams()).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> }
         }
         val sample = assertIs<MinimizeResult.Optimal>(result).sample
         val source = SourceProofContext(
@@ -53,7 +53,7 @@ class LinearSourceWitnessTest {
             mapOf(real to BigFraction.ONE),
         )
 
-        val checked = source.linearWitnessVerifier(Cancellation.Never).verify(Candidate(sample, 0.0))
+        val checked = source.linearWitnessVerifier(ExecutionControl.Never).verify(Candidate(sample, 0.0))
 
         assertIs<Verification.Rejected>(checked)
     }
@@ -80,7 +80,7 @@ class LinearSourceWitnessTest {
                 exactReals = listOf(BigFraction.ZERO),
             )
 
-            val checked = source.linearWitnessVerifier(Cancellation.Never).verify(Candidate(sample, 0.0))
+            val checked = source.linearWitnessVerifier(ExecutionControl.Never).verify(Candidate(sample, 0.0))
 
             if (value) {
                 assertIs<Verification.Accepted<Sample, Double?>>(checked)
@@ -95,7 +95,7 @@ class LinearSourceWitnessTest {
         val source = SourceProofContext(scope, emptySet(), emptyMap(), emptyMap())
         val sample = Sample(booleanArrayOf(), longArrayOf())
 
-        val checked = source.linearWitnessVerifier(Cancellation { true }).verify(Candidate(sample, 0.0))
+        val checked = source.linearWitnessVerifier(ExecutionControl { true }).verify(Candidate(sample, 0.0))
 
         assertIs<Verification.Indeterminate>(checked)
     }

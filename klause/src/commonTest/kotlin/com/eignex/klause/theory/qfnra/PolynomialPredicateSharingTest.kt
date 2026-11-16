@@ -4,8 +4,8 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRelation
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -118,8 +118,7 @@ class PolynomialPredicateSharingTest {
         )
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
         val original = formula.atoms.toList()
-        var work = 0
-        val arithmetic = PolynomialArithmetic(Cancellation { ++work > 20 })
+        val arithmetic = PolynomialArithmetic(PresolveBudget(7L).slice(7L))
 
         assertFailsWith<PolynomialInterrupted> { formula.withAtoms(original, arithmetic) }
 

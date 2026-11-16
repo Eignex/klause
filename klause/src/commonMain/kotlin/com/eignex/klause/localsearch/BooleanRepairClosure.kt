@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.IntArrayList
 
@@ -163,7 +163,7 @@ internal class BooleanRepairClosure private constructor(
         support?.beginBatch()
     }
 
-    fun closeInto(state: LocalSearchState, moves: List<Move>, sink: MoveSink, cancellation: Cancellation) {
+    fun closeInto(state: LocalSearchState, moves: List<Move>, sink: MoveSink, cancellation: ExecutionControl) {
         beginScoringBatch()
         for (move in moves) {
             if (cancellation.isCancelled()) return
@@ -176,7 +176,7 @@ internal class BooleanRepairClosure private constructor(
         }
     }
 
-    fun close(state: LocalSearchState, move: Move, cancellation: Cancellation): Move? {
+    fun close(state: LocalSearchState, move: Move, cancellation: ExecutionControl): Move? {
         if (inconsistent) return null
         operationsBeforePoll = 0
         if (interrupted(cancellation)) return null
@@ -236,7 +236,7 @@ internal class BooleanRepairClosure private constructor(
         return result.takeUnless { cancellation.isCancelled() }
     }
 
-    private fun interrupted(cancellation: Cancellation): Boolean {
+    private fun interrupted(cancellation: ExecutionControl): Boolean {
         repairWork?.charge(1L)
         // Nested short clauses share the same bounded graph-visit window.
         if (operationsBeforePoll-- > 0) return false
@@ -256,7 +256,7 @@ internal class BooleanRepairClosure private constructor(
         return true
     }
 
-    private fun expand(cancellation: Cancellation, supportState: LocalSearchState?): Boolean {
+    private fun expand(cancellation: ExecutionControl, supportState: LocalSearchState?): Boolean {
         var cursor = 0
         val scratch = support
         while (cursor < end || unitHead != unitTail || supportHead != supportTail) {
@@ -288,7 +288,7 @@ internal class BooleanRepairClosure private constructor(
         return !cancellation.isCancelled()
     }
 
-    private fun expandLiteral(literal: Int, cancellation: Cancellation, withSupport: Boolean): Boolean {
+    private fun expandLiteral(literal: Int, cancellation: ExecutionControl, withSupport: Boolean): Boolean {
         for (forced in edges[literal]) {
             if (interrupted(cancellation)) return false
             if (!force(forced)) return false
@@ -316,7 +316,7 @@ internal class BooleanRepairClosure private constructor(
 
     // Unforced live values are not premises for a proposal's unit consequences.
     private fun expandClause(
-        literals: IntArray, cancellation: Cancellation, supportState: LocalSearchState?,
+        literals: IntArray, cancellation: ExecutionControl, supportState: LocalSearchState?,
     ): Boolean {
         var unknown = 0
         var last = Lit.NONE

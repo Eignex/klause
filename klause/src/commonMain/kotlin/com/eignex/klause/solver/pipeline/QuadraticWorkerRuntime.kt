@@ -10,7 +10,7 @@ import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -65,14 +65,15 @@ internal class QuadraticWorkerRuntime(
             quadraticScalar(it.incumbent, sense, snapshot())
         } ?: MinimizeResult.Unknown(TerminationReason.BudgetExhausted, snapshot())
 
-    fun completeHandle(countedWork: () -> Long, advance: (Cancellation, Long, Long) -> Unit): QuadraticPortfolioSearch =
+    fun completeHandle(countedWork: () -> Long, advance: (ExecutionControl, Long, Long) ->
+        Unit): QuadraticPortfolioSearch =
         object : QuadraticPortfolioSearch, ReseedGuard {
             override val canReseed: Boolean get() = false
             override val completion: QuadraticOptimizationResult? get() = terminal
             override val isDone: Boolean get() = terminal != null
             override val stats: SolveStats get() = snapshot()
             override val work: Long get() = countedWork()
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = run(onIncumbent) {
                 advance(global, sliceMillis, sliceNodes)
             }
@@ -80,7 +81,7 @@ internal class QuadraticWorkerRuntime(
         }
 
     fun neighborhoodHandle(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         retained: () -> QuadraticNeighborhoodCursor?,
         prepare: () -> QuadraticNeighborhoodCursor,
     ): QuadraticPortfolioSearch = object : QuadraticPortfolioSearch, InstructionSlicedSearch, ReseedGuard {
@@ -91,10 +92,10 @@ internal class QuadraticWorkerRuntime(
         override val work: Long get() = neighborhoodPreparationInstructions + minOf(retained()?.work ?: 0L,
             Long.MAX_VALUE - neighborhoodPreparationInstructions)
         override val chargedInstructions: Long get() = work
-        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+        override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
             onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
             runInstructionSlice(global, sliceMillis, sliceNodes, onIncumbent)
-        override fun runInstructionSlice(global: Cancellation, sliceMillis: Long, sliceInstructions: Long,
+        override fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long,
             onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = run(onIncumbent) {
             val cursor = retained() ?: kotlin.run {
                 val before = native.work
@@ -108,8 +109,8 @@ internal class QuadraticWorkerRuntime(
                 }
             }
             val stop = native.polynomial or cancellation or global
-            val segment = stop or if (sliceMillis == Long.MAX_VALUE) Cancellation.Never
-                else Cancellation.after(sliceMillis.milliseconds)
+            val segment = stop or if (sliceMillis == Long.MAX_VALUE) ExecutionControl.Never
+                else ExecutionControl.after(sliceMillis.milliseconds)
             val done = cursor.advance(segment,
                 if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions, global)
             if (done || stop()) terminal = partial()

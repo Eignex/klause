@@ -15,12 +15,12 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
 import com.sun.management.ThreadMXBean
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.lang.management.ManagementFactory
 import java.security.MessageDigest
 import java.util.HexFormat
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 internal object IntegerRowLearningProfile {
     @JvmStatic

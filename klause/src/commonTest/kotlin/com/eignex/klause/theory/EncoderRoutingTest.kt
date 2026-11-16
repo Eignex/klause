@@ -75,7 +75,7 @@ import com.eignex.klause.solver.search.SearchBoolValue
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.skema.SchemaDef
 import com.eignex.util.collections.Bits
@@ -239,12 +239,13 @@ class EncoderRoutingTest {
             realLower = doubleArrayOf(-1.0, 1.0),
             realUpper = doubleArrayOf(1.0, 1.0),
         )
-        for (allowance in listOf(0L, 3L)) {
+        for (polynomialOwner in listOf(true, false)) {
+            for (allowance in listOf(0L, 3L)) {
             var installations = 0
             var charged = 0L
-            val caller = object : Cancellation {
+            val caller = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = false
-                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
             val providers = FactorProjectionProviders(
                 encoder = EncoderProvider { factor, target ->
@@ -261,12 +262,16 @@ class EncoderRoutingTest {
             )
 
             val result = BacktrackSolver.source(source).withProjectionProviders(providers)
-                .solve(PolynomialTheoryParams(maximumWork = allowance, cancellation = caller))
+                .solve(PolynomialTheoryParams(maximumWork = allowance, cancellation =
+                    if (polynomialOwner) caller else ExecutionControl.Never,
+                        ),
+                        TheoryParams(cancellation = if (polynomialOwner) ExecutionControl.Never else caller))
 
             assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
             assertEquals(if (allowance == 0L) 0 else 1, installations)
             assertEquals(allowance, charged)
         }
+    }
     }
 
     @Test
@@ -344,9 +349,9 @@ class EncoderRoutingTest {
             realUpper = doubleArrayOf(1.0, 1.0),
         )
         var spent = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= 4
-            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            override val accounting: WorkMeter get() = WorkMeter { spent += it }
         }
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
@@ -695,9 +700,9 @@ class EncoderRoutingTest {
             var cancelled = false
             var installations = 0
             var charged = 0L
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = cancelled
-                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
             val providers = FactorProjectionProviders(
                 encoder = EncoderProvider { factor, target ->

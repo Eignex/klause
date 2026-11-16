@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -15,14 +15,14 @@ class ConditionedQueryScopeTest {
     fun `a condition should capture caller buffers before nested queries`() {
         val pins = mutableMapOf(0 to true)
         val bounds = mutableMapOf(0 to BigFraction.ONE)
-        val scope = ConditionedQueryScope(Cancellation.Never)
+        val scope = ConditionedQueryScope(ExecutionControl.Never)
 
-        scope.withCondition(ExactNeighborhoodCondition(pins, bounds, emptyMap()), Cancellation.Never) { outer ->
+        scope.withCondition(ExactNeighborhoodCondition(pins, bounds, emptyMap()), ExecutionControl.Never) { outer ->
             pins[0] = false
             bounds.clear()
             scope.withCondition(
                 ExactNeighborhoodCondition(emptyMap(), emptyMap(), mapOf(0 to BigFraction.ONE)),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ) { nested ->
                 assertEquals(2, nested.size)
                 assertEquals(true, nested.first().bools[0])
@@ -34,16 +34,16 @@ class ConditionedQueryScopeTest {
 
     @Test
     fun `a failed query should retract its conditions and invocation stop`() {
-        val scope = ConditionedQueryScope(Cancellation.Never)
+        val scope = ConditionedQueryScope(ExecutionControl.Never)
         val condition = ExactNeighborhoodCondition(mapOf(0 to true), emptyMap(), emptyMap())
         assertFailsWith<IllegalArgumentException> {
-            scope.withCondition(condition, Cancellation { true }) {
+            scope.withCondition(condition, ExecutionControl { true }) {
                 assertTrue(scope.stop())
                 throw IllegalArgumentException("query failed")
             }
         }
 
-        scope.withCondition(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never) {
+        scope.withCondition(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), ExecutionControl.Never) {
             assertEquals(1, it.size)
             assertTrue(it.single().bools.isEmpty())
             assertFalse(scope.stop())
@@ -53,16 +53,16 @@ class ConditionedQueryScopeTest {
     @Test
     fun `an expired query deadline should retract before a sibling invocation`() {
         val clock = TestTimeSource()
-        val scope = ConditionedQueryScope(Cancellation.until(clock.markNow() + 10.seconds))
+        val scope = ConditionedQueryScope(ExecutionControl.until(clock.markNow() + 10.seconds))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         val first = clock.markNow() + 2.seconds
         val sibling = clock.markNow() + 6.seconds
 
-        scope.withCondition(condition, Cancellation.until(first)) {
+        scope.withCondition(condition, ExecutionControl.until(first)) {
             clock += 3.seconds
             assertTrue(scope.stop())
         }
-        scope.withCondition(condition, Cancellation.until(sibling)) {
+        scope.withCondition(condition, ExecutionControl.until(sibling)) {
             assertFalse(scope.stop())
             assertEquals(sibling, scope.stop.deadline())
         }
@@ -72,11 +72,11 @@ class ConditionedQueryScopeTest {
     fun `a sibling deadline should not renew the containing deadline`() {
         val clock = TestTimeSource()
         val deadline = clock.markNow() + 2.seconds
-        val scope = ConditionedQueryScope(Cancellation.until(deadline))
+        val scope = ConditionedQueryScope(ExecutionControl.until(deadline))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         clock += 3.seconds
 
-        scope.withCondition(condition, Cancellation.until(clock.markNow() + 10.seconds)) {
+        scope.withCondition(condition, ExecutionControl.until(clock.markNow() + 10.seconds)) {
             assertTrue(scope.stop())
             assertEquals(deadline, scope.stop.deadline())
         }
@@ -84,13 +84,14 @@ class ConditionedQueryScopeTest {
 
     @Test
     fun `closing a query owner should stop native work and reject another query`() {
-        val scope = ConditionedQueryScope(Cancellation.Never)
+        val scope = ConditionedQueryScope(ExecutionControl.Never)
 
         scope.close()
 
         assertTrue(scope.stop())
         assertFailsWith<IllegalStateException> {
-            scope.withCondition(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()), Cancellation.Never) {}
+            scope.withCondition(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
+                ExecutionControl.Never) {}
         }
     }
 }

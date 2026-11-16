@@ -28,7 +28,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     // CP decisions reach the LP in a bound batch; its scopes are synchronized when that batch is assembled.
@@ -129,7 +129,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             base.model.exactState === state
     }
 
-    fun sourceRootRelaxation(base: LpRelaxation, cancellation: Cancellation): LpRelaxation? {
+    fun sourceRootRelaxation(base: LpRelaxation, cancellation: ExecutionControl): LpRelaxation? {
         reset()
         val exact = base.authoritativeWithTemplates(cancellation, onWork = engine::noteNodeOverhead) {
             engine.sink.lp.observeTemplateUse(exactBounds = it)
@@ -143,7 +143,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         return rebound
     }
 
-    fun sourceRootRelaxation(relaxer: CpToLpRelaxation, cancellation: Cancellation): LpRelaxation? {
+    fun sourceRootRelaxation(relaxer: CpToLpRelaxation, cancellation: ExecutionControl): LpRelaxation? {
         reset()
         sourceRelaxer = relaxer
         val retained = LpRetainedSources(engine.problem, relaxer).also { sources = it }
@@ -163,7 +163,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         return rebound
     }
 
-    fun sourceRootCuts(base: LpRelaxation, selected: List<Cut>, cancellation: Cancellation): LpRelaxation? {
+    fun sourceRootCuts(base: LpRelaxation, selected: List<Cut>, cancellation: ExecutionControl): LpRelaxation? {
         if (!sourceRoot || native != null || currentModel !== base.model) return null
         return applyCuts(base, base.sourceMap ?: return null, selected, null, cancellation)
     }
@@ -336,7 +336,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         map: CutSourceMap,
         selected: List<Cut>?,
         session: PropagationSession?,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): LpRelaxation? {
         val core = engine.propagator
         val before = core.state ?: return null

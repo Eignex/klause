@@ -21,7 +21,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -58,7 +58,7 @@ class LinearSubSumAggregationTest {
             listOf(sumDef(), Linear(intArrayOf(1, 1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 3)),
         )
         val budget = PresolveBudget(1000)
-        val context = PresolveContext(cancellation = budget.orSpent(Cancellation { true }))
+        val context = PresolveContext(cancellation = budget.orSpent(ExecutionControl { true }))
 
         val delta = PresolvePass.AGGREGATE_SUB_SUMS.applySource(problem, context)
 
@@ -77,7 +77,7 @@ class LinearSubSumAggregationTest {
         )
         val budget = PresolveBudget(16)
 
-        val delta = LinearSubSumAggregation.aggregateSubSums(problem, budget.orSpent(Cancellation.Never))
+        val delta = LinearSubSumAggregation.aggregateSubSums(problem, budget.orSpent(ExecutionControl.Never))
 
         assertTrue(delta.isEmpty)
         assertTrue(budget.spent() in 16L..79L)
@@ -95,7 +95,7 @@ class LinearSubSumAggregationTest {
         val problem = Problem(0, count + 6, Array(count + 6) { IntDomain(0, 2) }, factors)
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val delta = LinearSubSumAggregation.aggregateSubSums(problem, budget.orSpent(Cancellation.Never))
+        val delta = LinearSubSumAggregation.aggregateSubSums(problem, budget.orSpent(ExecutionControl.Never))
 
         assertEquals(listOf(factors.lastIndex), delta.droppedIndices.toList())
         assertEquals(setOf(count + 2, count + 5), (delta.addedFactors.single() as Linear).vars.toSet())
@@ -109,10 +109,10 @@ class LinearSubSumAggregationTest {
         }
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 2) }, listOf(sumDef()) + targets)
         val fullBudget = PresolveBudget(Long.MAX_VALUE)
-        val complete = LinearSubSumAggregation.aggregateSubSums(problem, fullBudget.orSpent(Cancellation.Never))
+        val complete = LinearSubSumAggregation.aggregateSubSums(problem, fullBudget.orSpent(ExecutionControl.Never))
         val budget = PresolveBudget(fullBudget.spent() - 64)
 
-        val delta = LinearSubSumAggregation.aggregateSubSums(problem, budget.orSpent(Cancellation.Never))
+        val delta = LinearSubSumAggregation.aggregateSubSums(problem, budget.orSpent(ExecutionControl.Never))
 
         assertEquals(targets.size, complete.addedFactors.size)
         assertTrue(delta.addedFactors.size in 1 until targets.size)
@@ -316,7 +316,7 @@ class LinearSubSumAggregationTest {
             problem,
             PresolveConfig.parse("off,+sparsify").withEffort(maxRounds = 1),
             PresolveContext(presolveBudget = budget, solutionSetSensitive = true),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertEquals(2, result.problem.numFactors)
@@ -380,7 +380,7 @@ class LinearSubSumAggregationTest {
         val problem = Problem(0, 3, Array(3) { IntDomain(-2, 2) }, factors)
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(Cancellation.Never))
+        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(ExecutionControl.Never))
 
         assertTrue(delta.isEmpty)
         assertEquals(4L * factors.size, budget.spent())
@@ -391,7 +391,7 @@ class LinearSubSumAggregationTest {
         val problem = Problem(0, 4, Array(4) { IntDomain(0, 2) }, listOf(sumDef()))
         val budget = PresolveBudget(1000)
 
-        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(Cancellation { true }))
+        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(ExecutionControl { true }))
 
         assertTrue(delta.isEmpty)
         assertEquals(0L, budget.spent())
@@ -408,7 +408,7 @@ class LinearSubSumAggregationTest {
         )
         val budget = PresolveBudget(16)
 
-        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(Cancellation.Never))
+        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(ExecutionControl.Never))
 
         assertTrue(delta.isEmpty)
         assertTrue(budget.spent() in 16L..79L)
@@ -420,10 +420,10 @@ class LinearSubSumAggregationTest {
         val target = Linear(intArrayOf(4, 6, 7), intArrayOf(0, 1, 2), LinearOp.LE, 12)
         val problem = Problem(0, 3, Array(3) { IntDomain(-2, 2) }, listOf(equality) + List(16) { target })
         val completeBudget = PresolveBudget(Long.MAX_VALUE)
-        val complete = LinearSubSumAggregation.sparsifyRows(problem, completeBudget.orSpent(Cancellation.Never))
+        val complete = LinearSubSumAggregation.sparsifyRows(problem, completeBudget.orSpent(ExecutionControl.Never))
         val budget = PresolveBudget(completeBudget.spent() * 3 / 4)
 
-        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(Cancellation.Never))
+        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(ExecutionControl.Never))
 
         assertEquals(16, complete.addedFactors.size)
         assertTrue(delta.addedFactors.size in 1 until 16)
@@ -448,7 +448,7 @@ class LinearSubSumAggregationTest {
         val problem = Problem(0, count + 5, Array(count + 5) { IntDomain(-2, 2) }, factors)
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(Cancellation.Never))
+        val delta = LinearSubSumAggregation.sparsifyRows(problem, budget.orSpent(ExecutionControl.Never))
 
         assertEquals(listOf(factors.lastIndex), delta.droppedIndices.toList())
         assertTrue(budget.spent() in 1L..(500L * factors.size))

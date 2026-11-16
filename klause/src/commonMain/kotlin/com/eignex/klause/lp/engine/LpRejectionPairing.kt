@@ -65,7 +65,7 @@ internal class LpRejectionPairing {
                     val routed = routes[(index * LpContinuationSite.entries.size + site.ordinal) * 2 + present]
                     if (routed == 0L) continue
                     val float = if (present == 1) "FLOAT_PRESENT" else "FLOAT_MISSING"
-                    val context = "${reason}_${site}_${float}"
+                    val context = "${reason}_${site}_$float"
                     observer.observeContinuationRejection("VERIFY_CANDIDATE_ROUTE_${context}_$outcome", routed)
                     if (refinementCalls == 0) {
                         observer.observeContinuationRejection("VERIFY_CANDIDATE_ENTRY_${context}_NONE_$outcome", routed)

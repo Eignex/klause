@@ -8,14 +8,14 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.symbolicRealValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.times
 import kotlin.coroutines.cancellation.CancellationException
 
-private fun Cancellation.smtValueCheckpoint() {
+private fun ExecutionControl.smtValueCheckpoint() {
     charge(1)
     if (this()) throw CancellationException("SMT exact value rendering interrupted")
 }
@@ -36,7 +36,7 @@ fun smtRealTerm(value: String): String {
 }
 
 /** Render a certified algebraic real in exact SMT syntax. */
-fun smtAlgebraicTerm(value: AlgebraicReal, cancellation: Cancellation = Cancellation.Never): String =
+fun smtAlgebraicTerm(value: AlgebraicReal, cancellation: ExecutionControl = ExecutionControl.Never): String =
     value.rational?.let { smtRealTerm(it.toString()) }
         ?: smtRootTerm(value.definingCoefficients, value.rootIndex, cancellation)
 
@@ -44,7 +44,7 @@ fun smtAlgebraicTerm(value: AlgebraicReal, cancellation: Cancellation = Cancella
 fun smtRootTerm(
     coefficients: List<BigFraction>,
     rootIndex: Int,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): String {
     require(rootIndex > 0)
     var denominator = BIG_ONE
@@ -69,7 +69,7 @@ fun smtRootTerm(
 }
 
 /** Render an exact expression without replacing symbolic authority with a decimal approximation. */
-fun smtSymbolicTerm(value: ExactRealValue, cancellation: Cancellation = Cancellation.Never): String {
+fun smtSymbolicTerm(value: ExactRealValue, cancellation: ExecutionControl = ExecutionControl.Never): String {
     val expressions = HashMap<ExactRealExpression, String>()
     val pending = ArrayDeque<Pair<ExactRealExpression, Boolean>>()
     pending.addLast(value.expression to false)
@@ -103,7 +103,7 @@ fun smtSymbolicTerm(value: ExactRealValue, cancellation: Cancellation = Cancella
 }
 
 /** Render one certified source real from any supported sample representation. */
-fun Sample.smtRealValue(id: Int, cancellation: Cancellation = Cancellation.Never): String {
+fun Sample.smtRealValue(id: Int, cancellation: ExecutionControl = ExecutionControl.Never): String {
     cancellation.smtValueCheckpoint()
     return symbolicReals?.get(id)?.let { smtSymbolicTerm(it, cancellation) }
         ?: algebraicReals?.get(id)?.let { smtAlgebraicTerm(it, cancellation) }
@@ -111,7 +111,7 @@ fun Sample.smtRealValue(id: Int, cancellation: Cancellation = Cancellation.Never
 }
 
 /** Render one source real through its rational, algebraic or symbolic authority. */
-fun OpenTheoryAssignment.smtRealValue(id: Int, cancellation: Cancellation = Cancellation.Never): String {
+fun OpenTheoryAssignment.smtRealValue(id: Int, cancellation: ExecutionControl = ExecutionControl.Never): String {
     cancellation.smtValueCheckpoint()
     return when (this) {
         is OpenTheoryAssignment.Sampled -> sample.smtRealValue(id, cancellation)

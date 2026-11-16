@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.IntArrayList
@@ -152,9 +152,9 @@ class SearchLearningTest {
     fun `one work resumed slices should progress after cancelled optional reclamation`() {
         var limited = false
         var spent = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = limited && spent >= 1L
-            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            override val accounting: WorkMeter get() = WorkMeter { spent += it }
         }
         val session = SearchSession(emptyList(), cancellation = cancellation,
             learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
@@ -180,9 +180,9 @@ class SearchLearningTest {
     @Test
     fun `unchanged shared ownership should reuse its completed reclamation attempt`() {
         var charged = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val session = SearchSession(emptyList(), cancellation = cancellation,
             learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
@@ -205,9 +205,9 @@ class SearchLearningTest {
     @Test
     fun `unchanged shared ownership should reuse a deferred reclamation attempt`() {
         var charged = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val session = SearchSession(emptyList(), cancellation = cancellation,
             learnedDb = SearchLearnedDbParams(softLimitBytes = 0L, reclamationWork = 25L))
@@ -300,7 +300,7 @@ class SearchLearningTest {
     fun `cancelled reclamation preparation should publish no replacement generation`() {
         var cancelAfter = Int.MAX_VALUE
         var polls = 0
-        val session = SearchSession(emptyList(), cancellation = Cancellation { ++polls > cancelAfter },
+        val session = SearchSession(emptyList(), cancellation = ExecutionControl { ++polls > cancelAfter },
             learnedDb = SearchLearnedDbParams(glueLbd = 0, softLimitBytes = 0L))
         repeat(3) { session.learn(SearchExplanation(intArrayOf(it * 4, it * 4 + 2))) }
         polls = 0
@@ -339,7 +339,7 @@ class SearchLearningTest {
     @Test
     fun `cancellation should preserve pending learning until the search resumes`() {
         var cancelled = false
-        val session = SearchSession(emptyList(), cancellation = Cancellation { cancelled })
+        val session = SearchSession(emptyList(), cancellation = ExecutionControl { cancelled })
         session.initialize()
         val run = session.openRun(1, lifecycle = object : SearchRunLifecycle {
             override fun onCancellation(context: SearchContext): SearchRunDisposition = SearchRunDisposition.Pause

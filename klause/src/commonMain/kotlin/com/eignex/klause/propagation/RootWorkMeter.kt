@@ -1,7 +1,7 @@
 package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 
 internal interface RootWorkMeter : WorkMeter {
@@ -10,10 +10,10 @@ internal interface RootWorkMeter : WorkMeter {
 }
 
 internal class RootWorkAccounting(
-    private val outer: Cancellation,
+    private val outer: ExecutionControl,
     private val state: PropagationState,
-) : Cancellation {
-    private val meter = outer.workMeter() as? RootWorkMeter
+) : ExecutionControl() {
+    private val meter = outer.accounting as? RootWorkMeter
     private var reported = 0L
 
     init {
@@ -27,7 +27,8 @@ internal class RootWorkAccounting(
     }
 
     override fun deadline() = outer.deadline()
-    override fun workMeter() = outer.workMeter()
+    override val accounting get() = outer.accounting
+    override val admission get() = admissionFrom(outer)
 
     fun construction(entries: Long) {
         meter?.construction(entries)

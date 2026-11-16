@@ -10,7 +10,7 @@ import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -41,7 +41,7 @@ class PolynomialFailureCaptureTest {
         val capture = PolynomialFailureCapture()
         var stopped = false
         val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
-            QfNraParams(Cancellation { stopped }, maximumWork = 500_000), PolynomialCondition())
+            QfNraParams(ExecutionControl { stopped }, maximumWork = 500_000), PolynomialCondition())
         query.failureCapture = capture
 
         var result: QfNraResult? = null

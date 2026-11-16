@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -40,9 +40,9 @@ class LocalSearchEngineHandleTest {
             val solver = LocalSearchSolver(problem.bake())
             val params = LocalSearchParams(maxFlips = 1)
             val satisfaction = solver.resumableSolve(params)
-            assertTrue(satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) != null)
+            assertTrue(satisfaction.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) != null)
             val optimization = solver.resumable(LinearObjective(), params)
-            assertTrue(optimization.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} != null)
+            assertTrue(optimization.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {} != null)
             solver.resumableSolve(params).close()
             satisfaction.close()
             optimization.close()
@@ -58,11 +58,11 @@ class LocalSearchEngineHandleTest {
             val session = solver.session()
             val owner = if (optimizing) {
                 session.resumable(objective, params).also {
-                    assertNull(it.runSlice(Cancellation { true }, Long.MAX_VALUE, -1) {})
+                    assertNull(it.runSlice(ExecutionControl { true }, Long.MAX_VALUE, -1) {})
                 }
             } else {
                 session.resumableSolve(params).also {
-                    assertNull(it.runSlice(Cancellation { true }, Long.MAX_VALUE, -1))
+                    assertNull(it.runSlice(ExecutionControl { true }, Long.MAX_VALUE, -1))
                 }
             }
 
@@ -87,18 +87,18 @@ class LocalSearchEngineHandleTest {
         val params = LocalSearchParams(maxFlips = 1)
         val objective = LinearObjective()
         val satisfaction = solver.resumableSolve(params)
-        val verdict = satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1)
+        val verdict = satisfaction.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1)
         assertIs<SolveResult.Sat>(verdict)
         val optimization = solver.resumable(objective, params)
-        assertEquals(verdict, satisfaction.runSlice(Cancellation.Never, Long.MAX_VALUE, -1))
-        val optimum = optimization.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
+        assertEquals(verdict, satisfaction.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1))
+        val optimum = optimization.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {}
         assertTrue(optimum != null)
         assertIs<SolveResult.Sat>(solver.solve(params))
         satisfaction.close()
         optimization.close()
         val other = solver.resumableSolve(params)
-        assertSame(verdict, satisfaction.runSlice(Cancellation.Never, 0L, 0L))
-        assertSame(optimum, optimization.runSlice(Cancellation.Never, 0L, 0L) {})
+        assertSame(verdict, satisfaction.runSlice(ExecutionControl.Never, 0L, 0L))
+        assertSame(optimum, optimization.runSlice(ExecutionControl.Never, 0L, 0L) {})
         satisfaction.close()
         optimization.close()
         assertFailsWith<IllegalStateException> { solver.resumable(objective, params) }
@@ -124,16 +124,16 @@ class LocalSearchEngineHandleTest {
             val objective = LinearObjective()
             if (optimizing) {
                 val owner = solver.resumable(objective, params)
-                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} }
+                assertFailsWith<IllegalStateException> { owner.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {} }
                 fail = false
                 assertIs<SolveResult.Sat>(solver.solve(params))
-                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {} }
+                assertFailsWith<IllegalStateException> { owner.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {} }
             } else {
                 val owner = solver.resumableSolve(params)
-                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) }
+                assertFailsWith<IllegalStateException> { owner.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) }
                 fail = false
                 assertIs<SolveResult.Sat>(solver.solve(params))
-                assertFailsWith<IllegalStateException> { owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) }
+                assertFailsWith<IllegalStateException> { owner.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) }
             }
         }
     }
@@ -144,7 +144,7 @@ class LocalSearchEngineHandleTest {
         val owner = solver.resumable(LinearObjective(), LocalSearchParams(maxFlips = 1))
 
         val failure = assertFailsWith<IllegalArgumentException> {
-            owner.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {
+            owner.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {
                 throw IllegalArgumentException("callback failure")
             }
         }

@@ -10,7 +10,7 @@ import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -133,7 +133,7 @@ class PolynomialFormulaTest {
     fun `cancelled predicate sharing exposes no replacement formula`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (> x 0))")
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-        val arithmetic = PolynomialArithmetic(Cancellation { true })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { true })
 
         assertFailsWith<PolynomialInterrupted> { formula.withAtoms(formula.atoms, arithmetic) }
     }
@@ -174,7 +174,7 @@ class PolynomialFormulaTest {
     fun `cancelled witness guidance exposes no partial atoms`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (> x 0))")
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-        val arithmetic = PolynomialArithmetic(Cancellation { true })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { true })
 
         assertFailsWith<PolynomialInterrupted> { formula.witnessAtoms(arithmetic, 128) }
     }
@@ -236,7 +236,7 @@ class PolynomialFormulaTest {
             PolynomialExpression.Constant.of(bigIntOf(1)),
             PolynomialExpression.Constant.of(bigIntOf(2)),
         )
-        val arithmetic = PolynomialArithmetic(Cancellation { true })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { true })
 
         assertFailsWith<PolynomialInterrupted> { PolynomialFormula.normalize(source, arithmetic) }
     }

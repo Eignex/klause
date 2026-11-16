@@ -6,7 +6,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -28,7 +28,7 @@ class BoundedCompanionSearchTest {
                 override val incumbentTrialPending: Boolean get() = true
                 override val isDone: Boolean get() = false
                 override val stats: SolveStats get() = SolveStats.EMPTY
-                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                     assertEquals(ceiling, sliceMillis)
                     assertEquals(5_000L, sliceNodes)
@@ -39,9 +39,9 @@ class BoundedCompanionSearchTest {
             }
 
             val search = BoundedCompanionSearch(native, "trial", sliceLimit = ceiling.milliseconds, clock = clock)
-            assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+            assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
             assertFalse(search.canReseed)
-            val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
+            val result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {}
 
             assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
             assertEquals(1, calls)
@@ -59,7 +59,7 @@ class BoundedCompanionSearchTest {
         val native = object : ResumableSearch {
             override val isDone: Boolean get() = true
             override val stats: SolveStats get() = SolveStats.EMPTY
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult {
                 assertEquals(10L, sliceMillis)
                 assertEquals(7L, sliceNodes)
@@ -69,7 +69,7 @@ class BoundedCompanionSearchTest {
         }
         val search = BoundedCompanionSearch(native, "trial", activeLimit = 10.milliseconds, clock = clock)
 
-        val result = search.runSlice(Cancellation.Never, 12L, 7L) {}
+        val result = search.runSlice(ExecutionControl.Never, 12L, 7L) {}
 
         assertIs<MinimizeResult.Optimal>(result)
         assertEquals(1L, search.stats.smt.completeSearchStages?.get("trialOptimal"))

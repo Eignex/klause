@@ -23,13 +23,11 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.solveQfNra
-import com.eignex.klause.util.ArithmeticCancellation
 import com.eignex.klause.util.ArithmeticWorkSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkCreditPool
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.WorkReservation
-import com.eignex.klause.util.arithmeticSource
 import com.eignex.klause.util.reserveWork
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
@@ -67,33 +65,40 @@ internal sealed interface TranscendentalCheckResult {
 
 internal class TranscendentalTheoryService(
     private val source: TranscendentalProblem,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
     private val maximumWork: Long? = 100000,
     maximumBits: Int = 65536,
     private val polynomialLimits: PolynomialLimits = PolynomialLimits(),
 ) {
     private val pool = WorkCreditPool(maximumWork)
-    private val parentAccounting = cancellation.arithmeticSource()
     val work: Long get() = pool.spent
     var representationDeclined: Boolean = false
         private set
     val exhausted: Boolean get() = maximumWork?.let { work >= it } == true || representationDeclined
-    private var worker = Cancellation.Never
+    private var worker = ExecutionControl.Never
     private val meter = WorkMeter { units ->
         require(units >= 0)
         pool.debit(units)
         cancellation.charge(units)
     }
-    private val stop: ArithmeticCancellation = object : ArithmeticCancellation {
+    private val stop: ExecutionControl = object : ExecutionControl() {
         override fun isCancelled(): Boolean = cancellation() || worker() || exhausted
-        override fun workMeter(): WorkMeter = meter
+        override val accounting: WorkMeter get() = meter
         override fun deadline() = cancellation.deadline()
-        override fun arithmeticSource(): ArithmeticWorkSource? {
-            if (parentAccounting == null) return null
+        override val admission: ArithmeticWorkSource get() {
+            val parentAccounting = cancellation.admission
+            val parentMeter = cancellation.accounting
             return object : ArithmeticWorkSource {
-                override fun isCancelled(): Boolean = stop.isCancelled()
-                override fun reserve(maximum: Int): WorkReservation? =
-                    reserveWork(maximum, listOf(pool), parentAccounting) {}
+                override val quotaOwner get() = parentAccounting?.quotaOwner
+                override val quotaRemaining get() = parentAccounting?.quotaRemaining
+                override val quotaAvailable get() = parentAccounting?.quotaAvailable
+                override val exhausted get() = this@TranscendentalTheoryService.exhausted ||
+                    parentAccounting?.exhausted == true
+                override fun reserve(maximum: Int): WorkReservation? = reserveWork(
+                    maximum,
+                    listOf(pool),
+                    parentAccounting,
+                ) { if (parentAccounting?.metered != true) parentMeter?.charge(it.toLong()) }
             }
         }
     }
@@ -106,7 +111,7 @@ internal class TranscendentalTheoryService(
 
     fun check(
         condition: TranscendentalCondition = TranscendentalCondition(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         maximumProposals: Int = 8,
     ): TranscendentalCheckResult {
         require(maximumProposals >= 0)
@@ -125,7 +130,7 @@ internal class TranscendentalTheoryService(
             representationDeclined = true
             TranscendentalCheckResult.Unknown
         } finally {
-            worker = Cancellation.Never
+            worker = ExecutionControl.Never
         }
     }
 

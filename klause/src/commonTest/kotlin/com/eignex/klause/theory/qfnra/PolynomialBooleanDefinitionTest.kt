@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -152,7 +152,7 @@ class PolynomialBooleanDefinitionTest {
             "(declare-const x Real) (declare-const b Bool) (assert (= b (> x 0)))",
         )
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-        val arithmetic = PolynomialArithmetic(Cancellation { true })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { true })
 
         assertFailsWith<PolynomialInterrupted> { formula.reduceBooleanDefinitions(arithmetic) }
     }

@@ -19,7 +19,7 @@ import com.eignex.klause.presolve.BakeConfig
 import com.eignex.klause.presolve.BinaryColumnSubstitution
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.test.Test
@@ -487,7 +487,7 @@ class Xcsp3GlobalsTest {
         val problem = parsed.problem
         val inferred = DefinitionalSweep.infer(problem, parsed.definedVars)
         for (sweep in listOf(
-            DefinitionalSweep.withSource(problem, inferred, parsed.definitionHints, Cancellation.Never),
+            DefinitionalSweep.withSource(problem, inferred, parsed.definitionHints, ExecutionControl.Never),
             DefinitionalSweep.fromSource(problem, parsed.definitionHints),
         ).map { assertNotNull(it) }) {
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(5))

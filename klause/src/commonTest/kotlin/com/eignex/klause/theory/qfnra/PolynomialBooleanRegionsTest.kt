@@ -9,7 +9,7 @@ import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,9 +73,9 @@ class PolynomialBooleanRegionsTest {
             val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
             var spent = 0L
             val meter = WorkMeter { spent += it }
-            val cancellation = object : Cancellation {
+            val cancellation = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = false
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
             }
 
             val first = formula.booleanRegions(PolynomialArithmetic(cancellation))
@@ -157,7 +157,7 @@ class PolynomialBooleanRegionsTest {
         )
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
         var stopped = false
-        val pending = formula.booleanRegions(PolynomialArithmetic(Cancellation { stopped }))
+        val pending = formula.booleanRegions(PolynomialArithmetic(ExecutionControl { stopped }))
         assertNull(pending.next())
 
         stopped = true
@@ -408,7 +408,7 @@ class PolynomialBooleanRegionsTest {
         )
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
         var stopped = false
-        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { stopped })
         val progress = PolynomialQueryProgress()
         val pending = formula.booleanRegions(arithmetic, progress)
         while (progress.partialChecks == 0L) assertNull(pending.next())
@@ -1326,7 +1326,7 @@ class PolynomialBooleanRegionsTest {
             "(declare-const b Bool) (declare-const x Real) (assert (and b (or b (= (* x x) 2))))",
         )
         val normalized = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-        val stopped = PolynomialArithmetic(Cancellation { true })
+        val stopped = PolynomialArithmetic(ExecutionControl { true })
 
         assertFailsWith<PolynomialInterrupted> { normalized.booleanRegions(stopped).hasNext() }
     }

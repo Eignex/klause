@@ -1,188 +1,65 @@
 package com.eignex.klause.util
 
-import com.eignex.util.numbers.minOf
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration
 import kotlin.time.TimeSource
 
-/**
- * Caller-supplied cooperative-cancellation token. Engines call it periodically and stop
- * their search promptly when [isCancelled] returns `true`. The default token is
- * [Cancellation.Never].
- *
- * The interface is a `fun interface` so a bare `() -> Boolean` lambda SAM-converts to a
- * [Cancellation], and `params.cancellation()` reads naturally (the [invoke] operator
- * forwards to [isCancelled]).
- *
- * Compose tokens with [or] / [and]:
- * ```
- * val flag = AtomicBoolean(false)
- * val token = Cancellation { flag.get() } or Cancellation.after(5.seconds)
- * solver.solve(params.copy(cancellation = token))
- * ```
- *
- * Bridge to coroutine cancellation in one line:
- * ```
- * solver.solve(params.copy(cancellation = Cancellation { !coroutineContext.isActive }))
- * ```
- *
- * Deadline-backed tokens ([after] / [until]) also expose their [deadline], so time-relative budgets can
- * be *computed* from the token itself rather than threaded alongside it — see [shorten]. Composites
- * ([or] / [and]) surface the earliest deadline of their sides.
- *
- * Work-metered tokens expose their [workMeter], so an engine that counts its own deterministic work can
- * [charge] it to whatever budget the token stands for without that budget being threaded beside the
- * token. A plain token has no meter and ignores charges; composites surface either side's meter.
- *
- * Cancellation is **cooperative**: engines check it between work units (per flip in
- * local search, per decision-block in backtrack). A request to cancel is observed within
- * a few hundred operations, not instantly.
- *
- * Cancelled `solve` returns `SolveResult.Unknown(TerminationReason.Cancelled)`. Cancelled
- * `samples` / `enumerate` sequences stop yielding (the consumer sees an early end of
- * stream).
- */
+/** A cooperative stop predicate, independent of work accounting and admission. */
 fun interface Cancellation {
-    /** True iff cancellation has been requested. */
+    /** True when the caller requests execution to stop. */
     fun isCancelled(): Boolean
 
-    /** Makes the token callable as `cancellation()`; forwards to [isCancelled]. */
+    /** Evaluate this stop predicate. */
     operator fun invoke(): Boolean = isCancelled()
 
-    /** The instant this token fires at when it is deadline-backed ([after] / [until]); `null` for a plain
-     *  predicate (including [Never]). [shorten] derives its budget from it. */
+    /** The current deadline, when this predicate has one. */
     fun deadline(): ComparableTimeMark? = null
 
-    /** The deterministic work budget this token stops on, or `null` when it stops on something else. */
-    fun workMeter(): WorkMeter? = null
-
-    /** Charge [units] of deterministic work to this token's [workMeter]; a no-op on a token without one. */
-    fun charge(units: Long) {
-        workMeter()?.charge(units)
+    /** Stop when either predicate stops, preserving predicate order. */
+    infix fun or(other: Cancellation): Cancellation = object : Cancellation {
+        override fun isCancelled(): Boolean = this@Cancellation() || other()
+        override fun deadline(): ComparableTimeMark? = listOfNotNull(
+            this@Cancellation.deadline(),
+            other.deadline(),
+        ).minOrNull()
     }
 
-    /** Cancel when either side cancels. Short-circuit on the receiver; the composite reports the earlier
-     *  of the two [deadline]s (whichever bound bites first) and whichever side's [workMeter] it finds. */
-    infix fun or(other: Cancellation): Cancellation {
-        val self = this
-        val combined = earlierDeadline(self.deadline(), other.deadline())
-        val first = self.workMeter()
-        val meter = first ?: other.workMeter()
-        val accountingOwner = if (first != null) self else if (meter != null) other else null
-        return OrCancellation(self, other, combined, meter, accountingOwner)
-    }
+    /** Stop when both predicates stop. */
+    infix fun and(other: Cancellation): Cancellation = Cancellation { this() && other() }
 
-    /** Cancel only when both sides cancel — useful for "user requested AND budget
-     *  exhausted" two-key escapes that shouldn't fire on either alone. */
-    infix fun and(other: Cancellation): Cancellation {
-        val self = this
-        val meter = self.workMeter() ?: other.workMeter()
-        return object : SchedulingCancellation {
-            override val workScheduled: Boolean = self.workScheduled() || other.workScheduled()
-            override fun isCancelled(): Boolean = self.isCancelled() && other.isCancelled()
-            override fun workMeter(): WorkMeter? = meter
-        }
-    }
-
-    /**
-     * A token that fires after [fraction] of the time remaining to this token's [deadline] — for giving a
-     * phase a slice of the overall budget — and also when this token itself fires (so an external cancel
-     * still stops it). Returns this token **unchanged** when it carries no [deadline] (nothing to compute
-     * against): the caller pairs it with a work-based safeguard for that case. [fraction] in `[0, 1]`.
-     */
-    fun shorten(fraction: Double): Cancellation {
-        require(fraction in 0.0..1.0) { "fraction must be in [0, 1], got $fraction" }
-        val deadline = deadline() ?: return this
-        val now = TimeSource.Monotonic.markNow()
-        val remaining = deadline - now
-        if (remaining <= Duration.ZERO) return this
-        return until(now + remaining * fraction) or this
-    }
-
-    /** Standard [Cancellation] tokens. */
+    /** Standard stop predicates. */
     companion object {
-        /** Default token: never cancels. */
+        /** A predicate that never requests a stop. */
         val Never: Cancellation = Cancellation { false }
 
-        /**
-         * Cancel once [deadline] has passed. Deadline-backed (exposes [Cancellation.deadline]), so it
-         * composes with [shorten]. Backed by [TimeSource.Monotonic] via the caller's mark.
-         */
-        fun until(deadline: ComparableTimeMark): Cancellation = object : ClockOnlyCancellation, ArithmeticCancellation {
-            override fun isCancelled(): Boolean = deadline.hasPassedNow()
-            override fun deadline(): ComparableTimeMark = deadline
-            override fun arithmeticSource(): ArithmeticWorkSource = unmeteredArithmetic(this::isCancelled)
-        }
-
-        /**
-         * Cancel after [duration] has elapsed from this call, measured on [TimeSource.Monotonic]. The
-         * deadline is captured eagerly, so two calls yield two independent tokens.
-         */
+        /** Stop after [duration]. */
         fun after(duration: Duration): Cancellation = until(TimeSource.Monotonic.markNow() + duration)
 
-        private fun earlierDeadline(a: ComparableTimeMark?, b: ComparableTimeMark?): ComparableTimeMark? = when {
-            a == null -> b
-            b == null -> a
-            else -> minOf(a, b)
+        /** Stop at [deadline]. */
+        fun until(deadline: ComparableTimeMark): Cancellation {
+            if (deadline !is TimeSource.Monotonic.ValueTimeMark) {
+                return object : Cancellation {
+                    override fun isCancelled(): Boolean = deadline.hasPassedNow()
+                    override fun deadline(): ComparableTimeMark = deadline
+                }
+            }
+            val remaining = -deadline.elapsedNow()
+            return when {
+                remaining <= Duration.ZERO -> ConstantDeadline(deadline, true)
+                remaining == Duration.INFINITE -> ConstantDeadline(deadline, false)
+                else -> MonotonicDeadline(deadline, remaining.inWholeNanoseconds)
+            }
         }
     }
 }
 
-private interface ClockOnlyCancellation : Cancellation
-
-// Flatten library-owned composites at construction so hot polls visit ordered predicates without recursive calls.
-// The deadline and first work meter remain snapshots taken at composition, including for dynamic adapters.
-private class OrCancellation(
-    self: Cancellation,
-    other: Cancellation,
-    private val combined: ComparableTimeMark?,
-    private val meter: WorkMeter?,
-    accountingOwner: Cancellation?,
-) : SchedulingCancellation, ArithmeticCancellation {
-    override val workScheduled: Boolean = self.workScheduled() || other.workScheduled()
-    private val accountingOwner: Cancellation? = if (accountingOwner is OrCancellation) accountingOwner.accountingOwner
-        else accountingOwner
-    private val tokens: Array<Cancellation> = buildList<Cancellation> {
-        if (self is OrCancellation) {
-            for (token in self.tokens) appendOrdered(token)
-        } else if (self !== Cancellation.Never) {
-            appendOrdered(self)
-        }
-        if (other is OrCancellation) {
-            for (token in other.tokens) appendOrdered(token)
-        } else if (other !== Cancellation.Never) {
-            appendOrdered(other)
-        }
-    }.toTypedArray()
-
-    override fun isCancelled(): Boolean {
-        for (token in tokens) if (token.isCancelled()) return true
-        return false
-    }
-
-    override fun deadline(): ComparableTimeMark? = combined
-    override fun workMeter(): WorkMeter? = meter
-    override fun arithmeticSource(): ArithmeticWorkSource? {
-        val accounting = when {
-            accountingOwner != null -> accountingOwner.arithmeticSource()
-            tokens.all { it.arithmeticSource() != null } ->
-                unmeteredArithmetic(this::isCancelled)
-            else -> null
-        }
-        return accounting?.withCheckpoint(this::isCancelled)
-    }
+internal class MonotonicDeadline(private val end: ComparableTimeMark, nanos: Long) : Cancellation {
+    private val atNanos = monotonicNanos() + nanos
+    override fun deadline(): ComparableTimeMark = end
+    override fun isCancelled(): Boolean = monotonicNanos() - atNanos >= 0L
 }
 
-private fun MutableList<Cancellation>.appendOrdered(token: Cancellation) {
-    val last = lastOrNull()
-    if (last is ClockOnlyCancellation && token is ClockOnlyCancellation) {
-        val previous = last.deadline()
-        val next = token.deadline()
-        if (previous is TimeSource.Monotonic.ValueTimeMark && next is TimeSource.Monotonic.ValueTimeMark) {
-            // Adjacent monotonic deadlines have no intervening predicate effects.
-            if (next < previous) this[lastIndex] = token
-            return
-        }
-    }
-    add(token)
+private class ConstantDeadline(private val end: ComparableTimeMark, private val stopped: Boolean) : Cancellation {
+    override fun deadline(): ComparableTimeMark = end
+    override fun isCancelled(): Boolean = stopped
 }

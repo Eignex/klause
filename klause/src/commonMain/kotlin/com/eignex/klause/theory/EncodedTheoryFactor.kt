@@ -18,7 +18,9 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.SelectedEncoderRequest
 import com.eignex.klause.solver.pipeline.ExactSearchRow
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.numbers.BigInt
 
 internal class EncodedTheoryFactor private constructor(
@@ -44,7 +46,7 @@ internal fun PreparedFactorProjections.linearTheoryModel(
     target: EncodingTarget,
     indices: List<Int> = problem.factors.indices.toList(),
     fixedIntegers: Map<SourceIntId, BigInt> = emptyMap(),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
     onDecline: (EncoderDecline) -> Unit = {},
     completeFiniteConditions: Boolean = false,
@@ -61,7 +63,7 @@ internal fun PreparedFactorProjections.linearTheoryModel(
 ): Problem? {
     require(request.selection === this) { "encoder request belongs to a different canonical source" }
     require(request.target != EncodingTarget.POLYNOMIAL)
-    val stop = request.cancellation
+    val stop = request.cancellation.bindStopControl()
     if (stop()) {
         onDecline(EncoderDecline.RESOURCE)
         return null
@@ -93,7 +95,7 @@ internal fun PreparedFactorProjections.installLinearFactor(
     target: EncodingTarget,
     integerPins: Map<SourceIntId, BigInt> = emptyMap(),
     booleanPins: Map<SourceBoolId, Boolean> = emptyMap(),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     allocator: EncodingRealAllocator? = null,
     onDecline: (EncoderDecline) -> Unit = {},
     completeFiniteConditions: Boolean = false,
@@ -111,13 +113,13 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
     selected: Encoder,
     integerPins: Map<SourceIntId, BigInt>,
     booleanPins: Map<SourceBoolId, Boolean>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     allocator: EncodingRealAllocator,
     onDecline: (EncoderDecline) -> Unit,
     completeFiniteConditions: Boolean,
     conditions: EncodingConditions = EncodingConditions(integerPins, booleanPins),
 ): List<EncodedTheoryFactor>? {
-    if (cancellation()) {
+    if (cancellation.pollStop()) {
         onDecline(EncoderDecline.RESOURCE)
         return null
     }
@@ -157,7 +159,7 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
         onDecline(EncoderDecline.RESOURCE)
         return null
     }
-    if (cancellation()) {
+    if (cancellation.pollStop()) {
         onDecline(EncoderDecline.RESOURCE)
         return null
     }
@@ -178,7 +180,7 @@ private class LinearTheoryEncoding(
     override val sourceFactorIndex: Int,
     private val fixedIntegers: Map<SourceIntId, BigInt>,
     private val fixedBooleans: Map<SourceBoolId, Boolean>,
-    override val cancellation: Cancellation,
+    override val cancellation: ExecutionControl,
     private val booleans: Set<Int>,
     private val integers: Set<Int>,
     private val reals: Set<Int>,

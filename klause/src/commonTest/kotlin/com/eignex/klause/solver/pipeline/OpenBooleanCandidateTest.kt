@@ -10,7 +10,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.solver.search.SearchCandidateHints
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
@@ -30,9 +30,9 @@ class OpenBooleanCandidateTest {
         var firstPoint = false
         val calls = IntArray(6)
         var work = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
         val usage = OpenHintUsageSink()
         val hints = assertNotNull(
@@ -80,7 +80,7 @@ class OpenBooleanCandidateTest {
                 6,
                 intArrayOf(1, 2),
                 SearchCandidateHints { false },
-                Cancellation.Never,
+                ExecutionControl.Never,
                 usage = usage,
                 available = { true },
             ),
@@ -107,7 +107,7 @@ class OpenBooleanCandidateTest {
                 6,
                 intArrayOf(1, 2),
                 SearchCandidateHints { it == 2 },
-                Cancellation.Never,
+                ExecutionControl.Never,
                 usage = usage,
                 available = { true },
             ),
@@ -126,13 +126,13 @@ class OpenBooleanCandidateTest {
         var work = 0L
         var stoppedOnce = false
         var calls = 0
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean {
                 if (work < 45000L || stoppedOnce) return false
                 stoppedOnce = true
                 return true
             }
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
         val usage = OpenHintUsageSink()
 
@@ -172,7 +172,7 @@ class OpenBooleanCandidateTest {
                 calls++
                 true
             },
-            Cancellation.Never,
+            ExecutionControl.Never,
             usage = usage,
             available = { true },
         )
@@ -197,7 +197,7 @@ class OpenBooleanCandidateTest {
                     calls++
                     null
                 },
-                Cancellation.Never,
+                ExecutionControl.Never,
                 usage = usage,
                 available = { available },
             ),
@@ -231,7 +231,7 @@ class OpenBooleanCandidateTest {
                         calls++
                         value
                     },
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     usage = usage,
                     available = { true },
                 ),
@@ -275,7 +275,7 @@ class OpenBooleanCandidateTest {
                         if (interruption == 2) stopped = true
                         true
                     },
-                    Cancellation { stopped },
+                    ExecutionControl { stopped },
                     usage = usage,
                     available = { available },
                 ),
@@ -313,7 +313,7 @@ class OpenBooleanCandidateTest {
                     calls++
                     false
                 },
-                Cancellation.Never,
+                ExecutionControl.Never,
                 usage = usage,
                 available = live,
             )
@@ -348,7 +348,7 @@ class OpenBooleanCandidateTest {
                 width + 1,
                 IntArray(width) { it },
                 SearchCandidateHints { it != falseLeaf },
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -376,7 +376,7 @@ class OpenBooleanCandidateTest {
                 width + 3,
                 intArrayOf(width, width + 1),
                 SearchCandidateHints.ofLiterals(intArrayOf(left, right)),
-                Cancellation.Never,
+                ExecutionControl.Never,
                 usage = usage,
             ),
         )
@@ -392,7 +392,7 @@ class OpenBooleanCandidateTest {
             var available = true
             var stopped = false
             var calls = 0
-            val stop = Cancellation { stopped }
+            val stop = ExecutionControl { stopped }
             val usage = OpenHintUsageSink()
             val hints = assertNotNull(
                 SourceConjunctionHints.create(
@@ -432,7 +432,7 @@ class OpenBooleanCandidateTest {
                     1,
                     intArrayOf(0),
                     primitive,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     available = { available },
                     maxClauseEntries = capacity,
                 ),
@@ -447,7 +447,7 @@ class OpenBooleanCandidateTest {
                 1,
                 intArrayOf(0),
                 SearchCandidateHints { true },
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         assertEquals(true, legacy.preferredBool(0))
@@ -475,7 +475,7 @@ class OpenBooleanCandidateTest {
                         calls[variable]++
                         variable == 2
                     },
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     usage = usage,
                     available = { true },
                 ),
@@ -501,7 +501,7 @@ class OpenBooleanCandidateTest {
                 3,
                 intArrayOf(1, 2),
                 SearchCandidateHints { it == 1 },
-                Cancellation.Never,
+                ExecutionControl.Never,
                 available = { available },
                 knownBool = { if (it == 2) pin else null },
             ),
@@ -526,7 +526,7 @@ class OpenBooleanCandidateTest {
                 4,
                 intArrayOf(2, 3),
                 SearchCandidateHints { it == 2 },
-                Cancellation.Never,
+                ExecutionControl.Never,
                 available = { true },
             ),
         )
@@ -544,7 +544,7 @@ class OpenBooleanCandidateTest {
                 3,
                 intArrayOf(1, 2),
                 SearchCandidateHints.None,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 usage = usage,
                 available = { true },
                 knownBool = { if (it == 1) true else null },
@@ -565,7 +565,7 @@ class OpenBooleanCandidateTest {
                 3,
                 intArrayOf(1, 2),
                 SearchCandidateHints.ofLiterals(intArrayOf(2, 4)),
-                Cancellation.Never,
+                ExecutionControl.Never,
                 usage = usage,
                 available = { true },
                 maxClauseEntries = 0,
@@ -608,7 +608,7 @@ class OpenBooleanCandidateTest {
                     5,
                     if (ambiguous) intArrayOf(1, 2, 3, 4) else intArrayOf(2, 3, 4),
                     SearchCandidateHints { it != 4 },
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     available = { true },
                 ),
             )
@@ -622,9 +622,9 @@ class OpenBooleanCandidateTest {
     fun `a containing stop during point reads should withhold semantic selection and keep its charge`() {
         var work = 0L
         var limit = Long.MAX_VALUE
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= limit
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
         val usage = OpenHintUsageSink()
         val hints = assertNotNull(
@@ -703,7 +703,7 @@ class OpenBooleanCandidateTest {
         val usage = OpenHintUsageSink()
         val failure = IllegalStateException("index stop failed")
         var polls = 0
-        val stop = Cancellation {
+        val stop = ExecutionControl {
             polls++
             throw failure
         }
@@ -735,7 +735,7 @@ class OpenBooleanCandidateTest {
                 1,
                 intArrayOf(0),
                 primitive,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 maxClauses = 0,
                 usage = limited,
             ),
@@ -746,7 +746,7 @@ class OpenBooleanCandidateTest {
                 1,
                 intArrayOf(0),
                 primitive,
-                Cancellation { true },
+                ExecutionControl { true },
                 usage = stopped,
             ),
         )
@@ -756,7 +756,7 @@ class OpenBooleanCandidateTest {
                 1,
                 intArrayOf(2),
                 primitive,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 usage = invalid,
             ),
         )
@@ -812,7 +812,7 @@ class OpenBooleanCandidateTest {
         val model = differenceModel()
 
         val draw = model.componentPlan()
-            .openBooleanDraw(model, OpenCandidateParams(cancellation = Cancellation { true }))
+            .openBooleanDraw(model, OpenCandidateParams(cancellation = ExecutionControl { true }))
 
         assertNull(draw.candidate)
     }
@@ -840,7 +840,7 @@ class OpenBooleanCandidateTest {
                         SearchCandidateHints { variable ->
                             if (variable in 2..6) bits and (1 shl (variable - 2)) != 0 else null
                         },
-                        Cancellation.Never,
+                        ExecutionControl.Never,
                     ),
                 )
 
@@ -867,7 +867,7 @@ class OpenBooleanCandidateTest {
                     4,
                     intArrayOf(1, 2, 3),
                     SearchCandidateHints { variable -> if (variable in 1..3) true else null },
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             )
 
@@ -891,7 +891,7 @@ class OpenBooleanCandidateTest {
                 SearchCandidateHints { variable ->
                     if (variable in 1..2) true else null
                 },
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -914,7 +914,7 @@ class OpenBooleanCandidateTest {
                 SearchCandidateHints { variable ->
                     if (variable in 1..2) true else null
                 },
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -943,7 +943,7 @@ class OpenBooleanCandidateTest {
                         else -> null
                     }
                 },
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -971,7 +971,7 @@ class OpenBooleanCandidateTest {
                     5,
                     intArrayOf(2, 3, 4),
                     primitive,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                 ),
             )
 
@@ -994,7 +994,7 @@ class OpenBooleanCandidateTest {
                 SearchCandidateHints { variable ->
                     if (variable in 2..4) true else null
                 },
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -1005,9 +1005,9 @@ class OpenBooleanCandidateTest {
     fun `nested evaluation should charge the opening meter and withhold a cancelled proposal`() {
         var work = 0L
         var limit = Long.MAX_VALUE
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= limit
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
         val clauses = listOf(
             Clause(intArrayOf(3, 4)),
@@ -1057,7 +1057,7 @@ class OpenBooleanCandidateTest {
                 SearchCandidateHints { variable ->
                     if (variable in 2..4) value else null
                 },
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 

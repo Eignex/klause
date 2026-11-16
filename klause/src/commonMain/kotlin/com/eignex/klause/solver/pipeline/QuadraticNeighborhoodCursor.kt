@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.solver.resources.NodeAllowance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.resources.NodeAllowance
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.ceil
 import kotlin.random.Random
 
@@ -35,7 +35,7 @@ internal class QuadraticNeighborhoodCursor(
     private val adaptive: Boolean,
     seed: Long,
     private val allowance: QuadraticNeighborhoodAllowance,
-    private val lifetime: Cancellation,
+    private val lifetime: ExecutionControl,
     private val nativeWork: () -> Long,
     private val propose: (Set<Int>, BigFraction, Random) -> ExactNeighborhoodCondition,
     private val completion: ExactNeighborhoodCompletion,
@@ -62,7 +62,7 @@ internal class QuadraticNeighborhoodCursor(
     init { require(coordinates >= 0) }
 
     fun advance(
-        segment: Cancellation, instructions: Long, invocation: Cancellation = Cancellation.Never,
+        segment: ExecutionControl, instructions: Long, invocation: ExecutionControl = ExecutionControl.Never,
     ): Boolean {
         require(instructions >= 0)
         check(!closed) { "quadratic neighborhood cursor is closed" }

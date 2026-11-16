@@ -6,7 +6,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -23,7 +23,7 @@ class PropagationPreparationTest {
             Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 3),
         ))
         var cancelled = false
-        val preparation = PropagationPreparation(problem, Cancellation { cancelled }, 0, false, costAware = true)
+        val preparation = PropagationPreparation(problem, ExecutionControl { cancelled }, 0, false, costAware = true)
         while (!preparation.rootStarted) preparation.advance()
         cancelled = true
 
@@ -42,7 +42,7 @@ class PropagationPreparationTest {
     fun `prepared root attribution survives publication without adding propagation work`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)),
             arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 3)))
-        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false, attribution = true)
+        val preparation = PropagationPreparation(problem, ExecutionControl.Never, 0, false, attribution = true)
         var session: PropagationSession? = null
         while (session == null) session = preparation.advance()
 
@@ -57,7 +57,7 @@ class PropagationPreparationTest {
         val problem = Problem(3, 0, emptyArray(), arrayOf(
             Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
         ))
-        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        val preparation = PropagationPreparation(problem, ExecutionControl.Never, 0, false)
         var session: PropagationSession? = null
         while (session == null) session = preparation.advance()
         val assumptions = Assumptions(bools = mapOf(0 to false, 1 to false, 2 to false))
@@ -83,7 +83,7 @@ class PropagationPreparationTest {
             },
         )
         val expected = PropagationSession(problem)
-        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        val preparation = PropagationPreparation(problem, ExecutionControl.Never, 0, false)
         var session: PropagationSession? = null
 
         assertNull(preparation.advance())
@@ -105,7 +105,7 @@ class PropagationPreparationTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, if (v == 259) -1 else 10)
             },
         )
-        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        val preparation = PropagationPreparation(problem, ExecutionControl.Never, 0, false)
         var session: PropagationSession? = null
 
         assertNull(preparation.advance())
@@ -119,7 +119,7 @@ class PropagationPreparationTest {
     fun `cancellation between preparation batches should preserve resumable progress`() {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)), emptyArray())
         var cancelled = false
-        val preparation = PropagationPreparation(problem, Cancellation { cancelled }, 0, false)
+        val preparation = PropagationPreparation(problem, ExecutionControl { cancelled }, 0, false)
         preparation.advance()
         cancelled = true
 
@@ -141,7 +141,7 @@ class PropagationPreparationTest {
         )
         var polls = 0
         var cancelOnPoll = Int.MAX_VALUE
-        val preparation = PropagationPreparation(problem, Cancellation { ++polls >= cancelOnPoll }, 0, false)
+        val preparation = PropagationPreparation(problem, ExecutionControl { ++polls >= cancelOnPoll }, 0, false)
         while (!preparation.rootStarted) assertNull(preparation.advance())
         cancelOnPoll = polls + 2
 
@@ -169,7 +169,7 @@ class PropagationPreparationTest {
             ),
         )
         val expected = PropagationSession(problem)
-        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        val preparation = PropagationPreparation(problem, ExecutionControl.Never, 0, false)
         var session: PropagationSession? = null
 
         while (session == null) session = preparation.advance()
@@ -190,7 +190,7 @@ class PropagationPreparationTest {
             Array(260) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 1) },
         )
         var cancelled = false
-        val preparation = PropagationPreparation(problem, Cancellation { cancelled }, 0, false)
+        val preparation = PropagationPreparation(problem, ExecutionControl { cancelled }, 0, false)
         var ready: PropagationSession? = null
         while (ready == null) ready = preparation.advance()
         val session = assertNotNull(ready)
@@ -217,7 +217,7 @@ class PropagationPreparationTest {
     @Test
     fun `assumptions without wakes should remain pausable between pins`() {
         val problem = Problem(0, 260, Array(260) { IntDomain(0, 1) }, emptyArray())
-        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        val preparation = PropagationPreparation(problem, ExecutionControl.Never, 0, false)
         var ready: PropagationSession? = null
         while (ready == null) ready = preparation.advance()
         val session = assertNotNull(ready)
@@ -242,7 +242,7 @@ class PropagationPreparationTest {
             emptyArray(),
             Array(260) { Clause(intArrayOf(Lit.make(0, false), Lit.make(it + 1, true))) },
         )
-        val preparation = PropagationPreparation(problem, Cancellation.Never, 0, false)
+        val preparation = PropagationPreparation(problem, ExecutionControl.Never, 0, false)
         var ready: PropagationSession? = null
         while (ready == null) ready = preparation.advance()
         val session = assertNotNull(ready)

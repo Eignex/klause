@@ -27,7 +27,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -76,7 +76,7 @@ class QuadraticSourceWitnessTest {
         )
         assertIs<SourceEvidenceCheck.Checked>(
             publication.verify(expected, point, AlgebraicArithmetic()) {
-                checkQuadraticSourceWitness(request.preparedPlan, it, Cancellation.Never, PolynomialLimits())
+                checkQuadraticSourceWitness(request.preparedPlan, it, ExecutionControl.Never, PolynomialLimits())
             },
         )
     }
@@ -102,7 +102,7 @@ class QuadraticSourceWitnessTest {
         val checked = checkQuadraticSourceWitness(
             source.pipelineRequest().preparedPlan,
             point,
-            Cancellation.Never,
+            ExecutionControl.Never,
             PolynomialLimits(),
         )
 
@@ -117,7 +117,7 @@ class QuadraticSourceWitnessTest {
         val checked = checkQuadraticSourceWitness(
             source.preparePolynomialExecutionPlan(),
             point,
-            Cancellation.Never,
+            ExecutionControl.Never,
             PolynomialLimits(),
         )
 
@@ -143,7 +143,7 @@ class QuadraticSourceWitnessTest {
         val checked = checkQuadraticSourceWitness(
             source.pipelineRequest().preparedPlan,
             point,
-            Cancellation.Never,
+            ExecutionControl.Never,
             PolynomialLimits(),
         )
 
@@ -169,7 +169,7 @@ class QuadraticSourceWitnessTest {
         val checked = checkQuadraticSourceWitness(
             source.pipelineRequest().preparedPlan,
             point,
-            Cancellation.Never,
+            ExecutionControl.Never,
             PolynomialLimits(),
         )
 
@@ -213,7 +213,7 @@ class QuadraticSourceWitnessTest {
         )
         assertIs<SourceEvidenceCheck.Checked>(
             publication.verify(expected, point, AlgebraicArithmetic()) {
-                checkQuadraticSourceWitness(request.preparedPlan, it, Cancellation.Never, PolynomialLimits())
+                checkQuadraticSourceWitness(request.preparedPlan, it, ExecutionControl.Never, PolynomialLimits())
             },
         )
     }

@@ -1,14 +1,14 @@
 package com.eignex.klause.bench.profile
 
 import com.eignex.klause.bench.metric.sha256
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
 import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertFailsWith
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
 
 class LocalSearchTrajectorySourceTest {
     @ParameterizedTest

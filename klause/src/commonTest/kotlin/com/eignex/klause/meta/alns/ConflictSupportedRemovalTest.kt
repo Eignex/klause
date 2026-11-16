@@ -16,7 +16,7 @@ import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.BranchingConflict
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -36,7 +36,7 @@ class ConflictSupportedRemovalTest {
         var observedCalls = 0
         val base = BacktrackParams(randomSeed = 3, maxDecisions = 32)
         val guidance = ConflictSupportedRemoval(problem, objective)
-        guidance.begin(center, Assumptions.None, 2.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 2.0, ExecutionControl.Never)
 
         val control = BacktrackSolver(problem).minimize(
             objective,
@@ -72,7 +72,7 @@ class ConflictSupportedRemovalTest {
         val params = BacktrackParams(pooledIncumbents = IncumbentSource { null })
 
         val observed = guidance.observe(params)
-        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 0.0, ExecutionControl.Never)
 
         assertSame(params, observed)
         assertEquals(ConflictGuidanceStatus.Unsupported, guidance.status)
@@ -92,7 +92,7 @@ class ConflictSupportedRemovalTest {
         val incumbent = Sample(BooleanArray(0), longArrayOf(1, 1))
         val pins = Assumptions.None.withInt(0, 1)
         val guidance = ConflictSupportedRemoval(source, objective)
-        guidance.begin(incumbent, pins, 2.0, Cancellation.Never)
+        guidance.begin(incumbent, pins, 2.0, ExecutionControl.Never)
         val params = guidance.observe(BacktrackParams(randomSeed = 3, maxDecisions = 16)).copy(
             assumptions = pins,
             objectiveBoundSupplier = { 2.0 },
@@ -116,7 +116,7 @@ class ConflictSupportedRemovalTest {
         val source = Problem(3, 0, emptyArray(), clauses).bake()
         val params = BacktrackParams(randomSeed = 3, maxDecisions = 32)
         val guidance = ConflictSupportedRemoval(source, objective)
-        guidance.begin(Sample(BooleanArray(3), LongArray(0)), Assumptions.None, 0.0, Cancellation.Never)
+        guidance.begin(Sample(BooleanArray(3), LongArray(0)), Assumptions.None, 0.0, ExecutionControl.Never)
 
         val control = BacktrackSolver(source).solve(params)
         val observed = BacktrackSolver(source).solve(guidance.observe(params))
@@ -131,7 +131,7 @@ class ConflictSupportedRemovalTest {
     fun `finite conflict attribution should rank both coordinate spaces`() {
         val guidance = ConflictSupportedRemoval(problem, objective)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 0.0, ExecutionControl.Never)
         observer.onConflict(
             VarRef.Bool(0),
             PropagationResult.Unsat(
@@ -151,7 +151,7 @@ class ConflictSupportedRemovalTest {
     fun `multiple bound attributions should count a source input once per conflict`() {
         val guidance = ConflictSupportedRemoval(problem, objective)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 0.0, ExecutionControl.Never)
 
         observer.onConflict(null, BranchingConflict(ints = intArrayOf(0, 0, 0)))
         observer.onConflict(null, BranchingConflict(ints = intArrayOf(1)))
@@ -164,7 +164,7 @@ class ConflictSupportedRemovalTest {
         val guidance = ConflictSupportedRemoval(problem, objective)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
         val improved = Sample(BooleanArray(2), longArrayOf(0, 1))
-        guidance.begin(center, Assumptions.None, 2.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 2.0, ExecutionControl.Never)
         observer.onConflict(null, BranchingConflict(ints = intArrayOf(0)))
         observer.onSolution(improved)
 
@@ -187,7 +187,7 @@ class ConflictSupportedRemovalTest {
         val incumbent = Sample(booleanArrayOf(), longArrayOf(9_007_199_254_740_993L))
         val guidance = ConflictSupportedRemoval(source, wideObjective)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(incumbent, Assumptions.None, Double.POSITIVE_INFINITY, Cancellation.Never)
+        guidance.begin(incumbent, Assumptions.None, Double.POSITIVE_INFINITY, ExecutionControl.Never)
         observer.onSolution(incumbent)
 
         observer.onConflict(null, BranchingConflict(ints = intArrayOf(0)))
@@ -200,7 +200,7 @@ class ConflictSupportedRemovalTest {
         for (empty in listOf(false, true)) {
             val guidance = ConflictSupportedRemoval(problem, objective)
             val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-            guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+            guidance.begin(center, Assumptions.None, 0.0, ExecutionControl.Never)
             if (empty) observer.onConflict(null, BranchingConflict.Empty)
 
             val freed = guidance.destroy(Random(17), problem, center, objective, 0.5)
@@ -218,7 +218,7 @@ class ConflictSupportedRemovalTest {
         for (change in listOf("center", "model", "objective")) {
             val guidance = ConflictSupportedRemoval(problem, objective)
             val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-            guidance.begin(center, Assumptions.None, -1.0, Cancellation.Never)
+            guidance.begin(center, Assumptions.None, -1.0, ExecutionControl.Never)
             observer.onConflict(null, BranchingConflict(intArrayOf(1)))
 
             guidance.destroy(
@@ -239,7 +239,7 @@ class ConflictSupportedRemovalTest {
     fun `the conflict prefix cap should preserve only admitted support`() {
         val guidance = ConflictSupportedRemoval(problem, objective, maxConflicts = 1)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 0.0, ExecutionControl.Never)
         observer.onConflict(null, BranchingConflict(intArrayOf(1)))
 
         observer.onConflict(null, BranchingConflict(ints = intArrayOf(0)))
@@ -255,10 +255,10 @@ class ConflictSupportedRemovalTest {
     fun `a reseed should discard every attribution from the previous repair`() {
         val guidance = ConflictSupportedRemoval(problem, objective)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 0.0, ExecutionControl.Never)
         observer.onConflict(null, BranchingConflict(intArrayOf(1)))
 
-        guidance.begin(center, Assumptions.None, -1.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, -1.0, ExecutionControl.Never)
 
         assertEquals(ConflictGuidanceStatus.Unavailable, guidance.status)
         assertEquals(-1.0, guidance.originCutoff)
@@ -268,7 +268,7 @@ class ConflictSupportedRemovalTest {
     fun `capture limits should decline an oversized attribution as a whole`() {
         val guidance = ConflictSupportedRemoval(problem, objective, maxCoordinates = 4)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 0.0, ExecutionControl.Never)
 
         observer.onConflict(null, BranchingConflict(intArrayOf(0, 1, 0, 1, 0)))
 
@@ -281,7 +281,7 @@ class ConflictSupportedRemovalTest {
         val assumptions = Assumptions.None.withBool(1, false)
         val guidance = ConflictSupportedRemoval(problem, objective, assumptions)
         val observer = guidance.observe(BacktrackParams(assumptions = assumptions)).variableSelector.fresh()
-        guidance.begin(center, assumptions, 0.0, Cancellation.Never)
+        guidance.begin(center, assumptions, 0.0, ExecutionControl.Never)
 
         observer.onConflict(null, BranchingConflict(intArrayOf(1)))
 
@@ -292,12 +292,12 @@ class ConflictSupportedRemovalTest {
     fun `changed caller pins should retire guidance at scoped selection`() {
         val guidance = ConflictSupportedRemoval(problem, objective)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 0.0, ExecutionControl.Never)
         observer.onConflict(null, BranchingConflict(intArrayOf(1)))
         guidance.end()
 
         guidance.destroy(Random(3), problem, center, objective, 0.5,
-            Assumptions.None.withBool(0, false), Cancellation.Never)
+            Assumptions.None.withBool(0, false), ExecutionControl.Never)
 
         assertEquals(ConflictGuidanceStatus.Incompatible, guidance.status)
         assertNull(guidance.originPins)
@@ -307,11 +307,11 @@ class ConflictSupportedRemovalTest {
     fun `scoped selection cancellation should retire acquired guidance`() {
         val guidance = ConflictSupportedRemoval(problem, objective)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(center, Assumptions.None, 0.0, Cancellation.Never)
+        guidance.begin(center, Assumptions.None, 0.0, ExecutionControl.Never)
         observer.onConflict(null, BranchingConflict(intArrayOf(1)))
         guidance.end()
 
-        guidance.destroy(Random(3), problem, center, objective, 0.5, Assumptions.None, Cancellation { true })
+        guidance.destroy(Random(3), problem, center, objective, 0.5, Assumptions.None, ExecutionControl { true })
 
         assertEquals(ConflictGuidanceStatus.Cancelled, guidance.status)
         assertNull(guidance.originPins)
@@ -322,7 +322,7 @@ class ConflictSupportedRemovalTest {
         var stopped = false
         val guidance = ConflictSupportedRemoval(problem, objective)
         val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-        guidance.begin(center, Assumptions.None, 0.0, Cancellation { stopped })
+        guidance.begin(center, Assumptions.None, 0.0, ExecutionControl { stopped })
         observer.onConflict(null, BranchingConflict(intArrayOf(1)))
         guidance.end()
         stopped = true
@@ -340,7 +340,7 @@ class ConflictSupportedRemovalTest {
             var stopped = false
             val guidance = ConflictSupportedRemoval(problem, objective)
             val observer = guidance.observe(BacktrackParams()).variableSelector.fresh()
-            guidance.begin(center, Assumptions.None, 0.0, Cancellation { stopped })
+            guidance.begin(center, Assumptions.None, 0.0, ExecutionControl { stopped })
             observer.onConflict(null, BranchingConflict(intArrayOf(1)))
 
             if (close) {

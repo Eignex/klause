@@ -21,15 +21,9 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.math.BigDecimal
-import java.math.BigInteger
-import kotlin.math.ceil
-import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -40,6 +34,12 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.math.BigDecimal
+import java.math.BigInteger
+import kotlin.math.ceil
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object RepairOwnerReplay {
     private const val PIPELINE = "com.eignex.klause.solver.pipeline."
@@ -67,11 +67,11 @@ internal object RepairOwnerReplay {
         controls: File, problem: BakedProblem, objective: LinearObjective, prepared: FinitePipelinePreparation,
         source: BakedProblem, inputs: IntArray, file: File, seed: Long, allowance: Long = 100_000L,
         fragmentAllowance: Long = 2_000L,
-        sourceCheck: ((Sample, Cancellation) -> PointCheck)? = null, mixedContext: SourceProofContext? = null,
+        sourceCheck: ((Sample, ExecutionControl) -> PointCheck)? = null, mixedContext: SourceProofContext? = null,
         sourceMaximize: Boolean = false, structured: List<StructuredInner> = emptyList(),
         descent: RepairDescent? = null, ownerSequence: List<String>? = null,
-        completionReplay: ((Sample, Cancellation) -> JsonObject)? = null,
-        completionObjective: ((Sample, Cancellation) -> BigFraction?)? = null,
+        completionReplay: ((Sample, ExecutionControl) -> JsonObject)? = null,
+        completionObjective: ((Sample, ExecutionControl) -> BigFraction?)? = null,
     ) {
         val owners = ownerSequence ?: (DEFAULT_OWNERS.take(1) + structured.map(StructuredInner::owner) +
             DEFAULT_OWNERS.drop(1))
@@ -83,7 +83,7 @@ internal object RepairOwnerReplay {
         val thread = Thread.currentThread().threadId()
         val setupStarted = System.nanoTime()
         val setupAllocation = bean.getThreadAllocatedBytes(thread)
-        fun accepted(sample: Sample, stop: Cancellation) =
+        fun accepted(sample: Sample, stop: ExecutionControl) =
             sourceCheck?.invoke(sample, stop) ?: PointCheck(checkSource(source, prepared.reconstruct(sample), stop))
         val scopeOwner = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
@@ -128,7 +128,7 @@ internal object RepairOwnerReplay {
             val freed = freedType.getDeclaredConstructor(IntArray::class.java, IntArray::class.java)
                 .newInstance(bools, ints)
             val pins = call(scopeOwner, "pins", problem, center, freed) as Assumptions
-            val checked = accepted(center, Cancellation.after(2000.milliseconds))
+            val checked = accepted(center, ExecutionControl.after(2000.milliseconds))
             check(checked.accepted)
             val decline = entry["decline"]?.takeUnless { it == JsonNull }?.jsonPrimitive?.content
             val requested = entry["requestedCount"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
@@ -156,7 +156,7 @@ internal object RepairOwnerReplay {
         file.bufferedWriter().use { writer ->
             for (kind in owners) {
                 val budget = NodeBudget(allowance)
-                val lifetime = Cancellation.after(10_000.milliseconds)
+                val lifetime = ExecutionControl.after(10_000.milliseconds)
                 var previousCutoff: BigFraction? = null
                 var retained: Any? = null
                 var transient: AutoCloseable? = null
@@ -171,18 +171,18 @@ internal object RepairOwnerReplay {
                     mixedOperations += call(checkNotNull(NumericalFrontierSnapshot.field(owner, "budget")),
                         "getOperations") as Int
                 }
-                var activeStop: Cancellation = Cancellation.Never
+                var activeStop: ExecutionControl = ExecutionControl.Never
                 var activeCenter: Sample? = null
                 var firstFloat: Sample? = null
-                val dynamic = object : Cancellation {
+                val dynamic = object : ExecutionControl() {
                     override fun isCancelled(): Boolean = activeStop()
                     override fun deadline() = activeStop.deadline()
                 }
                 try {
                     for (scope in scopes) {
                         val fragmentStart = budget.spent
-                        val funded = Cancellation { budget.spent - fragmentStart >= fragmentAllowance }
-                        val stop = lifetime or Cancellation.after(2000.milliseconds) or funded
+                        val funded = ExecutionControl { budget.spent - fragmentStart >= fragmentAllowance }
+                        val stop = lifetime or ExecutionControl.after(2000.milliseconds) or funded
                         activeStop = stop
                         activeCenter = scope.center
                         firstFloat = null
@@ -317,7 +317,7 @@ internal object RepairOwnerReplay {
                             descent?.continueFrom(problem, objective, checkNotNull(sample), seed, kind, scope.id,
                                 ::accepted)
                         val completion = firstFloat?.let { point ->
-                            completionReplay?.invoke(point, Cancellation.after(2000.milliseconds))
+                            completionReplay?.invoke(point, ExecutionControl.after(2000.milliseconds))
                         }
                         writer.appendLine(buildJsonObject {
                             put("centerId", scope.id)
@@ -421,7 +421,7 @@ internal object RepairOwnerReplay {
         }
     }
 
-    private fun local(problem: BakedProblem, objective: LinearObjective, scope: Scope, stop: Cancellation,
+    private fun local(problem: BakedProblem, objective: LinearObjective, scope: Scope, stop: ExecutionControl,
         budget: NodeBudget, seed: Long, allowance: Long,
     ): Outcome {
         val start = System.nanoTime()
@@ -443,7 +443,7 @@ internal object RepairOwnerReplay {
         }, result.stats, preparation)
     }
 
-    private fun structuredLocal(problem: BakedProblem, objective: LinearObjective, scope: Scope, stop: Cancellation,
+    private fun structuredLocal(problem: BakedProblem, objective: LinearObjective, scope: Scope, stop: ExecutionControl,
         budget: NodeBudget, seed: Long, allowance: Long, inner: StructuredInner,
     ): Outcome {
         val run = inner.repair(problem, objective, scope.center, scope.pins, scope.freedBools, scope.freedInts, stop,
@@ -451,14 +451,15 @@ internal object RepairOwnerReplay {
         return Outcome(run.sample, run.reason, run.stats, run.preparationNs, structured = run.report)
     }
 
-    private fun complete(owner: Any, scope: Scope, stop: Cancellation, preparation: Long, allowance: Long): Outcome {
+    private fun complete(owner: Any, scope: Scope, stop: ExecutionControl, preparation: Long,
+        allowance: Long): Outcome {
         val start = System.nanoTime()
         call(owner, "beginExact", scope.pins, allowance, scope.cutoff, stop)
         val prepared = preparation + System.nanoTime() - start
         var result: Any
         var pauses = 0L
         do {
-            result = checkNotNull(call(owner, "runSlice", Cancellation.Never, 10L, 64L))
+            result = checkNotNull(call(owner, "runSlice", ExecutionControl.Never, 10L, 64L))
             if (call(result, "getReason") == null) pauses++
         } while (call(result, "getReason") == null && !stop())
         val reason = call(result, "getReason") as TerminationReason?
@@ -467,7 +468,7 @@ internal object RepairOwnerReplay {
             call(owner, "getStats") as SolveStats, prepared, pauses = pauses)
     }
 
-    private fun mixed(problem: BakedProblem, objective: LinearObjective, stop: Cancellation, budget: NodeBudget,
+    private fun mixed(problem: BakedProblem, objective: LinearObjective, stop: ExecutionControl, budget: NodeBudget,
         center: () -> Sample?, work: Long, allocation: Long, operations: Int,
         originalContext: SourceProofContext?,
     ): Any? {
@@ -483,7 +484,7 @@ internal object RepairOwnerReplay {
             .newInstance(problem, context, objective, limits, policy, true, center, stop, null)
     }
 
-    private fun numerical(owner: Any, scope: Scope, stop: Cancellation, budget: NodeBudget,
+    private fun numerical(owner: Any, scope: Scope, stop: ExecutionControl, budget: NodeBudget,
         preparation: Long,
     ): Outcome {
         val bools = (0 until scope.center.numBoolVars).filter { it !in scope.freedBools }
@@ -497,7 +498,7 @@ internal object RepairOwnerReplay {
         var pauses = 0L
         do {
             val before = call(owner, "getWork") as Long
-            attempt = checkNotNull(call(owner, "attempt", condition, Cancellation.Never))
+            attempt = checkNotNull(call(owner, "attempt", condition, ExecutionControl.Never))
             call(budget, "spendMoves", 1L + ceil(((call(owner, "getWork") as Long) - before) * 0.8).toLong())
             result = checkNotNull(call(attempt, "getResult"))
             if (result.javaClass.simpleName == "Paused") pauses++
@@ -513,7 +514,7 @@ internal object RepairOwnerReplay {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun checkSource(problem: BakedProblem, sample: Sample, stop: Cancellation): Boolean {
+    private fun checkSource(problem: BakedProblem, sample: Sample, stop: ExecutionControl): Boolean {
         val verifier = Class.forName("com.eignex.klause.solver.validation.FiniteWitnessVerificationKt")
             .methods.single { it.name == "finiteWitnessVerifier" && it.parameterCount == 5 }
             .invoke(null, problem, null, Assumptions.None, stop, null)
@@ -533,7 +534,7 @@ internal object RepairOwnerReplay {
         put("approximateReals", JsonArray(value.reals.map(::JsonPrimitive)))
     }
 
-    private fun clauseUsage(owner: Any, stop: Cancellation): ClauseUsage {
+    private fun clauseUsage(owner: Any, stop: ExecutionControl): ClauseUsage {
         val field = owner.javaClass.declaredFields.single {
             it.type.name == "com.eignex.klause.backtrack.ResumableMinimize"
         }.apply { isAccessible = true }
@@ -573,7 +574,7 @@ internal object RepairOwnerReplay {
         }
     }
 
-    private fun stopped(stop: Cancellation): TerminationReason =
+    private fun stopped(stop: ExecutionControl): TerminationReason =
         if (stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout else TerminationReason.Cancelled
 
     private fun call(owner: Any, name: String, vararg args: Any?): Any? =

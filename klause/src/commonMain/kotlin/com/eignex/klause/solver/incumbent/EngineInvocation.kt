@@ -13,7 +13,7 @@ import com.eignex.klause.solver.evidence.checkWitness
 import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -79,7 +79,7 @@ internal class EngineInvocation(
         (other.deductions.intHoleVarIds.isEmpty() && other.deductions.intSetKeys.isEmpty()) ||
             other.deductions == own.deductions
 
-    fun checkWitness(sample: Sample, cancellation: Cancellation): SourceEvidenceCheck {
+    fun checkWitness(sample: Sample, cancellation: ExecutionControl): SourceEvidenceCheck {
         if (sourceCondition != sourceWitnessCondition) {
             val declared = sourceCondition.checkWitness(sample, cancellation)
             if (declared != SourceEvidenceCheck.Checked) return declared
@@ -90,7 +90,7 @@ internal class EngineInvocation(
     }
 
     private fun checkRestrictions(
-        sample: Sample, pins: Assumptions, condition: SourceCondition, cancellation: Cancellation,
+        sample: Sample, pins: Assumptions, condition: SourceCondition, cancellation: ExecutionControl,
     ): SourceEvidenceCheck {
         val checked = condition.checkWitness(sample, cancellation)
         if (checked != SourceEvidenceCheck.Checked) return checked

@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.Encoder
@@ -15,7 +16,7 @@ import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.linearTheoryModel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
@@ -29,6 +30,52 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SelectedEncoderRequestTest {
+    @Test
+    fun `batched preflight should stop at the exact containing work allowance`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            Array<Factor>(3) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2) },
+        )
+        val selected = FactorProjectionProviders.Default.prepare(source)
+        val budget = PresolveBudget(2)
+
+        val request = selected.requestEncoders(EncodingTarget.LINEAR, listOf(0, 1, 2), cancellation = budget.slice(2))
+
+        assertNull(request)
+        assertEquals(2L, budget.spent())
+    }
+
+    @Test
+    fun `cancellation during private installation should withhold the complete model`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            Array<Factor>(3) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2) },
+        )
+        var stopped = false
+        var decline: EncoderDecline? = null
+        val selected = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
+                val builtin = BuiltInEncoderProvider.select(factor, target)
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    builtin.install(view, encoding).also { stopped = true }
+                }
+            },
+        ).prepare(source)
+
+        val model = selected.linearTheoryModel(
+            EncodingTarget.LINEAR,
+            cancellation = ExecutionControl { stopped },
+            onDecline = { decline = it },
+        )
+
+        assertNull(model)
+        assertEquals(EncoderDecline.RESOURCE, decline)
+    }
+
     @Test
     fun `editing returned conditions should not change installed relations`() {
         val source = Problem(2, 2, Array(2) { IntDomain(0, 2) }, arrayOf<Factor>(
@@ -108,7 +155,7 @@ class SelectedEncoderRequestTest {
             val builtin = BuiltInEncoderProvider.select(factor, target)
             if (factor === conditioned) {
                 Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0)), mapOf(SourceBoolId(0) to true)) {
-                        view, encoding ->
+                        view, encoding, ->
                     installed++
                     builtin.install(view, encoding)
                 }
@@ -143,7 +190,7 @@ class SelectedEncoderRequestTest {
         val selected = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
             val builtin = BuiltInEncoderProvider.select(factor, target)
             Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0)), mapOf(SourceBoolId(0) to true)) {
-                    view, encoding ->
+                    view, encoding, ->
                 builtin.install(view, encoding)
             }
         }).prepare(source)
@@ -209,7 +256,7 @@ class SelectedEncoderRequestTest {
             }
         }).prepare(source)
         val request = assertNotNull(selected.requestEncoders(EncodingTarget.LINEAR, listOf(0),
-            cancellation = Cancellation { stopped }))
+            cancellation = ExecutionControl { stopped }))
         var decline: EncoderDecline? = null
         stopped = true
 
@@ -260,9 +307,9 @@ class SelectedEncoderRequestTest {
         var installed = 0
         var charged = 0L
         var decline: EncoderDecline? = null
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val selected = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
             val builtin = BuiltInEncoderProvider.select(factor, target)

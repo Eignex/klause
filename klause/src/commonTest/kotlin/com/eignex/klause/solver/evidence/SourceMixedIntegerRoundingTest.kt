@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.shl
 import kotlin.test.Test
@@ -26,7 +26,7 @@ class SourceMixedIntegerRoundingTest {
             val bound = SourceInequality(mapOf(y to boundCoefficient), BigFraction.ZERO)
             var remaining = 7
 
-            val cut = assertNotNull(mixedIntegerRounding(row, listOf(bound), Cancellation.Never) { _, _ ->
+            val cut = assertNotNull(mixedIntegerRounding(row, listOf(bound), ExecutionControl.Never) { _, _ ->
                 check(remaining-- > 0)
             })
 
@@ -52,7 +52,7 @@ class SourceMixedIntegerRoundingTest {
             val bound = SourceInequality(mapOf(y to boundCoefficient), boundCoefficient * endpoint)
             var remaining = 8
 
-            val cut = mixedIntegerRounding(row, listOf(bound), Cancellation.Never) { _, _ ->
+            val cut = mixedIntegerRounding(row, listOf(bound), ExecutionControl.Never) { _, _ ->
                 check(remaining-- > 0)
             }
 
@@ -68,7 +68,7 @@ class SourceMixedIntegerRoundingTest {
         for (allowance in listOf(7, 11)) {
             var remaining = allowance
 
-            val cut = mixedIntegerRounding(row, listOf(bound), Cancellation { remaining < 0 }) { _, _ ->
+            val cut = mixedIntegerRounding(row, listOf(bound), ExecutionControl { remaining < 0 }) { _, _ ->
                 remaining--
             }
 
@@ -102,7 +102,7 @@ class SourceMixedIntegerRoundingTest {
         val bound = SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)
         var cancelled = false
 
-        val cut = mixedIntegerRounding(row, listOf(bound), Cancellation { cancelled }) { _, _ -> cancelled = true }
+        val cut = mixedIntegerRounding(row, listOf(bound), ExecutionControl { cancelled }) { _, _ -> cancelled = true }
 
         assertNull(cut)
     }
@@ -117,7 +117,7 @@ class SourceMixedIntegerRoundingTest {
                 coefficient * endpoint + half)
             val bound = SourceInequality(mapOf(y to boundCoefficient), boundCoefficient * endpoint)
 
-            val cut = assertNotNull(mixedIntegerRounding(row, listOf(bound), Cancellation.Never))
+            val cut = assertNotNull(mixedIntegerRounding(row, listOf(bound), ExecutionControl.Never))
 
             assertEquals(SourceInequality(mapOf(x to BigFraction.ONE, y to coefficient * BigFraction.ofLong(2)),
                 coefficient * BigFraction.ofLong(2) * endpoint), cut)
@@ -129,7 +129,7 @@ class SourceMixedIntegerRoundingTest {
         val row = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), half)
         val bound = SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)
 
-        val cut = mixedIntegerRounding(row, listOf(bound), Cancellation.Never)
+        val cut = mixedIntegerRounding(row, listOf(bound), ExecutionControl.Never)
 
         assertEquals(SourceInequality(mapOf(x to BigFraction.ONE), BigFraction.ZERO), cut)
     }
@@ -149,7 +149,7 @@ class SourceMixedIntegerRoundingTest {
             SourceInequality(mapOf(x to half, y to BigFraction.MINUS_ONE), half) to listOf(bound),
             SourceInequality(row.coefficients, BigFraction.ONE) to listOf(bound),
         )) {
-            assertNull(mixedIntegerRounding(candidate, bounds, Cancellation.Never))
+            assertNull(mixedIntegerRounding(candidate, bounds, ExecutionControl.Never))
         }
     }
 

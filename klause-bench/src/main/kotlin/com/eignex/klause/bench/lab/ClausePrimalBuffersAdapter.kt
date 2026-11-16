@@ -12,12 +12,12 @@ import com.eignex.lab.bench.BenchResources
 import com.eignex.lab.bench.BenchResult
 import com.eignex.lab.bench.BenchSuite
 import com.eignex.lab.bench.MetricDirection
-import java.io.File
-import java.nio.file.Files
-import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.File
+import java.nio.file.Files
+import java.util.concurrent.TimeUnit
 
 /** Paired production clausal-walk buffer allocation and latency measurements. */
 fun main(args: Array<String>) {

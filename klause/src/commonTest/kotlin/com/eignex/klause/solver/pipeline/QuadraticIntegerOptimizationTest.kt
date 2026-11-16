@@ -17,7 +17,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.coroutines.cancellation.CancellationException
@@ -377,7 +377,7 @@ class QuadraticIntegerOptimizationTest {
         )
         var slices = 0
 
-        while (!handle.isDone && slices++ < 4096) handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { }
+        while (!handle.isDone && slices++ < 4096) handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { }
         val result = assertIs<QuadraticOptimizationResult.Optimal>(handle.completion)
         handle.close()
         adapter.close()

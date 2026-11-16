@@ -25,9 +25,9 @@ import com.eignex.klause.lp.rootDomainOf
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.solver.search.ComponentCheck
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.abs
@@ -39,7 +39,7 @@ import kotlin.time.TimeSource
 
 internal fun LpEngine.lpRoundingProbe(
     objective: LinearObjective,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     initial: Sample? = null,
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
@@ -378,7 +378,7 @@ internal fun pinIntTowardLp(
  */
 internal fun LpEngine.lpFeasibilityPump(
     objective: LinearObjective,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     initial: Sample? = null,
     accept: (Sample) -> Sample? = { it },
 ): Sample? {
@@ -497,7 +497,7 @@ private fun LpEngine.perturbRounding(
  *  falling back to the dual solve; null on a trivial/overflowing/failed relaxation. */
 private fun LpEngine.solveRelaxation(
     obj: LinearObjective,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     previous: PumpPreparation? = null,
 ): Pair<LpRelaxation, DoubleArray>? {
     val reused = previous?.let { preparePumpObjective(it, obj, cancellation) }
@@ -552,7 +552,7 @@ private class PumpPreparation(
 
 private fun LpEngine.admitPumpPreparation(
     base: LpRelaxation,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PumpPreparation? {
     val model = base.model
     val started = TimeSource.Monotonic.markNow()
@@ -625,7 +625,7 @@ private fun LpEngine.admitPumpPreparation(
 private fun LpEngine.preparePumpObjective(
     prepared: PumpPreparation,
     objective: LinearObjective,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): LpRelaxation? {
     val base = prepared.relaxation
     val model = base.model
@@ -694,7 +694,7 @@ private fun LpEngine.preparePumpObjective(
 
 private fun LpEngine.solvePrimalRelaxation(
     model: LpModel,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     primal: Boolean,
     warm: Basis? = null,
     observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)? = null,
@@ -729,14 +729,14 @@ private fun LpEngine.solvePrimalRelaxation(
 }
 
 private fun LpEngine.solveRetainedPrimalRelaxation(
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     observeResult: ((FloatLpResult?, LpFloatTermination?) -> Unit)?,
 ): FloatLpResult? {
     val started = TimeSource.Monotonic.markNow()
     var outcome = "RETAINED_DECLINED"
     val remaining = minOf(rootPrimalWorkBudget(), retainedRootRemainingWork())
     if (remaining <= 0L) return null
-    val token = cancellation or Cancellation { retainedRootRemainingWork() <= 0L }
+    val token = cancellation or ExecutionControl { retainedRootRemainingWork() <= 0L }
     try {
         val attempt = propagator.solveFloat(token = token, queryAllowance = {
             minOf(rootPrimalWorkBudget(), retainedRootRemainingWork()).coerceAtLeast(1L)

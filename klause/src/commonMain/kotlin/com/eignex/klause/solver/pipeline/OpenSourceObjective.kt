@@ -10,7 +10,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class OpenIncumbentValue(val source: BigFraction, val execution: BigFraction)
 
@@ -19,7 +19,7 @@ internal class OpenSourceObjective(
     val original: LinearObjective = execution,
     val maximize: Boolean = false,
     val context: SourceProofContext? = null,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
 ) {
     fun value(sample: Sample): OpenIncumbentValue? {
         val captured = context
@@ -48,7 +48,7 @@ internal class OpenSourceObjective(
 
     fun completed(
         authority: LinearOptimizationResult,
-        stop: Cancellation,
+        stop: ExecutionControl,
         stoppedReason: TerminationReason,
     ): OpenTheoryOptimum {
         val ray = authority.terminal?.claim as? SourceClaim.Ray ?: return authority.openOptimum()

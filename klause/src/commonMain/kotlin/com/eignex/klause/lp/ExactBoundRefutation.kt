@@ -2,7 +2,7 @@ package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
@@ -42,7 +42,7 @@ import com.eignex.util.numbers.unaryMinus
 internal fun exactBoundsInfeasible(
     openBounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): Boolean {
     val n = openBounds.size
     if (n == 0 || constraints.isEmpty()) return false
@@ -107,7 +107,7 @@ private fun eliminateOpenDefinitions(
     rows: MutableList<Row>,
     lo: Array<BigInt?>,
     hi: Array<BigInt?>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ) {
     var budget = MAX_ELIMINATIONS
     while (budget-- > 0) {
@@ -136,7 +136,7 @@ private fun eliminateOpenDefinitions(
  * grow past the work cap, which abandons elimination with the rows already rewritten — still a sound
  * system, just a less reduced one.
  */
-private fun substitute(rows: MutableList<Row>, definition: Row, target: Int, cancellation: Cancellation): Boolean {
+private fun substitute(rows: MutableList<Row>, definition: Row, target: Int, cancellation: ExecutionControl): Boolean {
     val c = definition.coeffs.getValue(target)
     // |c| = 1, so `target = (bound − rest) / c` is exact: scale by c itself rather than dividing.
     val scale = if (c > BIG_ZERO) BIG_ONE else BIG_ONE.negate()
@@ -165,7 +165,7 @@ private fun propagateToEmpty(
     rows: List<Row>,
     lo: Array<BigInt?>,
     hi: Array<BigInt?>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean {
     repeat(MAX_ROUNDS) {
         var changed = false
@@ -183,7 +183,7 @@ private inline fun tightenRow(
     row: Row,
     lo: Array<BigInt?>,
     hi: Array<BigInt?>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     onChange: () -> Unit,
 ): Boolean {
     for ((j, c) in row.coeffs) {

@@ -11,7 +11,7 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -26,7 +26,7 @@ class DiophantineReductionTest {
         for (sourceLane in listOf(true, false)) {
             val budget = PresolveBudget(1000)
             var polls = 0
-            val token = budget.orSpent(Cancellation { polls++; true })
+            val token = budget.orSpent(ExecutionControl { polls++; true })
 
             if (sourceLane) {
                 val delta = DiophantineReduction.reduceSource(source, token)
@@ -54,7 +54,7 @@ class DiophantineReductionTest {
         val finite = source.bake()
         for (sourceLane in listOf(true, false)) {
             val budget = PresolveBudget(1)
-            val token = budget.orSpent(Cancellation.Never)
+            val token = budget.orSpent(ExecutionControl.Never)
 
             if (sourceLane) {
                 val delta = DiophantineReduction.reduceSource(source, token)
@@ -81,7 +81,7 @@ class DiophantineReductionTest {
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
         var extractionPolls = 0
-        val token = budget.orSpent(Cancellation { budget.spent() > 0 && ++extractionPolls >= 3 })
+        val token = budget.orSpent(ExecutionControl { budget.spent() > 0 && ++extractionPolls >= 3 })
 
         val delta = DiophantineReduction.reduceSource(source, token)
 
@@ -104,7 +104,7 @@ class DiophantineReductionTest {
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
         var cancelled = false
-        val token = budget.orSpent(Cancellation { (budget.spent() > 80).also { cancelled = it } })
+        val token = budget.orSpent(ExecutionControl { (budget.spent() > 80).also { cancelled = it } })
 
         val delta = DiophantineReduction.reduceSource(source, token)
 
@@ -128,7 +128,7 @@ class DiophantineReductionTest {
         for (workLimited in listOf(true, false)) {
             val budget = PresolveBudget(if (workLimited) 64 else Long.MAX_VALUE)
             var polls = 0
-            val token = budget.orSpent(Cancellation { polls++; !workLimited && budget.spent() >= 64 })
+            val token = budget.orSpent(ExecutionControl { polls++; !workLimited && budget.spent() >= 64 })
 
             val delta = DiophantineReduction.reduce(model, token)
 
@@ -151,7 +151,7 @@ class DiophantineReductionTest {
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
         var polls = 0
-        val token = budget.orSpent(Cancellation { polls++; false })
+        val token = budget.orSpent(ExecutionControl { polls++; false })
 
         val delta = DiophantineReduction.reduce(model, token)
 

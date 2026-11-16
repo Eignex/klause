@@ -25,7 +25,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -117,13 +117,13 @@ class BooleanProofPortfolioTest {
                 newIdentity = { "task-authority-${++identities}" })
             assertNotNull(admitted).use { tasks ->
                 assertEquals(0, identities)
-                val first = tasks.open(0, Cancellation.Never)
-                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                val first = tasks.open(0, ExecutionControl.Never)
+                assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
                 assertEquals(2, tasks.size)
                 assertEquals(1, identities)
-                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
-                val second = tasks.open(1, Cancellation.Never)
-                val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+                assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
+                val second = tasks.open(1, ExecutionControl.Never)
+                val result = second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 assertTrue(result is SolveResult.Unsat)
                 assertEquals(2, tasks.completed)
@@ -156,7 +156,7 @@ class BooleanProofPortfolioTest {
         try {
             var decline: String? = null
             val tasks = BooleanProofPortfolio.forWorkers(workers, probeFirst = true, nativeOnly = true,
-                cancellation = Cancellation { true },
+                cancellation = ExecutionControl { true },
                 newIdentity = { error("cancelled admission allocated task authority") }) {
                 decline = it
             }
@@ -187,7 +187,8 @@ class BooleanProofPortfolioTest {
             val admitted = BooleanProofPortfolio.forWorkers(workers, probeFirst = true,
                 newIdentity = { error("completed source probe requested task authority") })
             assertNotNull(admitted).use { tasks ->
-                val result = tasks.open(0, Cancellation.Never).runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+                val result = tasks.open(0, ExecutionControl.Never).runSlice(ExecutionControl.Never,
+                    Long.MAX_VALUE, 5000L)
 
                 assertTrue(result is SolveResult.Unsat)
                 assertEquals(pins.bools, assertNotNull(result.assumptionCore).bools)
@@ -264,8 +265,8 @@ class BooleanProofPortfolioTest {
         val params = List(2) { BacktrackParams(nativeSat = false, variableSelector = InputOrder,
             valueSelector = IndomainMin, assumptions = Assumptions(bools = pins)) }
         BooleanProofPortfolio(pinned, scoped, listOf(1), params, probeFirst = true).use { tasks ->
-            val first = tasks.open(0, Cancellation.Never)
-            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            val first = tasks.open(0, ExecutionControl.Never)
+            assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
             val root = first.stats.search.rootPropagationWork.sum
             val probe = tasks.probeWork
             assertEquals(2, Lit.variable(assertNotNull(tasks.partitionLiteral)))
@@ -274,9 +275,9 @@ class BooleanProofPortfolioTest {
             assertEquals(1, tasks.retainedProbes)
             assertTrue(probe > 0L)
             assertEquals(probe, tasks.work)
-            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
-            val second = tasks.open(1, Cancellation.Never)
-            val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+            assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
+            val second = tasks.open(1, ExecutionControl.Never)
+            val result = second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
             assertTrue(result is SolveResult.Unsat)
             assertEquals(pins, assertNotNull(result.assumptionCore).bools)
@@ -291,8 +292,8 @@ class BooleanProofPortfolioTest {
     fun `a completed normal source probe should avoid a task board and peer root`() {
         val params = List(2) { BacktrackParams(nativeSat = false) }
         BooleanProofPortfolio(problem, context, listOf(0), params, probeFirst = true).use { tasks ->
-            val first = tasks.open(0, Cancellation.Never)
-            val result = first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+            val first = tasks.open(0, ExecutionControl.Never)
+            val result = first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
             assertTrue(result is SolveResult.Unsat)
             assertEquals(0, tasks.size)
@@ -307,14 +308,14 @@ class BooleanProofPortfolioTest {
     fun `losing an adopted probe should return its cube and retain its charges`() {
         val params = List(2) { BacktrackParams(nativeSat = false) }
         BooleanProofPortfolio(problem, context, listOf(0), params, probeFirst = true).use { tasks ->
-            val first = tasks.open(0, Cancellation.Never)
-            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            val first = tasks.open(0, ExecutionControl.Never)
+            assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
             assertEquals(2, tasks.size)
             first.close()
             val lostWork = first.work
-            val second = tasks.open(1, Cancellation.Never)
-            assertNull(second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
-            val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+            val second = tasks.open(1, ExecutionControl.Never)
+            assertNull(second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
+            val result = second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
             assertTrue(result is SolveResult.Unsat)
             assertEquals(2, tasks.completed)
@@ -331,13 +332,13 @@ class BooleanProofPortfolioTest {
         val budget = NodeBudget(100L)
         val params = List(2) { BacktrackParams(nativeSat = false, nodeBudget = budget) }
         BooleanProofPortfolio(quotaProblem, context, listOf(0), params, probeFirst = true).use { tasks ->
-            val first = tasks.open(0, Cancellation.Never)
-            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            val first = tasks.open(0, ExecutionControl.Never)
+            assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
             assertEquals(2, tasks.size)
             val nodes = first.stats.search.nodes.sum
             while (!budget.exhausted()) budget.spend()
             val spent = budget.spent
-            val result = first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+            val result = first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
             assertTrue(result is SolveResult.Unknown, "expected Unknown, got " + result?.let { it::class.simpleName })
             assertEquals(TerminationReason.BudgetExhausted, result.reason)
@@ -355,8 +356,8 @@ class BooleanProofPortfolioTest {
         val workers = PortfolioBuilder.build(problem, scenario)
         try {
             assertNotNull(BooleanProofPortfolio.forWorkers(workers, probeFirst = true)).use { tasks ->
-                val first = tasks.open(0, Cancellation.Never)
-                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                val first = tasks.open(0, ExecutionControl.Never)
+                assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
                 assertEquals(2, tasks.size)
 
                 assertFailsWith<IllegalStateException> { workers[0].newResumableSolve() }
@@ -380,12 +381,12 @@ class BooleanProofPortfolioTest {
                 variableSelector = InputOrder, valueSelector = IndomainMin,
                 clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned()) }
             BooleanProofPortfolio(guarded, context, listOf(0), params, probeFirst = true).use { tasks ->
-                val first = tasks.open(0, Cancellation.Never)
-                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                val first = tasks.open(0, ExecutionControl.Never)
+                assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
                 assertEquals(Lit.make(0, false), tasks.partitionLiteral)
-                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
-                val second = tasks.open(1, Cancellation.Never)
-                val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+                assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
+                val second = tasks.open(1, ExecutionControl.Never)
+                val result = second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 assertTrue(result is SolveResult.Sat)
                 assertTrue(result.assignment.boolValue(0))
@@ -406,13 +407,13 @@ class BooleanProofPortfolioTest {
                 variableSelector = InputOrder, valueSelector = IndomainMin,
                 clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned()) }
             BooleanProofPortfolio(guarded, context, listOf(1, 0), params).use { tasks ->
-                val first = tasks.open(0, Cancellation.Never)
-                val second = tasks.open(1, Cancellation.Never)
-                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                val first = tasks.open(0, ExecutionControl.Never)
+                val second = tasks.open(1, ExecutionControl.Never)
+                assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
                 assertEquals(0, tasks.completed)
-                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
-                assertNull(second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
-                val result = first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+                assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
+                assertNull(second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
+                val result = first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 assertTrue(result is SolveResult.Sat)
                 assertTrue(result.assignment.boolValue(0))
@@ -433,7 +434,7 @@ class BooleanProofPortfolioTest {
         Portfolio.thompson(workers, diagnostics = PortfolioDiagnostics(100000L, 1L)).use { portfolio ->
             portfolio.disjointBooleanProof = true
             repeat(2) {
-                val result = portfolio.solve(Cancellation.Never)
+                val result = portfolio.solve(ExecutionControl.Never)
 
                 assertTrue(result is SolveResult.Sat)
                 assertTrue(result.assignment.boolValue(0))
@@ -450,7 +451,7 @@ class BooleanProofPortfolioTest {
         val workers = PortfolioBuilder.build(problem, scenario)
         Portfolio.thompson(workers, diagnostics = PortfolioDiagnostics(100000L, 1L)).use { portfolio ->
             portfolio.disjointBooleanProof = true
-            val result = portfolio.solve(Cancellation.Never)
+            val result = portfolio.solve(ExecutionControl.Never)
 
             assertTrue(result is SolveResult.Unsat)
             assertEquals(4, portfolio.lastBooleanProofTasks, portfolio.lastBooleanProofDecline)
@@ -467,8 +468,8 @@ class BooleanProofPortfolioTest {
         try {
             val admitted = BooleanProofPortfolio.forWorkers(workers) { error("unexpected decline: " + it) }
             assertNotNull(admitted).use { tasks ->
-                val first = tasks.open(0, Cancellation.Never)
-                assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+                val first = tasks.open(0, ExecutionControl.Never)
+                assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
 
                 assertFailsWith<IllegalStateException> { workers[0].newResumableSolve() }
                 first.close()
@@ -516,17 +517,17 @@ class BooleanProofPortfolioTest {
         val params = List(2) { worker -> BacktrackParams(nativeSat = false,
             clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned()) }
         BooleanProofPortfolio(problem, context, listOf(0, 1), params).use { tasks ->
-            val first = tasks.open(0, Cancellation.Never)
-            val second = tasks.open(1, Cancellation.Never)
-            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
-            assertNull(second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
-            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
-            val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+            val first = tasks.open(0, ExecutionControl.Never)
+            val second = tasks.open(1, ExecutionControl.Never)
+            assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
+            assertNull(second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
+            assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
+            val result = second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
             val work = second.work
 
             assertTrue(result is SolveResult.Unsat)
             assertTrue(second.isDone)
-            assertEquals(result, second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
+            assertEquals(result, second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
             assertEquals(work, second.work)
         }
     }
@@ -535,13 +536,13 @@ class BooleanProofPortfolioTest {
     fun `closing a paused lane should return its unresolved coverage to its peer`() {
         val params = List(2) { BacktrackParams(nativeSat = false) }
         BooleanProofPortfolio(problem, context, listOf(0, 1), params).use { tasks ->
-            val first = tasks.open(0, Cancellation.Never)
-            val second = tasks.open(1, Cancellation.Never)
-            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+            val first = tasks.open(0, ExecutionControl.Never)
+            val second = tasks.open(1, ExecutionControl.Never)
+            assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
             first.close()
             val spent = first.work
-            repeat(3) { assertNull(second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)) }
-            val result = second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L)
+            repeat(3) { assertNull(second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)) }
+            val result = second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
             assertTrue(result is SolveResult.Unsat)
             assertEquals(spent, first.work)
@@ -553,14 +554,14 @@ class BooleanProofPortfolioTest {
     fun `a lane with no available task should leave the schedule to its pending peer`() {
         val params = List(2) { BacktrackParams(nativeSat = false) }
         BooleanProofPortfolio(problem, context, listOf(0), params).use { tasks ->
-            val first = tasks.open(0, Cancellation.Never)
-            val second = tasks.open(1, Cancellation.Never)
-            assertNull(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
-            assertNull(second.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L))
+            val first = tasks.open(0, ExecutionControl.Never)
+            val second = tasks.open(1, ExecutionControl.Never)
+            assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
+            assertNull(second.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L))
 
             assertTrue(tasks.available(0))
             assertFalse(tasks.available(1))
-            assertTrue(first.runSlice(Cancellation.Never, Long.MAX_VALUE, 5000L) is SolveResult.Unsat)
+            assertTrue(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L) is SolveResult.Unsat)
         }
     }
 }

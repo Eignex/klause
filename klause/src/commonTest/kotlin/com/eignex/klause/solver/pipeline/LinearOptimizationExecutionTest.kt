@@ -21,7 +21,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
@@ -67,7 +67,7 @@ class LinearOptimizationExecutionTest {
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
         val request = OpenTheoryRequest(model, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
-        val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val original = assertNotNull(request.linearAuthorityContext(ExecutionControl.Never))
         val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
         val context = SourceProofContext(
             original.scope.copy(
@@ -88,7 +88,7 @@ class LinearOptimizationExecutionTest {
             val params = TheoryParams(
                 openWorkLimit = 100_000,
                 maxFlips = 0,
-                cancellation = Cancellation { cancelled },
+                cancellation = ExecutionControl { cancelled },
             )
 
             val execution = assertIs<OpenTheoryExecution.Optimize>(
@@ -139,7 +139,7 @@ class LinearOptimizationExecutionTest {
             model,
             LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(1.0)),
         )
-        val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val original = assertNotNull(request.linearAuthorityContext(ExecutionControl.Never))
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val wide = BigFraction.of(parseBigInt("18446744073709551616"), BIG_ONE)
         val third = BigFraction.of(BIG_ONE, parseBigInt("3"))
@@ -202,7 +202,7 @@ class LinearOptimizationExecutionTest {
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
         val request = OpenTheoryRequest(model, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
-        val original = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val original = assertNotNull(request.linearAuthorityContext(ExecutionControl.Never))
         val context = SourceProofContext(
             original.scope.copy(
                 condition = SourceCondition(
@@ -345,14 +345,14 @@ class LinearOptimizationExecutionTest {
         val invocation = LinearAuthorityInvocation(context, TheoryParams())
 
         val failure = assertFailsWith<IllegalArgumentException> {
-            invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ ->
+            invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ ->
                 throw IllegalArgumentException("publication failed")
             }
         }
 
         assertEquals("publication failed", failure.message)
         assertFailsWith<IllegalStateException> {
-            invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
         }
         invocation.close()
     }

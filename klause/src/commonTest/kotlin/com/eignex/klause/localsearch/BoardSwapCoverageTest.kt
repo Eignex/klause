@@ -17,7 +17,7 @@ import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -60,7 +60,7 @@ class BoardSwapCoverageTest {
             var polls = 0
 
             resumed.boardCoverage.request(resumed)
-            strategy.pickMove(resumed, Cancellation { ++polls >= 3 })
+            strategy.pickMove(resumed, ExecutionControl { ++polls >= 3 })
             val resumedMoves = MoveSink()
             val pairs = mutableSetOf<Set<Int>>()
             repeat(32) {
@@ -187,7 +187,7 @@ class BoardSwapCoverageTest {
                 var result: MinimizeResult? = null
                 repeat(if (sliced) 256 else 1) {
                     if (!handle.isDone) result = counted.runInstructionSlice(
-                        Cancellation.Never, Long.MAX_VALUE, if (sliced) 1L else Long.MAX_VALUE,
+                        ExecutionControl.Never, Long.MAX_VALUE, if (sliced) 1L else Long.MAX_VALUE,
                     ) {}
                 }
                 assertEquals(0.0, assertIs<MinimizeResult.BestFound>(result).objective)
@@ -260,7 +260,7 @@ class BoardSwapCoverageTest {
         engine.resumable(
             LinearObjective(),
             LocalSearchParams(maxFlips = 34L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
-        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(4, fresh.size)
     }
@@ -370,7 +370,7 @@ class BoardSwapCoverageTest {
         engine.resumable(
             LinearObjective(),
             LocalSearchParams(maxFlips = 6L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
-        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(listOf("stall", "stall"), events)
     }
@@ -394,7 +394,7 @@ class BoardSwapCoverageTest {
         LocalSearchEngine(initial.model, strategy = strategy).resumable(
             LinearObjective(),
             LocalSearchParams(maxFlips = 2L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
-        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(listOf(false, true), requested)
     }
@@ -416,7 +416,7 @@ class BoardSwapCoverageTest {
         LocalSearchEngine(initial.model, strategy = strategy).resumable(
             LinearObjective(),
             LocalSearchParams(maxFlips = 2L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
-        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(listOf(false, false), requested)
     }
@@ -433,7 +433,7 @@ class BoardSwapCoverageTest {
             deferredSink.clear()
             SatisfiedStructured.sampled(1).generate(sampled, sampledSink)
             SatisfiedStructured.structural(1).generate(
-                deferred, deferredSink, Cancellation.Never, retainCoverage = false,
+                deferred, deferredSink, ExecutionControl.Never, retainCoverage = false,
             )
 
             assertEquals(sampledSink.list, deferredSink.list)
@@ -571,7 +571,7 @@ class BoardSwapCoverageTest {
         engine.resumable(
             LinearObjective(intCoefficients = longArrayOf(0, 0, 1)),
             LocalSearchParams(maxFlips = 1L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
-        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(0, optima)
     }
@@ -601,7 +601,7 @@ class BoardSwapCoverageTest {
         engine.resumable(
             LinearObjective(),
             LocalSearchParams(maxFlips = 1L, randomSeed = 7L, initialAssignment = initial.assignment.snapshot()),
-        ).use { handle -> handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        ).use { handle -> handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(0, optima)
     }

@@ -8,7 +8,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class LinearBooleanCutLimits(
@@ -38,7 +38,7 @@ internal object LinearBooleanCutPreparation {
     private fun stop(reason: String): Nothing = throw Stop(reason)
 
     fun prepare(
-        source: SourceProofContext, cancellation: Cancellation,
+        source: SourceProofContext, cancellation: ExecutionControl,
         onCost: (Long, Long) -> Unit = { _, _ -> },
         limits: LinearBooleanCutLimits = LinearBooleanCutLimits(),
     ): LinearBooleanCuts {

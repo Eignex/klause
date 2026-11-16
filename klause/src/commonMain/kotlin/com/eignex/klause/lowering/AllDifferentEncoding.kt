@@ -12,11 +12,11 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.EncodingAffineExpression
 import com.eignex.klause.theory.EncodingLinearTerm
 import com.eignex.klause.theory.LinearEncodingFormula
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun allDifferentLinearFormula(
     factor: AllDifferent,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): LinearEncodingFormula? {
     if (cancellation()) return null
     fun comparison(terms: List<Pair<Int, BigFraction>>, op: LinearOp, bound: BigFraction) =
@@ -50,7 +50,7 @@ internal fun allDifferentLinearFormula(
 internal fun allDifferentPolynomialFormula(
     factor: AllDifferent,
     integer: (Int) -> PolynomialExpression,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PolynomialRealFormula? {
     if (cancellation()) return null
     val clauses = ArrayList<PolynomialRealFormula>()

@@ -10,7 +10,7 @@ import com.eignex.klause.lp.engine.certifyLpBoundOnly
 import com.eignex.klause.lp.engine.checkedLpWitness
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -33,7 +33,7 @@ class SparseSourceLpTest {
             rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
         for ((inactive, expected) in listOf(setOf(2) to setOf(1), setOf(0, 1) to setOf(0),
             setOf(0, 1, 2) to setOf(0, 1))) {
-            val mapped = prepared.emittedInactiveRows(inactive, Cancellation.Never) { _, _ -> true }
+            val mapped = prepared.emittedInactiveRows(inactive, ExecutionControl.Never) { _, _ -> true }
 
             assertEquals(expected, mapped)
         }
@@ -49,7 +49,7 @@ class SparseSourceLpTest {
             listOf(ExactLpColumn(ExactLpBounds())), listOf(BigFraction.ZERO), BigFraction.ZERO, limits,
             rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
         for (inactive in listOf(setOf(0), setOf(1))) {
-            val mapped = prepared.emittedInactiveRows(inactive, Cancellation.Never) { _, _ -> true }
+            val mapped = prepared.emittedInactiveRows(inactive, ExecutionControl.Never) { _, _ -> true }
 
             assertNull(mapped)
         }
@@ -66,7 +66,7 @@ class SparseSourceLpTest {
             rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES).prepared)
         var charges = 0
 
-        val mapped = prepared.emittedInactiveRows(setOf(0, 1), Cancellation.Never) { _, _ -> ++charges < 2 }
+        val mapped = prepared.emittedInactiveRows(setOf(0, 1), ExecutionControl.Never) { _, _ -> ++charges < 2 }
 
         assertNull(mapped)
         assertEquals(2, charges)
@@ -208,7 +208,7 @@ class SparseSourceLpTest {
             assertNull(result.prepared)
             assertEquals(reason, result.decline)
         }
-        val cancelled = prepare(listOf(row), limits, cancellation = Cancellation { true })
+        val cancelled = prepare(listOf(row), limits, cancellation = ExecutionControl { true })
         assertNull(cancelled.prepared)
         assertEquals(SparseSourceLpDecline.CANCELLED, cancelled.decline)
     }
@@ -219,7 +219,7 @@ class SparseSourceLpTest {
         var entered = false
         val rows = List(8) { ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE) }
 
-        val result = budget.runSparse(Cancellation.Never, prepare = {
+        val result = budget.runSparse(ExecutionControl.Never, prepare = {
             prepare(rows, limits.copy(work = 100L), cancellation = it)
         }) { _, _ ->
             entered = true
@@ -238,7 +238,7 @@ class SparseSourceLpTest {
     fun `exhausted sparse budget should skip preparation`() {
         var prepared = false
 
-        val result = SourceLpBudget(maxOperations = 0).runSparse(Cancellation.Never, prepare = {
+        val result = SourceLpBudget(maxOperations = 0).runSparse(ExecutionControl.Never, prepare = {
             prepared = true
             prepare(emptyList(), limits)
         }) { _, _ -> true }
@@ -250,12 +250,12 @@ class SparseSourceLpTest {
     @Test
     fun `sparse admission should resume without reserving or consuming another operation`() {
         val budget = SourceLpBudget(maxOperations = 1)
-        val admission = assertNotNull(budget.admitSparse(Cancellation.Never) { prepare(emptyList(), limits) })
+        val admission = assertNotNull(budget.admitSparse(ExecutionControl.Never) { prepare(emptyList(), limits) })
         val reservedWork = budget.reservedWork
         val reservedAllocation = budget.reservedAllocation
 
         repeat(3) {
-            val resumed = budget.resumeSparse(admission, Cancellation.Never) { prepared, _ ->
+            val resumed = budget.resumeSparse(admission, ExecutionControl.Never) { prepared, _ ->
                 budget.observe(floatWork = 7L, boundCertification = 11L)
                 prepared
             }
@@ -268,32 +268,32 @@ class SparseSourceLpTest {
         assertEquals(21L, budget.measuredFloatWork)
         assertEquals(33L, budget.measuredBoundCertificationWork)
         admission.close()
-        assertNull(budget.resumeSparse(admission, Cancellation.Never) { _, _ -> true })
+        assertNull(budget.resumeSparse(admission, ExecutionControl.Never) { _, _ -> true })
     }
 
     @Test
     fun `changed sparse consultations should spend operations without repeating matrix reservations`() {
         val budget = SourceLpBudget(maxOperations = 2)
-        val initial = assertNotNull(budget.admitSparse(Cancellation.Never) { prepare(emptyList(), limits) })
+        val initial = assertNotNull(budget.admitSparse(ExecutionControl.Never) { prepare(emptyList(), limits) })
         val reservedWork = budget.reservedWork
         val reservedAllocation = budget.reservedAllocation
         val preparationWork = budget.measuredPreparationWork
 
-        val next = assertNotNull(budget.admitSparse(initial.prepared, Cancellation.Never))
+        val next = assertNotNull(budget.admitSparse(initial.prepared, ExecutionControl.Never))
 
         assertSame(initial.prepared, next.prepared)
         assertEquals(2, budget.operations)
         assertEquals(reservedWork + 1024L, budget.reservedWork)
         assertEquals(reservedAllocation, budget.reservedAllocation)
         assertEquals(preparationWork, budget.measuredPreparationWork)
-        assertNull(budget.admitSparse(next.prepared, Cancellation.Never))
+        assertNull(budget.admitSparse(next.prepared, ExecutionControl.Never))
     }
 
     private fun prepare(
         rows: List<ExactRationalInequality>,
         allowance: SparseSourceLpLimits,
         cost: BigFraction = BigFraction.ONE,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ) = SparseSourceLp.prepare(rows, listOf(ExactLpColumn(ExactLpBounds())), listOf(cost),
         BigFraction.ZERO, allowance, cancellation)
 

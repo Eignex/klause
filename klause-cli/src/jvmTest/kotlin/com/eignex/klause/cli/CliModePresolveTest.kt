@@ -10,7 +10,7 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,7 +32,7 @@ class CliModePresolveTest {
                 constraint int_eq_reif(y, 1, c);
                 constraint bool_clause([b, c], []);
                 solve satisfy;
-            """.trimIndent())
+                """.trimIndent())
         }
 
         val output = try {
@@ -213,7 +213,7 @@ class CliModePresolveTest {
         assertEquals(presolveWorkFor(6_000L), shared.allowance)
 
         shared.charge(shared.allowance)
-        val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)
+        val (cancel, budget) = SolveCore.presolveAllowance(common, ExecutionControl.Never)
         assertSame(shared, budget)
         assertTrue(cancel())
     }
@@ -222,9 +222,9 @@ class CliModePresolveTest {
     fun `elapsed presolve exhaustion should preserve the search cancellation`() {
         val common = CommonOptions().apply { timeLimitMs = 10_000L }
         val shared = requireNotNull(common.sharedPresolveBudget())
-        common.presolveTimeCancellation = Cancellation { true }
+        common.presolveTimeCancellation = ExecutionControl { true }
 
-        val solveCancellation = Cancellation { false }
+        val solveCancellation = ExecutionControl { false }
         val (cancel, budget) = SolveCore.presolveAllowance(common, solveCancellation)
 
         assertTrue(cancel())
@@ -236,7 +236,7 @@ class CliModePresolveTest {
     @Test
     fun `routing exhaustion should leave source preparation runnable`() {
         val parent = PresolveBudget(6_000L)
-        val route = routingSlice(parent, Cancellation.Never)
+        val route = routingSlice(parent, ExecutionControl.Never)
 
         route.charge(3_000L)
 
@@ -261,7 +261,7 @@ class CliModePresolveTest {
     @Test
     fun `global cancellation should also stop a routing slice`() {
         var stopped = false
-        val route = routingSlice(PresolveBudget(6_000L), Cancellation { stopped })
+        val route = routingSlice(PresolveBudget(6_000L), ExecutionControl { stopped })
         assertFalse(route())
 
         stopped = true
@@ -285,7 +285,7 @@ class CliModePresolveTest {
             assertEquals(presolveWorkFor(12_000L), shared.allowance)
 
             System.setProperty(CliKnobs.presolveBudgetMs, "1")
-            SolveCore.presolveAllowance(common, Cancellation.Never)
+            SolveCore.presolveAllowance(common, ExecutionControl.Never)
             assertSame(shared, common.presolveBudget)
         } finally {
             if (oldBudget == null) {
@@ -341,7 +341,7 @@ class CliModePresolveTest {
             assertTrue(common.presolveAllowanceInitialized)
             assertEquals(null, common.presolveBudget)
 
-            val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)
+            val (cancel, budget) = SolveCore.presolveAllowance(common, ExecutionControl.Never)
             assertFalse(cancel())
             assertEquals(null, budget)
         } finally {
@@ -364,7 +364,7 @@ class CliModePresolveTest {
         assertTrue(common.routingCancellation()())
         assertFalse(common.presolveAllowanceInitialized)
 
-        val (cancel, budget) = SolveCore.presolveAllowance(common, Cancellation.Never)
+        val (cancel, budget) = SolveCore.presolveAllowance(common, ExecutionControl.Never)
         assertFalse(cancel())
         assertEquals(presolveWorkFor(6_000L), budget?.remaining())
     }
@@ -384,21 +384,21 @@ class CliModePresolveTest {
         val route = assertIs<SourceProblemRoute.OpenTheory>(pipeline.invocation.route)
         assertEquals(ProblemPipeline.EXACT_LIRA, route.request.route)
         assertTrue(common.routingCancellation()())
-        assertFalse(common.routingPreparationCancellation()())
+        assertFalse(common.routingPreparationCancellation().control())
     }
 
     @Test
     fun `required admission should retain routing charges after optional exhaustion`() {
         val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }
         val optional = common.routingCancellation()
-        val required = common.routingPreparationCancellation()
+        val required = common.routingPreparationCancellation().control
         val budget = checkNotNull(common.presolveBudget)
 
         required.charge(2)
 
         assertTrue(optional())
         assertFalse(required())
-        assertSame(optional.workMeter(), required.workMeter())
+        assertSame(optional.accounting, required.accounting)
         assertEquals(2L, budget.spent())
     }
 
@@ -409,7 +409,7 @@ class CliModePresolveTest {
             engineParams += "open-bound-proof=false"
         }
 
-        val stop = common.routingPreparationCancellation()
+        val stop = common.routingPreparationCancellation().control
 
         assertTrue(stop())
         assertFalse(common.presolveAllowanceInitialized)

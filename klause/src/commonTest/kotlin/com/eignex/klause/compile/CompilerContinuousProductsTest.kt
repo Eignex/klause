@@ -19,6 +19,8 @@ import com.eignex.klause.schema.pow
 import com.eignex.klause.schema.times
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.skema.SchemaDef
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -26,8 +28,6 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 
 class CompilerContinuousProductsTest {
     @Test

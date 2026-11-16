@@ -37,7 +37,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.nextDown
 import kotlin.math.nextUp
 import kotlin.random.Random
@@ -151,7 +151,7 @@ class LpBoundingTest {
             assertTrue(engine.cutPool.add(cut, base))
 
             val outcome = engine.sparseSafePrune(
-                relaxer, session, 100.0, sink, Cancellation.Never, -1, true, hints = hints,
+                relaxer, session, 100.0, sink, ExecutionControl.Never, -1, true, hints = hints,
             )
 
             assertFalse(outcome.prune)
@@ -182,7 +182,7 @@ class LpBoundingTest {
         LpEngine(problem, sumObjective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
             val outcome = engine.sparseSafePrune(
                 assertNotNull(engine.lpRelaxer), session, Double.POSITIVE_INFINITY, sink,
-                Cancellation.Never, -1, true, hints = hints,
+                ExecutionControl.Never, -1, true, hints = hints,
             )
 
             assertFalse(outcome.prune)
@@ -199,7 +199,7 @@ class LpBoundingTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
                 iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
@@ -237,7 +237,7 @@ class LpBoundingTest {
             ))
 
             val outcome = engine.sparseSafePrune(
-                relaxer, session, 100.0, sink, Cancellation.Never, -1, true, hints = hints,
+                relaxer, session, 100.0, sink, ExecutionControl.Never, -1, true, hints = hints,
             )
 
             assertFalse(outcome.prune)
@@ -255,7 +255,7 @@ class LpBoundingTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
                 iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
@@ -289,7 +289,7 @@ class LpBoundingTest {
             ))
 
             val outcome = engine.sparseSafePrune(
-                relaxer, session, 100.0, sink, Cancellation.Never, -1, true, hints = hints,
+                relaxer, session, 100.0, sink, ExecutionControl.Never, -1, true, hints = hints,
             )
 
             assertFalse(outcome.prune)
@@ -306,10 +306,10 @@ class LpBoundingTest {
         val session = PropagationSession(problem)
         var queries = 0
         var cutCancelled = false
-        val token = Cancellation { cutCancelled }
+        val token = ExecutionControl { cutCancelled }
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
                 iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
@@ -385,7 +385,7 @@ class LpBoundingTest {
             assertTrue(engine.cutPool.add(Cut(intArrayOf(), longArrayOf(), Relation.GE, 1L, global = true), base))
 
             val outcome = engine.sparseSafePrune(
-                relaxer, session, 100.0, sink, Cancellation.Never, -1, true, hints = hints,
+                relaxer, session, 100.0, sink, ExecutionControl.Never, -1, true, hints = hints,
             )
 
             assertTrue(outcome.prune)
@@ -441,8 +441,9 @@ class LpBoundingTest {
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
                 val relaxer = assertNotNull(engine.lpRelaxer)
 
-                assertFalse(engine.sparseSafePrune(relaxer, session, cutoff, sink, Cancellation.Never, -1, true).prune)
-                assertFalse(engine.sparseCertifiedPrune(relaxer, session, cutoff, sink, Cancellation.Never).prune)
+                assertFalse(engine.sparseSafePrune(relaxer, session, cutoff, sink, ExecutionControl.Never, -1,
+                    true).prune)
+                assertFalse(engine.sparseCertifiedPrune(relaxer, session, cutoff, sink, ExecutionControl.Never).prune)
                 val root = engine.rootLpRelaxationBound(relaxer, emptyList())
 
                 assertTrue(assertNotNull(BigFraction.ofDouble(root)) <= BigFraction.ofLong(constant))
@@ -466,8 +467,8 @@ class LpBoundingTest {
 
             assertEquals(BigFraction.ONE, BigFraction.ofLong(constant) - BigFraction.ofLong(lower + 1L))
             assertEquals(1.0, root)
-            assertFalse(engine.sparseSafePrune(relaxer, session, 2.0, sink, Cancellation.Never, -1, true).prune)
-            assertFalse(engine.sparseCertifiedPrune(relaxer, session, 2.0, sink, Cancellation.Never).prune)
+            assertFalse(engine.sparseSafePrune(relaxer, session, 2.0, sink, ExecutionControl.Never, -1, true).prune)
+            assertFalse(engine.sparseCertifiedPrune(relaxer, session, 2.0, sink, ExecutionControl.Never).prune)
         }
     }
 
@@ -503,8 +504,8 @@ class LpBoundingTest {
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
                 val relaxer = assertNotNull(engine.lpRelaxer)
 
-                assertFalse(engine.sparseSafePrune(relaxer, session, 0.0, sink, Cancellation.Never, 0, true).prune)
-                assertFalse(engine.sparseCertifiedPrune(relaxer, session, 0.0, sink, Cancellation.Never).prune)
+                assertFalse(engine.sparseSafePrune(relaxer, session, 0.0, sink, ExecutionControl.Never, 0, true).prune)
+                assertFalse(engine.sparseCertifiedPrune(relaxer, session, 0.0, sink, ExecutionControl.Never).prune)
                 assertTrue(engine.rootLpRelaxationBound(relaxer, emptyList()).isNaN())
                 assertEquals(0L, session.intDomain(0).min)
                 assertEquals(1L, session.intDomain(0).max)
@@ -521,8 +522,8 @@ class LpBoundingTest {
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
             val relaxer = assertNotNull(engine.lpRelaxer)
 
-            assertTrue(engine.sparseSafePrune(relaxer, session, 7.0, sink, Cancellation.Never, -1, true).prune)
-            assertTrue(engine.sparseCertifiedPrune(relaxer, session, 7.0, sink, Cancellation.Never).prune)
+            assertTrue(engine.sparseSafePrune(relaxer, session, 7.0, sink, ExecutionControl.Never, -1, true).prune)
+            assertTrue(engine.sparseCertifiedPrune(relaxer, session, 7.0, sink, ExecutionControl.Never).prune)
             assertEquals(7.0, engine.rootLpRelaxationBound(relaxer, emptyList()))
         }
     }
@@ -553,7 +554,7 @@ class LpBoundingTest {
                     session,
                     Double.POSITIVE_INFINITY,
                     sink,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     3,
                     true,
                     learn = learn,
@@ -743,7 +744,7 @@ class LpBoundingTest {
                             session,
                             minimum - 0.125,
                             sink,
-                            Cancellation.Never,
+                            ExecutionControl.Never,
                             -1,
                             true,
                         )
@@ -797,7 +798,7 @@ class LpBoundingTest {
                             PropagationSession(problem),
                             minimum - 0.125,
                             sink,
-                            Cancellation.Never,
+                            ExecutionControl.Never,
                         )
                         val root = engine.rootLpRelaxationBound(relaxer, emptyList())
 
@@ -851,7 +852,7 @@ class LpBoundingTest {
                             PropagationSession(problem),
                             cutoff,
                             sink,
-                            Cancellation.Never,
+                            ExecutionControl.Never,
                             -1,
                             true,
                         ).prune,
@@ -863,7 +864,7 @@ class LpBoundingTest {
                             PropagationSession(problem),
                             cutoff,
                             sink,
-                            Cancellation.Never,
+                            ExecutionControl.Never,
                         ).prune,
                     )
                 }
@@ -904,7 +905,7 @@ class LpBoundingTest {
                             PropagationSession(problem),
                             exact.toDouble(),
                             sink,
-                            Cancellation.Never,
+                            ExecutionControl.Never,
                             -1,
                             true,
                         ).prune,
@@ -915,7 +916,7 @@ class LpBoundingTest {
                             PropagationSession(problem),
                             exact.toDouble(),
                             sink,
-                            Cancellation.Never,
+                            ExecutionControl.Never,
                         ).prune,
                     )
                 }
@@ -951,7 +952,7 @@ class LpBoundingTest {
                         PropagationSession(compiled.model),
                         minimum - 0.125,
                         sink,
-                        Cancellation.Never,
+                        ExecutionControl.Never,
                         -1,
                         true,
                     ).prune,
@@ -962,7 +963,7 @@ class LpBoundingTest {
                         PropagationSession(compiled.model),
                         minimum,
                         sink,
-                        Cancellation.Never,
+                        ExecutionControl.Never,
                     ).prune,
                 )
             }
@@ -986,7 +987,7 @@ class LpBoundingTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newTableauSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     iterationLimit: Int,
                     workLimit: Long,
                     trackDegeneracy: Boolean,
@@ -1037,7 +1038,7 @@ class LpBoundingTest {
             realCoefficients = doubleArrayOf(0.5),
         )
         val sink = SolveStatsSink(backend = "continuous-cancelled")
-        val cancelled = Cancellation { true }
+        val cancelled = ExecutionControl { true }
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
             val relaxer = assertNotNull(engine.lpRelaxer)
 
@@ -1105,7 +1106,7 @@ class LpBoundingTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newTableauSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,

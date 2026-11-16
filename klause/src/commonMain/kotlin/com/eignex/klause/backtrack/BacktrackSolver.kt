@@ -9,7 +9,6 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Optimizer
@@ -26,7 +25,6 @@ import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.Solver
 import com.eignex.klause.solver.SourceStrategy
-import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.result.MinimizeResult
@@ -36,7 +34,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.time.ComparableTimeMark
 
@@ -132,10 +130,11 @@ class BacktrackSolver internal constructor(
         var activeExactCutoff: BigFraction? = null
         var exactCompletion = false
         var activeCancellation = params.cancellation
-        val handleCancellation = object : Cancellation {
+        val handleCancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = activeCancellation()
             override fun deadline(): ComparableTimeMark? = activeCancellation.deadline()
-            override fun workMeter() = activeCancellation.workMeter()
+            override val accounting get() = activeCancellation.accounting
+            override val admission get() = admissionFrom(activeCancellation)
         }
         val handle = ResumableMinimize(
             this,
@@ -157,7 +156,7 @@ class BacktrackSolver internal constructor(
                 assumptions: Assumptions,
                 decisionBudget: Long,
                 cutoff: Double,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
             ) {
                 beginFragment(assumptions, decisionBudget, cutoff, BigFraction.ofDouble(cutoff), false, cancellation)
             }
@@ -166,7 +165,7 @@ class BacktrackSolver internal constructor(
                 assumptions: Assumptions,
                 decisionBudget: Long,
                 cutoff: BigFraction,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
             ) {
                 beginFragment(assumptions, decisionBudget,
                     SourceObjectiveScore(cutoff.toDouble(), cutoff).pruningBound, cutoff, true, cancellation)
@@ -178,7 +177,7 @@ class BacktrackSolver internal constructor(
                 cutoff: Double,
                 exactCutoff: BigFraction?,
                 requireExactCompletion: Boolean,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
             ) {
                 try {
                     check(!closed) { "repair search is closed" }
@@ -194,7 +193,7 @@ class BacktrackSolver internal constructor(
                     activeCutoff = cutoff
                     activeExactCutoff = exactCutoff
                     exactCompletion = requireExactCompletion
-                    activeCancellation = params.cancellation or cancellation
+                    activeCancellation = params.cancellation.withAccounting(cancellation) or cancellation
                     handle.rebind(assumptions, decisionBudget)
                     best = null
                     terminal = null
@@ -210,7 +209,7 @@ class BacktrackSolver internal constructor(
                 }
             }
 
-            override fun runSlice(cancellation: Cancellation, millis: Long, work: Long): RepairSearchStep {
+            override fun runSlice(cancellation: ExecutionControl, millis: Long, work: Long): RepairSearchStep {
                 terminal?.let { return it }
                 check(!closed) { "repair search is closed" }
                 check(started) { "no repair fragment has been started" }

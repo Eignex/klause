@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -26,7 +26,7 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
 
     override fun newGeneralSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         pricing: LpPricingOptions,
     ): LpSolver {
@@ -61,7 +61,7 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
 
     override fun newTableauSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
@@ -80,7 +80,7 @@ internal class RecordingLpEngineFactory(private val delegate: LpEngineFactory = 
 
     override fun newPersistentSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         refactorUpdateLimit: Int,
         iterationLimit: Int,
         workLimit: Long,
@@ -190,7 +190,7 @@ class LpSolverTest {
                     override fun exactWitness(
                         observer: LpCertificationObserver?,
                         policy: LpCertificationPolicy,
-                        cancellation: Cancellation,
+                        cancellation: ExecutionControl,
                     ): ExactLpWitness? = delegate.exactWitness(observer, policy, cancellation)
                 }
             }
@@ -210,7 +210,7 @@ class LpSolverTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newGeneralSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 workLimit: Long,
                 pricing: LpPricingOptions,
             ): LpSolver {
@@ -240,7 +240,7 @@ class LpSolverTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newGeneralSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 workLimit: Long,
                 pricing: LpPricingOptions,
             ): LpSolver {
@@ -259,7 +259,7 @@ class LpSolverTest {
     fun `a thrown solve should close the injected solver and preserve cancellation`() {
         val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
         var closed = false
-        val token = Cancellation { true }
+        val token = ExecutionControl { true }
         val solver = object : LpSolver {
             override fun solve(warm: Basis?): FloatLpResult? = error("injected solve failure")
             override fun solvePrimal(warm: Basis?): FloatLpResult? = null
@@ -271,7 +271,7 @@ class LpSolverTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newGeneralSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 workLimit: Long,
                 pricing: LpPricingOptions,
             ): LpSolver {

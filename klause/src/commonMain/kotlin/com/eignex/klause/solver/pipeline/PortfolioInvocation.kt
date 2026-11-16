@@ -22,14 +22,15 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.TimeSource
 
 internal data class PortfolioInvocationControls(
     val parallelism: Int = 1,
     val seed: Long = 0,
     val workerSeed: Long = seed,
-    val cancellation: Cancellation = Cancellation.Never,
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     val nodeBudget: NodeBudget? = null,
     val baseSliceWork: Long = 5_000,
     val maxSliceWork: Long = 150_000,
@@ -173,31 +174,33 @@ internal class PortfolioInvocation(
         return stats.copy(smt = stats.smt.copy(completeSearchStages = stages))
     }
 
-    override fun solve(cancellation: Cancellation): SolveResult {
+    override fun solve(cancellation: ExecutionControl): SolveResult {
         check(!closed) { "portfolio invocation is closed" }
-        return withPreparationStats(portfolio.solve(controls.cancellation or cancellation))
+        return withPreparationStats(portfolio.solve(controls.cancellation .includingStop( cancellation)))
     }
 
     override fun minimize(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onImprovement: ((AttributedImprovement) -> Unit)?,
     ): MinimizeResult {
         check(!closed) { "portfolio invocation is closed" }
         val incumbents = optimizationIncumbents
-        val result = if (incumbents == null) portfolio.minimize(controls.cancellation or cancellation, onImprovement)
-        else portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents)
+        val result = if (incumbents == null) portfolio.minimize(controls.cancellation
+            .includingStop( cancellation), onImprovement)
+        else portfolio.minimize(controls.cancellation .includingStop( cancellation), onImprovement, incumbents)
         return withPreparationStats(result)
     }
 
     fun <V> minimize(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onImprovement: ((AttributedImprovement) -> Unit)?,
         incumbents: PortfolioIncumbents<V>,
         terminalCheck: PortfolioTerminalCheck? = null,
         onAccepted: ((AcceptedPortfolioIncumbent<V>) -> Unit)? = null,
     ): MinimizeResult {
         check(!closed) { "portfolio invocation is closed" }
-        val result = portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents, terminalCheck,
+        val result = portfolio.minimize(controls.cancellation .includingStop( cancellation), onImprovement,
+            incumbents, terminalCheck,
             onAccepted)
         return withPreparationStats(result)
     }

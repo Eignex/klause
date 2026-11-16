@@ -11,7 +11,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Finite strategy controls for polynomial satisfaction and finite-objective optimization. */
 data class PolynomialStrategyParams(
@@ -32,7 +32,7 @@ internal class PolynomialStrategyAdapters(
     private val model: SharedPolynomialModel,
     private val scope: PolynomialInvocationScope,
     private val params: PolynomialStrategyParams,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val parallelism: Int,
 ) {
     fun solve(engine: FiniteEngine): SolveResult = if (usesPortfolio(engine)) {

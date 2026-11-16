@@ -9,7 +9,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
@@ -51,7 +51,7 @@ class OpenPortfolioTest {
         )
     }
 
-    private fun params() = TheoryParams(cancellation = Cancellation.after(10.seconds))
+    private fun params() = TheoryParams(cancellation = ExecutionControl.after(10.seconds))
 
     private fun satisfied(execution: OpenTheoryExecution) = assertIs<OpenTheoryExecution.Satisfy>(execution).result
 
@@ -194,7 +194,7 @@ class OpenPortfolioTest {
             Product(0, 1, 2),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 1))
-        val params = TheoryParams(cancellation = Cancellation.after(100.milliseconds))
+        val params = TheoryParams(cancellation = ExecutionControl.after(100.milliseconds))
 
         val result = optimum(OpenTheoryPipeline.searchWithoutTheory(model, params, objective))
 

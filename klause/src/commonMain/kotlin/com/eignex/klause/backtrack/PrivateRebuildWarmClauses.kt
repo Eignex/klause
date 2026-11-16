@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.propagation.OWN_ORIGIN
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PrivateRebuildWarmClauses private constructor(
     val clauses: Array<Factor>,
@@ -27,7 +27,7 @@ internal class PrivateRebuildWarmClauses private constructor(
             fixed: Array<Boolean?>,
             byteLimit: Long,
             allowance: Long,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): PrivateRebuildWarmClauses? {
             if (!session.canSimplifyRoot || cancellation()) return null
             var spent = 0L

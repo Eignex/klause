@@ -3,7 +3,7 @@ package com.eignex.klause.presolve
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal object TableValueSubstitution {
     private const val MAX_COLUMNS = 4096
@@ -12,7 +12,7 @@ internal object TableValueSubstitution {
     private const val MAX_CELLS = 65_536
     private const val MAX_WORK = 262_144
 
-    private class Work(private val token: Cancellation) {
+    private class Work(private val token: ExecutionControl) {
         private var left = MAX_WORK
 
         fun visit(): Boolean {

@@ -25,7 +25,7 @@ import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.sourceRoute
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import java.io.File
 
 /**
@@ -127,7 +127,7 @@ internal object SmtLibFormat : ProblemFormat {
                 } else ExecutionOperation.SATISFY
                 val invocation = SourceSetup.prepare(SourceSetupRequest(
                     parsed.source, operation, FiniteEngine.BACKTRACK, objective, maximize,
-                    boundCancellation = Cancellation { true },
+                    boundCancellation = ExecutionControl { true },
                 ))
                 check(invocation.route is SourceProblemRoute.Finite) {
                     "${file.name}: in-process benchmarks require finite source bounds; use the CLI for open models"

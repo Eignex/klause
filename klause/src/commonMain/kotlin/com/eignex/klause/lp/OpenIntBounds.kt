@@ -11,7 +11,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.certifiedTightVariableBound
 import com.eignex.klause.lp.engine.columnNeighborhood
 import com.eignex.klause.lp.engine.rowIndex
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.addExact
@@ -81,7 +81,7 @@ internal class TightenedIntBounds(val bounds: Array<OpenIntBounds>, val refuted:
 internal fun tightenOpenIntBounds(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     realConstraints: List<Linear> = emptyList(),
     realLower: DoubleArray = emptyDoubleArray(),
     realUpper: DoubleArray = emptyDoubleArray(),
@@ -171,7 +171,7 @@ private fun tightenByNeighborhoodProbes(
     work: Array<OpenIntBounds>,
     posCol: IntArray,
     negCol: IntArray,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     observer: LpCertificationObserver?,
     context: LpSolveContext,
 ): Array<OpenIntBounds> {
@@ -278,7 +278,7 @@ private const val FBBT_CANCEL_POLL = 64
 private fun fbbtTightenOpenIntBounds(
     bounds: Array<OpenIntBounds>,
     constraints: List<Linear>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     realRows: List<Linear> = emptyList(),
     rLo: DoubleArray = emptyDoubleArray(),
     rUp: DoubleArray = emptyDoubleArray(),

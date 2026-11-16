@@ -2,10 +2,10 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
-import com.eignex.klause.lowering.trueLit
 
 internal fun Compiler.Builder.reifyAnd(literals: List<Int>): Int =
     retainBooleanDefinition { reifyLogical(literals, conjunction = true) }.also { result ->

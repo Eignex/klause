@@ -4,7 +4,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.SearchExplanation
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -31,7 +31,7 @@ class LearnedMemoryMaintenanceTest {
         var sliceStart = 0L
         lateinit var session: PropagationSession
         session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()),
-            Cancellation { limited && session.work - sliceStart >= 1L })
+            ExecutionControl { limited && session.work - sliceStart >= 1L })
         val maintenance = LearnedMemoryMaintenance()
         val params = BacktrackParams(learnedMemoryBytes = 0L, learnedMemoryWork = 100_000L)
         limited = true

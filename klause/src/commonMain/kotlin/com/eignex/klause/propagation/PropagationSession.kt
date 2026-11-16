@@ -9,9 +9,10 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.ValueOrderingStatsSink
 import com.eignex.klause.solver.search.ComponentCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemorySnapshot
+import com.eignex.klause.util.pollStop
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
@@ -45,7 +46,7 @@ enum class VarKind {
 class PropagationSession private constructor(
     /** The problem being propagated. */
     val problem: Problem,
-    private var cancellation: Cancellation,
+    private var cancellation: ExecutionControl,
     propagationCancelFloor: Int,
     nativeSat: Boolean,
     pbLearning: Boolean,
@@ -66,7 +67,7 @@ class PropagationSession private constructor(
     /** Construct a private propagation projection over [problem]. */
     constructor(
         problem: Problem,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
         nativeSat: Boolean = false,
         pbLearning: Boolean = false,
@@ -74,7 +75,7 @@ class PropagationSession private constructor(
 
     internal constructor(
         projection: PropagationProblem,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         propagationCancelFloor: Int = PROPAGATION_CANCEL_FLOOR,
         nativeSat: Boolean = false,
         pbLearning: Boolean = false,
@@ -84,9 +85,11 @@ class PropagationSession private constructor(
         costAware: Boolean = false,
         reasonPreflight: Boolean = false,
         onPropagationWork: ((() -> Long) -> Unit)? = null,
-    ) : this(projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection,
+    ) : this(
+        projection.problem, cancellation, propagationCancelFloor, nativeSat, pbLearning, projection,
         cumulativeUnarySubsets = cumulativeUnarySubsets, attribution = attribution, historicalTables = historicalTables,
-        costAware = costAware, reasonPreflight = reasonPreflight, onPropagationWork = onPropagationWork)
+        costAware = costAware, reasonPreflight = reasonPreflight, onPropagationWork = onPropagationWork,
+    )
 
     internal fun checkSelectedProjection(
         checks: SelectedProjectionChecks? = projection.selection?.originalChecks,
@@ -334,12 +337,14 @@ class PropagationSession private constructor(
     /** Whether the deadline token has fired. Read by the heuristics that run propagation *inside* one
      *  decision — see [com.eignex.klause.backtrack.selector.probeAndOrder], which spends a fixpoint per
      *  candidate value — since the engine only polls between nodes and cannot see past them. */
-    internal val cancelRequested: Boolean get() = cancellation()
+    internal val cancelRequested: Boolean get() = state.work >= state.workLimit || cancellation.pollStop()
 
     internal fun extensionalDensities(variable: Int, values: LongArray, maxVisits: Int = 65_536): DoubleArray? {
         if (fixpointCancelled || state.propQueue.isNotEmpty() || state.dirtyBools.isNotEmpty() ||
             state.dirtyInts.isNotEmpty()
-        ) return null
+        ) {
+            return null
+        }
         val occurrences = projection.intOccurrences[variable]
         var remaining = maxVisits.coerceIn(0, 65_536)
         val visit = {
@@ -349,6 +354,7 @@ class PropagationSession private constructor(
         var scores: DoubleArray? = null
         state.finiteWork.begin()
         try {
+            state.finiteWork.checkNow()
             for (fid in occurrences) {
                 if (!visit()) return null
                 val provider = projection.propagators[fid] as? ExtensionalSupportProvider ?: continue
@@ -383,7 +389,7 @@ class PropagationSession private constructor(
     internal val work: Long get() = retainedState?.work ?: retiredWork
     internal val valueOrdering = ValueOrderingStatsSink()
     internal fun visitValueScore(): Boolean {
-        if (cancellation()) {
+        if (cancelRequested) {
             probeCancelled = true
             return false
         }
@@ -392,9 +398,9 @@ class PropagationSession private constructor(
     }
     internal val propagationNanos: Long get() = retainedState?.propagationNanos ?: retiredPropagationNanos
 
-    private var requiredInprocessingCancellation: Cancellation? = null
+    private var requiredInprocessingCancellation: ExecutionControl? = null
 
-    internal fun <T> withInprocessingCancellation(token: Cancellation, operation: () -> T): T {
+    internal fun <T> withInprocessingCancellation(token: ExecutionControl, operation: () -> T): T {
         val previous = requiredInprocessingCancellation
         if (previous == null) requiredInprocessingCancellation = cancellation
         return try {
@@ -407,28 +413,41 @@ class PropagationSession private constructor(
     private fun <T> withRequiredInprocessingCancellation(operation: () -> T): T =
         usingCancellation(requiredInprocessingCancellation ?: cancellation, operation)
 
-    internal fun <T> withCancellation(token: Cancellation, operation: () -> T): T = usingCancellation(
-        if (token === cancellation || token === Cancellation.Never) cancellation else cancellation or token,
+    internal fun <T> withCancellation(token: ExecutionControl, operation: () -> T): T = usingCancellation(
+        if (token === cancellation || token === ExecutionControl.Never) {
+            cancellation
+        } else {
+            PropagationControl(cancellation, token)
+        },
         operation,
     )
 
-    internal fun <T> withProbeInvocation(token: Cancellation, operation: () -> T): T {
+    internal fun <T> withWorkLimit(units: Long?, operation: () -> T): T {
+        if (units == null) return operation()
+        require(units >= 0L)
+        val previous = state.workLimit
+        state.workLimit = minOf(previous, state.work + minOf(units, Long.MAX_VALUE - state.work))
+        return try {
+            operation()
+        } finally {
+            state.workLimit = previous
+        }
+    }
+
+    internal fun <T> withProbeInvocation(token: ExecutionControl, operation: () -> T): T {
         check(!fixpointCancelled)
         // A rolled-back probe keeps its completed prefix; its caller supplies the full current scope.
         probeCancelled = false
         return usingCancellation(token, operation)
     }
 
-    private fun <T> usingCancellation(token: Cancellation, operation: () -> T): T {
+    private fun <T> usingCancellation(token: ExecutionControl, operation: () -> T): T {
         val previous = cancellation
-        val finite = state.finiteWork.cancellation
         cancellation = token
-        state.finiteWork.cancellation = cancellation
         return try {
-            operation()
+            state.finiteWork.withCancellation(token, operation)
         } finally {
             cancellation = previous
-            state.finiteWork.cancellation = finite
         }
     }
 
@@ -464,7 +483,7 @@ class PropagationSession private constructor(
     internal companion object {
         // Point pins belong to a disposable verification root over a shareable projection, never a search root.
         fun forPointCheck(
-            projection: PropagationProblem, point: Assumptions, cancellation: Cancellation,
+            projection: PropagationProblem, point: Assumptions, cancellation: ExecutionControl,
         ): PropagationSession = PropagationSession(
             projection.problem, cancellation, PROPAGATION_CANCEL_FLOOR, true, false, projection,
             initialAssumptions = point,
@@ -472,7 +491,7 @@ class PropagationSession private constructor(
 
         fun preparation(
             state: PropagationState,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             conflict: IntArray?,
         ): Iterator<PropagationSession?> = sequence {
             var buffers: PropagationSessionBuffers? = null
@@ -492,7 +511,7 @@ class PropagationSession private constructor(
             ))
         }.iterator()
 
-        fun prepared(state: PropagationState, cancellation: Cancellation, conflict: IntArray?): PropagationSession =
+        fun prepared(state: PropagationState, cancellation: ExecutionControl, conflict: IntArray?): PropagationSession =
             PropagationSession(
                 state.problem, cancellation, state.cancelFloor, state.nativeSat, state.pbLearning,
                 state.projection, state, conflict,
@@ -667,7 +686,7 @@ class PropagationSession private constructor(
      * decision level. Returns the cumulative implied set beyond the seed pins (or Unsat).
      * A seed refutation retains its complete applied prefix: propagated levels alone can
      * omit earlier assumptions that contributed through a reason chain.
-     * Cancellation stops before the next pin and sets [fixpointCancelled]; the applied
+     * ExecutionControl stops before the next pin and sets [fixpointCancelled]; the applied
      * prefix is incomplete and cannot certify the full assumption set.
      */
     fun seed(assumptions: Assumptions): PropagationResult {
@@ -1243,7 +1262,9 @@ class PropagationSession private constructor(
         return ReclamationPreparation(maxWork, maxScratchBytes, cleanupCancellation(cancelled)) { owner.work += it }
     }
 
-    private fun cleanupCancellation(cancelled: () -> Boolean) = CleanupCancellation { cancelRequested || cancelled() }
+    private fun cleanupCancellation(cancelled: () -> Boolean) = CleanupCancellation(cancellation.stopPolling) {
+        cancelRequested || cancelled()
+    }
 
     internal val nativeCapWindowPending: Boolean get() = state.nativeEngine?.capWindowPending == true
     internal val nativeCapTraversalVisits: Long get() = state.nativeEngine?.capTraversalVisits ?: 0L

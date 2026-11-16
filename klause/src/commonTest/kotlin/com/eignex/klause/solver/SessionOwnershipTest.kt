@@ -2,7 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -21,12 +21,12 @@ class SessionOwnershipTest {
                 override val incumbentTrialPending: Boolean get() = pending
                 override val isDone: Boolean get() = false
                 override val stats: SolveStats get() = SolveStats.EMPTY
-                override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                     onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = null
             }
             val child = if (counted) {
                 object : ResumableSearch by source, InstructionSlicedSearch, ReseedGuard by source {
-                    override fun runInstructionSlice(global: Cancellation, sliceMillis: Long,
+                    override fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long,
                         sliceInstructions: Long, onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
                         source.runSlice(global, sliceMillis, sliceInstructions, onIncumbent)
                 }
@@ -50,14 +50,14 @@ class SessionOwnershipTest {
         val source = object : ResumableSolve {
             override val isDone: Boolean get() = false
             override val stats: SolveStats get() = SolveStats.EMPTY
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult =
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult =
                 throw failure
             override fun close(): Unit = throw failure
         }
         val owned = ownSolve(source) { releases++ }
 
         assertSame(failure, assertFailsWith<IllegalArgumentException> {
-            owned.runSlice(Cancellation.Never, 1L, 1L)
+            owned.runSlice(ExecutionControl.Never, 1L, 1L)
         })
 
         assertTrue(failure.suppressedExceptions.isEmpty())

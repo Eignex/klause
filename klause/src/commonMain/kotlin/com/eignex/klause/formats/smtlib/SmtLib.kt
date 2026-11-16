@@ -14,7 +14,7 @@ import com.eignex.klause.ir.SourceSemanticsOwner
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
 import kotlin.coroutines.cancellation.CancellationException
@@ -57,18 +57,18 @@ data class SmtLibProblem(
         boolean: (Int) -> Boolean,
         integer: (Int) -> String,
         real: (Int) -> String,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SmtSourceModel = reconstructSmtModel(this, boolean, integer, real, cancellation)
 
     /** Reconstruct a checked native assignment using its certified exact real representation. */
     fun reconstructModel(
         assignment: OpenTheoryAssignment,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SmtSourceModel = reconstructModel(assignment::boolValue, assignment::intValue,
         { assignment.smtRealValue(it, cancellation) }, cancellation)
 
     /** Reconstruct a checked sample, retaining arbitrary integers and exact real authority. */
-    fun reconstructModel(sample: Sample, cancellation: Cancellation = Cancellation.Never): SmtSourceModel =
+    fun reconstructModel(sample: Sample, cancellation: ExecutionControl = ExecutionControl.Never): SmtSourceModel =
         reconstructModel(sample::boolValue, { sample.exactIntValue(it).toString() },
             { sample.smtRealValue(it, cancellation) }, cancellation)
 
@@ -93,7 +93,7 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibProblem = parse(
         { StringCharSource(text) }, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
@@ -105,7 +105,7 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibProblem {
         var transferred = false
@@ -132,7 +132,7 @@ object SmtLib {
         unboundedIntLo: Long = DEFAULT_UNBOUNDED_INT_LO,
         unboundedIntHi: Long = DEFAULT_UNBOUNDED_INT_HI,
         settings: ProblemSettings = KlauseConfig.current.problemSettings(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibProblem = parseSmtLibSource(
         openSource, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,

@@ -4,8 +4,11 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.propagation.RootWorkMeter
 import com.eignex.klause.solver.result.PresolveInvocationStats
 import com.eignex.klause.solver.result.PresolvePreparationStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ArithmeticWorkSource
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.WorkReservation
+import com.eignex.klause.util.withQuota
 import com.eignex.util.collections.IntHashSet
 
 private const val ROOT_CONSTRUCTION_WEIGHT = 53L
@@ -14,15 +17,13 @@ private const val ROOT_PROPAGATION_WEIGHT = 53L
 /**
  * The presolve phase's remaining work allowance, and the means to hand each pass a slice of it.
  *
- * A single [Cancellation] cannot express this: it is an opaque predicate, so the round engine can ask
- * *whether* the budget is spent but not *how much is left*, and the first expensive pass is free to
- * consume all of it — leaving every pass declared after it to run against an already-fired predicate.
- * [remaining] closes that gap, and [slice] turns it into a per-pass stop.
+ * The round engine uses [remaining] to select a per-pass allowance. [slice] binds
+ * that allowance's stop, work sink and serial admission to an [ExecutionControl].
  *
  * The allowance is counted in deterministic work units that each pass [charge]s where it polls its
  * cancellation. Elapsed cancellation supplied by callers can stop a pass before its work allowance
  * is spent. The tokens [slice] and [orSpent] hand out carry this budget's native-work adapter as their
- * [Cancellation.workMeter], so work charged through them lands here without the budget being threaded
+ * [ExecutionControl.accounting], so work charged through them lands here without the budget being threaded
  * beside the token.
  *
  * Presolve runs on one thread, and so does every charge.
@@ -32,6 +33,7 @@ class PresolveBudget(
     val allowance: Long,
 ) : WorkMeter {
     private var spent = 0L
+    private var reserved = 0L
     internal var activeInvocation: PresolveInvocation? = null
     private val observations = ArrayList<PresolveInvocationStats>()
     private val preparation = ArrayList<PresolvePreparationStats>()
@@ -71,16 +73,16 @@ class PresolveBudget(
         preparation.add(observation)
     }
 
-    internal fun preparationCancellation(outer: Cancellation): Cancellation {
-        val meter = outer.workMeter()
+    internal fun preparationCancellation(outer: ExecutionControl): ExecutionControl {
+        val meter = outer.accounting
         if (meter === nativeMeter || (meter is PreparationWorkMeter && meter.budget === this)) {
             return observeStops(outer)
         }
         val recording = PreparationWorkMeter(this, meter)
-        return observeStops(object : Cancellation {
+        return observeStops(object : ExecutionControl(outer) {
             override fun isCancelled(): Boolean = outer()
             override fun deadline() = outer.deadline()
-            override fun workMeter(): WorkMeter? = if (activeInvocation != null) recording else outer.workMeter()
+            override val accounting: WorkMeter? get() = if (activeInvocation != null) recording else outer.accounting
         })
     }
 
@@ -151,36 +153,67 @@ class PresolveBudget(
      * unspent remainder in the pool, so the next slice is taken from a larger base rather than a fixed
      * quantum.
      */
-    fun slice(share: Long): Cancellation {
-        if (share <= 0L) return observeStops(Metered(nativeMeter) { true })
+    fun slice(share: Long): ExecutionControl {
+        if (share <= 0L) return observeStops(Metered(remaining()))
         val floor = (remaining() - share).coerceAtLeast(0L)
-        return observeStops(Metered(nativeMeter) { remaining() <= floor })
+        return observeStops(Metered( floor ))
     }
 
     /**
      * A cancellation that fires when [outer] does or the whole budget is spent. Work charged through it
      * lands here, whatever meter [outer] carries, and it keeps [outer]'s deadline.
      */
-    fun orSpent(outer: Cancellation): Cancellation = observeStops(
-        Metered(nativeMeter) { remaining() == 0L } or outer,
-    )
+    fun orSpent(outer: ExecutionControl): ExecutionControl {
+        if(
+        outer is StopObserver && outer.budget === this &&(outer.token as? Metered) ?.budget === this) return outer
+        return observeStops(Metered( 0L , outer,
+    ))
+    }
 
-    internal fun observeStops(token: Cancellation): Cancellation =
+    internal fun observeStops(token: ExecutionControl): ExecutionControl =
         if (token is StopObserver && token.budget === this) token else StopObserver(this, token)
 
-    private class StopObserver(val budget: PresolveBudget, private val token: Cancellation) : Cancellation {
+    private class StopObserver(val budget: PresolveBudget, val token: ExecutionControl) : ExecutionControl(token) {
+        override val containingStop get() = token
         override fun isCancelled(): Boolean = token().also { stopped ->
             if (stopped) budget.activeInvocation?.interrupted = true
         }
 
         override fun deadline() = token.deadline()
-        override fun workMeter() = token.workMeter()
+        override val accounting get() = token.accounting
+        override val admission get() = admissionFrom(token)
     }
 
-    private class Metered(private val meter: WorkMeter, private val fired: () -> Boolean) : Cancellation {
-        override fun isCancelled(): Boolean = fired()
+    private inner class Metered(private val floor: Long, private val outer: ExecutionControl =
+        ExecutionControl.Never) : ExecutionControl(outer) {
+        val budget get() = this@PresolveBudget
+        override val containingStop get() = outer
+        override fun isCancelled(): Boolean = remaining() <= floor || outer()
 
-        override fun workMeter(): WorkMeter = meter
+        override fun deadline() = outer.deadline()
+
+        override val accounting: WorkMeter get() = nativeMeter
+        private val source: ArithmeticWorkSource = object : ArithmeticWorkSource {
+            override val quotaOwner: Any get() = this@PresolveBudget
+            override val quotaRemaining get() = (remaining() - floor).coerceAtLeast(0L)
+            override val quotaAvailable get() = (quotaRemaining - reserved).coerceAtLeast(0L)
+            override val exhausted get() = remaining() <= floor
+            override fun reserve(maximum: Int): WorkReservation? {
+                require(maximum > 0)
+                val available = quotaAvailable
+                val granted = minOf(maximum.toLong(), available).toInt()
+                if (granted == 0) return null
+                reserved += granted
+                return WorkReservation(granted) { used ->
+                    reserved -= granted
+                    charge(used.toLong())
+                }
+            }
+        }
+        override val admission: ArithmeticWorkSource get() {
+            val containing = outer.admission
+            return if (containing?.quotaOwner === this@PresolveBudget) source.withQuota(containing) else source
+        }
     }
 }
 
@@ -207,7 +240,7 @@ private class PreparationWorkMeter(val budget: PresolveBudget, private val outer
     }
 }
 
-internal fun Cancellation.recordPresolveProbe() {
+internal fun ExecutionControl.recordPresolveProbe() {
     presolveBudget()?.recordProbe()
 }
 
@@ -217,7 +250,7 @@ private fun saturatedSum(total: Long, units: Long): Long =
 private fun weighted(units: Long, weight: Long): Long =
     if (units > Long.MAX_VALUE / weight) Long.MAX_VALUE else units * weight
 
-internal fun Cancellation.presolveBudget(): PresolveBudget? = when (val meter = workMeter()) {
+internal fun ExecutionControl.presolveBudget(): PresolveBudget? = when (val meter = accounting) {
     is PresolveRootWorkMeter -> meter.budget
     is PreparationWorkMeter -> meter.budget
     else -> null

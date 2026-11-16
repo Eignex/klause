@@ -43,7 +43,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -400,12 +400,12 @@ class PreparedFactorProjectionsTest {
         val rejected = checker.check(
             Sample(booleanArrayOf(false, false), longArrayOf()),
             Assumptions.None,
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
         val accepted = checker.check(
             Sample(booleanArrayOf(true, false), longArrayOf()),
             Assumptions.None,
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
 
         assertTrue(rejected is Completion.Refuted)
@@ -522,7 +522,7 @@ class PreparedFactorProjectionsTest {
         val preparationWork = session.preparationStatistics()["propagationPreparationIndexWork"] ?: 0L
         var polls = 0
 
-        val result = requireNotNull(selection.originalChecks).check(session, Cancellation { ++polls >= 2 })
+        val result = requireNotNull(selection.originalChecks).check(session, ExecutionControl { ++polls >= 2 })
 
         assertEquals(ComponentCheck.Indeterminate, result)
         assertEquals(work, session.work)
@@ -606,7 +606,7 @@ class PreparedFactorProjectionsTest {
         val result = checker.check(
             Sample(booleanArrayOf(false, false), longArrayOf()),
             Assumptions.None,
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
 
         assertTrue(result is Completion.Refuted)

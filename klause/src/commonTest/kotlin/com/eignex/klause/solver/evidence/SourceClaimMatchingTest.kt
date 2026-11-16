@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -22,7 +22,7 @@ class SourceClaimMatchingTest {
             matchSourceClaims(
                 SourceClaim.Witness(first),
                 SourceClaim.Witness(second),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
     }
@@ -37,7 +37,7 @@ class SourceClaimMatchingTest {
             matchSourceClaims(
                 SourceClaim.Witness(first),
                 SourceClaim.Witness(second),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
     }
@@ -48,7 +48,7 @@ class SourceClaimMatchingTest {
         val first = SourceClaim.Bound(SourceValue.Algebraic(value))
         val second = SourceClaim.Bound(BigFraction.ONE)
 
-        assertEquals(SourceEvidenceCheck.Checked, matchSourceClaims(first, second, Cancellation.Never))
+        assertEquals(SourceEvidenceCheck.Checked, matchSourceClaims(first, second, ExecutionControl.Never))
     }
 
     @Test
@@ -56,7 +56,7 @@ class SourceClaimMatchingTest {
         val first = SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0)))
         val second = SourceClaim.Witness(Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0)))
 
-        assertIs<SourceEvidenceCheck.Unavailable>(matchSourceClaims(first, second, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Unavailable>(matchSourceClaims(first, second, ExecutionControl.Never))
     }
 
     @Test
@@ -64,6 +64,6 @@ class SourceClaimMatchingTest {
         val first = SourceClaim.Bound(BigFraction.ONE)
         val second = SourceClaim.Bound(BigFraction.ofLong(2))
 
-        assertIs<SourceEvidenceCheck.Rejected>(matchSourceClaims(first, second, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Rejected>(matchSourceClaims(first, second, ExecutionControl.Never))
     }
 }

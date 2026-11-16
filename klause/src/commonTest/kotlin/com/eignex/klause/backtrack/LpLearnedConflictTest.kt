@@ -23,7 +23,7 @@ import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchRunLifecycle
 import com.eignex.klause.solver.search.SearchRunObserver
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -74,7 +74,8 @@ class LpLearnedConflictTest {
                     if (context.boolValue(0) == true || context.boolValue(1) == true) ComponentCheck.Feasible
                     else ComponentCheck.Infeasible()
             }).use { lp ->
-                val session = SearchSession(listOf(cp, before, lp, after), cancellation = Cancellation { cancelled })
+                val session = SearchSession(listOf(cp, before, lp, after), cancellation =
+                    ExecutionControl { cancelled })
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 val run = session.openRun(
                     3,
@@ -154,7 +155,7 @@ class LpLearnedConflictTest {
                     return ComponentResult.Indeterminate
                 }
             }).use { lp ->
-                val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+                val session = SearchSession(listOf(cp, lp), cancellation = ExecutionControl { cancelled })
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 val run = session.openRun(2, nodePolicy = object : SearchNodePolicy {
                     override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
@@ -195,7 +196,7 @@ class LpLearnedConflictTest {
                 return ComponentResult.Indeterminate
             }
         }).use { lp ->
-            val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+            val session = SearchSession(listOf(cp, lp), cancellation = ExecutionControl { cancelled })
             assertIs<ComponentResult.Consistent>(session.initialize())
             val run = session.openRun(2, nodePolicy = object : SearchNodePolicy {
                 override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
@@ -219,9 +220,9 @@ class LpLearnedConflictTest {
     fun `an interrupted native learned fixpoint should not acquire a shared continuation`() {
         var cancelled = false
         val native = PropagationSession(Problem(2, 0, emptyArray(), emptyArray()),
-            Cancellation { cancelled }, propagationCancelFloor = 0)
+            ExecutionControl { cancelled }, propagationCancelFloor = 0)
         val cp = CpSearchComponent(native, branching = CpBranching.None)
-        val session = SearchSession(listOf(cp), cancellation = Cancellation { cancelled })
+        val session = SearchSession(listOf(cp), cancellation = ExecutionControl { cancelled })
         assertIs<ComponentResult.Consistent>(session.initialize())
         val run = session.openRun(2, nodePolicy = object : SearchNodePolicy {
             override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
@@ -256,7 +257,7 @@ class LpLearnedConflictTest {
                 return ComponentResult.Indeterminate
             }
         }).use { lp ->
-            val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+            val session = SearchSession(listOf(cp, lp), cancellation = ExecutionControl { cancelled })
             assertIs<ComponentResult.Consistent>(session.initialize())
             val run = session.openRun(2, nodePolicy = object : SearchNodePolicy {
                 override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
@@ -304,7 +305,7 @@ class LpLearnedConflictTest {
             override fun check(context: SearchContext): ComponentCheck =
                 if (context.boolValue(0) == true) ComponentCheck.Feasible else ComponentCheck.Infeasible()
         }).use { lp ->
-            val session = SearchSession(listOf(cp, lp), cancellation = Cancellation { cancelled })
+            val session = SearchSession(listOf(cp, lp), cancellation = ExecutionControl { cancelled })
             assertIs<ComponentResult.Consistent>(session.initialize())
             val run = session.openRun(2, modelContinuation = SearchModelContinuation.Chronological,
                 nodePolicy = object : SearchNodePolicy {

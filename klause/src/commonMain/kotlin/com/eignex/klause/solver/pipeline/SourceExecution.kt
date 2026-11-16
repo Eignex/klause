@@ -15,7 +15,8 @@ import com.eignex.klause.presolve.effortStats
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.Duration
 
 /** Installed execution family, after source routing and operation admission. */
@@ -73,7 +74,7 @@ class SourceExecutionRequest private constructor(
     /** Optional override of canonical source preparation. */
     val presolveConfig: PresolveConfig?,
     /** Containing token for the optional source preparation phase. */
-    val presolveCancellation: Cancellation,
+    val presolveCancellation: ExecutionControl,
     /** Shared source preparation ledger, without a renewed allowance. */
     val presolveBudget: PresolveBudget?,
     /** Optional native integer controls, retaining their shared decision allowance. */
@@ -126,7 +127,7 @@ class SourceExecutionRequest private constructor(
             prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer)
     }
 
-    internal fun withValidationCancellation(stop: Cancellation): SourceExecutionRequest {
+    internal fun withValidationCancellation(stop: ExecutionControl): SourceExecutionRequest {
         val boundedPolynomial = polynomial.copy(cancellation = polynomial.cancellation or stop)
         return SourceExecutionRequest(invocation, finiteRequest,
             theory.copy(cancellation = theory.cancellation or stop), boundedPolynomial,
@@ -149,10 +150,10 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
         randomSeed: Long? = null,
         nodeBudget: NodeBudget? = null,
-        timeout: Cancellation = Cancellation.Never,
-        cancellation: Cancellation = Cancellation.Never,
+        timeout: ExecutionControl = ExecutionControl.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         presolveConfig: PresolveConfig? = null,
-        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveCancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
     ) : this(
         invocation, SourceExecutionPolicy(explicitPresolve = presolveConfig != null), executionOptions,
@@ -169,10 +170,10 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
         randomSeed: Long? = null,
         nodeBudget: NodeBudget? = null,
-        timeout: Cancellation = Cancellation.Never,
-        cancellation: Cancellation = Cancellation.Never,
+        timeout: ExecutionControl = ExecutionControl.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         presolveConfig: PresolveConfig? = null,
-        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveCancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
     ) : this(
         invocation,
@@ -190,7 +191,7 @@ class SourceExecutionRequest private constructor(
         invocation: PreparedSourceInvocation,
         controls: SourceExecutionControls,
         cores: Int,
-        presolveCancellation: Cancellation,
+        presolveCancellation: ExecutionControl,
         presolveBudget: PresolveBudget?,
         policy: SourceExecutionPolicy,
     ) : this(
@@ -208,7 +209,7 @@ class SourceExecutionRequest private constructor(
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
         cores: Int = 1,
         presolveConfig: PresolveConfig? = null,
-        presolveCancellation: Cancellation = Cancellation.Never,
+        presolveCancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
     ) : this(
         invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
@@ -222,7 +223,7 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
     ) : this(
         invocation, null, TheoryParams(), nonlinearInteger.polynomial, cores, null,
-        Cancellation.Never, null, nonlinearInteger, null, nonlinearInteger.nodeBudget,
+        ExecutionControl.Never, null, nonlinearInteger, null, nonlinearInteger.nodeBudget,
     )
 
     /** Bind full exact function controls without renewing the containing invocation. */
@@ -232,7 +233,7 @@ class SourceExecutionRequest private constructor(
         cores: Int = 1,
     ) : this(
         invocation, null, TheoryParams(), PolynomialTheoryParams(), cores, null,
-        Cancellation.Never, null, null, transcendental, transcendental.nodeBudget,
+        ExecutionControl.Never, null, null, transcendental, transcendental.nodeBudget,
     )
 
     init {
@@ -413,18 +414,21 @@ fun SourceSetup.execute(
     val validation = request.invocation.source.takeIf {
         kind != SourceExecutionKind.FINITE && it.witnessValidators.isNotEmpty()
     }?.let {
-        SourceWitnessPublication(it, request.invocation.cancellation or request.theory.cancellation or
-            request.theory.timeout or request.polynomial.cancellation or request.polynomial.timeout or
-            (request.transcendental?.cancellation ?: Cancellation.Never) or
-            (request.transcendental?.timeout ?: Cancellation.Never) or
-            (request.nonlinearInteger?.polynomial?.cancellation ?: Cancellation.Never) or
-            (request.nonlinearInteger?.polynomial?.timeout ?: Cancellation.Never))
+        val controls = listOfNotNull(request.invocation.cancellation, request.theory.cancellation,
+            request.theory.timeout, request.polynomial.cancellation, request.polynomial.timeout,
+            request.transcendental?.cancellation, request.transcendental?.timeout,
+            request.nonlinearInteger?.polynomial?.cancellation, request.nonlinearInteger?.polynomial?.timeout)
+        val owner = controls.firstOrNull { control -> control.accounting != null } ?: ExecutionControl.Never
+        val stop = controls.fold(ExecutionControl.Never.withAccounting(owner)) { joined, control ->
+            joined.includingStop(control)
+        }
+        SourceWitnessPublication(it, stop)
     }
     val executionRequest = validation?.let { request.withValidationCancellation(it.stop) } ?: request
     fun executeValidated(
         bound: SourceExecutionRequest,
         observed: SourceExecutionCallbacks,
-        bindScope: ((Cancellation, Boolean) -> Unit)?,
+        bindScope: ((ExecutionControl, Boolean) -> Unit)?,
     ): SourceExecutionResult {
         val result = executeCapturedSource(bound, validation?.callbacks(observed) ?: observed, bindScope)
         return validation?.qualify(result) ?: result
@@ -477,7 +481,7 @@ private fun validateSourceExecution(request: SourceExecutionRequest): SourceExec
 private fun executeCapturedSource(
     request: SourceExecutionRequest,
     callbacks: SourceExecutionCallbacks,
-    bindScope: ((Cancellation, Boolean) -> Unit)? = null,
+    bindScope: ((ExecutionControl, Boolean) -> Unit)? = null,
 ): SourceExecutionResult {
     val invocation = request.invocation
     val kind = SourceSetup.executionKind(invocation)
@@ -492,7 +496,7 @@ private fun executeCapturedSource(
             require(finite.shape === shape) { "finite execution belongs to a different source invocation" }
             invocation.requireFiniteExecution(finite.shape, finite.engine, finite.operation)
             bindScope?.invoke(
-                finite.cancellation or Cancellation { finite.deadlineExceeded() },
+                finite.cancellation or ExecutionControl { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
             )
             val result = FinitePipeline.solve(finite, callbacks.finite, finite.lpSolveContext,
@@ -511,8 +515,14 @@ private fun executeCapturedSource(
             } else {
                 val prepared = native.withPresolve(
                     request.presolveConfig ?: route.request.presolveConfig,
-                    cancellation = route.request.presolveCancellation or request.presolveCancellation or
-                        invocation.cancellation,
+                    cancellation = route.request.presolveCancellation .withAccounting(
+                        if (request.presolveBudget !=
+                            null
+                        ) { request.presolveCancellation } else {
+                            route.request.presolveCancellation
+                        },
+                    ).includingStop(request.presolveCancellation).includingStop(
+                        invocation.cancellation),
                     budget = request.presolveBudget ?: route.request.presolveBudget,
                 )
                 OpenTheoryPipeline.execute(prepared, params, engine, request.cores, callbacks.onLinearIncumbent)
@@ -534,14 +544,14 @@ private fun executeCapturedSource(
             val source = original.prepareSource(
                 request.presolveConfig ?: PresolveConfig.DEFAULT,
                 objective?.let { if (invocation.maximizeSourceObjective) it.negated() else it },
-                request.presolveCancellation or params.cancellation or params.timeout,
-                invocation.cancellation or params.cancellation or params.timeout,
+                request.presolveCancellation .includingStop( params.cancellation ).includingStop( params.timeout),
+                invocation.cancellation .includingStop( params.cancellation ).includingStop( params.timeout),
                 request.presolveBudget,
             )
             if (source.infeasible) return SourceExecutionResult.Refuted(invocation).also {
                 it.preparationStats = source.stats
             }
-            val prepared = original.afterSourcePreparation(source, params.cancellation or params.timeout)
+            val prepared = original.afterSourcePreparation(source, params.cancellation .includingStop( params.timeout))
                 ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
                     it.preparationStats = source.stats
                 }
@@ -599,15 +609,22 @@ private fun executeSourceHeuristic(
     callbacks.onLinearIncumbent,
 )
 
-private fun TheoryParams.boundTo(invocation: PreparedSourceInvocation): TheoryParams = copy(
-    cancellation = cancellation or invocation.cancellation,
-    timeout = timeout or invocation.containingDeadline(),
+internal fun TheoryParams.boundTo(invocation: PreparedSourceInvocation): TheoryParams = copy(
+    cancellation = cancellation .withAccounting(
+        if (cancellation.accounting != null) cancellation else invocation.cancellation,
+    ).includingStop( invocation.cancellation),
+    timeout = timeout .includingStop( invocation.containingDeadline(timeout)),
 )
 
 private fun PolynomialTheoryParams.boundTo(invocation: PreparedSourceInvocation): PolynomialTheoryParams = copy(
-    cancellation = cancellation or invocation.cancellation,
-    timeout = timeout or invocation.containingDeadline(),
+    cancellation = cancellation .withAccounting(
+        if (cancellation.accounting != null) cancellation else invocation.cancellation,
+    ).includingStop(invocation.cancellation),
+    timeout = timeout .includingStop( invocation.containingDeadline(timeout)),
 )
 
-private fun PreparedSourceInvocation.containingDeadline(): Cancellation =
-    cancellation.deadline()?.let { Cancellation.until(it) } ?: Cancellation.Never
+private fun PreparedSourceInvocation.containingDeadline(timeout: ExecutionControl): ExecutionControl {
+    val end =
+    cancellation.deadline()?: return ExecutionControl.Never
+    return if (timeout.deadline() == end) ExecutionControl.Never else ExecutionControl.until(end)
+}

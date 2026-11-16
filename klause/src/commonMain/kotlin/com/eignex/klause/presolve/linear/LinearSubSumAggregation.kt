@@ -7,7 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.equivalentLinear
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.collections.MutableIntObjectMap
@@ -37,7 +37,7 @@ internal object LinearSubSumAggregation {
     private const val SCAN_WORK_PER_TERM = 8L
     private const val CANCEL_POLL_MASK = 63L
 
-    private class Work(private val cancellation: Cancellation) {
+    private class Work(private val cancellation: ExecutionControl) {
         var visits = 0L
             private set
         private var limit = Long.MAX_VALUE
@@ -85,7 +85,7 @@ internal object LinearSubSumAggregation {
 
     fun sparsificationEligible(factorCount: Int): Boolean = factorCount <= MAX_FACTORS
 
-    fun sparsifyRows(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+    fun sparsifyRows(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): PassDelta {
         if (!sparsificationEligible(problem.factors.size) || cancellation()) return PassDelta()
         val work = Work(cancellation)
         val rows = arrayOfNulls<SparseRow>(problem.factors.size)
@@ -235,7 +235,7 @@ internal object LinearSubSumAggregation {
         }
     }
 
-    fun aggregateSubSums(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+    fun aggregateSubSums(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): PassDelta {
         val factors = problem.factors
         if (factors.size > MAX_FACTORS || cancellation()) return PassDelta()
         val work = Work(cancellation)

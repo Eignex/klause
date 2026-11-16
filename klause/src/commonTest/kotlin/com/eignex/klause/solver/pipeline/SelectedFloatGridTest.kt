@@ -16,7 +16,7 @@ import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncoderSupport
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -119,7 +119,7 @@ class SelectedFloatGridTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val request = SourceSetupRequest(SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.MIXED)
-        val selection = SourceRouteSelection(request, SourceProblemRoute.Refuted, Cancellation.Never)
+        val selection = SourceRouteSelection(request, SourceProblemRoute.Refuted, ExecutionControl.Never)
 
         val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(
             selection, listOf(FloatGridVariable(SourceRealId(0))),
@@ -202,7 +202,7 @@ class SelectedFloatGridTest {
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         var stopped = false
         val selection = SourceSetup.selectRoute(SourceSetupRequest(SourceAttachment(source),
-            ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH, cancellation = Cancellation { stopped }))
+            ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH, cancellation = ExecutionControl { stopped }))
         stopped = true
 
         val result = assertIs<SelectedFloatGridPreparation.Declined>(SourceSetup.prepareSelectedFloatGrid(

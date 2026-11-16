@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PreparedSourceHints(val sweep: DefinitionalSweep?, val objective: IncrementalObjective?)
 
@@ -21,7 +21,7 @@ internal fun PreparedSourceInvocation.heuristicHints(
     problem: Problem,
     objective: LinearObjective?,
     mapping: SourceMapping?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     strategies: Set<ExecutionStrategy>,
     capabilities: ExecutionCapabilities,
 ): PreparedSourceHints? {
@@ -106,7 +106,7 @@ internal fun PreparedSourceInvocation.heuristicHints(
 
 private fun SourceDefinitionReferences.foldsForMoves(
     objective: LinearObjective?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<BoolFoldDefinition>? {
     if (objective == null) return emptyList()
     val weights = objective.boolWeights

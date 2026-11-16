@@ -6,7 +6,9 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.followStopControl
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -29,7 +31,7 @@ internal class ResumableOpenTheory(
     private val params: TheoryParams,
     private val state: OpenTheorySolveState = OpenTheorySolveState(params),
 ) : AutoCloseable {
-    private var globalToken: Cancellation = Cancellation.Never
+    private var globalToken: ExecutionControl = ExecutionControl.Never
     private var sliceEndWork = Long.MAX_VALUE
     private var sliceEnd: ComparableTimeMark? = null
     private var expandedThisSlice = false
@@ -66,9 +68,9 @@ internal class ResumableOpenTheory(
      * non-negative, or after [sliceMillis], whichever comes first. The verdict once there is one, else null with
      * the search paused.
      */
-    fun runSlice(global: Cancellation, sliceMillis: Long, sliceWork: Long): OpenTheoryResult? {
+    fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceWork: Long): OpenTheoryResult? {
         verdict?.let { return it }
-        globalToken = global
+        globalToken = global.bindStopControl()
         sliceEndWork = if (sliceWork >= 0L) state.work.spent + sliceWork else Long.MAX_VALUE
         sliceEnd =
             if (sliceMillis == Long.MAX_VALUE) null else TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
@@ -85,7 +87,7 @@ internal class ResumableOpenTheory(
     }
 
     private fun begin(): OpenTheoryStart {
-        val stop = Cancellation { globalToken() }
+        val stop = followStopControl { globalToken }
         return engine.begin(params.copy(cancellation = params.cancellation or stop), state, pausing)
     }
 

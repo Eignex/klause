@@ -22,7 +22,7 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.relation
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.sum
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BIG_ZERO
@@ -30,10 +30,10 @@ import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.parseBigInt
-import com.eignex.util.numbers.remainderOf as bigRemainder
 import com.eignex.util.numbers.shr
 import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.toLong
+import com.eignex.util.numbers.remainderOf as bigRemainder
 
 internal sealed interface PolynomialValue {
     data class Boolean(val formula: PolynomialRealFormula) : PolynomialValue {
@@ -130,7 +130,7 @@ internal class SmtLibPolynomialEvaluator(
     private val lowering: PolynomialRealLowering,
     private val validateOnly: Boolean = false,
     private val allowWidePowers: Boolean = false,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
     private val functions: FunctionSourceLowering? = null,
 ) {
     var hasNonlinearTerms = false
@@ -464,7 +464,7 @@ internal class SmtLibPolynomialEvaluator(
     }
 }
 
-private fun polynomialLiteral(text: String, cancellation: Cancellation): BigFraction? {
+private fun polynomialLiteral(text: String, cancellation: ExecutionControl): BigFraction? {
     val parts = text.split('.')
     if (parts.size !in 1..2 || parts.any { it.isEmpty() || it.any { digit -> digit !in '0'..'9' } }) return null
     cancellation.polynomialSourceCheckpoint()

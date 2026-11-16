@@ -9,7 +9,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -218,7 +218,7 @@ class PolynomialConjunctionTest {
         var stopped = false
         val atoms = listOf(PolynomialAtom(Polynomial.variable(0), PolynomialRelation.LE),
             PolynomialAtom(Polynomial.variable(0), PolynomialRelation.GE))
-        val pending = preparePolynomialConjunction(atoms, PolynomialArithmetic(Cancellation { stopped }))
+        val pending = preparePolynomialConjunction(atoms, PolynomialArithmetic(ExecutionControl { stopped }))
         assertNull(pending.next())
 
         stopped = true

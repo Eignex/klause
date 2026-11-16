@@ -22,7 +22,7 @@ import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -480,7 +480,7 @@ class PresolverTest {
             ),
         )
         val baked = problem.bake()
-        val pre = Presolver.run(baked, PresolveConfig.DEFAULT, cancellation = { true })
+        val pre = Presolver.run(baked, PresolveConfig.DEFAULT, cancellation = ExecutionControl { true })
         assertSame(baked, pre.problem)
         val s = Sample(BooleanArray(0), longArrayOf(3, 1, 0))
         assertSame(s, pre.reconstruct(s))
@@ -517,7 +517,7 @@ class PresolverTest {
             reducibleChain().bake(),
             PresolveConfig.parse(PresolvePass.FUSE_LINEAR_BOUNDS.id),
             PresolveContext.EMPTY.withPresolveBudget(budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertTrue(budget.spent() > 0L)
@@ -532,7 +532,7 @@ class PresolverTest {
             problem,
             PresolveConfig.DEFAULT,
             PresolveContext.EMPTY.withPresolveBudget(budget),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertSame(problem, presolved.problem)

@@ -7,11 +7,11 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SourceRebuilds
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
 internal object PrivateRebuildAlias {
-    fun reduce(problem: Problem, premises: Array<Clause>, cancellation: Cancellation): SourceDelta {
+    fun reduce(problem: Problem, premises: Array<Clause>, cancellation: ExecutionControl): SourceDelta {
         cancellation.charge(8L)
         if (cancellation() || premises.size != 2 || problem.numFactors < 2 ||
             problem.numIntVars != 0 || problem.numRealVars != 0 ||

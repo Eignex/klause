@@ -20,7 +20,7 @@ import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.TimeSource
 
 /** Round cap for the presolve↔LP-harvest fixpoint: a spin guard, never the real stop. The loop
@@ -72,7 +72,7 @@ object PresolvePipeline {
         config: PresolveConfig = PresolveConfig.DEFAULT,
         linearObjective: LinearObjective? = null,
         solutionSetSensitive: Boolean = false,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
         finiteLane: Boolean = false,
         transformObjective: Boolean = true,
@@ -115,7 +115,7 @@ object PresolvePipeline {
         linearObjective: LinearObjective?,
         config: PresolveConfig,
         solutionSetSensitive: Boolean,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         presolveBudget: PresolveBudget? = null,
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
@@ -146,7 +146,7 @@ object PresolvePipeline {
         linearObjective: LinearObjective?,
         config: PresolveConfig,
         solutionSetSensitive: Boolean,
-        callerCancellation: Cancellation = Cancellation.Never,
+        callerCancellation: ExecutionControl = ExecutionControl.Never,
         zeroObjectivePricing: LpZeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
         randomSeed: Long? = null,
         projections: PreparedFactorProjections? = null,
@@ -458,7 +458,7 @@ private fun refit(objective: LinearObjective?, problem: Problem): LinearObjectiv
  * [cancellation], stopping as well once [budget] is spent, and carrying [budget] as the meter every pass
  * and LP solve below charges. Whatever token the caller built, the phase's work lands in its own budget.
  */
-private fun phaseCancellation(cancellation: Cancellation, budget: PresolveBudget?): Cancellation =
+private fun phaseCancellation(cancellation: ExecutionControl, budget: PresolveBudget?): ExecutionControl =
     budget?.orSpent(cancellation) ?: cancellation
 
 private fun needsWideDomainLp(problem: Problem): Boolean {
@@ -489,11 +489,11 @@ private fun needsWideDomainLp(problem: Problem): Boolean {
  * each stage costs a bounded share of the phase rather than the phase itself. The simplex charges its
  * work through the slice, which is what stops it at the same pivot on every run.
  */
-private fun preBakeSlice(cancellation: Cancellation, budget: PresolveBudget?): Cancellation = budget?.let {
+private fun preBakeSlice(cancellation: ExecutionControl, budget: PresolveBudget?): ExecutionControl = budget?.let {
     it.slice(it.remaining() / 2) or cancellation
 } ?: cancellation
 
-private fun hasBinaryCandidate(problem: BakedProblem, objective: Set<Int>, cancellation: Cancellation): Boolean {
+private fun hasBinaryCandidate(problem: BakedProblem, objective: Set<Int>, cancellation: ExecutionControl): Boolean {
     for (v in 0 until problem.numIntVars) {
         cancellation.charge(1L)
         if (cancellation()) return false

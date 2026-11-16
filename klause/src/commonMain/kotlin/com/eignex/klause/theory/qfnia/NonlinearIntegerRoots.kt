@@ -12,8 +12,9 @@ import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.serialArithmeticSource
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BigInt
@@ -46,13 +47,14 @@ internal class NonlinearIntegerRootAdmission(
 internal class NonlinearIntegerRootStore(val problem: NonlinearIntegerProblem) {
     private var completed: Map<Int, List<BigInt>>? = null
 
-    fun admit(parent: Cancellation, limits: PolynomialLimits, step: () -> Unit): NonlinearIntegerRootAdmission {
+    fun admit(parent: ExecutionControl, limits: PolynomialLimits, step: () -> Unit): NonlinearIntegerRootAdmission {
         completed?.let { roots ->
             repeat(roots.size) { step() }
             return NonlinearIntegerRootAdmission(roots, 0, 0, false)
         }
         var equationWork = 0L
         var totalWork = 0L
+        var pendingWork: () -> Long = { 0L }
         var parentStopped = false
         val meter = WorkMeter {
             equationWork += it
@@ -60,22 +62,30 @@ internal class NonlinearIntegerRootStore(val problem: NonlinearIntegerProblem) {
             parent.charge(it)
         }
         // A private allowance declines one expensive equation without spending the containing search.
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean {
                 if (parent()) parentStopped = true
                 return parentStopped || equationWork >= MAX_EQUATION_WORK || totalWork >= MAX_ADMISSION_WORK
             }
             override fun deadline() = parent.deadline()
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
+            override val admission get() = serialArithmeticSource(
+                parent,
+                { minOf(MAX_EQUATION_WORK - equationWork, MAX_ADMISSION_WORK - totalWork) - pendingWork() },
+                {
+                    equationWork += it
+                    totalWork += it
+                },
+            )
         }
-        val arithmetic = PolynomialArithmetic(token, limits)
+        val arithmetic = PolynomialArithmetic(token, limits).also { pendingWork = { it.execution.admittedWork } }
         val roots = HashMap<Int, List<BigInt>>()
         var admitted = 0L
         var declined = 0L
         for ((variable, equation) in unaryEquations(step)) {
             equationWork = 0
             try {
-                val found = integerRoots(equation, variable, arithmetic)
+                val found = arithmetic.execution.operation { integerRoots(equation, variable, arithmetic) }
                 if (found == null) {
                     declined++
                     continue

@@ -1,7 +1,9 @@
 package com.eignex.klause.arithmetic.quadratic
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
+import com.eignex.klause.solver.pipeline.QuadraticNativeScope
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -145,9 +147,9 @@ class QuadraticCandidatesTest {
             rows = listOf(QuadraticRow(listOf(q(-1)), q(-2), QuadraticRowRelation.LE)),
         )
         var charged = 0L
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val candidates = QuadraticCandidates(QuadraticControl(token))
 
@@ -172,18 +174,15 @@ class QuadraticCandidatesTest {
     @Test
     fun `cancelling before a numerical kernel should withhold the proposal`() {
         val model = QuadraticModel(listOf(q(0), q(0)), listOf(listOf(q(2), q(0)), listOf(q(0), q(2))))
-        var charged = 0L
-        val token = object : Cancellation {
-            override fun isCancelled(): Boolean = charged >= 2L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
-        }
+        val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = 2), concurrent = false)
 
         val stop = assertFailsWith<QuadraticInterrupted> {
-            QuadraticCandidates(QuadraticControl(token)).proposeActiveRows(model, listOf(1.0, 1.0), iterations = 1)
+            QuadraticCandidates(QuadraticControl(scope.numerical)).proposeActiveRows(model, listOf(1.0, 1.0),
+                iterations = 1)
         }
 
         assertEquals(QuadraticStop.CANCELLED, stop.reason)
-        assertEquals(2L, charged)
+        assertEquals(2L, scope.work)
     }
 
     @Test

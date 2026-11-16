@@ -16,7 +16,7 @@ import com.eignex.klause.localsearch.schedule.RoundAccumulator
 import com.eignex.klause.localsearch.schedule.ScheduleBundle
 import com.eignex.klause.localsearch.schedule.StallSchedule
 import com.eignex.klause.localsearch.scoring.MoveScoring
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Temperature a Metropolis acceptance falls back to when the schedule axis supplies none. */
 private const val DEFAULT_METROPOLIS_TEMPERATURE = 1.0
@@ -149,14 +149,14 @@ class SourceDrivenStrategy(
     private var repairAlternativeSink: MoveSink? = null
 
     /** Pick the next move to apply, or `null` when this pick has no accepted candidate. */
-    fun pickMove(state: LocalSearchState): Move? = pickMove(state, Cancellation.Never)
+    fun pickMove(state: LocalSearchState): Move? = pickMove(state, ExecutionControl.Never)
 
-    internal fun pickMove(state: LocalSearchState, cancellation: Cancellation): Move? =
+    internal fun pickMove(state: LocalSearchState, cancellation: ExecutionControl): Move? =
         pickMove(state, cancellation, null)
 
     internal fun pickMove(
         state: LocalSearchState,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         evaluation: CompletedMoveEvaluation?,
     ): Move? {
         state.boardCoverage.beginPick(state)
@@ -168,7 +168,7 @@ class SourceDrivenStrategy(
 
     private fun pickCollectedMove(
         state: LocalSearchState,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         evaluation: CompletedMoveEvaluation?,
     ): Move? {
         evaluation?.begin()
@@ -236,7 +236,7 @@ class SourceDrivenStrategy(
 
     private fun collectMoves(
         state: LocalSearchState,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         stalled: Boolean,
         phaseCost: Long,
         completionSeeds: Boolean,
@@ -303,7 +303,8 @@ class SourceDrivenStrategy(
         return completionSeed
     }
 
-    private fun generate(cs: ConfiguredSource, state: LocalSearchState, sink: MoveSink, cancellation: Cancellation) {
+    private fun generate(cs: ConfiguredSource, state: LocalSearchState, sink: MoveSink,
+        cancellation: ExecutionControl) {
         val source = cs.source
         if (source is SatisfiedStructured) {
             source.generate(state, sink, cancellation, retainCoverage = state.boardCoverage.requested)

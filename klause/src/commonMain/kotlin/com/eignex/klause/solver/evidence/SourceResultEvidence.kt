@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.evidence
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Engine-reported completion, separate from independently checked original-source derivations. */
 data class SourceEngineAttestation(
@@ -49,17 +49,18 @@ class SourceResultEvidence private constructor(
     fun verify(
         claim: SourceClaim,
         context: SourceProofContext,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceEvidenceCheck = verify(claim, context, cancellation, SourceProofAllowance(100_000, 128))
 
     internal fun verify(
-        claim: SourceClaim, context: SourceProofContext, cancellation: Cancellation, allowance: SourceProofAllowance,
+        claim: SourceClaim, context: SourceProofContext, cancellation: ExecutionControl,
+            allowance: SourceProofAllowance,
     ): SourceEvidenceCheck {
         if (scope != context.scope || capturedDerivations.any { it.scope != scope }) {
             return SourceEvidenceCheck.Rejected("completed result evidence has mismatched original-source scopes")
         }
         var stopped = false
-        val limited = Cancellation {
+        val limited = ExecutionControl {
             stopped = stopped || cancellation() || !allowance.consume(0)
             stopped
         }

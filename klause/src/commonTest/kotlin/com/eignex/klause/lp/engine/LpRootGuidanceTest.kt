@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -62,7 +62,7 @@ class LpRootGuidanceTest {
             override fun observeExactInput(accepted: Boolean) = Unit
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         }
-        LpScopedSolver(LpExactState(model), Cancellation { cancelled }).use { owner ->
+        LpScopedSolver(LpExactState(model), ExecutionControl { cancelled }).use { owner ->
             val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits(),
                 observer = observer)
 

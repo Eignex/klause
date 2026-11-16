@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -17,7 +17,7 @@ class PresolveRoundEngineTest {
             var liveFactors = 200_001
             var changed = 0L
 
-            override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome {
+            override fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome {
                 if (pass == PresolvePass.REMOVE_REDUNDANT) {
                     if (liveFactors <= 2) return PassOutcome.UNCHANGED
                     changed += liveFactors - 2
@@ -40,7 +40,7 @@ class PresolveRoundEngineTest {
         }
 
         PresolveRoundEngine.run(listOf(PresolvePass.SUBSUME_CLAUSES, PresolvePass.REMOVE_REDUNDANT),
-            2, Cancellation.Never, null, host)
+            2, ExecutionControl.Never, null, host)
 
         assertEquals(listOf(PassOutcome.SKIPPED, PassOutcome.CHANGED), outcomes)
         assertEquals(1, host.liveFactors)
@@ -59,7 +59,7 @@ class PresolveRoundEngineTest {
         val runs = ArrayList<PresolvePass>()
         private var units = 0L
 
-        override fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome = budget.observe(
+        override fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome = budget.observe(
             pass, PresolveLane.SOURCE, { PresolveSizeStats(size.toInt(), 0, 0, size) },
         ) { invocation ->
             val change = changes[pass]?.getOrNull(runs.count { it == pass }) ?: 0L
@@ -94,7 +94,7 @@ class PresolveRoundEngineTest {
     }
 
     private fun runs(passes: List<PresolvePass>, host: ScriptedHost): List<PresolvePass> {
-        PresolveRoundEngine.run(passes, MAX_PRESOLVE_ROUNDS, Cancellation.Never, host.budget, host)
+        PresolveRoundEngine.run(passes, MAX_PRESOLVE_ROUNDS, ExecutionControl.Never, host.budget, host)
         return host.runs
     }
 
@@ -104,8 +104,8 @@ class PresolveRoundEngineTest {
         val stopped = ScriptedHost(10_000, mapOf(pass to listOf(5L, 5L)), decreasingComplexity = true)
         val continued = ScriptedHost(10_000, mapOf(pass to listOf(5L, 5L)), decreasingComplexity = true)
 
-        PresolveRoundEngine.run(listOf(pass), 16, Cancellation.Never, null, stopped, 0.001)
-        PresolveRoundEngine.run(listOf(pass), 16, Cancellation.Never, null, continued, 0.0001)
+        PresolveRoundEngine.run(listOf(pass), 16, ExecutionControl.Never, null, stopped, 0.001)
+        PresolveRoundEngine.run(listOf(pass), 16, ExecutionControl.Never, null, continued, 0.0001)
 
         assertEquals(1, stopped.runs.size)
         assertEquals(3, continued.runs.size)
@@ -116,7 +116,7 @@ class PresolveRoundEngineTest {
         val pass = PresolvePass.STRENGTHEN_COEFFICIENTS
         val host = ScriptedHost(10_000, mapOf(pass to listOf(100L, 100L, 100L)), decreasingComplexity = true)
 
-        PresolveRoundEngine.run(listOf(pass), 2, Cancellation.Never, null, host, 0.0)
+        PresolveRoundEngine.run(listOf(pass), 2, ExecutionControl.Never, null, host, 0.0)
 
         assertEquals(2, host.runs.size)
     }

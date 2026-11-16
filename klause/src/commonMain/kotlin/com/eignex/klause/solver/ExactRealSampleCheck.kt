@@ -14,14 +14,14 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.exactRealSource
 import com.eignex.klause.theory.transcendental.SourceTruth
 import com.eignex.klause.theory.transcendental.TranscendentalSourceCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 /**
  * Check an exact sample against every native factor and declaration using complete polynomial encodings.
  * Null withholds a verdict when an encoding, analytic identity or resource allowance is unavailable.
  */
-fun Problem.checkExactRealSample(sample: Sample, cancellation: Cancellation = Cancellation.Never): Boolean? {
+fun Problem.checkExactRealSample(sample: Sample, cancellation: ExecutionControl = ExecutionControl.Never): Boolean? {
     if (sample.numBoolVars != numBoolVars || sample.numIntVars != numIntVars || sample.numRealVars != numRealVars) {
         return false
     }

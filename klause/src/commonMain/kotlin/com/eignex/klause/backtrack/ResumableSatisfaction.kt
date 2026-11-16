@@ -10,8 +10,9 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.followStopControl
 import com.eignex.klause.util.workScheduled
 
 /**
@@ -37,7 +38,7 @@ internal class ResumableSatisfaction(
     onPropagationWork: ((() -> Long) -> Unit)? = null,
 ) : ResumableSolve {
     private val lifetimeToken = params0.cancellation.lifetimeCancellation()
-    private var globalToken: Cancellation = params0.cancellation
+    private var globalToken: ExecutionControl = params0.cancellation
     private val sink = SolveStatsSink(backend = "backtrack").also { it.start() }
 
     // Its LP reading waits for the traversal below; nothing arms the slice before the first [runSlice].
@@ -47,9 +48,14 @@ internal class ResumableSatisfaction(
         { traversal.propagationWork() },
         ownsWorkDebt = ownsWorkDebt,
     )
-    private val params = params0.copy(cancellation = cancelledWhen({
-        listOfNotNull(globalToken.deadline(), slice.deadline).minOrNull()
-    }, { globalToken.workScheduled() }) { globalToken() || slice.expired() })
+    private val params = params0.copy(
+        cancellation = object : ExecutionControl() {
+            override fun isCancelled(): Boolean = globalToken() || slice.expired()
+            override fun deadline() = listOfNotNull(globalToken.deadline(), slice.deadline).minOrNull()
+            override val workScheduled get() = globalToken.workScheduled()
+            override val stopPolling get() = globalToken.stopPolling
+        },
+    )
     private var assumptions = params0.assumptions
     private var retiredAffineStatistics: Map<String, Long> = emptyMap()
     private val traversal: CpSatisfactionTraversal = CpSatisfactionTraversal(
@@ -57,9 +63,7 @@ internal class ResumableSatisfaction(
         params,
         sink,
         solver.lpSolveContext,
-        propagationCancellation = cancelledWhen({ globalToken.deadline() }, { globalToken.workScheduled() }) {
-            globalToken()
-        },
+        propagationCancellation = followStopControl { globalToken },
         projection = preparedSession?.projection ?: solver.propagationProjection(params.nativeSat ?: true),
         deferredInitialization = true,
         singleModel = true,
@@ -68,8 +72,12 @@ internal class ResumableSatisfaction(
         preparedSeed = preparedSeed,
         rebindable = rebindable,
         onPropagationWork = onPropagationWork,
-        onRelease = if (affineFactorId < 0) null else { session ->
-            retiredAffineStatistics = session.affineParityStatistics(affineFactorId)
+        onRelease = if (affineFactorId < 0) {
+            null
+        } else {
+            { session ->
+                retiredAffineStatistics = session.affineParityStatistics(affineFactorId)
+            }
         },
         slice = TraversalSlice(pauses = { !globalToken() }, atRoot = atRoot, beforeBranch = {
             slice.charge()
@@ -122,10 +130,10 @@ internal class ResumableSatisfaction(
         return true
     }
 
-    internal fun rebind(assumptions: Assumptions, cancellation: Cancellation) {
+    internal fun rebind(assumptions: Assumptions, cancellation: ExecutionControl) {
         check(rebindable && !closed)
         try {
-            globalToken = lifetimeToken or cancellation
+            globalToken = (lifetimeToken or cancellation).bindStopControl()
             slice.begin(Long.MAX_VALUE, -1L)
             traversal.rebind(assumptions)
             this.assumptions = assumptions
@@ -136,10 +144,10 @@ internal class ResumableSatisfaction(
         }
     }
 
-    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? {
         done?.let { return it }
         check(!closed) { "search is closed" }
-        globalToken = lifetimeToken or global
+        globalToken = (lifetimeToken or global).bindStopControl()
         if (!traversal.hasRootOutcome && !slice.begin(sliceMillis, sliceNodes)) return null
         traversal.fixedCancellationCadence = slice.workBounded
         try {
@@ -151,7 +159,10 @@ internal class ResumableSatisfaction(
                 return null
             }
             return solver.verdictOf(
-                outcome, assumptions, sink, finish = !rebindable,
+                outcome,
+                assumptions,
+                sink,
+                finish = !rebindable,
             ).also {
                 done = it
                 if (!rebindable) close()

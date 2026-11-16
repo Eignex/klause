@@ -47,12 +47,12 @@ import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LinearAuthorityTraversal(
     private val source: SourceProofContext,
     private val budget: SourceLpBudget,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val pause: () -> Boolean,
     private val onIncumbent: (Sample) -> Unit,
     private val incumbent: () -> Pair<Sample, BigFraction>?,
@@ -677,7 +677,7 @@ internal class LinearAuthorityTraversal(
 
     private fun checked(claim: SourceClaim, proof: SourceDerivation): SourceEvidence? {
         val evidence = SourceEvidence(source.scope, claim, proof)
-        val verification = if (aggregateBranches == null) cancellation else Cancellation {
+        val verification = if (aggregateBranches == null) cancellation else ExecutionControl {
             budget.funding?.charge(1L)
             observe("numericalAggregateCoverageWork")
             cancellation() || budget.funding?.exhausted == true
@@ -713,7 +713,7 @@ private class CoverageNode(val condition: SourceCondition) {
         else -> emptySet()
     }
 
-    fun boundCoverage(inherited: SourceEvidence?, minimizes: Boolean, cancellation: Cancellation): BoundCoverage? {
+    fun boundCoverage(inherited: SourceEvidence?, minimizes: Boolean, cancellation: ExecutionControl): BoundCoverage? {
         if (cancellation()) return null
         fun value(evidence: SourceEvidence): BigFraction =
             ((evidence.claim as SourceClaim.Bound).value as SourceValue.Rational).value

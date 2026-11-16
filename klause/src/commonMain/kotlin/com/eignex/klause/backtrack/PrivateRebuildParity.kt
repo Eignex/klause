@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
 
@@ -28,7 +28,7 @@ internal class PrivateRebuildParity private constructor(
 
     val sourceRowCount: Int get() = sourceKeys.size
 
-    fun materializeSourceRows(cancellation: Cancellation): Array<Factor>? {
+    fun materializeSourceRows(cancellation: ExecutionControl): Array<Factor>? {
         cancellation.charge(sourceKeys.size * 2L + 8L)
         if (cancellation()) return null
         val result = ArrayList<Factor>(sourceKeys.size)

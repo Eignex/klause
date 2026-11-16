@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
+import com.eignex.klause.util.StopPolling
 import com.eignex.util.collections.IntArrayList
 
 internal enum class ReclamationStatus { WITHIN_LIMIT, RECLAIMED, PROTECTED_FLOOR, DEFERRED, CANCELLED }
@@ -65,14 +66,20 @@ internal class ReclamationPreparation(
 // Cleanup polls before every bounded mutation, a few work units apart. A short window keeps every poll; a long
 // one reads its token once per interval, so the deadline clocks stay off the cost of each step and a request
 // is still observed within that many steps.
-internal class CleanupCancellation(private val token: () -> Boolean) : () -> Boolean {
+internal class CleanupCancellation(private val polling: StopPolling? = null, private val token: () ->
+    Boolean) : () -> Boolean {
     private var polls = 0
     private var requested = false
 
     override fun invoke(): Boolean {
         if (requested) return true
-        val poll = polls++
+        val shared = polling
+        if (shared != null) {
+            if (!shared.due(1)) return false
+        } else {
+            val poll = polls++
         if (poll >= INTERVAL && poll and (INTERVAL - 1) != 0) return false
+        }
         requested = token()
         return requested
     }

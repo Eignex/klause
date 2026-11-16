@@ -3,9 +3,9 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.linear.AffineSingletons
 import com.eignex.klause.presolve.linear.LinearSubSumAggregation
-import com.eignex.klause.presolve.structural.StructuralReduction
 import com.eignex.klause.presolve.structural.RedundantConstraints
 import com.eignex.klause.presolve.structural.RedundantConstraints.SubsumeIncremental
+import com.eignex.klause.presolve.structural.StructuralReduction
 import com.eignex.klause.propagation.BakedProblem
 
 private const val PROBE_PASS_MAX_CANDIDATES = 2_048
@@ -647,10 +647,10 @@ enum class PresolvePass(
         FOLD_COMPARISON_CLAUSES -> problem.numBoolVars > 0 && problem.numIntVars > 0
         DROP_DEPENDENT_EQUALITIES -> problem.numIntVars > 0 || problem.numRealVars > 0
         ELIMINATE_BOOL_VARS, ELIMINATE_BLOCKED_CLAUSES, IMPLICATION_GRAPH,
-        PROBE_FAILED_LITERALS -> problem.numBoolVars > 0
+        PROBE_FAILED_LITERALS, -> problem.numBoolVars > 0
         ELIMINATE_AFFINE_SINGLETONS, REDUCE_DIOPHANTINE, PROJECT_SINGLETON_INEQUALITIES,
         FUSE_LINEAR_BOUNDS,
-        VALUE_PRECEDENCE, PROBE_INT_BOUNDS, PROBE_INT_HOLES, SUBSTITUTE_BINARY_COLUMNS -> problem.numIntVars > 0
+        VALUE_PRECEDENCE, PROBE_INT_BOUNDS, PROBE_INT_HOLES, SUBSTITUTE_BINARY_COLUMNS, -> problem.numIntVars > 0
         MERGE_DUPLICATE_COLUMNS -> problem.numIntVars >= 2
         else -> true
     }

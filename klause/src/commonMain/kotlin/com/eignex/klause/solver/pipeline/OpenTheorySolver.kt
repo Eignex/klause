@@ -44,7 +44,8 @@ import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import com.eignex.kumulant.stat.summary.MaxResult
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.BigInt
@@ -264,8 +265,8 @@ class OpenTheoryEngine internal constructor(
     // ahead of it. Its result is kept: selecting the plan reads every factor and builds the theory
     // fragment, which on a large model is most of what a short budget has, so several feasibility
     // rounds through one engine pay for it once.
-    private val prepareSource: (Cancellation) -> OpenSourcePreparation,
-    private val preparationCancellation: Cancellation,
+    private val prepareSource: (ExecutionControl) -> OpenSourcePreparation,
+    private val preparationCancellation: ExecutionControl,
     private val reuseOpeningBoundAttempt: Boolean,
     private val sourceSemantics: EffectiveSourceSemantics,
 ) {
@@ -282,7 +283,7 @@ class OpenTheoryEngine internal constructor(
         route,
         PresolveConfig.DEFAULT,
         false,
-        Cancellation.Never,
+        ExecutionControl.Never,
         null,
     )
 
@@ -291,7 +292,7 @@ class OpenTheoryEngine internal constructor(
         route: ProblemPipeline,
         presolveConfig: PresolveConfig,
         solutionSetSensitive: Boolean,
-        presolveCancellation: Cancellation,
+        presolveCancellation: ExecutionControl,
         presolveBudget: PresolveBudget?,
         projections: PreparedFactorProjections? = null,
         capturedPlan: ComponentPlan? = null,
@@ -304,7 +305,7 @@ class OpenTheoryEngine internal constructor(
                 cancellation = cancellation,
                 budget = presolveBudget,
                 projections = projections,
-                presolveCancellation = presolveCancellation or cancellation,
+                presolveCancellation = presolveCancellation .withAccounting(cancellation).includingStop( cancellation),
                 capturedPlan = capturedPlan,
             )
         },
@@ -316,7 +317,7 @@ class OpenTheoryEngine internal constructor(
     /** Decide an already-prepared model under the plan selected from it. */
     internal constructor(
         planned: OpenSourcePreparation.Planned,
-        preparationCancellation: Cancellation,
+        preparationCancellation: ExecutionControl,
         reuseOpeningBoundAttempt: Boolean,
         declaredRoute: ProblemPipeline = planned.route,
     ) : this(declaredRoute, { planned }, preparationCancellation, reuseOpeningBoundAttempt,
@@ -369,7 +370,7 @@ class OpenTheoryEngine internal constructor(
         nodePolicy: SearchNodePolicy,
     ): OpenTheoryStart {
         val work = state.work
-        val cancellation = params.timeout or params.cancellation
+        val cancellation = params.timeout .withAccounting(params.cancellation).includingStop( params.cancellation)
         val stats = SolveStatsSink(backend = declaredRoute.backendName())
         stats.start()
         // Preparation reads the whole model, so a budget already spent is answered before that work
@@ -547,7 +548,7 @@ class OpenTheoryEngine internal constructor(
     }
 
     /** Prepare the source under the caller's stop, once per engine. */
-    private fun prepare(cancellation: Cancellation): OpenSourcePreparation = preparation
+    private fun prepare(cancellation: ExecutionControl): OpenSourcePreparation = preparation
         ?: prepareSource(cancellation).also {
             if (!cancellation() &&
                 (it as? OpenSourcePreparation.Planned)?.plan?.encodingDecline != EncoderDecline.RESOURCE
@@ -555,11 +556,12 @@ class OpenTheoryEngine internal constructor(
         }
 
     /** The bound-closing phase's allowance: what is left of preparation's, capped by the solve's own. */
-    private fun boundCancellation(prepared: PreparedSource, cancellation: Cancellation): Cancellation =
+    private fun boundCancellation(prepared: PreparedSource, cancellation: ExecutionControl): ExecutionControl =
         alsoStoppedBy(cancellation).let { stop -> prepared.budget?.orSpent(stop) ?: stop }
 
     /** The preparation allowance and the solve's own stop, whichever fires first. */
-    private fun alsoStoppedBy(cancellation: Cancellation): Cancellation = preparationCancellation or cancellation
+    private fun alsoStoppedBy(cancellation: ExecutionControl): ExecutionControl =
+        preparationCancellation .includingStop( cancellation)
 
     private fun unknown(
         timedOut: Boolean,
@@ -647,7 +649,7 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
      * already answered. The deferral carries across rounds with it, so a descent whose rounds each
      * branch a little accumulates toward one draw rather than restarting the count.
      */
-    fun candidateHints(plan: ComponentPlan, model: Problem, cancellation: Cancellation): SearchCandidateHints {
+    fun candidateHints(plan: ComponentPlan, model: Problem, cancellation: ExecutionControl): SearchCandidateHints {
         deferred?.let { return it }
         params.openHintFlips ?: return SearchCandidateHints.None.also { deferred = it }
         return DeferredCandidateHints(params.openHintMinSplits) { draw(plan, model, cancellation) }
@@ -655,7 +657,7 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
     }
 
     /** Spend the allowance once the traversal has shown it branches, within what the budget has left. */
-    private fun draw(plan: ComponentPlan, model: Problem, cancellation: Cancellation): SearchCandidateHints {
+    private fun draw(plan: ComponentPlan, model: Problem, cancellation: ExecutionControl): SearchCandidateHints {
         val flips = params.openHintFlips ?: return SearchCandidateHints.None
         // One budget covers the draw and the traversal that reads it: the sink hands out what it still
         // holds and charges what the draw spends.

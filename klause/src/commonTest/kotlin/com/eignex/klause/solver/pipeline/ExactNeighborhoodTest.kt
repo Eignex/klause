@@ -7,7 +7,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,9 +25,9 @@ class ExactNeighborhoodTest {
         }, coordinateValues = { emptyList() }, maximumMoves = 1,
             prepareBooleanCenter = { ++preparations > 1 }, centerPreparationPending = { preparations == 1 })
 
-        assertFalse(search.advance(Cancellation.Never, 10))
+        assertFalse(search.advance(ExecutionControl.Never, 10))
         assertEquals(0.0, search.stats.ls.completions.sum)
-        assertTrue(search.advance(Cancellation.Never, 10))
+        assertTrue(search.advance(ExecutionControl.Never, 10))
 
         assertEquals(2, preparations)
         assertEquals(1, checks)
@@ -45,7 +45,7 @@ class ExactNeighborhoodTest {
             false
         }, completionExhausted = { exhausted })
 
-        assertTrue(search.advance(Cancellation.Never, Long.MAX_VALUE))
+        assertTrue(search.advance(ExecutionControl.Never, Long.MAX_VALUE))
 
         assertEquals(0, checks)
         assertIs<SolveResult.Unknown>(search.solveResult(TerminationReason.BudgetExhausted))
@@ -64,9 +64,9 @@ class ExactNeighborhoodTest {
                 ExactNeighborhoodCondition(emptyMap(), pins, pins)
             })
 
-        assertFalse(search.advance(Cancellation.Never, 10))
+        assertFalse(search.advance(ExecutionControl.Never, 10))
         assertEquals(0.0, search.stats.ls.completions.sum)
-        assertTrue(search.advance(Cancellation.Never, 10))
+        assertTrue(search.advance(ExecutionControl.Never, 10))
 
         assertEquals(conditions[0], conditions[1])
         assertEquals(1L, proposals)
@@ -83,9 +83,9 @@ class ExactNeighborhoodTest {
         }, coordinateValues = { emptyList() }, maximumMoves = 1, prepareBooleanCenter = { true },
             rootCoordinateValue = { BigFraction.ofLong(it + 3L) })
 
-        assertFalse(search.advance(Cancellation.Never, 1))
+        assertFalse(search.advance(ExecutionControl.Never, 1))
         assertTrue(conditions.isEmpty())
-        assertTrue(search.advance(Cancellation.Never, 10))
+        assertTrue(search.advance(ExecutionControl.Never, 10))
 
         assertEquals(mapOf(0 to BigFraction.ofLong(3), 1 to BigFraction.ofLong(4)), conditions.single().lower)
     }
@@ -114,9 +114,9 @@ class ExactNeighborhoodTest {
             },
         )
 
-        assertFalse(search.advance(Cancellation.Never, 1))
+        assertFalse(search.advance(ExecutionControl.Never, 1))
         assertTrue(conditions.isEmpty())
-        assertTrue(search.advance(Cancellation.Never, 10))
+        assertTrue(search.advance(ExecutionControl.Never, 10))
 
         assertEquals(listOf(0, 1, 2), visited)
         assertEquals(mapOf(0 to true, 1 to false, 2 to false), conditions.single().bools)
@@ -143,7 +143,7 @@ class ExactNeighborhoodTest {
             },
         )
 
-        assertFalse(search.advance(Cancellation { cancelled }, 10))
+        assertFalse(search.advance(ExecutionControl { cancelled }, 10))
 
         assertEquals(0, checks)
         assertEquals(1L, search.work)
@@ -166,7 +166,7 @@ class ExactNeighborhoodTest {
             rootBooleanValue = { true },
         )
 
-        assertTrue(search.advance(Cancellation.Never, 10))
+        assertTrue(search.advance(ExecutionControl.Never, 10))
 
         assertEquals(0, checks)
         assertEquals(1L, search.work)
@@ -188,7 +188,7 @@ class ExactNeighborhoodTest {
             prepareBooleanCenter = { false },
         )
 
-        assertTrue(search.advance(Cancellation.Never, 10))
+        assertTrue(search.advance(ExecutionControl.Never, 10))
 
         assertEquals(0, checks)
         assertEquals(1.0, search.stats.ls.completionsUndecided.sum)
@@ -205,7 +205,7 @@ class ExactNeighborhoodTest {
             maximumMoves = 3,
         )
 
-        search.advance(Cancellation.Never, 3)
+        search.advance(ExecutionControl.Never, 3)
 
         assertIs<SolveResult.Unknown>(search.solveResult(TerminationReason.BudgetExhausted))
         assertEquals(3.0, search.stats.ls.completionsRefuted.sum)
@@ -225,7 +225,7 @@ class ExactNeighborhoodTest {
             nodeBudget = NodeBudget(0).allowance,
         )
 
-        search.advance(Cancellation.Never, 10)
+        search.advance(ExecutionControl.Never, 10)
 
         assertEquals(0, checks)
         assertEquals(0.0, search.stats.ls.moves.sum)
@@ -245,8 +245,8 @@ class ExactNeighborhoodTest {
             maximumMoves = 8,
         )
 
-        search.advance(Cancellation.Never, 3)
-        search.advance(Cancellation.Never, 5)
+        search.advance(ExecutionControl.Never, 3)
+        search.advance(ExecutionControl.Never, 5)
 
         assertEquals(BigFraction.ZERO, windows.first().lower[0])
         assertTrue(windows.any { requireNotNull(it.upper[0]) > BigFraction.ONE })
@@ -270,7 +270,7 @@ class ExactNeighborhoodTest {
             maximumMoves = 3,
         )
 
-        search.advance(Cancellation.Never, 3)
+        search.advance(ExecutionControl.Never, 3)
 
         assertEquals(listOf(null, BigFraction.ofLong(10), BigFraction.ofLong(9)), cutoffs)
         assertEquals(

@@ -16,7 +16,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.theory.finiteLinearModel
 import com.eignex.klause.theory.rebindEncoding
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun BakedProblem.fixedDiscreteSample(): Sample? {
     val root = baked as? PropagationResult.Implied ?: return null
@@ -39,7 +39,7 @@ internal class FiniteExactNeighborhood(
     val exhausted: Boolean get() = adapter?.exhausted == true
     val declined: Boolean get() = adapter?.declined == true
 
-    private fun prepare(cancellation: Cancellation): OpenExactNeighborhood? {
+    private fun prepare(cancellation: ExecutionControl): OpenExactNeighborhood? {
         adapter?.let { return it }
         val stop = params.cancellation or params.timeout or cancellation
         if (stop()) return null
@@ -67,7 +67,7 @@ internal class FiniteExactNeighborhood(
 
     override fun check(
         condition: ExactNeighborhoodCondition,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): ExactNeighborhoodResult {
         val result = prepare(cancellation)?.check(condition, cancellation)
             ?: return ExactNeighborhoodResult.Undecided
@@ -117,7 +117,7 @@ internal fun finiteExactNeighborhoodWorker(
         return created
     }
     worker = exactNeighborhoodWorker(if (adaptive) "alns/exact-neighborhood" else "ls/exact-neighborhood",
-        armId, objective, Cancellation.Never, exhausted = { retained?.exhausted == true },
+        armId, objective, ExecutionControl.Never, exhausted = { retained?.exhausted == true },
         declined = { retained?.declined == true },
         open = { adapter().search(adaptive, seed) })
         .bindEvidence(ModelIdentity.of(source, objective), provesResults = false)

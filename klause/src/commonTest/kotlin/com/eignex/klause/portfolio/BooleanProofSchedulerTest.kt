@@ -22,7 +22,7 @@ import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -41,17 +41,17 @@ class BooleanProofSchedulerTest {
     fun `an adopted positive decision should reserve its cube before a peer starts`() {
         val params = BacktrackParams(nativeSat = false, valueSelector = IndomainMax)
         BacktrackSolver(contradiction).openBooleanProof(params).use { search ->
-            search.begin(Assumptions.None, params.maxDecisions, Double.POSITIVE_INFINITY, Cancellation.Never)
-            assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L).reason)
+            search.begin(Assumptions.None, params.maxDecisions, Double.POSITIVE_INFINITY, ExecutionControl.Never)
+            assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L).reason)
             val literal = assertNotNull(search.splitLiteral())
             assertTrue(Lit.isPositive(literal))
             BooleanProofScheduler(contradiction, context, listOf(Lit.variable(literal)),
                 List(2) { params }, true).use { scheduler ->
                 scheduler.adopt(0, search, literal)
-                val peer = scheduler.runSlice(1, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                val peer = scheduler.runSlice(1, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
                 assertEquals(0, peer.task)
                 assertFalse(scheduler.nativeCoverageComplete)
-                val adopted = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                val adopted = scheduler.runSlice(0, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 assertEquals(1, adopted.task)
                 assertTrue(scheduler.nativeCoverageComplete)
@@ -69,13 +69,13 @@ class BooleanProofSchedulerTest {
             val params = BacktrackParams(nativeSat = native, nodeBudget = budget,
                 variableSelector = InputOrder, valueSelector = IndomainMin)
             BacktrackSolver(problem).openBooleanProof(params).use { search ->
-                search.begin(Assumptions.None, params.maxDecisions, Double.POSITIVE_INFINITY, Cancellation.Never)
-                assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 2L).reason)
+                search.begin(Assumptions.None, params.maxDecisions, Double.POSITIVE_INFINITY, ExecutionControl.Never)
+                assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 2L).reason)
                 val literal = assertNotNull(search.splitLiteral())
                 BooleanProofScheduler(problem, context, listOf(Lit.variable(literal)),
                     List(2) { params }, true).use { scheduler ->
                     assertTrue(scheduler.adopt(0, search, literal))
-                    val result = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                    val result = scheduler.runSlice(0, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                     assertEquals(Lit.isPositive(literal), assertNotNull(result.sample).boolValue(Lit.variable(literal)))
                     assertEquals(4L, budget.spent)
@@ -90,8 +90,8 @@ class BooleanProofSchedulerTest {
         val foreign = Problem(5, 0, emptyArray(), contradiction.factors).bake()
         val params = BacktrackParams(nativeSat = false)
         BacktrackSolver(foreign).openBooleanProof(params).use { search ->
-            search.begin(Assumptions.None, params.maxDecisions, Double.POSITIVE_INFINITY, Cancellation.Never)
-            assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L).reason)
+            search.begin(Assumptions.None, params.maxDecisions, Double.POSITIVE_INFINITY, ExecutionControl.Never)
+            assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L).reason)
             val literal = assertNotNull(search.splitLiteral())
             BooleanProofScheduler(contradiction, context, listOf(Lit.variable(literal)),
                 List(2) { params }, true).use { scheduler ->
@@ -108,7 +108,7 @@ class BooleanProofSchedulerTest {
     fun `retained workers should refute every disjoint task without independent proof authority`() {
         BooleanProofScheduler(contradiction, context, listOf(0, 1), List(2) { BacktrackParams() }).use { scheduler ->
             repeat(4) { task ->
-                val step = scheduler.runSlice(task % 2, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                val step = scheduler.runSlice(task % 2, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
                 assertEquals(task, step.task)
             }
 
@@ -127,8 +127,8 @@ class BooleanProofSchedulerTest {
         val scoped = context.copy(scope = context.scope.copy(condition = SourceCondition(bools = assumptions.bools)))
         BooleanProofScheduler(problem, scoped, listOf(0), listOf(BacktrackParams(assumptions = assumptions)))
             .use { scheduler ->
-                scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
-                val step = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                scheduler.runSlice(0, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
+                val step = scheduler.runSlice(0, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 val sample = assertNotNull(step.sample)
                 assertTrue(sample.boolValue(0))
@@ -136,7 +136,7 @@ class BooleanProofSchedulerTest {
                 assertEquals(1, scheduler.completed)
                 assertFalse(scheduler.nativeCoverageComplete)
                 val charged = scheduler.work
-                val repeated = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                val repeated = scheduler.runSlice(0, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
                 assertEquals(sample, repeated.sample)
                 assertEquals(charged, scheduler.work)
             }
@@ -147,10 +147,10 @@ class BooleanProofSchedulerTest {
         val budget = NodeBudget(0L)
         BooleanProofScheduler(contradiction, context, listOf(0), listOf(BacktrackParams(nodeBudget = budget)))
             .use { scheduler ->
-                val first = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                val first = scheduler.runSlice(0, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
                 val work = scheduler.work
                 scheduler.loseWorker(0)
-                val second = scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+                val second = scheduler.runSlice(0, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
 
                 assertEquals(first.task, second.task)
                 assertNull(second.sample)
@@ -163,7 +163,7 @@ class BooleanProofSchedulerTest {
     @Test
     fun `changed assumptions should revoke accepted coverage and retire private state`() {
         BooleanProofScheduler(contradiction, context, listOf(0), listOf(BacktrackParams())).use { scheduler ->
-            scheduler.runSlice(0, Cancellation.Never, Long.MAX_VALUE, 5000L)
+            scheduler.runSlice(0, ExecutionControl.Never, Long.MAX_VALUE, 5000L)
             assertEquals(1, scheduler.completed)
             val work = scheduler.work
 
@@ -187,7 +187,7 @@ class BooleanProofSchedulerTest {
         }
         val problem = Problem(5, 0, emptyArray(), factors).bake()
         BooleanProofScheduler(problem, context, listOf(0), List(2) { BacktrackParams() }).use { scheduler ->
-            val result = scheduler.run(Cancellation.Never, 100L, 1L, 1L)
+            val result = scheduler.run(ExecutionControl.Never, 100L, 1L, 1L)
 
             assertTrue(result is SolveResult.Unsat)
             assertTrue(scheduler.nativeCoverageComplete)
@@ -210,10 +210,10 @@ class BooleanProofSchedulerTest {
         val budget = NodeBudget(0L)
         BooleanProofScheduler(contradiction, context, listOf(0), listOf(BacktrackParams(nodeBudget = budget)))
             .use { scheduler ->
-                scheduler.run(Cancellation.Never, 5000L)
+                scheduler.run(ExecutionControl.Never, 5000L)
                 val charged = scheduler.chargedWork
 
-                scheduler.run(Cancellation.Never, 5000L)
+                scheduler.run(ExecutionControl.Never, 5000L)
 
                 assertEquals(charged, scheduler.chargedWork)
                 assertFalse(scheduler.nativeCoverageComplete)
@@ -231,11 +231,11 @@ class BooleanProofSchedulerTest {
         }
         val params = BacktrackParams(nativeSat = false, branchObserver = observer)
         BooleanProofScheduler(contradiction, context, listOf(0), listOf(params)).use { scheduler ->
-            assertFailsWith<IllegalStateException> { scheduler.run(Cancellation.Never, 5000L) }
+            assertFailsWith<IllegalStateException> { scheduler.run(ExecutionControl.Never, 5000L) }
             assertTrue(scheduler.chargedWork > 0L)
             val previous = attempts
 
-            scheduler.run(Cancellation.Never, scheduler.chargedWork)
+            scheduler.run(ExecutionControl.Never, scheduler.chargedWork)
 
             assertEquals(previous, attempts)
             assertFalse(scheduler.nativeCoverageComplete)
@@ -245,7 +245,7 @@ class BooleanProofSchedulerTest {
     @Test
     fun `cancelled entry should leave every task pending`() {
         BooleanProofScheduler(contradiction, context, listOf(0), listOf(BacktrackParams())).use { scheduler ->
-            val step = scheduler.runSlice(0, Cancellation { true }, Long.MAX_VALUE, 5000L)
+            val step = scheduler.runSlice(0, ExecutionControl { true }, Long.MAX_VALUE, 5000L)
 
             assertNull(step.task)
             assertEquals(2, scheduler.pending)

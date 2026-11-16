@@ -4,7 +4,7 @@ import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -150,7 +150,7 @@ internal object NumericalResidualReplay {
             constructor.newInstance(probe.context, pricing, false)
         } else {
             constructor.newInstance(
-                state, Cancellation.Never, probe.context, 64, 4096, workLimit, false, Int.MAX_VALUE, pricing,
+                state, ExecutionControl.Never, probe.context, 64, 4096, workLimit, false, Int.MAX_VALUE, pricing,
             )
         }
         val steps = ArrayList<JsonElement>()
@@ -166,7 +166,7 @@ internal object NumericalResidualReplay {
                     setupNs += System.nanoTime() - started
                 }
                 val active = requireNotNull(current)
-                val stop = Cancellation.after(2000.milliseconds)
+                val stop = ExecutionControl.after(2000.milliseconds)
                 val solveStarted = System.nanoTime()
                 val prepared = prepare?.invoke(active, stop) as? Boolean ?: true
                 val prepareNs = System.nanoTime() - solveStarted
@@ -291,7 +291,7 @@ internal object NumericalResidualReplay {
     private fun driveCursor(
         owner: Any,
         model: Any,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         observer: Any?,
         quantum: Long,

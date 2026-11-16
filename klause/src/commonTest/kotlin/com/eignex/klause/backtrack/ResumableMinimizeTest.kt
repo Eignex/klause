@@ -10,7 +10,6 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
@@ -43,18 +42,14 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.propagation.PropagationState
-import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
-import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchBranchAttemptObserver
@@ -62,8 +57,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.cancelledWhen
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -101,7 +95,7 @@ internal class UnresolvedRealLeafFixture(val withIncumbent: Boolean) {
     val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
         override fun newPersistentSolver(
             model: LpModel,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             refactorUpdateLimit: Int,
             iterationLimit: Int,
             workLimit: Long,
@@ -214,7 +208,7 @@ class ResumableMinimizeTest {
             lpPlan = LpPlan(componentSplit = false))
 
         val result = BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, 50_000L) { }
+            search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 50_000L) { }
         }
 
         val unbounded = assertIs<MinimizeResult.Unbounded>(result)
@@ -238,7 +232,8 @@ class ResumableMinimizeTest {
                 rootCutHarvest = false, boundMaxDepth = -1))
         val offered = ArrayList<Sample>()
         BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+            search.runSlice(ExecutionControl { offered.isNotEmpty() }, Long.MAX_VALUE,
+                100_000L) { offered += it.sample }
 
             val sample = offered.single()
             assertEquals(2L, sample.ints[0])
@@ -274,7 +269,7 @@ class ResumableMinimizeTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
                 workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
@@ -299,7 +294,7 @@ class ResumableMinimizeTest {
             lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false, boundMaxDepth = -1))
         val offered = ArrayList<Sample>()
-        val stopAtPoint = Cancellation { offered.isNotEmpty() }
+        val stopAtPoint = ExecutionControl { offered.isNotEmpty() }
         BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
             search.runSlice(stopAtPoint, Long.MAX_VALUE, 5_000L) { offered += it.sample }
             assertTrue(offered.isEmpty())
@@ -351,7 +346,7 @@ class ResumableMinimizeTest {
         val offered = ArrayList<Sample>()
         BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
 
-            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
+            search.runSlice(ExecutionControl { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
 
             assertEquals(listOf(1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L), offered.single().ints.toList())
             assertEquals(2, factory.floatAllowances.size)
@@ -379,7 +374,7 @@ class ResumableMinimizeTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
                 workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
@@ -401,7 +396,7 @@ class ResumableMinimizeTest {
             lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true, rootCutHarvest = false))
         BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
             var firstRefreshes: Long? = null
-            val stopAtPoint = Cancellation { firstRefreshes != null }
+            val stopAtPoint = ExecutionControl { firstRefreshes != null }
             search.runSlice(stopAtPoint, Long.MAX_VALUE, 5_000L) {
                 firstRefreshes = 0L
             }
@@ -442,7 +437,7 @@ class ResumableMinimizeTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
                 workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
@@ -466,7 +461,7 @@ class ResumableMinimizeTest {
         BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
             var firstPasses = Double.NaN
             var firstDeferrals = 0L
-            val observed = Cancellation { samples.isNotEmpty() && search.stats.lp.nodePasses.sum > 0.0 }
+            val observed = ExecutionControl { samples.isNotEmpty() && search.stats.lp.nodePasses.sum > 0.0 }
             search.runSlice(observed, Long.MAX_VALUE, 5_000L) { samples += it.sample }
             assertTrue(samples.isEmpty())
 
@@ -509,7 +504,7 @@ class ResumableMinimizeTest {
                 }
             })
         BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
+            search.runSlice(ExecutionControl { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
 
             assertEquals(listOf(0, 2), attempts.take(2))
             assertTrue(assertNotNull(search.stats.lp.phases["PRIMAL_COMPONENT_ORDER_ROOT"]).work > 0L)
@@ -531,7 +526,7 @@ class ResumableMinimizeTest {
         val offered = ArrayList<Sample>()
 
         BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
+            search.runSlice(ExecutionControl { offered.isNotEmpty() }, Long.MAX_VALUE, -1L) { offered += it.sample }
 
             assertEquals(listOf(0L, 1L), offered.first().ints.toList())
             assertTrue((search.stats.lp.phases["PRIMAL_PROPOSAL_ROOT"]?.outcomes?.get("PINS_REJECTED") ?: 0L) > 0L)
@@ -560,7 +555,7 @@ class ResumableMinimizeTest {
                 })
 
             BacktrackSolver(problem).resumable(objective, params).use { search ->
-                search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers.add(it.objective) }
+                search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { offers.add(it.objective) }
 
                 val expected = if (branching) SearchDecision.IntAtMost(0, 0L)
                     else SearchDecision.IntAtLeast(0, 1L)
@@ -591,7 +586,7 @@ class ResumableMinimizeTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
                 workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
@@ -612,7 +607,7 @@ class ResumableMinimizeTest {
             lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false, boundMaxDepth = -1))
         val offered = ArrayList<Sample>()
-        val stopAtWitness = Cancellation { offered.isNotEmpty() }
+        val stopAtWitness = ExecutionControl { offered.isNotEmpty() }
         BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
             search.runSlice(stopAtWitness, Long.MAX_VALUE, 5_000L) { offered += it.sample }
             assertTrue(offered.isEmpty())
@@ -645,7 +640,7 @@ class ResumableMinimizeTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
                 workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 constructions++
@@ -673,7 +668,7 @@ class ResumableMinimizeTest {
             lpConfig = LpConfig.parse("default,+sparse-trial"),
             lpPlan = LpPlan(rootCutHarvest = false))
         val offered = ArrayList<Sample>()
-        val stopAtWitness = Cancellation { offered.isNotEmpty() }
+        val stopAtWitness = ExecutionControl { offered.isNotEmpty() }
         val accept: (MinimizeResult.WithSample) -> Unit = {
             assertEquals(1, queries)
             assertEquals(1, constructions)
@@ -703,7 +698,7 @@ class ResumableMinimizeTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newTableauSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     iterationLimit: Int,
                     workLimit: Long,
                     trackDegeneracy: Boolean,
@@ -738,10 +733,10 @@ class ResumableMinimizeTest {
             val offered = ArrayList<Sample>()
 
             BacktrackSolver(problem, LpSolveContext(factory)).resumable(objective, params).use { search ->
-                search.runSlice(Cancellation.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
+                search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5_000L) { offered += it.sample }
                 val outcome = if (allowance > charged) "PENDING" else "ROOT_WORK_SPENT"
                 assertEquals(1L, search.stats.lp.phases.getValue("PRIMAL_CONTINUATION_ROOT").outcomes[outcome])
-                search.runSlice(Cancellation.Never, Long.MAX_VALUE, 100_000L) { offered += it.sample }
+                search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 100_000L) { offered += it.sample }
             }
 
             if (allowance > charged) {
@@ -803,7 +798,7 @@ class ResumableMinimizeTest {
         var result: MinimizeResult? = null
         search.use {
             while (result == null) {
-                result = it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {
+                result = it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) {
                     assertEquals(3, batches)
                 }
             }
@@ -849,7 +844,7 @@ class ResumableMinimizeTest {
             repeat(3) {
                 if (it > 0) search.rebind(Assumptions.None, 100L)
                 val result = assertIs<MinimizeResult.Optimal>(
-                    search.runSlice(Cancellation.Never, 1000L, 100L) {},
+                    search.runSlice(ExecutionControl.Never, 1000L, 100L) {},
                 )
                 assertEquals(-1.0, result.objective)
             }
@@ -874,7 +869,7 @@ class ResumableMinimizeTest {
         )
 
         ResumableMinimize(BacktrackSolver(problem), objective, params, rebindable = true).use { search ->
-            val initialResult = search.runSlice(Cancellation.Never, 1000L, 100000L) {}
+            val initialResult = search.runSlice(ExecutionControl.Never, 1000L, 100000L) {}
             val initial = assertIs<MinimizeResult.Optimal>(
                 initialResult,
                 if (initialResult == null) {
@@ -886,7 +881,7 @@ class ResumableMinimizeTest {
             assertEquals(-38.0, initial.objective)
 
             search.rebind(Assumptions.None.withInt(0, 0), 100000L)
-            val restrictedResult = search.runSlice(Cancellation.Never, 1000L, 100000L) {}
+            val restrictedResult = search.runSlice(ExecutionControl.Never, 1000L, 100000L) {}
             val restricted = assertIs<MinimizeResult.Optimal>(
                 restrictedResult,
                 if (restrictedResult == null) {
@@ -927,7 +922,7 @@ class ResumableMinimizeTest {
 
         BacktrackSolver(problem).resumable(objective, params).use { search ->
             val result = assertIs<MinimizeResult.BestFound>(
-                search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {},
+                search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {},
             )
 
             assertEquals(4L, firstMaximum)
@@ -952,7 +947,7 @@ class ResumableMinimizeTest {
         val offers = mutableListOf<Double>()
 
         BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
+            search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
         }
 
         assertEquals(listOf(5.0, 0.0), offers)
@@ -974,7 +969,7 @@ class ResumableMinimizeTest {
         val offers = mutableListOf<Double>()
 
         BacktrackSolver(problem).resumable(objective, params).use { search ->
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
+            search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
         }
 
         assertEquals(listOf(0.0), offers)
@@ -995,7 +990,7 @@ class ResumableMinimizeTest {
             BacktrackSolver(problem), objective, params, rebindable = true,
             initialCandidate = Sample(BooleanArray(0), longArrayOf(5L)),
         ).use { search ->
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
+            search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { offers += it.objective }
         }
 
         assertEquals(listOf(0.0), offers)
@@ -1018,7 +1013,7 @@ class ResumableMinimizeTest {
             rebindable = true,
         ).use { search ->
             val initial = assertIs<MinimizeResult.BestFound>(
-                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+                search.runSlice(ExecutionControl.Never, 1000L, 100000L) {},
             )
             assertEquals(-4.0, initial.objective)
             assertTrue(search.stats.lp.rootReducedCostFixes.sum > 0.0)
@@ -1026,7 +1021,7 @@ class ResumableMinimizeTest {
 
             search.rebind(Assumptions.None.withInt(0, 0), 100000L)
             val restricted = assertIs<MinimizeResult.BestFound>(
-                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+                search.runSlice(ExecutionControl.Never, 1000L, 100000L) {},
             )
             assertEquals(TerminationReason.SearchExhausted, restricted.reason)
             assertEquals(3.0, restricted.objective)
@@ -1051,7 +1046,7 @@ class ResumableMinimizeTest {
             rebindable = true,
         ).use { search ->
             val result = assertIs<MinimizeResult.BestFound>(
-                search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+                search.runSlice(ExecutionControl.Never, 1000L, 100000L) {},
             )
             assertEquals(-4.0, result.objective)
             assertEquals(0.0, search.stats.lp.nodePasses.sum)
@@ -1076,12 +1071,12 @@ class ResumableMinimizeTest {
                 rebindable = true,
             ).use { search ->
                 assertIs<MinimizeResult.BestFound>(
-                    search.runSlice(Cancellation.Never, 1000L, 100000L) {},
+                    search.runSlice(ExecutionControl.Never, 1000L, 100000L) {},
                 )
                 cutoff = invalid
                 search.rebind(Assumptions.None.withInt(0, 2), 100000L)
                 assertFailsWith<IllegalArgumentException> {
-                    search.runSlice(Cancellation.Never, 1000L, 100000L) {}
+                    search.runSlice(ExecutionControl.Never, 1000L, 100000L) {}
                 }
             }
         }
@@ -1103,7 +1098,7 @@ class ResumableMinimizeTest {
         ).use { search ->
             val offers = ArrayList<Long>()
             val result = assertIs<MinimizeResult.BestFound>(
-                search.runSlice(Cancellation.Never, 1000L, 100L) { offers += it.sample.ints.single() },
+                search.runSlice(ExecutionControl.Never, 1000L, 100L) { offers += it.sample.ints.single() },
             )
             assertEquals(TerminationReason.SearchExhausted, result.reason)
             assertEquals(values, offers)
@@ -1118,14 +1113,14 @@ class ResumableMinimizeTest {
 
         ResumableMinimize(fixture.solver, fixture.objective, fixture.params, rebindable = true).use { search ->
             val first = assertIs<MinimizeResult.Unknown>(
-                search.runSlice(Cancellation.Never, 1000L, 100L) {},
+                search.runSlice(ExecutionControl.Never, 1000L, 100L) {},
             )
             assertEquals(TerminationReason.Unsupported, first.reason)
 
             fixture.acceptProof = { _, _ -> true }
             search.rebind(Assumptions.None, 100L)
             val second = assertIs<MinimizeResult.Optimal>(
-                search.runSlice(Cancellation.Never, 1000L, 100L) {},
+                search.runSlice(ExecutionControl.Never, 1000L, 100L) {},
             )
             assertEquals(0.5, second.objective)
         }
@@ -1140,7 +1135,7 @@ class ResumableMinimizeTest {
         fixture.solver.resumable(fixture.objective, fixture.params).use { search ->
             var terminal: MinimizeResult? = null
             while (terminal == null) {
-                terminal = search.runSlice(Cancellation.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
+                terminal = search.runSlice(ExecutionControl.Never, sliceMillis = 60_000, sliceNodes = -1L) { }
             }
 
             assertIs<MinimizeResult.Unknown>(terminal)
@@ -1154,7 +1149,7 @@ class ResumableMinimizeTest {
         val factory = RecordingLpEngineFactory()
         var cancelled = false
         val params = fixture.params.copy(
-            cancellation = Cancellation { cancelled },
+            cancellation = ExecutionControl { cancelled },
             clauseExchange = onSearchStart { cancelled = true },
         )
         val solver = BacktrackSolver(fixture.problem, LpSolveContext(factory))
@@ -1164,7 +1159,7 @@ class ResumableMinimizeTest {
             assertEquals(0.0, search.stats.search.nodes.sum)
 
             cancelled = false
-            assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {})
+            assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
         }
     }
 
@@ -1174,7 +1169,7 @@ class ResumableMinimizeTest {
 
         val result = BacktrackSolver(fixture.problem).minimize(
             fixture.objective,
-            fixture.params.copy(cancellation = Cancellation { true }),
+            fixture.params.copy(cancellation = ExecutionControl { true }),
         )
 
         assertIs<MinimizeResult.Unknown>(result)
@@ -1185,7 +1180,7 @@ class ResumableMinimizeTest {
         val fixture = FiniteCutoffKnapsackFixture
         var cancelled = false
         val params = fixture.params.copy(
-            cancellation = Cancellation { cancelled },
+            cancellation = ExecutionControl { cancelled },
             clauseExchange = onSearchStart { cancelled = true },
             lpPlan = fixture.params.lpPlan.copy(componentOwnership = true),
         )

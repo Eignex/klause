@@ -2,7 +2,7 @@ package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -340,7 +340,7 @@ class SearchAtomRegistryTest {
         var cancelled = true
         val session = SearchSession(
             emptyList(),
-            cancellation = Cancellation { cancelled },
+            cancellation = ExecutionControl { cancelled },
             atoms = SearchAtomRegistry(1),
         )
         assertNull(session.registerAtom(Symbol("a"), Symbol("b")))

@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class ComponentLpDeductions(
     val primary: LpDeductionCertificate,
@@ -40,7 +40,7 @@ internal class ComponentLpDeductionCache(size: Int) {
         duals: DoubleArray,
         observer: LpCertificationObserver?,
         policy: LpCertificationPolicy,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         withAlternatives: Boolean,
         sharedMeter: MixedCertificateMeter?,
     ): ComponentLpDeductions? {

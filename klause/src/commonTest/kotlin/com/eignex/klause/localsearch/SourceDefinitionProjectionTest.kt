@@ -15,7 +15,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,7 +31,7 @@ class SourceDefinitionProjectionTest {
             "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
         val state = LocalSearchState(program.problem.bake(), Random(0))
-        state.invariants = sweep.searchingChannels(true, false, Cancellation.Never)
+        state.invariants = sweep.searchingChannels(true, false, ExecutionControl.Never)
             ?.network(program.problem.numIntVars, program.problem.numBoolVars)
         state.assignment.setBool(program.boolVarsByName.getValue("b"), false)
         state.assignment.setInt(program.intVarsByName.getValue("y"), 1)
@@ -47,7 +47,7 @@ class SourceDefinitionProjectionTest {
             "constraint int_eq_reif(x, 1, b) :: defines_var(b); " +
             "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
-        val view = assertNotNull(sweep.searchingChannels(false, true, Cancellation.Never))
+        val view = assertNotNull(sweep.searchingChannels(false, true, ExecutionControl.Never))
         val boolean = program.boolVarsByName.getValue("b")
         val sink = MoveSink(Assumptions.None.withBool(boolean, false)).apply {
             setInvariants(view.network(program.problem.numIntVars, program.problem.numBoolVars))
@@ -65,7 +65,7 @@ class SourceDefinitionProjectionTest {
             "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
-        val view = assertNotNull(sweep.searchingChannels(false, true, Cancellation.Never))
+        val view = assertNotNull(sweep.searchingChannels(false, true, ExecutionControl.Never))
         val network = view.network(program.problem.numIntVars, program.problem.numBoolVars)
 
         assertFalse(network.isDefinedBool(program.boolVarsByName.getValue("b")))
@@ -79,7 +79,7 @@ class SourceDefinitionProjectionTest {
             "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
-        val view = assertNotNull(sweep.searchingChannels(true, false, Cancellation.Never))
+        val view = assertNotNull(sweep.searchingChannels(true, false, ExecutionControl.Never))
         val network = view.network(program.problem.numIntVars, program.problem.numBoolVars)
 
         assertTrue(network.isDefinedBool(program.boolVarsByName.getValue("b")))
@@ -92,7 +92,7 @@ class SourceDefinitionProjectionTest {
             "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
-        assertNull(sweep.searchingChannels(true, true, Cancellation.Never))
+        assertNull(sweep.searchingChannels(true, true, ExecutionControl.Never))
     }
 
     @Test
@@ -101,7 +101,7 @@ class SourceDefinitionProjectionTest {
             "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
         val sweep = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
-        assertNull(sweep.searchingChannels(true, false, Cancellation { true }))
+        assertNull(sweep.searchingChannels(true, false, ExecutionControl { true }))
     }
 
     @Test
@@ -235,7 +235,7 @@ class SourceDefinitionProjectionTest {
         var polls = 0
 
         val cancelled = DefinitionalSweep.fromSource(
-            program.problem, program.definitionHints, Cancellation { ++polls >= 2 },
+            program.problem, program.definitionHints, ExecutionControl { ++polls >= 2 },
         )
         val retry = DefinitionalSweep.fromSource(program.problem, program.definitionHints)
 

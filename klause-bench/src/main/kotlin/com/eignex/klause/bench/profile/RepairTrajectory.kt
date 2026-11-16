@@ -15,12 +15,12 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.FinitePipelinePreparation
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
-import java.io.File
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
 import kotlin.math.abs
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.seconds
@@ -97,7 +97,7 @@ internal object RepairTrajectory {
         val scope = Class.forName("com.eignex.klause.meta.alns.RepairScope").getField("INSTANCE").get(null)
         val freedType = Class.forName("com.eignex.klause.meta.alns.FreedVars")
         val pins = scope.javaClass.methods.single { it.name == "pins" }
-        val stop = Cancellation.after(10.seconds)
+        val stop = ExecutionControl.after(10.seconds)
         val random = Random(seed)
         var centers = 0
         var planned = 0
@@ -231,7 +231,7 @@ internal object RepairTrajectory {
     fun checkSource(problem: BakedProblem, sample: Sample): Boolean {
         val verifier = Class.forName("com.eignex.klause.solver.validation.FiniteWitnessVerificationKt")
             .methods.single { it.name == "finiteWitnessVerifier" && it.parameterCount == 5 }
-            .invoke(null, problem, null, Assumptions.None, Cancellation.after(2.seconds), null)
+            .invoke(null, problem, null, Assumptions.None, ExecutionControl.after(2.seconds), null)
             as CandidateVerifier<Sample, Double?>
         return (verifier.verify(Candidate(sample, null)) is Verification.Accepted).also {
             check(it) { "captured final point failed original-source checking" }

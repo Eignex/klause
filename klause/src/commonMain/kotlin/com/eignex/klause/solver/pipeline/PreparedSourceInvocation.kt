@@ -2,14 +2,14 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 // Route and operation binding selected by setup. A private grid consumer reads it before setup
 // returns the immutable PreparedSourceInvocation.
 internal class SourceRouteSelection(
     val request: SourceSetupRequest,
     val route: SourceProblemRoute,
-    val cancellation: Cancellation,
+    val cancellation: ExecutionControl,
     val linearSource: PreparedLinearSource? = null,
 ) {
     val source: SourceAttachment get() = request.source
@@ -52,12 +52,12 @@ class PreparedSourceInvocation internal constructor(
     internal constructor(
         request: SourceSetupRequest,
         route: SourceProblemRoute,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         linearSource: PreparedLinearSource? = null,
     ) : this(SourceRouteSelection(request, route, cancellation, linearSource))
 
     internal val request: SourceSetupRequest get() = selection.request
-    internal val cancellation: Cancellation get() = selection.cancellation
+    internal val cancellation: ExecutionControl get() = selection.cancellation
     internal val linearSource: PreparedLinearSource? get() = selection.linearSource
 
     /** Existing source route selected once by library setup. */

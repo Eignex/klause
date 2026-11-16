@@ -25,7 +25,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -56,7 +56,7 @@ class LinearBooleanCutsTest {
         val prepared = model().prepareExecutionPlan(objective)
         val source = assertNotNull(assertNotNull(prepared.model).sourceProofContext(scope, objective))
 
-        val result = LinearBooleanCutPreparation.prepare(source, Cancellation.Never)
+        val result = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never)
 
         assertTrue(result.complete, result.reason)
         for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
@@ -71,11 +71,11 @@ class LinearBooleanCutsTest {
     fun `common rows should refute a coupled row while its Boolean remains unpinned`() {
         val source = assertNotNull(model(true).sourceProofContext(scope, objective))
         val baseline = LinearActiveRows(source, SourceLpBudget()).use {
-            it.check(SourceCondition(), Cancellation.Never)
+            it.check(SourceCondition(), ExecutionControl.Never)
         }
 
         val result = LinearActiveRows(source, SourceLpBudget(), composeBranches = true).use {
-            it.check(SourceCondition(), Cancellation.Never)
+            it.check(SourceCondition(), ExecutionControl.Never)
         }
 
         assertNull(baseline.evidence)
@@ -89,7 +89,7 @@ class LinearBooleanCutsTest {
         val source = assertNotNull(model(true).sourceProofContext(scope, objective))
         val proofs = listOf(false, true).map { value ->
             LinearActiveRows(source, SourceLpBudget()).use {
-                val result = it.check(SourceCondition(bools = mapOf(0 to value)), Cancellation.Never)
+                val result = it.check(SourceCondition(bools = mapOf(0 to value)), ExecutionControl.Never)
                 assertNotNull(result.evidence).derivation
             }
         }
@@ -114,7 +114,7 @@ class LinearBooleanCutsTest {
                 SourceClaim.Witness(witness), SourceDerivation.SourceWitness)))
         }
         val result = LinearActiveRows(source, SourceLpBudget(), composeBranches = true).use {
-            it.check(SourceCondition(), Cancellation.Never)
+            it.check(SourceCondition(), ExecutionControl.Never)
         }
 
         assertNull(result.evidence)
@@ -131,7 +131,7 @@ class LinearBooleanCutsTest {
                     mapOf(0 to true)),
             ), mapOf(x to BigFraction.ONE))
 
-            val evidence = LinearBooleanCutPreparation.prepare(source, Cancellation.Never).consequences.single()
+            val evidence = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never).consequences.single()
 
             assertEquals(leftStrict && rightStrict, (evidence.claim as SourceClaim.Consequence).inequality.strict)
             assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(evidence))
@@ -144,7 +144,7 @@ class LinearBooleanCutsTest {
         val premises = source.premises.filterValues { it.guards[0] != false }
         val incomplete = SourceProofContext(scope, source.coordinates, premises, source.objective)
 
-        val result = LinearBooleanCutPreparation.prepare(incomplete, Cancellation.Never)
+        val result = LinearBooleanCutPreparation.prepare(incomplete, ExecutionControl.Never)
 
         assertTrue(result.complete)
         assertTrue(result.consequences.isEmpty())
@@ -164,7 +164,7 @@ class LinearBooleanCutsTest {
             }
             val source = SourceProofContext(scope, setOf(x, bool, other, integer), rows, mapOf(x to BigFraction.ONE))
 
-            val result = LinearBooleanCutPreparation.prepare(source, Cancellation.Never)
+            val result = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never)
 
             assertTrue(result.consequences.isEmpty(), kind)
         }
@@ -174,7 +174,7 @@ class LinearBooleanCutsTest {
     fun `a common row should supply an exact checked objective bound`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
         val row = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.MINUS_ONE), quarter)
-        val common = LinearBooleanCutPreparation.prepare(source, Cancellation.Never).consequences.single {
+        val common = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never).consequences.single {
             it.claim == SourceClaim.Consequence(row)
         }
 
@@ -187,7 +187,7 @@ class LinearBooleanCutsTest {
     @Test
     fun `imported common rows should reject foreign revisions and changed source premises`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
-        val common = LinearBooleanCutPreparation.prepare(source, Cancellation.Never).consequences.first()
+        val common = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never).consequences.first()
         val imported = SourceEvidence(scope.copy(revision = SourceRevision("other", scope.revision.semantics)),
             common.claim, SourceDerivation.Import(common))
         val missing = SourceProofContext(scope, source.coordinates,
@@ -203,11 +203,11 @@ class LinearBooleanCutsTest {
         val restricted = SourceCondition(lower = mapOf(x to BigFraction.ONE), upper = mapOf(y to BigFraction.ZERO))
 
         LinearActiveRows(source, SourceLpBudget(), composeBranches = true).use { checker ->
-            assertNotNull(checker.check(restricted, Cancellation.Never).evidence)
+            assertNotNull(checker.check(restricted, ExecutionControl.Never).evidence)
             checker.retract()
-            assertNull(checker.check(SourceCondition(), Cancellation.Never).evidence)
+            assertNull(checker.check(SourceCondition(), ExecutionControl.Never).evidence)
             checker.retract()
-            assertNotNull(checker.check(restricted, Cancellation.Never).evidence)
+            assertNotNull(checker.check(restricted, ExecutionControl.Never).evidence)
         }
     }
 
@@ -215,9 +215,9 @@ class LinearBooleanCutsTest {
     fun `a consequence import should preserve invocation bounds and objective identity`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
         val restricted = scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO)))
-        val conditioned = LinearBooleanCutPreparation.prepare(source.atScope(restricted), Cancellation.Never)
+        val conditioned = LinearBooleanCutPreparation.prepare(source.atScope(restricted), ExecutionControl.Never)
             .consequences.first()
-        val original = LinearBooleanCutPreparation.prepare(source, Cancellation.Never).consequences.first()
+        val original = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never).consequences.first()
         val foreign = scope.copy(objective = SourceObjective("other", ObjectiveSense.MAXIMIZE))
 
         for ((context, evidence) in listOf(source to SourceEvidence(scope, conditioned.claim,
@@ -230,7 +230,7 @@ class LinearBooleanCutsTest {
     @Test
     fun `a stale common row should not survive a real coordinate remap`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
-        val common = LinearBooleanCutPreparation.prepare(source, Cancellation.Never).consequences.single {
+        val common = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never).consequences.single {
             it.claim == SourceClaim.Consequence(SourceInequality(mapOf(x to BigFraction.ONE,
                 y to BigFraction.MINUS_ONE), quarter))
         }
@@ -276,7 +276,7 @@ class LinearBooleanCutsTest {
             var work = 0L
             var allocation = 0L
 
-            val result = LinearBooleanCutPreparation.prepare(source, Cancellation.Never,
+            val result = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never,
                 { steps, bytes -> work += steps; allocation += bytes }, limits)
 
             assertFalse(result.complete)
@@ -291,9 +291,9 @@ class LinearBooleanCutsTest {
         val source = assertNotNull(model(true).sourceProofContext(scope, objective))
         val funding = SourceLpFunding(1L, 1024L).apply { grant(1L) }
         val result = LinearActiveRows(source, SourceLpBudget(funding = funding), composeBranches = true).use {
-            it.check(SourceCondition(), Cancellation.Never)
+            it.check(SourceCondition(), ExecutionControl.Never)
         }
-        val cancelled = LinearBooleanCutPreparation.prepare(source, Cancellation { true })
+        val cancelled = LinearBooleanCutPreparation.prepare(source, ExecutionControl { true })
 
         assertNull(result.evidence)
         assertEquals(1L, funding.spent)

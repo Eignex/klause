@@ -14,13 +14,13 @@ import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun prepareFactorQuadratic(
     request: SourceSetupRequest,
     projections: PreparedFactorProjections,
-    polynomialStop: Cancellation,
-    stop: Cancellation,
+    polynomialStop: ExecutionControl,
+    stop: ExecutionControl,
 ): SourceProblemRoute {
     val source = request.source.problem
     val bounded = if (source.hasFiniteIntegerRanges()) {
@@ -199,7 +199,9 @@ internal fun executeNativeSource(
                 strategy = request.polynomial.strategy,
             )
             val params = controls.copy(
-                cancellation = controls.cancellation or invocation.cancellation,
+                cancellation = controls.cancellation.withAccounting(
+                    if (controls.cancellation.accounting != null) controls.cancellation else invocation.cancellation,
+                ) or invocation.cancellation,
                 timeout = controls.timeout or invocation.nativeDeadline(),
             )
             SourceExecutionResult.Transcendental(
@@ -211,9 +213,11 @@ internal fun executeNativeSource(
 }
 
 private fun PolynomialTheoryParams.nativeBoundTo(invocation: PreparedSourceInvocation): PolynomialTheoryParams = copy(
-    cancellation = cancellation or invocation.cancellation,
+    cancellation = cancellation.withAccounting(
+        if (cancellation.accounting != null) cancellation else invocation.cancellation,
+    ) or invocation.cancellation,
     timeout = timeout or invocation.nativeDeadline(),
 )
 
-private fun PreparedSourceInvocation.nativeDeadline(): Cancellation =
-    cancellation.deadline()?.let { Cancellation.until(it) } ?: Cancellation.Never
+private fun PreparedSourceInvocation.nativeDeadline(): ExecutionControl =
+    cancellation.deadline()?.let { ExecutionControl.until(it) } ?: ExecutionControl.Never

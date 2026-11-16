@@ -26,7 +26,7 @@ import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class LinearAuthorityLpShape(
     val inputRows: Int, val rows: Int, val columns: Int, val admitted: Boolean,
@@ -107,7 +107,7 @@ internal class LinearAuthorityLp(
         rows: List<ExactRationalInequality>,
         costs: List<BigFraction>,
         constant: BigFraction,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         inactive: Set<Int> = emptySet(),
         onDecline: (String) -> Unit = {},
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
@@ -178,7 +178,7 @@ internal class LinearAuthorityLp(
         costs: List<BigFraction>,
         constant: BigFraction,
         scope: SourceScope,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         inactive: Set<Int>,
         unconditionalRows: Boolean,
     ): LinearAuthorityLpGuidance? {
@@ -252,7 +252,7 @@ internal class LinearAuthorityLp(
 
     fun recover(
         coordinates: List<SourceCoordinate>, point: List<BigFraction>, rows: List<ExactRationalInequality>,
-        inactive: Set<Int>, cancellation: Cancellation, observe: (String, Long) -> Unit,
+        inactive: Set<Int>, cancellation: ExecutionControl, observe: (String, Long) -> Unit,
         progress: LinearPrimalRecoveryProgress,
     ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
         recoverLinearPrimal(coordinates, point, rows, inactive, token, complete = { residual, columns, active ->
@@ -283,7 +283,7 @@ internal class LinearAuthorityLp(
 
     fun refine(
         coordinates: List<SourceCoordinate>, point: List<BigFraction>, rows: List<ExactRationalInequality>,
-        inactive: Set<Int>, costs: List<BigFraction>, cancellation: Cancellation, observe: (String, Long) -> Unit,
+        inactive: Set<Int>, costs: List<BigFraction>, cancellation: ExecutionControl, observe: (String, Long) -> Unit,
     ): List<BigFraction>? = session?.withGuidance(cancellation) { token ->
         refineLinearPrimal(coordinates, point, rows, inactive, costs, token, complete = { residual, objective, active ->
             val retained = objectiveCompletion ?: LinearResidualCompletion(budget, guidancePolicy,
@@ -303,7 +303,7 @@ internal class LinearAuthorityLp(
         coefficients: List<BigFraction>,
         rhs: BigFraction,
         strict: Boolean,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): List<BigFraction>? {
         if (session != null) return LinearAuthorityLp(budget, onShape, onPhase = onPhase).use {
             it.combination(rows, coefficients, rhs, strict, cancellation)

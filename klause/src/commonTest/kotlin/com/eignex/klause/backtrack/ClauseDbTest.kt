@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SearchStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -270,7 +270,8 @@ class ClauseDbTest {
             var stop = true
             val params = BacktrackParams(maxLearnedClauses = 5, tieredLearnedDb = true,
                 learnedMemoryWork = 128L,
-                cancellation = Cancellation { stop && session.learnedLifecycle().getValue("learnedCapVisits") >= 2L })
+                cancellation = ExecutionControl { stop &&
+                    session.learnedLifecycle().getValue("learnedCapVisits") >= 2L })
             forgetIfOverCap(session, params)
             assertEquals(6, session.activeLearnedClauseCount)
 
@@ -347,7 +348,7 @@ class ClauseDbTest {
                         tieredLearnedDb = tiered,
                         learnedMemoryWork = if (mode == "work") 0L else 10_000L,
                         learnedMemoryScratchBytes = if (mode == "scratch") 0L else 10_000L,
-                        cancellation = Cancellation {
+                        cancellation = ExecutionControl {
                             mode == "cancelled" || (mode == "scan" && session.work - before >= 4L)
                         },
                         onEvent = { events.add(it) },
@@ -467,7 +468,7 @@ class ClauseDbTest {
             val baseline = empty.snapshot { pass.retainedMemory(empty, false) }
             val stats = SearchStatsSink()
             var prepared = false
-            val cancellation = Cancellation {
+            val cancellation = ExecutionControl {
                 prepared = prepared || (stats.inprocessProbes >= 9L && session.decisionLevel > 0)
                 prepared && session.decisionLevel == 0
             }

@@ -5,12 +5,12 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class ProblemPipelineFiniteTest(private val engine: FiniteEngine, private val text: String) {
@@ -40,7 +40,7 @@ class ProblemPipelineFiniteTest(private val engine: FiniteEngine, private val te
         })
 
         val invocation = SourceSetup.prepare(SourceSetupRequest(source.source, ExecutionOperation.SATISFY, engine,
-            providers = providers, boundCancellation = Cancellation { true }))
+            providers = providers, boundCancellation = ExecutionControl { true }))
 
         assertIs<SourceProblemRoute.Finite>(invocation.route)
         assertEquals(0, installations)

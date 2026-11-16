@@ -22,7 +22,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.search.SearchInvocationResources
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
@@ -30,7 +30,7 @@ import kotlin.time.TimeSource
 
 internal class LinearIncumbentCompletion(
     private val budget: SourceLpBudget,
-    private val originalCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    private val originalCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
     private val shared: LinearIncumbentSharing? = null,
     private val observe: (String, Long) -> Unit,
 ) : AutoCloseable {
@@ -47,7 +47,7 @@ internal class LinearIncumbentCompletion(
     private val attempts = ArrayList<Attempt>()
     private var closed = false
 
-    fun complete(source: SourceProofContext, seed: Sample, cancellation: Cancellation): Sample? {
+    fun complete(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
         val started = TimeSource.Monotonic.markNow()
         return try {
             completeSeed(source, seed, cancellation)
@@ -56,7 +56,7 @@ internal class LinearIncumbentCompletion(
         }
     }
 
-    private fun completeSeed(source: SourceProofContext, seed: Sample, cancellation: Cancellation): Sample? {
+    private fun completeSeed(source: SourceProofContext, seed: Sample, cancellation: ExecutionControl): Sample? {
         check(!closed)
         if (cancellation()) return null
         if (seed.exactReals != null) return seed
@@ -165,7 +165,7 @@ internal class LinearIncumbentCompletion(
         return point
     }
 
-    private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: Cancellation): List<BigFraction>? {
+    private fun seedPoint(query: LinearAuthorityQuery, seed: Sample, token: ExecutionControl): List<BigFraction>? {
         val point = ArrayList<BigFraction>(query.coordinates.size)
         for (coordinate in query.coordinates) {
             if (token()) return null
@@ -181,7 +181,7 @@ internal class LinearIncumbentCompletion(
         return point.takeUnless { token() }
     }
 
-    private fun prepare(source: SourceProofContext, seed: Sample, token: Cancellation): LinearAuthorityQuery? {
+    private fun prepare(source: SourceProofContext, seed: Sample, token: ExecutionControl): LinearAuthorityQuery? {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported() ||
             source.coordinates.count { it.kind == SourceCoordinate.Kind.Boolean } != seed.numBoolVars ||
             source.coordinates.count { it.kind == SourceCoordinate.Kind.Integer } != seed.numIntVars ||
@@ -225,9 +225,10 @@ internal class LinearIncumbentCompletion(
         observe(stage, count)
     }
 
-    fun checking(cancellation: Cancellation): Cancellation = metered(cancellation, checking = true)
+    fun checking(cancellation: ExecutionControl): ExecutionControl = metered(cancellation, checking = true)
 
-    private fun metered(cancellation: Cancellation, checking: Boolean): Cancellation = object : Cancellation {
+    private fun metered(cancellation: ExecutionControl, checking: Boolean): ExecutionControl =
+        object : ExecutionControl() {
         private val meter = WorkMeter { units ->
             if (checking) budget.observe(boundCertification = units) else budget.observe(preparation = units)
         }
@@ -236,7 +237,7 @@ internal class LinearIncumbentCompletion(
             return closed || cancellation() || budget.funding?.paused == true
         }
         override fun deadline() = cancellation.deadline()
-        override fun workMeter(): WorkMeter = meter
+        override val accounting: WorkMeter get() = meter
     }
 
     private fun finish(attempt: Attempt, point: Sample?): Sample? {

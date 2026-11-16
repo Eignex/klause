@@ -21,7 +21,7 @@ internal fun Propagator.propagationFamily(): FactorFamily = when (this) {
     is ClausePropagator -> FactorFamily.Clause
     is PseudoBooleanPropagator -> FactorFamily.Pb
     is LinearPropagator, is ReifiedLinearPropagator, is WideLinearPropagator,
-    is WideReifiedLinearPropagator -> FactorFamily.Linear
+    is WideReifiedLinearPropagator, -> FactorFamily.Linear
     is TablePropagator -> FactorFamily.Table
     is MddPropagator -> FactorFamily.Mdd
     is AllDifferentPropagator, is AffineDistinctPropagator -> FactorFamily.Distinct

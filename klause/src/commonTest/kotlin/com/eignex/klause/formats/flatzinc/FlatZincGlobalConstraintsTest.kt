@@ -52,7 +52,7 @@ class FlatZincGlobalConstraintsTest {
             constraint klause_disjunctive_opt([true,true,p],[a,b,c],[2,2,2]);
             constraint bool_clause([p,choice],[]);
             solve satisfy;
-        """.trimIndent())
+            """.trimIndent())
 
         val session = PropagationSession(program.sourceProgram.problem)
 
@@ -69,7 +69,7 @@ class FlatZincGlobalConstraintsTest {
                 constraint bool_not(p,q);
                 constraint klause_disjunctive_opt([$guard,$guard],[start,start],[2,2]);
                 solve satisfy;
-            """.trimIndent())
+                """.trimIndent())
 
             val session = PropagationSession(program.sourceProgram.problem)
 
@@ -84,7 +84,7 @@ class FlatZincGlobalConstraintsTest {
             array[1..2] of bool: present = [false,true];
             constraint klause_disjunctive_opt(present,[start,0],[2,2]);
             solve satisfy;
-        """.trimIndent())
+            """.trimIndent())
 
         val samples = BacktrackSolver(program.sourceProgram.problem.bake()).enumerate().toList()
 
@@ -115,7 +115,7 @@ class FlatZincGlobalConstraintsTest {
                     var $domain: d;
                     constraint klause_disjunctive_opt([true,true],[0,1],[1,d]);
                     solve satisfy;
-                """.trimIndent())
+                    """.trimIndent())
             }
         }
     }

@@ -38,7 +38,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ZERO
@@ -85,16 +85,16 @@ class PreparedSearchRegistrationTest {
                     ),
                 ),
             )
-            val prepared = kotlin.test.assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+            val prepared = kotlin.test.assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
             var positiveTrace: List<String>? = null
             for (allowance in listOf(1L, 0L, null)) {
                 val trace = ArrayList<String>()
-                val stop = object : Cancellation {
+                val stop = object : ExecutionControl() {
                     override fun isCancelled(): Boolean {
                         trace += "poll"
                         return false
                     }
-                    override fun workMeter(): WorkMeter = WorkMeter { trace += "charge:$it" }
+                    override val accounting: WorkMeter get() = WorkMeter { trace += "charge:$it" }
                 }
                 val stats = SmtStatsSink()
                 val resources = SearchInvocationResources()
@@ -146,7 +146,7 @@ class PreparedSearchRegistrationTest {
             var calls = 0
             val resources = SearchInvocationResources()
             val stats = SmtStatsSink()
-            val opening = SearchComponentOpening(Cancellation { stopped }, stats, null, resources, openingAllowance)
+            val opening = SearchComponentOpening(ExecutionControl { stopped }, stats, null, resources, openingAllowance)
             opening.registerCandidateHints(
                 intArrayOf(0, 1),
                 SearchCandidateHints {
@@ -186,7 +186,7 @@ class PreparedSearchRegistrationTest {
         for (stopped in listOf(false, true)) {
             val source = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2))))
             val resources = SearchInvocationResources()
-            val opening = SearchComponentOpening(Cancellation { stopped }, null, null, resources)
+            val opening = SearchComponentOpening(ExecutionControl { stopped }, null, null, resources)
             var released = false
             var calls = 0
             opening.registerCandidateHints(
@@ -252,7 +252,7 @@ class PreparedSearchRegistrationTest {
                 source,
                 emptyMap(),
                 Long.MAX_VALUE,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 SearchLearnedDbParams(),
                 stats,
                 openHintFlips = allowance,
@@ -292,7 +292,7 @@ class PreparedSearchRegistrationTest {
                     source,
                     emptyMap(),
                     Long.MAX_VALUE,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     SearchLearnedDbParams(),
                     stats,
                 ).use { planned ->
@@ -351,7 +351,7 @@ class PreparedSearchRegistrationTest {
                 source,
                 emptyMap(),
                 Long.MAX_VALUE,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 SearchLearnedDbParams(),
                 stats,
             ).use { planned ->
@@ -399,7 +399,7 @@ class PreparedSearchRegistrationTest {
                     source,
                     emptyMap(),
                     Long.MAX_VALUE,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     SearchLearnedDbParams(),
                     stats,
                     openHintFlips = allowance,
@@ -450,7 +450,7 @@ class PreparedSearchRegistrationTest {
                 source,
                 emptyMap(),
                 Long.MAX_VALUE,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 SearchLearnedDbParams(),
                 stats,
             ).use { planned ->
@@ -496,7 +496,7 @@ class PreparedSearchRegistrationTest {
                 source,
                 emptyMap(),
                 Long.MAX_VALUE,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 SearchLearnedDbParams(),
                 stats,
                 openHintFlips = allowance,
@@ -532,7 +532,7 @@ class PreparedSearchRegistrationTest {
             source,
             emptyMap(),
             Long.MAX_VALUE,
-            Cancellation.Never,
+            ExecutionControl.Never,
             SearchLearnedDbParams(),
             stats,
         ).use { planned ->
@@ -564,7 +564,7 @@ class PreparedSearchRegistrationTest {
                 source,
                 emptyMap(),
                 Long.MAX_VALUE,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 SearchLearnedDbParams(),
             )
             try {
@@ -618,10 +618,10 @@ class PreparedSearchRegistrationTest {
                     ),
                 )
             }
-            val prepared = kotlin.test.assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+            val prepared = kotlin.test.assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
             for (preference in listOf(false, null)) {
                 val resources = SearchInvocationResources()
-                val opening = SearchComponentOpening(Cancellation.Never, null, null, resources)
+                val opening = SearchComponentOpening(ExecutionControl.Never, null, null, resources)
                 var calls = 0
                 var releases = 0
                 opening.registerCandidateHints(
@@ -675,12 +675,12 @@ class PreparedSearchRegistrationTest {
                     ),
                 ),
             )
-            val prepared = kotlin.test.assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+            val prepared = kotlin.test.assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
             var stopped = false
             var charged = 0L
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = stopped
-                override fun workMeter(): WorkMeter = WorkMeter {
+                override val accounting: WorkMeter get() = WorkMeter {
                     charged += it
                     stopped = true
                 }
@@ -708,9 +708,9 @@ class PreparedSearchRegistrationTest {
             val source = guardedZeroSource(integerCount, numBoolVars = 1)
             var stopped = false
             var charged = 0L
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = stopped
-                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
             source.componentPlan().search(
                 source,
@@ -719,7 +719,7 @@ class PreparedSearchRegistrationTest {
                 stop,
                 SearchLearnedDbParams(),
                 smtStats = null,
-                theorySolveStop = Cancellation.Never,
+                theorySolveStop = ExecutionControl.Never,
             ).use { planned ->
                 assertIs<ComponentResult.Consistent>(planned.session.initialize())
                 assertTrue(charged > 0L)
@@ -799,7 +799,7 @@ class PreparedSearchRegistrationTest {
                 source,
                 emptyMap(),
                 Long.MAX_VALUE,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 SearchLearnedDbParams(),
                 stats,
                 openHintFlips = 1L,
@@ -871,7 +871,7 @@ class PreparedSearchRegistrationTest {
         val prepared = PreparedSearchRegistrations(source, registrations)
 
         val failure = assertFailsWith<IllegalArgumentException> {
-            prepared.open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null)
+            prepared.open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null)
         }
 
         assertSame(primary, failure)
@@ -901,7 +901,7 @@ class PreparedSearchRegistrationTest {
         val prepared = PreparedSearchRegistrations(source, listOf(registration))
 
         assertFailsWith<IllegalArgumentException> {
-            prepared.open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null)
+            prepared.open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null)
         }
 
         assertEquals(1, closes)
@@ -930,7 +930,7 @@ class PreparedSearchRegistrationTest {
             }
         }
         val search = PreparedSearchRegistrations(source, listOf(registration))
-            .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null)
+            .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null)
 
         search.close()
         search.close()
@@ -1029,7 +1029,7 @@ class PreparedSearchRegistrationTest {
             },
         )
 
-        prepared.open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+        prepared.open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
             assertIs<ComponentResult.Consistent>(search.session.initialize())
             val result = assertIs<SearchResult.Satisfied>(search.session.solve(2))
 
@@ -1055,10 +1055,10 @@ class PreparedSearchRegistrationTest {
         }
         val prepared = PreparedSearchRegistrations(source, listOf(registration))
 
-        prepared.open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { first ->
+        prepared.open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { first ->
             assertIs<ComponentResult.Consistent>(first.session.initialize())
             assertIs<ComponentResult.Consistent>(first.session.push(SearchDecision.Bool(0)))
-            prepared.open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { sibling ->
+            prepared.open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { sibling ->
                 assertIs<ComponentResult.Consistent>(sibling.session.initialize())
                 assertIs<ComponentResult.Consistent>(sibling.session.push(SearchDecision.Bool(1)))
 
@@ -1136,7 +1136,7 @@ class PreparedSearchRegistrationTest {
             realUpper = doubleArrayOf(1.0),
         )
         val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
-        prepared.prepareSource(Cancellation.Never)
+        prepared.prepareSource(ExecutionControl.Never)
         val coordinate = SearchExactRealValue(SourceRealId(0))
 
         prepared.open().use { first ->
@@ -1177,7 +1177,7 @@ class PreparedSearchRegistrationTest {
             realUpper = doubleArrayOf(1.0),
         )
         val prepared = PreparedSearchComponents(source.componentPlan(), source, emptyMap())
-        prepared.prepareSource(Cancellation.Never)
+        prepared.prepareSource(ExecutionControl.Never)
 
         val published = prepared.open().use { search ->
             assertIs<ComponentResult.Consistent>(search.session.initialize())

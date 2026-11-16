@@ -5,14 +5,14 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.lang.management.ManagementFactory
-import java.nio.file.Files
-import java.nio.file.Path
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.lang.management.ManagementFactory
+import java.nio.file.Files
+import java.nio.file.Path
 
 /** Allocation and latency of production clausal primal walk construction and repair trials. */
 object ClausePrimalBuffersProfile {
@@ -98,8 +98,8 @@ object ClausePrimalBuffersProfile {
                 bytes = bean.getThreadAllocatedBytes(thread)
                 started = System.nanoTime()
                 for (variable in trialVariables) {
-                    walk.begin(variable, Cancellation.Never)
-                    check(walk.advance(Cancellation.Never, -1L) == true)
+                    walk.begin(variable, ExecutionControl.Never)
+                    check(walk.advance(ExecutionControl.Never, -1L) == true)
                     result.trials++
                 }
                 result.trialNs += System.nanoTime() - started

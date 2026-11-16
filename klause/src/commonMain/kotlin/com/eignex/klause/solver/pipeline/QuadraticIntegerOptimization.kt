@@ -52,7 +52,7 @@ import com.eignex.klause.theory.qfnia.integerBounds
 import com.eignex.klause.theory.qfnia.integerSeeds
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraAssignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong
@@ -183,7 +183,7 @@ internal class QuadraticIntegerOptimization(
     private var initialized = false
     private var traversal: QuadraticIntegerTraversalCursor? = null
     private var neighborhood: QuadraticNeighborhoodCursor? = null
-    private var operation: Cancellation = Cancellation.Never
+    private var operation: ExecutionControl = ExecutionControl.Never
     private val runtime = QuadraticWorkerRuntime(native, sense, { stats }, ::partial) {
         try { traversal?.close() } finally {
             try { neighborhood?.close() } finally { sink.stop() }
@@ -261,11 +261,11 @@ internal class QuadraticIntegerOptimization(
     private fun completeHandle(): QuadraticPortfolioSearch =
         runtime.completeHandle(::countedWork, ::advanceComplete)
 
-    private fun advanceComplete(global: Cancellation, millis: Long, work: Long) {
+    private fun advanceComplete(global: ExecutionControl, millis: Long, work: Long) {
         operation = global
         initialize()
         readIncumbent()?.let { accept(it, heuristic = false) }
-        val stop = native.polynomial or controls.strategy.backtrack.cancellation or Cancellation {
+        val stop = native.polynomial or controls.strategy.backtrack.cancellation or ExecutionControl {
             operation() || budget?.allowance?.exhausted() == true
         }
         if (stop() || params.maximumCandidates == 0L) { terminal = partial(); return }
@@ -330,7 +330,7 @@ internal class QuadraticIntegerOptimization(
     }
 
     private fun complete(): QuadraticOptimizationResult {
-        val stop = native.polynomial or controls.strategy.backtrack.cancellation or Cancellation {
+        val stop = native.polynomial or controls.strategy.backtrack.cancellation or ExecutionControl {
             budget?.allowance?.exhausted() == true
         }
         if (stop() || params.maximumCandidates == 0L) return partial()
@@ -338,7 +338,7 @@ internal class QuadraticIntegerOptimization(
         return completed(exhausted, stop)
     }
 
-    private fun completed(exhausted: Boolean, stop: Cancellation): QuadraticOptimizationResult {
+    private fun completed(exhausted: Boolean, stop: ExecutionControl): QuadraticOptimizationResult {
         globalUnbounded?.let { proof ->
             if (!stop()) return QuadraticOptimizationResult.Unbounded(
                 requireNotNull(incumbent), certificate(proof, QuadraticClaim.Unbounded), sense, stats,
@@ -367,7 +367,7 @@ internal class QuadraticIntegerOptimization(
         )
     }
 
-    private fun traverse(condition: PolynomialCondition, stop: Cancellation, global: Boolean): Boolean {
+    private fun traverse(condition: PolynomialCondition, stop: ExecutionControl, global: Boolean): Boolean {
         if (stop() || params.maximumCandidates == 0L) return false
         val component = QuadraticIntegerComponent(source, condition, relaxation.arithmetic::step) { node, context ->
             sink.search.observeNode(context.decisionLevel)
@@ -430,7 +430,7 @@ internal class QuadraticIntegerOptimization(
     private fun classify(
         condition: PolynomialCondition,
         context: SearchContext,
-        stop: Cancellation,
+        stop: ExecutionControl,
         global: Boolean,
     ): QuadraticIntegerNode {
         if (relevantBooleans.any { it !in condition.bools }) return QuadraticIntegerNode.BranchBooleans
@@ -611,7 +611,9 @@ internal class QuadraticIntegerOptimization(
         val worker = controls.strategy.localSearch
         val maximum = minOf(params.maximumMoves,
             if (adaptive) controls.strategy.alnsIterations.toLong() else Long.MAX_VALUE)
-        val stop = native.polynomial or worker.cancellation or Cancellation { budget?.allowance?.exhausted() == true }
+        val stop = native.polynomial or worker.cancellation or ExecutionControl {
+            budget?.allowance?.exhausted() == true
+        }
         val seeds = source.integerSeeds(stop, relaxation.arithmetic::step).mapIndexed { id, value ->
             relaxation.arithmetic.step()
             val coordinate = source.integerCoordinates[id]

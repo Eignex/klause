@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.parseBigInt
@@ -636,7 +636,7 @@ private val CAPTURE_MAGIC: ByteArray = byteArrayOf(0x4b, 0x4c, 0x50, 0x43, 0x41,
 private class CaptureWriter(
     private val valueLimit: Int = Int.MAX_VALUE,
     private val byteLimit: Int = Int.MAX_VALUE,
-    private val cancellation: Cancellation? = null,
+    private val cancellation: ExecutionControl? = null,
 ) {
     private var data = ByteArray(256)
     private var size = 0
@@ -1120,7 +1120,7 @@ internal class LpExactCapture private constructor(
         }.toByteArray()
     }
 
-    fun encodeWithin(valueLimit: Int, byteLimit: Int, cancellation: Cancellation): ByteArray? {
+    fun encodeWithin(valueLimit: Int, byteLimit: Int, cancellation: ExecutionControl): ByteArray? {
         require(valueLimit >= 0 && byteLimit >= 0)
         if (cancellation() || events.size > valueLimit) return null
         validateFormat()

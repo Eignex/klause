@@ -12,7 +12,7 @@ import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BigInt
@@ -22,12 +22,12 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.remainderOf as bigRemainder
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.roundToLong
+import com.eignex.util.numbers.remainderOf as bigRemainder
 
 private class FloatGridRow(
     val integers: IntArray,
@@ -44,7 +44,7 @@ internal fun lowerGridRow(
     factor: Linear,
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     truncate: Boolean = false,
 ): List<Factor>? {
     val constants = factor.realConstants ?: return null
@@ -57,7 +57,7 @@ internal fun lowerGridRow(
     factor: ReifiedRealLinear,
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     truncate: Boolean = false,
 ): List<Factor>? = lowerGridRow(FloatGridRow(factor.vars, factor.intCoeffs, factor.realVars, factor.realCoeffs,
     factor.op, factor.bound, factor.strict, factor.aux), columns, scale, cancellation, truncate)
@@ -66,7 +66,7 @@ private fun lowerGridRow(
     row: FloatGridRow,
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     truncate: Boolean,
 ): List<Factor>? = with(row) {
     val terms = LinkedHashMap<Int, BigFraction>()
@@ -127,7 +127,7 @@ private fun BigInt.word(): Long? = if (fitsLong()) toLongExact() else null
 internal fun prepareGridAbsImage(
     input: GridCoordinate,
     output: GridCoordinate,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): IntArray? {
     cancellation.charge(input.buckets.toLong())
     if (cancellation()) return null
@@ -152,7 +152,7 @@ internal fun prepareGridAbsImage(
 internal fun lowerGridElement(
     factor: RealElement,
     columns: Map<Int, FloatGridColumn>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<Factor>? {
     if (factor.size == 0) return listOf(Clause(intArrayOf()))
     val output = columns.getValue(factor.result).coordinate
@@ -176,7 +176,7 @@ internal fun lowerGridMinMax(
     factor: RealArrayMinMax,
     columns: Map<Int, FloatGridColumn>,
     scale: Long,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): GridArrayMinMax? {
     val roles = intArrayOf(factor.result) + factor.xs
     val coordinates = IntArray(roles.size)

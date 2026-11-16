@@ -23,7 +23,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -95,7 +95,7 @@ class SearchTest {
                 override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
                     if (cancelled) ComponentResult.Indeterminate else ComponentResult.Consistent
             }) },
-            cancellation = Cancellation { cancelled }, branchObserver = object : SearchBranchAttemptObserver {
+            cancellation = ExecutionControl { cancelled }, branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     cancelled = true
                 }
@@ -164,7 +164,7 @@ class SearchTest {
 
     @Test
     fun `a value probe that sees the deadline should ask the run to poll before it commits`() {
-        val session = PropagationSession(problemOf(IntDomain(0, 3)), Cancellation { true })
+        val session = PropagationSession(problemOf(IntDomain(0, 3)), ExecutionControl { true })
         val params = BacktrackParams(variableSelector = SmallestDomain, valueSelector = Impact(), randomSeed = 0L)
         val brancher = BacktrackBrancher(session, params, sink = null, restart = RestartSchedule.from(params))
         val context = SearchSession(emptyList())

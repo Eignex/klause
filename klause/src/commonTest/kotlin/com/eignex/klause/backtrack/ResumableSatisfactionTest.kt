@@ -4,9 +4,9 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.ClauseExchange
 import com.eignex.klause.propagation.PropagationSession
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
@@ -16,7 +16,7 @@ import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -59,7 +59,7 @@ class ResumableSatisfactionTest {
 
         val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
             var verdict: SolveResult? = null
-            repeat(32) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+            repeat(32) { if (verdict == null) verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
             assertNotNull(verdict)
         }
 
@@ -96,7 +96,7 @@ class ResumableSatisfactionTest {
 
         val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
             var verdict: SolveResult? = null
-            repeat(2048) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+            repeat(2048) { if (verdict == null) verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
             assertNotNull(verdict)
         }
 
@@ -136,7 +136,7 @@ class ResumableSatisfactionTest {
             val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
                 var verdict: SolveResult? = null
                 repeat(32) {
-                    if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork)
+                    if (verdict == null) verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceWork)
                 }
                 assertNotNull(verdict)
             }
@@ -178,7 +178,7 @@ class ResumableSatisfactionTest {
 
         val result = BacktrackSolver(problem).resumableSolve(params).use { search ->
             var verdict: SolveResult? = null
-            repeat(32) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+            repeat(32) { if (verdict == null) verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
             assertNotNull(verdict)
         }
 
@@ -256,7 +256,7 @@ class ResumableSatisfactionTest {
         val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(BacktrackParams(
             clauseExchange = exchange, componentFactory = { listOf(component) },
         ))
-        repeat(10) { if (native == null) search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+        repeat(10) { if (native == null) search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
 
         search.close()
         search.close()
@@ -285,7 +285,8 @@ class ResumableSatisfactionTest {
 
             val result = if (resumed) solver.resumableSolve(params).use { search ->
                 var verdict: SolveResult? = null
-                repeat(100) { if (verdict == null) verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+                repeat(100) { if (verdict == null) verdict = search.runSlice(ExecutionControl.Never,
+                    Long.MAX_VALUE, 1L) }
                 assertNotNull(verdict)
             }
             else solver.solve(params)
@@ -329,7 +330,7 @@ class ResumableSatisfactionTest {
         val search = BacktrackSolver(pigeonhole(3, 2).bake()).resumableSolve(
             BacktrackParams(componentFactory = { listOf(component) }),
         )
-        assertNull(search.runSlice(Cancellation.Never, 0L, 1L))
+        assertNull(search.runSlice(ExecutionControl.Never, 0L, 1L))
 
         search.close()
         search.close()
@@ -353,7 +354,7 @@ class ResumableSatisfactionTest {
             BacktrackParams(componentFactory = { listOf(component) }),
         )
         assertEquals(0, batches)
-        assertNull(search.runSlice(Cancellation.Never, 0L, 1L))
+        assertNull(search.runSlice(ExecutionControl.Never, 0L, 1L))
         assertEquals(0, batches)
 
         val verdict = search.use { runToVerdict(it, 1L) }
@@ -380,7 +381,7 @@ class ResumableSatisfactionTest {
         BacktrackSolver(problem.bake()).resumableSolve(BacktrackParams(randomSeed = 0L))
 
     private fun runToVerdict(search: ResumableSolve, sliceWork: Long): SolveResult {
-        while (true) search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork)?.let { return it }
+        while (true) search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceWork)?.let { return it }
     }
 
     @Test
@@ -403,7 +404,7 @@ class ResumableSatisfactionTest {
     fun `a work-budgeted slice should pause before the search finishes`() {
         val search = handle(pigeonhole(6, 5))
 
-        assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 1L))
+        assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceNodes = 1L))
         assertFalse(search.isDone)
     }
 
@@ -411,7 +412,7 @@ class ResumableSatisfactionTest {
     fun `a fired run token should end the search instead of pausing it`() {
         val search = handle(pigeonhole(6, 5))
 
-        val verdict = search.runSlice(Cancellation { true }, Long.MAX_VALUE, sliceNodes = 1_000_000L)
+        val verdict = search.runSlice(ExecutionControl { true }, Long.MAX_VALUE, sliceNodes = 1_000_000L)
 
         assertIs<SolveResult.Unknown>(verdict)
         assertTrue(search.isDone)
@@ -421,7 +422,7 @@ class ResumableSatisfactionTest {
     fun `a constructor refutation should return even with no slice work allowance`() {
         val search = handle(pigeonhole(2, 1))
 
-        val verdict = search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 0L)
+        val verdict = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceNodes = 0L)
 
         assertIs<SolveResult.Unsat>(verdict)
     }
@@ -431,7 +432,7 @@ class ResumableSatisfactionTest {
         val solver = BacktrackSolver(pigeonhole(3, 2).bake())
 
         assertFailsWith<SearchInitializationCancelled> {
-            solver.resumableSolve(BacktrackParams(cancellation = Cancellation { true }))
+            solver.resumableSolve(BacktrackParams(cancellation = ExecutionControl { true }))
         }
 
         assertIs<SolveResult.Unsat>(runToVerdict(solver.resumableSolve(BacktrackParams()), 1L))
@@ -446,7 +447,7 @@ class ResumableSatisfactionTest {
             BacktrackParams(componentFactory = { listOf(component) }),
         )
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) }
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0L) }
 
         assertIs<SolveResult.Unknown>(result)
         assertTrue(search.isDone)
@@ -468,12 +469,12 @@ class ResumableSatisfactionTest {
     fun `a resumed handle should retain its bound lifetime cancellation scope`() {
         var cancelled = false
         val search = BacktrackSolver(pigeonhole(6, 5).bake()).resumableSolve(
-            BacktrackParams().withLifetimeCancellation(Cancellation { cancelled }),
+            BacktrackParams().withLifetimeCancellation(ExecutionControl { cancelled }),
         )
-        assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L))
+        assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
         cancelled = true
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1L) }
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) }
 
         assertIs<SolveResult.Unknown>(result)
         assertTrue(search.isDone)

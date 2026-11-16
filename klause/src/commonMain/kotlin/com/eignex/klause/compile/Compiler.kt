@@ -56,8 +56,6 @@ import com.eignex.klause.model.IntCmpOp
 import com.eignex.klause.model.IntCompare
 import com.eignex.klause.model.IntDomainSpec
 import com.eignex.klause.model.IntExpr
-import com.eignex.klause.model.IntLit
-import com.eignex.klause.model.IntRef
 import com.eignex.klause.model.IntSpec
 import com.eignex.klause.model.InverseChannel
 import com.eignex.klause.model.LexExpr
@@ -91,7 +89,6 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.projection.FloatGridAbsentPin
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.skema.SchemaDef
-import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntObjectMap
 
 internal class Compiler(

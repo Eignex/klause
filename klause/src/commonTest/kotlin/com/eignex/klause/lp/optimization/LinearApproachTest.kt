@@ -17,7 +17,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -182,7 +182,7 @@ class LinearApproachTest {
             LinearApproach(endpoint, SourceDerivation.Premise("positive")),
         )
 
-        val checked = SourceEvidenceVerifier(source).verify(evidence, Cancellation { true })
+        val checked = SourceEvidenceVerifier(source).verify(evidence, ExecutionControl { true })
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }

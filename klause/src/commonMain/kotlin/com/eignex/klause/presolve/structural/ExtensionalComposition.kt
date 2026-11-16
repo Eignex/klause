@@ -4,7 +4,7 @@ import com.eignex.klause.factor.table.Mdd
 import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.presolve.PassDelta
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 
@@ -26,7 +26,7 @@ internal object ExtensionalComposition {
         val cyclicCells: Int = 65_536,
     )
 
-    private class Meter(val cancellation: Cancellation, val limits: Limits) {
+    private class Meter(val cancellation: ExecutionControl, val limits: Limits) {
         var remaining = limits.work
         var pairRemaining = Int.MAX_VALUE
         var retained = 0
@@ -48,7 +48,7 @@ internal object ExtensionalComposition {
 
     fun reduce(
         factors: Array<Factor>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         limits: Limits = Limits(),
     ): PassDelta {
         val meter = Meter(cancellation, limits)

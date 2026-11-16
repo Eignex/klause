@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -19,7 +19,7 @@ class CoreRefinementTest {
     fun `refinement removes an unrelated pin by a joint refutation`() {
         val literals = IntArray(3) { Lit.make(it, true) }
         val problem = Problem(3, 0, emptyArray(), arrayOf(Clause(literals.copyOfRange(1, 3)))).bake()
-        val refined = CoreRefinement.refine(problem, literals, Assumptions.None, Cancellation.Never) {}
+        val refined = CoreRefinement.refine(problem, literals, Assumptions.None, ExecutionControl.Never) {}
 
         assertContentEquals(literals.copyOfRange(1, 3), refined)
     }
@@ -32,7 +32,7 @@ class CoreRefinementTest {
         )).bake()
         val literals = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true))
 
-        val refined = CoreRefinement.refine(problem, literals, Assumptions.None, Cancellation.Never) {}
+        val refined = CoreRefinement.refine(problem, literals, Assumptions.None, ExecutionControl.Never) {}
 
         assertContentEquals(intArrayOf(literals[0], literals[2]), refined)
     }
@@ -45,7 +45,7 @@ class CoreRefinementTest {
         val literals = intArrayOf(Lit.make(1, true), Lit.make(2, true))
 
         val refined = CoreRefinement.refine(problem, literals, Assumptions(bools = mapOf(0 to false)),
-            Cancellation.Never) {}
+            ExecutionControl.Never) {}
 
         assertContentEquals(intArrayOf(literals[1]), refined)
     }
@@ -56,7 +56,7 @@ class CoreRefinementTest {
         val problem = Problem(3, 0, emptyArray(), arrayOf(Clause(literals.copyOfRange(1, 3)))).bake()
         var cancelled = false
 
-        val refined = CoreRefinement.refine(problem, literals, Assumptions.None, Cancellation { cancelled }) {
+        val refined = CoreRefinement.refine(problem, literals, Assumptions.None, ExecutionControl { cancelled }) {
             cancelled = true
         }
 
@@ -71,7 +71,7 @@ class CoreRefinementTest {
         val search = CoreGuidedSearch(problem, LinearObjective(longArrayOf(1, 100, 100)),
             BacktrackParams(), coreRefinement = CoreRefinementMode.REASONS)
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(100.0, assertIs<MinimizeResult.Optimal>(result).objective)
         assertEquals(2, search.stats.coreGuided.largestCore)
@@ -87,7 +87,7 @@ class CoreRefinementTest {
         val search = CoreGuidedSearch(problem, LinearObjective(longArrayOf(1, 100, 100)),
             BacktrackParams(), coreRefinement = CoreRefinementMode.REASONS)
 
-        search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(3, search.stats.coreGuided.largestCore)
     }
@@ -101,7 +101,7 @@ class CoreRefinementTest {
             BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to false))),
             coreRefinement = CoreRefinementMode.REASONS)
 
-        val result = search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        val result = search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
 
         assertEquals(1.0, assertIs<MinimizeResult.Optimal>(result).objective)
     }

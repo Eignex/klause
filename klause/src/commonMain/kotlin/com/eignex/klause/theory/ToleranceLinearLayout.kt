@@ -29,7 +29,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.solver.validation.RealToleranceScope
 import com.eignex.klause.solver.validation.capturedSourceSlack
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong
@@ -87,7 +87,7 @@ internal class ToleranceLinearLayout(private val problem: Problem, policy: Sourc
 
     // The completion model at [sample]'s discrete coordinates. Null when an encoder declines or [cancellation]
     // stops the encoding.
-    fun model(encoders: PreparedFactorProjections, sample: Sample, cancellation: Cancellation): Problem? {
+    fun model(encoders: PreparedFactorProjections, sample: Sample, cancellation: ExecutionControl): Problem? {
         require(encoders.problem === problem) { "tolerance layout belongs to a different source" }
         val exact = encoders.linearTheoryModel(EncodingTarget.LINEAR, kept,
             (0 until problem.numIntVars).associate { SourceIntId(it) to sample.exactIntValue(it) }, cancellation,

@@ -235,9 +235,7 @@ internal class SubcircuitPropagator(private val succ: IntArray, private val n: I
         }
 
         // A node opted in by its root domain costs no literal.
-        private fun cost(k: Int): Int {
-            return if (k.toLong() in state.rootDomains[succ[k]]) 1 else 0
-        }
+        private fun cost(k: Int): Int = if (k.toLong() in state.rootDomains[succ[k]]) 1 else 0
 
         private fun addLiteral(literal: Int) {
             if (!literals.contains(literal)) literals.add(literal)

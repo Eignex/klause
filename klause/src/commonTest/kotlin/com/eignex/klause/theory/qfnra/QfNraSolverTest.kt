@@ -10,7 +10,7 @@ import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -20,9 +20,31 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class QfNraSolverTest {
+    @Test
+    fun `probe settlement should preserve the primary arithmetic failure`() {
+        val primary = IllegalArgumentException("arithmetic")
+        val cleanup = IllegalStateException("accounting")
+        val work = QfNraWork(QfNraParams(ExecutionControl(accounting = WorkMeter { throw cleanup })))
+        val arithmetic = PolynomialArithmetic(work)
+        work.execution = arithmetic.execution
+
+        val observed = assertFailsWith<IllegalArgumentException> {
+            arithmetic.execution.operation {
+                work.probe {
+                    arithmetic.step()
+                    throw primary
+                }
+            }
+        }
+
+        assertSame(primary, observed)
+        assertSame(cleanup, observed.suppressedExceptions.single())
+    }
+
     @Test
     fun `intermediate root rewrites retain active search`() {
         for (length in listOf(1, 2, 4)) {
@@ -313,14 +335,11 @@ class QfNraSolverTest {
         val source = SmtLibPolynomial.parse(
             "$declarations (assert (= (* x0 x0) 2)) (assert (= (* x0 x1) 1))",
         )
-        var stopped = false
-        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
-            QfNraParams(cancellation = Cancellation { stopped }), PolynomialCondition())
+        lateinit
+        var query: QfNraQuery
+        query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(cancellation = ExecutionControl { query.stats.liftedCells > 0L }), PolynomialCondition())
         var result: QfNraResult? = null
-        while (result == null && query.stats.liftedCells == 0L) result = query.next()
-        assertNull(result)
-
-        stopped = true
         while (result == null) result = query.next()
 
         val unknown = assertIs<QfNraResult.Unknown>(result)
@@ -414,7 +433,8 @@ class QfNraSolverTest {
                 val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
                 assertEquals(0, algebraic.compare(witness.realValue(0), algebraic.rational(BigFraction.ONE)))
                 assertEquals(33, witness.realCount)
-            } else assertIs<QfNraResult.Unsatisfiable>(result)
+            } else
+                assertIs<QfNraResult.Unsatisfiable>(result)
         }
     }
 
@@ -954,7 +974,7 @@ class QfNraSolverTest {
     fun `pre cancelled calls should publish unknown without work`() {
         val source = SmtLibPolynomial.parse("(assert false) (check-sat)")
 
-        val result = solveQfNra(source.formula, 0, 0, QfNraParams(cancellation = Cancellation { true }))
+        val result = solveQfNra(source.formula, 0, 0, QfNraParams(cancellation = ExecutionControl { true }))
 
         val unknown = assertIs<QfNraResult.Unknown>(result)
         assertEquals(QfNraReason.Interrupted, unknown.reason)
@@ -986,9 +1006,9 @@ class QfNraSolverTest {
         )
         val limit = completed.stats.workSpent - 1
         var spent = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= limit
-            override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+            override val accounting: WorkMeter get() = WorkMeter { spent += it }
         }
 
         val result = solveQfNra(source.formula, source.boolCount, source.realCount, QfNraParams(cancellation))
@@ -1076,9 +1096,9 @@ class QfNraSolverTest {
     fun `an opaque containing meter should remain live after arithmetic construction`() {
         var charged = 0L
         var active: WorkMeter? = null
-        val work = QfNraWork(QfNraParams(cancellation = object : Cancellation {
+        val work = QfNraWork(QfNraParams(cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter? = active
+            override val accounting: WorkMeter? get() = active
         }))
         val arithmetic = PolynomialArithmetic(work)
         active = WorkMeter { charged += it }
@@ -1092,7 +1112,7 @@ class QfNraSolverTest {
     @Test
     fun `an optional probe should retain a containing stop that clears after observation`() {
         var pulse = false
-        val work = QfNraWork(QfNraParams(cancellation = Cancellation {
+        val work = QfNraWork(QfNraParams(cancellation = ExecutionControl {
             val observed = pulse
             pulse = false
             observed

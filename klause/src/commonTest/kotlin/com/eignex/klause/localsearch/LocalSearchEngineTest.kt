@@ -27,7 +27,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LocalSearchResidualFactor
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -67,11 +67,11 @@ class LocalSearchEngineTest {
         )
 
         search.resumableSolve(params).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L))
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L))
             assertEquals(0.0, handle.stats.ls.moves.sum)
             expired = false
 
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
             assertTrue(assertIs<SolveResult.Sat>(result).assignment.boolValue(0))
         }
@@ -107,11 +107,11 @@ class LocalSearchEngineTest {
         )
 
         search.resumable(objective, params).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L) {})
             assertEquals(0.0, handle.stats.ls.moves.sum)
             expired = false
 
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {}
 
             assertEquals(0.0, objective.evaluate(assertIs<MinimizeResult.BestFound>(result).sample))
         }
@@ -308,21 +308,21 @@ class LocalSearchEngineTest {
         val problem = Problem(1, 513, Array(513) { IntDomain(0, 9) }, emptyArray())
         val search = LocalSearchEngine(LocalSearchModel.open(problem), greedyRepairOnRestart = false)
         var expired = false
-        val params = LocalSearchParams(randomSeed = 7L).withLifetimeCancellation(Cancellation { expired })
+        val params = LocalSearchParams(randomSeed = 7L).withLifetimeCancellation(ExecutionControl { expired })
         val warm = WarmState()
         search.resumableSolve(params, warm).use { handle ->
             var polls = 0
-            assertNull(handle.runSlice(Cancellation { ++polls >= 12 }, Long.MAX_VALUE, -1L))
+            assertNull(handle.runSlice(ExecutionControl { ++polls >= 12 }, Long.MAX_VALUE, -1L))
             expired = true
 
-            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
 
             assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
             assertEquals(0.0, handle.stats.ls.moves.sum)
             assertFalse(handle.isDone)
         }
         search.resumableSolve(LocalSearchParams(randomSeed = 7L)).use {
-            assertIs<SolveResult.Sat>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            assertIs<SolveResult.Sat>(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
         }
     }
 
@@ -371,10 +371,10 @@ class LocalSearchEngineTest {
                 search.resumableSolve(params, warm).use { handle ->
                     if (stopAt != 0) {
                         var polls = 0
-                        assertNull(handle.runSlice(Cancellation { ++polls >= stopAt }, Long.MAX_VALUE, -1L))
+                        assertNull(handle.runSlice(ExecutionControl { ++polls >= stopAt }, Long.MAX_VALUE, -1L))
                         assertTrue(trace.isEmpty())
                     }
-                    handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+                    handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
                 }
                 trace to budget.movesLeft()
             }
@@ -397,14 +397,14 @@ class LocalSearchEngineTest {
             val warm = WarmState()
             var polls = 0
             val handle = search.resumableSolve(params, warm)
-            assertNull(handle.runSlice(Cancellation { ++polls >= stopAt }, Long.MAX_VALUE, -1L))
+            assertNull(handle.runSlice(ExecutionControl { ++polls >= stopAt }, Long.MAX_VALUE, -1L))
             handle.close()
             handle.close()
             assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
             assertTrue(warm.activityTouches().isEmpty())
-            assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) }
+            assertFailsWith<IllegalStateException> { handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) }
             search.resumableSolve(params, warm).use {
-                assertIs<SolveResult.Unknown>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+                assertIs<SolveResult.Unknown>(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
             }
             assertTrue(warm.bestCostSeen() < Long.MAX_VALUE)
         }
@@ -429,7 +429,7 @@ class LocalSearchEngineTest {
 
             search.resumable(LinearObjective(intCoefficients = longArrayOf(1)), params).use { handle ->
                 val counted = assertIs<InstructionSlicedSearch>(handle)
-                assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {})
+                assertNull(counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) {})
                 val paused = handle.stats.ls.phaseNanos
 
                 assertEquals(paused, handle.stats.ls.phaseNanos)
@@ -475,11 +475,11 @@ class LocalSearchEngineTest {
 
         search.resumable(LinearObjective(intCoefficients = longArrayOf(1)), params).use { handle ->
             val counted = assertIs<InstructionSlicedSearch>(handle)
-            assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 2L) {})
+            assertNull(counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 2L) {})
             val paused = handle.stats.ls.bestResidual
 
             val result = assertIs<MinimizeResult.Unknown>(
-                counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 2L) {},
+                counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 2L) {},
             )
 
             assertEquals(7L, paused?.cost)
@@ -527,11 +527,11 @@ class LocalSearchEngineTest {
         val params = LocalSearchParams(maxFlips = 2L, initialAssignment = Sample(booleanArrayOf(true), LongArray(0)))
 
         search.resumableSolve(params, warm).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L))
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L))
             assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
             assertEquals(0.0, handle.stats.ls.moves.sum)
 
-            val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            val result = assertIs<SolveResult.Sat>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
 
             assertTrue(result.assignment.bools[0])
         }
@@ -556,13 +556,13 @@ class LocalSearchEngineTest {
         val params = LocalSearchParams(maxFlips = 2L, initialAssignment = Sample(booleanArrayOf(false), LongArray(0)))
 
         search.resumableSolve(params, warm).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L))
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L))
             assertEquals(256, initialized.sum())
             assertEquals(Long.MAX_VALUE, warm.bestCostSeen())
             assertEquals(0.0, handle.stats.ls.moves.sum)
             expired = false
 
-            val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            val result = assertIs<SolveResult.Sat>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
 
             assertTrue(result.assignment.bools[0])
             assertTrue(initialized.all { it == 1 })
@@ -595,13 +595,13 @@ class LocalSearchEngineTest {
             LinearObjective(boolWeights = longArrayOf(1)),
             LocalSearchParams(maxFlips = 1L),
         ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) { found += it.sample })
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L) { found += it.sample })
             assertEquals(256, initialized.sum())
             assertTrue(found.isEmpty())
             expired = false
 
             val result = assertIs<MinimizeResult.Unknown>(
-                handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { found += it.sample },
+                handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { found += it.sample },
             )
 
             assertTrue(found.isEmpty())
@@ -625,10 +625,10 @@ class LocalSearchEngineTest {
             LinearObjective(boolWeights = LongArray(32) { 1L }),
             LocalSearchParams(maxFlips = 1L, randomSeed = 3L),
         ).use { handle ->
-            assertNull(handle.runSlice(Cancellation { ++polls >= 3 }, Long.MAX_VALUE, -1L) { found += it.sample })
+            assertNull(handle.runSlice(ExecutionControl { ++polls >= 3 }, Long.MAX_VALUE, -1L) { found += it.sample })
             assertTrue(found.isEmpty())
 
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { found += it.sample }
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { found += it.sample }
 
             assertIs<MinimizeResult.BestFound>(result)
             assertTrue(found.single().bools.all { it })
@@ -672,15 +672,15 @@ class LocalSearchEngineTest {
         val params = LocalSearchParams(
             randomSeed = 3L,
             initialAssignment = Sample(BooleanArray(0), longArrayOf(0)),
-        ).withLifetimeCancellation(Cancellation { cancelled })
+        ).withLifetimeCancellation(ExecutionControl { cancelled })
 
         search.resumable(LinearObjective(intCoefficients = longArrayOf(1)), params).use { handle ->
             val counted = assertIs<InstructionSlicedSearch>(handle)
-            assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {})
+            assertNull(counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) {})
             val before = handle.stats.ls.moves.sum
             cancelled = true
 
-            assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 1L) {})
+            assertNull(counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L) {})
 
             assertEquals(before, handle.stats.ls.moves.sum)
         }

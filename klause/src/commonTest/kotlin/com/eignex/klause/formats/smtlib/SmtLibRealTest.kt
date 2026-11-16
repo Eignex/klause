@@ -8,7 +8,7 @@ import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryCompletion
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
@@ -246,7 +246,7 @@ class SmtLibRealTest {
 
     @Test
     fun `a full predicate table should retain names and still create uncached definitions`() {
-        val predicates = SmtRealPredicates(Cancellation.Never, maxEntries = 2)
+        val predicates = SmtRealPredicates(ExecutionControl.Never, maxEntries = 2)
         val first = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)
         val second = RealComb(emptyMap(), mapOf(1 to BigFraction.ONE), BigFraction.ZERO)
         var next = 0
@@ -260,7 +260,7 @@ class SmtLibRealTest {
 
     @Test
     fun `an interrupted predicate lookup should not create a definition`() {
-        val predicates = SmtRealPredicates(Cancellation { true })
+        val predicates = SmtRealPredicates(ExecutionControl { true })
         val term = RealComb(emptyMap(), mapOf(0 to BigFraction.ONE), BigFraction.ZERO)
         var definitions = 0
 

@@ -55,7 +55,8 @@ import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.theory.SourceToleranceSearch
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -72,10 +73,10 @@ class FiniteSolveRequest(
     val explicitPresolveConfig: Boolean,
     /** Whether the caller needs the exact solution set. */
     val solutionSetSensitive: Boolean,
-    /** Cancellation shared by every engine worker. */
-    val cancellation: Cancellation,
-    /** Cancellation applying only while the model is prepared. */
-    val presolveCancellation: Cancellation = cancellation,
+    /** ExecutionControl shared by every engine worker. */
+    val cancellation: ExecutionControl,
+    /** ExecutionControl applying only while the model is prepared. */
+    val presolveCancellation: ExecutionControl = cancellation,
     /** Optional budget allocated to preparation. */
     val presolveBudget: PresolveBudget?,
     /** Portfolio worker count. */
@@ -181,8 +182,8 @@ class FiniteSolveRequest(
         presolveConfig: PresolveConfig,
         explicitPresolveConfig: Boolean,
         solutionSetSensitive: Boolean,
-        cancellation: Cancellation,
-        presolveCancellation: Cancellation = cancellation,
+        cancellation: ExecutionControl,
+        presolveCancellation: ExecutionControl = cancellation,
         presolveBudget: PresolveBudget?,
         cores: Int,
         engineParams: List<String>,
@@ -385,8 +386,8 @@ internal class FiniteExecutionRequest(
     val lpConfig: LpConfig,
     /** Entering-column policy for exactly zero-objective LP solves. */
     val zeroObjectivePricing: LpZeroObjectivePricing,
-    /** Cancellation shared by every engine worker. */
-    val cancellation: Cancellation,
+    /** ExecutionControl shared by every engine worker. */
+    val cancellation: ExecutionControl,
     /** Invocation-wide node allowance. */
     val nodeBudget: NodeBudget?,
     /** Advisory wall-clock allowance supplied to fixed-backtrack LP components. */
@@ -529,16 +530,17 @@ internal fun FinitePipeline.solve(
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == request.lpSolveContext) {
         "custom LP dependencies require the fixed finite route"
     }
+    val containingStop = request.shape.sourceInvocation?.let {
+        val owner = if (request.cancellation.accounting != null) request.cancellation else it.cancellation
+        request.cancellation.withAccounting(owner).includingStop(it.cancellation).encodingPreparationScope()
+    } ?: request.cancellation
     val validation = request.shape.sourceInvocation?.source?.takeIf { it.witnessValidators.isNotEmpty() }?.let {
-        SourceWitnessPublication(it, request.cancellation or request.shape.sourceInvocation!!.cancellation)
+        SourceWitnessPublication(it, containingStop)
     }
     val publicationCallbacks = if (validation == null) callbacks else FiniteSolveCallbacks(
         { sample -> if (validation.accept(sample)) callbacks.onSample(sample) },
         { improvement -> if (validation.accept(improvement.sample)) callbacks.onImprovement(improvement) },
     )
-    val containingStop = request.shape.sourceInvocation?.let {
-        (request.cancellation or it.cancellation).encodingPreparationScope()
-    } ?: request.cancellation
     val stop = validation?.let { containingStop or it.stop } ?: containingStop
     val gridPublication = request.shape.sourceInvocation?.floatGrid?.let {
         FloatGridPublication(it, stop, request.toleranceCheck, publicationCallbacks)
@@ -742,10 +744,11 @@ internal fun FinitePipeline.solve(
 }
 
 private fun FiniteSolveRequest.preparationRequest(
-    stop: Cancellation,
+    stop: ExecutionControl,
     protectObjective: Boolean = false,
 ): FinitePipelineRequest {
-    val preparationStop = if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation or stop
+    val preparationStop =
+        if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation .includingStop( stop)
     val sourcePreparation = (sourceControls as? SourceFiniteControls.Backtrack)?.params?.let {
         it.lpConfig?.sourcePreparation ?: it.lpPlan.sourcePreparation
     } ?: lpConfig.sourcePreparation ?: LpSourcePreparation.ADMITTED
@@ -758,7 +761,7 @@ private fun FiniteSolveRequest.preparationRequest(
             (shape.sourceInvocation != null && operation == ExecutionOperation.ENUMERATE),
         cancellation = preparationStop,
         solveCancellation = if (protectObjective) {
-            presolveBudget?.orSpent(preparationStop or stop) ?: (preparationStop or stop)
+            presolveBudget?.orSpent(preparationStop .includingStop( stop)) ?:preparationStop .includingStop( stop)
         } else stop,
         presolveBudget = presolveBudget, zeroObjectivePricing = zeroObjectivePricing, randomSeed = randomSeed,
         sourcePreparation = sourcePreparation,
@@ -768,7 +771,7 @@ private fun FiniteSolveRequest.preparationRequest(
 
 private fun FiniteSolveRequest.objectiveCoordinateHints(
     coordinates: FinitePipelinePreparation,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): PreparedSourceHints? {
     val plan = coordinates.executionPlan ?: return null
     if (coordinates.presolve?.infeasible == true || plan.decline != null || stop() ||
@@ -898,12 +901,13 @@ private fun executeSourceFinite(
     val start = TimeSource.Monotonic.markNow()
     val solved = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).solve(
-            controls.params.copy(cancellation = controls.cancellation or request.cancellation),
+            controls.params.copy(cancellation = controls.cancellation .includingStop( request.cancellation),
+        )
         )
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
             completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, null) else null,
-        ).solve(controls.params.copy(cancellation = controls.cancellation or request.cancellation))
+        ).solve(controls.params.copy(cancellation = controls.cancellation .includingStop( request.cancellation)))
     }
     val sample = (solved as? SolveResult.Sat)?.assignment
     if (sample != null) callbacks.onSample(sample)
@@ -929,12 +933,14 @@ private fun executeSourceMinimum(
     val start = TimeSource.Monotonic.markNow()
     val result = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).minimize(
-            objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation),
+            objective, controls.params.copy(cancellation = controls.cancellation .includingStop( request.cancellation),
+        )
         )
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
             completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, objective) else null,
-        ).minimize(objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation))
+        ).minimize(objective, controls.params.copy(cancellation =
+            controls.cancellation .includingStop( request.cancellation)))
     }
     val sample = result.assignment
     if (sample != null) callbacks.onSample(sample)

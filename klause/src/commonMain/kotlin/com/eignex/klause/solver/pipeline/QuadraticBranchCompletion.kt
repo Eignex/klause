@@ -27,11 +27,8 @@ import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.polynomialPointFixings
 import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
-import com.eignex.klause.util.ArithmeticCancellation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.arithmeticSource
-import com.eignex.klause.util.withCheckpoint
 import com.eignex.util.numbers.bigIntOf
 
 internal sealed interface QuadraticBranchResult {
@@ -55,11 +52,11 @@ internal class QuadraticBranchCompletion(
     private val native: QuadraticNativeScope,
 ) {
     private val limits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells)
-    private var operation: Cancellation = Cancellation.Never
-    private fun token(parent: Cancellation): Cancellation = object : ArithmeticCancellation {
-        override fun arithmeticSource() = parent.arithmeticSource()?.withCheckpoint(this::isCancelled)
+    private var operation: ExecutionControl = ExecutionControl.Never
+    private fun token(parent: ExecutionControl): ExecutionControl = object : ExecutionControl() {
+        override val admission get() = parent.admission
         override fun isCancelled(): Boolean = parent() || operation()
-        override fun workMeter(): WorkMeter? = parent.workMeter()
+        override val accounting: WorkMeter? get() = parent.accounting
         override fun deadline() = parent.deadline()?.let { outer ->
             operation.deadline()?.let { inner -> minOf(outer, inner) } ?: outer
         } ?: operation.deadline()
@@ -82,7 +79,7 @@ internal class QuadraticBranchCompletion(
     fun check(
         finite: Sample,
         proposed: PolynomialCondition,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): QuadraticBranchResult {
         operation = cancellation
         return try {
@@ -165,7 +162,7 @@ internal class QuadraticBranchCompletion(
         } catch (_: QuadraticInterrupted) {
             QuadraticBranchResult.Unknown
         } finally {
-            operation = Cancellation.Never
+            operation = ExecutionControl.Never
         }
     }
 

@@ -2,7 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.propagatedImplicationGraph
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 
 /**
@@ -55,7 +55,7 @@ class ImplicitSeeding(
      *  (in id order); seeds past the cap find no forced literals, so the move source degrades to
      *  lone flips. */
     val implicationGraph: Array<IntArray> by lazy {
-        problem.propagatedImplicationGraph(maxImplicationCandidates, Cancellation.Never)
+        problem.propagatedImplicationGraph(maxImplicationCandidates, ExecutionControl.Never)
     }
 
     private fun electImplicitFactors(): IntArray {

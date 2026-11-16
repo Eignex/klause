@@ -6,24 +6,22 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun checkRealFiniteDomains(
     source: Problem,
     sample: Sample,
-    cancellation: Cancellation,
-): Verification<List<BigFraction>, Unit> {
-    return if (sample.numRealVars != source.numRealVars) {
+    cancellation: ExecutionControl,
+): Verification<List<BigFraction>, Unit> = if (sample.numRealVars != source.numRealVars) {
         Verification.Rejected("assignment does not cover the real variables")
     } else {
         finiteDomainCoordinates(source, sample, cancellation)
     }
-}
 
 private fun finiteDomainCoordinates(
     source: Problem,
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<List<BigFraction>, Unit> {
     cancellation.charge(source.numRealVars.toLong())
     if (cancellation()) return Verification.Indeterminate("finite real membership check cancelled")
@@ -72,7 +70,7 @@ private fun isolatedRationalRoot(
     lower: BigFraction,
     upper: BigFraction,
     value: BigFraction,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean? {
     if (cancellation()) return null
     if (value <= lower || value >= upper) return false

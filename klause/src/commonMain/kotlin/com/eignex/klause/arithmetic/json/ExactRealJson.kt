@@ -15,7 +15,7 @@ import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.*
 
 /**
@@ -34,7 +34,7 @@ object ExactRealJson {
     /** Decode and validate every root selection, exponent and analytic function domain. */
     fun decodeFromJsonElement(element: JsonElement): ExactRealValue {
         var polls = 0
-        val stop = Cancellation { ++polls > 100000 }
+        val stop = ExecutionControl { ++polls > 100000 }
         val algebraic = AlgebraicArithmetic(PolynomialArithmetic(stop))
         val arithmetic = ExactRealArithmetic(TranscendentalArithmetic(stop, maximumWork = 100000), algebraic)
         fun decode(node: JsonElement, depth: Int): ExactRealValue {

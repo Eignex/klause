@@ -26,7 +26,7 @@ import com.eignex.klause.propagation.propagate
 import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -514,7 +514,7 @@ class AffineEliminationTest {
         val delta = Presolve.eliminateSourceAffineSingletons(
             problem,
             emptySet(),
-            Cancellation.Never,
+            ExecutionControl.Never,
             AffinePivotOrder.MARKOWITZ,
         )
 
@@ -539,7 +539,7 @@ class AffineEliminationTest {
         val delta = Presolve.eliminateSourceAffineSingletons(
             problem,
             emptySet(),
-            Cancellation.Never,
+            ExecutionControl.Never,
             AffinePivotOrder.MARKOWITZ,
         )
 
@@ -563,7 +563,7 @@ class AffineEliminationTest {
         val delta = Presolve.eliminateSourceAffineSingletons(
             problem,
             setOf(1),
-            Cancellation.Never,
+            ExecutionControl.Never,
             AffinePivotOrder.MARKOWITZ,
         )
 

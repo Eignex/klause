@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -105,7 +105,7 @@ class PolynomialConsequenceRefutationTest {
         val formula = PolynomialFormula.normalize(source.formula, normalization)
         val atoms = assertNotNull(formula.conjunctiveAtoms(normalization, Int.MAX_VALUE))
         var stopped = false
-        val pending = preparePolynomialConsequenceRefutation(atoms, PolynomialArithmetic(Cancellation { stopped }))
+        val pending = preparePolynomialConsequenceRefutation(atoms, PolynomialArithmetic(ExecutionControl { stopped }))
         assertNull(pending.next())
 
         stopped = true
@@ -391,17 +391,17 @@ class PolynomialConsequenceRefutationTest {
         )
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
         var completedWork = 0L
-        val counter = object : Cancellation {
+        val counter = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { completedWork += it }
+            override val accounting: WorkMeter get() = WorkMeter { completedWork += it }
         }
         assertTrue(refutePolynomialConsequences(formula, PolynomialArithmetic(counter), 128, 2048, 4096))
 
         for (limit in listOf(1L, completedWork / 2, completedWork - 1)) {
             var spent = 0L
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = spent >= limit
-                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+                override val accounting: WorkMeter get() = WorkMeter { spent += it }
             }
             assertFailsWith<PolynomialInterrupted> {
                 refutePolynomialConsequences(formula, PolynomialArithmetic(stop), 128, 2048, 4096)

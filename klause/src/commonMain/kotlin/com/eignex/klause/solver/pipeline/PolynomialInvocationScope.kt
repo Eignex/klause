@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraParams
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.concurrent.Mutex
 
 internal class PolynomialInvocationScope(
@@ -18,9 +18,9 @@ internal class PolynomialInvocationScope(
     val resource: PolynomialTheoryResource? get() = lock.withLock { decline }
     val stats: PolynomialTheoryStats get() = native.polynomialStats
     val stopped: Boolean get() = native.stopped
-    val cancellation: Cancellation get() = native.polynomial
+    val cancellation: ExecutionControl get() = native.polynomial
 
-    fun workerCancellation(slot: PortfolioWorkerSlot): Cancellation =
+    fun workerCancellation(slot: PortfolioWorkerSlot): ExecutionControl =
         native.worker(slot.index, params.maximumWork?.let(slot::nativeAllowance)).polynomial or slot.cancellation
 
     fun worker(slot: PortfolioWorkerSlot): PolynomialTheoryInvocation {

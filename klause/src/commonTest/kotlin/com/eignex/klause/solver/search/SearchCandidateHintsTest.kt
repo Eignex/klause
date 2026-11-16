@@ -6,7 +6,7 @@ import com.eignex.klause.solver.pipeline.bindOpenTheoryWork
 import com.eignex.klause.solver.pipeline.observedCandidateHints
 import com.eignex.klause.solver.result.OpenHintUsageSink
 import com.eignex.klause.solver.result.OpenTheoryWorkSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -78,7 +78,7 @@ class SearchCandidateHintsTest {
                 SearchCandidateHints { variable ->
                     if (variable in 2..4) true else null
                 },
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         val caller = SearchCandidateHints.ofLiterals(intArrayOf(literal(0, false)))

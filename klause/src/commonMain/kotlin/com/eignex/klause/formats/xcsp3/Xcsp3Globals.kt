@@ -17,14 +17,12 @@ import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.Regular
-import com.eignex.klause.factor.table.Table
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.LayeredMddData
 import com.eignex.klause.lowering.packLayeredMdd
 import com.eignex.klause.lowering.reifyLinear
-import com.eignex.klause.lowering.tseitinOr
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList

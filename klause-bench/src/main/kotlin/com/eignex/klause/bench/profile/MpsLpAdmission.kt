@@ -15,10 +15,10 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.lp.bounding.LpAutoConfig
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
-import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.objective.LinearObjective
@@ -30,17 +30,17 @@ import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.util.Base64
-import kotlin.time.Duration.Companion.seconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.util.Base64
+import kotlin.time.Duration.Companion.seconds
 
 internal object MpsLpAdmission {
     @JvmStatic
@@ -67,7 +67,7 @@ internal object MpsLpAdmission {
         require(bytes.size <= 16 * 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
         out.resolve("source.mps").writeBytes(bytes)
         val parsed = Mps.parse(bytes.decodeToString())
-        val stop = Cancellation.after(20.seconds)
+        val stop = ExecutionControl.after(20.seconds)
         val original = requireNotNull(parsed.toLinearSourceProblem(cancellation = stop))
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
@@ -203,7 +203,7 @@ internal object MpsLpAdmission {
         problem: Problem,
         objective: LinearObjective?,
         cone: Boolean,
-        stop: Cancellation,
+        stop: ExecutionControl,
         element: Boolean = false,
         elementIndexes: Set<Int>? = null,
         table: Boolean = false,
@@ -233,7 +233,8 @@ internal object MpsLpAdmission {
         return build.invoke(relaxer, domains, emptyList<Any>(), stop)
     }
 
-    private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean, stop: Cancellation): JsonObject {
+    private fun shape(problem: Problem, objective: LinearObjective?, cone: Boolean,
+        stop: ExecutionControl): JsonObject {
         val relaxation = rootRelaxation(problem, objective, cone, stop)
         val model = get(relaxation, "Model")
         val rows = get(model, "M") as Int

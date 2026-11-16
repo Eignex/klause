@@ -15,7 +15,7 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -112,7 +112,7 @@ class ImplicationGraphTest {
             ),
         )
 
-        val delta = Presolve.reduceSourceImplicationGraph(problem, Cancellation.Never, emptySet())
+        val delta = Presolve.reduceSourceImplicationGraph(problem, ExecutionControl.Never, emptySet())
 
         val reduced = assertNotNull(problem.withSourcePassDelta(delta))
         assertTrue(reduced.factors.none { 1 in it.boolVars })
@@ -142,7 +142,7 @@ class ImplicationGraphTest {
         val problem = Problem(16, 0, emptyArray(), emptyList()).bake()
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val delta = Presolve.reduceImplicationGraph(problem, 4, budget.orSpent(Cancellation.Never))
+        val delta = Presolve.reduceImplicationGraph(problem, 4, budget.orSpent(ExecutionControl.Never))
 
         assertTrue(delta.isEmpty)
         assertEquals(0L, budget.rootConstructionEntries)
@@ -158,7 +158,8 @@ class ImplicationGraphTest {
         for (allowance in listOf(1L, 31L, 491L, 681L, 1001L)) {
             val budget = PresolveBudget(allowance)
 
-            val delta = Presolve.reduceSourceImplicationGraph(problem, budget.orSpent(Cancellation.Never), emptySet())
+            val delta = Presolve.reduceSourceImplicationGraph(problem, budget.orSpent(ExecutionControl.Never),
+                emptySet())
 
             assertTrue(delta.isEmpty, "allowance=$allowance")
             assertTrue(delta.rebuild.isEmpty)
@@ -177,7 +178,7 @@ class ImplicationGraphTest {
             val budget = PresolveBudget(allowance)
 
             val delta = Presolve.reduceSourceImplicationGraph(
-                problem, budget.orSpent(Cancellation.Never), (0 until 10).toSet(),
+                problem, budget.orSpent(ExecutionControl.Never), (0 until 10).toSet(),
             )
 
             assertTrue(delta.isEmpty, "allowance=$allowance")
@@ -198,7 +199,7 @@ class ImplicationGraphTest {
             ),
         )
         var polls = 0
-        val token = Cancellation { ++polls == 5 }
+        val token = ExecutionControl { ++polls == 5 }
 
         val delta = Presolve.reduceSourceImplicationGraph(problem, token, emptySet())
 

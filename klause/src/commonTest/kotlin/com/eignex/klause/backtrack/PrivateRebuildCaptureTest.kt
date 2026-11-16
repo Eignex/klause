@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.OWN_ORIGIN
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.SearchStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -92,7 +92,7 @@ class PrivateRebuildCaptureTest {
     fun `cancellation should withhold a complete view`() {
         val session = PropagationSession(source().bake())
         var polls = 0
-        val result = session.withCancellation(Cancellation { ++polls >= 4 }) { capture(session) }
+        val result = session.withCancellation(ExecutionControl { ++polls >= 4 }) { capture(session) }
 
         assertNull(result["inprocessRootRebuildComplete"])
         assertNull(result["inprocessRootRebuildNewCandidates"])

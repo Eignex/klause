@@ -19,7 +19,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.conditionedLinearSupported
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Execution data selected from a source, before any mutable search state is allocated. */
 enum class PreparedExecutionKind {
@@ -263,10 +263,10 @@ class PreparedSourcePlan private constructor(
      * Returns null when a required source factor has no such completion. The returned plan admits
      * registered source rows; each query's conditions and mutable session belong to its worker.
      */
-    fun prepareConditionedLinearQuery(): PreparedSourcePlan? = prepareConditionedLinearQuery(Cancellation.Never)
+    fun prepareConditionedLinearQuery(): PreparedSourcePlan? = prepareConditionedLinearQuery(ExecutionControl.Never)
 
     /** Prepare the conditioned linear adapter under the current containing construction controls. */
-    fun prepareConditionedLinearQuery(cancellation: Cancellation): PreparedSourcePlan? {
+    fun prepareConditionedLinearQuery(cancellation: ExecutionControl): PreparedSourcePlan? {
         val selected = execution.finiteLinear ?: return null
         val ownership = selected.ownership.forLinearConditions(selected.model, cancellation = cancellation)
             ?: return null
@@ -349,7 +349,7 @@ fun Problem.prepareExecutionPlan(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     preferFinite: Boolean = false,
-): PreparedSourcePlan = prepareExecutionPlan(objective, maximize, preferFinite, Cancellation.Never)
+): PreparedSourcePlan = prepareExecutionPlan(objective, maximize, preferFinite, ExecutionControl.Never)
 
 /** Capture per-invocation factor mechanisms before selecting source ownership and admission. */
 fun Problem.prepareExecutionPlan(
@@ -357,14 +357,14 @@ fun Problem.prepareExecutionPlan(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     preferFinite: Boolean = false,
-): PreparedSourcePlan = prepareExecutionPlan(providers, objective, maximize, preferFinite, Cancellation.Never)
+): PreparedSourcePlan = prepareExecutionPlan(providers, objective, maximize, preferFinite, ExecutionControl.Never)
 
 /** Prepare source ownership and completion without running a solver or inventing finite bounds. */
 fun Problem.prepareExecutionPlan(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     preferFinite: Boolean = false,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PreparedSourcePlan = prepareExecutionPlan(this, objective, maximize, preferFinite, cancellation = cancellation)
 
 /** Capture per-invocation factor mechanisms before selecting source ownership and admission. */
@@ -373,7 +373,7 @@ fun Problem.prepareExecutionPlan(
     objective: LinearObjective? = null,
     maximize: Boolean = false,
     preferFinite: Boolean = false,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PreparedSourcePlan = prepareExecutionPlan(
     this,
     objective,
@@ -392,7 +392,7 @@ internal fun Problem.prepareExecutionPlan(
         ?: FactorProjectionProviders.Default,
     projections: PreparedFactorProjections = (this as? BakedProblem)?.factorProjections
         ?.takeIf { it.providers === providers } ?: providers.prepare(this),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): PreparedSourcePlan {
     projections.requireSource(this)
     if (requiresPolynomialCompletion(projections, preferFinite)) {
@@ -530,7 +530,7 @@ internal fun Problem.preparePolynomialExecutionPlan(
     maximize: Boolean = false,
     providers: FactorProjectionProviders = FactorProjectionProviders.Default,
     projections: PreparedFactorProjections = providers.prepare(this),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): PreparedSourcePlan {
     projections.requireSource(this)
     val openInteger = (0 until numIntVars).any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) }
@@ -640,11 +640,11 @@ internal fun Problem.preparePolynomialExecutionPlan(
 
 /** Preserve the original polynomial snapshot while preparing its finite and completion projections. */
 fun PolynomialRealProblem.prepareExecutionPlan(): PreparedSourcePlan =
-    prepareExecutionPlan(ProblemSettings(), Cancellation.Never)
+    prepareExecutionPlan(ProblemSettings(), ExecutionControl.Never)
 
 internal fun PolynomialRealProblem.prepareExecutionPlan(
     settings: ProblemSettings,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PreparedSourcePlan = Problem(
     numBoolVars = totalBoolCount, numIntVars = 0, intDomains = emptyArray(), factors = emptyArray(),
     numRealVars = totalRealCount,

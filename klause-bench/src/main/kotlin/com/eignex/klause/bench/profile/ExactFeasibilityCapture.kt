@@ -18,13 +18,7 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchNodePolicy
-import com.eignex.klause.util.Cancellation
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.lang.reflect.Proxy
-import java.util.IdentityHashMap
-import java.util.concurrent.TimeUnit
-import kotlin.time.Duration.Companion.milliseconds
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -32,6 +26,12 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.lang.reflect.Proxy
+import java.util.IdentityHashMap
+import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
 import java.lang.reflect.Array as ReflectArray
 
 internal object ExactFeasibilityCapture {
@@ -54,7 +54,7 @@ internal object ExactFeasibilityCapture {
         require(bytes.size <= 1024 * 1024 && sha256(bytes) == options.getValue("sha256"))
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        val stop = Cancellation.after(10_000.milliseconds)
+        val stop = ExecutionControl.after(10_000.milliseconds)
         val compiled = SmtLib.parse(bytes.decodeToString(), cancellation = stop)
         require(compiled.objective == null)
         val invocation = SourceSetup.prepare(SourceSetupRequest(
@@ -268,7 +268,7 @@ internal object ExactFeasibilityCapture {
         }
         val started = System.nanoTime()
         val result = method.invoke(
-            null, model, basis, cache, Cancellation.after(10_000.milliseconds), limits, 20, true, metrics,
+            null, model, basis, cache, ExecutionControl.after(10_000.milliseconds), limits, 20, true, metrics,
         )
         val elapsed = System.nanoTime() - started
         return buildJsonObject {

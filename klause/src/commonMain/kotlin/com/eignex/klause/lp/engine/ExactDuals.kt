@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.koblas.SparseMatrix
 import com.eignex.util.numbers.BIG_ONE
@@ -103,7 +103,7 @@ internal fun exactBasisDuals(
     model: LpModel,
     basis: Basis,
     start: DoubleArray,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ExactDualLimits = ExactDualLimits(),
 ): ExactDualsOutcome {
     val exact = model.exactState?.model ?: return declined(ExactDualDecline.SHAPE)
@@ -124,7 +124,7 @@ private fun declined(reason: ExactDualDecline, steps: Int = 0) = ExactDualsOutco
 
 private class ExactDualStop(val reason: ExactDualDecline) : RuntimeException()
 
-private class ExactDualMeter(val limits: ExactDualLimits, private val cancellation: Cancellation) {
+private class ExactDualMeter(val limits: ExactDualLimits, private val cancellation: ExecutionControl) {
     private val started = TimeSource.Monotonic.markNow()
     private val stride = PollStride()
     private var allocation = 0L

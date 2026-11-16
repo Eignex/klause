@@ -11,7 +11,7 @@ import com.eignex.klause.solver.RepairSearchStep
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 @Suppress("TooGenericExceptionCaught") // preserve engine failures while releasing retained query state
 internal class BooleanSatisfactionRepair(
@@ -34,8 +34,8 @@ internal class BooleanSatisfactionRepair(
     private var assumptions: Assumptions? = null
 
     internal fun matches(problem: BakedProblem, params: BacktrackParams): Boolean =
-        !closed && started && this.problem === problem && this.params.copy(cancellation = Cancellation.Never) ==
-            params.copy(cancellation = Cancellation.Never)
+        !closed && started && this.problem === problem && this.params.copy(cancellation = ExecutionControl.Never) ==
+            params.copy(cancellation = ExecutionControl.Never)
 
     internal fun matchesCondition(assumptions: Assumptions): Boolean = this.assumptions == assumptions
 
@@ -59,7 +59,7 @@ internal class BooleanSatisfactionRepair(
         assumptions: Assumptions,
         decisionBudget: Long,
         cutoff: Double,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ) {
         check(!closed)
         try {
@@ -76,7 +76,7 @@ internal class BooleanSatisfactionRepair(
         }
     }
 
-    override fun runSlice(cancellation: Cancellation, millis: Long, work: Long): RepairSearchStep {
+    override fun runSlice(cancellation: ExecutionControl, millis: Long, work: Long): RepairSearchStep {
         check(!closed && started)
         try {
             return when (val result = handle.runSlice(cancellation, millis, work)) {

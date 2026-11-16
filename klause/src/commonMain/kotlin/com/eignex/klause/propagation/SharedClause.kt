@@ -75,7 +75,7 @@ interface ClauseExchange {
     fun onSearchEnd(session: PropagationSession) {}
 
     /** Observe retained state at a cooperative pause without exchanging clauses or draining use credit.
-     *  Cancellation boundaries use [onSearchEnd] instead. Default no-op. */
+     *  ExecutionControl boundaries use [onSearchEnd] instead. Default no-op. */
     fun onSearchPause(session: PropagationSession) {}
 
     /** Release worker-private exchange state when the owning search is retired, after its final use drain.

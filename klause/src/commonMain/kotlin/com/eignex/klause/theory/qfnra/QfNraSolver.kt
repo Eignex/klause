@@ -20,21 +20,15 @@ import com.eignex.klause.theory.qfnra.PolynomialSigns.NEGATIVE_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.POSITIVE_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.ZERO_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
-import com.eignex.klause.util.ArithmeticCancellation
-import com.eignex.klause.util.ArithmeticWorkSource
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.WorkCreditPool
-import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.WorkReservation
-import com.eignex.klause.util.arithmeticSource
-import com.eignex.klause.util.reserveWork
+import com.eignex.klause.util.ArithmeticBudget
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.shl
 
 internal data class QfNraParams(
-    val cancellation: Cancellation = Cancellation.Never,
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     val maximumWork: Long? = null,
     val polynomialLimits: PolynomialLimits = PolynomialLimits(),
     val cellRefinement: Boolean = false,
@@ -106,7 +100,9 @@ internal class QfNraQuery(
     condition: PolynomialCondition,
 ) {
     private val work = QfNraWork(params)
-    private val arithmetic = PolynomialArithmetic(work, params.polynomialLimits)
+    private val arithmetic = PolynomialArithmetic(work, params.polynomialLimits).also {
+        work.execution = it.execution
+    }
     var failureCapture: PolynomialFailureCapture? = null
         set(value) {
             check(work.spentWork == 0L && result == null) { "attach failure capture before query entry" }
@@ -119,9 +115,11 @@ internal class QfNraQuery(
     } else null
     private val cellRefinement = if (params.cellRefinement) {
         PolynomialCellRefinement(formula, condition, work, params.polynomialLimits, cellFeedback) {
-            checkedCellObserver?.invoke(it)
+            checkedCellObserver?.let { observer -> arithmetic.execution.handoff { observer(it) } }
         }
-    } else null
+    } else {
+        null
+    }
     private val coupledSections = if (params.coupledSections) {
         PolynomialCoupledSections(work, params.polynomialLimits,
             prepareSupports = params.coupledPreparation, joint = params.coupledJoint)
@@ -141,6 +139,7 @@ internal class QfNraQuery(
     var probeCompleted: Boolean = false
         private set
     private var result: QfNraResult? = null
+    private var firstAdvance = true
     private val preparation = sequence<QfNraResult?> {
         val algebraic = AlgebraicArithmetic(arithmetic)
         try {
@@ -293,8 +292,13 @@ internal class QfNraQuery(
                 }
             }
             arithmetic.step()
-            yield(if (refuted) QfNraResult.Unsatisfiable(work.snapshot())
-                else QfNraResult.Satisfiable(checkNotNull(checked), work.snapshot()))
+            yield(
+                if (refuted) {
+                    QfNraResult.Unsatisfiable(work.snapshot())
+                } else {
+                    QfNraResult.Satisfiable(checkNotNull(checked), work.snapshot())
+                },
+            )
             return@sequence
         }
         yield(null)
@@ -303,20 +307,32 @@ internal class QfNraQuery(
         work.booleanTheoryAtoms = work.booleanTheoryAtoms ?: 0
         work.booleanTheoryConstantRefutations = work.booleanTheoryConstantRefutations ?: 0
         work.booleanTheoryResourceRefusals = work.booleanTheoryResourceRefusals ?: 0
-        val regions = reducedFormula.booleanRegions(arithmetic, progress,
-            onPartialCheck = failureCapture?.let { capture -> { owner, premises ->
-                capture.signCheck(owner, premises, progress.searchSnapshot, work.spentWork, arithmetic)
-            } },
+        val regions = reducedFormula.booleanRegions(
+            arithmetic,
+            progress,
+            onPartialCheck = failureCapture?.let { capture ->
+                { owner, premises ->
+                    capture.signCheck(owner, premises, progress.searchSnapshot, work.spentWork, arithmetic)
+                }
+            },
             onConflict = {
                 failureCapture?.signConflict(it, progress.searchSnapshot, work.spentWork, arithmetic)
-                partialConflictObserver?.invoke(it)
+                partialConflictObserver?.let { observer -> arithmetic.execution.handoff { observer(it) } }
             },
             coupled = coupledSections,
-            onCoupledConflict = { coupledConflictObserver?.invoke(it) })
+            onCoupledConflict = { conflict ->
+                coupledConflictObserver?.let { observer -> arithmetic.execution.handoff { observer(conflict) } }
+            },
+        )
         var incomplete: PolynomialResource? = null
         while (true) {
-            failureCapture?.operation("boolean-region", progress.searchSnapshot, progress.regions,
-                work.spentWork, arithmetic)
+            failureCapture?.operation(
+                "boolean-region",
+                progress.searchSnapshot,
+                progress.regions,
+                work.spentWork,
+                arithmetic,
+            )
             if (!regions.hasNext()) break
             val region = regions.next()
             if (region == null) {
@@ -335,8 +351,13 @@ internal class QfNraQuery(
                     continue
                 }
                 failureCapture?.context(formulaReduction, arithmetic, region)
-                failureCapture?.operation("regional-reduction", progress.searchSnapshot, progress.regions,
-                    work.spentWork, arithmetic)
+                failureCapture?.operation(
+                    "regional-reduction",
+                    progress.searchSnapshot,
+                    progress.regions,
+                    work.spentWork,
+                    arithmetic,
+                )
                 val reducing = PolynomialAffineReduction.prepare(reducedFormula, region, realCount, arithmetic) {
                     val sections = checkNotNull(work.equationalSections)
                     work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
@@ -357,7 +378,7 @@ internal class QfNraQuery(
                             cellFeedback?.candidateRejection(atom, scope, point, available) != null
                         }
                     }
-                reducedRegionObserver?.invoke(reduction.atoms)
+                reducedRegionObserver?.let { observer -> arithmetic.execution.handoff { observer(reduction.atoms) } }
                 val activeFormula = if (reduction.changed) {
                     PolynomialFormula.conjunction(reduction.atoms, arithmetic)
                 } else reducedFormula
@@ -409,20 +430,32 @@ internal class QfNraQuery(
                         val selected = family.map { arithmetic.step(); it }
                         val required = equations.filter { arithmetic.step(); it in family }
                         val exclusions = nonzero.filter { arithmetic.step(); it in family }
-                        failureCapture?.operation("projection", progress.searchSnapshot, progress.regions,
+                        failureCapture?.operation(
+                            "projection", progress.searchSnapshot, progress.regions,
                             work.spentWork, arithmetic, selected, zeroes = required, nonzero = exclusions,
-                            completeFamily = complete)
-                        val pending = PolynomialProjection.prepare(selected, realCount, arithmetic,
-                            required, order, nonzeroPolynomials = exclusions,
+                            completeFamily = complete,
+                        )
+                        val pending = PolynomialProjection.prepare(
+                            selected,
+                            realCount,
+                            arithmetic,
+                            required,
+                            order,
+                            nonzeroPolynomials = exclusions,
                             onElimination = { variable, operands, root ->
-                                failureCapture?.operation("elimination", progress.searchSnapshot, progress.regions,
-                                    work.spentWork, arithmetic, operands, variable, root, completeFamily = complete)
-                                projectionObserver?.invoke(variable, operands, root)
+                                failureCapture?.operation(
+                                    "elimination", progress.searchSnapshot, progress.regions,
+                                    work.spentWork, arithmetic, operands, variable, root, completeFamily = complete,
+                                )
+                                projectionObserver?.let { observer ->
+                                    arithmetic.execution.handoff { observer(variable, operands, root) }
+                                }
                             },
                             onRootSection = {
                                 val roots = checkNotNull(work.equationalRootLevels)
                                 work.equationalRootLevels = roots + minOf(1L, Long.MAX_VALUE - roots)
-                            }) {
+                            },
+                        ) {
                             val sections = checkNotNull(work.equationalSections)
                             work.equationalSections = sections + minOf(1L, Long.MAX_VALUE - sections)
                         }
@@ -432,11 +465,20 @@ internal class QfNraQuery(
                             if (projection == null) yield(null)
                         }
                         if (projection.inconsistentEquations) break
-                        work.projectedPolynomials += minOf(projection.polynomialCount,
-                            Long.MAX_VALUE - work.projectedPolynomials)
+                        work.projectedPolynomials += minOf(
+                            projection.polynomialCount,
+                            Long.MAX_VALUE - work.projectedPolynomials,
+                        )
                         yield(null)
-                        failureCapture?.operation("lifting", progress.searchSnapshot, progress.regions,
-                            work.spentWork, arithmetic, selected, completeFamily = complete)
+                        failureCapture?.operation(
+                            "lifting",
+                            progress.searchSnapshot,
+                            progress.regions,
+                            work.spentWork,
+                            arithmetic,
+                            selected,
+                            completeFamily = complete,
+                        )
                         val assignment = searchCells(activeFormula, activeRegion, projection, boolCount,
                             arithmetic, algebraic, work, fixed, if (complete) null else family,
                             failureCapture, progress.searchSnapshot, cellRegion, numericFeedback)
@@ -473,17 +515,54 @@ internal class QfNraQuery(
             }
         }
         arithmetic.step()
-        yield(if (incomplete == null) QfNraResult.Unsatisfiable(work.snapshot())
-            else QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), incomplete))
+        yield(
+            if (incomplete == null) {
+                QfNraResult.Unsatisfiable(work.snapshot())
+            } else {
+                QfNraResult.Unknown(QfNraReason.ResourceLimit, work.snapshot(), incomplete)
+            },
+        )
     }.iterator().also { cellFeedback?.replaceSnapshot(formulaReduction.formula, arithmetic) }
 
     fun next(): QfNraResult? {
         result?.let { return it }
-        return preparation.next().also { result = it }
+        var entered = false
+        val next = try {
+            arithmetic.execution.operation {
+                entered = true
+                val initial = firstAdvance
+                firstAdvance = false
+                val started = work.spentWork
+                val snapshot = progress.snapshots
+                val probeFinished = probeCompleted
+                var next = preparation.next()
+                var pauses = 1
+                while (!initial && next == null && progress.snapshots == snapshot && probeCompleted == probeFinished &&
+                    pauses < 8192 && work.spentWork - started < 32768
+                ) {
+                    next = preparation.next()
+                    pauses++
+                }
+                next
+            }
+        } catch (_: PolynomialInterrupted) {
+            if (!entered) failureCapture?.restoreCursor(PolynomialFailureCursorState(emptyMap(), emptyMap()))
+            QfNraResult.Unknown(
+                if (work.limitReached) QfNraReason.WorkLimit else QfNraReason.Interrupted,
+                work.snapshot(),
+            )
+        }
+        return when (next) {
+            is QfNraResult.Satisfiable -> next.copy(stats = work.snapshot())
+            is QfNraResult.Unsatisfiable -> next.copy(stats = work.snapshot())
+            is QfNraResult.Unknown -> next.copy(stats = work.snapshot())
+            null -> null
+        }.also { result = it }
     }
 }
 
-internal class QfNraWork(private val params: QfNraParams) : ArithmeticCancellation, WorkMeter {
+@Suppress("TooGenericExceptionCaught") // cleanup must retain the primary arithmetic or observer failure
+internal class QfNraWork(params: QfNraParams) : ArithmeticBudget(params.cancellation, params.maximumWork) {
     var projectedPolynomials: Long = 0
     var liftedCells: Long = 0
     var dyadicAttempts: Long = 0
@@ -498,67 +577,68 @@ internal class QfNraWork(private val params: QfNraParams) : ArithmeticCancellati
     var equationalRootLevels: Long? = null
     private var coupledWorkDeclines: Long = 0
     private var dyadicPreExtractionDeclines: Long = 0
-    private val pool = WorkCreditPool(params.maximumWork)
-    private val parentAccounting = params.cancellation.arithmeticSource()
-    private val spent: Long get() = pool.spent
     val spentWork: Long get() = spent
     private var probeEnd: Long? = null
     private var coupledEnd: Long? = null
     private var probeStart: Long = 0
     private var probeSpent: Long = 0
     private var probeParentStopped = false
-    val limitReached: Boolean get() = params.maximumWork?.let { spent >= it } == true
     override fun isCancelled(): Boolean {
-        val stopped = limitReached || params.cancellation()
+        val stopped = super.isCancelled()
         if (probeEnd != null && stopped) probeParentStopped = true
         return stopped || probeEnd?.let { spent >= it } == true || coupledEnd?.let { spent >= it } == true
     }
-    override fun deadline() = params.cancellation.deadline()
-    override fun workMeter(): WorkMeter = this
-    override fun arithmeticSource(): ArithmeticWorkSource? {
-        if (parentAccounting == null) return null
-        return object : ArithmeticWorkSource {
-            override fun isCancelled(): Boolean = this@QfNraWork.isCancelled()
-            override fun reserve(maximum: Int): WorkReservation? {
-                val end = listOfNotNull(probeEnd, coupledEnd).minOrNull()
-                val capacity = end?.let { minOf(maximum.toLong(), (it - spent).coerceAtLeast(0L)).toInt() } ?: maximum
-                if (capacity == 0) return null
-                return reserveWork(capacity, listOf(pool), parentAccounting) {}
-            }
-        }
-    }
-    override fun charge(units: Long) {
-        require(units >= 0)
-        pool.debit(units)
-        params.cancellation.charge(units)
-    }
+    override val exhausted get() = limitReached || probeEnd?.let { spent >= it } == true ||
+        coupledEnd?.let { spent >= it } == true
+    override val reservationLimit get() =
+        (minOf(probeEnd ?: Long.MAX_VALUE, coupledEnd ?: Long.MAX_VALUE) - spent).coerceAtLeast(0L)
     fun probe(block: () -> QfNraAssignment?): QfNraAssignment? {
+        execution?.flush()
         check(probeEnd == null)
         val remaining = (MAX_WITNESS_WORK - probeSpent).coerceAtLeast(0)
         if (remaining == 0L) return null
         probeStart = spent
         probeEnd = spent + minOf(remaining, Long.MAX_VALUE - spent)
         probeParentStopped = false
+        var failure: Throwable? = null
         return try {
             block()
         } catch (stop: PolynomialInterrupted) {
             // An enclosing stop remains terminal even if its predicate later clears.
-            if (probeParentStopped) throw stop
+            if (probeParentStopped) {
+                failure = stop
+                throw stop
+            }
             null
         } catch (_: PolynomialResourceLimit) {
             null
+        } catch (caught: Throwable) {
+            failure = caught
+            throw caught
         } finally {
-            probeSpent += minOf(spent - probeStart, Long.MAX_VALUE - probeSpent)
-            probeEnd = null
+            preservingFailure(failure) {
+                try {
+                    execution?.flush()
+                } finally {
+                    probeSpent += minOf(spent - probeStart, Long.MAX_VALUE - probeSpent)
+                    probeEnd = null
+                }
+                if (failure == null && !probeParentStopped) execution?.resume()
+            }
         }
     }
     fun coupled(block: () -> QfNraAssignment?): QfNraAssignment? {
+        execution?.flush()
         check(probeEnd != null && coupledEnd == null)
         coupledEnd = probeStart + minOf(MAX_WITNESS_WORK / 2, Long.MAX_VALUE - probeStart)
+        var failure: Throwable? = null
         return try {
             block()
         } catch (stop: PolynomialInterrupted) {
-            if (probeParentStopped) throw stop
+            if (probeParentStopped) {
+                failure = stop
+                throw stop
+            }
             if (coupledEnd?.let { spent >= it } == true) {
                 coupledWorkDeclines += minOf(1L, Long.MAX_VALUE - coupledWorkDeclines)
                 if (dyadicPreExtraction) {
@@ -566,15 +646,35 @@ internal class QfNraWork(private val params: QfNraParams) : ArithmeticCancellati
                 }
             }
             null
+        } catch (caught: Throwable) {
+            failure = caught
+            throw caught
         } finally {
-            coupledEnd = null
-            dyadicPreExtraction = false
+            preservingFailure(failure) {
+                try {
+                    execution?.flush()
+                } finally {
+                    coupledEnd = null
+                    dyadicPreExtraction = false
+                }
+                if (failure == null && !probeParentStopped) execution?.resume()
+            }
         }
     }
     fun snapshot(): QfNraStats = QfNraStats(projectedPolynomials, liftedCells, spent,
         dyadicAttempts, dyadicBases, coupledWorkDeclines, dyadicPreExtractionDeclines,
         booleanTheoryRegions, booleanTheoryAtoms, booleanTheoryConstantRefutations,
         booleanTheoryResourceRefusals, lastBooleanTheoryResource, equationalSections, equationalRootLevels)
+}
+
+@Suppress("TooGenericExceptionCaught") // settlement retains the primary observer or arithmetic failure
+private inline fun preservingFailure(primary: Throwable?, cleanup: () -> Unit) {
+    try {
+        cleanup()
+    } catch (failure: Throwable) {
+        if (primary == null) throw failure
+        if (failure !== primary) primary.addSuppressed(failure)
+    }
 }
 
 private const val MAX_WITNESS_WORK = 65_536L

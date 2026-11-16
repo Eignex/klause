@@ -21,7 +21,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -57,7 +57,7 @@ class PreparedSourcePlanObjectiveBindingTest {
                 }
             },
         )
-        val plan = source.prepareExecutionPlan(providers, cancellation = Cancellation { stopped })
+        val plan = source.prepareExecutionPlan(providers, cancellation = ExecutionControl { stopped })
         val preparedInstallations = installations
         val objective = LinearObjective(intCoefficients = longArrayOf(1), constant = 7)
         stopped = true
@@ -107,7 +107,7 @@ class PreparedSourcePlanObjectiveBindingTest {
     @Test
     fun `objective binding should not repair interrupted structural preparation`() {
         val source = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
-        val plan = source.prepareExecutionPlan(cancellation = Cancellation { true })
+        val plan = source.prepareExecutionPlan(cancellation = ExecutionControl { true })
 
         val operation = plan.withObjective(LinearObjective(intCoefficients = longArrayOf(1)))
         val admission = operation.capabilities.admission(FiniteEngine.BACKTRACK)
@@ -218,14 +218,14 @@ class PreparedSourcePlanObjectiveBindingTest {
         )
         var polls = 0
         val complete = source.preparePolynomialExecutionPlan(
-            cancellation = Cancellation {
+            cancellation = ExecutionControl {
                 polls++
                 false
             },
         )
         val lastPoll = polls
         polls = 0
-        val stopped = source.preparePolynomialExecutionPlan(cancellation = Cancellation { ++polls >= lastPoll })
+        val stopped = source.preparePolynomialExecutionPlan(cancellation = ExecutionControl { ++polls >= lastPoll })
 
         val operation = stopped.withObjective(LinearObjective(intCoefficients = longArrayOf(1)))
 

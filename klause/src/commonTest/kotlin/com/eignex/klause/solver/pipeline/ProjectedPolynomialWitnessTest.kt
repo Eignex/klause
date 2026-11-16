@@ -11,7 +11,7 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertIs
@@ -35,7 +35,7 @@ class ProjectedPolynomialWitnessTest {
             exactReals = listOf(BigFraction.ofLong(2)),
         )
 
-        val checked = checkProjectedPolynomialWitness(source, point, Cancellation.Never)
+        val checked = checkProjectedPolynomialWitness(source, point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Checked>(checked)
     }
@@ -57,7 +57,7 @@ class ProjectedPolynomialWitnessTest {
         ).last()
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.5), algebraicReals = listOf(root))
 
-        val checked = checkProjectedPolynomialWitness(source, point, Cancellation.Never)
+        val checked = checkProjectedPolynomialWitness(source, point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Checked>(checked)
     }
@@ -82,7 +82,7 @@ class ProjectedPolynomialWitnessTest {
         ).first()
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(-1.5), algebraicReals = listOf(root))
 
-        val checked = checkProjectedPolynomialWitness(source, point, Cancellation.Never)
+        val checked = checkProjectedPolynomialWitness(source, point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
@@ -111,7 +111,7 @@ class ProjectedPolynomialWitnessTest {
             exactReals = listOf(BigFraction.MINUS_ONE),
         )
 
-        val checked = checkProjectedPolynomialWitness(source, point, Cancellation.Never)
+        val checked = checkProjectedPolynomialWitness(source, point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
@@ -122,7 +122,7 @@ class ProjectedPolynomialWitnessTest {
         val source = PolynomialRealProblem(auxiliary, 0, 1, 0, 0, emptyMap(), emptyMap())
         val point = Sample(booleanArrayOf(), longArrayOf())
 
-        val checked = checkProjectedPolynomialWitness(source, point, Cancellation.Never)
+        val checked = checkProjectedPolynomialWitness(source, point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Checked>(checked)
     }
@@ -133,7 +133,7 @@ class ProjectedPolynomialWitnessTest {
         val source = PolynomialRealProblem(variable, 0, 1, 0, 1, emptyMap(), mapOf("b" to 0))
         val point = Sample(booleanArrayOf(false), longArrayOf())
 
-        val checked = checkProjectedPolynomialWitness(source, point, Cancellation.Never)
+        val checked = checkProjectedPolynomialWitness(source, point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Rejected>(checked)
     }
@@ -151,7 +151,7 @@ class ProjectedPolynomialWitnessTest {
         )
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0))
 
-        val checked = checkProjectedPolynomialWitness(source, point, Cancellation.Never)
+        val checked = checkProjectedPolynomialWitness(source, point, ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }
@@ -159,10 +159,9 @@ class ProjectedPolynomialWitnessTest {
     @Test
     fun `checking should charge the containing work allowance without renewing it`() {
         var spent = 0L
-        val cancellation = object : Cancellation, WorkMeter {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= 4L
-            override fun workMeter(): WorkMeter = this
-            override fun charge(units: Long) {
+            override val accounting = WorkMeter { units ->
                 spent += units
             }
         }

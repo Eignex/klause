@@ -10,7 +10,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import kotlin.random.Random
 import kotlin.test.Test
@@ -182,12 +182,12 @@ class DefinitionalSweepNetworkTest {
         val preparation = InvariantNetworkPreparation(sweep, 515, 0)
         var polls = 0
 
-        assertFalse(preparation.get(Cancellation { ++polls >= 12 }))
+        assertFalse(preparation.get(ExecutionControl { ++polls >= 12 }))
         assertFailsWith<IllegalStateException> { preparation.value }
-        assertFalse(preparation.get(Cancellation { true }))
-        assertTrue(preparation.get(Cancellation.Never))
+        assertFalse(preparation.get(ExecutionControl { true }))
+        assertTrue(preparation.get(ExecutionControl.Never))
         val network = assertNotNull(preparation.value)
-        assertTrue(preparation.get(Cancellation { true }))
+        assertTrue(preparation.get(ExecutionControl { true }))
 
         assertSame(network, preparation.value)
         assertContentEquals(

@@ -4,31 +4,35 @@ import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.AtomicCells
 
 internal class WorkCreditPool(val limit: Long?, val concurrency: Concurrency = Concurrency.None) {
-    private data class State(val spent: Long = 0L, val reserved: Long = 0L)
-    private var serialSpent = 0L
-    private var serialReserved = 0L
-    private val shared = if (concurrency == Concurrency.None) null else AtomicCells.newReference(State())
-    val spent: Long get() = shared?.load()?.spent ?: serialSpent
+    private val counter = WorkCounter(concurrency)
+    private var serialAvailable = limit ?: 0L
+    private val sharedAvailable = if (concurrency == Concurrency.None || limit == null) {
+        null
+    } else {
+        AtomicCells.newLong(
+            limit,
+        )
+    }
+    val spent: Long get() = counter.value
     val exhausted: Boolean get() = limit?.let { spent >= it } == true
 
     init { require(limit == null || limit >= 0L) }
 
     fun reserve(maximum: Int): WorkReservation? {
         require(maximum > 0)
-        val cap = limit ?: return WorkReservation(maximum) { debit(it.toLong()) }
-        val state = shared
-        if (state == null) {
-            val granted = minOf(maximum.toLong(), available(cap, serialSpent, serialReserved)).toInt()
+        if (limit == null) return WorkReservation(maximum) { record(it.toLong()) }
+        val available = sharedAvailable
+        if (available == null) {
+            val granted = minOf(maximum.toLong(), serialAvailable.coerceAtLeast(0L)).toInt()
             if (granted == 0) return null
-            serialReserved += granted
+            serialAvailable -= granted
             return WorkReservation(granted) { settle(granted, it) }
         }
         while (true) {
-            val current = state.load()
-            val remaining = available(cap, current.spent, current.reserved)
-            val granted = minOf(maximum.toLong(), remaining).toInt()
+            val current = available.load()
+            val granted = minOf(maximum.toLong(), current.coerceAtLeast(0L)).toInt()
             if (granted == 0) return null
-            if (state.compareAndSet(current, current.copy(reserved = current.reserved + granted))) {
+            if (available.compareAndSet(current, current - granted)) {
                 return WorkReservation(granted) { used -> settle(granted, used) }
             }
         }
@@ -37,37 +41,37 @@ internal class WorkCreditPool(val limit: Long?, val concurrency: Concurrency = C
     fun debit(units: Long) {
         require(units >= 0L)
         if (units == 0L) return
-        val state = shared
-        if (state == null) {
-            serialSpent = sum(serialSpent, units)
-            return
-        }
-        while (true) {
-            val current = state.load()
-            val next = current.copy(spent = sum(current.spent, units))
-            if (state.compareAndSet(current, next)) return
-        }
+        if (limit != null) adjustAvailable(-units)
+        record(units)
+    }
+
+    private fun record(units: Long) {
+        counter.add(units)
     }
 
     private fun settle(granted: Int, used: Int) {
-        val state = shared
-        if (state == null) {
-            check(serialReserved >= granted)
-            serialSpent = sum(serialSpent, used.toLong())
-            serialReserved -= granted
+        adjustAvailable((granted - used).toLong())
+        record(used.toLong())
+    }
+
+    private fun adjustAvailable(units: Long) {
+        val available = sharedAvailable
+        if (available == null) {
+            serialAvailable = adjust(serialAvailable, units)
             return
         }
         while (true) {
-            val current = state.load()
-            check(current.reserved >= granted)
-            val next = State(sum(current.spent, used.toLong()), current.reserved - granted)
-            if (state.compareAndSet(current, next)) return
+            val current = available.load()
+            val next = adjust(current, units)
+            if (current == next || available.compareAndSet(current, next)) return
         }
     }
 
-    private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
-    private fun available(cap: Long, spent: Long, reserved: Long): Long =
-        ((cap - spent).coerceAtLeast(0L) - reserved).coerceAtLeast(0L)
+    private fun adjust(current: Long, units: Long): Long = when {
+        units < 0 && current < Long.MIN_VALUE - units -> Long.MIN_VALUE
+        units > 0 && current > Long.MAX_VALUE - units -> Long.MAX_VALUE
+        else -> current + units
+    }
 }
 
 @Suppress("TooGenericExceptionCaught") // failed parent admission must return every child reservation

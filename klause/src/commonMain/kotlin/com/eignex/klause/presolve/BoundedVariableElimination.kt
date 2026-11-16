@@ -2,7 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
@@ -35,7 +35,7 @@ internal object BoundedVariableElimination {
     fun eliminate(
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild, infeasible ->
         if (infeasible) PassDelta(infeasible = true) else db.toDelta(rebuild)
     } ?: PassDelta()
@@ -51,7 +51,7 @@ internal object BoundedVariableElimination {
     fun eliminateSource(
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild, infeasible ->
         if (infeasible) SourceDelta(infeasible = true) else db.toSourceDelta(rebuild)
     } ?: SourceDelta()
@@ -59,7 +59,7 @@ internal object BoundedVariableElimination {
     private fun <T> run(
         problem: Problem,
         objectiveBoolVars: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         delta: (SatClauseDb, SourceRebuilds, Boolean) -> T,
     ): T? {
         val nb = problem.numBoolVars
@@ -78,7 +78,7 @@ internal object BoundedVariableElimination {
         return delta(db, eliminations.asRebuilds(), false)
     }
 
-    private fun candidateOrder(db: SatClauseDb, cancellation: Cancellation): IntArray? {
+    private fun candidateOrder(db: SatClauseDb, cancellation: ExecutionControl): IntArray? {
         val candidates = IntArrayList()
         val degrees = LongArray(db.numBoolVars)
         for (v in 0 until db.numBoolVars) {
@@ -125,7 +125,7 @@ internal object BoundedVariableElimination {
         v: Int,
         db: SatClauseDb,
         eliminations: ArrayList<VarElim>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): Boolean {
         val work = PivotWork(cancellation)
         if (!work.visit()) return false
@@ -218,7 +218,7 @@ internal object BoundedVariableElimination {
         return lits.toIntArray()
     }
 
-    private class PivotWork(private val cancellation: Cancellation) {
+    private class PivotWork(private val cancellation: ExecutionControl) {
         private var visits = 0
         var stopped = false
             private set

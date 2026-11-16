@@ -2,14 +2,14 @@ package com.eignex.klause.arithmetic.quadratic
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ArithmeticExecution
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal enum class QuadraticStop { CANCELLED, WORK_LIMIT, MATRIX_LIMIT }
 internal class QuadraticInterrupted(val reason: QuadraticStop) : RuntimeException()
 
 internal class QuadraticControl(
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     private val maximumWork: Long? = null,
     private val maximumMatrixCells: Long? = 262144,
     val execution: ArithmeticExecution = ArithmeticExecution(cancellation) {
@@ -26,13 +26,23 @@ internal class QuadraticControl(
 
     fun poll() = execution.checkpoint()
 
-    inline fun <T> operation(quantum: Int = 8, body: () -> T): T = execution.operation(quantum, body)
+    inline fun <T> operation(quantum: Int = 64, body: () -> T): T = execution.operation(quantum, body)
 
     fun step() {
         if (execution.unchecked) debit() else meteredStep()
     }
 
     private fun meteredStep() = execution.step { debit() }
+
+    fun steps(units: Int) {
+        require(units >= 0)
+        val admitted = minOf(
+            units.toLong(),
+            maximumWork?.let { (it - work).coerceAtLeast(0L) } ?: Long.MAX_VALUE,
+        ).toInt()
+        execution.advance(admitted) { count -> work += minOf(count.toLong(), Long.MAX_VALUE - work) }
+        if (admitted < units) throw QuadraticInterrupted(QuadraticStop.WORK_LIMIT)
+    }
 
     private fun debit() {
         if (maximumWork != null && work >= maximumWork) throw QuadraticInterrupted(QuadraticStop.WORK_LIMIT)

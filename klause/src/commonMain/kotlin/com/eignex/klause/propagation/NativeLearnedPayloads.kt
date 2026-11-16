@@ -265,7 +265,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     ) {
         primary?.sharingMemory(sample, 0, protectedRows, allPermanent, protected)
         val retained = directory.protectedCapacity({ units -> repeat(units.toInt()) { sample.step() } }) {
-            index, page -> page.sharingMemory(sample, index shl PAGE_SHIFT, protectedRows, allPermanent, protected)
+            index, page, -> page.sharingMemory(sample, index shl PAGE_SHIFT, protectedRows, allPermanent, protected)
         }
         sample.owned(this, 24L, protectedRows)
         sample.owned(cachedIndices, cachedIndices.size.toLong() * Int.SIZE_BYTES, protectedRows)

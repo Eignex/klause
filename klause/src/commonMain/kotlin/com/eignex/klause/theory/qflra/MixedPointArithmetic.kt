@@ -2,10 +2,10 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
-internal class MixedPointArithmetic(private val stop: Cancellation) {
+internal class MixedPointArithmetic(private val stop: ExecutionControl) {
     fun admitted(value: BigFraction): Boolean {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         stop.charge(1L + bits / Long.SIZE_BITS)

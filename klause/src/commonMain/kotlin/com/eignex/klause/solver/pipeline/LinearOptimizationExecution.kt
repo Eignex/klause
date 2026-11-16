@@ -7,7 +7,7 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Optimize a complete exact affine source context through the shared Boolean and integer traversal.
@@ -21,7 +21,7 @@ fun OpenTheoryPipeline.optimizeLinear(
 ): LinearOptimizationResult {
     require(context.scope.objective != null) { "linear optimization requires a source objective" }
     return LinearAuthorityInvocation(context, params).use { invocation ->
-        val result = requireNotNull(invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, -1, onIncumbent))
+        val result = requireNotNull(invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1, onIncumbent))
         invocation.close()
         LinearOptimizationResult(context.scope, result.terminal, result.bound, result.incumbent,
             result.value, result.reason, invocation.stats, context.semantics)

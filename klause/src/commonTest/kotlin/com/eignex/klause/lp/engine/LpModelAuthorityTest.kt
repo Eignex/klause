@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -42,7 +42,7 @@ class LpModelAuthorityTest {
             addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 0.0, strict = true)
         }.build(Sense.MINIMIZE)
 
-        val result = solveAndCertify(model, cancellation = Cancellation { true })
+        val result = solveAndCertify(model, cancellation = ExecutionControl { true })
 
         assertEquals(LpVerdict.INDETERMINATE, result.verdict)
         assertNull(result.witness)

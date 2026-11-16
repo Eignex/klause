@@ -25,7 +25,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.SearchInvocationResources
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
@@ -57,13 +57,13 @@ internal class JointLinearRepair(
     guidancePolicy: SparseSourceLpPolicy = SparseSourceLpPolicy(),
     private val boundOrdered: Boolean = false,
     private val external: () -> Sample? = { null },
-    private val publicationLifetime: Cancellation? = null,
+    private val publicationLifetime: ExecutionControl? = null,
     sourceIntegers: IntArray? = null,
     private val onIncumbentImport: (() -> Unit)? = null,
     private val onIncumbentUse: (() -> Unit)? = null,
     private val observeExternalIncumbents: Boolean = false,
     sharedCompletions: LinearIncumbentSharing? = null,
-    private val incumbentCompletionCheck: ((Sample, BigFraction, Cancellation) -> Boolean)? = null,
+    private val incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
     private val onComparison: ((JointRepairComparison) -> Unit)? = null,
     private val repairGuidance: LinearRepairGuidance? = null,
     onObservation: ((JointRepairObservation) -> Unit)? = null,
@@ -71,7 +71,7 @@ internal class JointLinearRepair(
     private class CheckedCenter(val sample: Sample, val value: BigFraction?)
 
     private val sourceIntegers = sourceIntegers?.copyOf()
-    private val stop = params.timeout or params.cancellation
+    private val stop = params.timeout.withAccounting(params.cancellation) or params.cancellation
     private val state = OpenTheorySolveState(params)
     private val funding = SourceLpFunding(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
     private val budget = SourceLpBudget(maxOperations = params.sourceLpOperations,
@@ -362,15 +362,15 @@ internal class JointLinearRepair(
         }
     }
 
-    private fun prepare(cancellation: Cancellation): Boolean {
+    private fun prepare(cancellation: ExecutionControl): Boolean {
         check(!closed)
         if (stop() || exhausted || cancellation()) return false
         if (selection == null) {
             val token = stop or cancellation
-            val construction = object : Cancellation {
+            val construction = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = token()
                 override fun deadline() = token.deadline()
-                override fun workMeter(): WorkMeter = WorkMeter { units ->
+                override val accounting: WorkMeter = WorkMeter { units ->
                     preparationWork += units
                     token.charge(units)
                 }
@@ -443,10 +443,10 @@ internal class JointLinearRepair(
         return value
     }
 
-    override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult =
+    override fun check(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): ExactNeighborhoodResult =
         attempt(condition, cancellation).result
 
-    fun attempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
+    fun attempt(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): JointRepairAttempt {
         readyCenterStep = null
         val result = advanceAttempt(condition, cancellation)
         if (result.result != ExactNeighborhoodResult.Paused) {
@@ -492,7 +492,8 @@ internal class JointLinearRepair(
             (0 until model.numIntVars).all { sample.exactIntValue(it) == center.exactIntValue(it) }
     }
 
-    private fun advanceAttempt(condition: ExactNeighborhoodCondition, cancellation: Cancellation): JointRepairAttempt {
+    private fun advanceAttempt(condition: ExactNeighborhoodCondition,
+        cancellation: ExecutionControl): JointRepairAttempt {
         check(!closed)
         if (stop() || exhausted) return stoppedAttempt()
         if (cancellation()) return JointRepairAttempt(ExactNeighborhoodResult.Paused)
@@ -559,7 +560,7 @@ internal class JointLinearRepair(
         val active = requireNotNull(query)
         val millis = cancellation.deadline()?.let { (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds }
             ?.coerceIn(1, QUERY_SLICE_MILLIS) ?: QUERY_SLICE_MILLIS
-        val result = active.runSlice(Cancellation.Never, millis, QUERY_SLICE_WORK) { _, _ -> }
+        val result = active.runSlice(ExecutionControl.Never, millis, QUERY_SLICE_WORK) { _, _ -> }
         val snapshot = result ?: active.snapshot(TerminationReason.BudgetExhausted)
         val imported = completion != null && active.incumbentIsImported
         if (imported && snapshot.incumbent != null) observe("jointRepairImportedPointWithheld")
@@ -653,7 +654,7 @@ internal class JointLinearRepair(
     })
 
     private fun refutationKey(condition: ExactNeighborhoodCondition,
-        cancellation: Cancellation): ExactNeighborhoodCondition? {
+        cancellation: ExecutionControl): ExactNeighborhoodCondition? {
         if (anchor != null || preparedCenter != null || condition.cutoff != null) return null
         val entries = condition.bools.size.toLong() + condition.lower.size + condition.upper.size
         if (entries > MAX_REFUTATION_ENTRIES || stop() || cancellation()) return null
@@ -682,7 +683,7 @@ internal class JointLinearRepair(
             upper = condition.upper.toMap())
     }
 
-    private fun rememberRefutation(key: ExactNeighborhoodCondition, cancellation: Cancellation) {
+    private fun rememberRefutation(key: ExactNeighborhoodCondition, cancellation: ExecutionControl) {
         if (stop() || cancellation() || anchor != null || preparedCenter != null ||
             funding.remainingWork <= 1L || funding.remainingAllocation <= 64L) return
         budget.observe(preparation = 1L)
@@ -744,7 +745,7 @@ internal class JointLinearRepair(
     }
 
     private fun reviseRefutedCenter(centers: MutableList<BigFraction>, bools: BooleanArray,
-        condition: ExactNeighborhoodCondition, cancellation: Cancellation) {
+        condition: ExactNeighborhoodCondition, cancellation: ExecutionControl) {
         val step = readyCenterStep
         readyCenterStep = null
         if (step == null || anchor != null || preparedCenter != null || completion == null ||
@@ -772,7 +773,7 @@ internal class JointLinearRepair(
         active?.close()
     }
 
-    private fun publicationChecking(cancellation: Cancellation): Cancellation = object : Cancellation {
+    private fun publicationChecking(cancellation: ExecutionControl): ExecutionControl = object : ExecutionControl() {
         private val meter = WorkMeter { units -> budget.observe(boundCertification = units) }
         override fun isCancelled(): Boolean {
             charge(1L)
@@ -780,7 +781,7 @@ internal class JointLinearRepair(
             return closed || cancellation() || funding.exhausted
         }
         override fun deadline() = cancellation.deadline()
-        override fun workMeter(): WorkMeter = meter
+        override val accounting: WorkMeter get() = meter
     }
 
     override fun close() {

@@ -10,12 +10,12 @@ import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.ResumableSolve
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class BooleanProofRecipe(
     val solver: BacktrackSolver,
     val params: BacktrackParams,
-    val reserve: (Cancellation, () -> ResumableSolve) -> ResumableSolve,
+    val reserve: (ExecutionControl, () -> ResumableSolve) -> ResumableSolve,
 ) {
     val problem: BakedProblem get() = solver.problem
 
@@ -25,7 +25,7 @@ internal class BooleanProofRecipe(
 
     private fun normalized(): BacktrackParams = params.copy(
         lpPlan = if (params.lpPlan.hasDefaultNumericalSettings()) defaultNumericalPlan else params.lpPlan,
-        randomSeed = null, nodeBudget = null, cancellation = Cancellation.Never, assumptions = Assumptions.None,
+        randomSeed = null, nodeBudget = null, cancellation = ExecutionControl.Never, assumptions = Assumptions.None,
         onEvent = null, clauseExchange = null, cutExchange = null, nativeSat = params.nativeSat ?: true,
     )
 

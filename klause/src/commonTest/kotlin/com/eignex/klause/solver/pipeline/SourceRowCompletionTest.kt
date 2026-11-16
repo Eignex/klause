@@ -11,7 +11,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -28,7 +28,7 @@ class SourceRowCompletionTest {
         val model = problem.bake()
         val objective = LinearObjective(intCoefficients = LongArray(model.numIntVars) { if (it == 0) 1L else 0L })
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
-            Cancellation.Never))
+            ExecutionControl.Never))
         val funding = SourceLpFunding(1_000_000, 4_000_000).apply { grant(1_000_000) }
         val packets = SourceRowCompletion(model, source, funding, frozen) { funding.paused }
             .complete(Sample(booleanArrayOf(), center), listOf(seed)) { it == seed.first }

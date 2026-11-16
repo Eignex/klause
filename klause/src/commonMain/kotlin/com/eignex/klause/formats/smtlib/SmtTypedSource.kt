@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class SmtTypedTerm(val operator: String, val arguments: List<Int>, val sort: SmtSort)
 
@@ -21,7 +21,7 @@ internal data class SmtReduction(
     val checks: List<SmtSourceCheck> = emptyList(),
 )
 
-internal fun captureSmtSource(commands: List<SExpr>, cancellation: Cancellation): SmtReduction {
+internal fun captureSmtSource(commands: List<SExpr>, cancellation: ExecutionControl): SmtReduction {
     val scope = SmtLibScope(cancellation)
     for (command in commands) {
         cancellation.polynomialSourceCheckpoint(1)

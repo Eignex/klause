@@ -15,7 +15,7 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.Term
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.div
@@ -43,7 +43,7 @@ internal fun lowerLinearSource(
     source: LinearSourceProblem,
     settings: ProblemSettings,
     numerical: Boolean,
-    stop: Cancellation,
+    stop: ExecutionControl,
     negativeZeroBound: ((index: Int, upper: Boolean) -> Boolean)? = null,
 ): LinearSourceView? {
     if (stop()) return null
@@ -224,7 +224,7 @@ internal fun lowerLinearSource(
 private fun BigFraction.fitsObjectiveLong(): Boolean =
     den == BIG_ONE && num.fitsLong() && num.toLongExact() != Long.MIN_VALUE
 
-private fun LinearSourceProblem.canProjectToDouble(stop: Cancellation): Boolean {
+private fun LinearSourceProblem.canProjectToDouble(stop: ExecutionControl): Boolean {
     fun supported(value: SemanticRational?): Boolean {
         stop.charge(1L)
         if (stop()) return false

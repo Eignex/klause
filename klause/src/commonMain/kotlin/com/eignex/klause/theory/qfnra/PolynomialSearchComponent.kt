@@ -14,7 +14,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.completedSearchSample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PolynomialSearchComponent(
     private val service: PolynomialTheoryService,
@@ -57,7 +57,7 @@ internal class PolynomialSearchComponent(
             return@sequence
         }
         val current = signatureOf(context)
-        val pending = invocation.prepareCheck(conditionOf(current), Cancellation { context.cancelled() })
+        val pending = invocation.prepareCheck(conditionOf(current), ExecutionControl { context.cancelled() })
         var result: QfNraResult? = null
         while (result == null) {
             result = pending.next()
@@ -103,7 +103,7 @@ internal class PolynomialSearchComponent(
         val current = signatureOf(context)
         if (signature == current) return outcome
         if (!context.consumeCheck()) return null
-        val result = invocation.check(conditionOf(current), Cancellation { context.cancelled() })
+        val result = invocation.check(conditionOf(current), ExecutionControl { context.cancelled() })
         retain(current, result)
         return result
     }

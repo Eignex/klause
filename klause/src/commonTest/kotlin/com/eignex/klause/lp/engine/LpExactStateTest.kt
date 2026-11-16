@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -125,7 +125,7 @@ class LpExactStateTest {
         assertEquals(6.0, repeated.upperD(0))
         assertEquals(1L, meter.work)
         assertEquals(0L, meter.allocation)
-        assertNull(state.ownerWorkingModel(LpProjectionMeter(cancellation = Cancellation { true })))
+        assertNull(state.ownerWorkingModel(LpProjectionMeter(cancellation = ExecutionControl { true })))
         assertSame(owner, assertNotNull(state.ownerWorkingModel()))
     }
 
@@ -230,7 +230,7 @@ class LpExactStateTest {
         var polls = 0
 
         assertNull(trail.state.ownerWorkingModel(LpProjectionMeter(allocationLimit = 0L)))
-        assertNull(trail.state.ownerWorkingModel(LpProjectionMeter(cancellation = Cancellation { ++polls >= 8 })))
+        assertNull(trail.state.ownerWorkingModel(LpProjectionMeter(cancellation = ExecutionControl { ++polls >= 8 })))
 
         assertEquals(0.0, original.costD(0))
         val retry = assertNotNull(trail.state.ownerWorkingModel())
@@ -423,7 +423,7 @@ class LpExactStateTest {
         val state = LpExactState(source)
 
         assertNull(state.toWorkingModel(LpProjectionMeter(workLimit = 0L)))
-        assertNull(state.toWorkingModel(LpProjectionMeter(cancellation = Cancellation { true })))
+        assertNull(state.toWorkingModel(LpProjectionMeter(cancellation = ExecutionControl { true })))
 
         assertFalse(state.matrixProjectionDeclined)
         assertNotNull(state.toWorkingModel())

@@ -14,7 +14,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -41,7 +41,7 @@ class PreparedSourceHintsTest {
         ))
 
         val view = assertNotNull(invocation.heuristicHints(preparation.problem, preparation.objective,
-            preparation.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+            preparation.sourceMapping, ExecutionControl.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
             assertNotNull(preparation.executionPlan).capabilities))
         val assignment = Assignment(preparation.problem.numBoolVars, preparation.problem.numIntVars)
         assignment.setInt(2, -2)
@@ -76,7 +76,7 @@ class PreparedSourceHintsTest {
         assertEquals(-1, assertNotNull(assertNotNull(preparation.sourceMapping).retainedCoordinates()).int(1))
 
         val view = assertNotNull(invocation.heuristicHints(preparation.problem, preparation.objective,
-            preparation.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+            preparation.sourceMapping, ExecutionControl.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
             assertNotNull(preparation.executionPlan).capabilities))
         val assignment = Assignment(preparation.problem.numBoolVars, preparation.problem.numIntVars)
         assertNotNull(view.sweep).sweep(assignment, domains)
@@ -101,7 +101,7 @@ class PreparedSourceHintsTest {
             assertTrue(invocation.source.definitionHints.isEmpty())
 
             val view = assertNotNull(invocation.heuristicHints(preparation.problem, preparation.objective,
-                preparation.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+                preparation.sourceMapping, ExecutionControl.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
                 assertNotNull(preparation.executionPlan).capabilities))
             val assignment = Assignment(0, domains.size)
             assignment.setInt(0, -3)

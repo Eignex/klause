@@ -15,7 +15,7 @@ import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.TransformationGuarantees
 import com.eignex.klause.presolve.retainedCoordinates
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -30,7 +30,7 @@ class SourceHintMappingTest {
         ), 10, LinearOp.LE, strict = true)
         val reconstruction = AffineReconstruction(3, intArrayOf(1, 2), longArrayOf(2, -1), 1)
         val projected = CapturedBooleanDefinition(assertNotNull(
-            hint.reconstructed(mapOf(0 to reconstruction), Cancellation.Never),
+            hint.reconstructed(mapOf(0 to reconstruction), ExecutionControl.Never),
         ))
 
         for ((y, z) in listOf(1L to 2L, 0L to 1L, 1L to 1L)) {
@@ -50,7 +50,7 @@ class SourceHintMappingTest {
             arrayOf(DefinitionHint.Operand.Variable(0)), 0, LinearOp.LE)
         val reconstruction = AffineReconstruction(0, intArrayOf(1), longArrayOf(2), 1)
 
-        val projected = hint.reconstructed(mapOf(0 to reconstruction), Cancellation.Never)
+        val projected = hint.reconstructed(mapOf(0 to reconstruction), ExecutionControl.Never)
 
         assertNull(projected)
     }
@@ -62,7 +62,7 @@ class SourceHintMappingTest {
         val reconstruction = AffineReconstruction(0, intArrayOf(1, 2), longArrayOf(1, 1), 1)
         val budget = PresolveBudget(2)
 
-        val projected = hint.reconstructed(mapOf(0 to reconstruction), budget.orSpent(Cancellation.Never))
+        val projected = hint.reconstructed(mapOf(0 to reconstruction), budget.orSpent(ExecutionControl.Never))
 
         assertNull(projected)
     }
@@ -73,7 +73,7 @@ class SourceHintMappingTest {
             arrayOf(DefinitionHint.Operand.Variable(0)), 0, LinearOp.LE)
         val reconstruction = AffineReconstruction(0, intArrayOf(1), longArrayOf(1), 2)
 
-        val projected = hint.reconstructed(mapOf(0 to reconstruction), Cancellation.Never)
+        val projected = hint.reconstructed(mapOf(0 to reconstruction), ExecutionControl.Never)
 
         assertNull(projected)
     }
@@ -93,7 +93,7 @@ class SourceHintMappingTest {
             SearchGroup(intArrayOf(), intArrayOf(1), VariableSelection.InputOrder, ValueSelection.Maximum),
         ), solutionGuided = true)
 
-        val projected = assertNotNull(hints.remapped(mapping, Cancellation.Never))
+        val projected = assertNotNull(hints.remapped(mapping, ExecutionControl.Never))
 
         assertEquals(listOf(2, 2, 2), projected.tiers[0].intVars.toList())
         assertEquals(listOf(2), projected.tiers[1].intVars.toList())
@@ -117,7 +117,7 @@ class SourceHintMappingTest {
             val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,
                 SourceRebuilds(listOf(rebuild)))
 
-            val projected = assertNotNull(hints.remapped(mapping, Cancellation.Never))
+            val projected = assertNotNull(hints.remapped(mapping, ExecutionControl.Never))
 
             assertEquals(listOf(2), projected.tiers.single().intVars.toList())
         }
@@ -135,7 +135,7 @@ class SourceHintMappingTest {
             SearchGroup(intArrayOf(), intArrayOf(0, 1), valueSelector = it)
         }
 
-        val projected = assertNotNull(SearchHints(tiers).remapped(mapping, Cancellation.Never))
+        val projected = assertNotNull(SearchHints(tiers).remapped(mapping, ExecutionControl.Never))
 
         assertEquals(List(tiers.size) { listOf(1) }, projected.tiers.map { it.intVars.toList() })
     }
@@ -145,7 +145,7 @@ class SourceHintMappingTest {
         val source = Problem(0, 3, Array(3) { IntDomain(-10, 10) }, emptyArray())
         val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY,
             SourceRebuilds(listOf(RebuildStep.AffineValue(1, 1, intArrayOf(2), longArrayOf(3), 2))))
-        val reconstructions = assertNotNull(mapping.affineReconstructions(Cancellation.Never))
+        val reconstructions = assertNotNull(mapping.affineReconstructions(ExecutionControl.Never))
         val row = arrayOf<DefinitionHint.Operand>(
             DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1),
         )
@@ -169,7 +169,7 @@ class SourceHintMappingTest {
             RebuildStep.AffineValue(0, 0, intArrayOf(2), longArrayOf(1), 1),
         )))
 
-        val reconstructions = assertNotNull(mapping.affineReconstructions(Cancellation.Never))
+        val reconstructions = assertNotNull(mapping.affineReconstructions(ExecutionControl.Never))
 
         assertEquals(emptyMap(), reconstructions)
     }
@@ -182,7 +182,7 @@ class SourceHintMappingTest {
         val hint = DefinitionHint.Linear(0, longArrayOf(1, -1),
             arrayOf(DefinitionHint.Operand.Variable(0), DefinitionHint.Operand.Variable(1)), -2)
 
-        assertNull(hint.reconstructed(assertNotNull(mapping.affineReconstructions(Cancellation.Never))))
+        assertNull(hint.reconstructed(assertNotNull(mapping.affineReconstructions(ExecutionControl.Never))))
     }
 
     @Test
@@ -192,7 +192,7 @@ class SourceHintMappingTest {
         val opaque = SourceMapping(source, source, TransformationGuarantees.IDENTITY, lift = { it })
         val direct = SourceMapping(source, source, TransformationGuarantees.IDENTITY)
 
-        assertNull(hints.remapped(opaque, Cancellation.Never))
-        assertNull(hints.remapped(direct, Cancellation { true }))
+        assertNull(hints.remapped(opaque, ExecutionControl.Never))
+        assertNull(hints.remapped(direct, ExecutionControl { true }))
     }
 }

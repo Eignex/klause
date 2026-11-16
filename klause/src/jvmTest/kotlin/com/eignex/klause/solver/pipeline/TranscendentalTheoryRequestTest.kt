@@ -12,7 +12,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
@@ -117,11 +117,13 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
             emptyMap(),
         )
         var charged = 0L
-        val meter = object : Cancellation {
+        var signalledAt: Long? = null
+        val meter = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it
+                if (charged >= 8 && signalledAt == null) signalledAt = charged }
         }
-        val cancelled = Cancellation { charged >= 8 }
+        val cancelled = ExecutionControl { signalledAt != null }
         val controls = params()
         val params = controls.copy(
             cancellation = meter,
@@ -134,7 +136,8 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
 
         assertIs<OpenTheoryResult.Unknown>(execution.result)
-        assertTrue(execution.workSpent in 1L..8L)
+        assertTrue(execution.workSpent - checkNotNull(signalledAt) in 0L..64L,
+            "work=${execution.workSpent}, stop=$signalledAt")
         assertEquals(execution.workSpent, charged)
     }
 

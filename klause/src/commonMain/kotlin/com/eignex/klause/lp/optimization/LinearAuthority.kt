@@ -18,7 +18,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.SourceEvidenceVerifier
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.fitsLong
@@ -155,7 +155,7 @@ internal class LinearAuthority(
         cutLifecycle.containing("RETIREMENT") { lp.close() }
     }
 
-    fun advanceWithPointCuts(source: SourceProofContext, cancellation: Cancellation,
+    fun advanceWithPointCuts(source: SourceProofContext, cancellation: ExecutionControl,
         retainBasePoint: Boolean = false): LinearAuthorityResult {
         val policy = pointPolicy ?: LinearAuthorityPointCuts(budget, onCut = cutLifecycle::observe)
             .also { pointPolicy = it }
@@ -303,10 +303,10 @@ internal class LinearAuthority(
     private fun preparePointFamily(
         source: SourceProofContext, family: LinearAuthorityTemplate, prepared: LinearAuthorityQuery,
         values: List<BigFraction>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): Pair<LinearAuthorityTemplate, LinearAuthorityQuery>? {
         if (values.size != prepared.coordinates.size || values.size > 8192) return null
-        val funded = Cancellation { cancellation() || budget.funding?.paused == true }
+        val funded = ExecutionControl { cancellation() || budget.funding?.paused == true }
         var work = 0L
         if (budget.funding?.remainingAllocation?.let { 128L + values.size * 96L > it } == true) return null
         cutCost(0L, 128L)
@@ -340,7 +340,7 @@ internal class LinearAuthority(
 
     private fun sameCurrentCuts(
         original: LinearAuthorityTemplate, query: LinearAuthorityQuery, refined: LinearAuthorityTemplate,
-        cancellation: Cancellation, maximumWork: Long,
+        cancellation: ExecutionControl, maximumWork: Long,
     ): Boolean {
         val before = original.cuts?.rows ?: return false
         val after = refined.cuts?.rows ?: return false
@@ -391,7 +391,7 @@ internal class LinearAuthority(
         }
     }
 
-    fun check(source: SourceProofContext, cancellation: Cancellation): LinearAuthorityResult {
+    fun check(source: SourceProofContext, cancellation: ExecutionControl): LinearAuthorityResult {
         cutLifecycle.families = emptySet()
         relaxedPoint = emptyMap()
         if (cancellation()) {
@@ -410,7 +410,7 @@ internal class LinearAuthority(
     }
 
     fun advance(
-        source: SourceProofContext, cancellation: Cancellation, cuts: Boolean = false, cutMask: Set<Int>? = null,
+        source: SourceProofContext, cancellation: ExecutionControl, cuts: Boolean = false, cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
         val replay = replayCuts
         cutLifecycle.families = when {
@@ -424,7 +424,7 @@ internal class LinearAuthority(
     }
 
     private fun advanceInternal(
-        source: SourceProofContext, cancellation: Cancellation, cuts: Boolean, cutMask: Set<Int>?,
+        source: SourceProofContext, cancellation: ExecutionControl, cuts: Boolean, cutMask: Set<Int>?,
     ): LinearAuthorityResult {
         relaxedPoint = emptyMap()
         capture?.discard()
@@ -461,7 +461,7 @@ internal class LinearAuthority(
     }
 
     private fun recover(
-        prepared: LinearAuthorityQuery, point: List<BigFraction>, cancellation: Cancellation,
+        prepared: LinearAuthorityQuery, point: List<BigFraction>, cancellation: ExecutionControl,
     ): List<BigFraction>? {
         val attempt = primalAttempt?.takeIf { it.query === prepared && it.point == point }
             ?: PrimalAttempt(prepared, point).also { primalAttempt = it }
@@ -485,7 +485,7 @@ internal class LinearAuthority(
         mask != null && pointPolicy?.retainsCandidateLayout(template?.cuts?.rows) == true
 
     private fun prepareQuery(
-        source: SourceProofContext, cancellation: Cancellation, cuts: Boolean, cutMask: Set<Int>?,
+        source: SourceProofContext, cancellation: ExecutionControl, cuts: Boolean, cutMask: Set<Int>?,
     ): LinearAuthorityQuery? {
         if (!source.affineObjectiveAvailable || !source.linearCoordinatesSupported()) return null
         if ((source.scope.condition.lower.keys + source.scope.condition.upper.keys).any {
@@ -528,7 +528,7 @@ internal class LinearAuthority(
                     when {
                         !cuts -> prepared
                         replay != null -> prepared.withReplayCuts(replay,
-                            Cancellation { cancellation() || budget.funding?.exhausted == true }, ::cutCost)
+                            ExecutionControl { cancellation() || budget.funding?.exhausted == true }, ::cutCost)
                         else -> withAdditionalCuts(prepared, cancellation)
                     }
                 }?.also(::adoptTemplate) ?: return null
@@ -549,13 +549,13 @@ internal class LinearAuthority(
     }
 
     private fun withAdditionalCuts(
-        prepared: LinearAuthorityTemplate, cancellation: Cancellation,
+        prepared: LinearAuthorityTemplate, cancellation: ExecutionControl,
         point: Map<SourceCoordinate, Double>? = null,
     ): LinearAuthorityTemplate? {
         val generateAggregates = aggregateCuts && !deferAggregatePreparation
         if (!generateAggregates && additionalCuts.isEmpty() &&
             (point == null || prepared.cuts?.rows.orEmpty().size <= 64)) return prepared
-        val funded = Cancellation { cancellation() || budget.funding?.paused == true }
+        val funded = ExecutionControl { cancellation() || budget.funding?.paused == true }
         val generated = if (generateAggregates) LinearAuthorityAggregateCuts.prepareSourcePairs(
             prepared.numeric, funded, { name, count ->
                 when (name) {
@@ -587,7 +587,7 @@ internal class LinearAuthority(
     }
 
     private fun checkSource(
-        source: SourceProofContext, cancellation: Cancellation, guidance: Boolean = false, cuts: Boolean = false,
+        source: SourceProofContext, cancellation: ExecutionControl, guidance: Boolean = false, cuts: Boolean = false,
         cutMask: Set<Int>? = null,
     ): LinearAuthorityResult {
         val cached = if (retainLp || guidance) query?.takeIf {

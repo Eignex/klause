@@ -32,7 +32,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
@@ -49,9 +49,9 @@ class QfLiraSolverHintsTest {
     @Test
     fun `explicit integer point preparation should decline without charging its caller`() {
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val model = Problem(
             numBoolVars = 1,
@@ -86,9 +86,9 @@ class QfLiraSolverHintsTest {
         )
         for (defaultOpening in listOf(false, true)) {
             var charged = 0L
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = false
-                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
             ExactLiraSearchComponent(model).use { component ->
                 val hints = assertNotNull(component.partialPointHints(stop, defaultOpening)).second
@@ -116,9 +116,9 @@ class QfLiraSolverHintsTest {
     fun `interrupted integer point preparation should retain its registration debit`() {
         var stopped = false
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = stopped
-            override fun workMeter(): WorkMeter = WorkMeter {
+            override val accounting: WorkMeter get() = WorkMeter {
                 charged += it
                 stopped = true
             }
@@ -180,7 +180,7 @@ class QfLiraSolverHintsTest {
                     ),
                 )
                 ExactLiraSearchComponent(model).use { component ->
-                    val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                    val hints = assertNotNull(component.partialPointHints(ExecutionControl.Never)).second
                     val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
                     assertIs<ComponentResult.Consistent>(session.initialize())
                     val expected = when (op) {
@@ -253,7 +253,7 @@ class QfLiraSolverHintsTest {
                 ExactLiraSearchComponent(model).use { component ->
                     val hints = assertNotNull(
                         component.partialPointHints(
-                            Cancellation.Never,
+                            ExecutionControl.Never,
                             defaultOpening = integerOnly,
                         ),
                     ).second
@@ -322,7 +322,7 @@ class QfLiraSolverHintsTest {
             val component = ExactLiraSearchComponent(model)
             val hints = assertNotNull(
                 component.partialPointHints(
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     defaultOpening = integerOnly,
                 ),
             ).second
@@ -380,7 +380,7 @@ class QfLiraSolverHintsTest {
             ),
         )
         ExactLiraSearchComponent(model).use { component ->
-            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val hints = assertNotNull(component.partialPointHints(ExecutionControl.Never)).second
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
             assertIs<ComponentResult.Consistent>(session.initialize())
 
@@ -433,7 +433,7 @@ class QfLiraSolverHintsTest {
                 ),
             )
             ExactLiraSearchComponent(model).use { component ->
-                val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+                val hints = assertNotNull(component.partialPointHints(ExecutionControl.Never)).second
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(3))
                 assertIs<ComponentResult.Consistent>(session.initialize())
                 assertNull(hints.preferredBool(1))
@@ -456,9 +456,9 @@ class QfLiraSolverHintsTest {
         for (incremental in listOf(false, true)) {
             var halted = false
             var charged = 0L
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = halted
-                override fun workMeter(): WorkMeter = WorkMeter { units ->
+                override val accounting: WorkMeter get() = WorkMeter { units ->
                     charged += units
                     if (units >= 4L) halted = true
                 }
@@ -511,9 +511,9 @@ class QfLiraSolverHintsTest {
         )
         val work = listOf(false, true).map { incremental ->
             var charged = 0L
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled() = false
-                override fun workMeter() = WorkMeter { charged += it }
+                override val accounting get() = WorkMeter { charged += it }
             }
             ExactLiraSearchComponent(model).use { component ->
                 if (incremental) component.useIncrementalLinearPropagation()
@@ -560,7 +560,7 @@ class QfLiraSolverHintsTest {
             ),
         )
         ExactLiraSearchComponent(model).use { component ->
-            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val hints = assertNotNull(component.partialPointHints(ExecutionControl.Never)).second
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(1))
 
             assertIs<ComponentResult.Consistent>(session.initialize())
@@ -599,14 +599,14 @@ class QfLiraSolverHintsTest {
             ExactLiraSearchComponent(model).use { component ->
                 val hints = assertNotNull(
                     component.partialPointHints(
-                        Cancellation.Never,
+                        ExecutionControl.Never,
                         defaultOpening = integerOnly,
                     ),
                 ).second
-                component.useSolveStop(Cancellation.Never)
+                component.useSolveStop(ExecutionControl.Never)
                 val session = SearchSession(
                     listOf(component),
-                    cancellation = Cancellation { cancelled },
+                    cancellation = ExecutionControl { cancelled },
                     atoms = SearchAtomRegistry(model.numBoolVars),
                 )
                 assertIs<ComponentResult.Consistent>(session.initialize())
@@ -668,7 +668,7 @@ class QfLiraSolverHintsTest {
             ),
         )
         ExactLiraSearchComponent(model).use { component ->
-            val hints = assertNotNull(component.partialPointHints(Cancellation.Never)).second
+            val hints = assertNotNull(component.partialPointHints(ExecutionControl.Never)).second
             val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
             assertIs<ComponentResult.Consistent>(session.initialize())
 
@@ -710,7 +710,7 @@ class QfLiraSolverHintsTest {
                 model,
                 emptyMap(),
                 Long.MAX_VALUE,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 SearchLearnedDbParams(),
                 null,
                 openHintFlips = flips,
@@ -755,7 +755,7 @@ class QfLiraSolverHintsTest {
         )
         for (guided in listOf(false, true)) {
             ExactLiraSearchComponent(model).use { component ->
-                assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true))
+                assertNotNull(component.partialPointHints(ExecutionControl.Never, defaultOpening = true))
                 component.useMixedPointCompletion()
                 if (guided) component.useDefaultDisjunctionHints()
                 val session = SearchSession(
@@ -783,7 +783,8 @@ class QfLiraSolverHintsTest {
             ExactLiraSearchComponent(partialModel()).use { component ->
                 component.observeWith(stats)
                 if (complete) component.observeCompleteTraversal()
-                val hints = assertNotNull(component.partialPointHints(Cancellation.Never, defaultOpening = true)).second
+                val hints = assertNotNull(component.partialPointHints(ExecutionControl.Never, defaultOpening =
+                    true)).second
                 assertNull(hints.preferredBool(0))
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
                 assertIs<ComponentResult.Consistent>(session.initialize())

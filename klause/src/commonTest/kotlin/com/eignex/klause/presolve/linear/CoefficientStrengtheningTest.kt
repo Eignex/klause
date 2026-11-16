@@ -19,7 +19,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
@@ -136,7 +136,7 @@ class CoefficientStrengtheningTest {
                 Array(numVars) { IntDomain(domains[it].first.toLong(), domains[it].last.toLong()) },
                 listOf(original),
             )
-        val delta = Presolve.strengthenCoefficients(problem, Cancellation.Never, problem.finiteIntDomains())
+        val delta = Presolve.strengthenCoefficients(problem, ExecutionControl.Never, problem.finiteIntDomains())
         val rewritten =
             problem.factors.filterIndexed { index, _ -> index !in delta.droppedIndices } + delta.addedFactors
         val values = Array(numVars) { v ->
@@ -213,7 +213,7 @@ class CoefficientStrengtheningTest {
             factors = arrayOf(Linear(intArrayOf(7, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
         )
 
-        val delta = Presolve.strengthenSourceCoefficients(problem, Cancellation.Never)
+        val delta = Presolve.strengthenSourceCoefficients(problem, ExecutionControl.Never)
 
         val lifted = assertIs<Linear>(delta.addedFactors.single())
         assertEquals(listOf(2L, 2L), lifted.vars.indices.map { lifted.integerConstants!!.coeff(it) })
@@ -233,7 +233,7 @@ class CoefficientStrengtheningTest {
                 factors = arrayOf(Linear(intArrayOf(7, 3), intArrayOf(0, 1), LinearOp.LE, 8)),
             )
 
-            assertTrue(Presolve.strengthenSourceCoefficients(problem, Cancellation.Never).isEmpty)
+            assertTrue(Presolve.strengthenSourceCoefficients(problem, ExecutionControl.Never).isEmpty)
         }
     }
 
@@ -247,7 +247,7 @@ class CoefficientStrengtheningTest {
             intDomains = arrayOf(open, open, open),
             factors = listOf(Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 10)),
         )
-        assertTrue(Presolve.strengthenCoefficients(problem, Cancellation.Never, problem.finiteIntDomains()).isEmpty)
+        assertTrue(Presolve.strengthenCoefficients(problem, ExecutionControl.Never, problem.finiteIntDomains()).isEmpty)
     }
 
     @Test
@@ -289,7 +289,7 @@ class CoefficientStrengtheningTest {
         val domains = arrayOf(IntDomain(0, 3).excludeValue(1), IntDomain(0, 1))
         val problem = Problem(0, 2, domains, listOf(row))
 
-        val delta = Presolve.strengthenCoefficients(problem, Cancellation.Never, domains)
+        val delta = Presolve.strengthenCoefficients(problem, ExecutionControl.Never, domains)
 
         val lifted = assertIs<Linear>(delta.addedFactors.single())
         for (x in listOf(0, 2, 3)) {
@@ -322,7 +322,7 @@ class CoefficientStrengtheningTest {
         val domains = Array(2) { IntDomain(0, Long.MAX_VALUE) }
         val problem = Problem(0, 2, domains, listOf(row))
 
-        val delta = Presolve.strengthenCoefficients(problem, Cancellation.Never, domains)
+        val delta = Presolve.strengthenCoefficients(problem, ExecutionControl.Never, domains)
 
         val reduced = checkNotNull(assertIs<Linear>(delta.addedFactors.single()).integerConstants)
         assertEquals(listOf(1L, 2L), reduced.coeffs.toList())
@@ -339,7 +339,7 @@ class CoefficientStrengtheningTest {
             factors = arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0)),
         )
 
-        val delta = Presolve.strengthenSourceCoefficients(problem, Cancellation.Never)
+        val delta = Presolve.strengthenSourceCoefficients(problem, ExecutionControl.Never)
 
         assertTrue(delta.isEmpty)
     }

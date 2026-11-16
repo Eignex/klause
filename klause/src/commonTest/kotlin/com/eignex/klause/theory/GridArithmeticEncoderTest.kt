@@ -16,7 +16,7 @@ import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.theory.qfnra.PolynomialFormula
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -90,10 +90,10 @@ class GridArithmeticEncoderTest {
                 val conflict = ExactNeighborhoodCondition(emptyMap(), conflictPins, conflictPins)
                 val negative = ExactNeighborhoodCondition(emptyMap(), negativePins, negativePins)
                 val zero = ExactNeighborhoodCondition(emptyMap(), zeroPins, zeroPins)
-                assertIs<ExactNeighborhoodResult.Refuted>(it.check(conflict, Cancellation.Never))
-                assertIs<ExactNeighborhoodResult.Undecided>(it.check(negative, Cancellation { true }))
-                val first = assertIs<ExactNeighborhoodResult.Witness>(it.check(negative, Cancellation.Never)).sample
-                assertIs<ExactNeighborhoodResult.Witness>(it.check(zero, Cancellation.Never))
+                assertIs<ExactNeighborhoodResult.Refuted>(it.check(conflict, ExecutionControl.Never))
+                assertIs<ExactNeighborhoodResult.Undecided>(it.check(negative, ExecutionControl { true }))
+                val first = assertIs<ExactNeighborhoodResult.Witness>(it.check(negative, ExecutionControl.Never)).sample
+                assertIs<ExactNeighborhoodResult.Witness>(it.check(zero, ExecutionControl.Never))
 
                 assertEquals(0L, first.intValue(0))
                 assertEquals(4L, first.intValue(1))
@@ -125,7 +125,7 @@ class GridArithmeticEncoderTest {
 
                         val checked = owner.check(
                             ExactNeighborhoodCondition(emptyMap(), fixed, fixed),
-                            Cancellation.Never,
+                            ExecutionControl.Never,
                         )
 
                         if (a * b == result) {
@@ -175,9 +175,9 @@ class GridArithmeticEncoderTest {
         val source = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf<Factor>(relation))
         val prepared = FactorProjectionProviders.Default.prepare(source)
         var work = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 2L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val stopped = prepared.linearTheoryModel(EncodingTarget.LINEAR, cancellation = cancellation)

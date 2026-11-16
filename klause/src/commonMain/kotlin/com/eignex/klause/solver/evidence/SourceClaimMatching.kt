@@ -6,7 +6,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun sameSourceClaimKind(first: SourceClaim, second: SourceClaim): Boolean = when (first) {
     is SourceClaim.Witness -> second is SourceClaim.Witness
@@ -22,7 +22,7 @@ internal fun sameSourceClaimKind(first: SourceClaim, second: SourceClaim): Boole
 }
 
 internal fun matchSourceClaims(
-    first: SourceClaim, second: SourceClaim, cancellation: Cancellation,
+    first: SourceClaim, second: SourceClaim, cancellation: ExecutionControl,
 ): SourceEvidenceCheck = try {
     val algebraic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
     algebraic.arithmetic.step()

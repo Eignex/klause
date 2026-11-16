@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.incumbent
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal enum class IncumbentOfferEvent {
     Segments, Offered, Coalesced, Checked, Installed, Rejected, Indeterminate, NotImproving, Dropped, Expired, Failed,
@@ -34,7 +34,7 @@ internal class BufferedIncumbentOffers<A, V>(
     }
 
     fun flush(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         measure: (() -> Unit) -> Unit,
         offer: (A, V) -> Publication<A, V>?,
     ) {

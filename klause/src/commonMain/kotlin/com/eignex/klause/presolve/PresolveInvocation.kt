@@ -10,7 +10,8 @@ import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolvePreparationStats
 import com.eignex.klause.solver.result.PresolveSizeStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.collections.IntHashSet
 import kotlin.time.Duration
 import kotlin.time.TimeSource
@@ -21,8 +22,8 @@ internal class PresolveEntrySize(private val budget: PresolveBudget?) {
     var booleanPins: IntHashSet? = null
         private set
 
-    fun units(problem: Problem, token: Cancellation): Long {
-        if (budget == null && token.workMeter() == null) return 0L
+    fun units(problem: Problem, token: ExecutionControl): Long {
+        if (budget == null && token.accounting == null) return 0L
         if (factors !== problem.factors) {
             entries = budget?.entryUnits(problem.factors) ?: passBaseUnits(problem.factors)
             booleanPins = budget?.entryBooleanPins
@@ -142,14 +143,14 @@ internal fun PresolveInvocation?.record(outcome: PassOutcome) {
 internal fun PresolveBudget?.observeRoundPass(
     pass: PresolvePass,
     lane: PresolveLane,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     size: () -> PresolveSizeStats,
     eligible: () -> Boolean,
     action: (PresolveInvocation?) -> PassOutcome,
 ): PassOutcome = observe(pass, lane, size) { invocation ->
     val outcome = when {
         !eligible() -> PassOutcome.SKIPPED
-        cancellation() -> PassOutcome.UNCHANGED
+        cancellation.presolveStopped() -> PassOutcome.UNCHANGED
         else -> action(invocation)
     }
     val result = if (outcome == PassOutcome.UNCHANGED && invocation?.interrupted == true) {
@@ -162,7 +163,7 @@ internal fun PresolveBudget?.observeRoundPass(
 internal fun <T> PresolveBudget?.observeTransform(
     pass: PresolvePass,
     input: Problem,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     eligible: () -> Boolean,
     unchanged: () -> T,
     output: (T) -> Problem,
@@ -198,8 +199,14 @@ internal fun <T> PresolveBudget?.observeTransform(
     }
 }
 
-internal fun Cancellation.interruptPresolveInvocation() {
+internal fun ExecutionControl.interruptPresolveInvocation() {
     presolveBudget()?.activeInvocation?.outcome = PresolveInvocationOutcome.INTERRUPTED
+}
+
+internal fun ExecutionControl.presolveStopped(): Boolean {
+    if (admission?.exhausted != true && !pollStop()) return false
+    presolveBudget()?.activeInvocation?.interrupted = true
+    return true
 }
 
 internal fun PresolveInvocation?.recordEntries(units: Long) {

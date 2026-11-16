@@ -38,15 +38,15 @@ import com.eignex.util.collections.Bits
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 
 class ProblemJsonTest {
     private val json = ProblemJson.default

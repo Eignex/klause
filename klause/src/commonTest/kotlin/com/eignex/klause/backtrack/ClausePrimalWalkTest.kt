@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -21,10 +21,10 @@ class ClausePrimalWalkTest {
         val walk = ClausePrimalWalk(Sample(BooleanArray(66) { it == 0 || it == 63 }, longArrayOf()),
             clauses, listOf(0, 63), Assumptions.None, 3L, null)
 
-        walk.begin(0, Cancellation.Never)
-        assertEquals(false, walk.advance(Cancellation.Never, -1L))
-        walk.begin(63, Cancellation.Never)
-        assertEquals(true, walk.advance(Cancellation.Never, -1L))
+        walk.begin(0, ExecutionControl.Never)
+        assertEquals(false, walk.advance(ExecutionControl.Never, -1L))
+        walk.begin(63, ExecutionControl.Never)
+        assertEquals(true, walk.advance(ExecutionControl.Never, -1L))
         val sample = walk.sample()
 
         assertTrue(sample.bools[0])
@@ -47,9 +47,9 @@ class ClausePrimalWalkTest {
             null,
         )
 
-        walk.begin(0, Cancellation.Never)
-        assertEquals(null, walk.advance(Cancellation.Never, 0L))
-        assertEquals(true, walk.advance(Cancellation.Never, -1L))
+        walk.begin(0, ExecutionControl.Never)
+        assertEquals(null, walk.advance(ExecutionControl.Never, 0L))
+        assertEquals(true, walk.advance(ExecutionControl.Never, -1L))
         val sample = walk.sample()
 
         assertTrue(!sample.bools[0])
@@ -71,8 +71,8 @@ class ClausePrimalWalkTest {
             null,
         )
 
-        walk.begin(0, Cancellation.Never)
-        assertEquals(true, walk.advance(Cancellation.Never, -1L))
+        walk.begin(0, ExecutionControl.Never)
+        assertEquals(true, walk.advance(ExecutionControl.Never, -1L))
         val sample = walk.sample()
 
         assertTrue(!sample.bools[0])
@@ -96,8 +96,8 @@ class ClausePrimalWalkTest {
             null,
         )
 
-        walk.begin(0, Cancellation.Never)
-        assertEquals(false, walk.advance(Cancellation.Never, -1L))
+        walk.begin(0, ExecutionControl.Never)
+        assertEquals(false, walk.advance(ExecutionControl.Never, -1L))
         val sample = walk.sample()
 
         assertTrue(sample.bools[0])
@@ -118,9 +118,9 @@ class ClausePrimalWalkTest {
             3L,
             NodeBudget(1L).apply { spend() },
         )
-        walk.begin(0, Cancellation.Never)
+        walk.begin(0, ExecutionControl.Never)
 
-        val outcome = walk.advance(Cancellation.Never, -1L)
+        val outcome = walk.advance(ExecutionControl.Never, -1L)
 
         assertEquals(null, outcome)
     }
@@ -140,9 +140,9 @@ class ClausePrimalWalkTest {
             3L,
             budget,
         )
-        walk.begin(0, Cancellation.Never)
+        walk.begin(0, ExecutionControl.Never)
 
-        val outcome = walk.advance(Cancellation.Never, -1L)
+        val outcome = walk.advance(ExecutionControl.Never, -1L)
 
         assertEquals(true, outcome)
         assertEquals(1L, budget.spent)

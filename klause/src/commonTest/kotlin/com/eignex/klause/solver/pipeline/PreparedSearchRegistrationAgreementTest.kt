@@ -31,7 +31,7 @@ import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.TypedSearchValueKey
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
@@ -81,7 +81,7 @@ class PreparedSearchRegistrationAgreementTest {
         }
 
         PreparedSearchRegistrations(source, registrations)
-            .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+            .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                 assertIs<ComponentResult.Consistent>(search.session.initialize())
                 val result = assertIs<SearchResult.Satisfied>(search.session.solve(0))
 
@@ -133,7 +133,7 @@ class PreparedSearchRegistrationAgreementTest {
             }
         }
         PreparedSearchRegistrations(source, registrations)
-            .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+            .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                 assertIs<ComponentResult.Consistent>(search.session.initialize())
                 val result = assertIs<SearchResult.Satisfied>(search.session.solve(0))
                 val value = requireNotNull(result.model.valueOf(SearchExactRealValue(SourceRealId(0))))
@@ -178,7 +178,7 @@ class PreparedSearchRegistrationAgreementTest {
         }
 
         PreparedSearchRegistrations(source, registrations)
-            .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+            .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                 val result = search.session.initialize()
 
                 assertIs<ComponentResult.Conflict>(result)
@@ -224,7 +224,7 @@ class PreparedSearchRegistrationAgreementTest {
             }
 
             PreparedSearchRegistrations(source, registrations)
-                .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+                .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                     assertIs<ComponentResult.Consistent>(search.session.initialize())
                     val result = assertIs<SearchResult.Satisfied>(search.session.solve(0))
 
@@ -278,7 +278,7 @@ class PreparedSearchRegistrationAgreementTest {
             }
         }
         PreparedSearchRegistrations(source, registrations)
-            .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+            .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                 assertIs<ComponentResult.Consistent>(search.session.initialize())
                 assertIs<ComponentResult.Consistent>(search.session.push(SearchDecision.Bool(0)))
                 assertIs<ComponentCheck.Feasible>(search.session.check())
@@ -320,7 +320,7 @@ class PreparedSearchRegistrationAgreementTest {
             }
         }
         PreparedSearchRegistrations(source, registrations)
-            .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+            .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                 assertIs<ComponentResult.Consistent>(search.session.initialize())
                 val result = search.session.solve(0)
 
@@ -360,7 +360,7 @@ class PreparedSearchRegistrationAgreementTest {
             }
         }
         PreparedSearchRegistrations(source, registrations)
-            .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+            .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                 assertIs<ComponentResult.Consistent>(search.session.initialize())
                 val result = search.session.solve(0)
 
@@ -386,7 +386,7 @@ class PreparedSearchRegistrationAgreementTest {
             }
         }
         PreparedSearchRegistrations(source, registrations)
-            .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+            .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                 val result = search.session.initialize()
 
                 assertIs<ComponentResult.Indeterminate>(result)
@@ -425,7 +425,7 @@ class PreparedSearchRegistrationAgreementTest {
             }
         }
         PreparedSearchRegistrations(source, registrations)
-            .open(0, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+            .open(0, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                 val result = search.session.initialize()
 
                 assertIs<ComponentResult.Indeterminate>(result)
@@ -534,9 +534,9 @@ class PreparedSearchRegistrationAgreementTest {
         )
         var armed = false
         var cancelled = false
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = cancelled
-            override fun workMeter(): WorkMeter = WorkMeter { if (armed) cancelled = true }
+            override val accounting: WorkMeter get() = WorkMeter { if (armed) cancelled = true }
         }
         ExactLiraSearchComponent(source).use { component ->
             val session = SearchComponentSet(listOf(component)).session(cancellation = stop)
@@ -620,7 +620,7 @@ class PreparedSearchRegistrationAgreementTest {
                 }
             }
             PreparedSearchRegistrations(source, registrations)
-                .open(Long.MAX_VALUE, Cancellation.Never, SearchLearnedDbParams(), null, null).use { search ->
+                .open(Long.MAX_VALUE, ExecutionControl.Never, SearchLearnedDbParams(), null, null).use { search ->
                     val result = search.session.initialize()
 
                     assertIs<ComponentResult.Conflict>(result)

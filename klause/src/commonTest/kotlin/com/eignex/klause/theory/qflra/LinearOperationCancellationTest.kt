@@ -1,6 +1,6 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -11,43 +11,79 @@ import kotlin.time.TestTimeSource
 
 class LinearOperationCancellationTest {
     @Test
-    fun `unmetered numerical polls should observe a containing stop within one batch`() {
+    fun `a known stop should remain observable at every scalar checkpoint`() {
         var cancelled = false
-        val token = LinearOperationCancellation({ Cancellation.Never }) { cancelled }
+        val token = LinearOperationCancellation({ ExecutionControl.Never }) { cancelled }
         token.begin()
-        assertFalse(token())
+        assertFalse(token.poll())
         cancelled = true
-
-        repeat(63) { assertFalse(token()) }
-
         assertTrue(token())
+
+        repeat(3) { assertTrue(token.poll()) }
     }
 
     @Test
-    fun `metered numerical polls should retain every charge and stop boundary`() {
+    fun `polls outside an operation should observe every source change`() {
+        var cancelled = false
+        val token = LinearOperationCancellation({ ExecutionControl { cancelled } }) { false }
+
+        assertFalse(token.poll())
+        cancelled = true
+        assertTrue(token.poll())
+        cancelled = false
+        assertFalse(token.poll())
+    }
+
+    @Test
+    fun `unmetered numerical polls should observe a containing stop within one batch`() {
+        var cancelled = false
+        val token = LinearOperationCancellation({ ExecutionControl.Never }) { cancelled }
+        token.begin()
+        assertFalse(token.poll())
+        cancelled = true
+
+        repeat(8191) { assertFalse(token.poll()) }
+
+        assertTrue(token.poll())
+    }
+
+    @Test
+    fun `accounting should retain every charge with bounded numerical polls`() {
         var charged = 0L
         val meter = WorkMeter { charged += it }
-        val source = object : Cancellation {
+        val source = object : ExecutionControl() {
             override fun isCancelled() = charged >= 3L
-            override fun workMeter() = meter
+            override val accounting get() = meter
         }
         val token = LinearOperationCancellation({ source }) { false }
         token.begin()
 
         repeat(2) {
             token.charge(1L)
-            assertFalse(token())
+            assertFalse(token.poll())
         }
         token.charge(1L)
+        repeat(8190) { assertFalse(token.poll()) }
+
+        assertTrue(token.poll())
+        assertEquals(3L, charged)
+    }
+
+    @Test
+    fun `a containing checkpoint should observe a stop within an unfinished loop batch`() {
+        var stopped = false
+        val token = LinearOperationCancellation({ ExecutionControl { stopped } }) { false }
+        token.begin()
+        assertFalse(token.poll())
+        stopped = true
 
         assertTrue(token())
-        assertEquals(3L, charged)
     }
 
     @Test
     fun `an operation stop should remain latched until the next operation`() {
         var expired = true
-        val token = LinearOperationCancellation({ Cancellation { expired } }) { false }
+        val token = LinearOperationCancellation({ ExecutionControl { expired } }) { false }
         token.begin()
         assertTrue(token())
         expired = false
@@ -62,15 +98,15 @@ class LinearOperationCancellationTest {
     @Test
     fun `a private deadline should release without renewing the containing deadline`() {
         val clock = TestTimeSource()
-        val containing = Cancellation.until(clock.markNow() + 4.seconds)
-        var operation = containing or Cancellation.until(clock.markNow() + 1.seconds)
+        val containing = ExecutionControl.until(clock.markNow() + 4.seconds)
+        var operation = containing or ExecutionControl.until(clock.markNow() + 1.seconds)
         val token = LinearOperationCancellation({ operation }) { containing() }
         token.begin()
         clock += 2.seconds
         assertTrue(token())
         assertFalse(containing())
         token.end()
-        operation = containing or Cancellation.until(clock.markNow() + 8.seconds)
+        operation = containing or ExecutionControl.until(clock.markNow() + 8.seconds)
         token.begin()
         assertEquals(containing.deadline(), token.deadline())
         assertFalse(token())
@@ -83,7 +119,7 @@ class LinearOperationCancellationTest {
     @Test
     fun `operation exit should poll a stop before the next numerical batch`() {
         var cancelled = false
-        val token = LinearOperationCancellation({ Cancellation { cancelled } }) { false }
+        val token = LinearOperationCancellation({ ExecutionControl { cancelled } }) { false }
         token.begin()
         assertFalse(token())
         cancelled = true

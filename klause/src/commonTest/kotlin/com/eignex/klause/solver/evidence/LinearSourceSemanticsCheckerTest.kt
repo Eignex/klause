@@ -5,7 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,8 +39,8 @@ class LinearSourceSemanticsCheckerTest {
                 exactReals = listOf(BigFraction.ZERO),
             )
 
-            assertIs<SourceEvidenceCheck.Rejected>(checker.witness(enabled, scope, Cancellation.Never))
-            assertEquals(SourceEvidenceCheck.Checked, checker.witness(disabled, scope, Cancellation.Never))
+            assertIs<SourceEvidenceCheck.Rejected>(checker.witness(enabled, scope, ExecutionControl.Never))
+            assertEquals(SourceEvidenceCheck.Checked, checker.witness(disabled, scope, ExecutionControl.Never))
         }
     }
 
@@ -53,8 +53,8 @@ class LinearSourceSemanticsCheckerTest {
         val fixed = SourceClaim.Ray(base, mapOf(x to BigFraction.ONE))
         val moving = SourceClaim.Ray(base, mapOf(x to BigFraction.ONE, integer to BigFraction.ONE))
 
-        assertEquals(SourceEvidenceCheck.Checked, checker.ray(fixed, scope, Cancellation.Never))
-        assertIs<SourceEvidenceCheck.Unavailable>(checker.ray(moving, scope, Cancellation.Never))
+        assertEquals(SourceEvidenceCheck.Checked, checker.ray(fixed, scope, ExecutionControl.Never))
+        assertIs<SourceEvidenceCheck.Unavailable>(checker.ray(moving, scope, ExecutionControl.Never))
     }
 
     @Test
@@ -67,7 +67,7 @@ class LinearSourceSemanticsCheckerTest {
             exactReals = listOf(value),
         )
 
-        assertEquals(SourceEvidenceCheck.Checked, checker.witness(sample, scope, Cancellation.Never))
+        assertEquals(SourceEvidenceCheck.Checked, checker.witness(sample, scope, ExecutionControl.Never))
     }
 
     @Test
@@ -75,21 +75,21 @@ class LinearSourceSemanticsCheckerTest {
         val value = AlgebraicArithmetic().roots(RationalPolynomial.of(-2, 0, 1)).last()
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), algebraicReals = listOf(value))
 
-        assertEquals(SourceEvidenceCheck.Checked, checker.witness(sample, scope, Cancellation.Never))
+        assertEquals(SourceEvidenceCheck.Checked, checker.witness(sample, scope, ExecutionControl.Never))
     }
 
     @Test
     fun `a rounded feasible value should not replace missing exact coordinates`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0))
 
-        assertIs<SourceEvidenceCheck.Unavailable>(checker.witness(sample, scope, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Unavailable>(checker.witness(sample, scope, ExecutionControl.Never))
     }
 
     @Test
     fun `a wrong point should fail the original source check`() {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
 
-        assertIs<SourceEvidenceCheck.Rejected>(checker.witness(sample, scope, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Rejected>(checker.witness(sample, scope, ExecutionControl.Never))
     }
 
     @Test
@@ -97,7 +97,7 @@ class LinearSourceSemanticsCheckerTest {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val conditioned = scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ofLong(2))))
 
-        assertIs<SourceEvidenceCheck.Rejected>(checker.witness(sample, conditioned, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Rejected>(checker.witness(sample, conditioned, ExecutionControl.Never))
     }
 
     @Test
@@ -105,7 +105,7 @@ class LinearSourceSemanticsCheckerTest {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val claim = SourceClaim.Ray(sample, mapOf(x to BigFraction.ONE))
 
-        assertEquals(SourceEvidenceCheck.Checked, checker.ray(claim, scope, Cancellation.Never))
+        assertEquals(SourceEvidenceCheck.Checked, checker.ray(claim, scope, ExecutionControl.Never))
     }
 
     @Test
@@ -113,7 +113,7 @@ class LinearSourceSemanticsCheckerTest {
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
         val claim = SourceClaim.Ray(sample, emptyMap())
 
-        assertIs<SourceEvidenceCheck.Rejected>(checker.ray(claim, scope, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Rejected>(checker.ray(claim, scope, ExecutionControl.Never))
     }
 
     @Test
@@ -122,7 +122,7 @@ class LinearSourceSemanticsCheckerTest {
         val claim = SourceClaim.Ray(sample, mapOf(x to BigFraction.ONE))
         val conditioned = scope.copy(condition = SourceCondition(upper = mapOf(x to BigFraction.ofLong(2))))
 
-        assertIs<SourceEvidenceCheck.Rejected>(checker.ray(claim, conditioned, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Rejected>(checker.ray(claim, conditioned, ExecutionControl.Never))
     }
 
     @Test
@@ -138,7 +138,7 @@ class LinearSourceSemanticsCheckerTest {
                     mapOf(x to BigFraction.ONE),
                 ),
                 scope,
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
     }
@@ -155,6 +155,6 @@ class LinearSourceSemanticsCheckerTest {
         val checker = LinearSourceSemanticsChecker(setOf(x), listOf(row))
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0), exactReals = listOf(BigFraction.ONE))
 
-        assertIs<SourceEvidenceCheck.Rejected>(checker.witness(sample, scope, Cancellation.Never))
+        assertIs<SourceEvidenceCheck.Rejected>(checker.witness(sample, scope, ExecutionControl.Never))
     }
 }

@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 internal enum class IntegerPinStatus { Established, Inactive, Unresolved }
@@ -28,7 +28,7 @@ internal class SourceIntegerBounds(
 }
 
 internal fun SourceProofContext.integerPinBounds(
-    condition: SourceCondition, cancellation: Cancellation,
+    condition: SourceCondition, cancellation: ExecutionControl,
 ): SourceIntegerBounds? {
     val lower = linkedMapOf<SourceCoordinate, BigFraction>()
     val upper = linkedMapOf<SourceCoordinate, BigFraction>()

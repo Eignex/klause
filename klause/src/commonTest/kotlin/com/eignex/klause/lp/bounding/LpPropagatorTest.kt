@@ -56,7 +56,7 @@ import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -78,13 +78,13 @@ class LpPropagatorTest {
             Triple(true, null, false), Triple(false, null, true),
             Triple(true, false, true), Triple(false, true, false),
         )) {
-            LpPropagator(object : LpSearchPolicy {}, cancellation = Cancellation { storedStopped },
+            LpPropagator(object : LpSearchPolicy {}, cancellation = ExecutionControl { storedStopped },
                 effort = { LpEffortProfile(work = 100_000L) }).use { lp ->
                 val installed = if (requested == null) lp.install(base, exact)
-                    else lp.install(base, exact, Cancellation { requested })
+                    else lp.install(base, exact, ExecutionControl { requested })
 
                 assertEquals(expected, installed)
-                assertEquals(expected, lp.prepare(Cancellation.Never, 100_000L))
+                assertEquals(expected, lp.prepare(ExecutionControl.Never, 100_000L))
             }
         }
     }
@@ -176,7 +176,7 @@ class LpPropagatorTest {
         var queries = 0
         LpPropagator(
             object : LpSearchPolicy {},
-            cancellation = Cancellation { stopped },
+            cancellation = ExecutionControl { stopped },
             queryWorkAllowance = { queries++; 100_000L },
             onPreparation = { reported += it.workOps },
         ).use { lp ->
@@ -378,7 +378,7 @@ class LpPropagatorTest {
             .build(PropagationSession(problem))
         var stopped = false
         var spent = 0L
-        LpPropagator(object : LpSearchPolicy {}, cancellation = Cancellation { stopped }, onEdit = {
+        LpPropagator(object : LpSearchPolicy {}, cancellation = ExecutionControl { stopped }, onEdit = {
             spent += it
             stopped = true
         }).use { lp ->
@@ -408,12 +408,12 @@ class LpPropagatorTest {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray())
             val base = CpToLpRelaxation(problem, LinearObjective(intCoefficients = longArrayOf(1)))
                 .build(PropagationSession(problem))
-            LpPropagator(object : LpSearchPolicy {}, cancellation = Cancellation { ownerStopped }).use { lp ->
+            LpPropagator(object : LpSearchPolicy {}, cancellation = ExecutionControl { ownerStopped }).use { lp ->
                 assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))
                 ownerStopped = stopOwner
                 callStopped = !stopOwner
 
-                val result = lp.solve(token = Cancellation { callStopped })
+                val result = lp.solve(token = ExecutionControl { callStopped })
 
                 assertTrue(result == null || result.verdict == LpVerdict.INDETERMINATE)
                 assertNull(result?.witness)
@@ -602,7 +602,7 @@ class LpPropagatorTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -693,7 +693,7 @@ class LpPropagatorTest {
         var reject = false
         val factory = wrappingFactory { delegate ->
             object : PersistentLpSolver by delegate {
-                override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                override fun adopt(state: LpExactState, token: ExecutionControl): Boolean =
                     !reject && delegate.adopt(state, token)
             }
         }
@@ -707,7 +707,7 @@ class LpPropagatorTest {
         LpPropagator(
             object : LpSearchPolicy {},
             solveContext = LpSolveContext(factory),
-            cancellation = Cancellation { cancelled },
+            cancellation = ExecutionControl { cancelled },
         ).use { lp ->
             assertTrue(lp.install(Any(), source))
             assertNotNull(lp.solve())
@@ -833,7 +833,7 @@ class LpPropagatorTest {
             var closes = 0
             val factory = wrappingFactory { delegate ->
                 object : PersistentLpSolver by delegate {
-                    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+                    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean =
                         !(fail && !cancelled) && delegate.adopt(state, token)
                     override fun close() {
                         closes++
@@ -852,7 +852,7 @@ class LpPropagatorTest {
             LpPropagator(
                 object : LpSearchPolicy {},
                 solveContext = LpSolveContext(factory),
-                cancellation = Cancellation { fail && cancelled },
+                cancellation = ExecutionControl { fail && cancelled },
             ).use { lp ->
                 assertTrue(lp.install(Any(), source))
                 assertNotNull(lp.solve())
@@ -872,7 +872,7 @@ class LpPropagatorTest {
         object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,

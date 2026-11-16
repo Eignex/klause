@@ -19,7 +19,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.forEachBinaryPartner
 import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -920,7 +920,7 @@ class RootInprocessingTest {
             var other = -1
 
             repeat(2) { attempt ->
-                val cancellation = Cancellation {
+                val cancellation = ExecutionControl {
                     attempt == 1 && interrupt &&
                         (stats.snapshot().learning["inprocessProbeImplicationFallbacks"] ?: 0L) > 0L
                 }
@@ -993,7 +993,7 @@ class RootInprocessingTest {
             val pass = RootProbingPass()
 
             var cancelled = false
-            val token = Cancellation {
+            val token = ExecutionControl {
                 if (session.decisionLevel > 0) cancelled = true
                 cancelled
             }
@@ -1367,7 +1367,7 @@ class RootInprocessingTest {
     fun `cancelled probing should leave no deduction or standing decision`() {
         val session = PropagationSession(problem(intArrayOf(0, 2), intArrayOf(0, 3)).bake())
         var polls = 0
-        session.withCancellation(Cancellation { ++polls >= 2 }) {
+        session.withCancellation(ExecutionControl { ++polls >= 2 }) {
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
         }
         assertEquals(0, session.learnedClauseCount)

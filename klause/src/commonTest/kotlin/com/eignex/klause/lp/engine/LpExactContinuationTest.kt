@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -30,7 +30,7 @@ class LpExactContinuationTest {
             )
         }
 
-        val result = captureContinuationTarget(model, solver, null, ExactContinuationLimits(), Cancellation.Never)
+        val result = captureContinuationTarget(model, solver, null, ExactContinuationLimits(), ExecutionControl.Never)
 
         assertNotNull(result.basis)
         assertNull(result.metrics.decline)
@@ -133,7 +133,7 @@ class LpExactContinuationTest {
         )
         for (limit in limits) {
             repeat(2) {
-                val declined = captureContinuationTarget(model, solver, null, limit, Cancellation.Never)
+                val declined = captureContinuationTarget(model, solver, null, limit, ExecutionControl.Never)
                 assertEquals(ContinuationDecline.DIMENSION, declined.metrics.decline)
                 assertEquals(1L, declined.metrics.work)
                 assertEquals(0L, declined.metrics.allocation)
@@ -142,7 +142,7 @@ class LpExactContinuationTest {
         }
         assertEquals(0, exports)
 
-        val admitted = captureContinuationTarget(model, solver, null, ExactContinuationLimits(), Cancellation.Never)
+        val admitted = captureContinuationTarget(model, solver, null, ExactContinuationLimits(), ExecutionControl.Never)
 
         assertNotNull(admitted.basis)
         assertNull(admitted.metrics.decline)
@@ -163,13 +163,16 @@ class LpExactContinuationTest {
                 Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
         }
         val cases = listOf(
-            Triple(ExactContinuationLimits(maxRows = 0, maxWork = 0L), Cancellation.Never, ContinuationDecline.WORK),
-            Triple(ExactContinuationLimits(maxRows = 0, maxTimeNs = 0L), Cancellation.Never, ContinuationDecline.TIME),
-            Triple(ExactContinuationLimits(maxRows = 0), Cancellation { true }, ContinuationDecline.CANCELLED),
+            Triple(ExactContinuationLimits(maxRows = 0, maxWork = 0L), ExecutionControl.Never,
+                ContinuationDecline.WORK),
+            Triple(ExactContinuationLimits(maxRows = 0, maxTimeNs = 0L), ExecutionControl.Never,
+                ContinuationDecline.TIME),
+            Triple(ExactContinuationLimits(maxRows = 0), ExecutionControl { true }, ContinuationDecline.CANCELLED),
         )
         for ((limit, cancellation, reason) in cases) {
             val stopped = captureContinuationTarget(model, solver, null, limit, cancellation)
-            val target = captureContinuationTarget(model, solver, null, ExactContinuationLimits(), Cancellation.Never)
+            val target = captureContinuationTarget(model, solver, null, ExactContinuationLimits(),
+                ExecutionControl.Never)
             val retried = continueExactLp(model, target.basis, targetMetrics = target.metrics)
 
             assertEquals(reason, stopped.metrics.decline)
@@ -487,7 +490,8 @@ class LpExactContinuationTest {
             assertNotNull(continueExactLp(initial, basis, cache, limits = limits).witness)
             assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
             val model = assertNotNull(trail.state.toWorkingModel())
-            val stopped = continueExactLp(model, basis, cache, limits = limits, cancellation = Cancellation { true })
+            val stopped = continueExactLp(model, basis, cache, limits = limits, cancellation =
+                ExecutionControl { true })
             assertNull(stopped.witness)
 
             val retried = continueExactLp(model, basis, cache, limits = limits)
@@ -530,7 +534,7 @@ class LpExactContinuationTest {
         val cancelled = continueExactLp(
             model,
             Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER)),
-            cancellation = Cancellation { true },
+            cancellation = ExecutionControl { true },
         )
 
         assertEquals(ContinuationDecline.NO_BASIS, missing.metrics.decline)

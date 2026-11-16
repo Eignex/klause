@@ -15,7 +15,8 @@ import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.MAX_SCALAR_COLUMN_ENTRIES
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.SymbolicLu
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
 import com.eignex.koblas.sparse.dotColumn
@@ -115,7 +116,7 @@ internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 64
  */
 internal class RevisedSimplex(
     private var model: LpModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     private val refactorUpdateLimit: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,
     private val iterationLimit: Int = 0,
     private val workLimit: Long = 0L,
@@ -348,7 +349,7 @@ internal class RevisedSimplex(
     // Building a scaling view is preparation the next solve reports, apart from the iterations its work limit caps.
     private val pendingNumericalWork = LpWork().apply { add(numerical.metrics.work) }
 
-    private val cancellation: Cancellation = solveControl.cancellation
+    private val cancellation: ExecutionControl = solveControl.cancellation
 
     private var deferUnscaledSourceDiagnostics = false
 
@@ -534,7 +535,7 @@ internal class RevisedSimplex(
     override val lastSingularRefactorizations: Int get() = observations.singularRefactorizations
     override val lastSmallPivotBails: Int get() = observations.smallPivotBails
     override val lastMetrics: LpSolveMetrics get() = observations.snapshot(work.ops)
-    override fun pausedDualProposal(cancellation: Cancellation): DoubleArray? {
+    override fun pausedDualProposal(cancellation: ExecutionControl): DoubleArray? {
         if (activeSolve?.isAdvancing != false || cancellation()) return null
         val proposal = DoubleArray(m)
         var nonzero = false
@@ -1160,9 +1161,9 @@ internal class RevisedSimplex(
         }
     }
 
-    override fun prepareLogicals(token: Cancellation): Basis? = prepareSourceBasis(null, token)
+    override fun prepareLogicals(token: ExecutionControl): Basis? = prepareSourceBasis(null, token)
 
-    override fun prepareBasis(basis: Basis, token: Cancellation): Basis? = prepareSourceBasis(basis, token)
+    override fun prepareBasis(basis: Basis, token: ExecutionControl): Basis? = prepareSourceBasis(basis, token)
 
     override fun retainedBasis(): Basis? {
         if (activeSolve != null) return null
@@ -1175,7 +1176,7 @@ internal class RevisedSimplex(
         return Basis(basicVar.copyOf(), status.copyOf(), captureEligible = false)
     }
 
-    private fun prepareSourceBasis(warm: Basis?, token: Cancellation): Basis? {
+    private fun prepareSourceBasis(warm: Basis?, token: ExecutionControl): Basis? {
         if (activeSolve != null) return null
         observations.termination = null
         continuationAvailable = false
@@ -1211,18 +1212,18 @@ internal class RevisedSimplex(
         }
     }
 
-    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
         if (activeSolve != null) return false
         observations.termination = null
         val current = model.exactState ?: return false
         if (current === state) {
-            if (token()) return false
+            if (token.pollStop()) return false
             solveControl.stopToken = token
             return true
         }
-        if (!current.sameMatrix(state) || token()) return false
+        if (!current.sameMatrix(state) || token.pollStop()) return false
         val next = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
-        if (token()) return false
+        if (token.pollStop()) return false
         continuationAvailable = false
         stoppedContinuationBasis = null
         refreshNumerical(next)
@@ -1248,7 +1249,7 @@ internal class RevisedSimplex(
         installUnscaledFallback(next)
     }
 
-    internal fun adoptProbe(next: LpModel, source: LpScalingView, token: Cancellation): Boolean {
+    internal fun adoptProbe(next: LpModel, source: LpScalingView, token: ExecutionControl): Boolean {
         val current = model.exactState ?: return false
         val state = next.exactState ?: return false
         if (activeSolve != null || allowUnscaledFallback || !current.sameMatrix(state) || token()) return false
@@ -2053,8 +2054,7 @@ internal class RevisedSimplex(
         observations.lastTheoryPricingWorkOps += amount
     }
 
-    private fun pricingResourceStopped(): Boolean =
-        cancellation() || solveControl.workExhausted()
+    private fun pricingResourceStopped(): Boolean = solveControl.pricingResourceStopped()
 
     private fun optimal(beta: DoubleArray): FloatLpResult = profiled(SimplexProfilePhase.OUTPUT) {
         basisLifecycle.kept = true
@@ -2218,7 +2218,7 @@ internal class RevisedSimplex(
     /** The structural primal `x*` at the last optimal [solve], for scoring tableau cuts by violation. */
     private var optimalPrimal: DoubleArray? = null
 
-    internal fun probeObjective(token: Cancellation): Double? {
+    internal fun probeObjective(token: ExecutionControl): Double? {
         val values = basicValueCache.values ?: return null
         if (optimalBasis == null || basicValueCache.model !== model ||
             basicValueCache.primalOnly || basicValueCache.numerical !== numerical
@@ -2290,7 +2290,7 @@ internal class RevisedSimplex(
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalGain>? {
         fun decline(reason: LpProbeDecline): List<LpDirectionalGain>? {
@@ -2359,7 +2359,7 @@ internal class RevisedSimplex(
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalValues>? {
         fun decline(reason: LpProbeDecline): List<LpDirectionalValues>? {
@@ -2412,7 +2412,7 @@ internal class RevisedSimplex(
         }).runValues(columns, splits, allowance - scan, token, observe)
     }
 
-    private fun probeBasisDecline(source: LpProbeSource, token: Cancellation): LpProbeDecline? {
+    private fun probeBasisDecline(source: LpProbeSource, token: ExecutionControl): LpProbeDecline? {
         val basis = source.basis
         val seen = BooleanArray(numVars)
         for ((slot, column) in basis.basicVars.withIndex()) {
@@ -2441,7 +2441,7 @@ internal class RevisedSimplex(
         pointModel: LpModel,
         columns: IntArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         charge: (Long) -> Unit,
     ): List<LpDirectionalCost?>? {
         if (columns.isEmpty() || columns.size > 2 || allowance <= 0L || token() || activeSolve != null ||
@@ -2482,7 +2482,7 @@ internal class RevisedSimplex(
         }
     }
 
-    private fun directionalReducedCosts(token: Cancellation): DoubleArray? {
+    private fun directionalReducedCosts(token: ExecutionControl): DoubleArray? {
         val costs = DoubleArray(numVars)
         for (j in 0 until numVars) {
             if (j % 256 == 0 && token()) return null
@@ -2496,7 +2496,7 @@ internal class RevisedSimplex(
     private fun directionalRowCosts(
         column: Int,
         row: IndexedVector,
-        token: Cancellation,
+        token: ExecutionControl,
         reducedCosts: DoubleArray?,
     ): LpDirectionalCost? {
         var down = Double.POSITIVE_INFINITY

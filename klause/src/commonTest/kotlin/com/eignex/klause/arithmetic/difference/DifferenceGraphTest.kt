@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.difference
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -55,9 +55,9 @@ class DifferenceGraphTest {
         )
         var work = 0L
         val meter = WorkMeter { work += it }
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 3L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         val result = differenceShortestPaths(

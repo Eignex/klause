@@ -21,7 +21,7 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.encodingPreparationScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.FloatInterval
 import com.eignex.util.collections.IntArrayList
 
@@ -52,7 +52,7 @@ internal sealed interface FloatGridPreparation {
     class Declined(val cause: FloatGridDecline, val sourceFactor: Int? = null) : FloatGridPreparation
 }
 
-internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: Cancellation): FloatGridPreparation {
+internal fun prepareFloatGrid(request: FloatGridRequest, cancellation: ExecutionControl): FloatGridPreparation {
     val stop = cancellation.encodingPreparationScope()
     val source = request.source
     if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
@@ -160,7 +160,7 @@ private fun preflightFloatFactor(
     source: Problem,
     factor: Factor,
     selected: BooleanArray,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean {
     cancellation.charge(1)
     if (cancellation()) return false
@@ -239,7 +239,7 @@ private fun lowerFloatGridFactor(
     factor: Factor,
     columns: Map<Int, FloatGridColumn>,
     policy: FloatSemantics.Grid,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     truncate: Boolean,
 ): List<Factor>? {
     fun coordinate(id: Int): GridCoordinate = columns.getValue(id).coordinate

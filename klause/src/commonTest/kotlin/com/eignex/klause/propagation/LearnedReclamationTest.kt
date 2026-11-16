@@ -6,7 +6,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryStatus
 import com.eignex.util.collections.IntArrayList
 import kotlin.test.Test
@@ -171,7 +171,7 @@ class LearnedReclamationTest {
             lateinit var session: PropagationSession
             session = PropagationSession(Problem(4, 0, emptyArray(),
                 arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native,
-                cancellation = Cancellation { limit != Long.MAX_VALUE && session.work >= limit })
+                cancellation = ExecutionControl { limit != Long.MAX_VALUE && session.work >= limit })
             assertEquals(native, session.usesNativeSat)
             repeat(3) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 2) }
             val observationWork = session.sharingMemory(maxWork = 1_000_000L).work

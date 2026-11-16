@@ -9,7 +9,6 @@ import com.eignex.klause.bench.metric.sha256
 import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.dimacs.Dimacs
 import com.eignex.klause.formats.dimacs.toProblem
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpEmphasis
 import com.eignex.klause.lp.bounding.LpPlan
@@ -26,15 +25,15 @@ import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.satisfyUnderAssumptions
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 
@@ -74,7 +73,7 @@ internal object CoreQueryProfile {
                     val preparationStart = System.nanoTime()
                     val beforePreparation = bean.getThreadAllocatedBytes(thread)
                     val ordinary = if (prepared) FinitePipeline.prepare(FinitePipelineRequest(
-                        source, FiniteEngine.BACKTRACK, objective, cancellation = Cancellation.after(2.seconds),
+                        source, FiniteEngine.BACKTRACK, objective, cancellation = ExecutionControl.after(2.seconds),
                     )) else null
                     val preparationNs = System.nanoTime() - preparationStart
                     val preparationBytes = bean.getThreadAllocatedBytes(thread) - beforePreparation
@@ -135,8 +134,8 @@ internal object CoreQueryProfile {
                                 observedSofts = pins.copyOf()
                             }
                         }
-                        val timeout = Cancellation.after(2.seconds)
-                        val stop = timeout or Cancellation { observe(); false }
+                        val timeout = ExecutionControl.after(2.seconds)
+                        val stop = timeout or ExecutionControl { observe(); false }
                         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
                             cancellation = stop, nativeSat = false)
                         val started = System.nanoTime()
@@ -192,7 +191,7 @@ internal object CoreQueryProfile {
                     for (minimize in listOf(false, true)) {
                         val started = System.nanoTime()
                         val result = BacktrackSolver(model).satisfyUnderAssumptions(pins,
-                            BacktrackParams(cancellation = Cancellation.after(2.seconds)), minimize)
+                            BacktrackParams(cancellation = ExecutionControl.after(2.seconds)), minimize)
                         out.resolve("helper-$unrelated-$prepared-$minimize.txt").writeText(
                             "elapsedNs=${System.nanoTime() - started}\n$result\n",
                         )
@@ -202,7 +201,7 @@ internal object CoreQueryProfile {
                         val before = bean.getThreadAllocatedBytes(thread)
                         val result = BacktrackSolver(model).minimize(cost, BacktrackParams(
                             variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = true,
-                            cancellation = Cancellation.after(2.seconds),
+                            cancellation = ExecutionControl.after(2.seconds),
                             lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null,
                             lpPlan = LpPlan(bounding = lp),
                         ))
@@ -247,7 +246,7 @@ internal object CoreQueryProfile {
     internal fun checkPoint(
         problem: BakedProblem,
         sample: Sample,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): Boolean {
         val session = PropagationSession(problem, cancellation)
         val pins = Assumptions(bools = (0 until problem.numBoolVars).associateWith { sample.boolValue(it) })

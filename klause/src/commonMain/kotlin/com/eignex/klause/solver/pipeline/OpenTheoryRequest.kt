@@ -19,7 +19,8 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.hasActivity
 import com.eignex.klause.theory.EncoderDecline
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.TimeSource
 
 /**
@@ -57,8 +58,8 @@ class OpenTheoryRequest internal constructor(
     internal val presolveConfig: PresolveConfig = PresolveConfig.DEFAULT,
     /** Whether source preparation must preserve the complete solution set. */
     internal val solutionSetSensitive: Boolean = false,
-    /** Cancellation token for source preparation. */
-    internal val presolveCancellation: Cancellation = Cancellation.Never,
+    /** ExecutionControl token for source preparation. */
+    internal val presolveCancellation: ExecutionControl = ExecutionControl.Never,
     /** Optional preparation allowance shared with source passes. */
     internal val presolveBudget: PresolveBudget? = null,
     /** Shared ownership preparation, retaining source identity through routing. */
@@ -86,7 +87,7 @@ class OpenTheoryRequest internal constructor(
     fun withPresolve(
         config: PresolveConfig,
         solutionSetSensitive: Boolean = false,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         budget: PresolveBudget? = null,
     ): OpenTheoryRequest = OpenTheoryRequest(
         model,
@@ -230,7 +231,7 @@ object OpenTheoryPipeline {
     ): OpenTheoryExecution {
         val portfolio = OpenPortfolio(request.model, request, params, seed = params.randomSeed, lanes = cores,
             sourceObjective = values, publication = publication, completeOnly = completeOnly)
-        val stop = params.cancellation or params.timeout
+        val stop = params.cancellation .includingStop( params.timeout)
         val objective = request.minimizedObjective ?: return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, integralMinimizer(request, objective), stop))
     }
@@ -261,7 +262,7 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val stop = params.cancellation or params.timeout
+        val stop = params.cancellation .includingStop( params.timeout)
         val prepared = preparedSource ?: model.prepareExecutionPlan(values?.original, values?.maximize ?: false,
             cancellation = stop)
         if (stop() || prepared.decline == PreparedPlanDecline.RESOURCE) return incompleteOpenExecution(objective,
@@ -397,7 +398,7 @@ object OpenTheoryPipeline {
         cores: Int,
         onAccepted: ((SourceIncumbentPublication) -> Unit)?,
     ): OpenTheoryExecution = observed(preparedSource.sourceSemantics, onAccepted) { publication ->
-        val stop = params.cancellation or params.timeout
+        val stop = params.cancellation .includingStop( params.timeout)
         if (stop() || preparedSource.decline == PreparedPlanDecline.RESOURCE) {
             incompleteOpenExecution(
                 objective,
@@ -420,7 +421,7 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val stop = params.cancellation or params.timeout
+        val stop = params.cancellation .includingStop( params.timeout)
         if (stop()) return incompleteOpenExecution(objective, params.preparationStopReason(stop))
         val selected = if (preparedSource == null) model.componentPlan(cancellation = stop) else null
         if (stop() || selected?.encodingDecline == EncoderDecline.RESOURCE ||
@@ -471,7 +472,7 @@ object OpenTheoryPipeline {
             if (integral != null) {
                 return integral.descent(params).use { descent ->
                     OpenTheoryExecution.Optimize(requireNotNull(descent.runSlice(
-                        params.cancellation or params.timeout, Long.MAX_VALUE, -1,
+                        params.cancellation .includingStop( params.timeout), Long.MAX_VALUE, -1,
                     ) { assignment, _ -> values?.publish(assignment.toSample(request.model, binding), publication) }))
                 }
             }
@@ -479,11 +480,11 @@ object OpenTheoryPipeline {
         return RationalTheoryDescent(request.model, objective, params, context,
             publicationInvocation = binding).use { descent ->
             val result = requireNotNull(descent.runSlice(
-                params.cancellation or params.timeout, Long.MAX_VALUE, -1,
+                params.cancellation .includingStop( params.timeout), Long.MAX_VALUE, -1,
             ) { incumbent -> values?.publish(incumbent.sample, publication) })
             val authority = descent.linearResult
             val folded = if (authority == null) result.openOptimum(objective) else requireNotNull(values).completed(
-                authority, params.cancellation or params.timeout,
+                authority, params.cancellation .includingStop( params.timeout),
                 if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled)
             OpenTheoryExecution.Optimize(folded)
         }
@@ -491,8 +492,9 @@ object OpenTheoryPipeline {
 
     private fun sourceObjective(request: OpenTheoryRequest, params: TheoryParams): OpenSourceObjective? =
         request.objective?.let { original -> OpenSourceObjective(requireNotNull(request.minimizedObjective), original,
-            request.maximize, request.linearAuthorityContext(params.cancellation or params.timeout),
-            params.cancellation or params.timeout) }
+            request.maximize, request.linearAuthorityContext(params.cancellation .includingStop( params.timeout)),
+            params.cancellation .includingStop( params.timeout),
+            ) }
 
     private fun observed(
         semantics: EffectiveSourceSemantics?,
@@ -531,7 +533,7 @@ object OpenTheoryPipeline {
         )
 }
 
-internal fun TheoryParams.preparationStopReason(stop: Cancellation): TerminationReason =
+internal fun TheoryParams.preparationStopReason(stop: ExecutionControl): TerminationReason =
     if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
     else TerminationReason.Cancelled
 

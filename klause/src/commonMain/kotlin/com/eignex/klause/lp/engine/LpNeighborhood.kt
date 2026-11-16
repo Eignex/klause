@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
@@ -348,7 +348,7 @@ private fun LpExactState.restrictTo(
     return LpNeighborhood(working, colMap, rows.toIntArray(), columns.toIntArray())
 }
 
-internal fun LpNeighborhood.rebindExact(state: LpExactState, token: Cancellation): LpNeighborhood? {
+internal fun LpNeighborhood.rebindExact(state: LpExactState, token: ExecutionControl): LpNeighborhood? {
     val previous = model.exactState ?: return null
     val source = state.model
     fun parentColumn(local: Int): Int = if (local < cols.size) cols[local] else source.n + rows[local - cols.size]

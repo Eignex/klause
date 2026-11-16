@@ -16,7 +16,6 @@ import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioTerminalPublication
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
@@ -32,11 +31,8 @@ import com.eignex.klause.solver.result.QuadraticObjectiveBound
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.ArithmeticCancellation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.arithmeticSource
-import com.eignex.klause.util.withCheckpoint
 import com.eignex.util.concurrent.Mutex
 
 internal class QuadraticPortfolioInvocation(
@@ -54,12 +50,12 @@ internal class QuadraticPortfolioInvocation(
     private data class Value(val source: AlgebraicReal, val minimized: AlgebraicReal)
     private val identity = ModelIdentity.of(plan.originalSource, objective)
     private val expected = sourceInvocation
-    private val external = params.timeout or params.cancellation
-    private val verification = object : ArithmeticCancellation {
-        override fun arithmeticSource() = native.polynomial.arithmeticSource()?.withCheckpoint(this::isCancelled)
+    private val external = params.timeout.withAccounting(params.cancellation) or params.cancellation
+    private val verification = object : ExecutionControl() {
+        override val admission get() = native.polynomial.admission
         override fun isCancelled(): Boolean = native.stopped
         override fun deadline() = external.deadline()
-        override fun workMeter(): WorkMeter? = native.polynomial.workMeter()
+        override val accounting: WorkMeter? get() = native.polynomial.accounting
     }
     private val limits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells)
     private val evaluation = AlgebraicArithmetic(PolynomialArithmetic(verification, limits))
@@ -110,7 +106,8 @@ internal class QuadraticPortfolioInvocation(
                 if (publication == null) {
                     Verification.Indeterminate("quadratic witness has no actual source publication")
                 } else when (val checked = witness(
-                    QuadraticIncumbent(sample, publication.incumbent.value), evaluation,
+                    QuadraticIncumbent(sample, publication.incumbent.value),
+                        AlgebraicArithmetic(PolynomialArithmetic(verification, limits)),
                 )) {
                     SourceEvidenceCheck.Checked -> Verification.Accepted(candidate)
                     is SourceEvidenceCheck.Rejected -> Verification.Rejected(checked.reason)

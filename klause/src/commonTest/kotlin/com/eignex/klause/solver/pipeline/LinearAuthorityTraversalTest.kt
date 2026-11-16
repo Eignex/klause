@@ -22,7 +22,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchNodeDisposition
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -59,7 +59,7 @@ class LinearAuthorityTraversalTest {
             })
             var standing: Pair<Sample, BigFraction>? = null
             LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
-                LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { standing },
+                LinearAuthorityTraversal(source, budget, ExecutionControl.Never, { false }, {}, { standing },
                     borrowedAuthority = authority, useGuidance = true, pointCuts = true,
                     aggregateCuts = true).use { component ->
                     val session = SearchComponentSet(listOf(component)).session()
@@ -115,7 +115,7 @@ class LinearAuthorityTraversalTest {
         })
         var standing: Pair<Sample, BigFraction>? = null
         LinearAuthority(budget, retainLp = true, aggregateCuts = true).use { authority ->
-            LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { standing },
+            LinearAuthorityTraversal(source, budget, ExecutionControl.Never, { false }, {}, { standing },
                 borrowedAuthority = authority, useGuidance = true, pointCuts = true,
                 aggregateCuts = true).use { component ->
                 val session = SearchComponentSet(listOf(component)).session()
@@ -149,7 +149,7 @@ class LinearAuthorityTraversalTest {
             "real" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         ), mapOf(integer to BigFraction.ONE, real to BigFraction.ONE))
         val point = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.0))
-        LinearAuthorityTraversal(source, SourceLpBudget(), Cancellation.Never, { false }, {},
+        LinearAuthorityTraversal(source, SourceLpBudget(), ExecutionControl.Never, { false }, {},
             { point to BigFraction.ofLong(2) }, useGuidance = true).use { component ->
             val session = SearchComponentSet(listOf(component)).session(atoms = SearchAtomRegistry(0))
             assertEquals(ComponentResult.Consistent, session.initialize())
@@ -175,7 +175,7 @@ class LinearAuthorityTraversalTest {
             mapOf(integer to BigFraction.ONE))
         val funding = SourceLpFunding(1_000_000L, 1_000_000L).apply { grant(1_000_000L) }
         val budget = SourceLpBudget(funding = funding)
-        LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { null },
+        LinearAuthorityTraversal(source, budget, ExecutionControl.Never, { false }, {}, { null },
             useRefutationPropagation = true).use { component ->
             val session = SearchComponentSet(listOf(component)).session(atoms = SearchAtomRegistry(0))
             assertEquals(ComponentResult.Consistent, session.initialize())
@@ -214,7 +214,7 @@ class LinearAuthorityTraversalTest {
                     Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(it.toDouble()),
                         exactReals = listOf(it)) to it * sign
                 }
-                LinearAuthorityTraversal(source, SourceLpBudget(), Cancellation.Never, { false }, {},
+                LinearAuthorityTraversal(source, SourceLpBudget(), ExecutionControl.Never, { false }, {},
                     { standing }, useGuidance = true, useCuts = false).use { component ->
                     val session = SearchComponentSet(listOf(component)).session(atoms = SearchAtomRegistry(0))
                     assertEquals(ComponentResult.Consistent, session.initialize())
@@ -266,7 +266,7 @@ class LinearAuthorityTraversalTest {
             }, listOf(integer, x, y, z, real).associateWith { sign })
             val point = Sample(booleanArrayOf(), longArrayOf(2, 1, 1, 0), doubleArrayOf(0.0),
                 exactReals = listOf(BigFraction.ZERO))
-            LinearAuthorityTraversal(source, SourceLpBudget(), Cancellation.Never, { false }, {},
+            LinearAuthorityTraversal(source, SourceLpBudget(), ExecutionControl.Never, { false }, {},
                 { point to BigFraction.ofLong(4) * sign }, useGuidance = true).use { component ->
                 val session = SearchComponentSet(listOf(component)).session(atoms = SearchAtomRegistry(0))
                 assertEquals(ComponentResult.Consistent, session.initialize())
@@ -291,7 +291,7 @@ class LinearAuthorityTraversalTest {
         val source = SourceProofContext(scope, setOf(integer), mapOf("lower" to SourcePremise(
             SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.ZERO))),
             mapOf(integer to BigFraction.ONE))
-        LinearAuthorityTraversal(source, SourceLpBudget(), Cancellation.Never, { false }, {}, { null },
+        LinearAuthorityTraversal(source, SourceLpBudget(), ExecutionControl.Never, { false }, {}, { null },
             useGuidance = true, useCuts = false).use { component ->
             val session = SearchComponentSet(listOf(component)).session(atoms = SearchAtomRegistry(0))
             assertEquals(ComponentResult.Consistent, session.initialize())

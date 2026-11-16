@@ -15,7 +15,7 @@ import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 internal class LpCutEdit(
@@ -79,7 +79,7 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
     fun prepareCompaction(
         state: LpExactState,
         remap: LpLayoutRemap,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): LpCutEdit? {
         require(remap.matches(state.model, state.rows))
         check(generation < Long.MAX_VALUE)
@@ -118,7 +118,7 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
         state: LpExactState,
         relaxation: LpRelaxation,
         selected: List<Cut>? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): LpCutEdit? {
         require(state.depth >= depth)
         val map = relaxation.sourceMap ?: return null

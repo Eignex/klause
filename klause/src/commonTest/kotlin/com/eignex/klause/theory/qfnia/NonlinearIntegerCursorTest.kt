@@ -6,7 +6,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -50,7 +50,7 @@ class NonlinearIntegerCursorTest {
             val cursor = NonlinearIntegerCursor(source, params, PolynomialCondition())
             assertNull(cursor.runSlice(maximumCandidates = 2))
             val before = cursor.stats
-            assertNull(cursor.runSlice(Cancellation { true }, 2))
+            assertNull(cursor.runSlice(ExecutionControl { true }, 2))
             assertEquals(before, cursor.stats)
 
             val sliced = requireNotNull(cursor.runSlice(maximumCandidates = 2))
@@ -136,9 +136,9 @@ class NonlinearIntegerCursorTest {
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
             parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
         var charged = 0L
-        val lifetime = object : Cancellation {
+        val lifetime = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(
@@ -165,7 +165,7 @@ class NonlinearIntegerCursorTest {
         NonlinearIntegerCursor(source, params, PolynomialCondition()).use { cursor ->
             assertNull(cursor.runSlice(maximumCandidates = 6))
             val before = cursor.stats
-            assertNull(cursor.runSlice(Cancellation { true }, 6))
+            assertNull(cursor.runSlice(ExecutionControl { true }, 6))
             assertEquals(before, cursor.stats)
 
             val sliced = requireNotNull(cursor.runSlice(maximumCandidates = 6))
@@ -314,7 +314,7 @@ class NonlinearIntegerCursorTest {
         NonlinearIntegerCursor(source, params, PolynomialCondition()).use { cursor ->
             assertNull(cursor.runSlice(maximumCandidates = 1))
             val before = cursor.stats
-            assertNull(cursor.runSlice(Cancellation { true }, 1))
+            assertNull(cursor.runSlice(ExecutionControl { true }, 1))
             assertEquals(before, cursor.stats)
             val resumed = requireNotNull(cursor.runSlice(maximumCandidates = 1))
 
@@ -361,9 +361,9 @@ class NonlinearIntegerCursorTest {
             parsed.boolVarNames,
         )
         var charged = 0L
-        val lifetime = object : Cancellation {
+        val lifetime = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val cursor = NonlinearIntegerCursor(
             source,
@@ -501,9 +501,9 @@ class NonlinearIntegerCursorTest {
         val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
             parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
         var charged = 0L
-        val lifetime = object : Cancellation {
+        val lifetime = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
         val params = NonlinearIntegerParams(arithmetic = QfNraParams(cancellation = lifetime),
             strategy = NonlinearIntegerStrategy.SEARCH, maximumCandidates = 6, admitIntegerRoots = true)

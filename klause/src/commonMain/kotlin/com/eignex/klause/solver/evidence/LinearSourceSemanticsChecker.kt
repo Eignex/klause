@@ -8,7 +8,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 /** Complete exact checker for a source consisting solely of declared coordinates and affine premises. */
@@ -35,11 +35,11 @@ class LinearSourceSemanticsChecker(
         }
     }
 
-    override fun witness(sample: Sample, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
+    override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck =
         checked(cancellation) { algebraic -> point(sample, scope, algebraic) }
 
     override fun objectiveEquals(
-        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: Cancellation,
+        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: ExecutionControl,
     ): SourceEvidenceCheck = checked(cancellation) { algebraic ->
         val pointCheck = point(sample, scope, algebraic)
         if (pointCheck != SourceEvidenceCheck.Checked) return@checked pointCheck
@@ -59,7 +59,7 @@ class LinearSourceSemanticsChecker(
         else SourceEvidenceCheck.Rejected("witness objective disagrees with the claimed bound")
     }
 
-    override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: Cancellation): SourceEvidenceCheck =
+    override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck =
         checked(cancellation) { algebraic ->
             val pointCheck = point(claim.sample, scope, algebraic)
             if (pointCheck != SourceEvidenceCheck.Checked) return@checked pointCheck
@@ -140,7 +140,7 @@ class LinearSourceSemanticsChecker(
         left.entries.fold(BigFraction.ZERO) { sum, (id, value) -> sum + value * (right[id] ?: BigFraction.ZERO) }
 
     private inline fun checked(
-        cancellation: Cancellation, action: (AlgebraicArithmetic) -> SourceEvidenceCheck,
+        cancellation: ExecutionControl, action: (AlgebraicArithmetic) -> SourceEvidenceCheck,
     ): SourceEvidenceCheck = try {
         val algebraic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
         algebraic.arithmetic.step()

@@ -13,7 +13,7 @@ import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
@@ -416,7 +416,7 @@ class MpsSemanticsTest {
         val source = assertNotNull(
             Mps.parse("ROWS\n E R\nCOLUMNS\n X R 1\nRHS\n RHS R 1\nENDATA").toLinearSourceProblem(),
         )
-        val stop = Cancellation { true }
+        val stop = ExecutionControl { true }
 
         assertNull(source.checkMpsWitness(listOf(BigFraction.ONE), stop))
     }
@@ -428,8 +428,8 @@ class MpsSemanticsTest {
         )
         var charged = 0L
         val meter = WorkMeter { charged += it }
-        val stop = object : Cancellation {
-            override fun workMeter(): WorkMeter = meter
+        val stop = object : ExecutionControl() {
+            override val accounting: WorkMeter get() = meter
             override fun isCancelled(): Boolean = charged >= 3L
         }
 

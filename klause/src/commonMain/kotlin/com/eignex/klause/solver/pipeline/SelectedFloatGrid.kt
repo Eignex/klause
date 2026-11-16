@@ -12,7 +12,7 @@ import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.projection.prepareFloatGrid
 import com.eignex.klause.solver.projection.projectObjective
 import com.eignex.klause.solver.validation.hasCapturedLinearTolerance
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal enum class FloatGridConsumerPurpose {
     FINITE_COMPATIBILITY, HEURISTIC_VIEW, AUTOMATIC_FINITE_COMPATIBILITY,
@@ -71,7 +71,7 @@ private fun selectFloatGrid(
     selection: SourceRouteSelection,
     purpose: FloatGridConsumerPurpose,
     declaredGridSemantics: Boolean,
-    prepare: (SelectedFloatGridConsumer, Cancellation) -> FloatGridPreparation,
+    prepare: (SelectedFloatGridConsumer, ExecutionControl) -> FloatGridPreparation,
 ): SelectedFloatGridPreparation {
     val stop = selection.cancellation
     if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)

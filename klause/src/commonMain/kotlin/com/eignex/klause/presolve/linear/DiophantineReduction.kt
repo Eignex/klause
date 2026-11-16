@@ -9,7 +9,7 @@ import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.presolveLinearRows
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.LongArrayList
 import kotlin.math.abs
 
@@ -86,7 +86,7 @@ internal object DiophantineReduction {
      * Every residue class the integer equalities in [factors] confine a column to, in row order, or the
      * column whose congruence has no solution at all. Reads coefficients alone, so both forms share it.
      */
-    private fun residues(factors: List<Factor>, cancellation: Cancellation): Pair<List<Residue>, Int> {
+    private fun residues(factors: List<Factor>, cancellation: ExecutionControl): Pair<List<Residue>, Int> {
         val out = ArrayList<Residue>()
         if (cancellation()) return out to -1
         for (f in presolveLinearRows(factors, cancellation = cancellation)) {
@@ -134,7 +134,7 @@ internal object DiophantineReduction {
      * A congruence with no solution refutes. Moving both sides past each other also refutes, which the
      * caller reads off the crossed range rather than this pass checking it.
      */
-    fun reduceSource(problem: Problem, cancellation: Cancellation = Cancellation.Never): SourceDelta {
+    fun reduceSource(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): SourceDelta {
         val (found, unsolvable) = residues(problem.factors.asList(), cancellation)
         if (unsolvable >= 0) return SourceDelta(infeasible = true)
         if (found.isEmpty()) return SourceDelta()
@@ -173,7 +173,7 @@ internal object DiophantineReduction {
 
     private fun floorMod(x: Long, m: Long): Long = ((x % m) + m) % m
 
-    fun reduce(problem: BakedProblem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+    fun reduce(problem: BakedProblem, cancellation: ExecutionControl = ExecutionControl.Never): PassDelta {
         var out: Array<IntDomain>? = null
         val (found, unsolvable) = residues(problem.factors.asList(), cancellation)
         if (unsolvable >= 0) return contradiction(problem, unsolvable)

@@ -28,7 +28,7 @@ import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.ToleranceRealSearch
 import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
 
@@ -54,22 +54,22 @@ internal class AbsRealCompletion(private val source: Problem, tolerance: SourceT
 
     fun complete(
         sample: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         controls: SearchExecutionControls? = null,
         solveContext: LpSolveContext = LpSolveContext.Production,
     ): Completed {
         var work = 0L
-        val counted = object : Cancellation {
+        val counted = object : ExecutionControl() {
             override fun isCancelled(): Boolean = cancellation()
             override fun deadline() = cancellation.deadline()
-            override fun workMeter(): WorkMeter = WorkMeter { units ->
+            override val accounting: WorkMeter = WorkMeter { units ->
                 work = if (units > Long.MAX_VALUE - work) Long.MAX_VALUE else work + units
                 cancellation.charge(units)
             }
         }
         val containing = controls ?: SearchExecutionControlAdapter(cancellation)
         val metered = object : SearchExecutionControls by containing {
-            override val cancellation: Cancellation = counted
+            override val cancellation: ExecutionControl = counted
         }
         val encoding = layout?.model(encoders, sample, counted) ?: encoders.finiteLinearModel(sample, counted)
             .takeIf { layout == null }
@@ -82,7 +82,7 @@ internal class AbsRealCompletion(private val source: Problem, tolerance: SourceT
 
     private fun completeWith(
         sample: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         controls: SearchExecutionControls,
         solveContext: LpSolveContext,
         encoding: Problem?,
@@ -146,7 +146,7 @@ internal class SourceToleranceSearch private constructor(
 
     override fun complete(
         discrete: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         controls: SearchExecutionControls?,
         context: LpSolveContext,
     ): ToleranceSearchResult {

@@ -10,7 +10,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Caller policy captured independently of source declarations and resolved before worker construction. */
 class SourceExecutionPolicy(
@@ -45,8 +45,8 @@ class SourceExecutionPolicy(
         engine: FiniteEngine,
         presolveConfig: PresolveConfig = PresolveConfig.DEFAULT,
         solutionSetSensitive: Boolean = false,
-        cancellation: Cancellation = Cancellation.Never,
-        presolveCancellation: Cancellation = cancellation,
+        cancellation: ExecutionControl = ExecutionControl.Never,
+        presolveCancellation: ExecutionControl = cancellation,
         presolveBudget: PresolveBudget? = null,
         cores: Int = 1,
         executionOptions: ExecutionOptions = ExecutionOptions(),

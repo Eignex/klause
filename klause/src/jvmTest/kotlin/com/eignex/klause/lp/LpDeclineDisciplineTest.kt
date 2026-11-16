@@ -64,7 +64,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.BeforeClass
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -101,11 +101,11 @@ private class DecliningPolicy : LpCertificationPolicy {
 
 private class ConsumerRecordingFactory : LpEngineFactory {
     val calls = ArrayList<DeclineCall>()
-    val cancellations = ArrayList<Cancellation>()
+    val cancellations = ArrayList<ExecutionControl>()
 
     override fun newGeneralSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         pricing: LpPricingOptions,
     ): LpSolver {
@@ -141,7 +141,7 @@ private class ConsumerRecordingFactory : LpEngineFactory {
 
     override fun newTableauSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
@@ -162,7 +162,7 @@ private class ConsumerRecordingFactory : LpEngineFactory {
 
     override fun newPersistentSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         refactorUpdateLimit: Int,
         iterationLimit: Int,
         workLimit: Long,
@@ -207,7 +207,7 @@ private class RecordingComponentSolver(
     calls: MutableList<DeclineCall>,
 ) : RecordingSolver(component, calls),
     RetainedComponentLpSolverCapability {
-    override fun adopt(state: LpExactState, token: Cancellation): Boolean =
+    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean =
         (component as? RetainedComponentLpSolverCapability)?.adopt(state, token) ?: false
 
     override fun resolveBounds(allowance: LpFloatAllowance?): FloatLpResult? =
@@ -219,7 +219,7 @@ private class RecordingComponentSolver(
     override fun exactWitness(
         observer: LpCertificationObserver?,
         policy: LpCertificationPolicy,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): ExactLpWitness? = component.exactWitness(observer, policy, cancellation)
 }
 
@@ -236,12 +236,12 @@ private class RecordingPersistentSolver(
     private val calls: MutableList<DeclineCall>,
 ) : RecordingSolver(persistent, calls),
     PersistentLpSolver {
-    override fun prepareLogicals(token: Cancellation): Basis? {
+    override fun prepareLogicals(token: ExecutionControl): Basis? {
         calls += DeclineCall.PREPARE_LOGICALS
         return persistent.prepareLogicals(token)
     }
 
-    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
         calls += DeclineCall.ADOPT
         return persistent.adopt(state, token)
     }
@@ -302,7 +302,7 @@ class LpDeclineDisciplineTest {
                 LinearObjective(intCoefficients = longArrayOf(0L)),
                 LpParams(lpPlan = LpPlan(bounding = true)),
                 SolveStatsSink("runtime-warmup"),
-            ).rootLpInfeasibleNoBake(Cancellation.Never)
+            ).rootLpInfeasibleNoBake(ExecutionControl.Never)
 
             val gatedProblem = gatedRealProblem()
             val gatedSession = PropagationSession(gatedProblem)
@@ -495,7 +495,7 @@ class LpDeclineDisciplineTest {
             PropagationSession(problem),
             1.5,
             SolveStatsSink("recovery-consumer"),
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
 
         assertFalse(outcome.prune)
@@ -536,8 +536,8 @@ class LpDeclineDisciplineTest {
         )
         val harness = harness()
 
-        val declined = engine(problem, unitObjective, harness).rootLpBoundsNoBake(Cancellation.Never)
-        val accepted = productionEngine(problem, unitObjective).rootLpBoundsNoBake(Cancellation.Never)
+        val declined = engine(problem, unitObjective, harness).rootLpBoundsNoBake(ExecutionControl.Never)
+        val accepted = productionEngine(problem, unitObjective).rootLpBoundsNoBake(ExecutionControl.Never)
 
         assertEquals(emptyList(), declined)
         assertTrue(accepted.any { it.varId == 0 && it.lo == 3L })
@@ -554,8 +554,8 @@ class LpDeclineDisciplineTest {
         )
         val harness = harness()
 
-        val declined = engine(problem, unitObjective, harness).redundantConstraints(Cancellation.Never)
-        val accepted = productionEngine(problem, unitObjective).redundantConstraints(Cancellation.Never)
+        val declined = engine(problem, unitObjective, harness).redundantConstraints(ExecutionControl.Never)
+        val accepted = productionEngine(problem, unitObjective).redundantConstraints(ExecutionControl.Never)
 
         assertEquals(emptyList(), declined)
         assertEquals(listOf(0), accepted)

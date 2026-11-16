@@ -14,7 +14,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.PassDelta
 import com.eignex.klause.presolve.PresolveShared
 import com.eignex.klause.presolve.integralLinear
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
@@ -53,7 +53,7 @@ internal object LinearBoundFusion {
         val droppable = ArrayList<Int>()
     }
 
-    fun fuseLinearBounds(problem: Problem, cancellation: Cancellation = Cancellation.Never): PassDelta {
+    fun fuseLinearBounds(problem: Problem, cancellation: ExecutionControl = ExecutionControl.Never): PassDelta {
         val scan = ScanMeter(cancellation)
         return try {
             fuse(problem, scan)

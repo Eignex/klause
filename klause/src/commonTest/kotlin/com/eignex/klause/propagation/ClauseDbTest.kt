@@ -3,7 +3,6 @@ package com.eignex.klause.propagation
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.LinearPropagator
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
@@ -12,7 +11,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -381,8 +380,9 @@ class ClauseDbTest {
         for (nativeSat in listOf(false, true)) {
             var cancelled = false
             val session = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()),
-                cancellation = Cancellation { cancelled }, propagationCancelFloor = 0, nativeSat = nativeSat)
-            val shared = SearchSession(listOf(CpSearchComponent(session)), cancellation = Cancellation { cancelled })
+                cancellation = ExecutionControl { cancelled }, propagationCancelFloor = 0, nativeSat = nativeSat)
+            val shared = SearchSession(listOf(CpSearchComponent(session)), cancellation =
+                ExecutionControl { cancelled })
             shared.initialize()
             shared.push(SearchDecision.Bool(4))
             cancelled = true

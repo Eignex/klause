@@ -36,7 +36,7 @@ import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveShape
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.solve
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.BeforeClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -58,11 +58,11 @@ private class TerminalRecordingFactory : LpEngineFactory {
         private set
     var persistentCloses = 0
         private set
-    val cancellations = ArrayList<Cancellation>()
+    val cancellations = ArrayList<ExecutionControl>()
 
     override fun newGeneralSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         pricing: LpPricingOptions,
     ): LpSolver {
@@ -100,7 +100,7 @@ private class TerminalRecordingFactory : LpEngineFactory {
 
     override fun newTableauSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
@@ -116,7 +116,7 @@ private class TerminalRecordingFactory : LpEngineFactory {
 
     override fun newPersistentSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         refactorUpdateLimit: Int,
         iterationLimit: Int,
         workLimit: Long,
@@ -202,7 +202,7 @@ class LpTerminalDeclineTest {
             compiled: com.eignex.klause.formats.mps.MpsCompiled,
             optimize: Boolean,
             context: LpSolveContext? = null,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
             samples: MutableList<Sample>? = null,
             allSolutions: Boolean = false,
         ): FiniteSolveOutcome.Completed {
@@ -342,7 +342,7 @@ class LpTerminalDeclineTest {
     @Test
     fun `cancellation during proof fallback should stay unknown without leaking context`() {
         var cancelled = false
-        val token = Cancellation { cancelled }
+        val token = ExecutionControl { cancelled }
         val factory = TerminalRecordingFactory()
         val policy = TerminalPolicy { _, successful ->
             if (successful) cancelled = true

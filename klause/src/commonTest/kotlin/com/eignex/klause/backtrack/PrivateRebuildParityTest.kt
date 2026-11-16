@@ -10,7 +10,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,7 +34,7 @@ class PrivateRebuildParityTest {
 
             val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val point = generation.reconstruct(Sample(BooleanArray(4), longArrayOf()))
 
             assertEquals(4, captured.newPins)
@@ -145,7 +145,7 @@ class PrivateRebuildParityTest {
 
             val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val point = generation.reconstruct(Sample(booleanArrayOf(false, phase != 0, false), longArrayOf()))
 
             assertEquals(1, captured.newPins)
@@ -199,7 +199,7 @@ class PrivateRebuildParityTest {
 
             val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val lifted = mutableSetOf<List<Boolean>>()
             for (mask in 0..7) {
                 val point = BooleanArray(3) { mask and (1 shl it) != 0 }
@@ -237,7 +237,7 @@ class PrivateRebuildParityTest {
             session.seed(Assumptions.None)
             val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val sourcePoints = mutableSetOf<List<Boolean>>()
             val liftedPoints = mutableSetOf<List<Boolean>>()
 
@@ -277,7 +277,7 @@ class PrivateRebuildParityTest {
             session.seed(Assumptions.None)
             val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val sourcePoints = mutableSetOf<List<Boolean>>()
             val liftedPoints = mutableSetOf<List<Boolean>>()
 
@@ -319,7 +319,7 @@ class PrivateRebuildParityTest {
             session.seed(Assumptions.None)
             val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val sourcePoints = mutableSetOf<List<Boolean>>()
             val liftedPoints = mutableSetOf<List<Boolean>>()
 
@@ -374,7 +374,8 @@ class PrivateRebuildParityTest {
         val session = PropagationSession(Problem(4, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake())
 
         val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
-        val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, Cancellation.Never, parity = captured)
+        val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, ExecutionControl.Never,
+            parity = captured)
 
         assertNull(captured.affine)
         assertNull(generation)
@@ -391,7 +392,7 @@ class PrivateRebuildParityTest {
 
         val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
         val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-            Cancellation.Never, parity = captured))
+            ExecutionControl.Never, parity = captured))
 
         assertTrue(generation.warmClauses.clauses.isEmpty())
         val lifted = generation.reconstruct(Sample(BooleanArray(3), longArrayOf()))
@@ -413,7 +414,7 @@ class PrivateRebuildParityTest {
 
             val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
             val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-                Cancellation.Never, parity = captured))
+                ExecutionControl.Never, parity = captured))
             val sourcePoints = mutableSetOf<List<Boolean>>()
             val privatePoints = mutableSetOf<List<Boolean>>()
             for (mask in 0..15) {
@@ -457,7 +458,7 @@ class PrivateRebuildParityTest {
 
         val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
         val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-            Cancellation.Never, parity = captured))
+            ExecutionControl.Never, parity = captured))
         val points = mutableSetOf<List<Boolean>>()
         for (mask in 0..7) {
             val point = BooleanArray(3) { mask and (1 shl it) != 0 }
@@ -495,7 +496,7 @@ class PrivateRebuildParityTest {
 
         val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
         val generation = assertNotNull(PrivateRebuildGeneration.prepare(session, 1_048_576L,
-            Cancellation.Never, parity = captured))
+            ExecutionControl.Never, parity = captured))
 
         assertEquals(1, generation.parityReducedRows)
         assertEquals(1, generation.warmClauses.clauses.size)
@@ -513,9 +514,9 @@ class PrivateRebuildParityTest {
             val session = PropagationSession(Problem(3, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake())
             val captured = assertNotNull(PrivateRebuildParity.capture(session, 1_048_576L, { true }))
             var work = 0L
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = work >= allowance
-                override fun workMeter(): WorkMeter = WorkMeter { work += it }
+                override val accounting: WorkMeter get() = WorkMeter { work += it }
             }
 
             val generation = PrivateRebuildGeneration.prepare(session, 1_048_576L, token, parity = captured)
@@ -611,7 +612,7 @@ class PrivateRebuildParityTest {
         val other = Problem(4, 0, emptyArray(), clauses.copyOf()).bake()
 
         val generation = PrivateRebuildGeneration.prepare(PropagationSession(other), 1_048_576L,
-            Cancellation.Never, parity = captured)
+            ExecutionControl.Never, parity = captured)
 
         assertNull(generation)
     }

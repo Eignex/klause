@@ -18,7 +18,7 @@ import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayDeque
@@ -61,7 +61,7 @@ class DefinitionalSweep internal constructor(
         }
     }
 
-    internal fun expandUnitBooleanScope(variables: IntArray, cancellation: Cancellation): IntArray? {
+    internal fun expandUnitBooleanScope(variables: IntArray, cancellation: ExecutionControl): IntArray? {
         if (variables.isEmpty() || unitBooleanLinks.isEmpty()) return variables
         val seen = IntHashSet()
         val result = IntArrayList()
@@ -86,11 +86,11 @@ class DefinitionalSweep internal constructor(
     companion object {
         /** Materialize source definition hints in this consumer's node and dependency representation.
          * Constraints remain enforced; competing outputs, cyclic cones and outputs admitting the
-         * minimum-word no-write sentinel stay searched. Cancellation discards the whole view. */
+         * minimum-word no-write sentinel stay searched. ExecutionControl discards the whole view. */
         fun fromSource(
             problem: Problem,
             hints: List<DefinitionHint>,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): DefinitionalSweep? = sourceDefinitionSweep(problem, hints, cancellation)
 
         /** Infer definitions using the source domains to recognize hinted binary literal channels.
@@ -102,13 +102,13 @@ class DefinitionalSweep internal constructor(
             problem: Problem,
             definedHints: IntArray = IntArray(0),
             boolFolds: List<BoolFoldDefinition> = emptyList(),
-        ): DefinitionalSweep? = infer(problem, definedHints, boolFolds, Cancellation.Never)
+        ): DefinitionalSweep? = infer(problem, definedHints, boolFolds, ExecutionControl.Never)
 
         internal fun infer(
             problem: Problem,
             definedHints: IntArray,
             boolFolds: List<BoolFoldDefinition>,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): DefinitionalSweep? {
             if (cancellation()) return null
             val base = infer(problem.factors, problem.numIntVars, definedHints, boolFolds, cancellation)
@@ -128,7 +128,7 @@ class DefinitionalSweep internal constructor(
             problem: Problem,
             inferred: DefinitionalSweep?,
             hints: List<DefinitionHint>,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): DefinitionalSweep? {
             if (cancellation()) return null
             if (hints.isEmpty()) return inferred
@@ -168,14 +168,14 @@ class DefinitionalSweep internal constructor(
             numIntVars: Int,
             definedHints: IntArray = IntArray(0),
             boolFolds: List<BoolFoldDefinition> = emptyList(),
-        ): DefinitionalSweep? = infer(factors, numIntVars, definedHints, boolFolds, Cancellation.Never)
+        ): DefinitionalSweep? = infer(factors, numIntVars, definedHints, boolFolds, ExecutionControl.Never)
 
         internal fun infer(
             factors: Array<Factor>,
             numIntVars: Int,
             definedHints: IntArray,
             boolFolds: List<BoolFoldDefinition>,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): DefinitionalSweep? {
             if (cancellation()) return null
             val def = arrayOfNulls<Factor>(numIntVars)
@@ -359,11 +359,11 @@ class DefinitionalSweep internal constructor(
 
     /** Build a gradient view of a finite canonical objective using this consumer's definitions. */
     fun functionalObjective(objective: LinearObjective): IncrementalObjective? =
-        functionalObjective(objective, Cancellation.Never)
+        functionalObjective(objective, ExecutionControl.Never)
 
     internal fun functionalObjective(
         objective: LinearObjective,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         captureBooleanCosts: Boolean = false,
     ): IncrementalObjective? {
         if (cancellation()) return null
@@ -415,7 +415,7 @@ class DefinitionalSweep internal constructor(
         minimize,
         boolTerms,
         boolTermCoeffs,
-        Cancellation.Never,
+        ExecutionControl.Never,
         false,
     )
 
@@ -426,7 +426,7 @@ class DefinitionalSweep internal constructor(
         minimize: Boolean,
         boolTerms: IntArray,
         boolTermCoeffs: LongArray,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         captureBooleanCosts: Boolean,
     ): IncrementalObjective? {
         if (cancellation()) return null
@@ -552,7 +552,7 @@ class DefinitionalSweep internal constructor(
         terms: IntArray,
         boolTerms: IntArray,
         coefficients: LongArray,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): DefinitionalSweep? {
         if (terms.isNotEmpty() || nodes.size !in 1..250_000 || boolTerms.size > 250_000) return null
         val priced = IntHashSet()
@@ -778,7 +778,7 @@ class DefinitionalSweep internal constructor(
     internal fun searchingChannels(
         values: Boolean,
         predicates: Boolean,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): DefinitionalSweep? {
         val retained = ArrayList<SweepNode>(nodes.size)
         for (node in nodes) {

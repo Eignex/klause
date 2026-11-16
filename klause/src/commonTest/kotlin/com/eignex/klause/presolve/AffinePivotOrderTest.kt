@@ -32,7 +32,7 @@ import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.heuristicHints
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -55,7 +55,7 @@ class AffinePivotOrderTest {
                 <minimize type="sum"><list>a b gt(x,0)</list><coeffs>1 1 7</coeffs></minimize>
               </objectives>
             </instance>
-        """.trimIndent())
+            """.trimIndent())
         val objective = assertNotNull(parsed.objective).toLinearObjective()
 
         val delta = AffineSingletons.eliminateSourceAffineSingletons(parsed.problem, objective = objective,
@@ -92,7 +92,7 @@ class AffinePivotOrderTest {
             explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
         ))
         val view = assertNotNull(invocation.heuristicHints(prepared.problem, prepared.objective,
-            prepared.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+            prepared.sourceMapping, ExecutionControl.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
             assertNotNull(prepared.executionPlan).capabilities))
         val assignment = Assignment(prepared.problem.numBoolVars, prepared.problem.numIntVars)
         assignment.setInt(2, 1)
@@ -121,7 +121,7 @@ class AffinePivotOrderTest {
         ))
 
         val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
-            cancellation = Cancellation { stopped }, pivotOrder = AffinePivotOrder.REWRITE_COST)
+            cancellation = ExecutionControl { stopped }, pivotOrder = AffinePivotOrder.REWRITE_COST)
 
         assertFalse(delta.isEmpty)
     }
@@ -141,7 +141,7 @@ class AffinePivotOrderTest {
         ))
 
         val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
-            cancellation = Cancellation { stopped }, pivotOrder = AffinePivotOrder.REWRITE_COST,
+            cancellation = ExecutionControl { stopped }, pivotOrder = AffinePivotOrder.REWRITE_COST,
             objective = LinearObjective(intCoefficients = longArrayOf(1, 0, 0, 0)))
 
         assertFalse(delta.isEmpty)
@@ -202,7 +202,7 @@ class AffinePivotOrderTest {
         ))
 
         val delta = AffineSingletons.eliminateSourceAffineSingletons(source,
-            cancellation = Cancellation { stopped }, pivotOrder = AffinePivotOrder.REWRITE_COST)
+            cancellation = ExecutionControl { stopped }, pivotOrder = AffinePivotOrder.REWRITE_COST)
 
         assertTrue(delta.isEmpty)
     }
@@ -227,7 +227,7 @@ class AffinePivotOrderTest {
             explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
         ))
         val view = assertNotNull(invocation.heuristicHints(preparation.problem, preparation.objective,
-            preparation.sourceMapping, Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+            preparation.sourceMapping, ExecutionControl.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
             assertNotNull(preparation.executionPlan).capabilities))
         val assignment = Assignment(preparation.problem.numBoolVars, preparation.problem.numIntVars)
         assignment.setInt(0, 3)

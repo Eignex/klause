@@ -2,7 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 
 /**
@@ -32,7 +32,7 @@ internal object BlockedClauseElimination {
     fun eliminate(
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild ->
         db.toDelta(rebuild)
     } ?: PassDelta()
@@ -48,7 +48,7 @@ internal object BlockedClauseElimination {
     fun eliminateSource(
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceDelta = run(problem, objectiveBoolVars, cancellation) { db, rebuild ->
         db.toSourceDelta(rebuild)
     } ?: SourceDelta()
@@ -56,7 +56,7 @@ internal object BlockedClauseElimination {
     private fun <T> run(
         problem: Problem,
         objectiveBoolVars: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         delta: (SatClauseDb, SourceRebuilds) -> T,
     ): T? {
         if (problem.numBoolVars == 0) return null
@@ -118,7 +118,7 @@ internal object BlockedClauseElimination {
         return false
     }
 
-    private class AttemptWork(private val cancellation: Cancellation) {
+    private class AttemptWork(private val cancellation: ExecutionControl) {
         private var visits = 0
         var stopped = false
             private set

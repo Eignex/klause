@@ -16,7 +16,7 @@ import com.eignex.klause.solver.SearchStream
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -35,13 +35,13 @@ class LocalSearchSessionTest {
         val handle = assertIs<InstructionSlicedSearch>(session.resumable(LinearObjective(), params))
 
         assertFailsWith<IllegalArgumentException> {
-            handle.runScheduledSlice(Cancellation.Never, Long.MAX_VALUE, 1L, 1L, 0.8) {
+            handle.runScheduledSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L, 1L, 0.8) {
                 throw IllegalArgumentException("consumer")
             }
         }
 
         session.resumableSolve(params).use { next ->
-            assertIs<SolveResult.Sat>(next.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L))
+            assertIs<SolveResult.Sat>(next.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L))
         }
         session.close()
     }
@@ -81,10 +81,10 @@ class LocalSearchSessionTest {
         val objective = LinearObjective(boolWeights = LongArray(6) { 1L })
 
         session.resumable(objective, LocalSearchParams(maxInstructions = 5L, randomSeed = 1L)).use { handle ->
-            assertNull(handle.runSlice(Cancellation { expired }, Long.MAX_VALUE, -1L) {})
+            assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L) {})
             assertEquals(0.0, handle.stats.ls.moves.sum)
             expired = false
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {}
 
             assertIs<MinimizeResult.Unknown>(result)
             assertEquals(5.0, handle.stats.ls.moves.sum)
@@ -103,10 +103,10 @@ class LocalSearchSessionTest {
         sliced.resumable(objective, params).use { handle ->
             val counted = assertIs<InstructionSlicedSearch>(handle)
             repeat(3) {
-                assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 3L) {})
+                assertNull(counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 3L) {})
                 assertFalse(handle.isDone)
             }
-            val result = assertNotNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 3L) {})
+            val result = assertNotNull(counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 3L) {})
 
             assertEquals(expected.stats.ls.moves, result.stats.ls.moves)
             assertEquals(expected.stats.ls.incumbentViolation, result.stats.ls.incumbentViolation)
@@ -127,7 +127,7 @@ class LocalSearchSessionTest {
         session.resumable(LinearObjective(boolWeights = longArrayOf(1)), LocalSearchParams(maxFlips = 1L))
             .use { handle ->
                 val result = assertIs<MinimizeResult.BestFound>(
-                    handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {},
+                    handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {},
                 )
 
                 assertTrue(result.sample.bools[0])
@@ -143,10 +143,10 @@ class LocalSearchSessionTest {
 
         session.resumable(LinearObjective(boolWeights = LongArray(6) { 1L }), params).use { handle ->
             val counted = assertIs<InstructionSlicedSearch>(handle)
-            assertNull(counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 3L) {})
+            assertNull(counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 3L) {})
             budget.spendMoves(5L)
             val spent = budget.spent
-            val result = counted.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 3L) {}
+            val result = counted.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 3L) {}
 
             assertIs<MinimizeResult.Unknown>(result)
             assertEquals(3.0, handle.stats.ls.moves.sum)
@@ -197,11 +197,11 @@ class LocalSearchSessionTest {
             LinearObjective(boolWeights = LongArray(6) { 1L }),
             LocalSearchParams(maxFlips = 10L),
         )
-        assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L) {})
+        assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0L) {})
         session.close()
         assertNull(session.warmState.factorWeights)
         assertFailsWith<IllegalStateException> { session.reset() }
-        assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {} }
+        assertFailsWith<IllegalStateException> { handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {} }
         solver.session().resumable(LinearObjective(), LocalSearchParams(maxFlips = 1L)).close()
     }
 

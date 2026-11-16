@@ -12,7 +12,7 @@ import com.eignex.klause.presolve.Presolver
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
@@ -28,7 +28,7 @@ class SubsetDominationTest {
             val factors = problem.factors.asList()
 
             val reduced = SubsetDomination().removeDominated(
-                problem, ColumnRanges.of(problem.intBounds), factors, budget.orSpent(Cancellation.Never),
+                problem, ColumnRanges.of(problem.intBounds), factors, budget.orSpent(ExecutionControl.Never),
             )
 
             val call = budget.invocations.single()
@@ -49,7 +49,8 @@ class SubsetDominationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val reduced = SubsetDomination().removeDominated(
-            problem, ColumnRanges.of(problem.intBounds), problem.factors.asList(), budget.orSpent(Cancellation.Never),
+            problem, ColumnRanges.of(problem.intBounds), problem.factors.asList(),
+                budget.orSpent(ExecutionControl.Never),
         )
 
         val call = budget.invocations.single()
@@ -69,7 +70,7 @@ class SubsetDominationTest {
             listOf(small, large, Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 0)))
         val state = SubsetDomination()
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
 
         val first = state.removeDominated(problem, ColumnRanges.of(problem.intBounds), problem.factors.asList(), token)
         val second = state.removeDominated(
@@ -98,7 +99,7 @@ class SubsetDominationTest {
         for ((index, changed) in changes.withIndex()) {
             val state = SubsetDomination()
             val budget = PresolveBudget(Long.MAX_VALUE)
-            val token = budget.orSpent(Cancellation.Never)
+            val token = budget.orSpent(ExecutionControl.Never)
             state.removeDominated(source, ColumnRanges.of(source.intBounds), source.factors.asList(), token)
 
             val reduced = state.removeDominated(
@@ -127,7 +128,7 @@ class SubsetDominationTest {
         }
         val state = SubsetDomination()
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
         state.removeDominated(problem, ranges, problem.factors.asList(), token)
 
         val reduced = state.removeDominated(changed, ranges, changed.factors.asList(), token)
@@ -148,7 +149,7 @@ class SubsetDominationTest {
                     LinearOp.LE, 0))
         val state = SubsetDomination()
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
         val factors = problem.factors.asList()
 
         repeat(3) {
@@ -177,7 +178,7 @@ class SubsetDominationTest {
         val changed = Problem(0, domains.size, domains, rows)
         val state = SubsetDomination()
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
         state.removeDominated(source, ColumnRanges.of(source.intBounds), source.factors.asList(), token)
 
         val reduced = state.removeDominated(
@@ -198,7 +199,7 @@ class SubsetDominationTest {
             listOf(small, large) + List(count) { Linear(intArrayOf(1), intArrayOf(it + 2), LinearOp.LE, 0) })
         val state = SubsetDomination()
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
         val factors = problem.factors.asList()
 
         val first = state.removeDominated(problem, ColumnRanges.of(problem.intBounds), factors, token)
@@ -225,7 +226,7 @@ class SubsetDominationTest {
         val replaced = Problem(0, count + 2, domains, listOf(loose, large) + unary)
         val state = SubsetDomination()
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
         state.removeDominated(source, ColumnRanges.of(source.intBounds), source.factors.asList(), token)
 
         val reduced = state.removeDominated(
@@ -254,7 +255,7 @@ class SubsetDominationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val reduced = SubsetDomination().removeDominated(
-            problem, ranges, problem.factors.asList(), budget.orSpent(Cancellation { stop }),
+            problem, ranges, problem.factors.asList(), budget.orSpent(ExecutionControl { stop }),
         )
 
         val call = budget.invocations.single()
@@ -274,7 +275,7 @@ class SubsetDominationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val reduced = SubsetDomination().removeDominated(
-            problem, ColumnRanges.of(problem.intBounds), factors, budget.orSpent(Cancellation { true }),
+            problem, ColumnRanges.of(problem.intBounds), factors, budget.orSpent(ExecutionControl { true }),
         )
 
         assertSame(factors, reduced)
@@ -289,7 +290,7 @@ class SubsetDominationTest {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, listOf(small, large, large))
         for (lane in PresolveLane.entries) {
             val budget = PresolveBudget(Long.MAX_VALUE)
-            val token = budget.orSpent(Cancellation.Never)
+            val token = budget.orSpent(ExecutionControl.Never)
             val context = PresolveContext(presolveBudget = budget)
             val config = PresolveConfig.parse("off,+subsume")
 

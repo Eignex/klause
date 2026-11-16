@@ -20,7 +20,7 @@ import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -78,9 +78,9 @@ class RealFiniteDomainEncoderTest {
             numRealVars = 1, realLower = doubleArrayOf(-3.0), realUpper = doubleArrayOf(8.0))
         val selected = FactorProjectionProviders.Default.prepare(source)
         var work = 0L
-        val stopped = object : Cancellation {
+        val stopped = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 2L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val interrupted = selected.linearTheoryModel(EncodingTarget.LINEAR, cancellation = stopped)

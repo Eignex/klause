@@ -14,14 +14,14 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 
 internal fun checkQuadraticSourceWitness(
     plan: PreparedSourcePlan,
     point: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     limits: PolynomialLimits,
 ): SourceEvidenceCheck = try {
     val arithmetic = PolynomialArithmetic(cancellation, limits)
@@ -49,7 +49,7 @@ internal fun checkQuadraticSourceWitness(
 private fun checkQuadraticIntegerWitness(
     source: NonlinearIntegerProblem,
     point: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     arithmetic: PolynomialArithmetic,
     limits: PolynomialLimits,
 ): SourceEvidenceCheck {
@@ -68,7 +68,7 @@ private fun checkQuadraticIntegerWitness(
 private fun checkQuadraticIrWitness(
     plan: PreparedSourcePlan,
     point: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     arithmetic: PolynomialArithmetic,
     limits: PolynomialLimits,
 ): SourceEvidenceCheck {

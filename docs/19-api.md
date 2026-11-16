@@ -24,7 +24,11 @@ which Klause exposes transitively. Import these types from `com.eignex.util.coll
 | `lp` projection protocols | `RelaxationBuilder`, factor relaxation/hull interfaces and typed source/CP/LP mapping handles |
 | Format entry points | Public parsing, compilation and solution-writing facades; meaning follows [input semantics](03-input-semantics.md) |
 | `formats.json.ProblemJson`, `factor.codec` | Problem documents, `FactorCodec` registration and `MissingFactorCodecException`; see [problem JSON](03-input-semantics.md#problem-json) |
-| Exported numerical contracts | `BigInt`, `BigFraction`, `AlgebraicReal`, `Cancellation` and `WorkMeter` |
+| Exported numerical contracts | `BigInt`, `BigFraction`, `AlgebraicReal`, `Cancellation`, `ExecutionControl` and `WorkMeter` |
+
+Solver execution parameters accept `ExecutionControl { cancelled }`.
+Use `ExecutionControl(Cancellation { cancelled }, meter)` to bind independent work
+accounting; charging does not evaluate cancellation.
 
 Supported extensions supply the behavior their interfaces document. A custom factor
 keeps borrowed arrays and structural keys stable, and registers a `FactorCodec` to be

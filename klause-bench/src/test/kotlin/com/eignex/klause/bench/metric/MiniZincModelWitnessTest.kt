@@ -9,6 +9,7 @@ import com.eignex.klause.bench.runner.Budget
 import com.eignex.klause.bench.runner.MiniZincRunner
 import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFetcher
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -17,7 +18,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import org.junit.jupiter.api.Assumptions.assumeTrue
 
 /** Needs `minizinc` with Gecode on `PATH`; skipped where it is not installed. */
 class MiniZincModelWitnessTest {

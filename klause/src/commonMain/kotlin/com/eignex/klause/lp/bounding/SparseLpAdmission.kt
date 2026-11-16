@@ -23,7 +23,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.magnitudeBitLength
 
@@ -47,7 +47,7 @@ internal class SparseLpAdmission(val metrics: Map<String, Long>, val sourceLayou
 internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     problem: Problem,
     objective: LinearObjective?,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     workAllowance: Long = SPARSE_LP_MAX_WORK,
     sourcePreparation: LpSourcePreparation = LpSourcePreparation.ADMITTED,
 ): SparseLpAdmission {
@@ -121,7 +121,7 @@ private fun sparseLpStorage(rows: Long, columns: Long, entries: Long): Long =
 internal fun estimateSparseLpAdmission(
     model: LpModel,
     preparationWork: Long = 0L,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): SparseLpAdmission {
     fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
         "PreparationWork" to preparationWork))

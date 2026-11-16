@@ -9,7 +9,7 @@ import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -104,7 +104,7 @@ class PolynomialTheoryRequestTest {
                 (assert (= (* x x) 1))
                 (assert (= (ite b x (- x)) 1))
                 (check-sat-assuming (b))
-                """.trimIndent(),
+            """.trimIndent(),
             ).realSource()
 
         val execution = OpenTheoryPipeline.execute(input.pipelineRequest())
@@ -169,7 +169,7 @@ class PolynomialTheoryRequestTest {
 
         val execution = OpenTheoryPipeline.execute(
             input.pipelineRequest(),
-            PolynomialTheoryParams(timeout = Cancellation { true }),
+            PolynomialTheoryParams(timeout = ExecutionControl { true }),
         )
 
         assertEquals(TerminationReason.Timeout, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)
@@ -182,7 +182,7 @@ class PolynomialTheoryRequestTest {
 
         val execution = OpenTheoryPipeline.execute(
             input.pipelineRequest(),
-            PolynomialTheoryParams(cancellation = Cancellation { true }),
+            PolynomialTheoryParams(cancellation = ExecutionControl { true }),
         )
 
         assertEquals(TerminationReason.Cancelled, assertIs<OpenTheoryResult.Unknown>(execution.result).reason)

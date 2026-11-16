@@ -36,35 +36,37 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
 
     fun proposeActiveRows(
         model: QuadraticModel, start: List<Double>, iterations: Int = 32,
-    ): List<Int>? = control.operation(64) {
+    ): List<Int>? = control.operation(256) {
         control.step()
         require(start.size == model.dimension && iterations >= 0)
         val numeric = prepare(model, start) ?: return@operation null
-        control.execution.boundary()
+        control.execution.pollingCost(start.size)
         val point = start.toDoubleArray()
         if (!improve(numeric, point, iterations)) return@operation null
         return@operation activeRows(numeric, point)
     }
 
     private fun prepare(model: QuadraticModel, start: List<Double>): NumericalProposal? {
-        control.execution.boundary()
+        control.execution.pollingCost(model.dimension)
         val hessian = model.hessian.map { row ->
-            control.execution.boundary()
+            control.execution.pollingCost(row.size)
             DoubleArray(row.size) { row[it].toDouble() }
         }
         val linear = model.linear.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
         val rows = model.rows
         val coefficients = rows.map { row ->
-            control.execution.boundary()
-            row.coefficients.let { values -> DoubleArray(values.size) { values[it].toDouble() } }
+            row.coefficients.let { values ->
+                control.execution.pollingCost(values.size)
+                DoubleArray(values.size) { values[it].toDouble() } }
         }
         val rhs = DoubleArray(rows.size) { rows[it].rhs.toDouble() }
         if (hessian.any { row -> row.any { !it.isFinite() } } || linear.any { !it.isFinite() } ||
             coefficients.any { row -> row.any { !it.isFinite() } } || rhs.any { !it.isFinite() } ||
             start.any { !it.isFinite() }
-        ) return null
+        )
+            return null
         var norm = hessian.maxOfOrNull { row ->
-            control.execution.boundary()
+            control.execution.pollingCost(row.size)
             koblas.asum(row, 0, row.size)
         } ?: 0.0
         for (row in coefficients) norm += 16.0 * dot(0.0, row, row)
@@ -74,7 +76,7 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
     }
 
     private fun improve(numeric: NumericalProposal, point: DoubleArray, iterations: Int): Boolean {
-        control.execution.boundary()
+        control.execution.pollingCost(point.size)
         val gradient = DoubleArray(point.size)
         repeat(iterations) {
             for (i in point.indices) gradient[i] = dot(numeric.linear[i], numeric.hessian[i], point)
@@ -106,7 +108,6 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             if (!residual.isFinite()) return null
             if (numeric.rows[j].relation == QuadraticRowRelation.EQ || residual >= -1e-6) active += j
         }
-        control.poll()
         return active
     }
 
@@ -121,13 +122,13 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
 
     private fun dot(initial: Double, left: DoubleArray, right: DoubleArray): Double {
         if (left.isEmpty()) return initial
-        repeat(left.size) { control.step() }
+        if(left.size == 1) control.step() else control.steps(left.size)
         return initial + koblas.dot(left, 0, right, 0, left.size)
     }
 
     private fun axpy(alpha: Double, source: DoubleArray, destination: DoubleArray) {
         if (source.isEmpty()) return
-        repeat(source.size) { control.step() }
+        if(source.size == 1) control.step() else control.steps(source.size)
         koblas.axpy(destination, 0, alpha, source, 0, source.size)
     }
 

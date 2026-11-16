@@ -33,7 +33,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagate
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -171,7 +171,7 @@ class RedundantConstraintsTest {
         val incremental = SubsumeIncremental(true, intArrayOf(0, 1), emptyList(), intArrayOf(), memo)
         val ranges = ColumnRanges.of(problem.intBounds)
         val stopped = RedundantConstraints.removeRedundantConstraints(
-            problem, ranges, incremental, Cancellation { true },
+            problem, ranges, incremental, ExecutionControl { true },
         )
         assertTrue(stopped.isEmpty)
 
@@ -188,7 +188,7 @@ class RedundantConstraintsTest {
         val problem = Problem(2, 0, emptyArray(), listOf(clause, clause))
         val memo = SubsumeMemo()
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val token = budget.orSpent(Cancellation.Never)
+        val token = budget.orSpent(ExecutionControl.Never)
         val ranges = ColumnRanges.of(problem.intBounds)
         RedundantConstraints.removeRedundantConstraints(
             problem, ranges, SubsumeIncremental(true, intArrayOf(0, 1), emptyList(), intArrayOf(), memo), token,
@@ -228,7 +228,7 @@ class RedundantConstraintsTest {
             val model = Problem(3, 2, dom(2, 1), exclusions + listOfNotNull(extra))
             val budget = PresolveBudget(1_000_000)
 
-            val delta = Presolve.removeRedundantSourceConstraints(model, budget.orSpent(Cancellation.Never))
+            val delta = Presolve.removeRedundantSourceConstraints(model, budget.orSpent(ExecutionControl.Never))
 
             assertTrue(delta.isEmpty, "unexpected reduction with $extra")
             assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, budget.invocations.single().outcome)
@@ -251,7 +251,7 @@ class RedundantConstraintsTest {
         )
         val budget = PresolveBudget(1_000_000)
 
-        val delta = Presolve.removeRedundantSourceConstraints(model, budget.orSpent(Cancellation.Never))
+        val delta = Presolve.removeRedundantSourceConstraints(model, budget.orSpent(ExecutionControl.Never))
 
         assertEquals(listOf(3), delta.droppedIndices.toList())
         assertTrue(budget.spent() > 0L)
@@ -267,7 +267,7 @@ class RedundantConstraintsTest {
             listOf(Cardinality(intArrayOf(pos(1), pos(2)), 0, 1), object : Factor by source {}),
         )
 
-        val delta = Presolve.removeRedundantSourceConstraints(model, Cancellation.Never)
+        val delta = Presolve.removeRedundantSourceConstraints(model, ExecutionControl.Never)
 
         assertEquals(listOf(1), delta.droppedIndices.toList())
     }
@@ -284,7 +284,7 @@ class RedundantConstraintsTest {
             ),
         )
 
-        val delta = Presolve.removeRedundantSourceConstraints(model, Cancellation.Never)
+        val delta = Presolve.removeRedundantSourceConstraints(model, ExecutionControl.Never)
 
         assertTrue(1 !in delta.droppedIndices)
     }
@@ -317,7 +317,7 @@ class RedundantConstraintsTest {
     fun `a subset-dominated source row should be dropped`() {
         val problem = Problem(0, 3, dom(3, 3), listOf(le(2, 0, 1, 1, 1), le(5, 0, 1, 1, 1, 2, 1)))
 
-        val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
+        val delta = Presolve.removeRedundantSourceConstraints(problem, ExecutionControl.Never)
 
         assertEquals(listOf(1), delta.droppedIndices.toList())
     }
@@ -354,7 +354,7 @@ class RedundantConstraintsTest {
         for ((domains, factors, expectedCount) in cases) {
             val problem = Problem(0, domains.size, domains, factors)
 
-            val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
+            val delta = Presolve.removeRedundantSourceConstraints(problem, ExecutionControl.Never)
             val reduced = Presolver.runSource(problem, PresolveConfig.parse("off,+subsume")).problem
 
             assertTrue(delta.isEmpty)
@@ -372,7 +372,7 @@ class RedundantConstraintsTest {
                 Linear(longArrayOf(1, coefficient), intArrayOf(0, 1), LinearOp.LE, 0L),
             ))
 
-            val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
+            val delta = Presolve.removeRedundantSourceConstraints(problem, ExecutionControl.Never)
             val reduced = Presolver.runSource(problem, PresolveConfig.parse("off,+subsume")).problem
 
             assertEquals(listOf(1), delta.droppedIndices.toList())
@@ -417,7 +417,7 @@ class RedundantConstraintsTest {
             factors = arrayOf(le(2, 0, 1, 1, 1), le(5, 0, 1, 1, 1, 2, 1)),
         )
 
-        val delta = Presolve.removeRedundantSourceConstraints(problem, Cancellation.Never)
+        val delta = Presolve.removeRedundantSourceConstraints(problem, ExecutionControl.Never)
 
         assertTrue(delta.droppedIndices.isEmpty())
     }

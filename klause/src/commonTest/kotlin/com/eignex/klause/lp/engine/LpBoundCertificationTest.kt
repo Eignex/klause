@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -509,7 +509,8 @@ class LpBoundCertificationTest {
 
     @Test
     fun `cancelled and nonfinite dual candidates should supply no bound`() {
-        val cancelled = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits(), Cancellation { true })
+        val cancelled = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits(),
+            ExecutionControl { true })
         val nonfinite = certifyLpBoundOnly(model(), doubleArrayOf(Double.NaN), ReconstructionLimits())
 
         assertNull(cancelled.bound)
@@ -634,7 +635,7 @@ class LpBoundCertificationTest {
     @Test
     fun `integer bound checking should withhold a proof after cancellation during policy review`() {
         var cancelled = false
-        val token = Cancellation { cancelled }
+        val token = ExecutionControl { cancelled }
         val policy = LpCertificationPolicy { _, success ->
             assertTrue(success)
             cancelled = true

@@ -29,7 +29,7 @@ import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -54,7 +54,7 @@ internal object IntegerAggregateBranches {
         require(bytes.size <= 65536 && sha256(bytes) == options.getValue("sha256"))
         out.resolve("source.smt2").writeBytes(bytes)
         Reports.writeJson(out.resolve("build-provenance.json").path, InstalledBuild.reference)
-        val preparationStop = Cancellation.after(10.seconds)
+        val preparationStop = ExecutionControl.after(10.seconds)
         val parsingStarted = System.nanoTime()
         val parsed = SmtLib.parse(bytes.decodeToString(), cancellation = preparationStop)
         val parsingNs = System.nanoTime() - parsingStarted
@@ -90,7 +90,7 @@ internal object IntegerAggregateBranches {
             inspectHermite(original, out, sha256(bytes))
             return
         }
-        val solveStop = Cancellation.after(5.seconds)
+        val solveStop = ExecutionControl.after(5.seconds)
         val params = TheoryParams(
             timeout = solveStop,
             randomSeed = 1L,
@@ -114,7 +114,7 @@ internal object IntegerAggregateBranches {
             val terminal = NumericalFrontierSnapshot.field(result, "terminal") as SourceEvidence?
             val verificationStarted = System.nanoTime()
             val checked = terminal?.let {
-                SourceEvidenceVerifier(context.withLinearAuthority()).verify(it, Cancellation.after(5.seconds))
+                SourceEvidenceVerifier(context.withLinearAuthority()).verify(it, ExecutionControl.after(5.seconds))
             }
             val verificationNs = System.nanoTime() - verificationStarted
             val stats = NumericalFrontierSnapshot.stats(invocation)
@@ -199,7 +199,7 @@ internal object IntegerAggregateBranches {
     }
 
     private fun inspectHermite(original: Problem, out: File, hash: String) {
-        val stop = Cancellation.after(5.seconds)
+        val stop = ExecutionControl.after(5.seconds)
         ExactLiraSearchComponent(original).use { component ->
             val session = SearchComponentSet(listOf(component)).session(
                 maxChecks = 256,

@@ -25,7 +25,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.remapped
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
@@ -58,7 +58,7 @@ class SourceMappingTest {
 
         val coordinates = assertNotNull(mapping.retainedCoordinates())
         val search = assertNotNull(SearchHints(listOf(SearchGroup(intArrayOf(1, 0), intArrayOf(0, 3, 1, 2))))
-            .remapped(coordinates, Cancellation.Never))
+            .remapped(coordinates, ExecutionControl.Never))
         val point = mapping.reconstructFrom(target, reduced)
 
         assertEquals(4, target.numBoolVars)
@@ -87,14 +87,14 @@ class SourceMappingTest {
             val delta = when (pass) {
                 PresolvePass.ELIMINATE_BOOL_VARS -> BoundedVariableElimination.eliminate(source, setOf(0, 2))
                 PresolvePass.ELIMINATE_BLOCKED_CLAUSES -> BlockedClauseElimination.eliminate(source, setOf(0, 2))
-                else -> ImplicationGraph.reduce(source, 3, Cancellation.Never)
+                else -> ImplicationGraph.reduce(source, 3, ExecutionControl.Never)
             }
             val target = source.withPassDelta(delta, BakeConfig.NONE)
             val mapping = SourceMapping(source, target, pass.guarantees, delta.rebuild)
 
             val coordinates = assertNotNull(mapping.retainedCoordinates(), pass.id)
             val search = assertNotNull(SearchHints(listOf(SearchGroup(intArrayOf(1, 2, 0), intArrayOf(0),
-                VariableSelection.InputOrder, ValueSelection.Maximum))).remapped(coordinates, Cancellation.Never))
+                VariableSelection.InputOrder, ValueSelection.Maximum))).remapped(coordinates, ExecutionControl.Never))
             val point = mapping.reconstructFrom(target, Sample(
                 booleanArrayOf(pass == PresolvePass.IMPLICATION_GRAPH, false, false), longArrayOf(2),
             ))
@@ -122,7 +122,7 @@ class SourceMappingTest {
 
         val coordinates = assertNotNull(mapping.retainedCoordinates())
         val search = assertNotNull(SearchHints(listOf(SearchGroup(intArrayOf(0), intArrayOf(0, 2, 1))))
-            .remapped(coordinates, Cancellation.Never))
+            .remapped(coordinates, ExecutionControl.Never))
         val point = mapping.reconstructFrom(target, Sample(booleanArrayOf(true), longArrayOf(5, 8, 4)))
 
         assertEquals(listOf(2, 1), search.tiers.single().intVars.toList())
@@ -207,9 +207,9 @@ class SourceMappingTest {
         val source = Problem(0, 4, Array(4) { IntDomain(0, 2) }, emptyArray())
         val mapping = SourceMapping(source, source, TransformationGuarantees.IDENTITY)
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val coordinates = mapping.retainedCoordinates(stop)
@@ -225,9 +225,9 @@ class SourceMappingTest {
         val mapping = SourceMapping(source, target, TransformationGuarantees.IDENTITY,
             SourceRebuilds(listOf(RebuildStep.IntegerFromLiteral(0, Lit.make(1, true))), sourceBoolVars = 1))
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 5
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val coordinates = mapping.retainedCoordinates(stop)

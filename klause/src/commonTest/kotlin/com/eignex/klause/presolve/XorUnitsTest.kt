@@ -13,7 +13,7 @@ import com.eignex.klause.presolve.PresolveShared.withPassDelta
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
@@ -135,7 +135,7 @@ class XorUnitsTest {
         for (limit in listOf(0L, 1L, 15L, 17L)) {
             val budget = PresolveBudget(limit)
 
-            val delta = XorUnits.deriveXorUnits(problem, budget.orSpent(Cancellation.Never))
+            val delta = XorUnits.deriveXorUnits(problem, budget.orSpent(ExecutionControl.Never))
 
             assertTrue(delta.isEmpty, "limit=$limit")
             assertFalse(delta.infeasible)

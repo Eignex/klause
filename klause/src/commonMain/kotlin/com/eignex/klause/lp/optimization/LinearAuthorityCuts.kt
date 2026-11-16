@@ -8,7 +8,7 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRoundingLimit
 import com.eignex.klause.solver.evidence.mixedIntegerRounding
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.abs
@@ -58,12 +58,12 @@ internal class LinearAuthorityCuts private constructor(
         }
 
         fun prepare(
-            source: SourceProofContext, cancellation: Cancellation, complementary: Boolean = false,
+            source: SourceProofContext, cancellation: ExecutionControl, complementary: Boolean = false,
             onWork: (Long) -> Unit = {},
         ): LinearAuthorityCuts? = prepareInternal(source, cancellation, complementary, null, 65_536L, onWork)
 
         fun prepareAtPoint(
-            source: SourceProofContext, cancellation: Cancellation, point: Map<SourceCoordinate, Double>,
+            source: SourceProofContext, cancellation: ExecutionControl, point: Map<SourceCoordinate, Double>,
             maximumWork: Long, onWork: (Long) -> Unit = {},
         ): LinearAuthorityCuts? {
             require(maximumWork in 0L..65_536L)
@@ -71,7 +71,7 @@ internal class LinearAuthorityCuts private constructor(
         }
 
         private fun prepareInternal(
-            source: SourceProofContext, cancellation: Cancellation, complementary: Boolean,
+            source: SourceProofContext, cancellation: ExecutionControl, complementary: Boolean,
             point: Map<SourceCoordinate, Double>?, maximumWork: Long, onWork: (Long) -> Unit,
         ): LinearAuthorityCuts? {
             var work = 0L

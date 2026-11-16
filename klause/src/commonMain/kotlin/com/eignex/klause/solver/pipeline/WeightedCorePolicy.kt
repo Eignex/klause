@@ -11,7 +11,7 @@ import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 
 private const val WEIGHTED_CORE_COLUMNS = 16_384
@@ -24,7 +24,7 @@ internal fun weightedCoreDefaultScenario(
     problem: Problem,
     objective: LinearObjective?,
     options: ExecutionOptions,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PortfolioScenario {
     if (cancellation() || objective == null || scenario.cores != 1 || scenario.kind != Kind.COP ||
         scenario.engine != EngineMix.MIXED || scenario.explicitArms || options.explicitArms ||

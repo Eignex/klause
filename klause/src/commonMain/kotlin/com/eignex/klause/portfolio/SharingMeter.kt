@@ -1,7 +1,7 @@
 package com.eignex.klause.portfolio
 
-import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.incumbent.IncumbentOfferEvent
+import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.klause.solver.result.ChannelTraffic
 import com.eignex.klause.solver.result.SharingChannel
 import com.eignex.klause.solver.result.SharingStats

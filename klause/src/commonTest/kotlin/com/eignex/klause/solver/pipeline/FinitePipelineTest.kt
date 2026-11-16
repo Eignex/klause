@@ -35,7 +35,7 @@ import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.hasActivity
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -83,14 +83,14 @@ class FinitePipelineTest {
         for (spec in specs) {
             for (stopAfterRefutation in listOf(false, true)) {
                 val budget = PresolveBudget(Long.MAX_VALUE)
-                val token = Cancellation {
+                val token = ExecutionControl {
                     stopAfterRefutation && budget.invocations.any { it.outcome == PresolveInvocationOutcome.REFUTED }
                 }
 
                 val preparation = FinitePipeline.prepare(
                     FinitePipelineRequest(
                         source, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.parse(spec),
-                        cancellation = token, solveCancellation = Cancellation.Never, presolveBudget = budget,
+                        cancellation = token, solveCancellation = ExecutionControl.Never, presolveBudget = budget,
                     ),
                 )
 
@@ -118,7 +118,8 @@ class FinitePipelineTest {
             val preparation = FinitePipeline.prepare(
                 FinitePipelineRequest(
                     source, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.parse(spec),
-                    cancellation = Cancellation { budget.probeCalls > 0L }, solveCancellation = Cancellation.Never,
+                    cancellation = ExecutionControl { budget.probeCalls > 0L }, solveCancellation =
+                        ExecutionControl.Never,
                     presolveBudget = budget,
                 ),
             )
@@ -140,7 +141,7 @@ class FinitePipelineTest {
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
                 problem, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
-                cancellation = budget.orSpent(Cancellation.Never), solveCancellation = Cancellation.Never,
+                cancellation = budget.orSpent(ExecutionControl.Never), solveCancellation = ExecutionControl.Never,
                 presolveBudget = budget,
             ),
         )
@@ -187,8 +188,8 @@ class FinitePipelineTest {
             FinitePipelineRequest(
                 problem, FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.parse("off,+strengthen"),
-                cancellation = budget.orSpent(Cancellation.Never),
-                solveCancellation = Cancellation.Never,
+                cancellation = budget.orSpent(ExecutionControl.Never),
+                solveCancellation = ExecutionControl.Never,
                 presolveBudget = budget,
             ),
         )
@@ -326,7 +327,7 @@ class FinitePipelineTest {
                 FiniteSolveRequest(
                     shape = FiniteSolveShape(problem, true, false, null, objective, null, null),
                     engine = engine, presolveConfig = PresolveConfig.DEFAULT, explicitPresolveConfig = true,
-                    solutionSetSensitive = false, cancellation = Cancellation.Never, presolveBudget = null,
+                    solutionSetSensitive = false, cancellation = ExecutionControl.Never, presolveBudget = null,
                     cores = 1, engineParams = emptyList(), randomSeed = 1L, defaultArms = 1, lpConfig = LpConfig(),
                     zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
                     solveBudgetMillis = null, allSolutions = false, solutionCap = null,
@@ -364,7 +365,7 @@ class FinitePipelineTest {
             FinitePipelineRequest(
                 problem = problem,
                 engine = FiniteEngine.BACKTRACK,
-                cancellation = Cancellation {
+                cancellation = ExecutionControl {
                     cancellationPolls++
                     false
                 },
@@ -392,8 +393,8 @@ class FinitePipelineTest {
                 problem = problem,
                 engine = FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.NONE,
-                cancellation = spent.orSpent(Cancellation.Never),
-                solveCancellation = Cancellation.Never,
+                cancellation = spent.orSpent(ExecutionControl.Never),
+                solveCancellation = ExecutionControl.Never,
                 presolveBudget = spent,
             ),
         )

@@ -13,7 +13,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.arrays.emptyIntArray
 import kotlin.time.TimeSource
@@ -56,7 +56,7 @@ internal class PrivateRebuildGeneration private constructor(
         fun prepare(
             session: PropagationSession,
             byteLimit: Long,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             onDecline: (String) -> Unit = {},
             learnedBinary: PrivateRebuildBinaryLearning? = null,
             parity: PrivateRebuildParity? = null,
@@ -239,10 +239,10 @@ internal class PrivateRebuildGeneration private constructor(
                 spent = saturatedWork(spent, it)
                 cancellation.charge(it)
             }
-            val passToken = object : Cancellation {
+            val passToken = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = cancellation() || spent >= allowance
                 override fun deadline() = cancellation.deadline()
-                override fun workMeter(): WorkMeter = meter
+                override val accounting: WorkMeter get() = meter
             }
             // A local pass boundary retains complete pivots; the containing call still controls
             // publication, opening and checks, and can decline the entire generation.

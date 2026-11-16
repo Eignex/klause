@@ -39,7 +39,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.skema.SchemaDef
 import kotlin.math.abs
 import kotlin.test.Test
@@ -158,7 +158,7 @@ class CompiledSourceBindingTest {
         val other = definition.compile()
         val original = assertNotNull(compiled.sourceBinding.bindOriginalSample(
             Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.25),
-                listOf(BigFraction.ofLong(4).reciprocal())), Cancellation.Never))
+                listOf(BigFraction.ofLong(4).reciprocal())), ExecutionControl.Never))
         val unbound = Sample(booleanArrayOf(), longArrayOf(2))
         val privatePoint = unbound.withCoordinateFrame(compiled.problem)
 
@@ -169,7 +169,7 @@ class CompiledSourceBindingTest {
             compiled.decode(x, unbound.withCoordinateFrame(other.problem))
         }
         assertFailsWith<IllegalArgumentException> {
-            compiled.sourceBinding.bindOriginalSample(privatePoint, Cancellation.Never)
+            compiled.sourceBinding.bindOriginalSample(privatePoint, ExecutionControl.Never)
         }
     }
 
@@ -178,7 +178,7 @@ class CompiledSourceBindingTest {
         val compiled = SchemaDef<SchemaEntry>(mapOf("x" to FloatSpec(0.0, 1.0))).compile()
         val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), listOf(BigFraction.ZERO))
 
-        val bound = compiled.sourceBinding.bindOriginalSample(sample, Cancellation { true })
+        val bound = compiled.sourceBinding.bindOriginalSample(sample, ExecutionControl { true })
 
         assertNull(bound)
         assertNull(sample.coordinateFrame)

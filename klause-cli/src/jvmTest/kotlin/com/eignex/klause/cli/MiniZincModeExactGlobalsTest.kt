@@ -2,6 +2,8 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -11,8 +13,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class MiniZincModeExactGlobalsTest(

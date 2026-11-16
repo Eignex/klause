@@ -8,8 +8,8 @@ import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
@@ -28,7 +28,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncoderProvider
 import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -59,7 +59,7 @@ class SourceSetupTest {
         assignment.setInt(1, 10)
 
         val view = assertNotNull(invocation.heuristicHints(
-            preparation.problem, null, preparation.sourceMapping, Cancellation.Never,
+            preparation.problem, null, preparation.sourceMapping, ExecutionControl.Never,
             setOf(ExecutionStrategy.LOCAL_SEARCH), assertNotNull(preparation.executionPlan).capabilities,
         ))
         assertNotNull(view.sweep).sweep(assignment, source.finiteIntDomains(), source.factors)
@@ -93,7 +93,7 @@ class SourceSetupTest {
         assignment.setBool(1, true)
 
         val view = assertNotNull(invocation.heuristicHints(
-            preparation.problem, preparation.objective, preparation.sourceMapping, Cancellation.Never,
+            preparation.problem, preparation.objective, preparation.sourceMapping, ExecutionControl.Never,
             setOf(ExecutionStrategy.LOCAL_SEARCH), assertNotNull(preparation.executionPlan).capabilities,
         ))
 
@@ -113,9 +113,9 @@ class SourceSetupTest {
             shape.problem, FiniteEngine.BACKTRACK, null, PresolveConfig.NONE, preparedPlan = shape.preparedPlan,
         ))
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val view = invocation.heuristicHints(
@@ -225,7 +225,7 @@ class SourceSetupTest {
 
             val result = FinitePipeline.solve(
                 FiniteSolveRequest(
-                shape, engine, PresolveConfig.NONE, false, false, Cancellation.Never,
+                shape, engine, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                 randomSeed = 3, defaultArms = 1, lpConfig = LpConfig.OFF,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -285,7 +285,7 @@ class SourceSetupTest {
         val shape = invocation.finiteShape()
         val publications = ArrayList<Sample>()
         val request = FiniteSolveRequest(
-            shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+            shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
             presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
             randomSeed = 3, defaultArms = 1, lpConfig = LpConfig.OFF,
             zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -336,14 +336,14 @@ class SourceSetupTest {
                 SourceAttachment(source),
                 ExecutionOperation.SATISFY,
                 FiniteEngine.FIXED,
-                cancellation = Cancellation { stopped },
+                cancellation = ExecutionControl { stopped },
             ),
         )
         stopped = true
         var publications = 0
 
         val request = FiniteSolveRequest(
-            invocation.finiteShape(), FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+            invocation.finiteShape(), FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
             presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
             randomSeed = 3, defaultArms = 1, lpConfig = LpConfig.OFF,
             zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -391,7 +391,7 @@ class SourceSetupTest {
                 preparation.problem,
                 preparation.objective,
                 preparation.sourceMapping,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 setOf(ExecutionStrategy.LOCAL_SEARCH),
                 assertNotNull(preparation.executionPlan).capabilities,
             ),
@@ -440,13 +440,13 @@ class SourceSetupTest {
             ),
         )
         val coordinates = assertNotNull(assertNotNull(preparation.sourceMapping).retainedCoordinates())
-        val search = assertNotNull(assertNotNull(shape.searchHints).remapped(coordinates, Cancellation.Never))
+        val search = assertNotNull(assertNotNull(shape.searchHints).remapped(coordinates, ExecutionControl.Never))
         val view = assertNotNull(
             invocation.heuristicHints(
                 preparation.problem,
                 preparation.objective,
                 preparation.sourceMapping,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 setOf(ExecutionStrategy.LOCAL_SEARCH),
                 assertNotNull(preparation.executionPlan).capabilities,
             ),

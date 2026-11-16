@@ -1,12 +1,12 @@
 package com.eignex.klause.lp.bounding
 
 import com.eignex.klause.lp.engine.LpModel
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
 
 internal class LpProofRows private constructor(val source: LpProofRowIndex?, val transformed: LpProofRowIndex?) {
-    fun unchanged(cancellation: Cancellation): Boolean {
+    fun unchanged(cancellation: ExecutionControl): Boolean {
         if (cancellation()) return false
         // A callback between these comparisons could invalidate an already checked owner.
         return source?.unchanged() != false && transformed?.unchanged() != false
@@ -18,7 +18,7 @@ internal class LpProofRows private constructor(val source: LpProofRowIndex?, val
         fun create(
             source: LpModel,
             transformed: LpModel,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             maxPrimitiveBytes: Long = MAX_PRIMITIVE_BYTES,
         ): LpProofRows {
             val sourceShape = proofRowShape(source, cancellation)
@@ -42,7 +42,7 @@ internal class LpProofRowIndex private constructor(
     private val columns: IntArray,
     private val values: LongArray,
 ) {
-    fun coefficients(row: Int, cancellation: Cancellation): Map<Int, Long> {
+    fun coefficients(row: Int, cancellation: ExecutionControl): Map<Int, Long> {
         val result = HashMap<Int, Long>()
         for (entry in offsets[row] until offsets[row + 1]) {
             checkProofRows(cancellation)
@@ -51,7 +51,7 @@ internal class LpProofRowIndex private constructor(
         return result
     }
 
-    fun forEachCoefficient(row: Int, cancellation: Cancellation, consume: (Int, Long) -> Boolean): Boolean {
+    fun forEachCoefficient(row: Int, cancellation: ExecutionControl, consume: (Int, Long) -> Boolean): Boolean {
         var entry = offsets[row]
         val end = offsets[row + 1]
         while (entry < end) {
@@ -87,7 +87,7 @@ internal class LpProofRowIndex private constructor(
     }
 
     companion object {
-        fun create(model: LpModel, shape: LpProofRowShape, cancellation: Cancellation): LpProofRowIndex {
+        fun create(model: LpModel, shape: LpProofRowShape, cancellation: ExecutionControl): LpProofRowIndex {
             val pointers = IntArray(model.n + 1)
             for (column in pointers.indices) {
                 checkProofRows(cancellation)
@@ -136,7 +136,7 @@ internal class LpProofRowIndex private constructor(
 
 internal data class LpProofRowShape(val start: Int, val end: Int, val bytes: Long)
 
-private fun proofRowShape(model: LpModel, cancellation: Cancellation): LpProofRowShape? {
+private fun proofRowShape(model: LpModel, cancellation: ExecutionControl): LpProofRowShape? {
     checkProofRows(cancellation)
     if (model.n < 0 || model.m < 0 || model.n >= model.csc.colPtr.size || model.m == Int.MAX_VALUE) return null
     val limit = minOf(model.csc.rowIdx.size, model.csc.colVal.size)
@@ -164,7 +164,7 @@ internal class LpProofRowsCancelled : RuntimeException()
 
 internal class LpProofRowsInvalidated : RuntimeException()
 
-private fun checkProofRows(cancellation: Cancellation) {
+private fun checkProofRows(cancellation: ExecutionControl) {
     if (cancellation()) throw LpProofRowsCancelled()
 }
 

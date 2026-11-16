@@ -37,7 +37,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.solver.search.SourceBoundTerm
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
@@ -160,7 +160,7 @@ class QfLiraSolverTest {
                 LinearOp.GE, 2.0, strict = true),
         ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
-        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         prepared.open().use { component ->
             component.useIncrementalLinearPropagation()
             val session = SearchSession(listOf(component))
@@ -184,7 +184,7 @@ class QfLiraSolverTest {
             ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
             ReifiedLinear(1, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
         ))
-        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         prepared.open().use { component ->
             component.useIncrementalLinearPropagation()
             val session = SearchSession(listOf(component))
@@ -215,7 +215,7 @@ class QfLiraSolverTest {
                 LinearOp.LE, 1.0),
         ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
             realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
-        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         prepared.open().use { component ->
             component.useIncrementalLinearPropagation()
             val session = SearchSession(listOf(component))
@@ -594,7 +594,7 @@ class QfLiraSolverTest {
     fun `partial check should observe cancellation`() {
         val session = SearchSession(
             components = listOf(ExactLiraSearchComponent(partialModel())),
-            cancellation = Cancellation { true },
+            cancellation = ExecutionControl { true },
         )
 
         assertIs<ComponentResult.Indeterminate>(session.initialize())
@@ -638,9 +638,9 @@ class QfLiraSolverTest {
     fun `stopped exact source preparation should withhold the factory and retain its charge`() {
         var charged = 0L
         val meter = WorkMeter { charged += it }
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 20L
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         assertNull(prepareExactLiraSource(partialModel(), stop))
@@ -654,12 +654,12 @@ class QfLiraSolverTest {
     fun `prepared source should open fresh disjunction names after cancelled initialization`() {
         val source = comparisonClauseModel(xUpper = 8)
         var preparationExpired = false
-        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation { preparationExpired }))
+        val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl { preparationExpired }))
         preparationExpired = true
         prepared.open().use { interrupted ->
             val session = SearchSession(
                 listOf(interrupted),
-                cancellation = Cancellation { true },
+                cancellation = ExecutionControl { true },
                 atoms = SearchAtomRegistry(0),
             )
             assertIs<ComponentResult.Indeterminate>(session.initialize())
@@ -676,7 +676,7 @@ class QfLiraSolverTest {
     @Test
     fun `prepared source should open an undecided sibling after a conflicting Boolean prefix`() {
         val source = partialModel()
-        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         prepared.open().use { first ->
             val session = SearchSession(listOf(first))
             assertIs<ComponentResult.Consistent>(session.initialize())
@@ -695,7 +695,7 @@ class QfLiraSolverTest {
     @Test
     fun `prepared openings should contribute only the current source model callback`() {
         val source = comparisonClauseModel(xUpper = 8)
-        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         val keys = List(2) { SearchModelKey(ExactLiraAssignment::class) }
         for (index in keys.indices) {
             prepared.open { value, model -> model.contribute(keys[index], value) }.use { component ->
@@ -731,7 +731,7 @@ class QfLiraSolverTest {
                 ),
             ),
         )
-        val prepared = assertNotNull(prepareExactLiraSource(source, Cancellation.Never))
+        val prepared = assertNotNull(prepareExactLiraSource(source, ExecutionControl.Never))
         for (key in List(2) { SearchModelKey(ExactLiraAssignment::class) }) {
             prepared.open { value, model -> model.contribute(key, value) }.use { component ->
                 val session = SearchSession(listOf(component))
@@ -840,7 +840,7 @@ class QfLiraSolverTest {
             var privateStopped = false
             val component = ExactLiraSearchComponent(source)
             if (incremental) component.useIncrementalLinearPropagation()
-            component.useOperationAllowance { parent -> parent or Cancellation { privateStopped } }
+            component.useOperationAllowance { parent -> parent or ExecutionControl { privateStopped } }
             component.use { owned ->
                 val session = SearchSession(listOf(owned))
                 assertIs<ComponentResult.Consistent>(session.initialize())
@@ -862,7 +862,7 @@ class QfLiraSolverTest {
     fun `a containing stop should prevent Boolean leaf publication`() {
         var stopped = false
         ExactLiraSearchComponent(partialModel()).use { component ->
-            val session = SearchSession(listOf(component), cancellation = Cancellation { stopped })
+            val session = SearchSession(listOf(component), cancellation = ExecutionControl { stopped })
             assertIs<ComponentResult.Consistent>(session.initialize())
             stopped = true
 

@@ -21,7 +21,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -155,7 +155,7 @@ class LocalSearchEnginePublicationTest {
             },
         )
 
-        val result = solver.solve(params.copy(initialAssignment = valid, cancellation = Cancellation { cancelled }))
+        val result = solver.solve(params.copy(initialAssignment = valid, cancellation = ExecutionControl { cancelled }))
 
         assertIs<SolveResult.Unknown>(result)
     }
@@ -201,7 +201,7 @@ class LocalSearchEnginePublicationTest {
         val problem = source.withFactors(arrayOf(interrupting)).bake()
         val solver = LocalSearchSolver(problem, greedyRepairOnRestart = false)
 
-        val result = solver.solve(params.copy(initialAssignment = valid, cancellation = Cancellation { cancelled }))
+        val result = solver.solve(params.copy(initialAssignment = valid, cancellation = ExecutionControl { cancelled }))
 
         assertTrue(cancelled)
         assertIs<SolveResult.Unknown>(result)
@@ -220,13 +220,13 @@ class LocalSearchEnginePublicationTest {
         val solver = LocalSearchSolver(source.withFactors(arrayOf(interrupting)).bake(), greedyRepairOnRestart = false)
         val scoped = params.copy(initialAssignment = valid)
         solver.resumableSolve(scoped).use { handle ->
-            assertNull(handle.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L))
+            assertNull(handle.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1L))
             assertTrue(cancelled)
             assertFalse(handle.isDone)
             interrupt = false
             cancelled = false
 
-            val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L)
+            val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
             assertEquals(valid, assertIs<SolveResult.Sat>(result).assignment)
         }
@@ -240,7 +240,7 @@ class LocalSearchEnginePublicationTest {
 
         val standalone = assertIs<SolveResult.Sat>(solver.solve(params.copy(initialAssignment = valid))).assignment
         val paired = Portfolio.thompson(listOf(worker)).use {
-            assertIs<SolveResult.Sat>(it.solve(Cancellation.Never)).assignment
+            assertIs<SolveResult.Sat>(it.solve(ExecutionControl.Never)).assignment
         }
         val complete = assertIs<SolveResult.Sat>(BacktrackSolver(problem).solve(BacktrackParams())).assignment
 

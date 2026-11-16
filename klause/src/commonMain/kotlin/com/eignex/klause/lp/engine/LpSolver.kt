@@ -3,7 +3,7 @@ package com.eignex.klause.lp.engine
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 /** Exact checks that may decline a float candidate. Engine-local: consumers adapt it into their own
@@ -194,7 +194,7 @@ internal data class LpSolveMetrics(
 internal interface LpSolver : AutoCloseable {
     val trialProgress: Map<String, Long> get() = emptyMap()
 
-    fun pausedDualProposal(cancellation: Cancellation = Cancellation.Never): DoubleArray? = null
+    fun pausedDualProposal(cancellation: ExecutionControl = ExecutionControl.Never): DoubleArray? = null
 
     // Certified callers validate source feasibility independently. Scaled arithmetic guards remain required.
     fun deferUnscaledSourceDiagnostics() = Unit
@@ -321,15 +321,15 @@ internal class LpPrimalGuidance(val coordinates: DoubleArray, val known: Boolean
  * component engine cannot accidentally hide the certification routes from its consumers.
  */
 internal interface ComponentLpSolverCapability : LpSolver {
-    fun partialBoundDuals(cancellation: Cancellation = Cancellation.Never): DoubleArray? = null
+    fun partialBoundDuals(cancellation: ExecutionControl = ExecutionControl.Never): DoubleArray? = null
 
-    fun partialPrimalGuidance(cancellation: Cancellation = Cancellation.Never): LpPrimalGuidance? = null
+    fun partialPrimalGuidance(cancellation: ExecutionControl = ExecutionControl.Never): LpPrimalGuidance? = null
 
     fun nodeDeductions(
         duals: DoubleArray,
         observer: LpCertificationObserver? = null,
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         withAlternatives: Boolean = false,
         sharedMeter: MixedCertificateMeter? = null,
     ): ComponentLpDeductions? = null
@@ -342,7 +342,7 @@ internal interface ComponentLpSolverCapability : LpSolver {
     fun exactWitness(
         observer: LpCertificationObserver? = null,
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): ExactLpWitness?
 }
 
@@ -368,7 +368,7 @@ internal data class LpFloatAllowance(val work: Long, val iterations: Int) {
 
 internal interface RetainedLpSolver : LpSolver {
     // A declined adoption requires the caller to discard this owner; a composite may retire partially edited children.
-    fun adopt(state: LpExactState, token: Cancellation = Cancellation.Never): Boolean = false
+    fun adopt(state: LpExactState, token: ExecutionControl = ExecutionControl.Never): Boolean = false
 
     fun resolveBounds(allowance: LpFloatAllowance? = null): FloatLpResult?
 }
@@ -392,9 +392,9 @@ internal interface RetainedComponentLpSolverCapability :
  */
 internal interface PersistentLpSolver : RetainedLpSolver {
     // Builds an all-logical basis without claiming feasibility; null means unsupported or declined.
-    fun prepareLogicals(token: Cancellation = Cancellation.Never): Basis? = null
+    fun prepareLogicals(token: ExecutionControl = ExecutionControl.Never): Basis? = null
 
-    fun prepareBasis(basis: Basis, token: Cancellation = Cancellation.Never): Basis? = prepareLogicals(token)
+    fun prepareBasis(basis: Basis, token: ExecutionControl = ExecutionControl.Never): Basis? = prepareLogicals(token)
 
     fun retainedBasis(): Basis? = null
 
@@ -426,7 +426,7 @@ internal interface PersistentLpSolver : RetainedLpSolver {
  */
 internal fun newLpSolver(
     model: LpModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     componentSplit: Boolean = true,
     factory: LpEngineFactory = ProductionLpEngineFactory,
     pricing: LpPricingOptions = LpPricingOptions(),
@@ -456,7 +456,7 @@ internal fun newLpSolver(
  */
 internal fun newTableauCutSolver(
     model: LpModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     iterationLimit: Int = 0,
     workLimit: Long = 0L,
     trackDegeneracy: Boolean = false,
@@ -466,7 +466,7 @@ internal fun newTableauCutSolver(
 
 internal fun newComponentTableauCutSolver(
     model: LpModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     iterationLimit: Int = 0,
     workLimit: Long = 0L,
     trackDegeneracy: Boolean = false,
@@ -507,7 +507,7 @@ internal fun LpPricingOptions.componentShare(columns: Int, totalColumns: Int, ro
  */
 internal fun newPersistentLpSolver(
     model: LpModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     refactorUpdateLimit: Int = DEFAULT_REFACTOR_UPDATE_LIMIT,
     iterationLimit: Int = 0,
     workLimit: Long = 0L,
@@ -526,7 +526,7 @@ internal fun newPersistentLpSolver(
 
 internal fun newRetainedLpSolver(
     model: LpModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     componentSplit: Boolean = true,
     factory: LpEngineFactory = ProductionLpEngineFactory,
     pricing: LpPricingOptions = LpPricingOptions(),

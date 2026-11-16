@@ -12,7 +12,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertIs
 
@@ -27,7 +27,7 @@ class FiniteWitnessVerificationTest {
         ).bake()
         val candidate = Candidate<Sample, Double?>(Sample(BooleanArray(0), longArrayOf(3, 7)), null)
 
-        val result = finiteWitnessVerifier(model, null, Cancellation { true }).verify(candidate)
+        val result = finiteWitnessVerifier(model, null, ExecutionControl { true }).verify(candidate)
 
         assertIs<Verification.Indeterminate>(result)
     }
@@ -106,7 +106,7 @@ class FiniteWitnessVerificationTest {
         val model = Problem(0, 0, emptyArray(), emptyList<Factor>(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0)).bake()
         val point = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.5))
-        val result = finiteWitnessVerifier(model, null, Cancellation { cancelled }, tolerance)
+        val result = finiteWitnessVerifier(model, null, ExecutionControl { cancelled }, tolerance)
             .verify(Candidate(point, null))
 
         assertIs<Verification.Indeterminate>(result)

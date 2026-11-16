@@ -2,7 +2,6 @@ package com.eignex.klause.bench.target
 
 import com.eignex.klause.bench.catalog.Catalog
 import com.eignex.klause.bench.catalog.Category
-import com.eignex.klause.bench.catalog.Format
 import com.eignex.klause.bench.catalog.ProblemSets
 import com.eignex.klause.bench.metric.InstalledBuild
 import com.eignex.klause.bench.metric.InstanceClassifier
@@ -17,15 +16,15 @@ import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.CorpusUnavailable
 import com.eignex.klause.bench.source.ProblemKind
-import java.io.File
-import java.time.Instant
-import java.time.temporal.ChronoUnit
-import kotlin.system.exitProcess
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import java.io.File
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import kotlin.system.exitProcess
 
 /**
  * The bench commands klause-lab runs: `select` names problems, `solve-one` solves one and writes its

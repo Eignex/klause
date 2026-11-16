@@ -18,7 +18,7 @@ import com.eignex.klause.solver.pipeline.prepareSelectedFloatGrid
 import com.eignex.klause.solver.projection.FloatGridDefinition
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.result.LpStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntDisjointSet
 
 internal class FlatZincGridGeometry(
@@ -53,7 +53,7 @@ internal class FlatZincSourceState(
         if (original.semantics.effective.floats !is FloatSemantics.Grid) {
             return FlatZincGridGeometry(null, original.floatRepresentations)
         }
-        val (representations, variables) = requireNotNull(gridVariables(Cancellation.Never))
+        val (representations, variables) = requireNotNull(gridVariables(ExecutionControl.Never))
         if (variables.isEmpty()) return FlatZincGridGeometry(null, representations)
         val selection = SourceSetup.selectRoute(SourceSetupRequest(attachment(), ExecutionOperation.SATISFY,
             FiniteEngine.LOCAL_SEARCH))
@@ -67,7 +67,7 @@ internal class FlatZincSourceState(
     }
 
     private fun gridVariables(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): Pair<Map<String, FloatRepresentation>, List<FloatGridVariable>>? {
         cancellation.charge(original.problem.numFactors.toLong() + original.problem.numRealVars)
         if (cancellation()) return null

@@ -21,7 +21,7 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -80,7 +80,7 @@ class LpBoundingMixedRowTest {
                     session,
                     100.0,
                     sink,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     -1,
                     true,
                     learn = learn,
@@ -93,7 +93,7 @@ class LpBoundingMixedRowTest {
                     session,
                     100.0,
                     sink,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     -1,
                     true,
                     learn = learn,
@@ -145,7 +145,7 @@ class LpBoundingMixedRowTest {
                     session,
                     100.0,
                     sink,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     -1,
                     true,
                     learn = learn,
@@ -201,7 +201,7 @@ class LpBoundingMixedRowTest {
                     session,
                     100.0,
                     sink,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     -1,
                     true,
                     learn = learn,
@@ -254,7 +254,7 @@ class LpBoundingMixedRowTest {
                     session,
                     100.0,
                     sink,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     -1,
                     true,
                     learn = learn,
@@ -267,7 +267,7 @@ class LpBoundingMixedRowTest {
                     session,
                     100.0,
                     sink,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     -1,
                     true,
                     learn = learn,
@@ -312,7 +312,7 @@ class LpBoundingMixedRowTest {
                     session,
                     Double.POSITIVE_INFINITY,
                     sink,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     -1,
                     true,
                 )
@@ -354,7 +354,7 @@ class LpBoundingMixedRowTest {
                 session,
                 Double.POSITIVE_INFINITY,
                 sink,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 -1,
                 true,
                 learn = true,
@@ -396,7 +396,7 @@ class LpBoundingMixedRowTest {
                 session,
                 Double.POSITIVE_INFINITY,
                 sink,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 -1,
                 true,
                 learn = true,
@@ -409,7 +409,7 @@ class LpBoundingMixedRowTest {
                 session,
                 Double.POSITIVE_INFINITY,
                 sink,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 -1,
                 true,
                 learn = true,
@@ -449,7 +449,7 @@ class LpBoundingMixedRowTest {
                 session,
                 4.0,
                 sink,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 -1,
                 true,
             )
@@ -488,7 +488,7 @@ class LpBoundingMixedRowTest {
                 session,
                 2.0,
                 sink,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 -1,
                 true,
             )
@@ -524,7 +524,7 @@ class LpBoundingMixedRowTest {
                         session,
                         cutoff,
                         sink,
-                        Cancellation.Never,
+                        ExecutionControl.Never,
                         -1,
                         true,
                     )
@@ -562,7 +562,7 @@ class LpBoundingMixedRowTest {
                         session,
                         cutoff,
                         sink,
-                        Cancellation.Never,
+                        ExecutionControl.Never,
                         -1,
                         true,
                     )
@@ -604,7 +604,7 @@ class LpBoundingMixedRowTest {
                     session,
                     2.0,
                     sink,
-                    Cancellation.Never,
+                    ExecutionControl.Never,
                     -1,
                     true,
                 )
@@ -649,7 +649,7 @@ class LpBoundingMixedRowTest {
                         session,
                         Double.POSITIVE_INFINITY,
                         sink,
-                        Cancellation.Never,
+                        ExecutionControl.Never,
                         -1,
                         true,
                     )
@@ -690,7 +690,7 @@ class LpBoundingMixedRowTest {
                 session,
                 Double.POSITIVE_INFINITY,
                 sink,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 -1,
                 true,
             )
@@ -730,7 +730,7 @@ class LpBoundingMixedRowTest {
                         session,
                         cutoff,
                         sink,
-                        Cancellation.Never,
+                        ExecutionControl.Never,
                         -1,
                         true,
                     )
@@ -767,7 +767,7 @@ class LpBoundingMixedRowTest {
                         session,
                         cutoff,
                         sink,
-                        Cancellation.Never,
+                        ExecutionControl.Never,
                         -1,
                         true,
                     )
@@ -793,7 +793,7 @@ class LpBoundingMixedRowTest {
                 val next = model.rebind(longArrayOf(lower), longArrayOf(10L))
                 assertNull(next.authoritativeModel())
 
-                val result = assertNotNull(engine.solveNode(next, null, Cancellation.Never))
+                val result = assertNotNull(engine.solveNode(next, null, ExecutionControl.Never))
 
                 assertEquals(maxOf(4L, lower).toDouble(), assertNotNull(result.second).objective)
                 assertEquals(List(closes.size - 1) { 1 } + 0, closes)
@@ -814,10 +814,10 @@ class LpBoundingMixedRowTest {
             SolveStatsSink("fallback"),
             LpSolveContext(closeCountingFactory(closes) { throw failures[it] }),
         ).use { engine ->
-            assertNotNull(engine.solveNode(model, null, Cancellation.Never)?.second)
+            assertNotNull(engine.solveNode(model, null, ExecutionControl.Never)?.second)
 
             val failure = assertFailsWith<IllegalStateException> {
-                engine.solveNode(model.rebind(longArrayOf(5L), longArrayOf(10L)), null, Cancellation.Never)
+                engine.solveNode(model.rebind(longArrayOf(5L), longArrayOf(10L)), null, ExecutionControl.Never)
             }
 
             assertSame(failures[0], failure)
@@ -838,7 +838,7 @@ class LpBoundingMixedRowTest {
                 session,
                 Double.POSITIVE_INFINITY,
                 sink,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 0,
                 true,
             )
@@ -861,7 +861,7 @@ class LpBoundingMixedRowTest {
                 session,
                 Double.POSITIVE_INFINITY,
                 sink,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 0,
                 true,
                 hints = hints,
@@ -884,7 +884,7 @@ class LpBoundingMixedRowTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,
@@ -902,7 +902,7 @@ class LpBoundingMixedRowTest {
                     pricing,
                 )
                 return object : PersistentLpSolver by delegate {
-                    override fun prepareLogicals(token: Cancellation): Basis? =
+                    override fun prepareLogicals(token: ExecutionControl): Basis? =
                         delegate.prepareLogicals(token).also { if (auxiliary) cancelled = true }
 
                     override fun close() {
@@ -912,7 +912,7 @@ class LpBoundingMixedRowTest {
                 }
             }
         }
-        val params = LpParams(lpPlan = LpPlan(bounding = true), cancellation = Cancellation { cancelled })
+        val params = LpParams(lpPlan = LpPlan(bounding = true), cancellation = ExecutionControl { cancelled })
         val objective = LinearObjective(intCoefficients = longArrayOf(1L))
         LpEngine(problem, objective, params, sink, LpSolveContext(factory)).use { engine ->
             val result = engine.leafCertify(session)
@@ -950,7 +950,7 @@ private fun closeCountingFactory(closes: MutableList<Int>, afterClose: (Int) -> 
     object : LpEngineFactory by ProductionLpEngineFactory {
         override fun newPersistentSolver(
             model: LpModel,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             refactorUpdateLimit: Int,
             iterationLimit: Int,
             workLimit: Long,

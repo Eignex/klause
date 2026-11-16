@@ -21,7 +21,7 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.heuristicHints
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -53,7 +53,7 @@ class LocalSearchWorkerBooleanCostsTest(
             shape.linearObjective, PresolveConfig.NONE, preparedPlan = shape.preparedPlan))
         val problem = assertIs<BakedProblem>(preparation.problem)
         val hints = assertNotNull(invocation.heuristicHints(problem, preparation.objective, preparation.sourceMapping,
-            Cancellation.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
+            ExecutionControl.Never, setOf(ExecutionStrategy.LOCAL_SEARCH),
             assertNotNull(preparation.executionPlan).capabilities))
         assertNull(hints.sweep)
         val gradient = assertNotNull(hints.objective)
@@ -70,7 +70,7 @@ class LocalSearchWorkerBooleanCostsTest(
         }.snapshot()
 
         val result = worker.use {
-            worker.improvements({ Double.POSITIVE_INFINITY }, Cancellation.Never,
+            worker.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never,
                 warmStart = warm, maxInstructions = 16L).last()
         }
 

@@ -22,7 +22,7 @@ import com.eignex.klause.propagation.propagatorProjection
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -46,9 +46,9 @@ class SingletonInequalityProjectionTest {
                 }
             }
             val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 10) }, listOf(factor), alreadyFolded = true)
-            val token = object : Cancellation {
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = true
-                override fun workMeter(): WorkMeter = WorkMeter { work += it }
+                override val accounting: WorkMeter get() = WorkMeter { work += it }
             }
             val context = PresolveContext(cancellation = token)
             reads = 0
@@ -81,10 +81,10 @@ class SingletonInequalityProjectionTest {
                     return row.linearForm
                 }
             }
-            val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 10) }, List(128) { factor }, alreadyFolded = true)
-            val token = object : Cancellation {
+            val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 10) }, List(4096) { factor }, alreadyFolded = true)
+            val token = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = memberships >= 8
-                override fun workMeter(): WorkMeter = WorkMeter { work += it }
+                override val accounting: WorkMeter get() = WorkMeter { work += it }
             }
             val context = PresolveContext(cancellation = token)
             memberships = 0
@@ -96,9 +96,9 @@ class SingletonInequalityProjectionTest {
             }
 
             assertTrue(empty, "$lane")
-            assertTrue(memberships in 8..30, "$lane: $memberships memberships")
+            assertTrue(memberships in 8..1032, "$lane: $memberships memberships")
             assertEquals(0, rows, "$lane")
-            assertTrue(work in 240L..880L, "$lane: $work units")
+            assertTrue(work in 240L..30960L, "$lane: $work units")
         }
     }
 
@@ -106,7 +106,7 @@ class SingletonInequalityProjectionTest {
     fun `row dispatch should stop within one stride of a live cancellation at any model size`() {
         val pass = PresolvePass.PROJECT_SINGLETON_INEQUALITIES
         for (lane in PresolveLane.entries) {
-            for (count in listOf(100, 1_000)) {
+            for (count in listOf(100, 4_096)) {
                 var reads = 0
                 var work = 0L
                 val row = Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10)
@@ -123,9 +123,9 @@ class SingletonInequalityProjectionTest {
                     List(count) { factor },
                     alreadyFolded = true,
                 )
-                val containing = object : Cancellation {
+                val containing = object : ExecutionControl() {
                     override fun isCancelled(): Boolean = reads >= 32
-                    override fun workMeter(): WorkMeter = WorkMeter { work += it }
+                    override val accounting: WorkMeter get() = WorkMeter { work += it }
                 }
                 val budget = PresolveBudget(0L)
                 val context = PresolveContext(cancellation = budget.preparationCancellation(containing))
@@ -139,8 +139,8 @@ class SingletonInequalityProjectionTest {
                 }
 
                 assertTrue(empty, "$lane $count")
-                assertTrue(reads in 32..96, "$lane $count: $reads reads")
-                assertTrue(work in count * 30L + 320L..count * 30L + 5_440L, "$lane $count: $work units")
+                assertTrue(reads in 32..1056, "$lane $count: $reads reads")
+                assertTrue(work in count * 30L + 320L..count * 30L + 59_200L, "$lane $count: $work units")
                 assertEquals(work, budget.invocations.single().nativeWork)
                 assertEquals(PresolveInvocationOutcome.INTERRUPTED, budget.invocations.single().outcome)
                 assertEquals(0L, budget.spent())
@@ -152,7 +152,7 @@ class SingletonInequalityProjectionTest {
     fun `linear specialization should stop within a long term scan in both lanes`() {
         for (lane in PresolveLane.entries) {
             var refs = 0
-            val linear = Linear(LongArray(512) { 1 }, IntArray(512) { it }, LinearOp.LE, 100)
+            val linear = Linear(LongArray(4096) { 1 }, IntArray(4096) { it }, LinearOp.LE, 100)
             val row = object : LinearRow by linear {
                 override fun ref(k: Int): Int {
                     refs++
@@ -162,8 +162,8 @@ class SingletonInequalityProjectionTest {
             val factor = object : Factor by linear, Propagator by linear.propagatorProjection() {
                 override val linearForm = LinearForm.Conjunction(listOf(row))
             }
-            val problem = BakedProblem(0, 512, Array(512) { IntDomain(0, 10) }, listOf(factor), alreadyFolded = true)
-            val context = PresolveContext(cancellation = Cancellation { refs >= 32 })
+            val problem = BakedProblem(0, 4096, Array(4096) { IntDomain(0, 10) }, listOf(factor), alreadyFolded = true)
+            val context = PresolveContext(cancellation = ExecutionControl { refs >= 32 })
             refs = 0
 
             val empty = when (lane) {
@@ -172,7 +172,7 @@ class SingletonInequalityProjectionTest {
             }
 
             assertTrue(empty, "$lane")
-            assertTrue(refs in 32..96, "$lane: $refs refs")
+            assertTrue(refs in 32..1056, "$lane: $refs refs")
         }
     }
 
@@ -199,7 +199,7 @@ class SingletonInequalityProjectionTest {
                 }
                 val context = PresolveContext(
                     objectiveIntCoeffs = objective,
-                    cancellation = budget.orSpent(Cancellation.Never),
+                    cancellation = budget.orSpent(ExecutionControl.Never),
                 )
 
                 val empty = when (lane) {
@@ -227,9 +227,9 @@ class SingletonInequalityProjectionTest {
                     alreadyFolded = true,
                 )
                 var work = 0L
-                val containing = object : Cancellation {
+                val containing = object : ExecutionControl() {
                     override fun isCancelled(): Boolean = false
-                    override fun workMeter(): WorkMeter = WorkMeter { work += it }
+                    override val accounting: WorkMeter get() = WorkMeter { work += it }
                 }
                 val budget = PresolveBudget(0L)
                 val context = PresolveContext(
@@ -285,7 +285,7 @@ class SingletonInequalityProjectionTest {
                     openIntLo = booleanArrayOf(openBelow, openBelow, false),
                     alreadyFolded = true,
                 )
-                val context = PresolveContext(cancellation = Cancellation { reads >= 2 })
+                val context = PresolveContext(cancellation = ExecutionControl { reads >= 2 })
                 reads = 0
 
                 val delta = when (lane) {

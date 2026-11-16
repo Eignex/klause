@@ -32,7 +32,7 @@ import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
@@ -143,8 +143,8 @@ internal class NonlinearIntegerInvocation(
     private var retainedResidues = NonlinearIntegerResidueCounts()
     internal val residueCounts: NonlinearIntegerResidueCounts
         get() = completedResidues + retainedResidues
-    private val external = polynomial.timeout or polynomial.cancellation
-    private val stop = external or Cancellation {
+    private val external = polynomial.timeout.withAccounting(polynomial.cancellation) or polynomial.cancellation
+    private val stop = external or ExecutionControl {
         polynomial.maximumWork?.let { native.workSpent >= it } == true || resource != null ||
             nodeBudget?.allowance?.exhausted() == true
     }
@@ -316,10 +316,10 @@ internal class NonlinearIntegerInvocation(
         override val stats: SolveStats get() = searchStats
         override val work: Long get() = slice.spent()
 
-        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+        override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? {
             result?.let { return it }
             if (!slice.begin(sliceMillis, sliceNodes)) return null
-            val segment = global or Cancellation { slice.expired() }
+            val segment = global or ExecutionControl { slice.expired() }
             val before = cursor.stats.candidates
             val offered = if (sliceNodes < 0) Long.MAX_VALUE else sliceNodes
             val cap = minOf(offered, nodeBudget?.allowance?.decisionsLeft() ?: Long.MAX_VALUE)
@@ -360,7 +360,7 @@ internal class NonlinearIntegerInvocation(
         override fun close() = cursor.close()
     }
 
-    override fun check(condition: ExactNeighborhoodCondition, cancellation: Cancellation): ExactNeighborhoodResult {
+    override fun check(condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): ExactNeighborhoodResult {
         require(condition.cutoff == null) { "nonlinear integer satisfaction has no objective cutoff" }
         fun remap(values: Map<Int, BigFraction>): Map<Int, BigFraction> = values.mapKeys { (id, _) ->
             require(id in source.integerCoordinates.indices) { "nonlinear neighborhood coordinate out of range" }
@@ -397,7 +397,7 @@ internal class NonlinearIntegerInvocation(
     private fun query(
         condition: PolynomialCondition,
         cap: Long,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         heuristic: Boolean = false,
         nativeCap: Long? = null,
     ): QfNraResult {

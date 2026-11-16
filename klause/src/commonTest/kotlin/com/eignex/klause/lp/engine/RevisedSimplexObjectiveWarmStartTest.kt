@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -21,7 +21,7 @@ class RevisedSimplexObjectiveWarmStartTest {
             assertNull(solver.solvePrimal())
             assertEquals(LpFloatTermination.UNBOUNDED_CANDIDATE, solver.lastTermination)
             assertTrue(trail.replaceObjective(ExactLpObjective(listOf(one, zero, zero))))
-            assertTrue(solver.adopt(trail.state, Cancellation.Never))
+            assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
 
             val result = assertNotNull(solver.resolveBounds())
 
@@ -45,7 +45,7 @@ class RevisedSimplexObjectiveWarmStartTest {
         RevisedSimplex(assertNotNull(trail.state.toWorkingModel())).use { solver ->
             assertNull(solver.solvePrimal())
             assertTrue(trail.assertBound(x, true, ExactLpSide(ExactLpNumber.of(3L)), 0L))
-            assertTrue(solver.adopt(trail.state, Cancellation.Never))
+            assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
 
             val result = assertNotNull(solver.resolveBounds())
 
@@ -83,7 +83,7 @@ class RevisedSimplexObjectiveWarmStartTest {
         repeat(4) { index ->
             val cost = if (index % 2 == 0) one else ExactLpNumber.of(-1L)
             assertTrue(trail.replaceObjective(ExactLpObjective(listOf(cost, ExactLpNumber.of(-1L), zero, one, zero))))
-            assertTrue(solver.adopt(trail.state, Cancellation.Never))
+            assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
 
             val result = assertNotNull(solver.resolveBounds())
 
@@ -174,8 +174,8 @@ class RevisedSimplexObjectiveWarmStartTest {
                 assertNotNull(sliced.solve())
                 assertTrue(trail.replaceObjective(ExactLpObjective(listOf(one, zero))))
                 assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.ofIeee(0.5)), 0L))
-                assertTrue(uninterrupted.adopt(trail.state, Cancellation.Never))
-                assertTrue(sliced.adopt(trail.state, Cancellation.Never))
+                assertTrue(uninterrupted.adopt(trail.state, ExecutionControl.Never))
+                assertTrue(sliced.adopt(trail.state, ExecutionControl.Never))
                 val expected = assertNotNull(uninterrupted.resolveBounds())
                 sliced.enableProgressTrace()
 
@@ -211,7 +211,7 @@ class RevisedSimplexObjectiveWarmStartTest {
         }
         val model = builder.build(Sense.MINIMIZE)
 
-        val cancelled = RevisedSimplex(model, cancellation = Cancellation { true }).solvePrimal()
+        val cancelled = RevisedSimplex(model, cancellation = ExecutionControl { true }).solvePrimal()
         val exhausted = RevisedSimplex(model, workLimit = 1L).solvePrimal()
 
         assertNull(cancelled)

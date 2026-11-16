@@ -43,8 +43,7 @@ import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.SchedulingCancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.workScheduled
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -66,9 +65,9 @@ class CoreGuidedSearchTest {
         val search = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = false, randomSeed = 3L),
             maximumWork = 2L)
 
-        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("unattained objective") }
+        val stopped = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { error("unattained objective") }
         val charged = search.work
-        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed allowance") }
+        val resumed = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { error("renewed allowance") }
 
         assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
         assertEquals(stopped, resumed)
@@ -81,7 +80,7 @@ class CoreGuidedSearchTest {
     fun `work scheduled queries should retain policy through preparation and ignore the slice clock`() {
         val clock = TestTimeSource()
         var marked = false
-        val token = object : SchedulingCancellation {
+        val token = object : ExecutionControl() {
             override val workScheduled: Boolean = true
             override fun isCancelled(): Boolean = false
         }
@@ -118,12 +117,12 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(longArrayOf(1))
         val search = CoreGuidedSearch(Problem(1, 0, emptyArray(), emptyArray()).bake(), objective, params)
 
-        val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L) {
+        val paused = search.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1L) {
             error("cancelled construction")
         }
         val charged = search.preparationWork
         cancelled = false
-        val resumed = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L) {}
+        val resumed = search.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1L) {}
 
         assertNull(paused)
         assertTrue(interrupted)
@@ -152,12 +151,12 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(longArrayOf(1))
         val search = CoreGuidedSearch(problem, objective, params, timeSource = clock)
 
-        val paused = search.runSlice(Cancellation.Never, 1_000L, -1L) { error("interrupted query") }
+        val paused = search.runSlice(ExecutionControl.Never, 1_000L, -1L) { error("interrupted query") }
 
         assertTrue(interrupter.interrupted)
         assertNull(paused)
         assertFalse(search.isDone)
-        val resumed = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, 1_000L, -1L) {})
+        val resumed = assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, 1_000L, -1L) {})
         assertEquals(0L, objective.evaluateLong(resumed.sample))
         search.close()
     }
@@ -175,9 +174,10 @@ class CoreGuidedSearchTest {
             params,
         )
 
-        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("unchecked candidate") }
+        val stopped = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { error("unchecked candidate") }
         val charged = search.work
-        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed unsupported query") }
+        val resumed = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE,
+            -1L) { error("renewed unsupported query") }
 
         assertEquals(TerminationReason.Unsupported, assertIs<MinimizeResult.Unknown>(stopped).reason)
         assertTrue(search.isDone)
@@ -209,12 +209,12 @@ class CoreGuidedSearchTest {
             timeSource = clock,
         )
 
-        val paused = search.runSlice(Cancellation.Never, 1_000L, -1L) { error("interrupted query") }
+        val paused = search.runSlice(ExecutionControl.Never, 1_000L, -1L) { error("interrupted query") }
 
         assertNull(paused)
         assertTrue(interrupted)
         assertFalse(search.isDone)
-        val resumed = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, 1_000L, -1L) {})
+        val resumed = assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, 1_000L, -1L) {})
         assertEquals(0L, objective.evaluateLong(resumed.sample))
         search.close()
     }
@@ -242,9 +242,9 @@ class CoreGuidedSearchTest {
             val bounded = params.copy(componentFactory = { listOf(interrupter) })
             val search = CoreGuidedSearch(problem, objective, bounded, timeSource = clock)
 
-            val stopped = search.runSlice(Cancellation.Never, 1_000L, -1L) {}
+            val stopped = search.runSlice(ExecutionControl.Never, 1_000L, -1L) {}
             val charged = search.work
-            val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) { error("renewed decisions") }
+            val resumed = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { error("renewed decisions") }
 
             assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
             assertTrue(search.isDone)
@@ -302,7 +302,7 @@ class CoreGuidedSearchTest {
         var result: MinimizeResult? = null
 
         repeat(10) {
-            if (result == null) result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) {}
+            if (result == null) result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) {}
         }
 
         val optimal = assertIs<MinimizeResult.Optimal>(result)
@@ -328,9 +328,9 @@ class CoreGuidedSearchTest {
             timeSource = clock,
         )
 
-        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("expired preparation") }
+        val stopped = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { error("expired preparation") }
         val charged = search.work
-        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("renewed active time") }
+        val resumed = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { error("renewed active time") }
 
         assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(stopped).reason)
         assertEquals(stopped, resumed)
@@ -344,9 +344,9 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(LongArray(8192) { 1L })
         val search = CoreGuidedSearch(problem, objective, BacktrackParams(), maximumWork = 1L)
 
-        val stopped = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("unprepared witness") }
+        val stopped = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { error("unprepared witness") }
         val charged = search.work
-        val resumed = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { error("renewed allowance") }
+        val resumed = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { error("renewed allowance") }
 
         val unknown = assertIs<MinimizeResult.Unknown>(stopped)
         assertEquals(TerminationReason.BudgetExhausted, unknown.reason)
@@ -363,9 +363,9 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(LongArray(1024) { 1L })
         val search = CoreGuidedSearch(problem, objective, BacktrackParams())
 
-        val paused = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { error("unfinished preparation") }
+        val paused = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { error("unfinished preparation") }
         val charged = search.work
-        val exhausted = search.runSlice(Cancellation.Never, Long.MAX_VALUE, 0) { error("exhausted slice") }
+        val exhausted = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0) { error("exhausted slice") }
 
         assertNull(paused)
         assertNull(exhausted)
@@ -374,7 +374,7 @@ class CoreGuidedSearchTest {
         assertEquals(charged, search.work)
         assertEquals(0.0, search.stats.search.nodes.sum)
         val optimal = assertIs<MinimizeResult.Optimal>(
-            search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {},
+            search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {},
         )
         assertEquals(0L, objective.evaluateLong(optimal.sample))
         search.close()
@@ -417,11 +417,12 @@ class CoreGuidedSearchTest {
         val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective, BacktrackParams())
         val initialPreparation = search.preparationWork
 
-        val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) { error("interrupted opening") }
+        val paused = search.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE,
+            -1) { error("interrupted opening") }
         val charged = search.work
         val chargedPreparation = search.preparationWork
         cancelled = false
-        val result = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {}
+        val result = search.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1) {}
 
         assertNull(paused)
         assertTrue(interrupted)
@@ -521,7 +522,7 @@ class CoreGuidedSearchTest {
             stratify = true,
         )
 
-        val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
+        val result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {}
 
         val retained = assertIs<MinimizeResult.BestFound>(result)
         assertEquals(2L, objective.evaluateLong(retained.sample))
@@ -603,7 +604,7 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE))
         val search = CoreGuidedSearch(problem, objective, BacktrackParams())
 
-        val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
+        val result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {}
 
         val optimal = assertIs<MinimizeResult.Optimal>(result)
         assertEquals("18446744073709551614", objective.evaluateExact(optimal.sample).num.toString())
@@ -616,8 +617,8 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(longArrayOf(Long.MIN_VALUE), constant = 4)
         val search = CoreGuidedSearch(problem, objective, BacktrackParams())
 
-        val paused = search.runSlice(Cancellation { true }, Long.MAX_VALUE, 1) { error("cancelled publication") }
-        val result = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {}
+        val paused = search.runSlice(ExecutionControl { true }, Long.MAX_VALUE, 1) { error("cancelled publication") }
+        val result = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {}
 
         assertNull(paused)
         val optimal = assertIs<MinimizeResult.Optimal>(result)
@@ -646,12 +647,12 @@ class CoreGuidedSearchTest {
             stratify = true,
         )
 
-        val paused = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {
+        val paused = search.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1) {
             incumbents += objective.evaluateLong(it.sample)
         }
         val retainedBound = search.lowerBound
         cancelled = false
-        val result = search.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {
+        val result = search.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1) {
             incumbents += objective.evaluateLong(it.sample)
         }
 
@@ -690,7 +691,7 @@ class CoreGuidedSearchTest {
             BacktrackParams(objectiveLowerBoundSink = { floors += it }),
         )
 
-        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
 
         assertEquals(listOf(3.0, 6.0), floors)
         assertEquals(6L, objective.evaluateLong(result.sample))
@@ -709,7 +710,7 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(longArrayOf(3, 3, 3, 5, 7, 8))
         val search = CoreGuidedSearch(problem, objective, BacktrackParams(objectiveLowerBoundSink = { floors += it }))
 
-        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
 
         assertEquals(listOf(3.0, 6.0), floors)
         assertEquals(6L, (0 until 3).sumOf { result.sample.intValue(it) })
@@ -728,7 +729,7 @@ class CoreGuidedSearchTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(-2, -7), constant = 4)
         val search = CoreGuidedSearch(problem, objective, BacktrackParams(objectiveLowerBoundSink = { floors += it }))
 
-        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
 
         assertEquals(listOf(-12.0), floors)
         assertEquals(8L, result.sample.intValue(0))
@@ -742,7 +743,7 @@ class CoreGuidedSearchTest {
         val params = BacktrackParams(assumptions = Assumptions(ints = mapOf(0 to 8L)))
         val search = CoreGuidedSearch(pairCover().bake(), objective, params)
 
-        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+        val result = assertIs<MinimizeResult.Optimal>(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
 
         assertEquals(8L, result.sample.intValue(0))
         assertEquals(11L, objective.evaluateLong(result.sample))
@@ -800,7 +801,7 @@ class CoreGuidedSearchTest {
 
         search.close()
 
-        assertFailsWith<IllegalStateException> { search.runSlice(Cancellation.Never, 1, 1) {} }
+        assertFailsWith<IllegalStateException> { search.runSlice(ExecutionControl.Never, 1, 1) {} }
     }
 
     private fun pairCover(numBoolVars: Int = 0, channels: List<Factor> = emptyList()) = Problem(

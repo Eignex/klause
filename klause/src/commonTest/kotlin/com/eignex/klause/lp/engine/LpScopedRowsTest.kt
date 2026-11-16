@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -175,7 +175,7 @@ class LpScopedRowsTest {
 
         assertFalse(trail.append(emptyList(), listOf(row), false))
         assertFalse(trail.append(listOf(LpStructuralColumn(ExactLpColumn(ExactLpBounds()))), listOf(row, row), false))
-        assertFalse(trail.append(emptyList(), emptyList(), false, Cancellation { true }))
+        assertFalse(trail.append(emptyList(), emptyList(), false, ExecutionControl { true }))
 
         assertSame(before, trail.state)
     }
@@ -231,7 +231,7 @@ class LpScopedRowsTest {
         assertTrue(trail.push())
         val before = trail.state
         assertFalse(trail.suspend(setOf(0, 7)))
-        assertFalse(trail.suspend(setOf(0), Cancellation { true }))
+        assertFalse(trail.suspend(setOf(0), ExecutionControl { true }))
         assertSame(before, trail.state)
         assertTrue(trail.suspend(setOf(0)))
         assertNotNull(checkedLpWitness(assertNotNull(trail.state.toWorkingModel()), listOf(BigFraction.ONE)))

@@ -6,7 +6,7 @@ import com.eignex.klause.factor.bool.PseudoBoolean
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.argsortBy
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
@@ -84,13 +84,14 @@ private const val CLIQUE_MERGE_WORK_BUDGET = 20_000_000L
 private const val CLIQUE_MERGE_CANCEL_POLL_MASK = 0x3F
 
 /** The [amoCliques] of [factors], grown into maximal cliques by [mergeCliques]. */
-internal fun maximalAmoCliques(factors: List<Factor>, cancellation: Cancellation = Cancellation.Never): List<Set<Int>> =
+internal fun maximalAmoCliques(factors: List<Factor>, cancellation: ExecutionControl =
+    ExecutionControl.Never): List<Set<Int>> =
     mergeCliques(amoCliques(factors), cancellation)
 
 /** The [persistentAmoCliques] of [factors], grown into maximal cliques by [mergeCliques]. */
 internal fun maximalPersistentAmoCliques(
     factors: List<Factor>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): List<Set<Int>> = mergeCliques(persistentAmoCliques(factors), cancellation)
 
 /**
@@ -108,7 +109,8 @@ internal fun maximalPersistentAmoCliques(
  * growth — every returned clique is still a valid at-most-one — so the result degrades in strength,
  * never in soundness.
  */
-internal fun mergeCliques(cliques: List<Set<Int>>, cancellation: Cancellation = Cancellation.Never): List<Set<Int>> {
+internal fun mergeCliques(cliques: List<Set<Int>>, cancellation: ExecutionControl =
+    ExecutionControl.Never): List<Set<Int>> {
     if (cliques.size < 2) return cliques
     var budget = CLIQUE_MERGE_WORK_BUDGET
     val graph = ConflictGraph(cliques)

@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -29,7 +29,7 @@ class ClausePrimalProjectionTest {
                 source,
                 Assumptions(bools = mapOf(0 to false, 4 to true)),
                 true,
-                Cancellation.Never,
+                ExecutionControl.Never,
                 {},
             ).projection,
         )

@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
@@ -29,7 +29,7 @@ internal class JointRepairNeighborhood private constructor(
     private val refutedPins = ArrayDeque<Pair<Int, BigFraction>>()
     private var refutationBools: Map<Int, Boolean>? = null
     private var refutationBudget: SourceLpBudget? = null
-    private var refutationToken: Cancellation = Cancellation.Never
+    private var refutationToken: ExecutionControl = ExecutionControl.Never
     var refutationSeeds: Long = 0
         private set
     var additionalRefutationSeeds: Long = 0
@@ -55,11 +55,11 @@ internal class JointRepairNeighborhood private constructor(
         refutedPins.clear()
         refutationBools = null
         refutationBudget = null
-        refutationToken = Cancellation.Never
+        refutationToken = ExecutionControl.Never
     }
 
     fun guideRefutation(assumptions: Set<SourceDerivation.Assumption>, condition: ExactNeighborhoodCondition,
-        budget: SourceLpBudget, token: Cancellation): Boolean {
+        budget: SourceLpBudget, token: ExecutionControl): Boolean {
         val funding = budget.funding
         if (funding == null || condition.cutoff != null || condition.bools.size > MAX_REFUTATION_BOOLEANS) {
             clearRefutation()
@@ -92,7 +92,7 @@ internal class JointRepairNeighborhood private constructor(
         return false
     }
 
-    private fun payRefutation(budget: SourceLpBudget, token: Cancellation, work: Long, bytes: Long): Boolean {
+    private fun payRefutation(budget: SourceLpBudget, token: ExecutionControl, work: Long, bytes: Long): Boolean {
         val funding = budget.funding ?: return false
         if (token() || funding.remainingWork <= work || funding.remainingAllocation <= bytes) return false
         // Advisory metadata spends the containing ledger without renewing a numerical query grant.
@@ -132,7 +132,7 @@ internal class JointRepairNeighborhood private constructor(
     }
 
     fun guide(hint: LinearRepairGuidance.Hint?, centers: List<BigFraction>,
-        budget: SourceLpBudget, token: Cancellation): Boolean {
+        budget: SourceLpBudget, token: ExecutionControl): Boolean {
         rankedSeeds = null
         if (hint == null || token() || seeds.isEmpty() || centers.size < integers ||
             centers.size > LinearRepairGuidance.MAX_COLUMNS) return false
@@ -215,7 +215,7 @@ internal class JointRepairNeighborhood private constructor(
 
     companion object {
         fun prepare(
-            source: SourceProofContext, integers: Int, reals: Int, cancellation: Cancellation,
+            source: SourceProofContext, integers: Int, reals: Int, cancellation: ExecutionControl,
             sourceIntegers: IntArray? = null,
         ): JointRepairNeighborhood? {
             if (cancellation() || integers.toLong() + reals > MAX_INDEX_ENTRIES) return null

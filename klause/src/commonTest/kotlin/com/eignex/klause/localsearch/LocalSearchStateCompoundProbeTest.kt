@@ -15,7 +15,9 @@ import com.eignex.klause.solver.*
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.bindStopControl
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlin.test.Test
@@ -26,6 +28,58 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 
 class LocalSearchStateCompoundProbeTest {
+
+    @Test
+    fun `probe inspections should be counted without a stop predicate`() {
+        val problem = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
+        val move = Move.Compound(listOf(Move.BoolFlip(0), Move.BoolFlip(0)))
+        var visits = 0L
+        state.inspectionWork = WorkMeter { visits += it }
+
+        state.scoringPick(ExecutionControl.Never) {
+            state.weightedNetDelta(move)
+            move
+        }
+
+        assertEquals(2L, visits)
+    }
+
+    @Test
+    fun `worker cancellation within a compound probe should restore the committed state`() {
+        val problem = Problem(
+            1,
+            0,
+            emptyArray(),
+            arrayOf<Factor>(Clause(intArrayOf(Lit.make(0, true)))),
+        )
+        val state = LocalSearchState(LocalSearchModel.open(problem), Random(7))
+        state.assignment.setBool(0, false)
+        state.recompute()
+        val before = state.assignment.snapshot()
+        val cost = state.cost
+        val step = state.step
+        val move = Move.Compound(List(2048) { Move.BoolFlip(0) })
+        var polls = 0
+
+        val interrupted = state.scoringPick(ExecutionControl { ++polls > 1 }.bindStopControl()) {
+            state.weightedNetDelta(move)
+            move
+        }
+
+        assertNull(interrupted)
+        assertEquals(before, state.assignment.snapshot())
+        assertEquals(cost, state.cost)
+        assertEquals(step, state.step)
+        state.apply(Move.BoolFlip(0))
+        assertEquals(0L, state.cost)
+        assertEquals(step + 1, state.step)
+    }
 
     @Test
     fun `cancelled probes should preserve committed observations at every rollback boundary`() {
@@ -59,8 +113,10 @@ class LocalSearchStateCompoundProbeTest {
             val breaks = state.boolBreakCount.copyOf()
             val makes = state.boolMakeCount.copyOf()
             var polls = 0
+            var probing = false
 
-            val interrupted = state.scoringPick(Cancellation {
+            val interrupted = state.scoringPick(ExecutionControl {
+                if (!probing) return@ExecutionControl false
                 assertEquals(best, state.bestCostSeen)
                 assertEquals(step, state.step)
                 assertContentEquals(touched, state.tabu.lastTouched)
@@ -69,7 +125,9 @@ class LocalSearchStateCompoundProbeTest {
                 assertContentEquals(intConf, state.intConfChange)
                 ++polls == boundary
             }) {
+                probing = true
                 state.weightedNetDelta(move)
+                probing = false
                 move
             }
 

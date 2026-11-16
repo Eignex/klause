@@ -16,7 +16,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -34,8 +34,9 @@ class CoreGuidedWorkerConfigTest {
         }.materialize(problem, 0, 0, 3L, 1.0, objective, null, null, null, null)
 
         worker.use {
-            requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never)).use { handle ->
-                val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+            requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY },
+                ExecutionControl.Never)).use { handle ->
+                val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {}
 
                 assertEquals(100L, objective.evaluateLong(assertIs<MinimizeResult.Optimal>(result).sample))
                 assertEquals(1L, handle.stats.coreGuided.cores)
@@ -63,8 +64,9 @@ class CoreGuidedWorkerConfigTest {
         )
 
         worker.use {
-            requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never)).use { handle ->
-                val paused = handle.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1L) {
+            requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY },
+                ExecutionControl.Never)).use { handle ->
+                val paused = handle.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1L) {
                     error("unfinished refinement")
                 }
 
@@ -100,15 +102,15 @@ class CoreGuidedWorkerConfigTest {
         val worker = BacktrackWorkerConfig(recipe).materialize(
             source.bake(), 0, 0, 3L, 1.0, objective, null, null, null, null,
         )
-        val handle = requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never))
+        val handle = requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, ExecutionControl.Never))
 
-        val paused = handle.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) { error("unfinished core") }
+        val paused = handle.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1) { error("unfinished core") }
         assertNull(paused)
         assertEquals(listOf(1.0), floors)
         assertEquals("1", handle.stats.coreGuided.lowerBound.toString())
         cancelled = false
         val result = assertIs<MinimizeResult.Optimal>(
-            handle.runSlice(Cancellation { cancelled }, Long.MAX_VALUE, -1) {},
+            handle.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1) {},
         )
 
         assertEquals(listOf(1.0, 2.0), floors)
@@ -129,8 +131,8 @@ class CoreGuidedWorkerConfigTest {
             problem, 0, 0, 3L, 1.0, objective, null, null, null, null,
         ).let { it.bindSource(SourceWorkerBinding(invocation, provesResults = it.permitsSourceProofs)) }
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(invocation)
-        val handle = requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never))
-        val result = assertIs<MinimizeResult.Optimal>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+        val handle = requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, ExecutionControl.Never))
+        val result = assertIs<MinimizeResult.Optimal>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
 
         val checked = verifier.proof(worker, EvidenceKind.Bound, CompletedEngineResult.Minimize(invocation, result))
 
@@ -151,8 +153,8 @@ class CoreGuidedWorkerConfigTest {
             problem, 0, 0, 3L, 1.0, objective, null, null, null, null,
         ).let { it.bindSource(SourceWorkerBinding(invocation, provesResults = it.permitsSourceProofs)) }
         val verifier = PortfolioEvidence(model, CandidateVerifier.trusting()).bindInvocation(invocation)
-        val handle = requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, Cancellation.Never))
-        val result = assertIs<MinimizeResult.Optimal>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+        val handle = requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY }, ExecutionControl.Never))
+        val result = assertIs<MinimizeResult.Optimal>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
 
         val checked = verifier.proof(worker, EvidenceKind.Bound, CompletedEngineResult.Minimize(invocation, result))
 

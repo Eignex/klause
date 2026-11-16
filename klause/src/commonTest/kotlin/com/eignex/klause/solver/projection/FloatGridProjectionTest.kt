@@ -24,7 +24,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.verifyRealCoordinates
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -47,7 +47,7 @@ class FloatGridProjectionTest {
         val variable = FloatGridVariable(SourceRealId(0), absentPin = FloatGridAbsentPin(SourceBoolId(0),
             assertNotNull(BigFraction.ofDouble(Double.MIN_VALUE)), listOf(0)))
 
-        val result = prepareFloatGrid(FloatGridRequest(source, listOf(variable)), Cancellation.Never)
+        val result = prepareFloatGrid(FloatGridRequest(source, listOf(variable)), ExecutionControl.Never)
 
         assertEquals(FloatGridDecline.GEOMETRY, assertIs<FloatGridPreparation.Declined>(result).cause)
         assertEquals(1, source.numRealVars)
@@ -70,10 +70,10 @@ class FloatGridProjectionTest {
                 semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(buckets, 1000)).resolve())
             val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
                 listOf(FloatGridVariable(SourceRealId(0), absentPin = FloatGridAbsentPin(SourceBoolId(0),
-                    BigFraction.ZERO, listOf(0, 1))))), Cancellation.Never))
+                    BigFraction.ZERO, listOf(0, 1))))), ExecutionControl.Never))
 
             val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { native ->
-                assertNotNull(prepared.mapping.reconstruct(prepared.problem, native, Cancellation.Never))
+                assertNotNull(prepared.mapping.reconstruct(prepared.problem, native, ExecutionControl.Never))
             }.toList()
 
             assertEquals(buckets, prepared.mapping.columns().single().selector().coordinate.buckets)
@@ -102,12 +102,12 @@ class FloatGridProjectionTest {
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
             listOf(FloatGridVariable(SourceRealId(0), absentPin = FloatGridAbsentPin(SourceBoolId(0),
-                BigFraction.ZERO, listOf(0, 1))), FloatGridVariable(SourceRealId(1)))), Cancellation.Never))
+                BigFraction.ZERO, listOf(0, 1))), FloatGridVariable(SourceRealId(1)))), ExecutionControl.Never))
         val native = BacktrackSolver(prepared.problem.bake()).enumerate().first()
         val objective = LinearObjective(constant = 7, realCoefficients = doubleArrayOf(3.0, 5.0))
 
-        val sample = assertNotNull(prepared.mapping.reconstruct(prepared.problem, native, Cancellation.Never))
-        val projected = assertNotNull(prepared.mapping.projectObjective(objective, Cancellation.Never))
+        val sample = assertNotNull(prepared.mapping.reconstruct(prepared.problem, native, ExecutionControl.Never))
+        val projected = assertNotNull(prepared.mapping.projectObjective(objective, ExecutionControl.Never))
 
         assertEquals(listOf(BigFraction.ZERO, BigFraction.ZERO), sample.exactReals)
         assertEquals(BigFraction.ofLong(7), projected.sourceValue(projected.native.evaluateLong(native), false))
@@ -121,16 +121,16 @@ class FloatGridProjectionTest {
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         var stopped = false
         val original = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation { stopped }))
+            listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl { stopped }))
         val definition = original.mapping.definition()
         stopped = true
         assertNull(original.mapping.reconstruct(original.problem, Sample(booleanArrayOf(), longArrayOf(1)),
-            Cancellation.Never))
+            ExecutionControl.Never))
         val owner = Any()
 
-        val rebound = assertIs<FloatGridPreparation.Prepared>(definition.bind(owner, Cancellation.Never))
+        val rebound = assertIs<FloatGridPreparation.Prepared>(definition.bind(owner, ExecutionControl.Never))
         val point = assertNotNull(rebound.mapping.reconstruct(rebound.problem,
-            Sample(booleanArrayOf(), longArrayOf(1)), Cancellation.Never))
+            Sample(booleanArrayOf(), longArrayOf(1)), ExecutionControl.Never))
 
         rebound.mapping.requireOwner(owner)
         assertSame(original.problem, rebound.problem)
@@ -143,11 +143,11 @@ class FloatGridProjectionTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+            listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
         var work = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 1L
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val rebound = assertIs<FloatGridPreparation.Declined>(prepared.mapping.definition().bind(Any(), stop))
@@ -174,7 +174,7 @@ class FloatGridProjectionTest {
                 semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
 
             val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-                listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+                listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
             val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { it.intValue(0) }.toSet()
 
             assertEquals(expected, points)
@@ -189,9 +189,9 @@ class FloatGridProjectionTest {
             realLower = doubleArrayOf(100.0), realUpper = doubleArrayOf(102.0), semantics = semantics)
 
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+            listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
         val sample = assertNotNull(prepared.mapping.reconstruct(prepared.problem,
-            Sample(booleanArrayOf(), longArrayOf(1, 2)), Cancellation.Never))
+            Sample(booleanArrayOf(), longArrayOf(1, 2)), ExecutionControl.Never))
 
         assertEquals(BigFraction.ofLong(102), sample.exactReals?.single())
         assertEquals(1L, sample.intValue(0))
@@ -210,9 +210,9 @@ class FloatGridProjectionTest {
             realUpper = doubleArrayOf(0.5, Double.POSITIVE_INFINITY), semantics = semantics)
 
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1)))), Cancellation.Never))
+            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1)))), ExecutionControl.Never))
         val sample = assertNotNull(prepared.mapping.reconstruct(prepared.problem,
-            Sample(booleanArrayOf(), longArrayOf(1, 2)), Cancellation.Never))
+            Sample(booleanArrayOf(), longArrayOf(1, 2)), ExecutionControl.Never))
 
         assertEquals(BigFraction.ofLong(5) * BigFraction.ofLong(12).reciprocal(), sample.exactReals?.get(0))
         assertEquals(BigFraction.ofLong(2) * BigFraction.ofLong(3).reciprocal(), sample.exactReals?.get(1))
@@ -227,7 +227,7 @@ class FloatGridProjectionTest {
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous).resolve())
 
         val result = prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0), 3))), Cancellation.Never)
+            listOf(FloatGridVariable(SourceRealId(0), 3))), ExecutionControl.Never)
 
         assertEquals(FloatGridDecline.POLICY, assertIs<FloatGridPreparation.Declined>(result).cause)
     }
@@ -239,7 +239,7 @@ class FloatGridProjectionTest {
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
 
         val result = prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never)
+            listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never)
 
         assertEquals(FloatGridDecline.OPEN_INTEGER, assertIs<FloatGridPreparation.Declined>(result).cause)
         assertFalse(source.intBounds.hasLower(0))
@@ -252,7 +252,7 @@ class FloatGridProjectionTest {
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(5, 1000)).resolve())
 
         val result = prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never)
+            listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never)
 
         val declined = assertIs<FloatGridPreparation.Declined>(result)
         assertEquals(FloatGridDecline.FACTOR, declined.cause)
@@ -265,12 +265,13 @@ class FloatGridProjectionTest {
             realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1)))), Cancellation.Never))
+            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1)))), ExecutionControl.Never))
         val privatePoint = Sample(booleanArrayOf(), longArrayOf(1, 0))
         val relation = assertIs<GridProduct>(prepared.problem.factors.single())
         assertEquals(true, relation.accepts(privatePoint::intValue))
 
-        val original = assertNotNull(prepared.mapping.reconstruct(prepared.problem, privatePoint, Cancellation.Never))
+        val original = assertNotNull(prepared.mapping.reconstruct(prepared.problem, privatePoint,
+            ExecutionControl.Never))
         val result = verifyRealCoordinates(source, original)
 
         assertIs<Verification.Rejected>(result)
@@ -282,11 +283,11 @@ class FloatGridProjectionTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val request = FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0))))
-        val first = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(request, Cancellation.Never))
-        val second = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(request, Cancellation.Never))
+        val first = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(request, ExecutionControl.Never))
+        val second = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(request, ExecutionControl.Never))
 
         assertFailsWith<IllegalArgumentException> {
-            first.mapping.reconstruct(second.problem, Sample(booleanArrayOf(), longArrayOf(1)), Cancellation.Never)
+            first.mapping.reconstruct(second.problem, Sample(booleanArrayOf(), longArrayOf(1)), ExecutionControl.Never)
         }
     }
 
@@ -297,13 +298,13 @@ class FloatGridProjectionTest {
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         var stopped = false
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation { stopped }))
+            listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl { stopped }))
         val point = Sample(booleanArrayOf(), longArrayOf(1))
         stopped = true
 
-        val first = prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never)
+        val first = prepared.mapping.reconstruct(prepared.problem, point, ExecutionControl.Never)
         stopped = false
-        val retry = prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never)
+        val retry = prepared.mapping.reconstruct(prepared.problem, point, ExecutionControl.Never)
 
         assertNull(first)
         assertNull(retry)
@@ -315,9 +316,9 @@ class FloatGridProjectionTest {
             realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(2.0, 2.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         var work = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 7
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val result = prepareFloatGrid(FloatGridRequest(source,
@@ -332,12 +333,12 @@ class FloatGridProjectionTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+            listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
         val originalObjective = LinearObjective(constant = 7, realCoefficients = doubleArrayOf(3.0))
 
-        val projected = assertNotNull(prepared.mapping.projectObjective(originalObjective, Cancellation.Never))
+        val projected = assertNotNull(prepared.mapping.projectObjective(originalObjective, ExecutionControl.Never))
         val original = assertNotNull(prepared.mapping.reconstruct(prepared.problem,
-            Sample(booleanArrayOf(), longArrayOf(2)), Cancellation.Never))
+            Sample(booleanArrayOf(), longArrayOf(2)), ExecutionControl.Never))
 
         assertSame(originalObjective, projected.original)
         assertEquals(BigFraction.ofLong(13), projected.sourceValue(-2, maximize = true))
@@ -350,12 +351,12 @@ class FloatGridProjectionTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+            listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
         val originalObjective = LinearObjective(longArrayOf(2), longArrayOf(3), 7, doubleArrayOf(0.5))
         val point = Sample(booleanArrayOf(true), longArrayOf(1, 2))
 
-        val projected = assertNotNull(prepared.mapping.projectObjective(originalObjective, Cancellation.Never))
-        val original = assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, Cancellation.Never))
+        val projected = assertNotNull(prepared.mapping.projectObjective(originalObjective, ExecutionControl.Never))
+        val original = assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, ExecutionControl.Never))
 
         assertEquals(originalObjective.evaluateExact(original),
             projected.sourceValue(projected.native.evaluateLong(point), maximize = false))
@@ -367,13 +368,13 @@ class FloatGridProjectionTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0),
             semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
         val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
-            listOf(FloatGridVariable(SourceRealId(0)))), Cancellation.Never))
+            listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
 
         val objective = prepared.mapping.projectObjective(LinearObjective(boolWeights = longArrayOf(1),
-            realCoefficients = doubleArrayOf(Double.MIN_VALUE)), Cancellation.Never)
+            realCoefficients = doubleArrayOf(Double.MIN_VALUE)), ExecutionControl.Never)
 
         assertNull(objective)
         assertNotNull(prepared.mapping.reconstruct(prepared.problem,
-            Sample(booleanArrayOf(false), longArrayOf(0)), Cancellation.Never))
+            Sample(booleanArrayOf(false), longArrayOf(0)), ExecutionControl.Never))
     }
 }

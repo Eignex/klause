@@ -20,7 +20,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.bandit.UnivariateBandit
 import kotlin.random.Random
 
@@ -36,7 +36,7 @@ internal class TrackingResumableSearch(
     private var done = false
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -80,7 +80,7 @@ internal class CountingResumableSolve(
 ) : ResumableSolve {
     var slices = 0
 
-    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? =
+    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? =
         if (++slices < slicesToVerdict) null else SolveResult.Sat(model)
 
     override val isDone: Boolean get() = slices >= slicesToVerdict
@@ -114,7 +114,7 @@ internal class ScriptedSearch(
     private var objective = start
 
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,

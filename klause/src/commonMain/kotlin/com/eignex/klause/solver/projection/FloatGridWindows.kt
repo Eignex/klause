@@ -10,7 +10,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.FloatInterval
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.collections.IntArrayList
@@ -24,7 +24,7 @@ internal fun prepareFloatGridColumns(
     source: Problem,
     requested: List<FloatGridVariable>,
     policy: FloatSemantics.Grid,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<FloatGridColumn>? {
     val positions = requested.withIndex().associate { it.value.source.index to it.index }
     val auxiliary = requested.filter { it.auxiliary }.mapTo(HashSet()) { it.source.index }
@@ -123,7 +123,7 @@ private fun privateImage(
     definition: FloatWindowDefinition,
     source: Problem,
     columns: Map<Int, FloatGridColumn>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): FloatInterval? {
     fun range(id: Int): FloatInterval? = columns[id]?.coordinate?.let { FloatInterval(it.lower, it.upper) }
     fun interval(lower: Double, upper: Double): FloatInterval? =

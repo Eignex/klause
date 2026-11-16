@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Reduced-source evidence and optional ordered lowering or presolve justifications. */
 class SourceMappingEvidence(
@@ -19,18 +19,19 @@ class SourceMappingEvidence(
     fun verify(
         claim: SourceClaim,
         context: SourceProofContext,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceEvidenceCheck = select(claim, context, cancellation, SourceProofAllowance(100_000, 128)).second
 
     internal fun project(
         claim: SourceClaim,
         context: SourceProofContext,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         allowance: SourceProofAllowance = SourceProofAllowance(100_000, 128),
     ): SourceEvidence = select(claim, context, cancellation, allowance).first
 
     private fun select(
-        claim: SourceClaim, context: SourceProofContext, cancellation: Cancellation, allowance: SourceProofAllowance,
+        claim: SourceClaim, context: SourceProofContext, cancellation: ExecutionControl,
+            allowance: SourceProofAllowance,
     ): Pair<SourceEvidence, SourceEvidenceCheck> {
         fun absent(reason: String) = SourceEvidence(source, claim, SourceDerivation.Unavailable(reason)) to
             SourceEvidenceCheck.Unavailable(reason)
@@ -42,7 +43,7 @@ class SourceMappingEvidence(
             return absent("mapped evidence has mixed target scopes")
         }
         var stopped = false
-        val limited = Cancellation {
+        val limited = ExecutionControl {
             stopped = stopped || cancellation() || !allowance.consume(0)
             stopped
         }
@@ -72,7 +73,7 @@ class SourceMappingEvidence(
 }
 
 private class MappingProofTranslation(
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val allowance: SourceProofAllowance,
 ) {
 

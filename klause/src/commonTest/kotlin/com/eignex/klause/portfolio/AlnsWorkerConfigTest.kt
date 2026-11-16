@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -38,7 +38,7 @@ class AlnsWorkerConfigTest {
                 pools = null,
             )
             try {
-                val result = assertIs<SolveResult.Sat>(worker.solve(Cancellation.Never, maxInstructions = 1))
+                val result = assertIs<SolveResult.Sat>(worker.solve(ExecutionControl.Never, maxInstructions = 1))
 
                 assertEquals(
                     result.assignment.ints[0] * result.assignment.ints[1],

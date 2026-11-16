@@ -23,7 +23,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
@@ -34,12 +34,12 @@ import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 
 internal fun verifyRealCoordinates(model: Problem, sample: Sample): Verification<Sample, Unit> =
-    verifyRealCoordinates(model, sample, Cancellation.Never)
+    verifyRealCoordinates(model, sample, ExecutionControl.Never)
 
 internal fun verifyRealCoordinates(
     model: Problem,
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<Sample, Unit> {
     cancellation.charge(1L)
     if (cancellation()) return Verification.Indeterminate("source coordinate check cancelled")
@@ -113,7 +113,7 @@ internal fun checkExactRealRelation(
     id: Int,
     factor: Factor,
     point: ExactRealPoint,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<Nothing, Nothing>? {
     val sample = point.sample
     val reals = point.reals
@@ -186,7 +186,7 @@ private fun checkExactRealRows(
     id: Int,
     factor: Factor,
     point: ExactRealPoint,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<Nothing, Nothing>? {
     val valid = if (factor is LinearIndicator) {
         point.sample.exactIntValue(factor.indicator) != bigIntOf(if (factor.whenOne) 1L else 0L) ||
@@ -201,7 +201,7 @@ private fun checkExactRealRows(
     return if (valid) null else Verification.Rejected("real factor $id refutes the assignment")
 }
 
-private fun ExactRealPoint.holdsExactly(row: LinearRow, cancellation: Cancellation): Boolean {
+private fun ExactRealPoint.holdsExactly(row: LinearRow, cancellation: ExecutionControl): Boolean {
     cancellation.charge(row.size.toLong() + 1L)
     if (cancellation()) return false
     return row.exactComparison(reals.size, row.activator == LinearRow.ALWAYS || truth(row.activator), ::truth)
@@ -212,7 +212,7 @@ private fun rationalPowerEquals(
     value: BigFraction,
     exponent: Int,
     expected: BigFraction,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean? {
     cancellation.charge(1)
     if (cancellation()) return null
@@ -236,7 +236,7 @@ private fun positivePowerEquals(
     value: BigInt,
     exponent: Int,
     expected: BigInt,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean? {
     if (value == BIG_ONE) return (expected == BIG_ONE).takeUnless { cancellation() }
     val width = expected.magnitudeBitLength().toLong()

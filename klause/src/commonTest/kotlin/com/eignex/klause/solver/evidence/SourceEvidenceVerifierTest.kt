@@ -3,7 +3,7 @@ package com.eignex.klause.solver.evidence
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -90,7 +90,7 @@ class SourceEvidenceVerifierTest {
         val evidence = SourceEvidence(scope, SourceClaim.Consequence(lower), SourceDerivation.Premise("lower"))
 
         val checks = SourceEvidenceVerifier(context, maximumSteps = 4)
-            .verifyAll(listOf(evidence, evidence), Cancellation.Never)
+            .verifyAll(listOf(evidence, evidence), ExecutionControl.Never)
 
         assertEquals(SourceEvidenceCheck.Checked, checks.first())
         assertIs<SourceEvidenceCheck.Unavailable>(checks.last())
@@ -283,7 +283,7 @@ class SourceEvidenceVerifierTest {
 
         val checked = SourceEvidenceVerifier(context).verify(
             SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE), SourceDerivation.Premise("guarded")),
-            Cancellation { ++polls > 6 },
+            ExecutionControl { ++polls > 6 },
         )
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
@@ -711,7 +711,7 @@ class SourceEvidenceVerifierTest {
         val evidence = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Import(imported))
         var polls = 0
 
-        val result = SourceEvidenceVerifier(source).verify(evidence, Cancellation { ++polls > 3 })
+        val result = SourceEvidenceVerifier(source).verify(evidence, ExecutionControl { ++polls > 3 })
 
         assertIs<SourceEvidenceCheck.Unavailable>(result)
     }
@@ -740,7 +740,7 @@ class SourceEvidenceVerifierTest {
         assertIs<SourceEvidenceCheck.Unavailable>(
             SourceEvidenceVerifier(context).verify(
                 evidence,
-                Cancellation { true },
+                ExecutionControl { true },
             ),
         )
     }

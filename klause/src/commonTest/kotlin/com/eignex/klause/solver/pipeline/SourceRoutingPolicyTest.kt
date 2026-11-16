@@ -9,7 +9,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderProvider
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,9 +27,9 @@ class SourceRoutingPolicyTest {
         for (engine in FiniteEngine.entries) {
             var charged = 0L
             var installations = 0
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = charged >= 1000
-                override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
             val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)
@@ -60,7 +60,7 @@ class SourceRoutingPolicyTest {
             arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 4)))
         var stopped = false
         var observations = 0
-        val stop = Cancellation { stopped }
+        val stop = ExecutionControl { stopped }
 
         val invocation = SourceSetup.prepare(SourceSetupRequest(
             SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
@@ -107,9 +107,9 @@ class SourceRoutingPolicyTest {
     fun `native declaration inspection should retain its containing preparation allowance`() {
         val source = Problem(0, 16, Array(16) { IntDomain(0, 1) }, emptyArray())
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged > 0
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val invocation = SourceSetup.prepare(SourceSetupRequest(
@@ -238,9 +238,9 @@ class SourceRoutingPolicyTest {
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged > 0
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val invocation = SourceSetup.prepare(
@@ -271,7 +271,7 @@ class SourceRoutingPolicyTest {
         )
         var stopped = false
         var observations = 0
-        val stop = Cancellation { stopped }
+        val stop = ExecutionControl { stopped }
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(

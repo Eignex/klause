@@ -20,7 +20,7 @@ import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -165,7 +165,7 @@ class LinearAuthorityInvocationTest {
                 if (!recordFeedback) it.run { _, _ -> } else {
                     var result: LinearInvocationResult? = null
                     repeat(64) { _ ->
-                        if (result == null) result = it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+                        if (result == null) result = it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { _, _ -> }
                     }
                     assertNotNull(result)
                 }
@@ -343,7 +343,7 @@ class LinearAuthorityInvocationTest {
 
         val result = LinearAuthority(budget, retainLp = true).use { authority ->
             LinearAuthorityInvocation(source, TheoryParams(), borrowedAuthority = authority).use {
-                it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+                it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
             }
         }
 
@@ -469,7 +469,7 @@ class LinearAuthorityInvocationTest {
 
         val result = LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 2), boundOrdered = true,
             cuts = false).use {
-            assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+            assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> })
         }
 
         val terminal = assertNotNull(result.terminal)
@@ -493,7 +493,7 @@ class LinearAuthorityInvocationTest {
         ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
         val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true, cuts = false).use {
-            assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+            assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> })
         }
 
         val terminal = assertNotNull(result.terminal)
@@ -519,7 +519,7 @@ class LinearAuthorityInvocationTest {
         ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
         val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true, cuts = false).use {
-            assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+            assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> })
         }
 
         val terminal = assertNotNull(result.terminal)
@@ -540,7 +540,7 @@ class LinearAuthorityInvocationTest {
         ), emptyMap())
 
         val result = LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use {
-            assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> })
+            assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> })
         }
 
         assertTrue(assertNotNull(assertNotNull(result.incumbent).exactReals).first() > BigFraction.ZERO)
@@ -569,7 +569,8 @@ class LinearAuthorityInvocationTest {
                 boundOrdered = true).use { invocation ->
                 var result: LinearInvocationResult? = null
                 repeat(32) {
-                    if (result == null) result = invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+                    if (result == null) result = invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE,
+                        1) { _, _ -> }
                 }
 
                 val terminal = assertNotNull(assertNotNull(result).terminal)
@@ -591,8 +592,8 @@ class LinearAuthorityInvocationTest {
         ), mapOf(real to BigFraction.ONE))
 
         LinearAuthorityInvocation(source, TheoryParams(), boundOrdered = true).use { invocation ->
-            invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
-            invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+            invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { _, _ -> }
+            invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { _, _ -> }
             val snapshot = invocation.snapshot(TerminationReason.BudgetExhausted)
 
             assertNotNull(snapshot.incumbent)
@@ -615,7 +616,7 @@ class LinearAuthorityInvocationTest {
                 ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
             val result = assertNotNull(LinearAuthorityInvocation(source, TheoryParams(), useBranchHistory = true).use {
-                it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+                it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
             })
 
             val terminal = assertNotNull(result.terminal)
@@ -647,7 +648,7 @@ class LinearAuthorityInvocationTest {
             )
 
             val result = assertNotNull(LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 2)).use {
-                it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+                it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
             })
 
             val terminal = assertNotNull(result.terminal)
@@ -673,7 +674,7 @@ class LinearAuthorityInvocationTest {
         )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
         }
 
         val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result?.terminal).claim)
@@ -705,7 +706,7 @@ class LinearAuthorityInvocationTest {
         )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
         }
 
         val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result?.terminal).claim)
@@ -737,7 +738,7 @@ class LinearAuthorityInvocationTest {
         )
 
         val result = LinearAuthorityInvocation(source, TheoryParams(maxLeaves = 1)).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
         }
 
         assertNull(result?.terminal)
@@ -764,7 +765,7 @@ class LinearAuthorityInvocationTest {
         )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
         }
 
         assertIs<SourceClaim.Optimal>(assertNotNull(result?.terminal).claim)
@@ -796,7 +797,7 @@ class LinearAuthorityInvocationTest {
         )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
         }
 
         assertIs<SourceClaim.Optimal>(assertNotNull(result?.terminal).claim)
@@ -828,7 +829,7 @@ class LinearAuthorityInvocationTest {
         )
 
         val result = LinearAuthorityInvocation(source, TheoryParams()).use {
-            it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _, _ -> }
+            it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _, _ -> }
         }
 
         val claim = assertIs<SourceClaim.Limit>(assertNotNull(result?.terminal).claim)
@@ -844,7 +845,7 @@ class LinearAuthorityInvocationTest {
         val invocation = LinearAuthorityInvocation(source, TheoryParams(), external = { sample })
 
         val result = invocation.use {
-            it.runSlice(Cancellation { stop }, Long.MAX_VALUE, -1) { accepted, _ ->
+            it.runSlice(ExecutionControl { stop }, Long.MAX_VALUE, -1) { accepted, _ ->
                 callbacks += accepted
                 stop = true
             }
@@ -871,7 +872,7 @@ class LinearAuthorityInvocationTest {
         val invocation = LinearAuthorityInvocation(source, TheoryParams())
 
         val result = invocation.use {
-            it.runSlice(Cancellation { stop }, Long.MAX_VALUE, -1) { _, _ -> stop = true }
+            it.runSlice(ExecutionControl { stop }, Long.MAX_VALUE, -1) { _, _ -> stop = true }
         }
 
         assertNull(result?.terminal)
@@ -895,7 +896,7 @@ class LinearAuthorityInvocationTest {
         )
         val invocation = LinearAuthorityInvocation(source, TheoryParams())
 
-        val paused = invocation.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { _, _ -> }
+        val paused = invocation.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { _, _ -> }
         invocation.close()
         val snapshot = invocation.snapshot(TerminationReason.Cancelled)
 

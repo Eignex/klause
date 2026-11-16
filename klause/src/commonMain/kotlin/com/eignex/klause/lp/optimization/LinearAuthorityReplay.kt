@@ -3,7 +3,7 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.solver.evidence.SourceEvidence
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class LinearAuthorityReplayResult(
     val query: LinearAuthorityCapturedQuery?,
@@ -22,7 +22,7 @@ internal object LinearAuthorityReplay {
         query: LinearAuthorityCapturedQuery,
         maximumWork: Long,
         maximumAllocation: Long,
-        stop: Cancellation,
+        stop: ExecutionControl,
         composeBranches: Boolean = false,
     ): LinearAuthorityReplayResult {
         val funding = SourceLpFunding(maximumWork, maximumAllocation).apply { grant(maximumWork) }
@@ -43,7 +43,7 @@ internal object LinearAuthorityReplay {
         mask: Set<Int>,
         maximumWork: Long,
         maximumAllocation: Long,
-        stop: Cancellation,
+        stop: ExecutionControl,
     ): LinearAuthorityReplayResult = solve(query, mask, emptyList(), true, false,
         maximumWork, maximumAllocation, stop, capturedPool = true)
 
@@ -54,18 +54,18 @@ internal object LinearAuthorityReplay {
         cuts: Boolean,
         maximumWork: Long,
         maximumAllocation: Long,
-        stop: Cancellation,
+        stop: ExecutionControl,
     ): LinearAuthorityReplayResult = solve(query, mask, additional, cuts, false,
         maximumWork, maximumAllocation, stop)
 
     fun generatedAggregates(
-        query: LinearAuthorityCapturedQuery, maximumWork: Long, maximumAllocation: Long, stop: Cancellation,
+        query: LinearAuthorityCapturedQuery, maximumWork: Long, maximumAllocation: Long, stop: ExecutionControl,
     ): LinearAuthorityReplayResult = solve(query, null, emptyList(), true, true,
         maximumWork, maximumAllocation, stop)
 
     private fun solve(
         query: LinearAuthorityCapturedQuery, mask: Set<Int>?, additional: List<LinearAuthorityCut>,
-        cuts: Boolean, aggregate: Boolean, maximumWork: Long, maximumAllocation: Long, stop: Cancellation,
+        cuts: Boolean, aggregate: Boolean, maximumWork: Long, maximumAllocation: Long, stop: ExecutionControl,
         capturedPool: Boolean = false,
     ): LinearAuthorityReplayResult {
         val funding = SourceLpFunding(maximumWork, maximumAllocation).apply { grant(maximumWork) }
@@ -89,7 +89,7 @@ internal object LinearAuthorityReplay {
     }
 
     private fun capturedCuts(
-        query: LinearAuthorityCapturedQuery, mask: Set<Int>?, budget: SourceLpBudget, stop: Cancellation,
+        query: LinearAuthorityCapturedQuery, mask: Set<Int>?, budget: SourceLpBudget, stop: ExecutionControl,
     ): List<LinearAuthorityCut>? {
         val funding = checkNotNull(budget.funding)
         fun charge(work: Long, allocation: Long): Boolean {

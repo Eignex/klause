@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -23,7 +23,7 @@ class RevisedSimplexSingletonStartTest {
             val model = assertNotNull(LpExactState(exact).toWorkingModel())
             for (singleton in listOf(false, true)) {
                 RevisedSimplex(model, singletonStart = singleton).use { solver ->
-                    assertNotNull(solver.prepareLogicals(Cancellation.Never))
+                    assertNotNull(solver.prepareLogicals(ExecutionControl.Never))
 
                     val result = assertNotNull(solver.resolveBounds())
                     val checked = verifyExactBasis(model, result.basis)
@@ -45,7 +45,7 @@ class RevisedSimplexSingletonStartTest {
             listOf(ExactLpRow()), ExactLpObjective(listOf(one, zero)))
         val working = assertNotNull(LpExactState(model).toWorkingModel())
         RevisedSimplex(working).use { solver ->
-            assertNotNull(solver.prepareLogicals(Cancellation.Never))
+            assertNotNull(solver.prepareLogicals(ExecutionControl.Never))
 
             val result = solver.resolveBounds(LpFloatAllowance(1_000_000L, 1))
 

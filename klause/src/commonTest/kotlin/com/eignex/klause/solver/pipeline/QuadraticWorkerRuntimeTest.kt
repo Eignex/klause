@@ -12,7 +12,7 @@ import com.eignex.klause.solver.result.QuadraticIncumbent
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,7 +38,7 @@ class QuadraticWorkerRuntimeTest {
         handle.close()
         handle.close()
 
-        assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) {} }
+        assertFailsWith<IllegalStateException> { handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) {} }
         assertFalse(handle.isDone)
         assertEquals(1, closed)
     }
@@ -51,14 +51,14 @@ class QuadraticWorkerRuntimeTest {
         )
         val runtime = QuadraticWorkerRuntime(native, ObjectiveSense.MINIMIZE, { SolveStats.EMPTY }, { partial }) {}
         val handle = runtime.completeHandle({ 7L }) { _, _, _ -> throw PolynomialInterrupted() }
-        val result = handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) {}
+        val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) {}
 
         handle.close()
 
         assertSame(partial, handle.completion)
         assertTrue(handle.isDone)
         assertEquals(7L, handle.work)
-        assertEquals(result, handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) {})
+        assertEquals(result, handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) {})
     }
 
     @Test
@@ -75,7 +75,7 @@ class QuadraticWorkerRuntimeTest {
             throw PolynomialResourceLimit(PolynomialResource.MATRIX_CELLS)
         }
 
-        handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) {}
+        handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) {}
 
         assertSame(partial, handle.completion)
     }
@@ -92,7 +92,7 @@ class QuadraticWorkerRuntimeTest {
         }) {}
         val handle = runtime.completeHandle({ 0L }) { _, _, _ -> throw CancellationException() }
 
-        handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) {}
+        handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) {}
 
         assertSame(partial, handle.completion)
     }
@@ -104,12 +104,12 @@ class QuadraticWorkerRuntimeTest {
             null, native.reason(), ObjectiveSense.MINIMIZE, SolveStats.EMPTY,
         )
         val runtime = QuadraticWorkerRuntime(native, ObjectiveSense.MINIMIZE, { SolveStats.EMPTY }, { partial }) {}
-        val handle = runtime.neighborhoodHandle(Cancellation.Never, { null }) {
+        val handle = runtime.neighborhoodHandle(ExecutionControl.Never, { null }) {
             native.polynomial.charge(5)
             throw PolynomialInterrupted()
         }
 
-        handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) {}
+        handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) {}
 
         assertEquals(quadraticNativeInstructions(5), (handle as InstructionSlicedSearch).chargedInstructions)
         assertSame(partial, handle.completion)
@@ -129,11 +129,11 @@ class QuadraticWorkerRuntimeTest {
         val failure = IllegalArgumentException("failed publication")
 
         val thrown = assertFailsWith<IllegalArgumentException> {
-            handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { throw failure }
+            handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { throw failure }
         }
         runtime.publish(point)
         var published = 0
-        handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { published++ }
+        handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { published++ }
 
         assertSame(failure, thrown)
         assertEquals(1, published)

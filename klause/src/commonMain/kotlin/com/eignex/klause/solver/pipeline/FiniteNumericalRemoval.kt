@@ -20,7 +20,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.random.Random
@@ -43,7 +43,7 @@ internal class FiniteNumericalRemoval(
     private var center: Sample? = null
     private var scores = intArrayOf()
     private var directions = intArrayOf()
-    private var token = Cancellation.Never
+    private var token = ExecutionControl.Never
     private var closed = false
     var status = Status.Unavailable
         private set
@@ -71,7 +71,7 @@ internal class FiniteNumericalRemoval(
         cutoff: SourceNumericalCutoff?,
         feedback: SourceNumericalFeedbackResult,
         support: SourceNumericalSupportResult? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ) {
         check(!closed)
         retire(Status.Unavailable)
@@ -265,7 +265,7 @@ internal class FiniteNumericalRemoval(
     } else BigFraction.ofLong(sample.intValue(index - model.numBoolVars))
 
     override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample, objective: LinearObjective,
-        fraction: Double, assumptions: Assumptions, cancellation: Cancellation,
+        fraction: Double, assumptions: Assumptions, cancellation: ExecutionControl,
     ): FreedVars {
         if (!closed && assumptions != callerPins) {
             retire(Status.Incompatible)
@@ -276,10 +276,10 @@ internal class FiniteNumericalRemoval(
 
     override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample, objective: LinearObjective,
         fraction: Double,
-    ): FreedVars = select(rng, problem, incumbent, objective, fraction, Cancellation.Never)
+    ): FreedVars = select(rng, problem, incumbent, objective, fraction, ExecutionControl.Never)
 
     private fun select(rng: Random, problem: BakedProblem, incumbent: Sample, objective: LinearObjective,
-        fraction: Double, cancellation: Cancellation,
+        fraction: Double, cancellation: ExecutionControl,
     ): FreedVars {
         if (closed) status = Status.Closed
         if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
@@ -334,15 +334,15 @@ internal class FiniteNumericalRemoval(
             selected.filter { it >= model.numBoolVars }.map { it - model.numBoolVars }.toIntArray()), cancellation)
     }
 
-    private fun closeSelection(problem: BakedProblem, requested: FreedVars, cancellation: Cancellation): FreedVars {
+    private fun closeSelection(problem: BakedProblem, requested: FreedVars, cancellation: ExecutionControl): FreedVars {
         if (definitions == null) return requested
         if (problem !== model) return FreedVars(intArrayOf(), intArrayOf())
         funding.charge(1, (model.numBoolVars.toLong() + model.numIntVars) * 96L)
         if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
         val meter = WorkMeter { funding.charge(it) }
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = token() || cancellation() || funding.paused
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         val work = RepairBlockWork(stop, 65_536)
         return try {
@@ -358,7 +358,7 @@ internal class FiniteNumericalRemoval(
         }
     }
 
-    private fun blocked(cancellation: Cancellation = Cancellation.Never): Boolean {
+    private fun blocked(cancellation: ExecutionControl = ExecutionControl.Never): Boolean {
         if (closed) return false
         val reason = when {
             token() || cancellation() -> Status.Cancelled
@@ -377,7 +377,7 @@ internal class FiniteNumericalRemoval(
         lastDecline = null
         lastCompletedInputs = intArrayOf()
         lastFilledInputs = 0
-        token = Cancellation.Never
+        token = ExecutionControl.Never
         originScope = null
         originCutoff = null
         rankedInputs = 0

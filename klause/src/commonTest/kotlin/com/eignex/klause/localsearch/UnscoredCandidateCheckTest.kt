@@ -9,7 +9,7 @@ import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertIs
 
@@ -29,8 +29,8 @@ class UnscoredCandidateCheckTest {
         val invalid = Sample(BooleanArray(0), longArrayOf(2, 3, 5))
         val valid = Sample(BooleanArray(0), longArrayOf(2, 3, 6))
 
-        assertIs<Completion.Refuted>(check.check(invalid, Assumptions.None, Cancellation.Never))
-        assertIs<Completion.Witness>(check.check(valid, Assumptions.None, Cancellation.Never))
+        assertIs<Completion.Refuted>(check.check(invalid, Assumptions.None, ExecutionControl.Never))
+        assertIs<Completion.Witness>(check.check(valid, Assumptions.None, ExecutionControl.Never))
     }
 
     @Test
@@ -43,10 +43,12 @@ class UnscoredCandidateCheckTest {
             }
         }
         val check = UnscoredCandidateCheck(Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf<Factor>(factor)).bake())
-        check.check(Sample(BooleanArray(0), longArrayOf(2, 3, 6)), Assumptions.None, Cancellation.Never)
+        check.check(Sample(BooleanArray(0), longArrayOf(2, 3, 6)), Assumptions.None, ExecutionControl.Never)
 
-        val refuted = check.check(Sample(BooleanArray(0), longArrayOf(2, 3, 5)), Assumptions.None, Cancellation.Never)
-        val accepted = check.check(Sample(BooleanArray(0), longArrayOf(1, 4, 4)), Assumptions.None, Cancellation.Never)
+        val refuted = check.check(Sample(BooleanArray(0), longArrayOf(2, 3, 5)), Assumptions.None,
+            ExecutionControl.Never)
+        val accepted = check.check(Sample(BooleanArray(0), longArrayOf(1, 4, 4)), Assumptions.None,
+            ExecutionControl.Never)
 
         assertIs<Completion.Refuted>(refuted)
         assertIs<Completion.Witness>(accepted)
@@ -63,7 +65,8 @@ class UnscoredCandidateCheckTest {
         }
         val check = UnscoredCandidateCheck(Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf<Factor>(factor)).bake())
 
-        val decided = check.check(Sample(BooleanArray(0), longArrayOf(10, 1, 10)), Assumptions.None, Cancellation.Never)
+        val decided = check.check(Sample(BooleanArray(0), longArrayOf(10, 1, 10)), Assumptions.None,
+            ExecutionControl.Never)
 
         assertIs<Completion.Witness>(decided)
     }

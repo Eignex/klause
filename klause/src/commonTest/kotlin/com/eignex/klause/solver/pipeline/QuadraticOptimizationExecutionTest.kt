@@ -28,7 +28,7 @@ import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -241,7 +241,7 @@ class QuadraticOptimizationExecutionTest {
         val cancelled = OpenTheoryPipeline.minimize(
             source,
             objective,
-            PolynomialTheoryParams(cancellation = Cancellation { true }),
+            PolynomialTheoryParams(cancellation = ExecutionControl { true }),
         )
 
         val optimum = assertIs<QuadraticOptimizationResult.Optimal>(execution.result)
@@ -305,7 +305,7 @@ class QuadraticOptimizationExecutionTest {
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
                 backtrack = BacktrackParams(
-                    cancellation = Cancellation { cancelled },
+                    cancellation = ExecutionControl { cancelled },
                     onEvent = { if (it is SearchEvent.Incumbent) cancelled = true },
                 ),
             ),
@@ -409,7 +409,7 @@ class QuadraticOptimizationExecutionTest {
         val handle = assertIs<QuadraticPortfolioSearch>(worker.newResumableSearch { Double.POSITIVE_INFINITY })
         var slices = 0
 
-        while (!handle.isDone && slices++ < 4096) handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { }
+        while (!handle.isDone && slices++ < 4096) handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { }
         val result = assertIs<QuadraticOptimizationResult.Optimal>(assertNotNull(handle.completion))
         handle.close()
         adapter.close()
@@ -449,7 +449,7 @@ class QuadraticOptimizationExecutionTest {
 
         handle.close()
 
-        assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1) { } }
+        assertFailsWith<IllegalStateException> { handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1) { } }
     }
 
     @Test
@@ -481,10 +481,10 @@ class QuadraticOptimizationExecutionTest {
             adapter.worker(1).newResumableSearch { Double.POSITIVE_INFINITY },
         )
 
-        handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 0) { }
+        handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 0) { }
         val preparation = handle.chargedInstructions
         val nativePreparation = native.work
-        handle.runInstructionSlice(Cancellation.Never, Long.MAX_VALUE, 0) { }
+        handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 0) { }
         handle.close()
         adapter.close()
 

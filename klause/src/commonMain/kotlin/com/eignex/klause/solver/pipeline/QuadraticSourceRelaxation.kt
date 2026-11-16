@@ -25,10 +25,7 @@ import com.eignex.klause.theory.qfnra.polynomialPointFixings
 import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
 import com.eignex.klause.theory.qfnra.tryPolynomialIntegerRecession
-import com.eignex.klause.util.ArithmeticCancellation
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.arithmeticSource
-import com.eignex.klause.util.withCheckpoint
+import com.eignex.klause.util.ExecutionControl
 
 internal sealed interface QuadraticRelaxationResult {
     data class Minimum(
@@ -51,11 +48,11 @@ internal class QuadraticSourceRelaxation(
     private val native: QuadraticNativeScope,
 ) {
     private val limits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells)
-    private var operation: Cancellation = Cancellation.Never
-    private fun token(parent: Cancellation): Cancellation = object : ArithmeticCancellation {
-        override fun arithmeticSource() = parent.arithmeticSource()?.withCheckpoint(this::isCancelled)
+    private var operation: ExecutionControl = ExecutionControl.Never
+    private fun token(parent: ExecutionControl): ExecutionControl = object : ExecutionControl() {
+        override val admission get() = parent.admission
         override fun isCancelled(): Boolean = parent() || operation()
-        override fun workMeter() = parent.workMeter()
+        override val accounting get() = parent.accounting
         override fun deadline() = parent.deadline()?.let { outer ->
             operation.deadline()?.let { inner -> minOf(outer, inner) } ?: outer
         } ?: operation.deadline()
@@ -70,7 +67,7 @@ internal class QuadraticSourceRelaxation(
         condition: PolynomialCondition,
         assignment: QfNraAssignment,
         integers: List<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): PolynomialIntegerRecession? {
         operation = cancellation
         return try {
@@ -84,13 +81,13 @@ internal class QuadraticSourceRelaxation(
         } catch (_: PolynomialResourceLimit) {
             null
         } finally {
-            operation = Cancellation.Never
+            operation = ExecutionControl.Never
         }
     }
 
     fun check(
         proposed: PolynomialCondition,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         mandatory: Boolean = true,
     ): QuadraticRelaxationResult {
         operation = cancellation
@@ -164,7 +161,7 @@ internal class QuadraticSourceRelaxation(
         } catch (_: QuadraticInterrupted) {
             QuadraticRelaxationResult.Unknown()
         } finally {
-            operation = Cancellation.Never
+            operation = ExecutionControl.Never
         }
     }
 }

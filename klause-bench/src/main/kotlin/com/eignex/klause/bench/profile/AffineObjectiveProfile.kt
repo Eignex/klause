@@ -32,18 +32,18 @@ import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
-import java.io.File
-import java.util.Base64
-import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.util.Base64
+import kotlin.time.Duration.Companion.seconds
 
 internal object AffineObjectiveProfile {
     @JvmStatic
@@ -101,7 +101,7 @@ internal object AffineObjectiveProfile {
                 }
                 directory.resolve("translation-rows-$exact.json").writeText(JsonArray(candidates).toString())
                 for (rewrite in listOf(false, true)) {
-                    val stop = Cancellation.after(8.seconds)
+                    val stop = ExecutionControl.after(8.seconds)
                     val budget = PresolveBudget(550_000_000L)
                     val started = System.nanoTime()
                     val prepared = FinitePipeline.prepare(FinitePipelineRequest(
@@ -140,7 +140,7 @@ internal object AffineObjectiveProfile {
     private fun scan(suite: String) {
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
         Reports.writeJson(out.resolve("provenance.json").path, InstalledBuild.reference)
-        val stop = Cancellation.after(120.seconds)
+        val stop = ExecutionControl.after(120.seconds)
         out.resolve("scan.jsonl").bufferedWriter().use { output ->
             for ((index, reference) in Catalog.uncapped(suite).problems.withIndex()) {
                 if (stop()) break

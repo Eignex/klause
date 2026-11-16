@@ -12,14 +12,14 @@ import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.TheoryEncoding
 import com.eignex.klause.theory.TheoryRealId
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 
 internal class PolynomialEncodingContext(
     override val sourceFactorIndex: Int,
     private val factor: Factor,
     private val lowering: PolynomialRealLowering,
-    override val cancellation: Cancellation,
+    override val cancellation: ExecutionControl,
     private val integerCoordinate: (Int) -> Int,
     private val realCoordinate: (Int) -> Int,
     private val fixedIntegers: Map<SourceIntId, BigInt> = emptyMap(),

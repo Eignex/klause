@@ -22,7 +22,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolvePreparationStage
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -290,7 +290,7 @@ class PresolvePipelineTest {
     fun `the pipeline should not charge another construction for an already baked input`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyList())
-            .bake(budget.orSpent(Cancellation.Never))
+            .bake(budget.orSpent(ExecutionControl.Never))
         val spent = budget.spent()
 
         PresolvePipeline.run(problem, null, PresolveConfig.NONE, false, presolveBudget = budget)

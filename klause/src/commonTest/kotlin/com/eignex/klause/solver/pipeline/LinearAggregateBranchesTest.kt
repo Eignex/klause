@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.lp.SourceLpBudget
-import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.simplex.exact.BigFraction
@@ -26,7 +26,7 @@ import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchComponentSet
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchRunEvent
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -49,7 +49,7 @@ class LinearAggregateBranchesTest {
 
     @Test
     fun `a thin row pair should propose a primitive adjacent partition`() {
-        val row = LinearAggregateBranches(SourceLpBudget()).propose(source, Cancellation.Never)
+        val row = LinearAggregateBranches(SourceLpBudget()).propose(source, ExecutionControl.Never)
 
         assertEquals(SourceInequality(integers.associateWith { BigFraction.ONE }, BigFraction.ONE), row)
     }
@@ -58,7 +58,7 @@ class LinearAggregateBranchesTest {
     fun `missing shift bounds should retain coordinate fallback`() {
         val unbounded = SourceProofContext(scope, integers.toSet(), rows.filterKeys { !it.startsWith("lower/") })
 
-        val row = LinearAggregateBranches(SourceLpBudget()).propose(unbounded, Cancellation.Never)
+        val row = LinearAggregateBranches(SourceLpBudget()).propose(unbounded, ExecutionControl.Never)
 
         assertNull(row)
     }
@@ -75,7 +75,7 @@ class LinearAggregateBranchesTest {
             SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO)) }
         val context = SourceProofContext(scope, ids.toSet(), premises)
 
-        val row = LinearAggregateBranches(SourceLpBudget()).propose(context, Cancellation.Never)
+        val row = LinearAggregateBranches(SourceLpBudget()).propose(context, ExecutionControl.Never)
 
         assertEquals(SourceInequality(ids.zip(listOf(1L, 1L, 2L, 2L).map(BigFraction::ofLong)).toMap(),
             BigFraction.ofLong(4)), row)
@@ -86,7 +86,7 @@ class LinearAggregateBranchesTest {
         val funding = SourceLpFunding(1_000_000L, 1L).also { it.grant(1_000_000L) }
         val policy = LinearAggregateBranches(SourceLpBudget(funding = funding))
 
-        val row = policy.propose(source, Cancellation.Never)
+        val row = policy.propose(source, ExecutionControl.Never)
 
         assertNull(row)
         assertTrue(funding.exhausted)
@@ -127,7 +127,7 @@ class LinearAggregateBranchesTest {
     @Test
     fun `aggregate coverage should survive backjump replay and restart`() {
         val budget = SourceLpBudget(maxOperations = 16)
-        LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { null },
+        LinearAuthorityTraversal(source, budget, ExecutionControl.Never, { false }, {}, { null },
             aggregateBranching = true).use { component ->
             val session = SearchComponentSet(listOf(component)).session()
             assertEquals(ComponentResult.Consistent, session.initialize())
@@ -175,7 +175,7 @@ class LinearAggregateBranchesTest {
     @Test
     fun `Boolean composition should retain coordinate coverage when aggregate branching is requested`() {
         val budget = SourceLpBudget(maxOperations = 64)
-        LinearAuthorityTraversal(source, budget, Cancellation.Never, { false }, {}, { null },
+        LinearAuthorityTraversal(source, budget, ExecutionControl.Never, { false }, {}, { null },
             composeBooleanBranches = true, aggregateBranching = true).use { component ->
             val session = SearchComponentSet(listOf(component)).session()
 

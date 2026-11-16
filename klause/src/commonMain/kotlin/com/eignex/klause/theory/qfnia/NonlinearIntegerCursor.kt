@@ -19,12 +19,11 @@ import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.ArithmeticBudget
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
-import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
@@ -40,8 +39,10 @@ internal class NonlinearIntegerCursor(
     private var closed = false
     private var initialized = false
     private var terminal: QfNraResult? = null
-    private val work = NonlinearIntegerWork(params.arithmetic)
-    private val arithmetic = PolynomialArithmetic(work, params.arithmetic.polynomialLimits)
+    private val work = ArithmeticBudget(params.arithmetic.cancellation, params.arithmetic.maximumWork)
+    private val arithmetic = PolynomialArithmetic(work, params.arithmetic.polynomialLimits).also {
+        work.execution = it.execution
+    }
     private val cells = NonlinearIntegerCells(problem.formula, problem.integerCoordinates, arithmetic)
     private var invocation = PolynomialTheoryService(problem.formula, problem.boolCount, problem.numericCount)
         .invocation(params.arithmetic.copy(cancellation = work, maximumWork = null))
@@ -71,7 +72,7 @@ internal class NonlinearIntegerCursor(
     val isDone: Boolean get() = terminal != null
 
     fun runSlice(
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         maximumCandidates: Long = Long.MAX_VALUE,
     ): NonlinearIntegerExecution? {
         require(maximumCandidates >= 0)
@@ -96,8 +97,10 @@ internal class NonlinearIntegerCursor(
                     }
                     else -> params.strategy
                 }
-                if (strategy == NonlinearIntegerStrategy.SEARCH) current = nextEnumeration()
-                else if (candidates > 0) repair(strategy)
+                if (strategy == NonlinearIntegerStrategy.SEARCH)
+                    current = nextEnumeration()
+                else if (candidates > 0)
+                    repair(strategy)
                 if (params.steerSourceCells && candidates % 2 == 0L) {
                     cells.propose(current, condition, visited, AlgebraicArithmetic(arithmetic))?.let { current = it }
                 }
@@ -196,7 +199,8 @@ internal class NonlinearIntegerCursor(
                 val id = coordinates[index]
                 condition.lower[id]?.let { value < it } == true || condition.upper[id]?.let { value > it } == true
             }
-        ) return null
+        )
+            return null
         if (rooted && current.indices.any { index ->
                 arithmetic.step()
                 rootWindows[index]?.let { current[index] !in it } == true
@@ -216,7 +220,8 @@ internal class NonlinearIntegerCursor(
             is QfNraResult.Unknown -> if (result.reason == QfNraReason.ResourceLimit && !work()) {
                 representationDecline = result
                 null
-            } else result
+            } else
+                result
             is QfNraResult.Unsatisfiable -> null
         }
     }
@@ -227,7 +232,8 @@ internal class NonlinearIntegerCursor(
         val released = if (strategy == NonlinearIntegerStrategy.ALNS) {
             repairs++
             setOf(first, (first + 1) % coordinates.size)
-        } else setOf(first)
+        } else
+            setOf(first)
         val fixed = coordinates.indices.filter { it !in released }
             .associate { coordinates[it] to BigFraction.of(current[it], BIG_ONE) }
         when (val guide = completion(fixed)) {
@@ -235,15 +241,18 @@ internal class NonlinearIntegerCursor(
                 current = current.mapIndexed { index, value ->
                     if (index in released) {
                         integerNear(guide.assignment.realValue(coordinates[index]), arithmetic)
-                    } else value
+                    } else
+                        value
                 }
             }
             is QfNraResult.Unsatisfiable -> {
                 // Candidate windows guide moves; they do not constrain the source's integer domains.
                 current = current.mapIndexed { index, value ->
-                    if (index in released) hints.getOrNull(random.nextInt(hints.size.coerceAtLeast(1)))
+                    if (index in released)
+                        hints.getOrNull(random.nextInt(hints.size.coerceAtLeast(1)))
                         ?: (value + if (random.nextBoolean()) radius else -radius)
-                    else value
+                    else
+                        value
                 }
             }
             is QfNraResult.Unknown -> {
@@ -253,7 +262,8 @@ internal class NonlinearIntegerCursor(
                     if (index in released) {
                         val hint = ((candidates - 1) % hints.size.coerceAtLeast(1)).toInt()
                         hints.getOrNull(hint) ?: (value + radius)
-                    } else value
+                    } else
+                        value
                 }
             }
         }
@@ -357,8 +367,10 @@ internal class NonlinearIntegerCursor(
         checkNonlinearSource(problem.formula, assignment, arithmetic)
     private fun unknown(): QfNraResult.Unknown =
         representationDecline?.takeIf { !work() }?.copy(stats = polynomialStats()) ?: QfNraResult.Unknown(
-        if (work.limitReached || !params.arithmetic.cancellation()) QfNraReason.WorkLimit
-        else QfNraReason.Interrupted,
+        if (work.limitReached || !params.arithmetic.cancellation())
+                QfNraReason.WorkLimit
+        else
+                QfNraReason.Interrupted,
         polynomialStats(),
     )
     private fun polynomialStats(): QfNraStats = invocation.stats.copy(workSpent = work.spent)
@@ -372,25 +384,11 @@ internal class NonlinearIntegerCursor(
     }
 }
 
-private class NonlinearIntegerWork(private val params: QfNraParams) : Cancellation, WorkMeter {
-    var spent: Long = 0
-        private set
-    val limitReached: Boolean get() = params.maximumWork?.let { spent >= it } == true
-    override fun isCancelled(): Boolean = limitReached || params.cancellation()
-    override fun deadline() = params.cancellation.deadline()
-    override fun workMeter(): WorkMeter = this
-    override fun charge(units: Long) {
-        require(units >= 0)
-        spent += minOf(units, Long.MAX_VALUE - spent)
-        params.cancellation.charge(units)
-    }
-}
+private fun integerNear(value: AlgebraicReal, arithmetic: PolynomialArithmetic): BigInt =
+    AlgebraicArithmetic(arithmetic).ceilInteger(value)
 
-private fun integerNear(value: AlgebraicReal, arithmetic: PolynomialArithmetic): BigInt {
-    return AlgebraicArithmetic(arithmetic).ceilInteger(value)
-}
-
-private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: PolynomialArithmetic): List<BigInt> {
+private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: PolynomialArithmetic): List<BigInt> =
+    arithmetic.execution.operation {
     val hints = linkedSetOf<BigInt>()
     val formulas = ArrayDeque<PolynomialRealFormula>()
     val expressions = ArrayDeque<PolynomialExpression>()
@@ -436,5 +434,5 @@ private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: Polyn
             is PolynomialExpression.Variable -> Unit
         }
     }
-    return hints.toList()
+        hints.toList()
 }

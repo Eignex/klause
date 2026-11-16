@@ -12,7 +12,7 @@ import com.eignex.klause.solver.executionCapabilities
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.validation.FinitePointCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class UnscoredCandidateCheck(
     problem: Problem,
@@ -42,7 +42,7 @@ internal class UnscoredCandidateCheck(
             source.intDomainOrNull(id)?.let { value in it } != false
     }
 
-    private fun retainedCheck(source: Problem, cancellation: Cancellation): FinitePointCheck {
+    private fun retainedCheck(source: Problem, cancellation: ExecutionControl): FinitePointCheck {
         retained?.let { return it }
         val baked = uncheckedSelection?.let { source.bake(it.forEngineView(source), cancellation) }
             ?: source.bake(cancellation)
@@ -50,7 +50,7 @@ internal class UnscoredCandidateCheck(
         return FinitePointCheck(baked).also { if (!cancellation()) retained = it }
     }
 
-    fun check(candidate: Sample, assumptions: Assumptions, cancellation: Cancellation): Completion {
+    fun check(candidate: Sample, assumptions: Assumptions, cancellation: ExecutionControl): Completion {
         val source = unchecked ?: return Completion.Witness(candidate)
         if (cancellation()) return Completion.Undecided()
         val points = if (reusable && withinDeclared(source, candidate)) retainedCheck(source, cancellation) else {

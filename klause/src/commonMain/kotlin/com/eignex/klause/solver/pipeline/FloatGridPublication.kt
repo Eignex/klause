@@ -7,11 +7,11 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.verifyProjectedSourceWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class FloatGridPublication(
     private val binding: SelectedFloatGridBinding,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val toleranceCheck: ((Sample) -> Boolean)?,
     private val callbacks: FiniteSolveCallbacks,
 ) {

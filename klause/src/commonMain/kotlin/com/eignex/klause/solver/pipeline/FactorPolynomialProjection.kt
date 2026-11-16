@@ -15,7 +15,7 @@ import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 
@@ -44,7 +44,7 @@ internal class FactorPolynomialProjection(
 internal fun Problem.integerPolynomialProjection(
     original: Problem,
     projections: PreparedFactorProjections,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     onDecline: (EncoderDecline) -> Unit,
 ): FactorPolynomialProjection? {
     projections.requireSource(this)

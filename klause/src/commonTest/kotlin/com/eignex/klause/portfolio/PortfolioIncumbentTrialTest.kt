@@ -9,7 +9,7 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -39,15 +39,16 @@ class PortfolioIncumbentTrialTest {
                 val finiteBounds = mutableListOf<Double>()
                 val exactReads = mutableListOf<BigFraction>()
                 val accepted = mutableListOf<BigFraction>()
-                val finder = TrackingResumableSearch(null,
-                    incumbent = MinimizeResult.BestFound(first, initial.toDouble(), TerminationReason.BudgetExhausted),
+                val reason = TerminationReason.BudgetExhausted
+                    val finder = TrackingResumableSearch(null,
+                    incumbent = MinimizeResult.BestFound(first, initial.toDouble(), reason),
                     onRun = {
                         clock += 100.milliseconds
                         assignments.offer(first, initial.toDouble())
                     })
                 val numericalBase = TrackingResumableSearch(null)
                 val numerical = object : ResumableSearch by numericalBase {
-                    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+                    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                         onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                         numericalSlices++
                         exactReads += requireNotNull(incumbents.exchange.current()).objective
@@ -93,7 +94,7 @@ class PortfolioIncumbentTrialTest {
                 Portfolio(workers, fixedBandit(4, 0), reseedStaleThreshold = 0).also {
                     it.runTimeSource = clock
                 }.use {
-                    it.minimize(Cancellation { (numericalSlices >= 5 && trialSlices >= 2) ||
+                    it.minimize(ExecutionControl { (numericalSlices >= 5 && trialSlices >= 2) ||
                         started.elapsedNow().inWholeMilliseconds > 12_000L }, null, incumbents,
                         onAccepted = { point -> accepted += point.objective })
                 }
@@ -120,7 +121,7 @@ class PortfolioIncumbentTrialTest {
         val trial = object : ResumableSearch by trialBase, ReseedGuard {
             override val canReseed: Boolean get() = false
             override val incumbentTrialPending: Boolean get() = trialSlices in 1..2
-            override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long,
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                 trialBase.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
                 return if (trialSlices == 3) MinimizeResult.Unknown(TerminationReason.BudgetExhausted) else null
@@ -134,7 +135,7 @@ class PortfolioIncumbentTrialTest {
 
         Portfolio(workers, fixedBandit(3, 0), baseSliceWork = 2, maxSliceWork = 2,
             reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(32, 1) {}).use {
-            it.minimize(Cancellation.Never)
+            it.minimize(ExecutionControl.Never)
         }
 
         assertEquals(3, trialSlices)

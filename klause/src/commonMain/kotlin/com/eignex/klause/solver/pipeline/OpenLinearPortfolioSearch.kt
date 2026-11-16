@@ -3,11 +3,11 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class OpenLinearPortfolioSearch(val native: LinearPortfolioSearch) : ResumableSearch by native {
     override fun runSlice(
-        global: Cancellation,
+        global: ExecutionControl,
         sliceMillis: Long,
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,

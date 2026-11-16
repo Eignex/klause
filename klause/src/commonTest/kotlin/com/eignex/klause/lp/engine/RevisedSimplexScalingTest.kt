@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,9 +32,9 @@ class RevisedSimplexScalingTest {
         )
         val solver = RevisedSimplex(assertNotNull(LpExactState(source).toWorkingModel()))
 
-        assertNotNull(solver.prepareLogicals(Cancellation.Never))
+        assertNotNull(solver.prepareLogicals(ExecutionControl.Never))
         val first = solver.lastMetrics
-        assertNotNull(solver.prepareLogicals(Cancellation.Never))
+        assertNotNull(solver.prepareLogicals(ExecutionControl.Never))
         val second = solver.lastMetrics
 
         assertTrue(solver.scalingMetrics.work > 0L)
@@ -142,7 +142,7 @@ class RevisedSimplexScalingTest {
         assertTrue(
             solver.adopt(
                 LpExactState(assertNotNull(next.authoritativeModel()), boundRevision = 1L),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         val reused = assertNotNull(solver.resolveBounds())
@@ -180,7 +180,7 @@ class RevisedSimplexScalingTest {
         val changed = ExactLpObjective(listOf(ExactLpNumber.ofIeee(1e300), zero, zero))
         assertTrue(trail.replaceObjective(changed))
 
-        assertTrue(solver.adopt(trail.state, Cancellation.Never))
+        assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
         val result = assertNotNull(solver.resolveBounds())
 
         assertFalse(solver.scalingMetrics.applied)
@@ -198,12 +198,12 @@ class RevisedSimplexScalingTest {
         val tiny = ExactLpNumber.of(BigFraction.of(BIG_ONE, BIG_ONE shl 2000))
 
         assertTrue(trail.assertBound(0, false, ExactLpSide(tiny), 7L))
-        assertTrue(solver.adopt(trail.state, Cancellation.Never))
+        assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
 
         assertFalse(solver.scalingMetrics.applied)
         assertEquals(LpScalingDecline.UPDATE_UNSAFE, solver.scalingMetrics.decline)
         assertEquals(1, solver.scalingMetrics.fallbacks)
-        assertTrue(solver.adopt(trail.state, Cancellation.Never))
+        assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
         assertEquals(1, solver.scalingMetrics.fallbacks)
     }
 
@@ -220,7 +220,7 @@ class RevisedSimplexScalingTest {
         assertTrue(trail.assertBound(0, false, ExactLpSide(tiny), 7L))
 
         val failure = assertFailsWith<IllegalStateException> {
-            solver.adopt(trail.state, Cancellation.Never)
+            solver.adopt(trail.state, ExecutionControl.Never)
         }
 
         assertEquals("owner", failure.message)

@@ -29,7 +29,7 @@ BOUNDS
  UI bound x 3
  FR bound y
 ENDATA
-""".trimIndent()
+        """.trimIndent()
         val baseline = Mps.parse(source)
 
         val transformed = MpsFeasibility.transform(source)

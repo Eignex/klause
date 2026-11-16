@@ -29,7 +29,7 @@ import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.solver.search.BooleanProofTasks
 import com.eignex.klause.solver.search.BooleanTaskCheck
 import com.eignex.klause.solver.search.BooleanTaskLease
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.OperatingSystemMXBean
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
@@ -63,7 +63,7 @@ object BooleanProofCoverageProfile {
         val slices = WorkSlices(options["slice-work"]?.toLong() ?: 8L,
             options["slice-max-work"]?.toLong() ?: 64L)
         val out = File(requireNotNull(System.getenv("OUT"))).apply { mkdirs() }
-        val stop = Cancellation.after(120.seconds)
+        val stop = ExecutionControl.after(120.seconds)
         val reference = Catalog.uncapped(options.getValue("suite")).problems
             .single { it.name == options.getValue("problem") }
         val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readNBytes(1048577) }
@@ -142,7 +142,7 @@ object BooleanProofCoverageProfile {
 
     private fun qualifyCosts(
         problem: BakedProblem, context: BooleanProofContext, splits: Int, seed: Long, work: Long,
-        repeats: Int, stop: Cancellation, bean: ThreadMXBean, report: File,
+        repeats: Int, stop: ExecutionControl, bean: ThreadMXBean, report: File,
         slices: WorkSlices,
     ) {
         if (repeats == 0) return
@@ -188,7 +188,7 @@ object BooleanProofCoverageProfile {
 
     private fun costQueries(
         mode: String, problem: BakedProblem, context: BooleanProofContext,
-        splits: Int, seed: Long, work: Long, stop: Cancellation, slices: WorkSlices,
+        splits: Int, seed: Long, work: Long, stop: ExecutionControl, slices: WorkSlices,
     ): Pair<List<SolveResult>, Boolean> {
         if (mode == "f1") {
             val workers = List(2) { worker ->
@@ -225,7 +225,7 @@ object BooleanProofCoverageProfile {
 
     private fun independentReplicas(
         problem: BakedProblem, context: BooleanProofContext, seed: Long, work: Long,
-        stop: Cancellation, bean: ThreadMXBean, report: File,
+        stop: ExecutionControl, bean: ThreadMXBean, report: File,
     ) {
         val capture = BooleanCoverageAttribution(context)
         for (worker in 0..1) {
@@ -250,14 +250,15 @@ object BooleanProofCoverageProfile {
 
     private fun qualifyTasks(
         problem: BakedProblem, context: BooleanProofContext, splits: Int, seed: Long, work: Long,
-        stop: Cancellation, bean: ThreadMXBean, report: File,
+        stop: ExecutionControl, bean: ThreadMXBean, report: File,
     ) {
         val tasks = BooleanProofTasks(context, (0 until splits).toList())
         val retired = checkNotNull(tasks.acquire(0))
         faultQuery(problem, retired, seed, work, tasks.size, stop, bean, report, "lost")
         tasks.loseWorker(0)
         val cancelled = checkNotNull(tasks.acquire(1))
-        faultQuery(problem, cancelled, seed, work, tasks.size, stop or Cancellation { true }, bean, report, "cancelled")
+        faultQuery(problem, cancelled, seed, work, tasks.size, stop or ExecutionControl { true }, bean,
+            report, "cancelled")
         tasks.cancel()
         check(!tasks.complete(retired) { error("lost completion reached checker") })
         check(!tasks.complete(cancelled) { error("cancelled completion reached checker") })
@@ -291,7 +292,7 @@ object BooleanProofCoverageProfile {
 
     private fun faultQuery(
         problem: BakedProblem, lease: BooleanTaskLease, seed: Long, work: Long, tasks: Int,
-        stop: Cancellation, bean: ThreadMXBean, report: File, fault: String,
+        stop: ExecutionControl, bean: ThreadMXBean, report: File, fault: String,
     ) {
         val allocated = bean.getThreadAllocatedBytes(Thread.currentThread().threadId())
         val begin = System.nanoTime()
@@ -306,7 +307,7 @@ object BooleanProofCoverageProfile {
     }
 
     private fun taskQuery(
-        problem: BakedProblem, lease: BooleanTaskLease, seed: Long, work: Long, tasks: Int, stop: Cancellation,
+        problem: BakedProblem, lease: BooleanTaskLease, seed: Long, work: Long, tasks: Int, stop: ExecutionControl,
     ): SolveResult {
         require(lease.context.scope.objective == null && lease.context.cutoff == null)
         val condition = lease.context.scope.condition
@@ -317,7 +318,7 @@ object BooleanProofCoverageProfile {
         ))
     }
 
-    private fun params(seed: Long, stop: Cancellation): BacktrackParams = BacktrackParams(
+    private fun params(seed: Long, stop: ExecutionControl): BacktrackParams = BacktrackParams(
         randomSeed = seed, cancellation = stop, nativeSat = false,
         variableSelector = InputOrder, valueSelector = IndomainMin,
     )

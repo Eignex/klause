@@ -54,9 +54,8 @@ internal class DifferenceGraph(val numVars: Int) {
      * An edge cycle of negative total weight, or null when the search finds none or [cancelled] stops it.
      * Null reports no deduction; it does not prove consistency.
      */
-    fun negativeCycle(active: BooleanArray? = null, cancelled: () -> Boolean = { false }): IntArray? {
-        return negativeCycleWithPotential(active, cancelled, null)
-    }
+    fun negativeCycle(active: BooleanArray? = null, cancelled: () -> Boolean = { false }): IntArray? =
+        negativeCycleWithPotential(active, cancelled, null)
 
     fun negativeCycleWithPotential(
         active: BooleanArray?,

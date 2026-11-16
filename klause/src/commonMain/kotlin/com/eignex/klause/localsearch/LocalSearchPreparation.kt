@@ -4,7 +4,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.concurrent.Mutex
 
 internal class LocalSearchPreparation(
@@ -17,7 +17,7 @@ internal class LocalSearchPreparation(
     private val steps = LocalSearchProblem.preparation(problem, domains, selection)
     private var completed: LocalSearchProblem? = null
 
-    fun get(cancellation: Cancellation): LocalSearchProblem? {
+    fun get(cancellation: ExecutionControl): LocalSearchProblem? {
         while (true) {
             // A bounded batch holds the lock; no suspended arm owns it or exposes unfinished indexes.
             val result = lock.withLock {

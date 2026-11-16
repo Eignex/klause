@@ -4,7 +4,8 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.SearchAtomPremise
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class ExplainedLinearBound(
@@ -61,7 +62,7 @@ internal data class PartialLinearInputs(val bound: BigFraction, val sides: List<
 internal fun partialLinearImplication(
     comparison: ExactComparison,
     bound: (column: Int, upper: Boolean) -> ExplainedLinearBound?,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): PartialLinearImplication? {
     val arithmetic = PartialImplicationArithmetic(stop)
     if (!arithmetic.admit(comparison.bound)) return null
@@ -73,7 +74,7 @@ internal fun partialLinearImplication(
 internal fun partialLinearActivityImplication(
     comparison: ExactComparison,
     activity: (upper: Boolean) -> ExplainedLinearBound?,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): PartialLinearImplication? {
     val upper by lazy { activity(true) }
     val lower by lazy { activity(false) }
@@ -111,11 +112,12 @@ internal fun partialLinearActivityImplication(
     }
 }
 
-internal class PartialImplicationArithmetic(private val stop: Cancellation) {
+internal class PartialImplicationArithmetic(private val stop: ExecutionControl) {
+    private val stride = PollStride()
     fun admit(value: BigFraction): Boolean {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         stop.charge(1L + bits / Long.SIZE_BITS)
-        return bits <= MAX_BITS && !stop()
+        return bits <= MAX_BITS && !(stride.due() &&stop())
     }
 
     fun affineValue(value: BigFraction, scale: BigFraction, offset: BigFraction): BigFraction? {

@@ -10,7 +10,7 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -40,8 +40,8 @@ class AffineOptimizationExecutionResourceTest(private val stop: String, private 
         )
         val params = when (stop) {
             "work" -> PolynomialTheoryParams(maximumWork = 0)
-            "timeout" -> PolynomialTheoryParams(timeout = Cancellation { true })
-            "cancelled" -> PolynomialTheoryParams(cancellation = Cancellation { true })
+            "timeout" -> PolynomialTheoryParams(timeout = ExecutionControl { true })
+            "cancelled" -> PolynomialTheoryParams(cancellation = ExecutionControl { true })
             else -> PolynomialTheoryParams(maximumDenseCoefficients = 1)
         }
 

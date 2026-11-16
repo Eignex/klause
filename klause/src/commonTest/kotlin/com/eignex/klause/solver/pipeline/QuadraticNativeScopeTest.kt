@@ -8,9 +8,8 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.QfNraStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.arithmeticSource
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
@@ -29,7 +28,7 @@ class QuadraticNativeScopeTest {
         lateinit var scope: QuadraticNativeScope
         scope = QuadraticNativeScope(PolynomialTheoryParams(
             maximumWork = 100,
-            cancellation = Cancellation { scope.work >= 2L },
+            cancellation = ExecutionControl { scope.work >= 2L },
         ), concurrent = false)
         val coefficient = BigFraction.of(parseBigInt("1" + "0".repeat(1300)), BIG_ONE)
         val polynomial = Polynomial.of(List(8) {
@@ -45,8 +44,8 @@ class QuadraticNativeScopeTest {
     @Test
     fun `unused sibling reservations should not manufacture native exhaustion`() {
         val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = 5))
-        val first = assertNotNull(scope.worker(0).polynomial.arithmeticSource())
-        val second = assertNotNull(scope.worker(1).numerical.arithmeticSource())
+        val first = assertNotNull(scope.worker(0).polynomial.admission)
+        val second = assertNotNull(scope.worker(1).numerical.admission)
         val held = assertNotNull(first.reserve(5))
 
         assertNull(second.reserve(1))
@@ -82,8 +81,8 @@ class QuadraticNativeScopeTest {
         val visited = ArrayList<Int>()
         var expired = false
         val scope = QuadraticNativeScope(PolynomialTheoryParams(
-            timeout = Cancellation { visited += 1; expired },
-            cancellation = Cancellation { visited += 2; false },
+            timeout = ExecutionControl { visited += 1; expired },
+            cancellation = ExecutionControl { visited += 2; false },
         )).worker(0)
 
         assertFalse(scope.polynomial())
@@ -100,7 +99,7 @@ class QuadraticNativeScopeTest {
         var polls = 0
         val scope = QuadraticNativeScope(PolynomialTheoryParams(
             maximumWork = 3,
-            cancellation = Cancellation { polls++; false },
+            cancellation = ExecutionControl { polls++; false },
         ))
         val worker = scope.worker(0, maximumWork = 1)
 
@@ -116,7 +115,7 @@ class QuadraticNativeScopeTest {
     fun `a containing deadline should stop every native worker`() {
         val clock = TestTimeSource()
         val scope = QuadraticNativeScope(PolynomialTheoryParams(
-            timeout = Cancellation.until(clock.markNow() + 1.seconds),
+            timeout = ExecutionControl.until(clock.markNow() + 1.seconds),
         ))
         val first = scope.worker(0)
         val second = scope.worker(1)
@@ -146,12 +145,12 @@ class QuadraticNativeScopeTest {
         var charges = 0L
         val scope = QuadraticNativeScope(
             PolynomialTheoryParams(
-                cancellation = object : Cancellation {
+                cancellation = object : ExecutionControl() {
                     override fun isCancelled(): Boolean {
                         polls++
                         return false
                     }
-                    override fun workMeter(): WorkMeter = WorkMeter { charges += it }
+                    override val accounting: WorkMeter get() = WorkMeter { charges += it }
                 },
             ),
         )
@@ -179,9 +178,9 @@ class QuadraticNativeScopeTest {
     @Test
     fun `worker native charges should reach the containing meter once`() {
         var forwarded = 0L
-        val lifetime = object : Cancellation {
+        val lifetime = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { forwarded += it }
+            override val accounting: WorkMeter get() = WorkMeter { forwarded += it }
         }
         val scope = QuadraticNativeScope(PolynomialTheoryParams(cancellation = lifetime))
         val complete = scope.worker(0)

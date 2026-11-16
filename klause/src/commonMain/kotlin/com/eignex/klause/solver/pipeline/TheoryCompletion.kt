@@ -7,7 +7,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.resources.LS_INSTRUCTIONS_PER_WORK
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.math.ceil
@@ -20,7 +20,7 @@ internal class TheoryCompletion(
     private val adapter = OpenExactNeighborhood(model, params, preparedSource = preparedSource)
     val stats: SolveStats get() = adapter.stats
 
-    override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
+    override fun complete(candidate: Sample, cancellation: ExecutionControl): Completion {
         require(candidate.numBoolVars == model.numBoolVars && candidate.numIntVars == model.numIntVars) {
             "completion requires the source discrete coordinates"
         }

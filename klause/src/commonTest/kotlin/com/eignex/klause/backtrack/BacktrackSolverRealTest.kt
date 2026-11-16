@@ -19,7 +19,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -131,7 +131,7 @@ class BacktrackSolverRealTest {
             p,
             objective = null,
             sample = Sample(booleanArrayOf(), longArrayOf()),
-            cancellation = Cancellation { true },
+            cancellation = ExecutionControl { true },
         )
         assertEquals(LpVerdict.INDETERMINATE, res.verdict)
     }

@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.DefinitionalSweep.SweepNode
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.objective.FunctionalObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.numbers.BIG_ZERO
@@ -22,7 +22,7 @@ import com.eignex.util.numbers.times
 internal fun sourceDefinitionSweep(
     problem: Problem,
     hints: List<DefinitionHint>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): DefinitionalSweep? {
     if (hints.isEmpty() || cancellation()) return null
     var visits = 0

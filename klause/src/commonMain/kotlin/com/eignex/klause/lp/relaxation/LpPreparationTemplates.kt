@@ -30,12 +30,15 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.RelaxationCapability
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ArithmeticWorkSource
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.reserveWork
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 internal fun LpRelaxation.authoritativeWithTemplates(
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     onWork: (Long) -> Unit = {},
     onReuse: (Int) -> Unit = {},
 ): ExactLpModel? {
@@ -43,10 +46,22 @@ internal fun LpRelaxation.authoritativeWithTemplates(
     val templates = preparationTemplates ?: return model.authoritativeModel()
     var reused = 0
     var work = 0L
-    val token = object : Cancellation by cancellation {
-        override fun charge(units: Long) {
+    val token = object : ExecutionControl() {
+        override fun isCancelled(): Boolean = cancellation()
+        override fun deadline() = cancellation.deadline()
+        override val accounting = WorkMeter { units ->
             work += units
             cancellation.charge(units)
+        }
+        override val admission get() = cancellation.admission?.let { parent ->
+            object : ArithmeticWorkSource {
+                override val quotaOwner get() = parent.quotaOwner
+                override val quotaRemaining get() = parent.quotaRemaining
+                override val quotaAvailable get() = parent.quotaAvailable
+                override val metered get() = parent.metered
+                override val exhausted get() = parent.exhausted
+                override fun reserve(maximum: Int) = reserveWork(maximum, emptyList(), parent) { work += it }
+            }
         }
     }
     fun prepared(index: Int): LpIntegerBoundTemplate? = if (index < model.n && colVarId[index] >= 0 &&
@@ -165,9 +180,9 @@ internal data class LpIntegerBoundTemplate(
     val statedUpper: Boolean,
 ) {
     private val completedColumn = AtomicReference<ExactLpColumn?>(null)
-    val column: ExactLpColumn get() = requireNotNull(column(false, Cancellation.Never))
+    val column: ExactLpColumn get() = requireNotNull(column(false, ExecutionControl.Never))
 
-    private fun column(open: Boolean, cancellation: Cancellation): ExactLpColumn? {
+    private fun column(open: Boolean, cancellation: ExecutionControl): ExactLpColumn? {
         val previous = completedColumn.load()
         if (previous != null && (previous.bounds.upper == null) == open) return previous
         cancellation.charge(COLUMN_WORK)
@@ -184,7 +199,8 @@ internal data class LpIntegerBoundTemplate(
         return current
     }
 
-    fun compatibleColumn(current: ExactLpColumn, cancellation: Cancellation = Cancellation.Never): ExactLpColumn? {
+    fun compatibleColumn(current: ExactLpColumn, cancellation: ExecutionControl =
+        ExecutionControl.Never): ExactLpColumn? {
         val previous = completedColumn.load()
         if (previous == current) return previous
         if (!matchesColumn(current, cancellation) || cancellation()) return null
@@ -192,14 +208,14 @@ internal data class LpIntegerBoundTemplate(
         return current
     }
 
-    private fun matchesColumn(current: ExactLpColumn, cancellation: Cancellation): Boolean =
+    private fun matchesColumn(current: ExactLpColumn, cancellation: ExecutionControl): Boolean =
         current.integral && current.tag == variable && current.origin.integerModelLong() == lower &&
             matchesLower(current.bounds.lower) && matchesUpper(current.bounds.upper, cancellation)
 
     private fun matchesLower(side: ExactLpSide?): Boolean = side != null &&
         !side.strict && side.premises == null && side.number.integerModelLong() == 0L
 
-    private fun matchesUpper(side: ExactLpSide?, cancellation: Cancellation): Boolean {
+    private fun matchesUpper(side: ExactLpSide?, cancellation: ExecutionControl): Boolean {
         if (side == null) return true
         if (side.strict || side.premises != null || side.number.ieeeBits != null) return false
         val width = upper - lower
@@ -209,7 +225,7 @@ internal data class LpIntegerBoundTemplate(
         return side.number.value == BigFraction.ofLong(upper) - BigFraction.ofLong(lower)
     }
 
-    fun compatibleColumn(model: LpModel, index: Int, cancellation: Cancellation): ExactLpColumn? {
+    fun compatibleColumn(model: LpModel, index: Int, cancellation: ExecutionControl): ExactLpColumn? {
         val width = upper - lower
         if (model.doubleView != null || model.exactState != null || model.colContinuous[index] ||
             model.probeClampedLo[index] || model.tag[index] != variable || model.loShift[index] != lower || width < 0L
@@ -293,7 +309,7 @@ internal class LpPreparationTemplates private constructor(
             rowScope: Any,
             objective: LinearObjective?,
             previous: LpPreparationTemplates?,
-            token: Cancellation,
+            token: ExecutionControl,
             onWork: (Long) -> Unit = {},
             reuseIndexes: Boolean = true,
             reuseMetadata: Boolean = false,
@@ -373,7 +389,8 @@ internal class LpPreparationTemplates private constructor(
                             changedBounds = LinkedHashMap(old.bounds)
                         }
                         if (!reserveBound()) return null
-                        changedBounds[variable] = LpIntegerBoundTemplate(variable, domain.min, domain.max, lower, upper)
+                        val updated = LpIntegerBoundTemplate(variable, domain.min, domain.max, lower, upper)
+                            changedBounds[variable] = updated
                         reusedBounds--
                     }
                     if (!visit()) return null

@@ -11,7 +11,7 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** One operation binding over an attached source and its containing preparation allowance. */
 class SourceSetupRequest private constructor(
@@ -28,9 +28,9 @@ class SourceSetupRequest private constructor(
     /** Source projection providers captured once for this setup. */
     val providers: FactorProjectionProviders,
     /** Containing allowance for required source preparation and native views. */
-    val cancellation: Cancellation,
+    val cancellation: ExecutionControl,
     /** Optional deduction allowance, also bounded by [cancellation]. */
-    val boundCancellation: Cancellation,
+    val boundCancellation: ExecutionControl,
     /** Original exact quadratic source objective, when the operation supplies one. */
     val quadraticObjective: QuadraticObjectiveSpec?,
     internal val requiresQuadraticCompletion: Boolean = false,
@@ -43,8 +43,8 @@ class SourceSetupRequest private constructor(
         objective: LinearObjective? = null,
         maximize: Boolean = false,
         providers: FactorProjectionProviders = source.providers,
-        cancellation: Cancellation = Cancellation.Never,
-        boundCancellation: Cancellation = cancellation,
+        cancellation: ExecutionControl = ExecutionControl.Never,
+        boundCancellation: ExecutionControl = cancellation,
     ) : this(source, operation, engine, objective, maximize, providers, cancellation, boundCancellation, null)
 
     /** Bind an original exact quadratic objective and direction before native preparation. */
@@ -54,8 +54,8 @@ class SourceSetupRequest private constructor(
         quadraticObjective: QuadraticObjectiveSpec,
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
         providers: FactorProjectionProviders = source.providers,
-        cancellation: Cancellation = Cancellation.Never,
-        boundCancellation: Cancellation = cancellation,
+        cancellation: ExecutionControl = ExecutionControl.Never,
+        boundCancellation: ExecutionControl = cancellation,
     ) : this(
         source, ExecutionOperation.OPTIMIZE, engine, null, sense == ObjectiveSense.MAXIMIZE,
         providers, cancellation, boundCancellation, quadraticObjective,
@@ -67,8 +67,8 @@ class SourceSetupRequest private constructor(
         quadraticObjective: QuadraticObjectiveSpec,
         sense: ObjectiveSense,
         providers: FactorProjectionProviders,
-        cancellation: Cancellation,
-        boundCancellation: Cancellation,
+        cancellation: ExecutionControl,
+        boundCancellation: ExecutionControl,
         requiresQuadraticCompletion: Boolean,
     ) : this(
         source, ExecutionOperation.OPTIMIZE, engine, null, sense == ObjectiveSense.MAXIMIZE,
@@ -117,14 +117,15 @@ object SourceSetup {
     fun prepare(request: SourceSetupRequest, onLpStats: (LpStats) -> Unit): PreparedSourceInvocation =
         PreparedSourceInvocation(selectRoute(request, onLpStats))
 
-    internal fun prepare(request: SourceSetupRequest, polynomialCancellation: Cancellation): PreparedSourceInvocation =
+    internal fun prepare(request: SourceSetupRequest,
+        polynomialCancellation: ExecutionControl): PreparedSourceInvocation =
         PreparedSourceInvocation(selectRoute(request, null, polynomialCancellation))
 
     // The grid consumer runs on the selected route before the invocation exists, so no execution view escapes first.
     internal fun prepareWithGrid(
         request: SourceSetupRequest,
         privateGrid: (SourceRouteSelection) -> SelectedFloatGridPreparation?,
-        polynomialCancellation: Cancellation = request.cancellation,
+        polynomialCancellation: ExecutionControl = request.cancellation,
         onLpStats: ((LpStats) -> Unit)? = null,
     ): PreparedSourceInvocation {
         val selection = selectRoute(request, onLpStats, polynomialCancellation)
@@ -139,7 +140,7 @@ object SourceSetup {
     internal fun selectRoute(
         request: SourceSetupRequest,
         onLpStats: ((LpStats) -> Unit)? = null,
-        polynomialCancellation: Cancellation = request.cancellation,
+        polynomialCancellation: ExecutionControl = request.cancellation,
     ): SourceRouteSelection {
         val stop = request.cancellation.encodingPreparationScope()
         request.source.formula?.let { formula ->

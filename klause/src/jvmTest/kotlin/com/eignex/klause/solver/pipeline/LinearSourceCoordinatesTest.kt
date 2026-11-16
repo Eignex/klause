@@ -14,9 +14,11 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.validation.LinearSourceCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -24,8 +26,6 @@ import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class LinearSourceCoordinatesTest(private val realFirst: Boolean, private val exact: Boolean) {
@@ -59,7 +59,7 @@ class LinearSourceCoordinatesTest(private val realFirst: Boolean, private val ex
         val working = invocation.finiteShape().problem
         val values = LongArray(2) { if (it == xColumn) 1 else 5 }
         val checked = assertIs<LinearSourceCheck.Accepted>(assertNotNull(invocation.linearSource)
-            .check(Sample(booleanArrayOf(), values), Cancellation.Never))
+            .check(Sample(booleanArrayOf(), values), ExecutionControl.Never))
 
         assertSame(source, plan.originalSource)
         assertEquals(exact, assertNotNull(invocation.linearSource).claimsCoverTolerance)
@@ -75,7 +75,7 @@ class LinearSourceCoordinatesTest(private val realFirst: Boolean, private val ex
         assertEquals(SourceCoordinate(SourceCoordinate.Kind.Integer, zColumn),
             plan.workingCoordinate(SourceCoordinate(SourceCoordinate.Kind.Real, 0)))
         assertFailsWith<IllegalArgumentException> { plan.realCoordinate(0) }
-        assertNull(plan.sourceCoordinates(Cancellation.Never))
+        assertNull(plan.sourceCoordinates(ExecutionControl.Never))
         assertEquals(if (realFirst) listOf(BigFraction.ofLong(5), BigFraction.ONE) else
             listOf(BigFraction.ONE, BigFraction.ofLong(5)), checked.witness.values)
         assertEquals(BigFraction.ofLong(5), checked.witness.objective)

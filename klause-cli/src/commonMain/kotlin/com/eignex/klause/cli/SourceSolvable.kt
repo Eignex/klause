@@ -40,7 +40,8 @@ internal fun sourceSolvable(
     }
     val start = TimeSource.Monotonic.markNow()
     var lpStats = LpStats()
-    val invocation = common.routingPreparationCancellation().use { stop ->
+    val invocation = common.routingPreparationCancellation().use { scope ->
+        val stop = scope.control
         SourceSetup.prepare(
             SourceSetupRequest(
                 if (definedVars.isEmpty() && boolFolds.isEmpty()) {
@@ -81,7 +82,8 @@ internal fun attachedSourceSolvable(
 ): Solvable {
     val start = TimeSource.Monotonic.markNow()
     var lpStats = LpStats()
-    val invocation = common.routingPreparationCancellation().use { stop ->
+    val invocation = common.routingPreparationCancellation().use { scope ->
+        val stop = scope.control
         val request = if (quadraticObjective != null) {
             SourceSetupRequest(
                 source,
@@ -146,7 +148,8 @@ internal fun linearSourceSolvable(
         else -> ExecutionOperation.SATISFY
     }
     var lpStats = LpStats()
-    val invocation = common.routingPreparationCancellation().use { stop ->
+    val invocation = common.routingPreparationCancellation().use { scope ->
+        val stop = scope.control
         val request = SourceSetupRequest(
             source, operation, common.resolvedEngine(),
             maximize = source.embeddedObjectiveSense == ObjectiveSense.MAXIMIZE,

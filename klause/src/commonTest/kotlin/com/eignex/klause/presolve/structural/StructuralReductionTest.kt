@@ -24,7 +24,7 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.propagatorProjection
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -38,7 +38,7 @@ class StructuralReductionTest {
                 val clause = Clause(IntArray(width) { Lit.make(it, true) })
                 val problem = BakedProblem(width, 0, emptyArray(), List(3) { clause }, alreadyFolded = true)
                 val budget = PresolveBudget(10_000L)
-                val token = budget.orSpent(Cancellation.Never)
+                val token = budget.orSpent(ExecutionControl.Never)
 
                 val empty = if (source) StructuralReduction.reduceSource(problem, token).isEmpty
                 else StructuralReduction.reduce(problem, token).isEmpty
@@ -62,7 +62,7 @@ class StructuralReductionTest {
             }
             val problem = BakedProblem(1, 0, emptyArray(), List(32) { clause } + custom, alreadyFolded = true)
             val budget = PresolveBudget(80L)
-            val token = budget.orSpent(Cancellation.Never)
+            val token = budget.orSpent(ExecutionControl.Never)
 
             val empty = if (source) StructuralReduction.reduceSource(problem, token).isEmpty
             else StructuralReduction.reduce(problem, token).isEmpty
@@ -131,7 +131,7 @@ class StructuralReductionTest {
                 },
             )
             val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 3) }, factors, alreadyFolded = true)
-            val token = Cancellation { stopped }
+            val token = ExecutionControl { stopped }
 
             if (source) {
                 val delta = StructuralReduction.reduceSource(problem, token)
@@ -173,7 +173,7 @@ class StructuralReductionTest {
             }
             val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 3) }, listOf(factor), alreadyFolded = true)
             val budget = PresolveBudget(200L)
-            val token = budget.orSpent(Cancellation.Never)
+            val token = budget.orSpent(ExecutionControl.Never)
 
             val empty = if (source) StructuralReduction.reduceSource(problem, token).isEmpty
             else StructuralReduction.reduce(problem, token).isEmpty

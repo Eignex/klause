@@ -8,7 +8,7 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 import kotlin.jvm.JvmInline
 
@@ -52,7 +52,7 @@ enum class EncoderDecline {
     UNSUPPORTED,
     /** Required captured source conditions are missing. */
     CONDITIONS,
-    /** Cancellation or a containing resource allowance interrupted installation. */
+    /** ExecutionControl or a containing resource allowance interrupted installation. */
     RESOURCE,
 }
 
@@ -119,7 +119,7 @@ interface TheoryEncoding {
     /** Original factor index in the retained canonical source. */
     val sourceFactorIndex: Int
     /** Containing invocation allowance; installation cannot create a fresh budget. */
-    val cancellation: Cancellation
+    val cancellation: ExecutionControl
 
     /** Exact captured condition, absent when the source integer is not fixed in this scope. */
     fun fixedInteger(id: SourceIntId): BigInt?

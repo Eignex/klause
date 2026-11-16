@@ -22,7 +22,7 @@ import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraAssignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -42,7 +42,7 @@ internal class SharedPolynomialModel private constructor(
     // cut short by cancellation keeps sound but weaker root deductions and is rebuilt by the next check.
     private val finitePoints = AtomicReference<Pair<PreparedFactorProjections?, FinitePointCheck>?>(null)
 
-    fun finitePointCheck(projections: PreparedFactorProjections?, cancellation: Cancellation): FinitePointCheck {
+    fun finitePointCheck(projections: PreparedFactorProjections?, cancellation: ExecutionControl): FinitePointCheck {
         finitePoints.load()?.let { (selected, check) -> if (selected === projections) return check }
         val baked = projections?.let { finite.bake(it, cancellation) } ?: finite.bake(cancellation)
         val check = FinitePointCheck(baked, finiteEnforcingFactors)
@@ -66,15 +66,14 @@ internal class SharedPolynomialModel private constructor(
         fun assemble(
             source: Problem,
             sourceFormula: PolynomialRealFormula? = null,
-        ): SharedPolynomialModel? {
-            return source.preparePolynomialExecutionPlan(sourceFormula).execution.polynomial?.completion
-        }
+        ): SharedPolynomialModel? =
+            source.preparePolynomialExecutionPlan(sourceFormula).execution.polynomial?.completion
 
         internal fun lower(
             source: Problem,
             sourceFormula: PolynomialRealFormula?,
             projections: PreparedFactorProjections,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             onDecline: (EncoderDecline) -> Unit,
         ): SharedPolynomialModel? {
             projections.requireSource(source)
@@ -178,7 +177,7 @@ internal class SharedPolynomialModel private constructor(
             if (stopped()) return null
             return SharedPolynomialModel(
                 source,
-                Problem(
+                Problem.of(
                     source.numBoolVars, source.numIntVars, source.declaredIntDomains,
                     Array(kept.size) { source.factors[kept[it]] },
                     source.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },

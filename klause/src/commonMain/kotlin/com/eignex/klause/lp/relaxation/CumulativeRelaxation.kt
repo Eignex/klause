@@ -1,6 +1,5 @@
 package com.eignex.klause.lp.relaxation
 
-import com.eignex.klause.bound.CumulativeEnergeticBound
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.scheduling.Diffn
 import com.eignex.klause.ir.Problem

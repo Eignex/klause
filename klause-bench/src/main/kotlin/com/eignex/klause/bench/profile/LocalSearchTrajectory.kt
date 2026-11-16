@@ -47,20 +47,20 @@ import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.util.Base64
-import kotlin.random.Random
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.nanoseconds
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.util.Base64
+import kotlin.random.Random
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.nanoseconds
 
 internal object LocalSearchTrajectory {
     @JvmStatic
@@ -219,7 +219,7 @@ internal object LocalSearchTrajectory {
         for (variant in if ((initial != null && channel == null) || selectorsFromWalk) variants.take(1) else variants) {
             val rewrite = variant.label
             val preparationStarted = System.nanoTime()
-            val stop = Cancellation.after(timeoutMillis.milliseconds)
+            val stop = ExecutionControl.after(timeoutMillis.milliseconds)
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 if (parsed.definedVars.isEmpty()) SourceAttachment(parsed.problem, parsed.definitionHints)
                 else SourceAttachment(parsed.problem, parsed.definedVars, emptyList(), parsed.definitionHints),
@@ -361,7 +361,7 @@ internal object LocalSearchTrajectory {
                     out.resolve("censored-$mode-$rewrite.txt").writeText("preparation-time-budget\n")
                     continue
                 }
-                val walkStop = if (walk) Cancellation.after(remainingNanos.coerceAtLeast(1).nanoseconds) else stop
+                val walkStop = if (walk) ExecutionControl.after(remainingNanos.coerceAtLeast(1).nanoseconds) else stop
                 val label = if (mode == "walk") rewrite.toString() else "$mode-$rewrite"
                 out.resolve("walk-$label.jsonl").bufferedWriter().use { writer ->
                     var picks = 0L
@@ -762,7 +762,7 @@ internal object LocalSearchTrajectory {
     internal fun trajectoryCoordinates(
         invocation: PreparedSourceInvocation,
         prepared: FinitePipelinePreparation,
-        stop: Cancellation,
+        stop: ExecutionControl,
     ): VarRemap? {
         val mapping = getter(prepared, "getSourceMapping") ?: return null
         val plan = getter(invocation, "getEnginePlan") ?: return null
@@ -778,7 +778,7 @@ internal object LocalSearchTrajectory {
     internal fun heuristicHints(
         invocation: PreparedSourceInvocation,
         prepared: FinitePipelinePreparation,
-        stop: Cancellation,
+        stop: ExecutionControl,
     ): Any? {
         val mapping = getter(prepared, "getSourceMapping")
         val plan = requireNotNull(getter(prepared, "getExecutionPlan"))

@@ -11,13 +11,13 @@ import com.eignex.klause.lp.relaxation.LpRelaxation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.round
 import kotlin.time.TimeSource
 
 internal fun LpEngine.prepareRootComponentTrial(
     objective: LinearObjective,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean {
     val guide = rootRoundingWarmStart ?: return false
     val targets = rootPrimalTargets ?: return false
@@ -60,7 +60,7 @@ internal fun LpEngine.prepareRootComponentTrial(
 
 private fun LpEngine.fractionalComponentTargets(
     targets: RootPrimalTargets,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Boolean {
     val maximumWork = 8L * targets.intColumns.size
     if (!rootComponentPreparationAllowed(targets, 0L, maximumWork) ||
@@ -98,7 +98,7 @@ private fun LpEngine.fractionalComponentTargets(
 internal fun LpEngine.prepareComponentRounding(
     session: PropagationSession,
     guide: RootRoundingWarmStart,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): RootComponentRounding? {
     guide.componentRounding?.let { return it }
     if (session.decisionLevel != 0) return null
@@ -114,7 +114,7 @@ internal fun LpEngine.pinRootComponents(
     relaxation: LpRelaxation,
     primal: DoubleArray,
     knownColumns: BooleanArray?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     charge: () -> Unit,
 ): Sample? {
     val order = pending.order
@@ -192,7 +192,7 @@ internal fun LpEngine.pinRootComponents(
 private fun LpEngine.retainCompletedRoundingComponents(
     pending: RootComponentRounding,
     session: PropagationSession,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     charge: () -> Unit,
 ) {
     val targets = rootPrimalTargets?.takeIf { it.components === pending.order }

@@ -29,10 +29,8 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.SchedulingCancellation
-import com.eignex.klause.util.cancelledWhen
-import com.eignex.klause.util.workScheduled
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.withStopFlag
 import com.eignex.kumulant.bandit.UnivariateBandit
 import com.eignex.util.concurrent.Mutex
 import com.eignex.util.concurrent.parallelRun
@@ -245,7 +243,7 @@ class Portfolio(
      * A backtrack arm's [ResumableSolve] is resumed each time it is scheduled; an arm whose handle reaches a verdict
      * that settles nothing, or fails, is retired. Local-search satisfaction walks resume across counted segments.
      */
-    override fun solve(cancellation: Cancellation): SolveResult = qualify(solveRun(cancellation))
+    override fun solve(cancellation: ExecutionControl): SolveResult = qualify(solveRun(cancellation))
 
     private fun sourceSemantics(): EffectiveSourceSemantics? {
         val model = workers.firstOrNull()?.evidenceModel ?: return null
@@ -263,7 +261,7 @@ class Portfolio(
     private fun qualify(result: MinimizeResult.WithSample): MinimizeResult.WithSample =
         sourceSemantics()?.let { result.withSourceSemantics(it) } ?: result
 
-    private fun solveRun(cancellation: Cancellation): SolveResult {
+    private fun solveRun(cancellation: ExecutionControl): SolveResult {
         val run = Schedule(cancellation, arrayOfNulls<ResumableSolve>(workers.size))
         lastBooleanProofTasks = 0
         lastBooleanProofCompleted = 0
@@ -454,7 +452,7 @@ class Portfolio(
      * that produced it, in the order the incumbent installed them.
      */
     override fun minimize(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onImprovement: ((AttributedImprovement) -> Unit)?,
     ): MinimizeResult {
         val exact = exactLinearObjective
@@ -463,7 +461,7 @@ class Portfolio(
     }
 
     internal fun <V> minimize(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onImprovement: ((AttributedImprovement) -> Unit)?,
         incumbents: PortfolioIncumbents<V>,
         terminalCheck: PortfolioTerminalCheck? = null,
@@ -472,7 +470,7 @@ class Portfolio(
 
     @Suppress("TooGenericExceptionCaught")
     private fun <V> minimizeRun(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         onImprovement: ((AttributedImprovement) -> Unit)?,
         incumbents: PortfolioIncumbents<V>,
         terminalCheck: PortfolioTerminalCheck?,
@@ -819,7 +817,7 @@ class Portfolio(
         }
         val stats = run.folded()
         unbounded?.let { return it.copy(stats = stats) }
-        // Cancellation or retirement stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
+        // ExecutionControl or retirement stopped a still-open search: keep the incumbent (BestFound) or report Unknown.
         val reason = when {
             run.allRetired -> PortfolioReduction.unsettledReason(stopReasons)
             run.workLimitReached -> TerminationReason.BudgetExhausted
@@ -897,7 +895,7 @@ class Portfolio(
      * handle is advanced only by the lane holding its arm; preparation hints are read only while the arm is idle.
      */
     @Suppress("TooGenericExceptionCaught")
-    private inner class Schedule<H : AutoCloseable>(cancellation: Cancellation, val handles: Array<H?>) {
+    private inner class Schedule<H : AutoCloseable>(cancellation: ExecutionControl, val handles: Array<H?>) {
         private val scopedReward = if (rewardPolicy is SourceRateReward)
             rewardPolicy.fresh(workers.map { it.family }) else rewardPolicy
         val pricesAcceptedGains: Boolean get() = scopedReward is SourceRateReward
@@ -939,12 +937,13 @@ class Portfolio(
         private val stopped = AtomicBoolean(false)
 
         /** The run's token: the caller's, stopped early once any lane settles the run. */
-        private val external = if (diagnostics == null) cancellation else object : SchedulingCancellation {
+        private val external = if (diagnostics == null) cancellation else object : ExecutionControl() {
             override val workScheduled: Boolean = true
             override fun isCancelled(): Boolean = cancellation()
-            override fun workMeter() = cancellation.workMeter()
+            override val accounting get() = cancellation.accounting
+                override val admission get() = admissionFrom(cancellation)
         }
-        val token: Cancellation = external.alsoStoppedBy(stopped)
+        val token: ExecutionControl = external.alsoStoppedBy(stopped)
         private val earnable = workers.map { it.signals }
         val ledger = RewardLedger(workers.size) { arm, signal ->
             !workers[arm].auxiliaryProof && signal in earnable[arm]
@@ -1704,10 +1703,11 @@ class Portfolio(
      * short budget from going to a few long segments: with the probes and a couple of grown slices spending it, the
      * policy would get almost no choices to make. A counted arm ([PortfolioWorker.acceptsInstructionBudget]) usually
      * ends at its instruction budget first; see [baseSliceWork]. An arm with neither a counter nor a resumable handle
-     * has only the time bounds, a deadline it can size a sub-phase against ([Cancellation.shorten]). A whole segment
+     * has only the time bounds,
+     a deadline it can size a sub-phase against ([ExecutionControl.shorten]). A whole segment
      * has none.
      */
-    private fun segmentToken(worker: PortfolioWorker, cancellation: Cancellation, claim: Claim): Cancellation {
+    private fun segmentToken(worker: PortfolioWorker, cancellation: ExecutionControl, claim: Claim): ExecutionControl {
         if (diagnostics != null) return cancellation
         if (claim.whole) return cancellation
         val slice = if (claim.probing && worker.acceptsInstructionBudget) probeSliceMillis else claim.sliceMillis
@@ -1715,7 +1715,7 @@ class Portfolio(
     }
 
     // The offered segment deadline also bounds search after atomic handle construction.
-    private fun remainingMillis(token: Cancellation): Long = token.deadline()?.let {
+    private fun remainingMillis(token: ExecutionControl): Long = token.deadline()?.let {
         (it - TimeSource.Monotonic.markNow()).inWholeMilliseconds.coerceAtLeast(0L)
     } ?: Long.MAX_VALUE
 
@@ -1729,8 +1729,8 @@ class Portfolio(
     private fun remainingShare(claim: Claim): Double =
         if (claim.probing) REMAINING_SHARE * claim.probeFraction else REMAINING_SHARE / familyCount
 
-    private fun until(millis: Long): Cancellation =
-        Cancellation.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
+    private fun until(millis: Long): ExecutionControl =
+        ExecutionControl.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
 
     /** Geometric growth shared by every slice axis (millis and work): grow by [sliceGrowth], never past [cap]. */
     private fun grow(current: Long, cap: Long): Long = (current * sliceGrowth).toLong().coerceAtMost(cap)
@@ -1808,5 +1808,5 @@ private const val AUXILIARY_PREPARATION_ALLOWANCES = 12
 private const val CHECK_SHARE = 0.2
 
 // The caller's token that also stops on [flag], keeping the caller's deadline.
-private fun Cancellation.alsoStoppedBy(flag: AtomicBoolean): Cancellation =
-    cancelledWhen(this::deadline, this::workScheduled) { flag.load() || this() }
+private fun ExecutionControl.alsoStoppedBy(flag: AtomicBoolean): ExecutionControl =
+    withStopFlag( flag)

@@ -1,8 +1,8 @@
 package com.eignex.klause.bench.profile
 
+import kotlinx.serialization.json.Json
 import java.util.Base64
 import java.util.zip.GZIPInputStream
-import kotlinx.serialization.json.Json
 
 internal fun trajectoryBatch(args: Array<String>): List<List<String>>? {
     if (args.size != 1) return null

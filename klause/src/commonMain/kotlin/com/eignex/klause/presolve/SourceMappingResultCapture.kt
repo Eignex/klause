@@ -13,7 +13,7 @@ import com.eignex.klause.solver.evidence.SourceResultCapture
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 
@@ -22,7 +22,7 @@ internal fun SourceMapping.captureSolve(
     result: SolveResult,
     capture: SourceResultCapture,
     producer: String,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): SolveResult {
     require(reduced === target) { "result reconstruction belongs to another reduced model" }
     require(capture.belongsTo(source)) { "result capture belongs to another original source" }
@@ -55,7 +55,7 @@ internal fun SourceMapping.captureMinimize(
     capture: SourceResultCapture,
     objective: LinearObjective,
     producer: String,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): MinimizeResult {
     require(reduced === target) { "result reconstruction belongs to another reduced model" }
     require(capture.belongsTo(source, objective)) { "result capture belongs to another original source objective" }
@@ -103,7 +103,7 @@ private fun SourceMapping.captureOptimal(
     objective: LinearObjective,
     producer: String,
     mapping: SourceMappingEvidence,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): MinimizeResult.Optimal {
     val point = sourcePoint(reduced, result.sample)
     val candidate = MinimizeResult.Optimal(point, objective.minimizedTelemetry(point, capture), result.stats)

@@ -5,14 +5,14 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class JointRepairCenter(
     private val model: Problem,
     private val budget: SourceLpBudget,
-    private val stop: Cancellation,
+    private val stop: ExecutionControl,
     private val eligible: (Int) -> Boolean,
 ) {
     class Step(val condition: ExactNeighborhoodCondition, val coordinate: Int,
@@ -59,7 +59,7 @@ internal class JointRepairCenter(
     }
 
     fun apply(step: Step, centers: MutableList<BigFraction>, bools: BooleanArray,
-        condition: ExactNeighborhoodCondition, cancellation: Cancellation): Boolean {
+        condition: ExactNeighborhoodCondition, cancellation: ExecutionControl): Boolean {
         if (step.condition !== condition || condition.cutoff != null || cancellation() ||
             step.coordinate !in 0 until model.numIntVars || !eligible(step.coordinate)) return false
         val entries = condition.bools.size.toLong() + condition.lower.size + condition.upper.size

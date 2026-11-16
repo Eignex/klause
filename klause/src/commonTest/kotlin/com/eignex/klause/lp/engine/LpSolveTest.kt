@@ -4,7 +4,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactSimplexBound
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -432,7 +432,7 @@ class LpSolveTest {
             override fun solvePrimal(warm: Basis?): FloatLpResult? = null
         }
 
-        val result = certifyLpResult(model, repeated, null, Cancellation { true }, counterResults = cache)
+        val result = certifyLpResult(model, repeated, null, ExecutionControl { true }, counterResults = cache)
 
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
         assertEquals(first.exactPrimal, result.exactPrimal)
@@ -597,7 +597,7 @@ class LpSolveTest {
             assertNotNull(state.toWorkingModel()),
             solver,
             candidate,
-            Cancellation { cancelled },
+            ExecutionControl { cancelled },
             policy = context.certificationPolicy,
         )
 

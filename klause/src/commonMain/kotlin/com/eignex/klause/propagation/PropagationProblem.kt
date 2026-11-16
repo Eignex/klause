@@ -5,7 +5,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.isClausal
 import com.eignex.klause.solver.selectedFactorProjections
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntHashSet
 
@@ -28,7 +28,8 @@ class PropagationProblem private constructor(
         selection.requireSource(problem)
     }
 
-    internal fun bakeRetainedView(view: Problem, factorIndices: IntArray, cancellation: Cancellation): BakedProblem {
+    internal fun bakeRetainedView(view: Problem, factorIndices: IntArray,
+        cancellation: ExecutionControl): BakedProblem {
         require(view.numBoolVars == problem.numBoolVars && view.numIntVars == problem.numIntVars &&
             view.numRealVars == problem.numRealVars && factorIndices.size == view.numFactors &&
             factorIndices.indices.all { index ->

@@ -43,7 +43,7 @@ import com.eignex.klause.lowering.tseitinAnd
 import com.eignex.klause.lowering.tseitinIff
 import com.eignex.klause.lowering.tseitinOr
 import com.eignex.klause.lowering.wideConstHolds
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableLongIntMap
 
@@ -112,7 +112,7 @@ internal object Compiler {
     internal class Builder(
         private val settings: ProblemSettings = KlauseConfig.current.problemSettings(),
         private val semantics: EffectiveSourceSemantics = xcsp3Semantics.resolve(),
-        private val recoveryCancellation: Cancellation = Cancellation.Never,
+        private val recoveryCancellation: ExecutionControl = ExecutionControl.Never,
     ) : CnfLowering {
         internal val varIds = LinkedHashMap<String, Int>() // resolved name (incl. array cells) -> int var id
         internal val arrayDims = HashMap<String, IntArray>() // array id -> declared dimension sizes
@@ -952,10 +952,9 @@ internal object Compiler {
         }
 
         /** `if(cond, a, b)` as a linear term: a fresh int pinned to `a` or `b` by the condition. */
-        internal fun ifTerm(args: List<FExpr>): IntComb {
-            return selectionTerm(compileBool(args[0]), materializeVar(linear(args[1])),
+        internal fun ifTerm(args: List<FExpr>): IntComb = selectionTerm(compileBool(args[0]),
+            materializeVar(linear(args[1])),
                 materializeVar(linear(args[2])))
-        }
 
         internal fun divModTerm(args: List<FExpr>, mod: Boolean): IntComb {
             val a = divModOperand(args[0]) { linear(args[0]) }

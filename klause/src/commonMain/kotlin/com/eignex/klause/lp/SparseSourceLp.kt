@@ -10,7 +10,7 @@ import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class SparseSourceLpLimits(val work: Long, val allocation: Long, val scalarBits: Int = 4096) {
@@ -54,7 +54,7 @@ internal class SparseSourceLp private constructor(
     } ?: intArrayOf(primaryRows[row])
 
     fun emittedInactiveRows(
-        inactive: Set<Int>, cancellation: Cancellation,
+        inactive: Set<Int>, cancellation: ExecutionControl,
         onCost: (Long, Long) -> Boolean,
     ): Set<Int>? {
         if (cancellation()) return null
@@ -87,7 +87,7 @@ internal class SparseSourceLp private constructor(
 
     fun sourceRowWeights(
         weights: List<BigFraction>,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): List<BigFraction>? {
         if (weights.size != emittedRowCount || cancellation()) return null
         val expanded = MutableList(sourceRowCount) { BigFraction.ZERO }
@@ -113,7 +113,7 @@ internal class SparseSourceLp private constructor(
             costs: List<BigFraction>,
             constant: BigFraction,
             limits: SparseSourceLpLimits,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
             rowPolicy: SparseSourceLpRowPolicy = SparseSourceLpRowPolicy.IDENTITY,
         ): SparseSourceLpPreparation {
             val meter = SparsePreparationMeter(limits, cancellation)
@@ -215,13 +215,14 @@ internal class SparseSourceLp private constructor(
             costs: List<BigFraction>,
             constant: BigFraction,
             policy: SparseSourceLpPolicy,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): SparseSourceLpPreparation = prepare(rows, columns, costs, constant, policy.preparation,
             cancellation, policy.rowPolicy)
     }
 }
 
-private class SparsePreparationMeter(private val limits: SparseSourceLpLimits, private val cancellation: Cancellation) {
+private class SparsePreparationMeter(private val limits: SparseSourceLpLimits,
+    private val cancellation: ExecutionControl) {
     var decline: SparseSourceLpDecline? = null
     var work = 0L
         private set

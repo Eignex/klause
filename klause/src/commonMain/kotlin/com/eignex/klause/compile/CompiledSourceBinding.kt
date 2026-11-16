@@ -27,7 +27,7 @@ import com.eignex.klause.solver.projection.FloatGridRequest
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.projection.prepareFloatGrid
 import com.eignex.klause.solver.validation.verifyOpenWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
@@ -93,7 +93,7 @@ internal class CompiledSourceBinding(
         return false
     }
 
-    fun bindOriginalSample(sample: Sample, cancellation: Cancellation): Sample? {
+    fun bindOriginalSample(sample: Sample, cancellation: ExecutionControl): Sample? {
         val frame = sample.coordinateFrame
         require(frame == null || frame === originalProblem) { "source assignment retains a foreign coordinate frame" }
         if (cancellation()) return null
@@ -167,16 +167,16 @@ internal class CompiledSourceBinding(
     }
 
     private fun prepareCompatibility(): FloatGridDefinition? {
-        val selected = selectedVariables(Cancellation.Never) ?: error("schema finite view preparation interrupted")
+        val selected = selectedVariables(ExecutionControl.Never) ?: error("schema finite view preparation interrupted")
         if (selected.isEmpty()) return null
         val request = FloatGridRequest(originalProblem, selected, truncatedRows = truncatedRows)
-        return when (val prepared = prepareFloatGrid(request, Cancellation.Never)) {
+        return when (val prepared = prepareFloatGrid(request, ExecutionControl.Never)) {
             is FloatGridPreparation.Prepared -> prepared.mapping.definition()
             is FloatGridPreparation.Declined -> error("schema finite view declined: ${prepared.cause}")
         }
     }
 
-    private fun selectedVariables(cancellation: Cancellation): List<FloatGridVariable>? {
+    private fun selectedVariables(cancellation: ExecutionControl): List<FloatGridVariable>? {
         if (cancellation()) return null
         if (originalProblem.semantics.effective.floats !is FloatSemantics.Grid) return emptyList()
         val selected = HashSet<Int>()

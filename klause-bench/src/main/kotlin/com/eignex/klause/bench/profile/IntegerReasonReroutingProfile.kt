@@ -15,15 +15,15 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
 import com.sun.management.ThreadMXBean
-import java.io.File
-import java.lang.management.ManagementFactory
-import java.security.MessageDigest
-import java.util.HexFormat
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.io.File
+import java.lang.management.ManagementFactory
+import java.security.MessageDigest
+import java.util.HexFormat
 
 internal object IntegerReasonReroutingProfile {
     @JvmStatic
@@ -46,7 +46,7 @@ internal object IntegerReasonReroutingProfile {
         for (order in orders) for (arm in listOf("clauses", "original", "eager", "numeric-surrogate")) {
             val started = System.nanoTime()
             val before = bean.getThreadAllocatedBytes(thread)
-            val source = "${scale}*x+y<=z; x-y<=0; z-${scale}*x<=w; " +
+            val source = "$scale*x+y<=z; x-y<=0; z-$scale*x<=w; " +
                 "x=0..$scale; y=0..$scale; z=0..${scale * (scale + 1)}; w=0..${scale * (scale + 1)}"
             val factors = arrayOf(
                 Linear(intArrayOf(scale, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),

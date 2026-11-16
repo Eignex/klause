@@ -10,7 +10,6 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.meta.alns.Alns
 import com.eignex.klause.meta.alns.BacktrackRepair
 import com.eignex.klause.portfolio.PortfolioWorker
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.conditionedRoot
@@ -36,16 +35,16 @@ import com.eignex.klause.theory.qfnra.PolynomialTheoryInvocation
 import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class PolynomialWorkerAdapter(
     private val model: SharedPolynomialModel,
     private val invocation: PolynomialTheoryInvocation,
     private val params: PolynomialStrategyParams,
     private val binding: EngineInvocation,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ) {
-    private val cancellation = cancellation or Cancellation {
+    private val cancellation = cancellation or ExecutionControl {
         invocation.workExhausted || invocation.lastUnknown?.reason == QfNraReason.ResourceLimit
     }
     private val finite: BakedProblem = binding.preparedPlan.finiteFactorProjections?.let { selected ->
@@ -78,10 +77,11 @@ internal class PolynomialWorkerAdapter(
     }
 
     private fun backtrackParams(): BacktrackParams = params.backtrack.withAssumptions(params.assumptions).copy(
-        cancellation = params.backtrack.cancellation or cancellation,
+        cancellation = params.backtrack.cancellation.withAccounting(cancellation) or cancellation,
         valueSelector = params.backtrack.valueSelector.let { values ->
             if (values is SolutionGuided) values else PolynomialWitnessValues(values, SearchCandidateHints { variable ->
-                invocation.preferredBool(variable, params.backtrack.cancellation or cancellation)
+                invocation.preferredBool(variable,
+                    params.backtrack.cancellation.withAccounting(cancellation) or cancellation)
             })
         },
         componentFactory = {
@@ -102,7 +102,7 @@ internal class PolynomialWorkerAdapter(
     )
 
     private fun localParams(): LocalSearchParams = params.localSearch.withAssumptions(params.assumptions).copy(
-        cancellation = params.localSearch.cancellation or cancellation,
+        cancellation = params.localSearch.cancellation.withAccounting(cancellation) or cancellation,
     )
 
     private var refutedCondition: PolynomialCondition? = null
@@ -134,7 +134,7 @@ internal class PolynomialWorkerAdapter(
 
     private val finiteEnforcement = FiniteFactorEnforcement(model.finite, enforcingFactors)
     private val completion = object : CandidateCompletion, FiniteFactorEnforcer by finiteEnforcement {
-        override fun complete(candidate: Sample, cancellation: Cancellation): Completion =
+        override fun complete(candidate: Sample, cancellation: ExecutionControl): Completion =
             candidateCompletion.complete(candidate, cancellation)
     }
 
@@ -165,7 +165,7 @@ internal class PolynomialWorkerAdapter(
         }
     }
 
-    private fun alns(stop: Cancellation, instructions: Long? = null): SolveResult {
+    private fun alns(stop: ExecutionControl, instructions: Long? = null): SolveResult {
         val objective = LinearObjective(intCoefficients = LongArray(finite.numIntVars) { 1L })
         val result = alnsMinimize(objective, stop, instructions)
         return result.assignment?.let { SolveResult.Sat(it, result.stats) }
@@ -174,7 +174,7 @@ internal class PolynomialWorkerAdapter(
 
     private fun alnsMinimize(
         objective: LinearObjective,
-        stop: Cancellation,
+        stop: ExecutionControl,
         instructions: Long? = null,
     ): MinimizeResult {
         val inner = localSearch()

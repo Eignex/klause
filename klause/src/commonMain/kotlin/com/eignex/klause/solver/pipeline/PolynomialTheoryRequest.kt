@@ -10,7 +10,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 
 /** A polynomial request composing exact continuous constraints with finite factors. */
@@ -76,9 +76,9 @@ data class PolynomialTheoryParams(
     /** Maximum matrix cell count; null disables the cap subject to checked dimensions. */
     val maximumMatrixCells: Long? = 262144,
     /** Wall-time token retained separately for the common termination reason. */
-    val timeout: Cancellation = Cancellation.Never,
+    val timeout: ExecutionControl = ExecutionControl.Never,
     /** External cooperative token, forwarding native charges once to its meter. */
-    val cancellation: Cancellation = Cancellation.Never,
+    val cancellation: ExecutionControl = ExecutionControl.Never,
     /** Finite search, heuristic and neighbourhood controls for theory composition. */
     val strategy: PolynomialStrategyParams = PolynomialStrategyParams(),
 ) {
@@ -228,7 +228,7 @@ private fun minimizePolynomial(
     cores: Int,
 ): PolynomialOptimizationExecution {
     require(cores > 0)
-    val stop = params.timeout or params.cancellation
+    val stop = params.timeout.withAccounting(params.cancellation) or params.cancellation
     val operation = request.preparedPlan.withObjective(objective)
     if (objective.realCoefficientValues.any { it != 0.0 } ||
         !operation.capabilities.admission(engine, ExecutionOperation.OPTIMIZE).runnable
@@ -302,7 +302,7 @@ private fun executePolynomial(
     cores: Int,
 ): PolynomialTheoryExecution {
     require(cores > 0)
-    val stop = params.timeout or params.cancellation
+    val stop = params.timeout.withAccounting(params.cancellation) or params.cancellation
     fun incomplete(
         reason: TerminationReason,
         stats: PolynomialTheoryStats,

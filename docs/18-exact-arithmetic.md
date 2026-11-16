@@ -3,17 +3,18 @@
 Exact kernels certify arithmetic facts for source-aware callers. They own immutable
 values, numerical certificates and private workspace; callers own formula truth,
 strategy and publication. Kernels read no factors, finite domains or solver verdicts
-and charge work to the containing token.
+and charge work to the explicitly bound execution owner.
 
 `util.ArithmeticExecution` separates native work admission from cancellation
 checkpoints. An owned arithmetic operation uses a local cursor: floating proposal
-loops checkpoint after at most 64 admitted units, quadratic certification after at
-most eight, and polynomial and enclosure kernels after at most 32. Coefficient
+loops checkpoint after at most 256 admitted units, quadratic certification after at
+most 64, and polynomial and enclosure kernels after at most 8,192. Coefficient
 operations whose combined operand size exceeds 4096 bits force a checkpoint before
-the exact primitive.
+the exact primitive. Cancellation polls retain admitted credit between settlement boundaries.
 Entry, allocation admission, callback handoff, prepared-cursor suspension and all
-exits settle spent work and check the live containing stop. Nested methods share
-the cursor; retained state holds no unused credit while paused. A stopped operation
+exits settle spent work and check the live containing stop. Callback return rebinds
+the accounting owner. Nested methods share the cursor; retained state holds no unused
+credit while paused. A stopped operation
 publishes no partial arithmetic result. One arbitrary-precision primitive remains
 cooperative and runs to completion between checkpoints.
 
@@ -21,8 +22,8 @@ A unit is one explicit kernel `step`: scalar multiply-accumulate, coefficient vi
 elimination update or operation admission, according to the kernel. A quadratic
 primitive used by polynomial refutation admits one polynomial unit; a pure
 checkpoint admits none. Numerical evaluation order and exact operands are unchanged.
-Opaque caller tokens retain their per-step before/after predicates and unit charges;
-only owned accounting sources can reserve bounded credit.
+Accounting does not determine polling cadence. Only explicit allowance sources
+reserve credit; opaque work sinks receive completed unit charges without evaluating cancellation.
 
 ## Exact quadratic certificates
 
@@ -172,7 +173,7 @@ and only the specialized polynomial's distinct real roots.
 
 ### Invocation resources
 
-Every operation checks the caller's `Cancellation` at bounded checkpoints and charges deterministic work;
+Every operation checks the caller's `ExecutionControl` at bounded checkpoints and charges deterministic work;
 `PolynomialInterrupted` publishes no partial result. `PolynomialLimits` defaults to
 65,536 dense coefficients and 262,144 elimination matrix cells, and dimensions are
 checked before allocation. No cap truncates a polynomial or supplies a refutation;

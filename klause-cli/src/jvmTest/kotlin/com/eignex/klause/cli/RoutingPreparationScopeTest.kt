@@ -20,13 +20,14 @@ class RoutingPreparationScopeTest {
     @Test
     fun `closing required admission should stop charging its completed routing ledger`() {
         val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }
-        val stop = common.routingPreparationCancellation()
+        val scope = common.routingPreparationCancellation()
+        val stop = scope.control
         val budget = assertNotNull(common.presolveBudget)
         stop.charge(2L)
         assertTrue(common.routingCancellation()())
         assertFalse(stop())
 
-        stop.close()
+        scope.close()
         stop.charge(3L)
 
         assertEquals(2L, budget.spent())
@@ -35,8 +36,10 @@ class RoutingPreparationScopeTest {
     @Test
     fun `a completed routing scope should retain the live containing deadline`() {
         val common = CommonOptions()
-        val stop = common.routingPreparationCancellation()
-        stop.close()
+        val scope = common.routingPreparationCancellation()
+        val
+        stop = scope.control
+        scope.close()
         assertFalse(stop())
 
         common.deadlineAtMs = nowMillis() - 1L
@@ -47,14 +50,15 @@ class RoutingPreparationScopeTest {
     @Test
     fun `failed admission should release its routing meter`() {
         val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }
-        val stop = common.routingPreparationCancellation()
-        assertNotNull(stop.workMeter())
+        val scope = common.routingPreparationCancellation()
+        val stop = scope.control
+        assertNotNull(stop.accounting)
 
         assertFailsWith<IllegalArgumentException> {
-            stop.use { throw IllegalArgumentException("admission failed") }
+            scope.use { throw IllegalArgumentException("admission failed") }
         }
 
-        assertNull(stop.workMeter())
+        assertNull(stop.accounting)
     }
 
     @Test

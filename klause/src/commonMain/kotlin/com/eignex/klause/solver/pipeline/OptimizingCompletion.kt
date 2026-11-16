@@ -7,7 +7,7 @@ import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.refuteOpenWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Completes a local-search candidate over an open model whose objective weighs continuous columns: the residual LP
@@ -24,7 +24,7 @@ internal class OptimizingCompletion(
 ) : CandidateCompletion {
     private val leaf = LeafRealCompletion(model, objective)
 
-    override fun complete(candidate: Sample, cancellation: Cancellation): Completion {
+    override fun complete(candidate: Sample, cancellation: ExecutionControl): Completion {
         val optimized = leaf.complete(candidate, cancellation)
         if (optimized is Completion.Refuted) return optimized
         if (optimized is Completion.Witness && refuteOpenWitness(model, optimized.sample) == null) return optimized

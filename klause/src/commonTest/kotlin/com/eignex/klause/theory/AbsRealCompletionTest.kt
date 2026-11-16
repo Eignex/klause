@@ -31,7 +31,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.solver.validation.unreadRelation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -82,8 +82,8 @@ class AbsRealCompletionTest {
         )
         val completion = LeafRealCompletion(source, null)
 
-        val refuted = completion.complete(Sample(BooleanArray(0), longArrayOf(0)), Cancellation.Never)
-        val sibling = completion.complete(Sample(BooleanArray(0), longArrayOf(-1)), Cancellation.Never)
+        val refuted = completion.complete(Sample(BooleanArray(0), longArrayOf(0)), ExecutionControl.Never)
+        val sibling = completion.complete(Sample(BooleanArray(0), longArrayOf(-1)), ExecutionControl.Never)
 
         assertIs<Completion.Refuted>(refuted)
         assertTrue(refuted.work > 0L)
@@ -154,13 +154,13 @@ class AbsRealCompletionTest {
         )
         val completion = AbsRealCompletion(source)
         var charged = 0L
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 7L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val interrupted = completion.complete(Sample(BooleanArray(0), LongArray(0)), stop)
-        val sibling = completion.complete(Sample(BooleanArray(0), LongArray(0)), Cancellation.Never)
+        val sibling = completion.complete(Sample(BooleanArray(0), LongArray(0)), ExecutionControl.Never)
 
         assertIs<AbsRealCompletion.Result.Undecided>(interrupted.result)
         assertEquals(charged, interrupted.work)
@@ -222,16 +222,16 @@ class AbsRealCompletionTest {
         LongArray(problem.numIntVars) { problem.intBounds.lower(it) })
 
     private fun withinTolerance(problem: Problem) =
-        AbsRealCompletion(problem, tenth).complete(discrete(problem), Cancellation.Never).result
+        AbsRealCompletion(problem, tenth).complete(discrete(problem), ExecutionControl.Never).result
 
     @Test
     fun `tolerance completion should find a point the source accepts where the exact search refutes`() {
         val accepted = relations(within = true).mapValues { (_, problem) ->
-            val completed = AbsRealCompletion(problem, tenth).complete(discrete(problem), Cancellation.Never).result
+            val completed = AbsRealCompletion(problem, tenth).complete(discrete(problem), ExecutionControl.Never).result
             val witness = assertIs<AbsRealCompletion.Result.Witness>(completed)
             val reals = DoubleArray(witness.reals.size) { witness.reals[it].toDouble() }
             val sample = discrete(problem).copy(reals = reals, exactReals = witness.reals)
-            witness.withinTolerance && assertNotNull(capturedRealAcceptance(problem, Cancellation.Never))(sample)
+            witness.withinTolerance && assertNotNull(capturedRealAcceptance(problem, ExecutionControl.Never))(sample)
         }
 
         assertEquals(relations(within = true).mapValues { true }, accepted)
@@ -240,7 +240,7 @@ class AbsRealCompletionTest {
     @Test
     fun `tolerance completion should refute a point beyond the source tolerance`() {
         val results = relations(within = false).mapValues { (_, problem) ->
-            AbsRealCompletion(problem, tenth).complete(discrete(problem), Cancellation.Never).result
+            AbsRealCompletion(problem, tenth).complete(discrete(problem), ExecutionControl.Never).result
         }
 
         assertEquals(relations(within = false).mapValues { AbsRealCompletion.Result.Refuted }, results)
@@ -249,7 +249,7 @@ class AbsRealCompletionTest {
     @Test
     fun `exact completion should refute a point only the tolerance admits`() {
         val results = relations(within = true).mapValues { (_, problem) ->
-            AbsRealCompletion(problem).complete(discrete(problem), Cancellation.Never).result
+            AbsRealCompletion(problem).complete(discrete(problem), ExecutionControl.Never).result
         }
 
         assertEquals(relations(within = true).mapValues { AbsRealCompletion.Result.Refuted }, results)
@@ -260,7 +260,7 @@ class AbsRealCompletionTest {
         val relative = SourceTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10)))
         val problem = fixed(listOf(RealAbs(0, 1)), doubleArrayOf(5.0, 5.5), tolerance = relative)
 
-        val completed = AbsRealCompletion(problem, relative).complete(discrete(problem), Cancellation.Never).result
+        val completed = AbsRealCompletion(problem, relative).complete(discrete(problem), ExecutionControl.Never).result
 
         assertIs<AbsRealCompletion.Result.Witness>(completed)
     }
@@ -281,7 +281,7 @@ class AbsRealCompletionTest {
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
 
         val completed = AbsRealCompletion(problem, tenth)
-            .complete(Sample(booleanArrayOf(false), longArrayOf()), Cancellation.Never).result
+            .complete(Sample(booleanArrayOf(false), longArrayOf()), ExecutionControl.Never).result
 
         assertEquals(AbsRealCompletion.Result.Refuted, completed)
     }
@@ -299,7 +299,7 @@ class AbsRealCompletionTest {
         val search = SourceToleranceSearch(source, tenth)
             .reconstructedBy { it.copy(ints = longArrayOf(it.intValue(0) + 1)) }
 
-        val found = search.complete(Sample(booleanArrayOf(), longArrayOf(0)), Cancellation.Never, null,
+        val found = search.complete(Sample(booleanArrayOf(), longArrayOf(0)), ExecutionControl.Never, null,
             LpSolveContext.Production)
 
         assertIs<ToleranceSearchResult.Witness>(found)
@@ -310,7 +310,7 @@ class AbsRealCompletionTest {
         val source = fixed(listOf(ContinuousProduct(0, 0, 1)), doubleArrayOf(0.5, 0.3))
 
         val found = SourceToleranceSearch(source, tenth).complete(Sample(booleanArrayOf(), longArrayOf()),
-            Cancellation.Never, null, LpSolveContext.Production)
+            ExecutionControl.Never, null, LpSolveContext.Production)
 
         assertEquals(ToleranceSearchResult.Unavailable, found)
     }

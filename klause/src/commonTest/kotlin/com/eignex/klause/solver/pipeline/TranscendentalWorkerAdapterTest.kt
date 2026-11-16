@@ -14,7 +14,7 @@ import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -40,9 +40,9 @@ class TranscendentalWorkerAdapterTest {
         val adapter = TranscendentalWorkerAdapter(source, params, FiniteEngine.BACKTRACK)
 
         val sliced = adapter.completeHandle().use { handle ->
-            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1))
+            assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1))
             assertTrue(adapter.nativeWork > 0)
-            assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1))
+            assertIs<SolveResult.Unknown>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1))
         }
         val unsliced = TranscendentalWorkerAdapter(source, params, FiniteEngine.BACKTRACK).use { it.execute() }
 
@@ -73,10 +73,10 @@ class TranscendentalWorkerAdapterTest {
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
 
         val sliced = adapter.completeHandle().use { handle ->
-            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1))
+            assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1))
             val spent = adapter.nativeWork
             assertTrue(spent > 0)
-            val result = assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1))
+            val result = assertIs<SolveResult.Sat>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1))
             assertTrue(adapter.nativeWork > spent)
             result
         }
@@ -95,9 +95,9 @@ class TranscendentalWorkerAdapterTest {
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
 
         adapter.completeHandle().use { handle ->
-            assertNull(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 0))
+            assertNull(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0))
             assertEquals(0L, adapter.nativeWork)
-            assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, 1))
+            assertIs<SolveResult.Sat>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1))
         }
     }
 
@@ -107,9 +107,9 @@ class TranscendentalWorkerAdapterTest {
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK)
 
         adapter.completeHandle().use { handle ->
-            val result = assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation { true }, Long.MAX_VALUE, 1))
+            val result = assertIs<SolveResult.Unknown>(handle.runSlice(ExecutionControl { true }, Long.MAX_VALUE, 1))
             assertEquals(TerminationReason.Cancelled, result.reason)
-            assertIs<SolveResult.Unknown>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1))
+            assertIs<SolveResult.Unknown>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1))
             assertTrue(handle.isDone)
         }
         assertEquals(0L, adapter.nativeWork)
@@ -124,7 +124,7 @@ class TranscendentalWorkerAdapterTest {
         handle.close()
         handle.close()
 
-        assertFailsWith<IllegalStateException> { handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) }
+        assertFailsWith<IllegalStateException> { handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) }
         assertEquals(0L, adapter.nativeWork)
     }
 
@@ -140,13 +140,13 @@ class TranscendentalWorkerAdapterTest {
         val binding = EngineInvocation(source.prepareTranscendentalExecutionPlan(), identity)
         val adapter = TranscendentalWorkerAdapter(source, TranscendentalTheoryParams(), FiniteEngine.BACKTRACK, binding)
         val sample = adapter.completeHandle().use { handle ->
-            assertIs<SolveResult.Sat>(handle.runSlice(Cancellation.Never, Long.MAX_VALUE, -1)).assignment
+            assertIs<SolveResult.Sat>(handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1)).assignment
         }
         adapter.close()
         val foreign = EngineInvocation(source.prepareTranscendentalExecutionPlan(), identity)
 
-        val accepted = polynomialWitnessVerifier(binding, Cancellation.Never).verify(Candidate(sample, null))
-        val rejected = polynomialWitnessVerifier(foreign, Cancellation.Never).verify(Candidate(sample, null))
+        val accepted = polynomialWitnessVerifier(binding, ExecutionControl.Never).verify(Candidate(sample, null))
+        val rejected = polynomialWitnessVerifier(foreign, ExecutionControl.Never).verify(Candidate(sample, null))
 
         assertIs<Verification.Accepted<*, *>>(accepted)
         assertIs<Verification.Rejected>(rejected)

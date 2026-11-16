@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.search
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Why an exact search operation could not finish; none of these causes proves exhaustion. */
 enum class SearchStopCause {
@@ -50,13 +50,13 @@ interface SearchExecutionAccounting {
 /** Execution services available to components and alternate coordinators through [SearchContext]. */
 interface SearchExecutionControls : SearchExecutionAccounting {
     /** Invocation token, retaining its deadline and caller work meter. */
-    val cancellation: Cancellation
+    val cancellation: ExecutionControl
 
     /** Most recent unresolved stop, with containing cancellation and work limits taking precedence. */
     override val stopCause: SearchStopCause?
 
     /** Select a native operation allowance without renewing the containing allowance. */
-    fun operationAllowance(parent: Cancellation): Cancellation = parent.shorten(0.5)
+    fun operationAllowance(parent: ExecutionControl): ExecutionControl = parent.shorten(0.5)
 
     /** Report a stopped or declined operation. */
     fun reportStop(cause: SearchStopCause)
@@ -70,9 +70,9 @@ interface SearchExecutionControls : SearchExecutionAccounting {
 
 /** Injects caller cancellation, native accounting and policy-owned operation allowances. */
 class SearchExecutionControlAdapter(
-    override val cancellation: Cancellation = Cancellation.Never,
+    override val cancellation: ExecutionControl = ExecutionControl.Never,
     private val accounting: SearchExecutionAccounting = SearchExecutionAccounting.Unlimited,
-    private val allowance: (Cancellation) -> Cancellation = { it.shorten(0.5) },
+    private val allowance: (ExecutionControl) -> ExecutionControl = { it.shorten(0.5) },
 ) : SearchExecutionControls {
     private var cause: SearchStopCause? = null
 
@@ -101,7 +101,7 @@ class SearchExecutionControlAdapter(
         if (!it) reportStop(accounting.stopCause ?: SearchStopCause.CheckAllowance)
     }
 
-    override fun operationAllowance(parent: Cancellation): Cancellation = allowance(parent)
+    override fun operationAllowance(parent: ExecutionControl): ExecutionControl = allowance(parent)
 
     override fun reportStop(cause: SearchStopCause) {
         if ((
@@ -127,6 +127,6 @@ class SearchExecutionControlAdapter(
 
 private val SearchStopCause?.isAllowance: Boolean get() = when (this) {
     SearchStopCause.WorkAllowance, SearchStopCause.CheckAllowance,
-    SearchStopCause.DecisionAllowance, SearchStopCause.OperationAllowance -> true
+    SearchStopCause.DecisionAllowance, SearchStopCause.OperationAllowance, -> true
     else -> false
 }

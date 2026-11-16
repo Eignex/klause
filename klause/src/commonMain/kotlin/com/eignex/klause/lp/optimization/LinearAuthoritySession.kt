@@ -22,7 +22,7 @@ import com.eignex.klause.lp.engine.advanceRootGuidance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LinearAuthoritySession(
     private val budget: SourceLpBudget,
@@ -44,11 +44,12 @@ internal class LinearAuthoritySession(
     private var completedPolicy: SparseSourceLpPolicy? = null
     private var lifetime: LpFloatAllowance? = null
     private var appendPending = false
-    private var currentToken: Cancellation = Cancellation.Never
-    private val token = object : Cancellation {
+    private var currentToken: ExecutionControl = ExecutionControl.Never
+    private val token = object : ExecutionControl() {
         override fun isCancelled(): Boolean = currentToken()
         override fun deadline() = currentToken.deadline()
-        override fun workMeter() = currentToken.workMeter()
+        override val accounting get() = currentToken.accounting
+        override val admission get() = admissionFrom(currentToken)
     }
     var preparations: Long = 0L
         private set
@@ -58,7 +59,7 @@ internal class LinearAuthoritySession(
     fun bind(
         packed: LinearAuthorityModel,
         costs: ExactLpObjective,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         build: () -> ExactLpModel?,
         authority: SourceScope? = null,
         allowance: LpFloatAllowance? = null,
@@ -153,10 +154,10 @@ internal class LinearAuthoritySession(
         costs: List<BigFraction>,
         constant: BigFraction,
         scope: SourceScope,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         policy: SparseSourceLpPolicy,
         observer: LpCertificationObserver,
-        consume: (LpRootGuidance, SparseSourceLp, Cancellation) -> T?,
+        consume: (LpRootGuidance, SparseSourceLp, ExecutionControl) -> T?,
     ): T? {
         if (cancellation()) {
             close()
@@ -266,7 +267,7 @@ internal class LinearAuthoritySession(
         }
     }
 
-    fun <T> withGuidance(cancellation: Cancellation, block: (Cancellation) -> T?): T? {
+    fun <T> withGuidance(cancellation: ExecutionControl, block: (ExecutionControl) -> T?): T? {
         val reservation = admission ?: return null
         return budget.resumeSparse(reservation, cancellation) { _, active -> block(active) }
     }

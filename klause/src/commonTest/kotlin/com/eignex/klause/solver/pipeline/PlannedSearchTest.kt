@@ -20,7 +20,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.klause.solver.search.SearchResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.toLongExact
@@ -204,7 +204,7 @@ class PlannedSearchTest {
         val plan = requireNotNull(source.componentPlan)
         val prepared = PreparedSearchComponents(plan, model, plan.cpSourceDomains(model))
         var stopped = false
-        val interrupted = prepared.open(cancellation = Cancellation { stopped })
+        val interrupted = prepared.open(cancellation = ExecutionControl { stopped })
         val projection = requireNotNull(interrupted.cp).session.projection
         stopped = true
         interrupted.use {

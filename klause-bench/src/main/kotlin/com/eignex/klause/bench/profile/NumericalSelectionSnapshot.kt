@@ -17,7 +17,7 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -25,11 +25,11 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-internal class NumericalSelectionSnapshot(private val stop: Cancellation) {
+internal class NumericalSelectionSnapshot(private val stop: ExecutionControl) {
     fun journal(): Any {
         val type = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityCapture")
         return type.getDeclaredConstructor(Int::class.javaPrimitiveType, Long::class.javaPrimitiveType,
-            Long::class.javaPrimitiveType, Cancellation::class.java).newInstance(64, 1_000_000L, 16_777_216L, stop)
+            Long::class.javaPrimitiveType, ExecutionControl::class.java).newInstance(64, 1_000_000L, 16_777_216L, stop)
     }
 
     fun attach(invocation: Any): Any {

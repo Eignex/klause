@@ -3,7 +3,7 @@ package com.eignex.klause.meta.alns
 import com.eignex.klause.localsearch.InvariantNetwork
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
@@ -13,7 +13,7 @@ internal enum class RepairBlockDecline {
 
 internal object RepairBlockInterrupted : RuntimeException()
 
-internal class RepairBlockWork(private val cancellation: Cancellation, private val limit: Int) {
+internal class RepairBlockWork(private val cancellation: ExecutionControl, private val limit: Int) {
     var visits = 0
         private set
     var decline: RepairBlockDecline? = null

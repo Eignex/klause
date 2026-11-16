@@ -5,19 +5,19 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.LpParams
+import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.lp.relaxation.CpToLpRelaxation
 import com.eignex.klause.lp.relaxation.RootDomains
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.FactorProjectionProviders
+import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -99,7 +99,7 @@ class LpHarvestTest {
             ),
         ).bake()
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, 0L, 0L, 1L))
-        val harvested = lpHarvest(problem, obj, objShavingParams, cancellation = Cancellation.Never)
+        val harvested = lpHarvest(problem, obj, objShavingParams, cancellation = ExecutionControl.Never)
         assertTrue(harvested !== problem)
         assertTrue(harvested.finiteIntDomain(3).min >= 2)
         assertTrue(2 in harvested.finiteIntDomain(3))
@@ -116,7 +116,7 @@ class LpHarvestTest {
         val obj = LinearObjective(intCoefficients = longArrayOf(0L, -1L))
         assertSame(
             problem,
-            lpHarvest(problem, obj, objShavingParams, cancellation = Cancellation.Never),
+            lpHarvest(problem, obj, objShavingParams, cancellation = ExecutionControl.Never),
         )
     }
 
@@ -135,7 +135,7 @@ class LpHarvestTest {
             ),
         ).bake()
         assertTrue(problem.baked !is PropagationResult.Unsat)
-        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = ExecutionControl.Never)
         assertTrue(harvested.baked is PropagationResult.Unsat)
     }
 
@@ -152,7 +152,7 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.LE, 5),
             ),
         ).bake()
-        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = ExecutionControl.Never)
         assertTrue(harvested.factors.none { it is Linear && it.vars.size == 3 })
         assertEquals(3, harvested.factors.count { it is Linear })
         assertSameFeasibleSet(problem, harvested, hi = 10)
@@ -170,7 +170,7 @@ class LpHarvestTest {
                 Linear(intArrayOf(1, -1), intArrayOf(2, 0), LinearOp.LE, 0),
             ),
         ).bake()
-        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = Cancellation.Never)
+        val harvested = lpHarvest(problem, LinearObjective(), shavingParams, cancellation = ExecutionControl.Never)
         assertTrue(
             harvested.factors.any { it is Linear && it.op == LinearOp.EQ && it.vars.size == 2 },
         )
@@ -193,7 +193,7 @@ class LpHarvestTest {
     fun `harvest should stop when the budget expires inside the simplex`() {
         val problem = coverSystem().bake()
         var polls = 0
-        val spent = Cancellation { polls++ > 0 }
+        val spent = ExecutionControl { polls++ > 0 }
 
         val result = lpHarvestReporting(problem, LinearObjective(), shavingParams, cancellation = spent)
 
@@ -209,7 +209,7 @@ class LpHarvestTest {
             coverSystem(),
             LinearObjective(),
             LpPlan(bounding = true),
-            budget.orSpent(Cancellation.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         assertFalse(result.infeasible)

@@ -17,7 +17,7 @@ import com.eignex.klause.presolve.presolveBudget
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.CheckedLongOverflowException
@@ -59,7 +59,7 @@ internal class SubsetDomination {
         problem: Problem,
         ranges: ColumnRanges,
         factors: List<Factor>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): List<Factor> {
         val budget = cancellation.presolveBudget()
         val lane = budget?.activeInvocation?.lane ?: PresolveLane.SOURCE
@@ -261,7 +261,7 @@ internal class SubsetDomination {
         return addExact(mulExact(scale, a.signature.bound), extra) <= b.signature.bound
     }
 
-    private class Scan(cancellation: Cancellation) {
+    private class Scan(cancellation: ExecutionControl) {
         private val meter = ScanMeter(cancellation)
         private var visits = 0
         private var capped = false

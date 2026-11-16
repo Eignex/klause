@@ -19,8 +19,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.BooleanProofContext
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.SchedulingCancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.workScheduled
 import kotlin.uuid.Uuid
 
@@ -31,7 +30,7 @@ internal class BooleanProofPortfolio private constructor(
     private val createContext: () -> BooleanProofContext,
     splitVariables: List<Int>,
     parameters: List<BacktrackParams>,
-    private val reservations: List<(Cancellation, () -> ResumableSolve) -> ResumableSolve>? = null,
+    private val reservations: List<(ExecutionControl, () -> ResumableSolve) -> ResumableSolve>? = null,
     private val probeFirst: Boolean = false,
     private val solvers: List<BacktrackSolver>? = null,
 ) : AutoCloseable {
@@ -40,7 +39,7 @@ internal class BooleanProofPortfolio private constructor(
         context: BooleanProofContext,
         splitVariables: List<Int>,
         parameters: List<BacktrackParams>,
-        reservations: List<(Cancellation, () -> ResumableSolve) -> ResumableSolve>? = null,
+        reservations: List<(ExecutionControl, () -> ResumableSolve) -> ResumableSolve>? = null,
         probeFirst: Boolean = false,
         solvers: List<BacktrackSolver>? = null,
     ) : this(problem, context.scope.condition, { context }, splitVariables, parameters,
@@ -49,13 +48,14 @@ internal class BooleanProofPortfolio private constructor(
     }
 
     private var taskContext: BooleanProofContext? = null
-    private val openingTokens = Array(parameters.size) { Cancellation.Never }
+    private val openingTokens = Array(parameters.size) { ExecutionControl.Never }
     private val parameters = parameters.mapIndexed { worker, params ->
-        params.withCancellation(object : SchedulingCancellation {
+        params.withCancellation(object : ExecutionControl() {
             override val workScheduled: Boolean get() = openingTokens[worker].workScheduled()
             override fun isCancelled(): Boolean = openingTokens[worker]()
             override fun deadline() = openingTokens[worker].deadline()
-            override fun workMeter() = openingTokens[worker].workMeter()
+            override val accounting get() = openingTokens[worker].accounting
+            override val admission get() = admissionFrom(openingTokens[worker])
         })
     }
     private var scheduler: BooleanProofScheduler? = if (probeFirst) null else board(splitVariables)
@@ -106,7 +106,7 @@ internal class BooleanProofPortfolio private constructor(
     fun available(worker: Int): Boolean = !closed && !terminal && handles[worker]?.closed != true &&
         (scheduler?.hasTask(worker) ?: (probeOwner == null || probeOwner == worker))
 
-    fun open(worker: Int, cancellation: Cancellation): ResumableSolve {
+    fun open(worker: Int, cancellation: ExecutionControl): ResumableSolve {
         check(!closed && handles[worker] == null)
         openingTokens[worker] = cancellation
         val open = { Lane(worker).also { handles[worker] = it } }
@@ -132,7 +132,7 @@ internal class BooleanProofPortfolio private constructor(
         override val work: Long get() = workerWork(worker)
         override val stats: SolveStats get() = workerStats(worker)
 
-        override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+        override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? {
             done?.let { return it }
             check(!closed && !this@BooleanProofPortfolio.closed) { "search is closed" }
             if (global()) return finish(SolveResult.Unknown(TerminationReason.Cancelled, semantics = problem.semantics))
@@ -149,7 +149,7 @@ internal class BooleanProofPortfolio private constructor(
             return null
         }
 
-        private fun probe(global: Cancellation, millis: Long, work: Long): SolveResult? {
+        private fun probe(global: ExecutionControl, millis: Long, work: Long): SolveResult? {
             val before = workerWork(worker)
             probeSegments++
             return try {
@@ -159,7 +159,7 @@ internal class BooleanProofPortfolio private constructor(
             }
         }
 
-        private fun probeStep(global: Cancellation, millis: Long, work: Long): SolveResult? {
+        private fun probeStep(global: ExecutionControl, millis: Long, work: Long): SolveResult? {
             if (probeOwner == null) probeOwner = worker
             val search = probes[worker] ?: try {
                 val params = parameters[worker].copy(assumptions = Assumptions.None)
@@ -246,7 +246,7 @@ internal class BooleanProofPortfolio private constructor(
             workers: List<PortfolioWorker>,
             probeFirst: Boolean = false,
             nativeOnly: Boolean = false,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
             newIdentity: () -> String = { Uuid.random().toString() },
             declined: (String) -> Unit = {},
         ): BooleanProofPortfolio? {

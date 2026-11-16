@@ -29,7 +29,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.LinearSourceCheck
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
@@ -50,7 +50,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0), LinearOp.EQ, 0.0)
             }, numRealVars = 3, realLower = DoubleArray(3) { 0.5 }, realUpper = DoubleArray(3) { 1.0 })
         val objective = LinearObjective(realCoefficients = DoubleArray(3) { 1.0 })
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         for (enabled in listOf(false, true)) {
             val params = TheoryParams(sourceIncumbentCompletion = true, sourceRefutationCenterStep = enabled,
                 sourceCuts = false, maxFlips = 6)
@@ -58,7 +59,7 @@ class JointLinearRepairTest {
                 repair.search(adaptive = false).use { search ->
                     var done = false
                     var found: Sample? = null
-                    val stopOnPoint = Cancellation { found != null }
+                    val stopOnPoint = ExecutionControl { found != null }
                     repeat(64) {
                         if (!done && found == null) done = search.advance(stopOnPoint, 5_000) { sample, _ ->
                             found = sample
@@ -92,7 +93,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0), LinearOp.EQ, 0.0)
             }, numRealVars = 3, realLower = DoubleArray(3) { 0.5 }, realUpper = DoubleArray(3) { 1.0 })
         val objective = LinearObjective(realCoefficients = DoubleArray(3) { 1.0 })
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val pooled = Sample(booleanArrayOf(), LongArray(3) { 1 }, DoubleArray(3) { 1.0 },
             exactReals = List(3) { BigFraction.ONE })
         val params = TheoryParams(sourceIncumbentCompletion = true, sourceRefutationCenterStep = true,
@@ -101,7 +103,7 @@ class JointLinearRepairTest {
         JointLinearRepair(model, source, objective, params, external = { pooled }).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
-                repeat(64) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
                 assertEquals(0L, repair.stats.smt.completeSearchStages?.get("jointRepairAdvisoryCenterMoves") ?: 0L)
                 assertContentEquals(LongArray(3) { 1 }, pooled.ints)
             }
@@ -116,7 +118,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0), LinearOp.EQ, 0.0)
             }, numRealVars = 3, realLower = DoubleArray(3) { 0.5 }, realUpper = DoubleArray(3) { 1.0 })
         val objective = LinearObjective(realCoefficients = DoubleArray(3) { 1.0 })
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val params = TheoryParams(sourceIncumbentCompletion = true, sourceRefutationCenterStep = true,
             sourceCuts = false, maxFlips = 6)
         var originalChecks = 0
@@ -127,7 +130,7 @@ class JointLinearRepairTest {
         }).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
-                repeat(64) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                 assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
                 assertTrue(originalChecks > 0)
@@ -144,14 +147,15 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0), LinearOp.EQ, 0.0)
             }, numRealVars = 2, realLower = DoubleArray(2) { 0.5 }, realUpper = DoubleArray(2) { 1.0 })
         val objective = LinearObjective(realCoefficients = DoubleArray(2) { 1.0 })
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val records = mutableListOf<JointRepairObservation>()
         val params = TheoryParams(sourceIncumbentCompletion = true, sourceCuts = false, maxFlips = 4)
 
         JointLinearRepair(model, source, objective, params, onObservation = records::add).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
-                repeat(64) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
                 assertIs<MinimizeResult.WithSample>(search.minimizeResult(TerminationReason.BudgetExhausted))
             }
         }
@@ -179,13 +183,14 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0), LinearOp.EQ, 0.0)
             }, numRealVars = 2, realLower = DoubleArray(2) { 0.5 }, realUpper = DoubleArray(2) { 1.0 })
         val objective = LinearObjective(realCoefficients = DoubleArray(2) { 1.0 })
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         for (completion in listOf(false, true)) {
             val params = TheoryParams(sourceIncumbentCompletion = completion, sourceCuts = false, maxFlips = 4)
             JointLinearRepair(model, source, objective, params).use { repair ->
                 repair.search(adaptive = false).use { search ->
                     var done = false
-                    repeat(64) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                    repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                     val result = search.minimizeResult(TerminationReason.BudgetExhausted)
 
@@ -217,12 +222,13 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(id), doubleArrayOf(1.0), intArrayOf(id), doubleArrayOf(-1.0), LinearOp.EQ, 0.0)
             }, numRealVars = 2, realLower = DoubleArray(2) { 0.5 }, realUpper = DoubleArray(2) { 1.0 })
         val objective = LinearObjective(realCoefficients = DoubleArray(2) { 1.0 })
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         JointLinearRepair(model, source, objective, TheoryParams(sourceCuts = false)).use { repair ->
-            var result = repair.check(condition, Cancellation.Never)
+            var result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
 
             val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
@@ -241,27 +247,29 @@ class JointLinearRepairTest {
                 LinearOp.EQ, 0.0)), numRealVars = 1,
             realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
             mapOf(0 to BigFraction.ZERO))
         for (completion in listOf(false, true)) {
             val events = mutableListOf<JointRepairComparison>()
             JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = completion),
                 onComparison = events::add).use { repair ->
-                var result = repair.check(condition, Cancellation.Never)
+                var result = repair.check(condition, ExecutionControl.Never)
                 repeat(64) {
-                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition,
+                        ExecutionControl.Never)
                 }
                 assertEquals(ExactNeighborhoodResult.Refuted, result)
                 val other = condition.copy(lower = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ONE))
-                result = repair.check(other, Cancellation.Never)
+                result = repair.check(other, ExecutionControl.Never)
                 repeat(64) {
-                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(other, Cancellation.Never)
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(other, ExecutionControl.Never)
                 }
                 assertEquals(ExactNeighborhoodResult.Refuted, result)
                 val before = repair.stats.smt.sourceLp
 
-                val repeated = repair.check(condition, Cancellation.Never)
+                val repeated = repair.check(condition, ExecutionControl.Never)
                 val after = repair.stats.smt.sourceLp
 
                 assertEquals(ExactNeighborhoodResult.Refuted, repeated)
@@ -282,7 +290,8 @@ class JointLinearRepairTest {
                 LinearOp.EQ, 0.0)), numRealVars = 1,
             realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(mapOf(0 to false), mapOf(0 to BigFraction.ZERO),
             mapOf(0 to BigFraction.ZERO))
         val variants = listOf(condition.copy(bools = mapOf(0 to true)),
@@ -291,15 +300,16 @@ class JointLinearRepairTest {
         for (changed in variants) {
             val events = mutableListOf<JointRepairComparison>()
             JointLinearRepair(model, source, objective, TheoryParams(), onComparison = events::add).use { repair ->
-                var result = repair.check(condition, Cancellation.Never)
+                var result = repair.check(condition, ExecutionControl.Never)
                 repeat(64) {
-                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition,
+                        ExecutionControl.Never)
                 }
                 assertEquals(ExactNeighborhoodResult.Refuted, result)
 
-                result = repair.check(changed, Cancellation.Never)
+                result = repair.check(changed, ExecutionControl.Never)
                 repeat(64) {
-                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(changed, Cancellation.Never)
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(changed, ExecutionControl.Never)
                 }
 
                 assertTrue(result != ExactNeighborhoodResult.Paused)
@@ -316,20 +326,21 @@ class JointLinearRepairTest {
                 LinearOp.EQ, 0.0)), numRealVars = 1,
             realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val pins = mutableMapOf(0 to BigFraction.ZERO)
         val condition = ExactNeighborhoodCondition(emptyMap(), pins, pins)
         JointLinearRepair(model, source, objective, TheoryParams()).use { repair ->
-            var result = repair.check(condition, Cancellation.Never)
+            var result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
             assertEquals(ExactNeighborhoodResult.Refuted, result)
             pins[0] = BigFraction.ONE
 
-            result = repair.check(condition, Cancellation.Never)
+            result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
 
             val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
@@ -347,20 +358,21 @@ class JointLinearRepairTest {
                 LinearOp.EQ, 0.0)), numRealVars = 1,
             realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
             mapOf(0 to BigFraction.ZERO))
         val events = mutableListOf<JointRepairComparison>()
         JointLinearRepair(model, source, objective, TheoryParams(), onComparison = events::add).use { repair ->
-            var result = repair.check(condition, Cancellation.Never)
+            var result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
             assertEquals(ExactNeighborhoodResult.Refuted, result)
             var polls = 0
 
-            val cancelled = repair.check(condition, Cancellation { ++polls >= 3 })
-            val resumed = repair.check(condition, Cancellation.Never)
+            val cancelled = repair.check(condition, ExecutionControl { ++polls >= 3 })
+            val resumed = repair.check(condition, ExecutionControl.Never)
 
             assertEquals(ExactNeighborhoodResult.Paused, cancelled)
             assertEquals(ExactNeighborhoodResult.Refuted, resumed)
@@ -376,20 +388,21 @@ class JointLinearRepairTest {
                 LinearOp.EQ, 0.0)), numRealVars = 1,
             realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
             mapOf(0 to BigFraction.ZERO))
         var cancelled = false
-        val params = TheoryParams(cancellation = Cancellation { cancelled })
+        val params = TheoryParams(cancellation = ExecutionControl { cancelled })
         JointLinearRepair(model, source, objective, params).use { repair ->
-            var result = repair.check(condition, Cancellation.Never)
+            var result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
             assertEquals(ExactNeighborhoodResult.Refuted, result)
             cancelled = true
 
-            val stopped = repair.attempt(condition, Cancellation.Never)
+            val stopped = repair.attempt(condition, ExecutionControl.Never)
 
             assertEquals(ExactNeighborhoodResult.Undecided, stopped.result)
             assertEquals(TerminationReason.Cancelled, stopped.reason)
@@ -404,7 +417,8 @@ class JointLinearRepairTest {
                 LinearOp.EQ, 0.0)), numRealVars = 1,
             realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
             mapOf(0 to BigFraction.ZERO))
         var offered: Sample? = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(1.0),
@@ -412,16 +426,16 @@ class JointLinearRepairTest {
         val events = mutableListOf<JointRepairComparison>()
         JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
             external = { offered }, onComparison = events::add).use { repair ->
-            var result = repair.check(condition, Cancellation.Never)
+            var result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
             assertEquals(ExactNeighborhoodResult.Refuted, result)
             offered = null
 
-            result = repair.check(condition, Cancellation.Never)
+            result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
 
             assertEquals(ExactNeighborhoodResult.Refuted, result)
@@ -435,15 +449,17 @@ class JointLinearRepairTest {
             intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         val events = mutableListOf<JointRepairComparison>()
         JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
             incumbentCompletionCheck = { _, _, _ -> false }, onComparison = events::add).use { repair ->
             repeat(2) {
-                var result = repair.check(condition, Cancellation.Never)
+                var result = repair.check(condition, ExecutionControl.Never)
                 repeat(64) {
-                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition,
+                        ExecutionControl.Never)
                 }
 
                 assertEquals(ExactNeighborhoodResult.Undecided, result)
@@ -470,13 +486,14 @@ class JointLinearRepairTest {
             realLower = DoubleArray(3), realUpper = DoubleArray(3) { 1.0 })
         val objective = LinearObjective(intCoefficients = longArrayOf(0, 0, 0, 1, 1, 1),
             realCoefficients = DoubleArray(3) { 1.0 })
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         for (completion in listOf(false, true)) {
             val params = TheoryParams(sourceIncumbentCompletion = completion, sourceCuts = false, maxFlips = 2)
             JointLinearRepair(model, source, objective, params).use { repair ->
                 repair.search(adaptive = false).use { search ->
                     var done = false
-                    repeat(64) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                    repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                     val result = search.minimizeResult(TerminationReason.BudgetExhausted)
 
@@ -506,7 +523,7 @@ class JointLinearRepairTest {
             val objective = LinearObjective(intCoefficients = LongArray(3) { sign },
                 realCoefficients = doubleArrayOf(sign.toDouble()))
             val source = assertNotNull(model.linearAuthorityContext(
-                objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+                objective, ObjectiveSense.MINIMIZE, ExecutionControl.Never))
             val oldValue = if (sign > 0) 1L else 0L
             var offered = Sample(BooleanArray(0), LongArray(3) { oldValue }, doubleArrayOf(oldValue.toDouble()),
                 exactReals = listOf(BigFraction.ofLong(oldValue)))
@@ -528,14 +545,14 @@ class JointLinearRepairTest {
                 onIncumbentUse = { uses += importedVersion },
                 incumbentCompletionCheck = { _, _, _ -> true }, onComparison = { events += it }).use { repair ->
                 repair.search(adaptive = false).use { search ->
-                    search.advance(Cancellation.Never, 1)
+                    search.advance(ExecutionControl.Never, 1)
                     assertEquals(BigFraction.ofLong(4 * sign * oldValue),
                         events.first { it.phase == "center" }.completedValue)
                     offered = Sample(BooleanArray(0), LongArray(3) { 1 - oldValue },
                         doubleArrayOf(oldValue.toDouble()), exactReals = listOf(BigFraction.ofLong(oldValue)))
                     offeredVersion = 2
                     var done = false
-                    repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                    repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                     assertEquals(listOf(BigFraction.ofLong(sign * (3 - 2 * oldValue))),
                         events.filter { it.phase == "query" }.map { it.cutoff })
@@ -568,7 +585,7 @@ class JointLinearRepairTest {
             val objective = LinearObjective(intCoefficients = LongArray(3) { sign },
                 realCoefficients = doubleArrayOf(sign.toDouble()))
             val source = assertNotNull(model.linearAuthorityContext(
-                objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+                objective, ObjectiveSense.MINIMIZE, ExecutionControl.Never))
             val oldValue = if (sign > 0) 1L else 0L
             var offered = Sample(BooleanArray(0), LongArray(3) { oldValue }, doubleArrayOf(oldValue.toDouble()),
                 exactReals = listOf(BigFraction.ofLong(oldValue)))
@@ -577,11 +594,11 @@ class JointLinearRepairTest {
                 TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1), external = { offered },
                 incumbentCompletionCheck = { _, _, _ -> true }, onComparison = { events += it }).use { repair ->
                 repair.search(adaptive = false).use { search ->
-                    search.advance(Cancellation.Never, 1)
+                    search.advance(ExecutionControl.Never, 1)
                     offered = offered.copy(reals = doubleArrayOf((1 - oldValue).toDouble()),
                         exactReals = listOf(BigFraction.ofLong(1 - oldValue)))
                     var done = false
-                    repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                    repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                     assertIs<MinimizeResult.Unknown>(search.minimizeResult(TerminationReason.BudgetExhausted))
                     assertEquals(listOf(BigFraction.ofLong(sign * (1 + 2 * oldValue))),
@@ -603,14 +620,14 @@ class JointLinearRepairTest {
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
             val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(1.0))
             val source = assertNotNull(model.linearAuthorityContext(
-                objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+                objective, ObjectiveSense.MINIMIZE, ExecutionControl.Never))
             var offered = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0),
                 exactReals = listOf(BigFraction.ONE))
             var cancelled = false
             var originalChecked = false
             val events = mutableListOf<JointRepairComparison>()
             val params = TheoryParams(sourceIncumbentCompletion = true, sourceLpWorkLimit = 1_000_000,
-                maxFlips = 1, cancellation = Cancellation { cancelled })
+                maxFlips = 1, cancellation = ExecutionControl { cancelled })
             JointLinearRepair(model, source, objective, params, external = { offered },
                 incumbentCompletionCheck = { _, _, token ->
                     originalChecked = true
@@ -619,10 +636,10 @@ class JointLinearRepairTest {
                     true
                 }, onComparison = { events += it }).use { repair ->
                 repair.search(adaptive = false).use { search ->
-                    search.advance(Cancellation.Never, 1)
+                    search.advance(ExecutionControl.Never, 1)
                     offered = offered.copy(ints = longArrayOf(0))
                     var done = false
-                    repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                    repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                     assertTrue(originalChecked)
                     assertTrue(events.none { it.phase == "query" })
@@ -641,7 +658,8 @@ class JointLinearRepairTest {
             factors = emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(1.0))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         for ((exact, real, originalAccepted) in listOf(Triple(false, 1L, true), Triple(true, 2L, true),
                 Triple(true, 1L, false))) {
             var offered = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0),
@@ -649,18 +667,18 @@ class JointLinearRepairTest {
             var halted = false
             val events = mutableListOf<JointRepairComparison>()
             val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1,
-                cancellation = Cancellation { halted })
+                cancellation = ExecutionControl { halted })
             JointLinearRepair(model, source, objective, params, external = { offered },
                 incumbentCompletionCheck = { _, _, _ -> originalAccepted }, onComparison = {
                     events += it
                     if (it.phase == "query") halted = true
                 }).use { repair ->
                 repair.search(adaptive = false).use { search ->
-                    search.advance(Cancellation.Never, 1)
+                    search.advance(ExecutionControl.Never, 1)
                     assertEquals(BigFraction.ofLong(3), events.first { it.phase == "center" }.completedValue)
                     offered = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(real.toDouble()),
                         exactReals = if (exact) listOf(BigFraction.ofLong(real)) else null)
-                    repeat(32) { if (!halted) search.advance(Cancellation.Never, 5_000) }
+                    repeat(32) { if (!halted) search.advance(ExecutionControl.Never, 5_000) }
 
                     assertEquals(listOf(BigFraction.ofLong(3)),
                         events.filter { it.phase == "query" }.map { it.cutoff })
@@ -680,7 +698,8 @@ class JointLinearRepairTest {
                 LinearOp.EQ, 0.0)), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val offered = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.333))
         val events = mutableListOf<JointRepairComparison>()
 
@@ -689,7 +708,7 @@ class JointLinearRepairTest {
             onComparison = { events += it }).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
-                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
             }
         }
 
@@ -704,18 +723,20 @@ class JointLinearRepairTest {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ZERO)
 
         for (accepted in listOf(false, true)) {
             val events = mutableListOf<JointRepairComparison>()
             JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
                 incumbentCompletionCheck = { _, _, _ -> accepted }, onComparison = { events += it }).use { repair ->
-                assertEquals(ExactNeighborhoodResult.Paused, repair.check(condition, Cancellation { true }))
+                assertEquals(ExactNeighborhoodResult.Paused, repair.check(condition, ExecutionControl { true }))
                 assertTrue(events.isEmpty())
-                var result = repair.check(condition, Cancellation.Never)
+                var result = repair.check(condition, ExecutionControl.Never)
                 repeat(32) {
-                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition,
+                        ExecutionControl.Never)
                 }
 
                 assertEquals(listOf(1L), events.filter { it.phase == "query" }.map { it.condition })
@@ -735,13 +756,14 @@ class JointLinearRepairTest {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
             factors = arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.GE, 1)))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         for (enabled in listOf(false, true)) {
             val params = TheoryParams(sourceCuts = enabled, maxFlips = 1)
             JointLinearRepair(model, source, objective, params, boundOrdered = true).use { repair ->
                 repair.search(adaptive = false).use { search ->
                     var done = false
-                    repeat(64) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                    repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
 
                     val result = search.minimizeResult(TerminationReason.BudgetExhausted)
 
@@ -769,13 +791,14 @@ class JointLinearRepairTest {
             ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         for (enabled in listOf(false, true)) {
             val params = TheoryParams(sourceAggregateCuts = enabled, sourcePointCuts = true, maxFlips = 1)
             JointLinearRepair(model, source, objective, params, boundOrdered = true).use { repair ->
                 repair.search(adaptive = false).use { search ->
                     var done = false
-                    repeat(64) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                    repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
 
                     val result = search.minimizeResult(TerminationReason.BudgetExhausted)
 
@@ -799,10 +822,11 @@ class JointLinearRepairTest {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(2, 2), null, null),
             factors = arrayOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.GE, 1)))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val repair = JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true)
         val root = repair.search(adaptive = false).use { search ->
-            search.advance(Cancellation.Never, 1)
+            search.advance(ExecutionControl.Never, 1)
 
             val stages = assertNotNull(repair.stats.smt.completeSearchStages)
             assertEquals(1L, stages["jointRepairRootQueries"])
@@ -825,15 +849,17 @@ class JointLinearRepairTest {
             ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         JointLinearRepair(model, source, objective, TheoryParams(sourceAggregateCuts = true),
             boundOrdered = true).use { repair ->
             var first: Map<String, Long>? = null
             repeat(3) { index ->
-                var result = repair.check(condition, Cancellation.Never)
+                var result = repair.check(condition, ExecutionControl.Never)
                 repeat(32) {
-                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition,
+                        ExecutionControl.Never)
                 }
 
                 assertIs<ExactNeighborhoodResult.Witness>(result)
@@ -863,7 +889,7 @@ class JointLinearRepairTest {
             })
         val objective = LinearObjective(intCoefficients = LongArray(size) { 1 })
         val source = assertNotNull(model.linearAuthorityContext(
-            objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+            objective, ObjectiveSense.MINIMIZE, ExecutionControl.Never))
         val seed = Sample(BooleanArray(0), LongArray(size) { 1 })
         val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3)
 
@@ -872,12 +898,12 @@ class JointLinearRepairTest {
                 repair.search(adaptive = adaptive).use { search ->
                     repeat(128) {
                         if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
-                            search.advance(Cancellation.Never, 1)
+                            search.advance(ExecutionControl.Never, 1)
                         }
                     }
                     assertEquals(adaptive, repair.incumbentTrialPending)
                     var done = false
-                    repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                    repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
 
                     val result = search.minimizeResult(TerminationReason.BudgetExhausted)
                     if (adaptive) {
@@ -908,7 +934,7 @@ class JointLinearRepairTest {
             })
         val objective = LinearObjective(intCoefficients = LongArray(size) { 1 })
         val source = assertNotNull(model.linearAuthorityContext(
-            objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+            objective, ObjectiveSense.MINIMIZE, ExecutionControl.Never))
         val seed = Sample(BooleanArray(0), LongArray(size) { 1 })
         val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 3)
 
@@ -917,12 +943,12 @@ class JointLinearRepairTest {
                 repair.search(adaptive = adaptive).use { search ->
                     repeat(128) {
                         if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
-                            search.advance(Cancellation.Never, 1)
+                            search.advance(ExecutionControl.Never, 1)
                         }
                     }
                     assertEquals(adaptive, repair.incumbentTrialPending)
                     var done = false
-                    repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                    repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
 
                     val result = search.minimizeResult(TerminationReason.BudgetExhausted)
                     if (adaptive) {
@@ -952,7 +978,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(1.0))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val seed = Sample(BooleanArray(0), LongArray(3) { 1 }, doubleArrayOf(1.0),
             exactReals = listOf(BigFraction.ONE))
         val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 2)
@@ -963,14 +990,15 @@ class JointLinearRepairTest {
                 repair.search(adaptive = adaptive).use { search ->
                     val points = ArrayList<Sample>()
                     repeat(128) {
-                        if (points.isEmpty()) search.advance(Cancellation.Never, 1) { sample, _ -> points += sample }
+                        if (points.isEmpty()) search.advance(ExecutionControl.Never, 1) { sample, _, ->
+                            points += sample }
                     }
                     val first = points.single()
                     assertContentEquals(LongArray(3) { 1 }, LongArray(3) { first.intValue(it) })
                     assertEquals(listOf(BigFraction.ZERO), first.exactReals)
                     assertEquals(adaptive, repair.incumbentTrialPending)
                     var done = false
-                    repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                    repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
 
                     val result = assertIs<MinimizeResult.WithSample>(
                         search.minimizeResult(TerminationReason.BudgetExhausted))
@@ -993,13 +1021,14 @@ class JointLinearRepairTest {
             intBounds = IntBounds.fromModelBounds(LongArray(3), LongArray(3) { 1 }, null, null),
             factors = arrayOf(Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val seed = Sample(BooleanArray(0), LongArray(3) { 1 })
         val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
         JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
             repair.search(adaptive = true).use { search ->
                 var done = false
-                repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
 
                 val result = assertIs<MinimizeResult.WithSample>(
                     search.minimizeResult(TerminationReason.BudgetExhausted))
@@ -1018,17 +1047,18 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1), realCoefficients = doubleArrayOf(1.0))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         var cancelled = false
-        val params = TheoryParams(sourceIncumbentCompletion = true, cancellation = Cancellation { cancelled })
+        val params = TheoryParams(sourceIncumbentCompletion = true, cancellation = ExecutionControl { cancelled })
         val seed = Sample(BooleanArray(0), LongArray(3) { 1 }, doubleArrayOf(1.0),
             exactReals = listOf(BigFraction.ONE))
         JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
             repair.search(adaptive = true).use { search ->
                 repeat(128) {
-                    if (!cancelled) search.advance(Cancellation.Never, 1) { _, _ -> cancelled = true }
+                    if (!cancelled) search.advance(ExecutionControl.Never, 1) { _, _ -> cancelled = true }
                 }
-                search.advance(Cancellation.Never, 1)
+                search.advance(ExecutionControl.Never, 1)
 
                 assertTrue(cancelled)
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCandidates"))
@@ -1045,20 +1075,21 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
             ))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         var cancelled = false
-        val params = TheoryParams(sourceIncumbentCompletion = true, cancellation = Cancellation { cancelled })
+        val params = TheoryParams(sourceIncumbentCompletion = true, cancellation = ExecutionControl { cancelled })
         val seed = Sample(BooleanArray(0), longArrayOf(1, 1, 1))
         JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
             repair.search(adaptive = true).use { search ->
                 repeat(128) {
                     if (repair.stats.smt.completeSearchStages?.get("jointRepairCutoffClosures") != 1L) {
-                        search.advance(Cancellation.Never, 1)
+                        search.advance(ExecutionControl.Never, 1)
                     }
                 }
                 assertTrue(repair.incumbentTrialPending)
                 cancelled = true
-                search.advance(Cancellation.Never, 1)
+                search.advance(ExecutionControl.Never, 1)
 
                 assertFalse(repair.incumbentTrialPending)
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCandidates"))
@@ -1075,13 +1106,14 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0),
             ))
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val params = TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1)
         val seed = Sample(BooleanArray(0), longArrayOf(1, 1, 1))
         JointLinearRepair(model, source, objective, params, external = { seed }).use { repair ->
             repair.search(adaptive = true).use { search ->
                 var done = false
-                repeat(128) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                repeat(128) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
 
                 assertTrue(done)
                 assertEquals(1L, repair.stats.smt.completeSearchStages?.get("jointRepairCandidates"))
@@ -1097,7 +1129,8 @@ class JointLinearRepairTest {
             factors = emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val center = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ofLong(2))
 
@@ -1106,10 +1139,10 @@ class JointLinearRepairTest {
             JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = completion),
                 external = { center }, incumbentCompletionCheck = { _, _, _ -> publicationChecks++; true },
             ).use { repair ->
-                var attempt = repair.attempt(condition, Cancellation.Never)
+                var attempt = repair.attempt(condition, ExecutionControl.Never)
                 repeat(32) {
                     if (attempt.result == ExactNeighborhoodResult.Paused) {
-                        attempt = repair.attempt(condition, Cancellation.Never)
+                        attempt = repair.attempt(condition, ExecutionControl.Never)
                     }
                 }
 
@@ -1132,7 +1165,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
 
         val result = JointLinearRepair(model, source, objective,
@@ -1140,7 +1174,7 @@ class JointLinearRepairTest {
             external = { seed }).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
-                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
                 search.minimizeResult(TerminationReason.BudgetExhausted)
             }
         }
@@ -1156,7 +1190,8 @@ class JointLinearRepairTest {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         val params = TheoryParams(sourceIncumbentCompletion = true)
 
@@ -1164,7 +1199,7 @@ class JointLinearRepairTest {
             var cancelled = false
             var checkedValue: BigFraction? = null
             JointLinearRepair(model, source, objective, params,
-                publicationLifetime = Cancellation { cancelled },
+                publicationLifetime = ExecutionControl { cancelled },
                 incumbentCompletionCheck = { _, value, token ->
                     checkedValue = value
                     token.charge(if (limit == "funding") params.sourceLpWorkLimit else 1L)
@@ -1172,9 +1207,10 @@ class JointLinearRepairTest {
                     true
                 },
             ).use { repair ->
-                var result = repair.check(condition, Cancellation.Never)
+                var result = repair.check(condition, ExecutionControl.Never)
                 repeat(64) {
-                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition,
+                        ExecutionControl.Never)
                 }
 
                 assertEquals(BigFraction.MINUS_ONE, checkedValue)
@@ -1198,7 +1234,8 @@ class JointLinearRepairTest {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0000005))
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val endpoint = assertNotNull(BigFraction.ofDouble(1.0000005))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to endpoint), mapOf(0 to endpoint))
 
@@ -1206,15 +1243,16 @@ class JointLinearRepairTest {
             JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true),
                 incumbentCompletionCheck = if (checkOriginal) original.incumbentCompletionCheck(null) else null,
             ).use { repair ->
-                var result = repair.check(condition, Cancellation.Never)
+                var result = repair.check(condition, ExecutionControl.Never)
                 repeat(64) {
-                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                    if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition,
+                        ExecutionControl.Never)
                 }
 
                 if (checkOriginal) assertEquals(ExactNeighborhoodResult.Undecided, result)
                 else {
                     val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
-                    val accepted = assertIs<LinearSourceCheck.Accepted>(original.check(point, Cancellation.Never))
+                    val accepted = assertIs<LinearSourceCheck.Accepted>(original.check(point, ExecutionControl.Never))
                     assertFalse(accepted.witness.exact)
                 }
             }
@@ -1228,7 +1266,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(3.0),
             exactReals = listOf(BigFraction.ofLong(3)))
         var consumed = false
@@ -1236,10 +1275,10 @@ class JointLinearRepairTest {
         JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
             external = { seed }, onIncumbentUse = { consumed = true }).use { repair ->
             repair.search(adaptive = false).use { search ->
-                search.advance(Cancellation.Never, 1)
+                search.advance(ExecutionControl.Never, 1)
                 assertTrue(repair.incumbentTrialPending)
                 var done = false
-                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                 assertFalse(consumed)
                 assertFalse(repair.incumbentTrialPending)
@@ -1254,7 +1293,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         for (exact in listOf(false, true)) {
             val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.75),
                 exactReals = if (exact) listOf(BigFraction.ofLong(3) * BigFraction.ofLong(4).reciprocal()) else null)
@@ -1263,7 +1303,7 @@ class JointLinearRepairTest {
                 JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = completion),
                     external = { seed }, onIncumbentUse = { consumed = true }).use { repair ->
                     repair.search(adaptive = false).use { search ->
-                        search.advance(Cancellation.Never, 1)
+                        search.advance(ExecutionControl.Never, 1)
 
                         assertFalse(consumed)
                         assertEquals(completion, repair.incumbentTrialPending)
@@ -1280,7 +1320,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.75))
         var consumed = false
 
@@ -1288,10 +1329,10 @@ class JointLinearRepairTest {
             external = { seed }, onIncumbentUse = { consumed = true },
             incumbentCompletionCheck = { _, _, _ -> false }).use { repair ->
             repair.search(adaptive = false).use { search ->
-                search.advance(Cancellation.Never, 1)
+                search.advance(ExecutionControl.Never, 1)
                 assertTrue(repair.incumbentTrialPending)
                 var done = false
-                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                 assertFalse(consumed)
                 assertFalse(repair.incumbentTrialPending)
@@ -1306,7 +1347,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.75),
             exactReals = listOf(BigFraction.ofLong(3) * BigFraction.ofLong(4).reciprocal()))
         var paused = false
@@ -1314,11 +1356,11 @@ class JointLinearRepairTest {
         JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = true, maxFlips = 1),
             external = { seed }, onIncumbentUse = { paused = true }).use { repair ->
             repair.search(adaptive = false).use { search ->
-                search.advance(Cancellation { paused }, 5_000)
+                search.advance(ExecutionControl { paused }, 5_000)
                 assertTrue(repair.incumbentTrialPending)
                 paused = false
                 var done = false
-                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
 
                 assertEquals(1L, assertIs<MinimizeResult.WithSample>(
                     search.minimizeResult(TerminationReason.BudgetExhausted)).sample.intValue(0))
@@ -1334,7 +1376,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val seed = Sample(booleanArrayOf(), longArrayOf(2), doubleArrayOf(0.75),
             exactReals = listOf(BigFraction.ofLong(3) * BigFraction.ofLong(4).reciprocal()))
 
@@ -1343,7 +1386,7 @@ class JointLinearRepairTest {
                 TheoryParams(sourceIncumbentCompletion = completion, maxFlips = 1), external = { seed }).use { repair ->
                 repair.search(adaptive = false).use { search ->
                     var done = false
-                    repeat(32) { if (!done) done = search.advance(Cancellation.Never, 5_000) }
+                    repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 5_000) }
                     search.minimizeResult(TerminationReason.BudgetExhausted)
                 }
             }
@@ -1364,7 +1407,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val seed = Sample(booleanArrayOf(), longArrayOf(1), doubleArrayOf(0.75))
         val events = mutableListOf<String>()
 
@@ -1373,7 +1417,7 @@ class JointLinearRepairTest {
             onIncumbentUse = { events += "use" }).use { repair ->
             repair.search(adaptive = false).use { search ->
                 var done = false
-                repeat(32) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                repeat(32) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
             }
             assertTrue((repair.stats.smt.completeSearchStages?.get("jointRepairExternalCompletionChecked") ?: 0L) > 0L)
         }
@@ -1388,13 +1432,14 @@ class JointLinearRepairTest {
             Linear(intArrayOf(-1, 1), intArrayOf(0, 1), LinearOp.EQ, 0),
         ))
         val objective = LinearObjective(intCoefficients = longArrayOf(0, 1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val center = Sample(BooleanArray(0), longArrayOf(1, 1))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.ONE)
         JointLinearRepair(model, source, objective, TheoryParams(), external = { center }).use { repair ->
-            var result = repair.check(condition, Cancellation.Never)
+            var result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
 
             val point = assertIs<ExactNeighborhoodResult.Witness>(result).sample
@@ -1408,13 +1453,14 @@ class JointLinearRepairTest {
         val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
             realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap(), BigFraction.MINUS_ONE)
         JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true).use { repair ->
-            var attempt = repair.attempt(condition, Cancellation.Never)
+            var attempt = repair.attempt(condition, ExecutionControl.Never)
             repeat(64) {
                 if (attempt.result == ExactNeighborhoodResult.Paused) {
-                    attempt = repair.attempt(condition, Cancellation.Never)
+                    attempt = repair.attempt(condition, ExecutionControl.Never)
                 }
             }
 
@@ -1428,16 +1474,17 @@ class JointLinearRepairTest {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap())
         JointLinearRepair(model, source, objective, TheoryParams(sourceLpWorkLimit = 0)).use { repair ->
-            val result = repair.attempt(condition, Cancellation.Never)
+            val result = repair.attempt(condition, ExecutionControl.Never)
 
             assertEquals(ExactNeighborhoodResult.Undecided, result.result)
             assertEquals(TerminationReason.BudgetExhausted, result.reason)
         }
         JointLinearRepair(model, source, objective, TheoryParams()).use { repair ->
-            val result = repair.attempt(condition, Cancellation { true })
+            val result = repair.attempt(condition, ExecutionControl { true })
 
             assertEquals(ExactNeighborhoodResult.Paused, result.result)
             assertEquals(null, result.reason)
@@ -1450,16 +1497,17 @@ class JointLinearRepairTest {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(1), null, null),
             factors = emptyArray())
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val center = Sample(BooleanArray(0), longArrayOf(1))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE),
             mapOf(0 to BigFraction.ONE), BigFraction.ONE)
         JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true,
             external = { center }).use { repair ->
-            var attempt = repair.attempt(condition, Cancellation.Never)
+            var attempt = repair.attempt(condition, ExecutionControl.Never)
             repeat(64) {
                 if (attempt.result == ExactNeighborhoodResult.Paused) {
-                    attempt = repair.attempt(condition, Cancellation.Never)
+                    attempt = repair.attempt(condition, ExecutionControl.Never)
                 }
             }
 
@@ -1477,13 +1525,14 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE),
             mapOf(0 to BigFraction.ONE))
         for (atomic in listOf(false, true)) {
             JointLinearRepair(model, source, objective, TheoryParams(),
-                publicationLifetime = if (atomic) Cancellation.Never else null).use { repair ->
-                val slice = Cancellation {
+                publicationLifetime = if (atomic) ExecutionControl.Never else null).use { repair ->
+                val slice = ExecutionControl {
                     (repair.stats.smt.completeSearchStages?.get("jointRepairClosedLeaves") ?: 0L) > 0
                 }
 
@@ -1504,19 +1553,20 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE),
             mapOf(0 to BigFraction.ONE))
         lateinit var repair: JointLinearRepair
-        val lifetime = Cancellation {
+        val lifetime = ExecutionControl {
             (repair.stats.smt.completeSearchStages?.get("jointRepairClosedLeaves") ?: 0L) > 0
         }
         repair = JointLinearRepair(model, source, objective, TheoryParams(), publicationLifetime = lifetime)
 
         val result = repair.use { current ->
-            var result = current.check(condition, Cancellation.Never)
+            var result = current.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = current.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = current.check(condition, ExecutionControl.Never)
             }
             result
         }
@@ -1532,13 +1582,14 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val repair = JointLinearRepair(model, source, objective,
             TheoryParams(maxFlips = 1, nodeBudget = NodeBudget(1000)))
 
         val result = repair.use {
             it.search(adaptive = false).use { search ->
-                while (!search.advance(Cancellation.Never, 1000)) Unit
+                while (!search.advance(ExecutionControl.Never, 1000)) Unit
                 search.minimizeResult(TerminationReason.BudgetExhausted)
             }
         }
@@ -1554,14 +1605,15 @@ class JointLinearRepairTest {
                     LinearOp.EQ, 0.1),
             ), numRealVars = 129, realLower = DoubleArray(129), realUpper = DoubleArray(129) { 1.0 })
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
             mapOf(0 to BigFraction.ZERO))
 
         JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1)).use { repair ->
-            var result = repair.check(condition, Cancellation.Never)
+            var result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
 
             val sample = assertIs<ExactNeighborhoodResult.Witness>(result).sample
@@ -1581,13 +1633,14 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(1), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
             ), numRealVars = 127, realLower = DoubleArray(127) { 0.5 }, realUpper = DoubleArray(127) { 1.0 })
         val objective = LinearObjective(realCoefficients = DoubleArray(127) { if (it == 0) 1.0 else 0.0 })
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         JointLinearRepair(model, source, objective, TheoryParams(), boundOrdered = true).use { repair ->
             val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
                 mapOf(0 to BigFraction.ZERO))
-            var result = repair.check(condition, Cancellation.Never)
+            var result = repair.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(condition, ExecutionControl.Never)
             }
 
             assertEquals(ExactNeighborhoodResult.Refuted, result)
@@ -1595,9 +1648,9 @@ class JointLinearRepairTest {
             assertTrue(repair.stats.smt.sourceLp.conflictCertificationWork > 0L)
             val feasible = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
                 mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE))
-            result = repair.check(feasible, Cancellation.Never)
+            result = repair.check(feasible, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = repair.check(feasible, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = repair.check(feasible, ExecutionControl.Never)
             }
 
             val witness = assertIs<ExactNeighborhoodResult.Witness>(result).sample
@@ -1613,15 +1666,16 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(3.0, 3.0), LinearOp.EQ, 0.1),
             ), numRealVars = 129, realLower = DoubleArray(129), realUpper = DoubleArray(129) { 1.0 })
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1))
         val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ZERO),
             mapOf(0 to BigFraction.ZERO))
 
         val result = repair.use { current ->
-            var result = current.check(condition, Cancellation.Never)
+            var result = current.check(condition, ExecutionControl.Never)
             repeat(64) {
-                if (result == ExactNeighborhoodResult.Paused) result = current.check(condition, Cancellation.Never)
+                if (result == ExactNeighborhoodResult.Paused) result = current.check(condition, ExecutionControl.Never)
             }
             result
         }
@@ -1641,14 +1695,15 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         for (inputPass in listOf(false, true)) {
             val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2),
                 sourceIntegers = intArrayOf(0))
 
             val result = repair.use {
                 it.search(adaptive = false, sourceInputPass = inputPass).use { search ->
-                    while (!search.advance(Cancellation.Never, 1_000_000)) Unit
+                    while (!search.advance(ExecutionControl.Never, 1_000_000)) Unit
                     search.minimizeResult(TerminationReason.BudgetExhausted)
                 }
             }
@@ -1667,7 +1722,8 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         for (boundOrdered in listOf(false, true)) {
             val repair = JointLinearRepair(model, source, objective,
                 TheoryParams(maxFlips = 1, maxLeaves = 2, openWorkLimit = 2), SparseSourceLpPolicy(quantum = 1L),
@@ -1675,10 +1731,10 @@ class JointLinearRepairTest {
 
             val result = repair.use {
                 it.search(adaptive = false).use { search ->
-                    assertFalse(search.advance(Cancellation.Never, 1))
+                    assertFalse(search.advance(ExecutionControl.Never, 1))
                     assertEquals(0.0, search.stats.ls.completions.sum)
                     var done = false
-                    repeat(64) { if (!done) done = search.advance(Cancellation.Never, 1) }
+                    repeat(64) { if (!done) done = search.advance(ExecutionControl.Never, 1) }
                     assertTrue(done)
                     search.minimizeResult(TerminationReason.BudgetExhausted)
                 }
@@ -1697,12 +1753,13 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.GE, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.75), realUpper = doubleArrayOf(2.0))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 1))
 
         val result = repair.use {
             it.search(adaptive = false).use { search ->
-                while (!search.advance(Cancellation.Never, 1_000_000)) Unit
+                while (!search.advance(ExecutionControl.Never, 1_000_000)) Unit
                 search.minimizeResult(TerminationReason.BudgetExhausted)
             }
         }
@@ -1719,12 +1776,13 @@ class JointLinearRepairTest {
                 Linear(intArrayOf(1), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(-1.0), LinearOp.EQ, 0.0),
             ), numRealVars = 1, realLower = doubleArrayOf(0.5), realUpper = doubleArrayOf(1.0))
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, Cancellation.Never))
+        val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
+            ExecutionControl.Never))
         val repair = JointLinearRepair(model, source, objective, TheoryParams(maxFlips = 2))
 
         val result = repair.use {
             it.search(adaptive = false).use { search ->
-                while (!search.advance(Cancellation.Never, 1_000_000)) Unit
+                while (!search.advance(ExecutionControl.Never, 1_000_000)) Unit
                 search.minimizeResult(TerminationReason.BudgetExhausted)
             }
         }
@@ -1743,12 +1801,12 @@ class JointLinearRepairTest {
         val model = Problem(0, intBounds = IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, null),
             factors = arrayOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
         val source = assertNotNull(model.linearAuthorityContext(LinearObjective(), ObjectiveSense.MINIMIZE,
-            Cancellation.Never))
+            ExecutionControl.Never))
         val repair = JointLinearRepair(model, source, null, TheoryParams(maxFlips = 2))
 
         val result = repair.use {
             it.search(adaptive = false).use { search ->
-                while (!search.advance(Cancellation.Never, 1_000_000)) Unit
+                while (!search.advance(ExecutionControl.Never, 1_000_000)) Unit
                 search.solveResult(TerminationReason.BudgetExhausted)
             }
         }

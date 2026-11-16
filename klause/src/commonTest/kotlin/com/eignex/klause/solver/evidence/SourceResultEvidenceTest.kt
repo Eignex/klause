@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertIs
 
@@ -136,7 +136,8 @@ class SourceResultEvidenceTest {
         val supported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
         val result = SourceResultEvidence(scope, List(20) { missing } + supported)
 
-        val checked = result.verify(SourceClaim.Refutation, context, Cancellation.Never, SourceProofAllowance(8, 128))
+        val checked = result.verify(SourceClaim.Refutation, context, ExecutionControl.Never,
+            SourceProofAllowance(8, 128))
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }
@@ -147,7 +148,7 @@ class SourceResultEvidenceTest {
         val result = SourceResultEvidence(scope, listOf(supported, supported))
         var polls = 0
 
-        val checked = result.verify(SourceClaim.Refutation, context, Cancellation { ++polls == 2 })
+        val checked = result.verify(SourceClaim.Refutation, context, ExecutionControl { ++polls == 2 })
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }

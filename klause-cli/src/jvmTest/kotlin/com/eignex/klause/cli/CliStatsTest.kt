@@ -34,7 +34,7 @@ import com.eignex.klause.solver.result.SmtStats
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.solver.result.ValueOrderingStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
@@ -270,7 +270,7 @@ class CliStatsTest {
     @Test
     fun `presolve should print native construction separately from converted phase work`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
-        Problem.of(0, 1, arrayOf(IntDomain(0, 3)), emptyList()).bake(budget.orSpent(Cancellation.Never))
+        Problem.of(0, 1, arrayOf(IntDomain(0, 3)), emptyList()).bake(budget.orSpent(ExecutionControl.Never))
         val stats = SolveStats(
             presolve = PresolveStats(
                 effort = presolveEffortStats(PresolveConfig.NONE, budget, Duration.ZERO),

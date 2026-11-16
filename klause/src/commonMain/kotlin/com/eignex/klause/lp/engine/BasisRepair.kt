@@ -5,7 +5,7 @@ import com.eignex.klause.simplex.basis.BasisRepairControl
 import com.eignex.klause.simplex.basis.BasisRepairStop
 import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.simplex.basis.BasisRepair as SolverBasisRepair
 
 internal data class BasisBoundState(val hasLower: Boolean, val hasUpper: Boolean, val fixed: Boolean) {
@@ -103,7 +103,7 @@ internal class EngineBasisRepairer(private val exactRankLimits: ExactRankLimits 
         bounds: Array<BasisBoundState>,
         statuses: Array<VarStatus>,
         exactModel: LpModel?,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         control: BasisRepairControl = BasisRepairControl(cancellation),
     ): BasisRecoveryResult {
         attempts = saturatingIncrement(attempts)
@@ -335,7 +335,7 @@ internal fun exactBasisRankEvidence(
     model: LpModel?,
     headings: IntArray,
     limits: ExactRankLimits = ExactRankLimits(),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): ExactBasisRankEvidence {
     model ?: return ExactBasisRankEvidence.UNAVAILABLE
     if (model.exactState == null || headings.size != model.m || headings.any { it !in 0 until model.numVars }) {

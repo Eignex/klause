@@ -11,7 +11,7 @@ import com.eignex.klause.lowering.FunctionSourceLowering
 import com.eignex.klause.lowering.PolynomialConditional
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
 
@@ -67,7 +67,7 @@ internal object SmtLibPolynomial {
     // Reflection-based diagnostics bind the four-argument source entries.
     fun parse(
         text: String,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         allowIntegers: Boolean,
         allowFunctions: Boolean,
     ): SmtLibPolynomialProblem = parse(
@@ -76,7 +76,7 @@ internal object SmtLibPolynomial {
 
     fun parse(
         source: CharSource,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         allowIntegers: Boolean,
         allowFunctions: Boolean,
     ): SmtLibPolynomialProblem = parse(
@@ -85,7 +85,7 @@ internal object SmtLibPolynomial {
 
     fun parse(
         text: String,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         allowIntegers: Boolean = false,
         allowFunctions: Boolean = false,
         semantics: EffectiveSourceSemantics = smtLibSemantics.resolve(),
@@ -94,7 +94,7 @@ internal object SmtLibPolynomial {
 
     fun parse(
         source: CharSource,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         allowIntegers: Boolean = false,
         allowFunctions: Boolean = false,
         semantics: EffectiveSourceSemantics = smtLibSemantics.resolve(),
@@ -111,7 +111,7 @@ internal object SmtLibPolynomial {
 }
 
 internal class SmtLibPolynomialCompiler(
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
     private val allowIntegers: Boolean = false,
     private val allowFunctions: Boolean = false,
     private val semantics: EffectiveSourceSemantics = smtLibSemantics.resolve(),
@@ -373,7 +373,7 @@ internal fun SExpr.SList.polynomialName(index: Int): String {
 
 private class PolynomialSourceInput(
     private val source: CharSource,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
 ) : CharSource {
     private var chunk = ""
     private var offset = 0
@@ -389,7 +389,7 @@ private class PolynomialSourceInput(
     }
 }
 
-private fun SExpr.hasFunctionSyntax(cancellation: Cancellation): Boolean {
+private fun SExpr.hasFunctionSyntax(cancellation: ExecutionControl): Boolean {
     val pending = ArrayDeque<SExpr>()
     pending.addLast(this)
     while (pending.isNotEmpty()) {

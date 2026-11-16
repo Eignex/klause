@@ -4,7 +4,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.time.TimeSource
 
@@ -40,7 +40,7 @@ internal data class JointRepairObservation(
 
 internal class JointRepairObservationCapture(
     private val budget: SourceLpBudget,
-    private val stop: Cancellation,
+    private val stop: ExecutionControl,
     private val report: (JointRepairObservation) -> Unit,
 ) {
     private var records = 0L

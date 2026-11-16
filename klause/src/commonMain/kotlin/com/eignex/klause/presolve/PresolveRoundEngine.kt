@@ -2,7 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.PresolveInvocationStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Share of the model, in [PresolveRoundEngine.RoundHost.modelSize] units, that other passes must change
@@ -42,7 +42,7 @@ internal object PresolveRoundEngine {
     interface RoundHost {
         /** Run [pass] over the current model and fold its change in. [slice] caps this pass's own share
          *  of the phase budget; `null` leaves the host's own cancellation in place. */
-        fun runPass(pass: PresolvePass, slice: Cancellation?): PassOutcome
+        fun runPass(pass: PresolvePass, slice: ExecutionControl?): PassOutcome
 
         /** Post-pass hook, invoked whether or not the pass fired. */
         fun afterPass(pass: PresolvePass) {}
@@ -73,7 +73,7 @@ internal object PresolveRoundEngine {
     fun run(
         passes: List<PresolvePass>,
         maxRounds: Int,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         budget: PresolveBudget?,
         host: RoundHost,
         abortFraction: Double = 0.001,
@@ -104,12 +104,12 @@ internal object PresolveRoundEngine {
                 changedSince >= changeForCost.getValue(pass)
         }
 
-        while (round < maxRounds && !cancellation()) {
+        while (round < maxRounds && !cancellation.presolveStopped()) {
             budget?.recordRound()
             var ranAny = false
             var eligible = passes.count(::due)
             for (pass in passes) {
-                if (cancellation()) break
+                if (cancellation.presolveStopped()) break
                 if (!due(pass)) continue
                 ranAtVersion[pass] = version
                 ranAny = true
@@ -159,7 +159,7 @@ internal object PresolveRoundEngine {
         { sample -> reconstructs.foldRight(sample) { f, acc -> f(acc) } }
     }
 
-    private fun sliceOf(budget: PresolveBudget, cancellation: Cancellation, eligible: Int): Cancellation {
+    private fun sliceOf(budget: PresolveBudget, cancellation: ExecutionControl, eligible: Int): ExecutionControl {
         val left = budget.remaining()
         val share = if (eligible > 1) left / 2 else left
         return budget.slice(share) or cancellation

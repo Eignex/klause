@@ -3,7 +3,7 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedStage
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.OriginCounts
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.collections.IntArrayList
@@ -1086,12 +1086,13 @@ internal class NativeSatState(private val state: PropagationState) {
         rechecks.add(fid)
     }
 
-    private fun recheck(cancellation: Cancellation): Boolean {
-        val pollable = cancellation !== Cancellation.Never
+    private fun recheck(cancellation: ExecutionControl): Boolean {
+        val pollable = cancellation !== ExecutionControl.Never
+        val polling = cancellation.stopPolling
         var checked = 0
         while (recheckHead < rechecks.size) {
-            // One poll opens the queue; a long queue polls again at the propagation interval.
-            if (pollable && (checked++ and CANCEL_POLL_MASK) == 0 && cancellation()) {
+            val due = polling?.due(1) ?: ( (checked++ and CANCEL_POLL_MASK) == 0)
+            if (pollable && due && cancellation()) {
                 state.runCancelled = true
                 return false
             }
@@ -1129,7 +1130,7 @@ internal class NativeSatState(private val state: PropagationState) {
      * [bcpHead] over the pins added since. Returns the conflicting clause's decision levels, or null
      * at a clean fixpoint.
      */
-    fun propagate(allFactors: Boolean, cancellation: Cancellation): IntArray? {
+    fun propagate(allFactors: Boolean, cancellation: ExecutionControl): IntArray? {
         if (pendingConflict) {
             pendingConflict = false
             return state.conflictLevels
@@ -1171,12 +1172,14 @@ internal class NativeSatState(private val state: PropagationState) {
             }
             bcpHead = 0
         }
-        val pollable = cancellation !== Cancellation.Never
+        val pollable = cancellation !== ExecutionControl.Never
+        val polling = cancellation.stopPolling
         var fireCount = 0
         val trail = state.boolPinOrder
         while (bcpHead < trail.size) {
             if (pollable) {
-                if ((fireCount and CANCEL_POLL_MASK) == 0 && cancellation()) {
+                val due = polling?.due(1) ?: ((fireCount and CANCEL_POLL_MASK) == 0)
+                if (due && cancellation()) {
                     state.runCancelled = true
                     return null
                 }

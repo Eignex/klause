@@ -11,7 +11,7 @@ import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.abs
 import kotlin.uuid.Uuid
@@ -26,7 +26,7 @@ internal fun Problem.hasCompleteAbsSource(): Boolean = factors.any { it is Abs |
 
 internal fun Problem.absSourceWitnessContext(
     objective: LinearObjective,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): SourceProofContext? {
     if (cancellation() || !hasCompleteAbsSource()) return null
     val identity = Uuid.random().toString()
@@ -35,7 +35,7 @@ internal fun Problem.absSourceWitnessContext(
     return sourceProofContext(scope, objective, cancellation)
 }
 
-internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: Cancellation): SourceEvidenceCheck {
+internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: ExecutionControl): SourceEvidenceCheck {
     if (numRealVars > 0 && sample.exactReals == null) {
         return SourceEvidenceCheck.Unavailable("absolute value source requires rational real coordinates")
     }

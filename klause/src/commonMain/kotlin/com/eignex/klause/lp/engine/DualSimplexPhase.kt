@@ -579,7 +579,7 @@ internal class DualSimplexPhase(
         observations.lastTheoryPricingWorkOps += amount
     }
 
-    private fun pricingResourceStopped(): Boolean = cancellation() || control.workExhausted()
+    private fun pricingResourceStopped(): Boolean = control.pricingResourceStopped()
 
     private fun candidateOrderingWork(size: Int): Long {
         var levels = 0

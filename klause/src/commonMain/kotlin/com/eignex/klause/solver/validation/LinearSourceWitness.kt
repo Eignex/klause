@@ -4,7 +4,7 @@ import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 
 /** Checked declaration-order coordinates and their original source objective value. */
@@ -32,7 +32,7 @@ internal sealed interface LinearSourceCheck {
 internal fun checkLinearSourceWitness(
     source: LinearSourceProblem,
     values: List<BigFraction>,
-    stop: Cancellation,
+    stop: ExecutionControl,
 ): LinearSourceCheck {
     if (stop()) return LinearSourceCheck.Declined
     fun reject(): LinearSourceCheck = if (stop()) LinearSourceCheck.Declined else LinearSourceCheck.Rejected
@@ -41,7 +41,7 @@ internal fun checkLinearSourceWitness(
     fun stoppedAfterVisit(): Boolean {
         stop.charge(1L)
         visits++
-        return (stop.workMeter() != null || visits % SOURCE_POINT_POLL_BATCH == 0) && stop()
+        return ( visits % SOURCE_POINT_POLL_BATCH == 0) && stop()
     }
     val tolerance = source.semantics.effective.feasibilityTolerance ?: SourceTolerance()
     val absolute = BigFraction.of(tolerance.absolute.numerator, tolerance.absolute.denominator)

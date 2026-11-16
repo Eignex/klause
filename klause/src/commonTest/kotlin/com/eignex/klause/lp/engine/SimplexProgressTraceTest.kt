@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -138,7 +138,7 @@ class SimplexProgressTraceTest {
         }.build(Sense.MINIMIZE)
         val engines = mutableListOf<RevisedSimplex>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int,
+            override fun newPersistentSolver(model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
                 iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean,
                 pricing: LpPricingOptions): PersistentLpSolver =
                 RevisedSimplex(model, cancellation, refactorUpdateLimit = refactorUpdateLimit,
@@ -182,7 +182,7 @@ class SimplexProgressTraceTest {
             addVar(0L, 10L, cost = 1L)
             addRow(intArrayOf(0), longArrayOf(1L), Relation.GE, 4L)
         }.build(Sense.MINIMIZE)
-        RevisedSimplex(model, Cancellation { true }).use { solver ->
+        RevisedSimplex(model, ExecutionControl { true }).use { solver ->
             solver.enableProgressTrace(profile = true)
 
             assertNull(solver.solve())

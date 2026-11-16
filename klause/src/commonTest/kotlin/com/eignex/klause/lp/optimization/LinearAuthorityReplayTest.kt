@@ -16,7 +16,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -58,10 +58,10 @@ class LinearAuthorityReplayTest {
 
     @Test
     fun `replay masks should target supplied captured cuts after their owner closes`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts).use {
             it.capture = capture
-            it.advance(source, Cancellation.Never, cuts = true, cutMask = setOf(0))
+            it.advance(source, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
         }
         val original = capture.records.single()
         assertEquals(2, original.cuts.size)
@@ -72,7 +72,7 @@ class LinearAuthorityReplayTest {
             setOf(1) to BigFraction.ofLong(5) * half,
             setOf(0, 1) to BigFraction.ofLong(3),
         )) {
-            val replay = LinearAuthorityReplay.run(original, mask, 1_000_000L, 4_000_000L, Cancellation.Never)
+            val replay = LinearAuthorityReplay.run(original, mask, 1_000_000L, 4_000_000L, ExecutionControl.Never)
 
             val bound = assertNotNull(replay.strongestBound)
             val replayed = assertNotNull(replay.query)
@@ -87,15 +87,15 @@ class LinearAuthorityReplayTest {
 
     @Test
     fun `replay should decline masks outside the captured pool`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts).use {
             it.capture = capture
-            it.advance(source, Cancellation.Never, cuts = true, cutMask = setOf(0))
+            it.advance(source, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
         }
 
         for (mask in listOf(setOf(-1), setOf(2))) {
             val replay = LinearAuthorityReplay.run(capture.records.single(), mask,
-                1_000_000L, 4_000_000L, Cancellation.Never)
+                1_000_000L, 4_000_000L, ExecutionControl.Never)
 
             assertNotNull(replay.decline)
             assertNull(replay.query)
@@ -105,10 +105,10 @@ class LinearAuthorityReplayTest {
 
     @Test
     fun `replay should decline an incomplete captured pool`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts).use {
             it.capture = capture
-            it.advance(source, Cancellation.Never, cuts = true, cutMask = setOf(0))
+            it.advance(source, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
         }
         val original = capture.records.single()
 
@@ -118,7 +118,7 @@ class LinearAuthorityReplayTest {
             original.copy(cuts = original.cuts.map { it.copy(family = null) }),
         )) {
             val replay = LinearAuthorityReplay.run(incomplete, emptySet(),
-                1_000_000L, 4_000_000L, Cancellation.Never)
+                1_000_000L, 4_000_000L, ExecutionControl.Never)
 
             assertNotNull(replay.decline)
             assertNull(replay.query)
@@ -128,15 +128,15 @@ class LinearAuthorityReplayTest {
 
     @Test
     fun `replay should decline before importing beyond its allowance`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts).use {
             it.capture = capture
-            it.advance(source, Cancellation.Never, cuts = true, cutMask = setOf(0))
+            it.advance(source, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
         }
 
         for ((work, allocation) in listOf(1L to 4_000_000L, 1_000_000L to 1L)) {
             val replay = LinearAuthorityReplay.run(capture.records.single(), setOf(0), work, allocation,
-                Cancellation.Never)
+                ExecutionControl.Never)
 
             assertNotNull(replay.decline)
             assertNull(replay.query)
@@ -147,17 +147,17 @@ class LinearAuthorityReplayTest {
 
     @Test
     fun `replay should recheck captured derivations instead of trusting prior check flags`() {
-        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
         LinearAuthority(SourceLpBudget(), retainLp = true, additionalCuts = cuts).use {
             it.capture = capture
-            it.advance(source, Cancellation.Never, cuts = true, cutMask = setOf(0))
+            it.advance(source, ExecutionControl.Never, cuts = true, cutMask = setOf(0))
         }
         val original = capture.records.single()
         val invalid = original.copy(cuts = original.cuts.map {
             if (it.id == 0) it.copy(derivation = SourceDerivation.Premise("missing"), checked = true) else it
         })
 
-        val replay = LinearAuthorityReplay.run(invalid, setOf(0), 1_000_000L, 4_000_000L, Cancellation.Never)
+        val replay = LinearAuthorityReplay.run(invalid, setOf(0), 1_000_000L, 4_000_000L, ExecutionControl.Never)
 
         val bound = replay.strongestBound
         if (bound != null) {

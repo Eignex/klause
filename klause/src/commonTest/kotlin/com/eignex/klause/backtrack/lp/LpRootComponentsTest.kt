@@ -20,7 +20,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -43,16 +43,16 @@ class LpRootComponentsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), sink,
             LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val session = PropagationSession(problem)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             session.pinInt(0, 1)
             session.pinInt(2, 1)
             val queries = factory.floatAllowances.size
 
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).first()
             assertNull(sink.snapshot().lp.phases["PRIMAL_COMPONENT_VALUES_ROOT"]
                 ?.outcomes?.get("RESTART_VALUE_ORDER_OFFERED"))
@@ -79,15 +79,15 @@ class LpRootComponentsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("completed-component-values"),
             LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val session = PropagationSession(problem)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             session.pinInt(0, 1)
             val queries = factory.floatAllowances.size
 
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             engine.restartRootPrimalTargets()
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
@@ -109,14 +109,14 @@ class LpRootComponentsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("completed-component-values"),
             LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val session = PropagationSession(problem)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             session.pinInt(0, 1)
             session.pinInt(2, 1)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             val queries = factory.floatAllowances.size
 
             engine.clearRootPrimalTargets()
@@ -141,14 +141,14 @@ class LpRootComponentsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), sink,
             LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val session = PropagationSession(problem)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             session.pinInt(0, 1)
             session.pinInt(2, 1)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             val queries = factory.floatAllowances.size
 
             val relaxation = assertNotNull(engine.lpRelaxer).build(PropagationSession(problem))
@@ -176,17 +176,17 @@ class LpRootComponentsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("completed-component-values"),
             LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val session = PropagationSession(problem)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             session.pinInt(0, 1)
             session.pinInt(2, 1)
             offered = 0L
             val queries = factory.floatAllowances.size
 
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             engine.restartRootPrimalTargets()
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
@@ -208,16 +208,16 @@ class LpRootComponentsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("completed-component-values"),
             LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val session = PropagationSession(problem)
-            engine.pickRootComponent(session, Cancellation.Never)
+            engine.pickRootComponent(session, ExecutionControl.Never)
             session.pinInt(0, 1)
             session.pinInt(2, 1)
             val queries = factory.floatAllowances.size
 
-            engine.pickRootComponent(session, Cancellation { engine.rootComponentValues != null })
+            engine.pickRootComponent(session, ExecutionControl { engine.rootComponentValues != null })
             engine.restartRootPrimalTargets()
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
@@ -327,22 +327,22 @@ class LpRootComponentsTest {
                 LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                     rootCutHarvest = false)), SolveStatsSink("pending-component-preparation"),
                 LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
-                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
                 engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-                assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+                assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
                 val session = PropagationSession(problem)
                 val queries = factory.floatAllowances.size
                 var polls = 0
                 val token = when (boundary) {
-                    "work" -> Cancellation.Never
-                    "clock" -> Cancellation { true }
-                    else -> Cancellation { ++polls >= 2 }
+                    "work" -> ExecutionControl.Never
+                    "clock" -> ExecutionControl { true }
+                    else -> ExecutionControl { ++polls >= 2 }
                 }
                 if (boundary == "work") offered = 0L
                 assertNull(engine.pickRootComponent(session, token), boundary)
                 offered = 1_000_000L
 
-                val chosen = engine.pickRootComponent(session, Cancellation.Never)
+                val chosen = engine.pickRootComponent(session, ExecutionControl.Never)
 
                 assertEquals(VarRef.IntVar(0), chosen, boundary)
                 assertEquals(queries, factory.floatAllowances.size, boundary)
@@ -373,14 +373,14 @@ class LpRootComponentsTest {
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("charged-component-admission")).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             val targets = assertNotNull(engine.rootPrimalTargets)
             engine.noteNodeOverhead(SPARSE_LP_MAX_PREPARATION_WORK)
             assertTrue(engine.retainedRootRemainingWork() > 0L)
 
-            val chosen = engine.pickRootComponent(PropagationSession(problem), Cancellation.Never)
+            val chosen = engine.pickRootComponent(PropagationSession(problem), ExecutionControl.Never)
 
             assertNull(chosen)
             assertNull(targets.components)
@@ -434,7 +434,7 @@ class LpRootComponentsTest {
             Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
         ))
         var polls = 0
-        val meter = LpProjectionMeter(1_000L, rootComponentPreparationBytes(6), Cancellation { ++polls >= 2 })
+        val meter = LpProjectionMeter(1_000L, rootComponentPreparationBytes(6), ExecutionControl { ++polls >= 2 })
 
         assertFailsWith<LpProjectionStop> { rootComponentOrder(problem, meter) }
 
@@ -450,15 +450,15 @@ class LpRootComponentsTest {
         ))
         val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter()))
         val session = PropagationSession(problem)
-        assertEquals(0, firstRootComponentVariable(order, session, Cancellation.Never))
+        assertEquals(0, firstRootComponentVariable(order, session, ExecutionControl.Never))
         session.pinInt(0, 0)
-        assertEquals(2, firstRootComponentVariable(order, session, Cancellation.Never))
+        assertEquals(2, firstRootComponentVariable(order, session, ExecutionControl.Never))
         session.pinInt(2, 0)
-        assertEquals(4, firstRootComponentVariable(order, session, Cancellation.Never))
+        assertEquals(4, firstRootComponentVariable(order, session, ExecutionControl.Never))
         session.popToLevel(0)
         val before = session.work
 
-        val variable = firstRootComponentVariable(order, session, Cancellation.Never)
+        val variable = firstRootComponentVariable(order, session, ExecutionControl.Never)
 
         assertEquals(0, variable)
         assertEquals(before + 1L, session.work)

@@ -12,12 +12,12 @@ import com.eignex.klause.lp.engine.RetainedLpSolver
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.newRetainedLpSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.CheckedLongOverflowException
 
 internal class LpProbeSolver(
     model: LpModel,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val observer: LpCertificationObserver?,
     private val context: LpSolveContext,
 ) : AutoCloseable {

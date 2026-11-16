@@ -44,7 +44,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.random.Random
 import kotlin.test.Test
@@ -79,7 +79,7 @@ class LpPrimalHeuristicsTest {
                 LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                     rootCutHarvest = false)), SolveStatsSink("masked-component-admission"),
                 LpSolveContext(factory)).use { engine ->
-                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
                 engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
                 val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
                 val known = BooleanArray(relaxation.model.n)
@@ -93,15 +93,15 @@ class LpPrimalHeuristicsTest {
                 }
                 val guide = RootRoundingWarmStart(objective, relaxation, primal = point, knownColumns = known)
                 engine.rootRoundingWarmStart = guide
-                assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+                assertTrue(engine.retainRootPrimalTargets(ExecutionControl.Never))
                 val constructed = factory.calls.size
 
-                val prepared = engine.prepareRootComponentTrial(objective, Cancellation.Never)
+                val prepared = engine.prepareRootComponentTrial(objective, ExecutionControl.Never)
 
                 assertEquals(kind == "fractional", prepared, kind)
                 if (prepared) {
                     val prefix = assertNotNull(guide.pinning)
-                    val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+                    val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
                     assertEquals(listOf(1L, 1L, 1L, 1L, 0L, 0L, 0L, 0L), sample.ints.toList())
                     assertEquals(prefix.work, engine.primalPropagationWork)
                 } else {
@@ -124,7 +124,7 @@ class LpPrimalHeuristicsTest {
             var queries = 0
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
-                    model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
                     workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
                 ): PersistentLpSolver {
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
@@ -147,7 +147,7 @@ class LpPrimalHeuristicsTest {
                     rootCutHarvest = false, rootMaxWork = rootLimit)),
                 SolveStatsSink("separate-preparation-limit"),
                 LpSolveContext(factory)).use { engine ->
-                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
                 engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
                 assertTrue(engine.totalSolveWork() >= 8_000_000L)
                 val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
@@ -159,13 +159,13 @@ class LpPrimalHeuristicsTest {
                 val previousQueries = queries
                 val funded = rootLimit > before
 
-                val retained = engine.retainRootPrimalTargets(Cancellation.Never)
-                val prepared = engine.prepareRootComponentTrial(objective, Cancellation.Never)
+                val retained = engine.retainRootPrimalTargets(ExecutionControl.Never)
+                val prepared = engine.prepareRootComponentTrial(objective, ExecutionControl.Never)
 
                 assertEquals(funded, retained)
                 assertEquals(funded, prepared)
                 if (funded) {
-                    val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+                    val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
                     assertTrue(sample.ints.all { it in 0L..1L })
                     assertTrue(sample.ints[0] + sample.ints[2] >= 1L && sample.ints[1] + sample.ints[3] >= 1L)
                     assertTrue(engine.totalSolveWork() > before)
@@ -195,16 +195,16 @@ class LpPrimalHeuristicsTest {
             SolveStatsSink("funded-handoff-trial"), LpSolveContext(factory),
             nodeWorkAllowance = { offered }).use { engine ->
             engine.rootRoundingWarmStart = guide
-            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
+            assertTrue(engine.retainRootPrimalTargets(ExecutionControl.Never))
             offered = 0L
-            assertFalse(engine.prepareRootComponentTrial(objective, Cancellation.Never))
+            assertFalse(engine.prepareRootComponentTrial(objective, ExecutionControl.Never))
             assertNull(guide.pinning)
             assertEquals(0L, engine.primalPropagationWork)
             offered = 1_000_000L
-            assertTrue(engine.prepareRootComponentTrial(objective, Cancellation.Never))
+            assertTrue(engine.prepareRootComponentTrial(objective, ExecutionControl.Never))
             val prefix = assertNotNull(guide.pinning)
 
-            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
             assertTrue(sample.ints.all { it in 0L..1L })
             assertTrue(sample.ints[0] + sample.ints[2] >= 1L && sample.ints[1] + sample.ints[3] >= 1L)
@@ -231,15 +231,15 @@ class LpPrimalHeuristicsTest {
             SolveStatsSink("funded-component-rounding"), LpSolveContext(factory),
             nodeWorkAllowance = { offered }).use { engine ->
             engine.rootRoundingWarmStart = guide
-            assertTrue(engine.retainRootPrimalTargets(Cancellation.Never))
-            val order = assertNotNull(engine.prepareRootComponentOrder(session, Cancellation.Never))
+            assertTrue(engine.retainRootPrimalTargets(ExecutionControl.Never))
+            val order = assertNotNull(engine.prepareRootComponentOrder(session, ExecutionControl.Never))
             val targets = assertNotNull(engine.rootPrimalTargets)
             offered = 0L
-            assertNull(engine.prepareRootComponentRounding(targets, order, Cancellation.Never))
+            assertNull(engine.prepareRootComponentRounding(targets, order, ExecutionControl.Never))
             offered = 1_000_000L
 
-            assertNotNull(engine.prepareRootComponentRounding(targets, order, Cancellation.Never))
-            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNotNull(engine.prepareRootComponentRounding(targets, order, ExecutionControl.Never))
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
             assertEquals(List(4) { 1L }, sample.ints.toList())
             assertTrue(factory.calls.isEmpty())
@@ -271,7 +271,7 @@ class LpPrimalHeuristicsTest {
             engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, primal = primal,
                 sourceProblem = problem, auxiliaryPoint = true)
 
-            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
             assertEquals(listOf(1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L), sample.ints.toList())
             val verifier = finiteWitnessVerifier(problem.bake(), objective)
@@ -304,7 +304,7 @@ class LpPrimalHeuristicsTest {
             LpEngine(problem, objective,
                 LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                     rootCutHarvest = false)), sink, LpSolveContext(factory)).use { engine ->
-                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
                 engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
                 val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
                 val primal = DoubleArray(relaxation.model.n)
@@ -317,11 +317,11 @@ class LpPrimalHeuristicsTest {
                 val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal,
                     knownColumns = known, sourceProblem = problem)
                 val before = engine.primalPropagationWork
-                val limit = Cancellation { engine.primalPropagationWork - before >= 200_000L }
+                val limit = ExecutionControl { engine.primalPropagationWork - before >= 200_000L }
                 var expired = false
                 var retreatDepth = -1
                 var pinning: PropagationSession? = null
-                val slice = Cancellation {
+                val slice = ExecutionControl {
                     guidance.pinning?.let { pinning = it }
                     val pending = guidance.componentRounding
                     val repair = pending?.repair
@@ -374,7 +374,7 @@ class LpPrimalHeuristicsTest {
         val sink = SolveStatsSink("spent-component-repair")
         val factory = RecordingLpEngineFactory()
         var spend: (() -> Unit)? = null
-        val token = Cancellation {
+        val token = ExecutionControl {
             if (guidance.componentRounding?.repair?.active == true) {
                 val consume = spend
                 spend = null
@@ -414,7 +414,7 @@ class LpPrimalHeuristicsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)),
             SolveStatsSink("resumed-component-repair"), LpSolveContext(factory)).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
             val primal = DoubleArray(relaxation.model.n)
@@ -427,7 +427,7 @@ class LpPrimalHeuristicsTest {
             val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal, knownColumns = known,
                 sourceProblem = problem)
             var expired = false
-            val slice = Cancellation {
+            val slice = ExecutionControl {
                 val pending = guidance.componentRounding
                 val pinning = guidance.pinning
                 if (pending?.group == 1 && pending.repair?.active == true &&
@@ -444,7 +444,7 @@ class LpPrimalHeuristicsTest {
             assertEquals(IntDomain(2, 2), prefix.intDomain(0))
             val paid = engine.primalPropagationWork
 
-            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
             assertEquals(2L, sample.ints[0])
             assertEquals(2L, sample.ints[4])
@@ -475,7 +475,7 @@ class LpPrimalHeuristicsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)),
             SolveStatsSink("refreshed-component-repair"), LpSolveContext(factory)).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             val relaxation = assertNotNull(engine.rootRoundingWarmStart).relaxation
             val primal = DoubleArray(relaxation.model.n)
@@ -488,7 +488,7 @@ class LpPrimalHeuristicsTest {
             val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal, knownColumns = known,
                 sourceProblem = problem)
             var expired = false
-            val slice = Cancellation {
+            val slice = ExecutionControl {
                 val pending = guidance.componentRounding
                 val pinning = guidance.pinning
                 if (pending?.group == 1 && pending.repair?.active == true &&
@@ -505,9 +505,9 @@ class LpPrimalHeuristicsTest {
             assertEquals(IntDomain(2, 2), prefix.intDomain(0))
             val paid = engine.primalPropagationWork
 
-            engine.retainRootPartialPrimalGuidance(relaxation, Cancellation.Never)
+            engine.retainRootPartialPrimalGuidance(relaxation, ExecutionControl.Never)
             assertEquals(IntDomain(2, 2), assertNotNull(engine.rootRoundingWarmStart?.pinning).intDomain(0))
-            val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
             assertEquals(2L, sample.ints[0])
             assertEquals(2L, sample.ints[4])
@@ -545,7 +545,7 @@ class LpPrimalHeuristicsTest {
                 sourceProblem = problem, auxiliaryPoint = true)
             val factory = RecordingLpEngineFactory()
             var expired = false
-            val slice = Cancellation {
+            val slice = ExecutionControl {
                 val pending = guidance.componentRounding
                 val level = guidance.pinning?.decisionLevel ?: 0
                 if (pending?.group == 1 && level >= (if (withinDirection) 6 else 4) &&
@@ -563,7 +563,7 @@ class LpPrimalHeuristicsTest {
                 assertEquals(IntDomain(1, 1), prefix.intDomain(0))
                 val paid = engine.primalPropagationWork
 
-                val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+                val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
                 assertEquals(listOf(1L, 1L, 1L, 1L, 1L, 0L, 0L, 0L), sample.ints.toList())
                 assertEquals(prefix.work, engine.primalPropagationWork)
@@ -596,7 +596,7 @@ class LpPrimalHeuristicsTest {
             engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, primal = primal,
                 sourceProblem = problem, auxiliaryPoint = true)
 
-            assertNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
             engine.restartRootPrimalTargets()
             val values = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
@@ -626,7 +626,7 @@ class LpPrimalHeuristicsTest {
             SolveStatsSink("ordinary-nearest-rounding"), LpSolveContext(factory)).use { engine ->
             engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, primal = primal)
 
-            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+            val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
 
             assertNull(sample)
             assertTrue(factory.calls.isEmpty())
@@ -654,7 +654,7 @@ class LpPrimalHeuristicsTest {
             engine.rootRoundingWarmStart = guidance
             var changes = 0
             var paid = 0L
-            val slice = Cancellation {
+            val slice = ExecutionControl {
                 if (engine.primalPropagationWork > paid) {
                     paid = engine.primalPropagationWork
                     changes++
@@ -665,7 +665,7 @@ class LpPrimalHeuristicsTest {
             assertTrue(engine.rootRoundingInterrupted)
             val completedWork = engine.primalPropagationWork
 
-            assertNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+            assertNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
             assertEquals(completedWork, engine.primalPropagationWork)
             assertNull(engine.rootRoundingWarmStart)
@@ -688,7 +688,7 @@ class LpPrimalHeuristicsTest {
             SolveStatsSink("pending-rounding-admission"), LpSolveContext(factory)).use { engine ->
             engine.rootRoundingWarmStart = guidance
             var expired = false
-            assertNull(engine.lpRoundingProbe(objective, Cancellation { expired }) {
+            assertNull(engine.lpRoundingProbe(objective, ExecutionControl { expired }) {
                 expired = true
                 null
             })
@@ -697,7 +697,7 @@ class LpPrimalHeuristicsTest {
             assertEquals(IntDomain(1, 1), prefix.intDomain(1))
             val paid = engine.primalPropagationWork
 
-            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+            val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
 
             assertEquals(listOf(0L, 1L), assertNotNull(sample).ints.toList())
             assertEquals(paid, engine.primalPropagationWork)
@@ -725,14 +725,14 @@ class LpPrimalHeuristicsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
             SolveStatsSink("charged-rounding-direction"), LpSolveContext(factory)).use { engine ->
             engine.rootRoundingWarmStart = guidance
-            val slice = Cancellation { engine.primalPropagationWork > 0L }
+            val slice = ExecutionControl { engine.primalPropagationWork > 0L }
 
             assertNull(engine.lpRoundingProbe(objective, slice))
 
             assertTrue(engine.rootRoundingInterrupted)
             assertTrue(engine.primalPropagationWork > 0L)
             assertNull(guidance.pinning)
-            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+            val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
             assertEquals(List(4) { 1L }, assertNotNull(sample).ints.toList())
             assertTrue(factory.calls.isEmpty())
         }
@@ -771,7 +771,7 @@ class LpPrimalHeuristicsTest {
                 SolveStatsSink("directed-integer-rounding"), LpSolveContext(factory)).use { engine ->
                 engine.rootRoundingWarmStart = guidance
 
-                engine.lpRoundingProbe(objective, Cancellation.Never)
+                engine.lpRoundingProbe(objective, ExecutionControl.Never)
             }
 
             assertEquals(listOf(1L) + List(3) { if (upward) 1L else 0L }, assertNotNull(sample).ints.toList())
@@ -807,7 +807,7 @@ class LpPrimalHeuristicsTest {
             val factory = RecordingLpEngineFactory()
             assertEquals(IntDomain(0, upper), root.intDomain(0))
             var expired = false
-            val slice = Cancellation {
+            val slice = ExecutionControl {
                 val pins = guidance.pinning
                 if (pins != null && pins.decisionLevel >= 2 && pins.intDomain(0).min == 1L) expired = true
                 expired
@@ -822,7 +822,7 @@ class LpPrimalHeuristicsTest {
                 assertEquals(IntDomain(1, 1), prefix.intDomain(0))
                 val paid = engine.primalPropagationWork
 
-                val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+                val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
 
                 assertEquals(listOf(1L) + List(3) { if (upward) 1L else 0L }, assertNotNull(sample).ints.toList())
                 assertEquals(prefix.work, engine.primalPropagationWork)
@@ -842,7 +842,7 @@ class LpPrimalHeuristicsTest {
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
         val guidance = RootRoundingWarmStart(objective, relaxation, primal = DoubleArray(relaxation.model.n))
         var expired = false
-        val slice = Cancellation {
+        val slice = ExecutionControl {
             if ((guidance.pinning?.decisionLevel ?: 0) > 0) expired = true
             expired
         }
@@ -855,10 +855,10 @@ class LpPrimalHeuristicsTest {
             assertEquals(IntDomain(0, 0), prefix.intDomain(0))
             val paid = engine.primalPropagationWork
             assertTrue(paid > 0L)
-            assertNull(engine.lpRoundingProbe(objective, Cancellation { true }))
+            assertNull(engine.lpRoundingProbe(objective, ExecutionControl { true }))
             assertEquals(paid, engine.primalPropagationWork)
 
-            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+            val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
 
             assertTrue(expired)
             assertEquals(List(n) { 0L }, assertNotNull(sample).ints.toList())
@@ -878,7 +878,7 @@ class LpPrimalHeuristicsTest {
             val objective = LinearObjective(intCoefficients = LongArray(n) { 1L })
             val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
             val guidance = RootRoundingWarmStart(objective, relaxation, primal = DoubleArray(relaxation.model.n))
-            val slice = Cancellation { (guidance.pinning?.decisionLevel ?: 0) > 0 }
+            val slice = ExecutionControl { (guidance.pinning?.decisionLevel ?: 0) > 0 }
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
                 SolveStatsSink("changed-rounding-pins")).use { engine ->
                 engine.rootRoundingWarmStart = guidance
@@ -889,7 +889,7 @@ class LpPrimalHeuristicsTest {
                 engine.rootRoundingWarmStart = RootRoundingWarmStart(next, layout,
                     primal = DoubleArray(layout.model.n) { 1.0 })
 
-                val sample = engine.lpRoundingProbe(next, Cancellation.Never)
+                val sample = engine.lpRoundingProbe(next, ExecutionControl.Never)
 
                 assertEquals(List(n) { 1L }, assertNotNull(sample).ints.toList())
             }
@@ -906,10 +906,10 @@ class LpPrimalHeuristicsTest {
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
             SolveStatsSink("interrupted-rounding-root")).use { engine ->
             engine.rootRoundingWarmStart = guidance
-            assertNull(engine.lpRoundingProbe(objective, Cancellation { true }))
+            assertNull(engine.lpRoundingProbe(objective, ExecutionControl { true }))
             assertNull(guidance.pinning)
 
-            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+            val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
 
             assertEquals(listOf(0L, 1L), assertNotNull(sample).ints.toList())
         }
@@ -932,7 +932,7 @@ class LpPrimalHeuristicsTest {
                 engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
                     primal = guide, knownColumns = known)
 
-                engine.lpRoundingProbe(objective, Cancellation.Never)
+                engine.lpRoundingProbe(objective, ExecutionControl.Never)
             }
 
             assertEquals(expected, assertNotNull(sample).ints.toList())
@@ -958,7 +958,7 @@ class LpPrimalHeuristicsTest {
             SolveStatsSink("unknown-binary-rounding")).use { engine ->
             engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
                 primal = guide, knownColumns = known)
-            engine.lpRoundingProbe(objective, Cancellation.Never)
+            engine.lpRoundingProbe(objective, ExecutionControl.Never)
         }
 
         assertEquals(listOf(1L, 0L, 0L), assertNotNull(sample).ints.toList())
@@ -973,7 +973,7 @@ class LpPrimalHeuristicsTest {
         var solves = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newTableauSolver(
-                model: LpModel, cancellation: Cancellation, iterationLimit: Int, workLimit: Long,
+                model: LpModel, cancellation: ExecutionControl, iterationLimit: Int, workLimit: Long,
                 trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): TableauCutSolver {
                 solves++
@@ -988,7 +988,7 @@ class LpPrimalHeuristicsTest {
                 }
             }
         }
-        val token = Cancellation { stopped }
+        val token = ExecutionControl { stopped }
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
             SolveStatsSink("closed-rounding-point"), LpSolveContext(factory),
@@ -1012,7 +1012,7 @@ class LpPrimalHeuristicsTest {
             val objective = LinearObjective(intCoefficients = longArrayOf(1, 2))
             val factory = RecordingLpEngineFactory()
             var stopped = false
-            val token = Cancellation { stopped }
+            val token = ExecutionControl { stopped }
 
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
                 SolveStatsSink("resumed-rounding-point"), LpSolveContext(factory)).use { engine ->
@@ -1048,7 +1048,7 @@ class LpPrimalHeuristicsTest {
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             val constructed = factory.calls.size
 
-            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+            val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
 
             assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
             assertEquals(constructed, factory.calls.size)
@@ -1072,7 +1072,7 @@ class LpPrimalHeuristicsTest {
             var childCalls = 0
             val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
-                    model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
                     workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
                 ): PersistentLpSolver {
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
@@ -1091,8 +1091,8 @@ class LpPrimalHeuristicsTest {
                 LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                     rootCutHarvest = false)), SolveStatsSink("deferred-child-guidance"),
                 LpSolveContext(factory)).use { engine ->
-                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
-                val token = Cancellation { expired }
+                assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+                val token = ExecutionControl { expired }
                 val bound = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), token)
                 val queries = factory.floatAllowances.size
                 val constructions = factory.calls.size
@@ -1102,7 +1102,7 @@ class LpPrimalHeuristicsTest {
 
                 if (clearView) engine.cpAdapter.retract(0)
 
-                val sample = assertNotNull(engine.lpRoundingProbe(objective, Cancellation.Never))
+                val sample = assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
 
                 assertEquals(queries, factory.floatAllowances.size)
                 assertEquals(constructions, factory.calls.size)
@@ -1127,11 +1127,11 @@ class LpPrimalHeuristicsTest {
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("prepared-component-rounding"),
             LpSolveContext(factory)).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
-            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), Cancellation { true })
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
+            engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList(), ExecutionControl { true })
             val constructed = factory.calls.size
 
-            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+            val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
 
             assertEquals(listOf(1L, 0L, 1L, 0L), assertNotNull(sample).ints.toList())
             assertEquals(constructed, factory.calls.size)
@@ -1147,9 +1147,9 @@ class LpPrimalHeuristicsTest {
         val sample = LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
                 rootCutHarvest = false)), SolveStatsSink("changed-prepared-rounding")).use { engine ->
-            assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+            assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
 
-            engine.lpRoundingProbe(LinearObjective(intCoefficients = longArrayOf(2, 1)), Cancellation.Never)
+            engine.lpRoundingProbe(LinearObjective(intCoefficients = longArrayOf(2, 1)), ExecutionControl.Never)
         }
 
         assertEquals(listOf(0L, 1L), assertNotNull(sample).ints.toList())
@@ -1164,7 +1164,7 @@ class LpPrimalHeuristicsTest {
             var ownerPoint: DoubleArray? = null
             var stopped = false
             var activeEngine: LpEngine? = null
-            val token = Cancellation {
+            val token = ExecutionControl {
                 if (stopDuringPinning && (activeEngine?.rootRoundingWarmStart?.pinning?.decisionLevel ?: 0) > 0) {
                     stopped = true
                 }
@@ -1172,7 +1172,7 @@ class LpPrimalHeuristicsTest {
             }
             val factory = RecordingLpEngineFactory(object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
-                    model: LpModel, cancellation: Cancellation, refactorUpdateLimit: Int, iterationLimit: Int,
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
                     workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
                 ): PersistentLpSolver {
                     val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
@@ -1188,7 +1188,7 @@ class LpPrimalHeuristicsTest {
                     rootCutHarvest = false)), SolveStatsSink("owned-rounding-guidance"),
                 LpSolveContext(factory)).use { engine ->
                 activeEngine = engine
-                assertTrue(engine.prepareRootLayout(Cancellation.Never, Cancellation.Never))
+                assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
                 assertNull(engine.lpRoundingProbe(objective, token, accept = {
                     stopped = true
                     null
@@ -1201,7 +1201,7 @@ class LpPrimalHeuristicsTest {
                 val constructions = factory.calls.size
                 assertNotNull(ownerPoint).fill(1.0)
 
-                val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+                val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
 
                 assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
                 assertEquals(queries, factory.floatAllowances.size)
@@ -1221,7 +1221,7 @@ class LpPrimalHeuristicsTest {
         val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
             SolveStatsSink("declined-root-guidance")).use { engine ->
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            engine.lpRoundingProbe(objective, Cancellation.Never, accept = {
+            engine.lpRoundingProbe(objective, ExecutionControl.Never, accept = {
                 offered++
                 null
             })
@@ -1240,7 +1240,7 @@ class LpPrimalHeuristicsTest {
         val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true, probe = true)),
             SolveStatsSink("changed-root-guidance")).use { engine ->
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
-            engine.lpRoundingProbe(LinearObjective(intCoefficients = longArrayOf(2, 1)), Cancellation.Never)
+            engine.lpRoundingProbe(LinearObjective(intCoefficients = longArrayOf(2, 1)), ExecutionControl.Never)
         }
 
         assertEquals(listOf(0L, 1L), assertNotNull(sample).ints.toList())
@@ -1257,7 +1257,7 @@ class LpPrimalHeuristicsTest {
             SolveStatsSink("uncertified-root-guidance"), context).use { engine ->
             val lower = engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
 
-            val sample = engine.lpRoundingProbe(objective, Cancellation.Never)
+            val sample = engine.lpRoundingProbe(objective, ExecutionControl.Never)
 
             assertTrue(lower.isNaN())
             assertEquals(listOf(1L, 0L), assertNotNull(sample).ints.toList())
@@ -1273,7 +1273,7 @@ class LpPrimalHeuristicsTest {
         val objective = LinearObjective(intCoefficients = LongArray(n) { 1L })
         var armed = false
         var polls = 0
-        val session = PropagationSession(problem, Cancellation { armed && ++polls >= 4 })
+        val session = PropagationSession(problem, ExecutionControl { armed && ++polls >= 4 })
         val relaxation = CpToLpRelaxation(problem, objective).build(session)
         armed = true
 
@@ -1294,7 +1294,7 @@ class LpPrimalHeuristicsTest {
         val objective = LinearObjective(intCoefficients = longArrayOf(1, 1))
         var armed = false
         lateinit var session: PropagationSession
-        session = PropagationSession(problem, Cancellation {
+        session = PropagationSession(problem, ExecutionControl {
             armed && session.litTruth(session.boundGeLit(0, 16, true)) == true
         })
         repeat(128) { session.boundGeLit(0, it.toLong() + 1, true) }
@@ -1323,7 +1323,7 @@ class LpPrimalHeuristicsTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newTableauSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     iterationLimit: Int,
                     workLimit: Long,
                     trackDegeneracy: Boolean,
@@ -1347,7 +1347,7 @@ class LpPrimalHeuristicsTest {
                 }
             }
             val sink = SolveStatsSink(backend = "resumed-rounding")
-            val token = Cancellation { stopped }
+            val token = ExecutionControl { stopped }
 
             LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink,
                 LpSolveContext(factory)).use { engine ->
@@ -1377,7 +1377,7 @@ class LpPrimalHeuristicsTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newTableauSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     iterationLimit: Int,
                     workLimit: Long,
                     trackDegeneracy: Boolean,
@@ -1394,7 +1394,7 @@ class LpPrimalHeuristicsTest {
             val sample = LpEngine(problem, objective,
                 LpParams(lpPlan = LpPlan(bounding = true, sourcePreparation = mode)), sink,
                 LpSolveContext(factory)).use { engine ->
-                engine.lpFeasibilityPump(objective, Cancellation.Never) { it.takeIf { ++offered == 3 } }
+                engine.lpFeasibilityPump(objective, ExecutionControl.Never) { it.takeIf { ++offered == 3 } }
             }
 
             assertTrue(assertNotNull(sample).ints.sum() >= 1L)
@@ -1426,7 +1426,7 @@ class LpPrimalHeuristicsTest {
             val sample = LpEngine(problem, objective,
                 LpParams(lpPlan = LpPlan(bounding = true, sourcePreparation = LpSourcePreparation.ADMITTED)),
                 sink).use { engine ->
-                engine.lpFeasibilityPump(objective, Cancellation.Never) {
+                engine.lpFeasibilityPump(objective, ExecutionControl.Never) {
                     if (++offered == 1) {
                         problem.rootIntDomainsInPlace[0] = if (hole) {
                             IntDomain(0, 2).excludeValue(1)
@@ -1453,10 +1453,10 @@ class LpPrimalHeuristicsTest {
         val sink = SolveStatsSink("cancelled-pump-objective")
         var armed = false
         var stopped = false
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             private val meter = WorkMeter { if (armed) stopped = true }
             override fun isCancelled(): Boolean = stopped
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         val sample = LpEngine(problem, objective,
@@ -1485,7 +1485,7 @@ class LpPrimalHeuristicsTest {
 
             val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
                 assertNotNull(
-                    engine.lpFeasibilityPump(objective, Cancellation.Never) { sample ->
+                    engine.lpFeasibilityPump(objective, ExecutionControl.Never) { sample ->
                         if (declined == null) declined = sample.ints.single()
                         sample.takeIf { it.ints.single() != declined }
                     },
@@ -1506,7 +1506,7 @@ class LpPrimalHeuristicsTest {
 
         val sample = LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
             assertNotNull(
-                engine.lpFeasibilityPump(objective, Cancellation.Never, initial = initial) { sample ->
+                engine.lpFeasibilityPump(objective, ExecutionControl.Never, initial = initial) { sample ->
                     proposed += sample.ints.toList()
                     sample.takeIf { it.ints.toList() != initial.ints.toList() }
                 },
@@ -1527,7 +1527,7 @@ class LpPrimalHeuristicsTest {
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newTableauSolver(
                     model: LpModel,
-                    cancellation: Cancellation,
+                    cancellation: ExecutionControl,
                     iterationLimit: Int,
                     workLimit: Long,
                     trackDegeneracy: Boolean,
@@ -1559,12 +1559,12 @@ class LpPrimalHeuristicsTest {
                 LpSolveContext(factory),
             ).use { engine ->
                 if (pump) {
-                    engine.lpFeasibilityPump(objective, Cancellation.Never) {
+                    engine.lpFeasibilityPump(objective, ExecutionControl.Never) {
                         offered++
                         it
                     }
                 } else {
-                    engine.lpRoundingProbe(objective, Cancellation.Never) {
+                    engine.lpRoundingProbe(objective, ExecutionControl.Never) {
                         offered++
                         it
                     }
@@ -1585,7 +1585,7 @@ class LpPrimalHeuristicsTest {
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newTableauSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 iterationLimit: Int,
                 workLimit: Long,
                 trackDegeneracy: Boolean,
@@ -1620,7 +1620,7 @@ class LpPrimalHeuristicsTest {
             sink,
             LpSolveContext(factory),
         ).use { engine ->
-            assertNotNull(engine.lpFeasibilityPump(objective, Cancellation.Never))
+            assertNotNull(engine.lpFeasibilityPump(objective, ExecutionControl.Never))
         }
 
         val assembly = assertNotNull(sink.snapshot().lp.phases["PRIMAL_LP_ASSEMBLY_ROOT"]).work
@@ -1662,7 +1662,7 @@ class LpPrimalHeuristicsTest {
 
         LpEngine(problem, objective, LpParams(lpPlan = LpPlan(bounding = true)), sink).use { engine ->
             assertNotNull(
-                engine.lpRoundingProbe(objective, Cancellation.Never) { sample ->
+                engine.lpRoundingProbe(objective, ExecutionControl.Never) { sample ->
                     proposed += sample.ints.single()
                     sample.takeIf { it.ints.single() == 1L }
                 },
@@ -1673,7 +1673,7 @@ class LpPrimalHeuristicsTest {
         assertEquals(1.0, sink.snapshot().lp.rootPasses.sum)
     }
 
-    private val producers: List<Pair<String, LpEngine.(LinearObjective, Cancellation) -> Sample?>> = listOf(
+    private val producers: List<Pair<String, LpEngine.(LinearObjective, ExecutionControl) -> Sample?>> = listOf(
         "the rounding probe" to { objective, token -> lpRoundingProbe(objective, token) },
         "the feasibility pump" to { objective, token -> lpFeasibilityPump(objective, token) },
         "the best-bound tree search" to { objective, token -> lbTreeSearch(objective, token)?.sample },
@@ -1710,7 +1710,7 @@ class LpPrimalHeuristicsTest {
             )
             val verifier = finiteWitnessVerifier(problem.bake(), objective)
             for ((name, produce) in producers) {
-                val proposal = engine.produce(objective, Cancellation.Never) ?: continue
+                val proposal = engine.produce(objective, ExecutionControl.Never) ?: continue
                 produced[name] = produced.getValue(name) + 1
                 assertIs<Verification.Accepted<*, *>>(
                     verifier.verify(Candidate(proposal, objective.evaluate(proposal))),
@@ -1734,7 +1734,7 @@ class LpPrimalHeuristicsTest {
         )
         val problem = Problem(2, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2)))).bake(providers)
         for ((first, admitted) in listOf(false to false, true to true)) {
-            val session = PropagationSession(problem, Cancellation.Never)
+            val session = PropagationSession(problem, ExecutionControl.Never)
             session.pinBool(0, first)
             session.pinBool(1, false)
 

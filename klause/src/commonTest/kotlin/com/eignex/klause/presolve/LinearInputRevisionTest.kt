@@ -5,7 +5,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -19,7 +19,7 @@ class LinearInputRevisionTest {
             val source = Problem(0, 3, Array(3) { IntDomain(0, 3) }, listOf(
                 Linear(intArrayOf(3, 2), intArrayOf(0, 1), LinearOp.LE, 7),
             ))
-            val inputs = LinearInputRevision(source, PresolvePass.STRENGTHEN_COEFFICIENTS, Cancellation.Never)
+            val inputs = LinearInputRevision(source, PresolvePass.STRENGTHEN_COEFFICIENTS, ExecutionControl.Never)
             val before = assertNotNull(inputs.current(source))
             inputs.recordDelta(source.factors, intArrayOf(), emptyList())
 
@@ -34,7 +34,7 @@ class LinearInputRevisionTest {
         val source = Problem(0, 2, Array(2) { IntDomain(0, 3) }, listOf(
             Linear(intArrayOf(3, 2), intArrayOf(0, 1), LinearOp.EQ, 7),
         ))
-        val inputs = LinearInputRevision(source, PresolvePass.SPARSIFY_LINEAR_ROWS, Cancellation.Never)
+        val inputs = LinearInputRevision(source, PresolvePass.SPARSIFY_LINEAR_ROWS, ExecutionControl.Never)
         val before = assertNotNull(inputs.current(source))
         inputs.recordDelta(source.factors, intArrayOf(), emptyList())
 
@@ -45,7 +45,7 @@ class LinearInputRevisionTest {
     fun `dropped duplicate occurrences should release their last participating range`() {
         val row = Linear(intArrayOf(3, 2), intArrayOf(0, 1), LinearOp.LE, 7)
         val source = Problem(0, 2, Array(2) { IntDomain(0, 3) }, listOf(row, row))
-        val inputs = LinearInputRevision(source, PresolvePass.STRENGTHEN_COEFFICIENTS, Cancellation.Never)
+        val inputs = LinearInputRevision(source, PresolvePass.STRENGTHEN_COEFFICIENTS, ExecutionControl.Never)
         inputs.current(source)
         inputs.recordDelta(source.factors, intArrayOf(0), emptyList())
         val before = assertNotNull(inputs.current(source))
@@ -65,7 +65,7 @@ class LinearInputRevisionTest {
                 Linear(intArrayOf(3, 2), intArrayOf(0, 1), LinearOp.EQ, 7),
             ))
             val budget = PresolveBudget(Long.MAX_VALUE)
-            val inputs = LinearInputRevision(source, pass, budget.orSpent(Cancellation.Never))
+            val inputs = LinearInputRevision(source, pass, budget.orSpent(ExecutionControl.Never))
             val before = assertNotNull(inputs.current(source))
             val spent = budget.spent()
 
@@ -84,7 +84,7 @@ class LinearInputRevisionTest {
             ))
             val budget = PresolveBudget(1L)
 
-            val inputs = LinearInputRevision(source, pass, budget.orSpent(Cancellation.Never))
+            val inputs = LinearInputRevision(source, pass, budget.orSpent(ExecutionControl.Never))
 
             assertNull(inputs.current(source))
             assertEquals(0L, budget.remaining())

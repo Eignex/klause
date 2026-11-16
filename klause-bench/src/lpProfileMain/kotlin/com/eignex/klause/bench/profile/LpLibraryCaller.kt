@@ -11,7 +11,7 @@ import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.toLinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.io.encoding.Base64
 import kotlin.time.Duration.Companion.milliseconds
@@ -22,7 +22,7 @@ internal fun libraryCaller(options: Map<String, String>) {
     val timeout = options.getValue("timeout-ms").toLong().also { require(it in 1..300_000) }
     val seed = options.getValue("seed").toLong()
     val started = Monotonic.markNow()
-    val stop = Cancellation.after(timeout.milliseconds)
+    val stop = ExecutionControl.after(timeout.milliseconds)
     val parsed = Mps.parse(Base64.decode(options.getValue("source64")).decodeToString())
     val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
     val compiled = parsed.toProblem(semanticOverrides = exact)

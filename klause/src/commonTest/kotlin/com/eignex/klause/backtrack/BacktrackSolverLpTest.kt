@@ -10,7 +10,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.bounding.LpPlan
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -60,8 +60,8 @@ class BacktrackSolverLpTest {
         )
 
         search.use {
-            assertNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, 0L))
-            assertIs<SolveResult.Unsat>(it.runSlice(Cancellation.Never, Long.MAX_VALUE, 1_000L))
+            assertNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 0L))
+            assertIs<SolveResult.Unsat>(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1_000L))
         }
     }
 

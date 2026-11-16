@@ -12,7 +12,7 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -44,7 +44,7 @@ class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
 
         val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, engine, PresolveConfig.NONE, false, false, Cancellation.Never,
+                shape, engine, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = NodeBudget(100),
@@ -78,7 +78,7 @@ class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
 
         val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
-                shape, engine, PresolveConfig.NONE, false, false, Cancellation.after(50.milliseconds),
+                shape, engine, PresolveConfig.NONE, false, false, ExecutionControl.after(50.milliseconds),
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
                 randomSeed = 17, defaultArms = 1, lpConfig = LpConfig.AUTO,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = budget,

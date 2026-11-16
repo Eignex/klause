@@ -19,15 +19,15 @@ import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.portfolio.LocalSearchCatalog
 import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class WeightedCorePolicyTest(private val variant: String, private val automatic: Boolean) {
@@ -104,10 +104,10 @@ class WeightedCorePolicyTest(private val variant: String, private val automatic:
             intCoefficients = LongArray(integers) { 1L },
             constant = constant)
         var charged = 0L
-        val stop = if (variant == "stopped-scan") object : Cancellation {
+        val stop = if (variant == "stopped-scan") object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2L
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
-        } else Cancellation.Never
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
+        } else ExecutionControl.Never
 
         val selected = weightedCoreDefaultScenario(scenario, problem, objective, options, stop)
 

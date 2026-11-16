@@ -30,12 +30,11 @@ import com.eignex.klause.solver.result.CompletionRefutationStage
 import com.eignex.klause.solver.result.LocalSearchStatsSink
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SearchEvent
-import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicBoolean
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.random.Random
@@ -229,7 +228,7 @@ internal class LocalSearchEngine(
         params: LocalSearchParams,
         checkpoint: LocalSearchCheckpoint?,
     ): LocalSearchProblem {
-        if (checkpoint == null) return checkNotNull(projection.get(Cancellation.Never))
+        if (checkpoint == null) return checkNotNull(projection.get(ExecutionControl.Never))
         while (true) {
             projection.get(params.cancellation)?.let { return it }
             yield(null)
@@ -242,7 +241,7 @@ internal class LocalSearchEngine(
         checkpoint: LocalSearchCheckpoint?,
     ) {
         if (!perMoveInvariants) return
-        val cancellation = if (checkpoint == null) Cancellation.Never else params.cancellation
+        val cancellation = if (checkpoint == null) ExecutionControl.Never else params.cancellation
         while (!invariantNetwork.get(cancellation)) yield(null)
         state.invariants = invariantNetwork.value
     }
@@ -1319,7 +1318,7 @@ internal class LocalSearchEngine(
     private fun decide(
         state: LocalSearchState,
         candidate: Sample,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         stats: LocalSearchStatsSink?,
         charge: (Long) -> Unit,
     ): Completion {

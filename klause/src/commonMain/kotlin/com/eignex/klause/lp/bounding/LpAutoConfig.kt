@@ -38,12 +38,10 @@ import com.eignex.klause.lp.relaxation.CumulativeRelaxation
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.lp.relaxation.prepareCandidateArcCount
 import com.eignex.klause.lp.relaxation.prepareSchedulingViews
-import com.eignex.klause.lp.relaxation.schedulingViews
 import com.eignex.klause.lp.rootDomainOf
-import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class LpAdmission(
     val estimatedRows: Long,
@@ -160,7 +158,7 @@ object LpAutoConfig {
         config: LpConfig,
         base: LpPlan,
         objective: LinearObjective? = null,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         sparseTrialAllowed: Boolean = true,
         sparseTrialWork: Long = SPARSE_LP_MAX_WORK,
         sourcePreparation: LpSourcePreparation = config.sourcePreparation ?: base.sourcePreparation,

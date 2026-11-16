@@ -559,8 +559,9 @@ root continues a pending window before branching while its row, heap or cleanup
 state advances, taking each further attempt inside the same slice until the slice
 expires. Each attempt keeps the same bounded work and scratch allowance and
 debits the containing slice. Cleanup polls cancellation before every bounded
-mutation. Its first 64 polls read the session and caller tokens; later polls read
-them once per 64, so a request arriving mid-window is observed within that many steps. A completed pass waits for the next restart before
+mutation. Worker cleanup shares its worker's checkpoint countdown; unbound cleanup
+reads the session and caller tokens on its first 64 polls and then once per 64.
+A completed pass waits for the next restart before
 aging tiers again; an unfunded attempt permits search to proceed. Continuation
 reads existing ranking state without adding retained storage. Reaching the active
 quota still completes the pending pass; it does not start another tier epoch.

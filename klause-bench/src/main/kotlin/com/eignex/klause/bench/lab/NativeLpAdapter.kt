@@ -132,7 +132,7 @@ internal object NativeLpSuite : BenchSuite {
             SolveMetric.solve(entry, settings, budget, timestamp, sha, installedBuild = { identity },
                 invoke = { current, options, allowance, optimize ->
                     SolverInvocation.withSourceInput(CorpusFetcher.resolve(current.ref.source), allowance) {
-                            file, remaining ->
+                            file, remaining, ->
                         val command = SolverInvocation.klauseCommand(current, options, remaining, optimize,
                             file, executable)
                         SolverInvocation.invoke(command, SolverInvocation.dialectFor(current.ref.format),

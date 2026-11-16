@@ -8,7 +8,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.PresolveShared.withSourcePassDelta
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -22,7 +22,7 @@ class ParityInputRevisionTest {
             val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, listOf(
                 Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.EQ, 1),
             ))
-            val inputs = ParityInputRevision(source, Cancellation.Never)
+            val inputs = ParityInputRevision(source, ExecutionControl.Never)
             val before = assertNotNull(inputs.current(source))
             val delta = SourceDelta(bounds = source.intBounds.tightening().also { it.atMost(column, 1) }.build())
             val changed = assertNotNull(source.withSourcePassDelta(delta))
@@ -37,7 +37,7 @@ class ParityInputRevisionTest {
     @Test
     fun `only new participating unit pins should invalidate parity`() {
         val source = Problem(4, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
-        val inputs = ParityInputRevision(source, Cancellation.Never)
+        val inputs = ParityInputRevision(source, ExecutionControl.Never)
         val before = assertNotNull(inputs.current(source))
         val unrelated = SourceDelta(addedFactors = listOf(Clause(intArrayOf(Lit.make(3, true)))))
         val once = assertNotNull(source.withSourcePassDelta(unrelated))
@@ -57,7 +57,7 @@ class ParityInputRevisionTest {
     @Test
     fun `pins canceled from parity rows should keep the input revision`() {
         val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 0, 2, 4), 0)))
-        val inputs = ParityInputRevision(source, Cancellation.Never)
+        val inputs = ParityInputRevision(source, ExecutionControl.Never)
         val before = assertNotNull(inputs.current(source))
         val delta = SourceDelta(addedFactors = listOf(Clause(intArrayOf(Lit.make(0, true)))))
 
@@ -70,7 +70,7 @@ class ParityInputRevisionTest {
     @Test
     fun `finite root pins should invalidate parity without a new unit factor`() {
         val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
-        val inputs = ParityInputRevision(source, Cancellation.Never)
+        val inputs = ParityInputRevision(source, ExecutionControl.Never)
         val before = assertNotNull(inputs.current(source))
 
         inputs.recordDelta(source.factors, intArrayOf(), emptyList())
@@ -83,7 +83,7 @@ class ParityInputRevisionTest {
     @Test
     fun `a unit matching an established root pin should keep the input revision`() {
         val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
-        val inputs = ParityInputRevision(source, Cancellation.Never)
+        val inputs = ParityInputRevision(source, ExecutionControl.Never)
         val before = inputs.current({ v -> if (v == 2) true else null }) { null to null }
 
         inputs.recordDelta(source.factors, intArrayOf(), listOf(Clause(intArrayOf(Lit.make(2, true)))))
@@ -95,7 +95,7 @@ class ParityInputRevisionTest {
     @Test
     fun `changed parity rows should invalidate the input revision`() {
         val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
-        val inputs = ParityInputRevision(source, Cancellation.Never)
+        val inputs = ParityInputRevision(source, ExecutionControl.Never)
         val before = assertNotNull(inputs.current(source))
         val delta = SourceDelta(droppedIndices = intArrayOf(0), addedFactors = listOf(Xor(intArrayOf(0, 2, 4), 1)))
 
@@ -108,7 +108,7 @@ class ParityInputRevisionTest {
     fun `unrelated source factors should not rescan participating columns`() {
         val source = Problem(4, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val inputs = ParityInputRevision(source, budget.orSpent(Cancellation.Never))
+        val inputs = ParityInputRevision(source, budget.orSpent(ExecutionControl.Never))
         val before = assertNotNull(inputs.current(source))
         val spent = budget.spent()
         val delta = SourceDelta(addedFactors = listOf(Clause(intArrayOf(Lit.make(3, true)))))
@@ -125,7 +125,7 @@ class ParityInputRevisionTest {
         val source = Problem(3, 0, emptyArray(), listOf(Xor(intArrayOf(0, 2, 4), 0)))
         val budget = PresolveBudget(1L)
 
-        val inputs = ParityInputRevision(source, budget.orSpent(Cancellation.Never))
+        val inputs = ParityInputRevision(source, budget.orSpent(ExecutionControl.Never))
 
         assertNull(inputs.current(source))
         assertEquals(0L, budget.remaining())

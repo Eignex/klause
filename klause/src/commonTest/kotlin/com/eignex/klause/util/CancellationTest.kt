@@ -3,272 +3,54 @@ package com.eignex.klause.util
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import kotlin.time.ComparableTimeMark
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.TestTimeSource
+import kotlin.time.Duration
 import kotlin.time.TimeSource
+import kotlin.time.TestTimeSource
 
 class CancellationTest {
     @Test
-    fun `adjacent monotonic deadlines should stop before following predicates`() {
-        for (reverse in listOf(false, true)) {
-            val now = TimeSource.Monotonic.markNow()
-            val future = Cancellation.until(now + 10.minutes)
-            val expired = Cancellation.until(now - 10.minutes)
-            val clocks = if (reverse) expired or future else future or expired
-            val visited = ArrayList<Int>()
-            val token = (
-                Cancellation {
-                    visited += 1
-                    false
-                } or clocks
-                ) or Cancellation {
-                visited += 2
-                false
-            }
+    fun `an infinite monotonic deadline should remain open`() {
+            val stop = Cancellation.after(Duration.INFINITE)
 
-            assertTrue(token())
-
-            assertEquals(listOf(1), visited)
+            assertFalse(stop())
         }
-    }
 
     @Test
-    fun `adjacent monotonic deadlines should retain the earliest deadline snapshot`() {
-        for (reverse in listOf(false, true)) {
-            val now = TimeSource.Monotonic.markNow()
-            val early = now + 1.minutes
-            val late = now + 2.minutes
-            val first = Cancellation.until(if (reverse) late else early)
-            val second = Cancellation.until(if (reverse) early else late)
+    fun `an expired monotonic deadline should request a stop`() {
+            val stop = Cancellation.until( TimeSource.Monotonic.markNow()
+            - 1.seconds)
 
-            val token = first or second
-
-            assertEquals(early, token.deadline())
+            assertTrue(stop())
         }
-    }
 
     @Test
-    fun `predicates between monotonic deadlines should retain their evaluation order`() {
-        val now = TimeSource.Monotonic.markNow()
-        val visited = ArrayList<Int>()
-        val token = (
-            (
-                Cancellation.until(now + 10.minutes) or Cancellation {
-                    visited += 1
+    fun `predicate composition should preserve ordered short circuiting`() {
+        val calls = ArrayList<Int>()
+        val stop = Cancellation {
+                    calls += 1
                     false
-                }
-                ) or
-                Cancellation.until(now - 10.minutes)
-            ) or Cancellation {
-            visited += 2
+                } or
+                Cancellation{
+            calls += 2
+            true
+        } or Cancellation {
+            calls += 3
             false
         }
 
-        assertTrue(token())
+        assertTrue(stop())
 
-        assertEquals(listOf(1), visited)
+        assertEquals(listOf(1, 2), calls)
     }
 
     @Test
-    fun `both polling surfaces should observe rearmed adapter deadlines`() {
-        for (direct in listOf(false, true)) {
+    fun `a deadline should observe its supplied time source`() {
             val clock = TestTimeSource()
-            var deadline = clock.markNow() + 2.seconds
-            val token = cancelledWhen({ deadline }) { deadline.hasPassedNow() }
-            val read = if (direct) token::isCancelled else token::invoke
-            assertFalse(read())
-
-            deadline = clock.markNow() + 4.seconds
-            clock += 3.seconds
-
-            assertEquals(deadline, token.deadline())
-            assertFalse(read())
-            clock += 1.seconds
-            assertTrue(read())
-        }
-    }
-
-    @Test
-    fun `both polling surfaces should observe adapter external cancellation`() {
-        for (direct in listOf(false, true)) {
-            var external = false
-            val token = cancelledWhen({ null }) { external }
-            val read = if (direct) token::isCancelled else token::invoke
-            assertFalse(read())
-
-            external = true
-
-            assertTrue(read())
-        }
-    }
-
-    @Test
-    fun `both polling surfaces should observe external cancellation`() {
-        for (direct in listOf(false, true)) {
-            var stopped = false
-            val token = (Cancellation { stopped } or Cancellation.Never) or Cancellation { false }
-            val read = if (direct) token::isCancelled else token::invoke
-            assertFalse(read())
-
-            stopped = true
-
-            assertTrue(read())
-        }
-    }
-
-    @Test
-    fun `nested or compositions should preserve predicate order and short circuiting`() {
-        val visited = ArrayList<Int>()
-        var stopped = false
-        val first = Cancellation {
-            visited += 1
-            false
-        }
-        val second = Cancellation {
-            visited += 2
-            stopped
-        }
-        val third = Cancellation {
-            visited += 3
-            false
-        }
-        val fourth = Cancellation {
-            visited += 4
-            false
-        }
-        val token = (first or second) or (third or fourth)
-
-        assertFalse(token())
-        assertEquals(listOf(1, 2, 3, 4), visited)
-        visited.clear()
-        stopped = true
-        assertTrue(token())
-        assertEquals(listOf(1, 2), visited)
-    }
-
-    @Test
-    fun `nested or compositions should retain a deadline snapshot while adapters remain live`() {
-        val clock = TestTimeSource()
-        val first = clock.markNow() + 2.seconds
-        var deadline = first
-        val dynamic = cancelledWhen({ deadline }) { deadline.hasPassedNow() }
-        val token = (Cancellation.Never or dynamic) or Cancellation.until(clock.markNow() + 5.seconds)
-        deadline = clock.markNow() + 4.seconds
-
-        assertEquals(first, token.deadline())
-        clock += 3.seconds
-        assertFalse(token())
-        clock += 1.seconds
-        assertTrue(token())
-    }
-
-    @Test
-    fun `nested or compositions should charge the first work meter and observe its stop`() {
-        var firstWork = 0L
-        var secondWork = 0L
-        val first = object : Cancellation {
-            private val meter = WorkMeter { firstWork += it }
-            override fun isCancelled(): Boolean = firstWork >= 7L
-            override fun workMeter(): WorkMeter = meter
-        }
-        val second = object : Cancellation {
-            private val meter = WorkMeter { secondWork += it }
-            override fun isCancelled(): Boolean = secondWork >= 3L
-            override fun workMeter(): WorkMeter = meter
-        }
-        val token = (Cancellation.Never or first) or (second or Cancellation.Never)
-
-        assertSame(first.workMeter(), token.workMeter())
-        token.charge(6L)
-        assertFalse(token())
-        token.charge(1L)
-        assertTrue(token())
-        assertEquals(7L, firstWork)
-        assertEquals(0L, secondWork)
-    }
-
-    @Test
-    fun `or composition should leave and predicate semantics intact`() {
-        var external = false
-        val token = ((Cancellation { external } and Cancellation { false }) or Cancellation.Never) or
-            Cancellation { external }
-
-        assertFalse(token())
-        external = true
-        assertTrue(token())
-    }
-
-    @Test
-    fun `or should fire when either side cancels`() {
-        var a = false
-        var b = false
-        val combined = Cancellation { a } or Cancellation { b }
-        assertFalse(combined())
-        a = true
-        assertTrue(combined())
-        a = false
-        b = true
-        assertTrue(combined())
-    }
-
-    @Test
-    fun `and should fire only when both sides cancel`() {
-        var a = false
-        var b = false
-        val combined = Cancellation { a } and Cancellation { b }
-        assertFalse(combined())
-        a = true
-        assertFalse(combined())
-        b = true
-        assertTrue(combined())
-    }
-
-    @Test
-    fun `after should fire only once the duration has elapsed`() {
-        assertFalse(Cancellation.after(10.minutes)())
-        assertTrue(Cancellation.after((-1).seconds)())
-    }
-
-    @Test
-    fun `predicate token should report its current deadline`() {
-        val first = TimeSource.Monotonic.markNow() + 1.hours
-        var current: ComparableTimeMark = first
-        val token = cancelledWhen({ current }) { false }
-
-        assertEquals(first, token.deadline())
-        current = first + 1.hours
-        assertEquals(first + 1.hours, token.deadline())
-        assertTrue(assertNotNull(token.shorten(0.5).deadline()) < first + 1.hours)
-    }
-
-    @Test
-    fun `only deadline-backed tokens should expose a deadline`() {
-        assertNotNull(Cancellation.after(1.seconds).deadline())
-        assertNull(Cancellation.Never.deadline())
-        assertNull(Cancellation { false }.deadline())
-    }
-
-    @Test
-    fun `shorten should move the deadline earlier and leave deadline-less tokens untouched`() {
-        val full = Cancellation.after(100.seconds)
-        val short = full.shorten(0.1)
-        assertTrue(short.deadline()!! < full.deadline()!!)
-        val bare = Cancellation.Never.shorten(0.1)
-        assertNull(bare.deadline())
-        assertFalse(bare.isCancelled())
-    }
-
-    @Test
-    fun `or should report the earlier deadline`() {
-        val soon = Cancellation.after(1.seconds)
-        val late = Cancellation.after(100.seconds)
-        assertTrue((late or soon).deadline()!! <= soon.deadline()!!)
+            val stop = Cancellation.until( clock.markNow() + 2.seconds)
+            assertFalse(stop())
+            clock += 2.seconds
+            assertTrue(stop())
     }
 }

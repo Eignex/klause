@@ -11,7 +11,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.ModelIdentity
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** A source claim supported by a quadratic optimization attestation. */
 enum class QuadraticClaim {
@@ -48,7 +48,7 @@ class QuadraticCertificate private constructor(
     fun verify(
         expected: SourceClaim,
         context: SourceProofContext,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceEvidenceCheck {
         if (attestedScope != null && attestedScope != context.scope) {
             return SourceEvidenceCheck.Rejected("quadratic attestation belongs to a different source invocation")

@@ -66,7 +66,7 @@ internal class AbsPayload(val operand: Int, val result: Int)
 @Serializable
 internal class AffinePayload(
     val vars: IntArray,
-    val coefficients: List<@Serializable(with = BigIntSerializer::class) BigInt>,
+    val coefficients: List<@Serializable(with = BigIntSerializer::class) BigInt,>,
     @Serializable(with = BigIntSerializer::class) val constant: BigInt,
 )
 

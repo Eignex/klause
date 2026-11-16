@@ -31,7 +31,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.PolynomialCondition
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.toLongExact
 import kotlin.random.Random
 
@@ -154,17 +154,19 @@ internal class QuadraticWorkerAdapter(
     }
 
     private fun complete(): QuadraticOptimizationResult {
-        while (terminal == null && !native.stopped) advanceComplete(Cancellation.Never, Long.MAX_VALUE, -1)
+        while (terminal == null && !native.stopped) advanceComplete(ExecutionControl.Never, Long.MAX_VALUE, -1)
         return terminal ?: partial()
     }
 
-    private fun advanceComplete(global: Cancellation, millis: Long, nodes: Long) {
+    private fun advanceComplete(global: ExecutionControl, millis: Long, nodes: Long) {
         if (proofScope == null || native.stopped) { terminal = partial(); return }
         prepare()
         readIncumbent()?.let { accept(it) }
-        val stop = params.strategy.backtrack.cancellation or native.polynomial or global
+        val stop = params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native
+            .polynomial or global
         val cursor = traversal ?: QuadraticTraversalCursor(finite, params.strategy.backtrack.copy(
-            assumptions = assumptions, cancellation = params.strategy.backtrack.cancellation or native.polynomial,
+            assumptions = assumptions, cancellation =
+                params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native.polynomial,
             minHammingDistance = 0, recentWindow = 0,
         ), sink, { native.work }) { sample, cancellation ->
             completion.check(sample, condition(sample), cancellation)
@@ -189,7 +191,7 @@ internal class QuadraticWorkerAdapter(
         } else if (event != null || stop()) terminal = partial()
     }
 
-    private fun completed(stop: Cancellation): QuadraticOptimizationResult {
+    private fun completed(stop: ExecutionControl): QuadraticOptimizationResult {
         val proofs = QuadraticEngineDerivation.Branches(branchProofs)
         val limit = bestLimit
         if (limit == null) return QuadraticOptimizationResult.Infeasible(
@@ -251,7 +253,7 @@ internal class QuadraticWorkerAdapter(
         neighborhood?.let { return it }
         prepare()
         val controls = params.strategy.localSearch
-        val stop = controls.cancellation or native.polynomial
+        val stop = controls.cancellation.withAccounting(native.polynomial) or native.polynomial
         val centers = completion.pointFixings(completion.algebraic.arithmetic::step)
         val maximum = if (adaptive) params.strategy.alnsIterations.toLong() else Long.MAX_VALUE
         val allowance = QuadraticNeighborhoodAllowance(maximum,
@@ -305,13 +307,14 @@ internal class QuadraticWorkerAdapter(
 
     private fun heuristic(adaptive: Boolean): QuadraticOptimizationResult {
         val cursor = neighborhood(adaptive)
-        cursor.advance(params.strategy.localSearch.cancellation or native.polynomial, Long.MAX_VALUE)
+        cursor.advance(params.strategy.localSearch.cancellation.withAccounting(native.polynomial) or native
+            .polynomial, Long.MAX_VALUE)
         return partial()
     }
 
     private fun repairNeighborhood(
         neighborhood: ExactNeighborhoodCondition,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): ExactNeighborhoodResult {
         repairPoint = null
         var repair = assumptions

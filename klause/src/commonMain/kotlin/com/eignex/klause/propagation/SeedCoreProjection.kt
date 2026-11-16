@@ -2,13 +2,13 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.resolveSearchClauses
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.binarySearchInt
 
 internal fun PropagationSession.projectSeedCore(
     assumptions: Assumptions,
     conflict: PropagationResult.Unsat,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): PropagationResult.Unsat {
     val applied = conflict.conflictLevels.lastOrNull() ?: return conflict
     if (applied !in 1..assumptions.numBools || cancellation()) return conflict
@@ -22,7 +22,7 @@ internal fun PropagationSession.projectSeedCore(
         if (visits > remaining) return false
         remaining -= visits
         state.work += visits
-        cancellation.workMeter()?.charge(visits.toLong())
+        cancellation.accounting?.charge(visits.toLong())
         return !cancellation()
     }
     fun reason(variable: Int): IntArray? {

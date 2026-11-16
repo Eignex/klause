@@ -3,11 +3,11 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal sealed interface SourceFiniteControls {
     val engine: FiniteEngine
-    val cancellation: Cancellation
+    val cancellation: ExecutionControl
     val nodeBudget: NodeBudget?
     val randomSeed: Long?
 

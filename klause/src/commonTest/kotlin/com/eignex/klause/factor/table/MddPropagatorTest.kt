@@ -15,8 +15,7 @@ import com.eignex.klause.propagation.holeReasonFor
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.reasonOf
 import com.eignex.klause.propagation.undoTo
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.ExecutionControl
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -47,12 +46,12 @@ class MddPropagatorTest {
             state.beginRootFixpoint().forEach { }
             var polls = 0
 
-            assertNull(state.advanceRootFixpoint(Cancellation { ++polls >= limit }))
+            assertNull(state.advanceRootFixpoint(ExecutionControl { ++polls >= limit }))
 
             assertTrue(state.rootFixpointPending)
             assertFalse(state.runCancelled)
             assertEquals(limit, polls)
-            while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+            while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(ExecutionControl.Never))
             for (col in 0..1) assertEquals(IntDomain(0, 127), state.intDomains[col])
         }
     }
@@ -75,22 +74,19 @@ class MddPropagatorTest {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 3) }, arrayOf<Factor>(diagonal))
         val state = PropagationState(problem, Assumptions.None)
         state.beginRootFixpoint().forEach { }
-        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(ExecutionControl.Never))
         state.undoLogging = true
         val root = state.mark()
         state.currentLevel = 1
         check(state.excludeIntValue(0, 1))
         state.beginSeedFixpoint().forEach { }
-        var polls = 0
-        val cancellation = object : Cancellation {
-            override fun isCancelled(): Boolean = ++polls >= 2
-            override fun workMeter(): WorkMeter = WorkMeter { }
-        }
+        state.workLimit = state.work + 4
 
-        assertNull(state.advanceRootFixpoint(cancellation))
+        assertNull(state.advanceRootFixpoint(ExecutionControl.Never))
 
         assertTrue(state.rootFixpointPending)
-        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(Cancellation.Never))
+        state.workLimit = Long.MAX_VALUE
+        while (state.rootFixpointPending) assertNull(state.advanceRootFixpoint(ExecutionControl.Never))
         assertFalse(1L in state.intDomains[1])
         state.undoTo(root)
         state.currentLevel = 1
@@ -128,7 +124,7 @@ class MddPropagatorTest {
         state.cancelFloor = 0
         check(state.excludeIntValue(0, 1))
 
-        assertNull(state.runToFixpoint(allFactors = false, cancellation = Cancellation { true }))
+        assertNull(state.runToFixpoint(allFactors = false, cancellation = ExecutionControl { true }))
 
         assertTrue(state.runCancelled)
         assertTrue(1L in state.intDomains[1])

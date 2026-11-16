@@ -9,13 +9,13 @@ import com.eignex.klause.ir.TranscendentalDistinct
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
 import com.eignex.klause.ir.TranscendentalFunction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class FunctionSourceLowering(
     private val numeric: PolynomialRealLowering,
     private val originalNumericCount: Int,
     private val originalBoolCount: Int,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
 ) {
     private sealed interface Definition {
         data class Function(val function: TranscendentalFunction, val argument: PolynomialExpression) : Definition

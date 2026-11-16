@@ -17,14 +17,14 @@ import com.eignex.klause.solver.search.LearnedKind
 import com.eignex.klause.solver.search.LearnedLifecycle
 import com.eignex.klause.solver.search.LearnedStage
 import com.eignex.klause.solver.search.resolveSearchClauses
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class LinearRefutationReuse(
     private val source: SourceProofContext,
     private val budget: SourceLpBudget,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val maximumEntries: Int = 256,
     private val maximumBytes: Long = 1_048_576L,
     maximumAllocation: Long = 67_108_864L,
@@ -209,7 +209,7 @@ internal class LinearRefutationReuse(
                 return SourceEvidenceCheck.Unavailable("refutation reuse verification stopped")
             }
             observe("Verifications")
-            return SourceEvidenceVerifier(checker.atScope(evidence.scope)).verify(evidence, Cancellation {
+            return SourceEvidenceVerifier(checker.atScope(evidence.scope)).verify(evidence, ExecutionControl {
                 ++proofPolls > 100_000 || !spend(1L)
             })
         } finally {

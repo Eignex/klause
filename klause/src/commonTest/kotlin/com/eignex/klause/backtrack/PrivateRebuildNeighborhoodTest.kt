@@ -2,7 +2,7 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -17,12 +17,12 @@ class PrivateRebuildNeighborhoodTest {
             Clause(intArrayOf(3, 5, 7)), Clause(intArrayOf(1, 2)),
             Clause(intArrayOf(2, 4, 6)), Clause(intArrayOf(2, 4, 7)),
         ))
-        val admission = assertNotNull(PrivateRebuildAdmission.analyze(source, Cancellation.Never))
+        val admission = assertNotNull(PrivateRebuildAdmission.analyze(source, ExecutionControl.Never))
         var spent = 0L
         val meter = WorkMeter { spent += it }
-        val token = object : Cancellation {
+        val token = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= source.numBoolVars
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
 
         val neighborhood = PrivateRebuildNeighborhood.prepare(source, admission, token)

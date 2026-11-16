@@ -9,7 +9,7 @@ import com.eignex.klause.solver.lifetimeCancellation
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.withLifetime
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import kotlin.time.Duration.Companion.milliseconds
@@ -64,7 +64,7 @@ internal class PreparingSatisfaction(
     override val isDone: Boolean get() = query?.isDone == true
     internal val preparationPending: Boolean get() = query?.preparationPending ?: true
 
-    override fun runSlice(global: Cancellation, sliceMillis: Long, sliceNodes: Long): SolveResult? {
+    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? {
         query?.let {
             token = lifetime or global
             return it.runSlice(global, sliceMillis, sliceNodes)
@@ -73,7 +73,7 @@ internal class PreparingSatisfaction(
         if (sliceNodes == 0L) return null
         val deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
         val start = work
-        token = lifetime or global or Cancellation.until(deadline) or Cancellation {
+        token = lifetime or global or ExecutionControl.until(deadline) or ExecutionControl {
             sliceNodes >= 0L && work - start >= sliceNodes
         }
         while (!token()) {

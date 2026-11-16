@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,7 +94,7 @@ class AlgebraicArithmeticTest {
     fun `point sign certificates should observe requesting caller cancellation`() {
         val value = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val source = polynomial.add(Polynomial.ONE, Polynomial.variable(0))
-        val caller = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
+        val caller = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { true }))
 
         assertFailsWith<PolynomialInterrupted> { caller.signAt(source, mapOf(0 to value)) }
     }
@@ -115,7 +115,7 @@ class AlgebraicArithmeticTest {
     @Test
     fun `owned sign certificates should survive producer cancellation`() {
         var cancelled = false
-        val producer = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        val producer = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { cancelled }))
         val value = producer.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val source = polynomial.add(Polynomial.ONE, Polynomial.variable(0))
         val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 0)))
@@ -225,7 +225,7 @@ class AlgebraicArithmeticTest {
     @Test
     fun `captured related coordinates should use the lifting caller after producer cancellation`() {
         var cancelled = false
-        val producer = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        val producer = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { cancelled }))
         val base = producer.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
         val square = producer.power(base, 2)
         val z = Polynomial.variable(2)
@@ -306,7 +306,7 @@ class AlgebraicArithmeticTest {
     @Test
     fun `shared images should use the requesting caller after producer cancellation`() {
         var cancelled = false
-        val producer = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        val producer = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { cancelled }))
         val base = producer.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
         val square = producer.evaluate(RationalPolynomial.of(0, 0, 1), base)
         val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
@@ -321,7 +321,7 @@ class AlgebraicArithmeticTest {
     fun `interrupted image arithmetic should leave owned values usable by another caller`() {
         val base = arithmetic.roots(RationalPolynomial.of(-2, 0, 0, 1)).single()
         val square = arithmetic.evaluate(RationalPolynomial.of(0, 0, 1), base)
-        val interrupted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
+        val interrupted = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { true }))
         val caller = AlgebraicArithmetic(PolynomialArithmetic(limits = PolynomialLimits(maxMatrixCells = 25)))
 
         assertFailsWith<PolynomialInterrupted> { interrupted.add(base, square) }
@@ -372,7 +372,7 @@ class AlgebraicArithmeticTest {
         val value = arithmetic.roots(RationalPolynomial.of(-4, 0, 0, 1)).single()
         val relation = polynomial.subtract(Polynomial.variable(1), polynomial.power(Polynomial.variable(0), 2))
         var cancelled = false
-        val producer = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled },
+        val producer = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { cancelled },
             limits = PolynomialLimits(maxMatrixCells = 0)))
         val specialized = producer.specialize(relation, 1, mapOf(0 to base))
         cancelled = true
@@ -526,7 +526,7 @@ class AlgebraicArithmeticTest {
         val relation = polynomial.subtract(polynomial.power(Polynomial.variable(1), 2), Polynomial.variable(0))
         val specialized = arithmetic.specialize(relation, 1, mapOf(0 to base))
         var cancelled = false
-        val limited = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+        val limited = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { cancelled }))
         limited.roots(specialized)
         cancelled = true
 
@@ -538,9 +538,9 @@ class AlgebraicArithmeticTest {
         var spent = 0L
         var limit = Long.MAX_VALUE
         val meter = WorkMeter { spent += it }
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= limit
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         val counted = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
         val root = counted.roots(RationalPolynomial.of(-2, 0, 1)).last()
@@ -638,9 +638,9 @@ class AlgebraicArithmeticTest {
         var spent = 0L
         var limit = Long.MAX_VALUE
         val meter = WorkMeter { spent += it }
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = spent >= limit
-            override fun workMeter(): WorkMeter = meter
+            override val accounting: WorkMeter get() = meter
         }
         val counted = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
         val point = counted.pointEvaluation(mapOf(0 to root))
@@ -688,7 +688,7 @@ class AlgebraicArithmeticTest {
         val root = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         for (coordinate in listOf(root, arithmetic.rational(BigFraction.ofLong(2)))) {
             var cancelled = false
-            val counted = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { cancelled }))
+            val counted = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { cancelled }))
             val point = counted.pointEvaluation(mapOf(0 to coordinate))
             val source = polynomial.power(Polynomial.variable(0), 2)
             point.evaluate(source)
@@ -919,7 +919,7 @@ class AlgebraicArithmeticTest {
                 arithmetic.rational(BigFraction.ONE),
             ),
         )
-        val cancelled = AlgebraicArithmetic(PolynomialArithmetic(Cancellation { true }))
+        val cancelled = AlgebraicArithmetic(PolynomialArithmetic(ExecutionControl { true }))
 
         assertFailsWith<PolynomialInterrupted> { cancelled.roots(specialized) }
     }

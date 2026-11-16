@@ -19,6 +19,8 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
@@ -30,8 +32,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 
 @RunWith(Parameterized::class)
 class MiniZincModeTest(private val direction: String) {
@@ -49,7 +49,7 @@ class MiniZincModeTest(private val direction: String) {
                 var 0..28: hidden;
                 constraint int_lin_eq([2,-1], [x,hidden], 0);
                 solve $direction hidden;
-            """.trimIndent())
+                """.trimIndent())
         }
         val common = CommonOptions().apply {
             engine = "cp"
@@ -128,7 +128,7 @@ class MiniZincModeTest(private val direction: String) {
                 constraint int_lin_eq([1,-70], [cost_b,scaled_b], 0);
                 constraint int_lin_eq([1,1,-1], [cost_a,cost_b,total], -3000000000);
                 solve $direction total;
-            """.trimIndent())
+                """.trimIndent())
         }
         val outputModel = File.createTempFile("scaled-costs", ".ozn").apply {
             writeText("""
@@ -137,7 +137,7 @@ class MiniZincModeTest(private val direction: String) {
                 int: total;
                 output ["costs = ", show(array1d(-2..-1, [cost_a,cost_b])), ";\n",
                         "_objective = ", show(total), ";\n"];
-            """.trimIndent())
+                """.trimIndent())
         }
         val common = CommonOptions().apply {
             engine = "cp"

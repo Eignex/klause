@@ -7,7 +7,7 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.conditionedRoot
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -32,8 +32,8 @@ class MonotoneClausePrimalTest {
             MonotoneClausePrimal.create(
                 BacktrackSolver(problem),
                 objective,
-                BacktrackParams(cancellation = Cancellation { primal.models > 1L }),
-                Cancellation.Never,
+                BacktrackParams(cancellation = ExecutionControl { primal.models > 1L }),
+                ExecutionControl.Never,
             ),
         )
 
@@ -63,7 +63,7 @@ class MonotoneClausePrimalTest {
                 BacktrackSolver(problem),
                 objective,
                 BacktrackParams(),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         primal.use {
@@ -100,7 +100,7 @@ class MonotoneClausePrimalTest {
                 solver,
                 objective,
                 BacktrackParams(),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         primal.use {
@@ -129,7 +129,7 @@ class MonotoneClausePrimalTest {
                 solver,
                 objective,
                 BacktrackParams(assumptions = Assumptions(bools = mapOf(2 to true))),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         primal.use {
@@ -155,7 +155,7 @@ class MonotoneClausePrimalTest {
                 solver,
                 objective,
                 BacktrackParams(),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         primal.use { probe ->
@@ -185,7 +185,7 @@ class MonotoneClausePrimalTest {
                 solver,
                 objective,
                 BacktrackParams(),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
         primal.use {
@@ -219,7 +219,7 @@ class MonotoneClausePrimalTest {
                 solver,
                 objective,
                 BacktrackParams(assumptions = Assumptions(bools = mapOf(32 to true))),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -243,14 +243,14 @@ class MonotoneClausePrimalTest {
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(2, true))),
                 Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))),
             ),
-        ).bake().conditionedRoot(Assumptions(bools = mapOf(3 to true)), Cancellation.Never)
+        ).bake().conditionedRoot(Assumptions(bools = mapOf(3 to true)), ExecutionControl.Never)
         val objective = LinearObjective(boolWeights = longArrayOf(1L, 2L))
         val primal = assertNotNull(
             MonotoneClausePrimal.create(
                 BacktrackSolver(problem),
                 objective,
                 BacktrackParams(),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
 
@@ -277,7 +277,7 @@ class MonotoneClausePrimalTest {
                 solver,
                 LinearObjective(boolWeights = longArrayOf(1L)),
                 BacktrackParams(),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
     }
@@ -290,7 +290,7 @@ class MonotoneClausePrimalTest {
                 solver,
                 LinearObjective(boolWeights = longArrayOf(1L)),
                 BacktrackParams(assumptions = Assumptions(bools = mapOf(0 to true))),
-                Cancellation.Never,
+                ExecutionControl.Never,
             ),
         )
     }
@@ -303,7 +303,7 @@ class MonotoneClausePrimalTest {
                 solver,
                 LinearObjective(boolWeights = longArrayOf(1L)),
                 BacktrackParams(),
-                Cancellation { true },
+                ExecutionControl { true },
             ),
         )
         primal.use { assertNull(it.advance()) }

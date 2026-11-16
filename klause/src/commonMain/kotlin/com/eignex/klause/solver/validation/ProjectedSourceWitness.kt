@@ -6,13 +6,13 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun verifyProjectedSourceWitness(
     source: Problem,
     integerChecker: BakedProblem,
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     points: FinitePointCheck = FinitePointCheck(integerChecker),
     toleranceCheck: ((Sample) -> Boolean)?,
 ): Verification<Sample, Unit> {
@@ -51,7 +51,7 @@ internal fun verifyProjectedSourceWitness(
 private fun checkProjectedRealBounds(
     source: Problem,
     sample: Sample,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): Verification<Nothing, Nothing>? {
     for (id in 0 until source.numRealVars) {
         cancellation.charge(1)

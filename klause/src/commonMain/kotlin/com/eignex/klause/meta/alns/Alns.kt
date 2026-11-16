@@ -30,7 +30,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.checkPointRestrictions
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.solver.withSourceSemantics
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import com.eignex.kumulant.bandit.UnivariateBandit
@@ -185,7 +185,7 @@ internal class Alns(
         private val assumptions = backtrackParams?.assumptions?.mergedWith(params.assumptions) ?: params.assumptions
         private var supplied = false
 
-        fun acquire(current: Sample?, cancellation: Cancellation): Sample? {
+        fun acquire(current: Sample?, cancellation: ExecutionControl): Sample? {
             if (cancellation() || session?.depth?.let { it > 0 } == true) return null
             var best = current
             if (!supplied) {
@@ -209,7 +209,7 @@ internal class Alns(
         }
 
         // A caller-supplied starting point is outside every engine, so it is the one seed checked against the source.
-        private fun accepts(sample: Sample, current: Sample?, cancellation: Cancellation): Boolean {
+        private fun accepts(sample: Sample, current: Sample?, cancellation: ExecutionControl): Boolean {
             val checked = finiteWitnessVerifier(problem, objective, assumptions, cancellation, toleranceCheck)
                 .verify(Candidate(sample, null))
             return checked is Verification.Accepted && !cancellation() && improves(sample, current)
@@ -281,7 +281,8 @@ internal class Alns(
         private var closed = false
         private var currentCancellation = params.cancellation
         private val repairCancellation = cancelledWhen({ currentCancellation.deadline() },
-            { currentCancellation.workScheduled() }) {
+            { currentCancellation.workScheduled() },
+            { currentCancellation.stopPolling }) {
             currentCancellation() || backtrackParams?.cancellation?.invoke() == true
         }
         private var iter = 0
@@ -474,7 +475,7 @@ internal class Alns(
      * seed it with a *budget-bounded complete solve*: complete search reaches a first feasible fast on both
      * easy and feasibility-tight problems — where local search flails and leaves ALNS with no incumbent at
      * all — and hands over a CP-quality start. It is capped to a fraction of the run's budget
-     * (via [com.eignex.klause.util.Cancellation.shorten]) so destroy/repair keeps the rest, with
+     * (via [com.eignex.klause.util.ExecutionControl.shorten]) so destroy/repair keeps the rest, with
      * [BOOTSTRAP_DECISIONS] as the safeguard for a budget-less (deadline-free) run. A pure-LS ALNS (no
      * backtrack engine), or a fragment the bootstrap can't seed, falls back to local search.
      */
@@ -541,7 +542,7 @@ internal class Alns(
             }
 
         override fun runSlice(
-            global: Cancellation,
+            global: ExecutionControl,
             sliceMillis: Long,
             sliceNodes: Long,
             onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -552,7 +553,7 @@ internal class Alns(
         )
 
         override fun runInstructionSlice(
-            global: Cancellation,
+            global: ExecutionControl,
             sliceMillis: Long,
             sliceInstructions: Long,
             onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -563,7 +564,7 @@ internal class Alns(
             val token = if (sliceMillis == Long.MAX_VALUE) {
                 params.cancellation.lifetimeCancellation() or global
             } else {
-                params.cancellation.lifetimeCancellation() or global or Cancellation.after(sliceMillis.milliseconds)
+                params.cancellation.lifetimeCancellation() or global or ExecutionControl.after(sliceMillis.milliseconds)
             }
             if (sliceInstructions == 0L || token()) return null
             // Finite LNS segments are charged their offered scheduling allowance, independently of inner work.
@@ -608,12 +609,12 @@ internal class Alns(
         }
 
         private fun bootstrapIncumbent(
-            token: Cancellation,
+            token: ExecutionControl,
             sliceInstructions: Long,
             onIncumbent: (MinimizeResult.WithSample) -> Unit,
         ) {
             if (!cpFinished) {
-                val cpToken = token.shorten(BT_BOOTSTRAP_FRACTION) or Cancellation { neighborhood != null }
+                val cpToken = token.shorten(BT_BOOTSTRAP_FRACTION) or ExecutionControl { neighborhood != null }
                 val started = TimeSource.Monotonic.markNow()
                 try {
                     val engine = checkNotNull(backtrack)
@@ -639,7 +640,7 @@ internal class Alns(
                 }
             }
             if (neighborhood != null || token() || lsFinished) return
-            val lsToken = token or Cancellation { neighborhood != null }
+            val lsToken = token or ExecutionControl { neighborhood != null }
             val started = TimeSource.Monotonic.markNow()
             try {
                 val lp = params.withCancellation(lsToken)
@@ -785,7 +786,7 @@ internal class Alns(
     }
 
     private companion object {
-        /** Budget slice ([com.eignex.klause.util.Cancellation.shorten]) the complete-engine bootstrap may
+        /** Budget slice ([com.eignex.klause.util.ExecutionControl.shorten]) the complete-engine bootstrap may
          *  use before yielding to destroy/repair. Calibration knob. */
         const val BT_BOOTSTRAP_FRACTION = 0.5
 

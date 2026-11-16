@@ -1,16 +1,14 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
-import com.eignex.klause.solver.resources.WorkCounter
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.QfNraStats
-import com.eignex.klause.util.ArithmeticCancellation
 import com.eignex.klause.util.ArithmeticWorkSource
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.WorkCounter
 import com.eignex.klause.util.WorkCreditPool
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.WorkReservation
-import com.eignex.klause.util.arithmeticSource
 import com.eignex.klause.util.reserveWork
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.AtomicCells
@@ -26,11 +24,10 @@ internal class QuadraticNativeScope private constructor(
     constructor(params: PolynomialTheoryParams, concurrent: Boolean = true) :
         this(params, Ledger(params.maximumWork, if (concurrent) Concurrency.Relaxed else Concurrency.None), null, null)
 
-    private val stop = params.timeout or params.cancellation
+    private val stop = params.timeout.withAccounting(params.cancellation) or params.cancellation
     private val counters = Counters(ledger.concurrency)
     private val quota = maximumWorkerWork?.let { WorkCreditPool(it, ledger.concurrency) }
     private val pools = listOfNotNull(quota, ledger.pool)
-    private val parentAccounting = stop.arithmeticSource()
     private val workers = mutableMapOf<Int, QuadraticNativeScope>()
     private val representationDecline = ledger.cells.newReference<PolynomialTheoryResource?>(null)
     val resource: PolynomialTheoryResource? get() = representationDecline.load()
@@ -42,8 +39,8 @@ internal class QuadraticNativeScope private constructor(
     val polynomialStats: PolynomialTheoryStats get() = (if (root == null) ledger.counters else counters).stats()
     val exhausted: Boolean get() = ledger.pool.exhausted || quota?.exhausted == true
     val stopped: Boolean get() = exhausted || resource != null || root?.resource != null || stop()
-    val polynomial: Cancellation = Token(quadratic = false)
-    val numerical: Cancellation = Token(quadratic = true)
+    val polynomial: ExecutionControl = Token(quadratic = false)
+    val numerical: ExecutionControl = Token(quadratic = true)
 
     init { require(maximumWorkerWork == null || maximumWorkerWork >= 0) }
 
@@ -54,7 +51,8 @@ internal class QuadraticNativeScope private constructor(
         worker
     }
 
-    fun phaseCancellation(worker: Cancellation, share: Double): Cancellation = (polynomial or worker).shorten(share)
+    fun phaseCancellation(worker: ExecutionControl, share: Double): ExecutionControl =
+        (polynomial or worker).shorten(share)
 
     fun observe(stats: QfNraStats) {
         counters.observe(stats)
@@ -75,11 +73,11 @@ internal class QuadraticNativeScope private constructor(
         else -> TerminationReason.BudgetExhausted
     }
 
-    private inner class Token(private val quadratic: Boolean) : ArithmeticCancellation, WorkMeter {
+    private inner class Token(private val quadratic: Boolean) : ExecutionControl() {
         override fun isCancelled(): Boolean = stopped
         override fun deadline() = stop.deadline()
-        override fun workMeter(): WorkMeter = this
-        override fun charge(units: Long) {
+        override val accounting: WorkMeter = WorkMeter(::recordWork)
+        private fun recordWork(units: Long) {
             require(units >= 0)
             ledger.pool.debit(units)
             quota?.debit(units)
@@ -87,12 +85,18 @@ internal class QuadraticNativeScope private constructor(
             stop.charge(units)
         }
 
-        override fun arithmeticSource(): ArithmeticWorkSource? {
-            if (stop.workMeter() != null && parentAccounting == null) return null
-            return object : ArithmeticWorkSource {
-                override fun isCancelled(): Boolean = stopped
+        override val admission: ArithmeticWorkSource get() {
+            val parentAccounting = stop.admission
+            val parentMeter = stop.accounting
+            return object: ArithmeticWorkSource {
+            override val quotaOwner get () = parentAccounting?.quotaOwner
+                override val quotaRemaining get() = parentAccounting ?.quotaRemaining
+                override val quotaAvailable get() = parentAccounting?.quotaAvailable
+                override val exhausted get() = this@QuadraticNativeScope.exhausted || resource != null ||
+                    root?.resource != null || parentAccounting?.exhausted == true
                 override fun reserve(maximum: Int): WorkReservation? =
-                    reserveWork(maximum, pools, parentAccounting) { record(it.toLong()) }
+                    reserveWork(maximum, pools, parentAccounting) { record(it.toLong())
+                    if (parentAccounting?.metered != true) parentMeter?.charge(it.toLong()) }
             }
         }
 

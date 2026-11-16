@@ -6,7 +6,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -25,7 +25,7 @@ class LinearRepairGuidanceTest {
         val point = mutableMapOf(integer to 0.5)
         val guidance = LinearRepairGuidance()
 
-        assertTrue(guidance.remember(source, point, SourceLpBudget(funding = funding), Cancellation.Never))
+        assertTrue(guidance.remember(source, point, SourceLpBudget(funding = funding), ExecutionControl.Never))
         point[integer] = 1.0
 
         assertEquals(0.5, assertNotNull(guidance.find(source)).integer(0))
@@ -38,7 +38,7 @@ class LinearRepairGuidanceTest {
         val funding = SourceLpFunding(1000, 1000).also { it.grant(1000) }
         val guidance = LinearRepairGuidance()
         assertTrue(guidance.remember(source, mapOf(integer to 0.5),
-            SourceLpBudget(funding = funding), Cancellation.Never))
+            SourceLpBudget(funding = funding), ExecutionControl.Never))
 
         assertNull(guidance.find(SourceProofContext(scope, setOf(integer), emptyMap())))
     }
@@ -48,9 +48,9 @@ class LinearRepairGuidanceTest {
         val funding = SourceLpFunding(10_000, 10_000).also { it.grant(10_000) }
         val budget = SourceLpBudget(funding = funding)
         val guidance = LinearRepairGuidance()
-        assertTrue(guidance.remember(source, mapOf(integer to 0.5), budget, Cancellation.Never))
+        assertTrue(guidance.remember(source, mapOf(integer to 0.5), budget, ExecutionControl.Never))
 
-        assertFalse(guidance.remember(source, mapOf(integer to 1.0), budget, Cancellation.Never))
+        assertFalse(guidance.remember(source, mapOf(integer to 1.0), budget, ExecutionControl.Never))
 
         assertEquals(0.5, assertNotNull(guidance.find(source)).integer(0))
     }
@@ -68,7 +68,7 @@ class LinearRepairGuidanceTest {
             val guidance = LinearRepairGuidance()
 
             assertFalse(guidance.remember(source, point, SourceLpBudget(funding = funding),
-                Cancellation { variant == "cancelled" }))
+                ExecutionControl { variant == "cancelled" }))
 
             assertNull(guidance.find(source))
         }
@@ -81,7 +81,7 @@ class LinearRepairGuidanceTest {
             val guidance = LinearRepairGuidance()
 
             assertFalse(guidance.remember(source, mapOf(integer to 0.5),
-                SourceLpBudget(funding = funding), Cancellation.Never))
+                SourceLpBudget(funding = funding), ExecutionControl.Never))
 
             assertNull(guidance.find(source))
         }
@@ -92,11 +92,11 @@ class LinearRepairGuidanceTest {
         val funding = SourceLpFunding(1000, 1000).also { it.grant(1000) }
         val budget = SourceLpBudget(funding = funding)
         val guidance = LinearRepairGuidance()
-        assertTrue(guidance.remember(source, mapOf(integer to 0.5), budget, Cancellation.Never))
+        assertTrue(guidance.remember(source, mapOf(integer to 0.5), budget, ExecutionControl.Never))
 
         guidance.close()
 
         assertNull(guidance.find(source))
-        assertFalse(guidance.remember(source, mapOf(integer to 0.5), budget, Cancellation.Never))
+        assertFalse(guidance.remember(source, mapOf(integer to 0.5), budget, ExecutionControl.Never))
     }
 }

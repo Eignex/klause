@@ -7,14 +7,14 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 
 internal fun captureSmtSourceObjective(
     commands: List<SExpr>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     semantics: EffectiveSourceSemantics,
     semanticDeclarations: Set<String>? = null,
 ): SmtLibPolynomialProblem {
@@ -35,7 +35,7 @@ internal fun captureSmtSourceObjective(
 
 internal fun SmtLibPolynomialProblem.bindObjective(
     source: SmtLibProblem,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): SmtLibProblem {
     fun mapping(names: Map<String, Int>, retained: Map<String, Int>): IntArray {
         val canonical = retained.mapKeys { polynomialSymbol(it.key) }
@@ -63,7 +63,7 @@ internal fun SmtLibProblem.hasDeclaredAffineObjective(): Boolean {
 
 private fun QuadraticObjectiveSpec.affineObjective(
     source: SmtLibProblem,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): LinearObjectiveSpec? {
     if (constant.denominator != BIG_ONE || !constant.numerator.fitsLong()) return null
     val booleans = LongArray(source.model.numBoolVars)

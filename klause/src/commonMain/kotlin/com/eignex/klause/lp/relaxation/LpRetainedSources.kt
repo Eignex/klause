@@ -23,7 +23,7 @@ import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.strongerThan
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LpSourceEdit(
     val sourceState: LpExactState,
@@ -42,7 +42,8 @@ internal class LpSourceEdit(
     fun isCurrent(): Boolean = valid()
     fun commit() = publish()
 
-    fun boundAssertions(nextWitness: Long, cancellation: Cancellation = Cancellation.Never): List<LpBoundAssertion>? {
+    fun boundAssertions(nextWitness: Long, cancellation: ExecutionControl =
+        ExecutionControl.Never): List<LpBoundAssertion>? {
         val before = sourceState
         if (nextWitness < 0L || bounds.size != before.model.n + columns.size || !isCurrent() || cancellation()) {
             return null
@@ -199,7 +200,7 @@ internal class LpRetainedSources(
     fun prepare(
         state: LpExactState,
         domains: RelaxationDomains,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         onEmissionWork: ((Long) -> Unit)? = null,
     ): LpSourceEdit? {
         require(state.depth >= depth && state.model.n == columns.size)
@@ -386,7 +387,7 @@ internal class LpRetainedSources(
         }
     }
 
-    private fun checkCancellation(cancellation: Cancellation) {
+    private fun checkCancellation(cancellation: ExecutionControl) {
         if (cancellation()) throw LpAssemblyCancelled()
     }
 
@@ -394,7 +395,7 @@ internal class LpRetainedSources(
 
     fun prepareCompaction(
         state: LpExactState,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         retainedOverhead: Long = 0L,
     ): LpSourceCompaction? {
         require(state.model.n == columns.size && state.depth == depth)
@@ -452,7 +453,7 @@ internal class LpRetainedSources(
         }
     }
 
-    private fun compactionView(state: LpExactState, cancellation: Cancellation): CompactionView? {
+    private fun compactionView(state: LpExactState, cancellation: ExecutionControl): CompactionView? {
         val rows = state.rows
         val kept = ArrayList<Int>()
         var removed = 0L

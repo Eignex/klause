@@ -4,7 +4,7 @@ import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.engine.reconstructRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf
 import kotlin.math.round
 
@@ -13,9 +13,9 @@ internal fun completeMixedPoint(
     integerColumns: Int,
     primal: DoubleArray,
     rows: List<ExactRationalInequality>,
-    stop: Cancellation,
+    stop: ExecutionControl,
     onStage: ((String) -> Unit)? = null,
-    realCompletion: ((Int, List<ExactRationalInequality>, Cancellation) -> List<BigFraction>?)? = null,
+    realCompletion: ((Int, List<ExactRationalInequality>, ExecutionControl) -> List<BigFraction>?)? = null,
 ): List<BigFraction>? {
     onStage?.invoke("RECOVERY_ATTEMPT")
     fun declined(stage: String): List<BigFraction>? {

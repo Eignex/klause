@@ -9,7 +9,7 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
@@ -56,7 +56,7 @@ class BakedProblemTest {
             ) to IntDomain(3, 3),
         )
         for ((assumptions, expected) in cases) {
-            val root = source.conditionedRoot(assumptions, Cancellation.Never)
+            val root = source.conditionedRoot(assumptions, ExecutionControl.Never)
             assertEquals(expected, root.rootIntDomain(0))
             assertEquals(holey(), source.rootIntDomain(0))
         }
@@ -65,7 +65,7 @@ class BakedProblemTest {
     @Test
     fun `contradictory root deductions should produce an infeasible root`() {
         val source = Problem(0, 1, arrayOf(holey()), emptyArray()).bake()
-        val root = source.conditionedRoot(Assumptions.None.withTightenedMin(0, 7), Cancellation.Never)
+        val root = source.conditionedRoot(Assumptions.None.withTightenedMin(0, 7), ExecutionControl.Never)
         assertIs<PropagationResult.Unsat>(root.baked)
         assertEquals(holey(), source.rootIntDomain(0))
     }
@@ -76,7 +76,7 @@ class BakedProblemTest {
         for (stop in listOf(1, 2)) {
             var polls = 0
             assertFailsWith<CancellationException> {
-                source.conditionedRoot(Assumptions.None.withTightenedMin(0, 3), Cancellation { ++polls >= stop })
+                source.conditionedRoot(Assumptions.None.withTightenedMin(0, 3), ExecutionControl { ++polls >= stop })
             }
             assertEquals(holey(), source.rootIntDomain(0))
         }

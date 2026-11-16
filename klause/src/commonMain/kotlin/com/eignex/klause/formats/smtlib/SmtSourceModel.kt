@@ -2,7 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.pipeline.SourceWitnessValidator
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.coroutines.cancellation.CancellationException
 
 /** A source sort, independent of the scalar coordinates used to solve its encoding. */
@@ -183,7 +183,7 @@ private fun <T> withSmtModelValues(
     boolean: (Int) -> Boolean,
     integer: (Int) -> String,
     real: (Int) -> String,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     action: (SmtModelValues, () -> Unit) -> T,
 ): T {
     fun checkpoint(units: Long = 1) {
@@ -240,7 +240,7 @@ internal fun reconstructSmtModel(
     boolean: (Int) -> Boolean,
     integer: (Int) -> String,
     real: (Int) -> String,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): SmtSourceModel = withSmtModelValues(problem, boolean, integer, real, cancellation) { values, checkpoint ->
     val model = SmtSourceModel(problem.sourceBindings.map { binding ->
         checkpoint()

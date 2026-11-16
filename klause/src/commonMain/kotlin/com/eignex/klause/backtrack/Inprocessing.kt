@@ -7,7 +7,7 @@ import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.time.TimeSource
 
@@ -154,7 +154,7 @@ internal class Inprocessing(
         if (pendingRoot != null) {
             val elapsed = TimeSource.Monotonic.markNow()
             val limit = params.inprocessingWork - repayDebt(params.inprocessingWork)
-            val token = Cancellation { params.cancellation() || session.work - beforeResume >= limit }
+            val token = ExecutionControl { params.cancellation() || session.work - beforeResume >= limit }
             session.withCancellation(params.cancellation) {
                 session.withInprocessingCancellation(token) {
                     pendingRoot?.spending?.run(session, params, stats, resumingRoot = true,
@@ -221,7 +221,7 @@ internal class Inprocessing(
         val start = session.work
         val duration = TimeSource.Monotonic.markNow()
         val rootMark = session.explanationState.undoTop
-        val token = Cancellation { params.cancellation() || session.work - start >= offered }
+        val token = ExecutionControl { params.cancellation() || session.work - start >= offered }
         try {
             session.withCancellation(params.cancellation) {
                 session.withInprocessingCancellation(token) {

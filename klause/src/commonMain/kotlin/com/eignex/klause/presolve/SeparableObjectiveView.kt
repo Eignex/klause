@@ -4,7 +4,7 @@ import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.numbers.CheckedLongOverflowException
@@ -20,7 +20,7 @@ internal class SeparableObjectiveView private constructor(
         fun create(
             problem: BakedProblem,
             objective: LinearObjective,
-            cancellation: Cancellation = problem.cancellation,
+            cancellation: ExecutionControl = problem.cancellation,
         ): SeparableObjectiveView? {
             if (problem.semantics.isApproximate || problem.numRealVars != 0 ||
                 problem.numIntVars > 4096 || objective.intCoefficientValues.size > problem.numIntVars ||
@@ -45,7 +45,7 @@ internal class SeparableObjectiveView private constructor(
 private class Expansion(
     private val problem: BakedProblem,
     private val source: LinearObjective,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
 ) {
     private val definitions = HashMap<Int, MutableList<Linear>>()
     private val selected = HashMap<Int, Linear?>()

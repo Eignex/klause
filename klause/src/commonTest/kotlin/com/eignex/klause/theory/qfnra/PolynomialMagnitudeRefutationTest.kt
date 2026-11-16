@@ -3,12 +3,12 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -140,17 +140,17 @@ class PolynomialMagnitudeRefutationTest {
         )
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
         var completedWork = 0L
-        val counter = object : Cancellation {
+        val counter = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override fun workMeter(): WorkMeter = WorkMeter { completedWork += it }
+            override val accounting: WorkMeter get() = WorkMeter { completedWork += it }
         }
         assertTrue(refutePolynomialMagnitudes(formula, PolynomialArithmetic(counter), 128, 2048, 8, 4096))
 
         for (limit in listOf(1L, completedWork / 2, completedWork - 1)) {
             var spent = 0L
-            val stop = object : Cancellation {
+            val stop = object : ExecutionControl() {
                 override fun isCancelled(): Boolean = spent >= limit
-                override fun workMeter(): WorkMeter = WorkMeter { spent += it }
+                override val accounting: WorkMeter get() = WorkMeter { spent += it }
             }
             assertFailsWith<PolynomialInterrupted> {
                 refutePolynomialMagnitudes(formula, PolynomialArithmetic(stop), 128, 2048, 8, 4096)

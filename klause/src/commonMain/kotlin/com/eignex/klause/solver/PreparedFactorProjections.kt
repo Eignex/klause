@@ -28,7 +28,7 @@ import com.eignex.klause.propagation.SelectedProjectionChecks
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt
 
 /**
@@ -65,7 +65,7 @@ class PreparedFactorProjections internal constructor(
         indices: List<Int>,
         fixedIntegers: Map<SourceIntId, BigInt> = emptyMap(),
         fixedBooleans: Map<SourceBoolId, Boolean> = emptyMap(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         completeFiniteConditions: Boolean = false,
         onDecline: (EncoderDecline) -> Unit = {},
     ): SelectedEncoderRequest? {

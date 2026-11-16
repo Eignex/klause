@@ -22,7 +22,7 @@ import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -45,7 +45,7 @@ class PortfolioWorkerTest {
             override val canContinuePreparation = true
             override val incumbentTrialPending: Boolean get() = pending
             override fun runInstructionSlice(
-                global: Cancellation,
+                global: ExecutionControl,
                 sliceMillis: Long,
                 sliceInstructions: Long,
                 onIncumbent: (MinimizeResult.WithSample) -> Unit,
@@ -65,7 +65,7 @@ class PortfolioWorkerTest {
         assertTrue(assertIs<ReseedGuard>(handle).incumbentTrialPending)
 
         val terminal = assertIs<InstructionSlicedSearch>(handle).runInstructionSlice(
-            Cancellation.Never, 1L, 17L, points::add,
+            ExecutionControl.Never, 1L, 17L, points::add,
         )
 
         assertEquals(listOf(17L), allowances)
@@ -99,7 +99,7 @@ class PortfolioWorkerTest {
             val points = mutableListOf<MinimizeResult.WithSample>()
 
             val terminal = assertNotNull(worker.newResumableSearch { 0.0 }).use {
-                it.runSlice(Cancellation.Never, 1L, points::add)
+                it.runSlice(ExecutionControl.Never, 1L, points::add)
             }
 
             if (result.assignment == null) {
@@ -124,7 +124,7 @@ class PortfolioWorkerTest {
         val points = mutableListOf<MinimizeResult.WithSample>()
 
         val terminal = assertNotNull(worker.newResumableSearch { 0.0 }).use {
-            it.runSlice(Cancellation.Never, 1L, 1L, points::add)
+            it.runSlice(ExecutionControl.Never, 1L, 1L, points::add)
         }
 
         assertIs<MinimizeResult.Unknown>(terminal)

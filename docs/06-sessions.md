@@ -331,8 +331,8 @@ optimization returning with an unresolved objective leaf from an undecided
 component. It includes the native stop visible at return, when present. The
 CLI's verbose stream tags the worker; the event changes no result or allowance.
 
-Tight loops without an attached meter poll cancellation at most every 64 primitive
-visits; an attached meter polls after every debit. Entry, bulk allocation, result
+Tight loops poll cancellation at bounded checkpoints independently of accounting;
+nested worker operations share one countdown. Entry, bulk allocation, result
 delivery and nonpublication exits force a poll. Batching grants no work, and a
 stopped query publishes no partial fact, point or conflict. Custom contexts default
 to cancellation only.
@@ -424,9 +424,12 @@ variables. Each `WorkCounter` retains its fixed `concurrency` mode and defaults 
 acquire no mutex. Concurrent snapshots can span several charges; completed charges
 remain exact after workers join. Quota
 registration alone uses a mutex, and capacity is read before registration.
-`Cancellation` and `WorkMeter` live in `util` and contain no portfolio pricing; units
-come from the caller's adapter, and solver policy owns conversions and result
-semantics.
+`Cancellation` describes stopping and deadline metadata; `WorkMeter` records work.
+`ExecutionControl` binds these separately from arithmetic admission. Stop composition
+retains the receiver's accounting; `withAccounting` explicitly selects another owner.
+Charging work never evaluates cancellation. `withBoundedPolling()` gives each executing
+worker its own countdown, shared by nested work; direct stop observations and quota
+enforcement remain immediate. Solver policy owns currency conversions and result semantics.
 
 Arithmetic allowance cursors reserve bounded credit from persistent worker and
 containing `WorkCreditPool`s. Reserved capacity is distinct from spent work; a
@@ -434,8 +437,9 @@ sibling holding credit can delay admission without establishing exhaustion. A cu
 returns unused capacity and settles used units exactly once before handoff, pause
 or exit, including exceptional exits. Each containing meter receives the same
 admitted native units once. Unlimited pools still retain exact saturating charges.
-Serial pools use plain integer variables; shared pools update spent and reserved
-capacity together through relaxed atomic compare-and-set, without a mutex.
+Serial pools use plain integer variables; shared pools reserve available credit
+through relaxed atomic compare-and-set and record settled work in a separate
+saturating integer counter, without a mutex.
 
 Polynomial native checkpoints read the shared allowance, worker quota and representation
 stops without locking, then inspect containing predicates. Representation declines

@@ -4,7 +4,7 @@ import com.eignex.klause.lp.engine.reconstructRational
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntIndexedCollection
 import com.eignex.util.numbers.BIG_ONE
@@ -30,8 +30,8 @@ internal fun recoverLinearPrimal(
     point: List<BigFraction>,
     rows: List<ExactRationalInequality>,
     inactive: Set<Int>,
-    cancellation: Cancellation,
-    complete: (List<ExactRationalInequality>, IntIndexedCollection, Cancellation) -> List<BigFraction>?,
+    cancellation: ExecutionControl,
+    complete: (List<ExactRationalInequality>, IntIndexedCollection, ExecutionControl) -> List<BigFraction>?,
     observe: (String, Long) -> Unit,
     limits: LinearPrimalRecoveryLimits = LinearPrimalRecoveryLimits(),
     progress: LinearPrimalRecoveryProgress = LinearPrimalRecoveryProgress(),
@@ -197,8 +197,8 @@ internal fun refineLinearPrimal(
     rows: List<ExactRationalInequality>,
     inactive: Set<Int>,
     costs: List<BigFraction>,
-    cancellation: Cancellation,
-    complete: (List<ExactRationalInequality>, List<BigFraction>, Cancellation) -> List<BigFraction>?,
+    cancellation: ExecutionControl,
+    complete: (List<ExactRationalInequality>, List<BigFraction>, ExecutionControl) -> List<BigFraction>?,
     observe: (String, Long) -> Unit,
 ): List<BigFraction>? {
     val progress = LinearPrimalRecoveryProgress()
@@ -269,7 +269,7 @@ internal fun refineLinearPrimal(
 
 private class LinearPrimalMeter(
     private val limits: LinearPrimalRecoveryLimits,
-    private val token: Cancellation,
+    private val token: ExecutionControl,
     private val progress: LinearPrimalRecoveryProgress,
 ) {
 

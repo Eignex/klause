@@ -10,7 +10,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
@@ -24,7 +24,7 @@ internal class FiniteNumericalTrial(
     private val objective: LinearObjective,
     private val sense: ObjectiveSense,
     workLimit: Long,
-    private val stop: Cancellation,
+    private val stop: ExecutionControl,
 ) : AutoCloseable {
     private val fundingType = Class.forName("com.eignex.klause.lp.SourceLpFunding")
     private val funding = fundingType.getDeclaredConstructor(Long::class.javaPrimitiveType,
@@ -55,7 +55,7 @@ internal class FiniteNumericalTrial(
     val allocated: Long get() = field(funding, "allocated") as Long
 
     fun acquire(center: Sample, pins: Assumptions, arm: String, cuts: Boolean,
-        checkSource: (Sample, Cancellation) -> Boolean,
+        checkSource: (Sample, ExecutionControl) -> Boolean,
     ) {
         fundingType.getMethod("charge", Long::class.javaPrimitiveType, Long::class.javaPrimitiveType)
             .invoke(funding, 1L + problem.numIntVars + problem.numFactors, 64L)
@@ -102,7 +102,7 @@ internal class FiniteNumericalTrial(
         val full = requestType.getField("Companion").get(null).let { companion ->
             companion.javaClass.getMethod("getFull").invoke(companion)
         }
-        publisher = publisherType.getDeclaredConstructor(fundingType, Cancellation::class.java,
+        publisher = publisherType.getDeclaredConstructor(fundingType, ExecutionControl::class.java,
             Boolean::class.javaPrimitiveType, requestType).newInstance(funding, stop, true, full)
         val acquisition = publisherType.methods.single { it.name == "acquire" }
             .invoke(publisher, authority, prepared, cutoff, cuts)

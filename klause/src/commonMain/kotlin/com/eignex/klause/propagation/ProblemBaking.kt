@@ -4,7 +4,7 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PreparedFactorProjections
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
@@ -18,7 +18,7 @@ val Problem.baked: PropagationResult
         rootBake(
             this,
             PropagationResult.Implied.EMPTY,
-            Cancellation.Never,
+            ExecutionControl.Never,
         )
     }
 
@@ -29,22 +29,24 @@ val Problem.baked: PropagationResult
  * range materialized. Every declared side must be closed — no fallback endpoint is invented here, because
  * inventing one narrows the model.
  */
-fun Problem.bake(cancellation: Cancellation = Cancellation.Never): BakedProblem =
+fun Problem.bake(cancellation: ExecutionControl = ExecutionControl.Never): BakedProblem =
     bakeSelected(null, cancellation, null)
 
 /** Bake a private finite projection using the providers selected for this invocation. */
-fun Problem.bake(providers: FactorProjectionProviders, cancellation: Cancellation = Cancellation.Never): BakedProblem =
+fun Problem.bake(providers: FactorProjectionProviders, cancellation: ExecutionControl =
+    ExecutionControl.Never): BakedProblem =
     bakeSelected(providers, cancellation, null)
 
 /** Bake private engine state while retaining the descriptors captured for this canonical source. */
-fun Problem.bake(selection: PreparedFactorProjections, cancellation: Cancellation = Cancellation.Never): BakedProblem {
+fun Problem.bake(selection: PreparedFactorProjections, cancellation: ExecutionControl =
+    ExecutionControl.Never): BakedProblem {
     selection.requireSource(this)
     return bakeSelected(selection.providers, cancellation, selection)
 }
 
 private fun Problem.bakeSelected(
     providers: FactorProjectionProviders?,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     selection: PreparedFactorProjections?,
 ): BakedProblem {
     if (this is BakedProblem) {
@@ -100,12 +102,12 @@ internal fun BakedProblem.withAppendedFactor(extra: Factor): BakedProblem = Bake
 /** Run deductive propagation against [assumptions] through the propagation engine. */
 fun Problem.propagate(
     assumptions: Assumptions = Assumptions.None,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     skipExpensiveBake: Boolean = false,
 ): PropagationResult = runRootPropagation(this, assumptions, cancellation, skipExpensiveBake)
 
 @Suppress("ThrowsCount") // Each preparation stage must finish before the replacement root is published.
-internal fun BakedProblem.conditionedRoot(assumptions: Assumptions, token: Cancellation): BakedProblem {
+internal fun BakedProblem.conditionedRoot(assumptions: Assumptions, token: ExecutionControl): BakedProblem {
     if (token()) throw CancellationException("root preparation cancelled")
     val state = PropagationState(
         PropagationProblem(this),

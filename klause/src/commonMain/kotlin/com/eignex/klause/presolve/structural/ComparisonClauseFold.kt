@@ -18,7 +18,7 @@ import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationProblem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
@@ -54,7 +54,7 @@ internal object ComparisonClauseFold {
     fun fold(
         problem: BakedProblem,
         objectiveBoolVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         keepBinary: Boolean = false,
         objectiveIntVars: Set<Int> = emptySet(),
     ): PassDelta {
@@ -74,7 +74,7 @@ internal object ComparisonClauseFold {
     fun foldSource(
         problem: Problem,
         objectiveBoolVars: Set<Int> = emptySet(),
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         keepBinary: Boolean = false,
         objectiveIntVars: Set<Int> = emptySet(),
     ): SourceDelta {
@@ -96,7 +96,7 @@ internal object ComparisonClauseFold {
         ranges: ColumnRanges,
         uses: IntArray,
         objectiveBoolVars: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         substitutable: Lazy<BooleanArray?>?,
     ): SourceDelta {
         // A consumed definition must be equivalent to its single reified row.

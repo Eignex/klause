@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
@@ -40,13 +40,13 @@ internal class HermiteForm(val h: List<SparseIntRow>, val v: UnimodularTransform
  * when the input and the result both fit comfortably.
  *
  * A partial reduction is not usable: its `H` is not yet triangular, so forward substitution over it would
- * bound the wrong column. Cancellation therefore reports nothing rather than a prefix.
+ * bound the wrong column. ExecutionControl therefore reports nothing rather than a prefix.
  */
 @Suppress("NestedBlockDepth", "ReturnCount")
 internal fun hermiteNormalForm(
     a: List<SparseIntRow>,
     cols: Int,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): HermiteForm? {
     val rows = a.size
     val h = SparseIntColumns(rows, cols, a)

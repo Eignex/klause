@@ -8,7 +8,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -39,12 +39,12 @@ class CoreGuidedSearchSliceTest(
         val params = BacktrackParams(nativeSat = nativeSat, randomSeed = 3L)
         val fresh = CoreGuidedSearch(problem, objective, params, coreRefinement = refinement)
         val sliced = CoreGuidedSearch(problem, objective, params, coreRefinement = refinement)
-        val expected = assertIs<MinimizeResult.Optimal>(fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+        val expected = assertIs<MinimizeResult.Optimal>(fresh.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
         var result: MinimizeResult? = null
         var previousWork = 0L
 
         repeat(100) {
-            if (result == null) result = sliced.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork) {}
+            if (result == null) result = sliced.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceWork) {}
             assertTrue(sliced.work >= previousWork)
             previousWork = sliced.work
         }
@@ -66,11 +66,11 @@ class CoreGuidedSearchSliceTest(
         val params = BacktrackParams(nativeSat = nativeSat, randomSeed = 3L)
         val fresh = CoreGuidedSearch(problem, objective, params, stratify = true, coreRefinement = refinement)
         val sliced = CoreGuidedSearch(problem, objective, params, stratify = true, coreRefinement = refinement)
-        val expected = assertIs<MinimizeResult.Optimal>(fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) {})
+        val expected = assertIs<MinimizeResult.Optimal>(fresh.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) {})
         var result: MinimizeResult? = null
 
         repeat(100) {
-            if (result == null) result = sliced.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceWork) {}
+            if (result == null) result = sliced.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceWork) {}
         }
 
         val actual = assertIs<MinimizeResult.Optimal>(result)
@@ -91,13 +91,13 @@ class CoreGuidedSearchSliceTest(
         val params = BacktrackParams(nativeSat = nativeSat, randomSeed = 3L)
         val search = CoreGuidedSearch(problem, objective, params, coreRefinement = refinement)
         val fresh = CoreGuidedSearch(problem, objective, params, coreRefinement = refinement)
-        val expected = fresh.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+        val expected = fresh.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {}
 
-        val paused = search.runSlice(Cancellation { search.thresholdVisits >= sliceWork }, Long.MAX_VALUE, -1L) {
+        val paused = search.runSlice(ExecutionControl { search.thresholdVisits >= sliceWork }, Long.MAX_VALUE, -1L) {
             error("unfinished query pins")
         }
         val visited = search.thresholdVisits
-        val actual = search.runSlice(Cancellation.Never, Long.MAX_VALUE, -1L) {}
+        val actual = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {}
 
         assertNull(paused)
         assertEquals(sliceWork, visited)

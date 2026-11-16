@@ -2,7 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
@@ -19,8 +19,8 @@ internal object OriginalClauseSubsumption {
     fun eligible(numBoolVars: Int, factorCount: Int): Boolean = numBoolVars in 1..MAX_BOOL_VARS &&
         factorCount <= MAX_FACTORS
 
-    private class Work(private val cancellation: Cancellation, private val limits: Limits) {
-        private val meter = cancellation.workMeter()
+    private class Work(private val cancellation: ExecutionControl, private val limits: Limits) {
+        private val meter = cancellation.accounting
         private var visits = 0L
         private var candidates = 0L
         private var literals = 0L
@@ -67,7 +67,7 @@ internal object OriginalClauseSubsumption {
 
     fun simplify(
         problem: Problem,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         limits: Limits = Limits(),
     ): SourceDelta {
         if (cancellation() || !eligible(problem.numBoolVars, problem.factors.size)) {

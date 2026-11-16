@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.resources
 
+import com.eignex.klause.util.WorkCounter
 import com.eignex.kumulant.core.Concurrency
 import com.eignex.util.concurrent.Mutex
 

@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal enum class LpEmissionKind { OBJECTIVE, CIRCUIT, ENERGETIC, TIME_INDEXED, FACTOR, BOOLEAN_RLT }
 
@@ -70,13 +70,13 @@ internal class LpEmissionCache(private val relaxer: CpToLpRelaxation) {
     fun refresh(
         domains: RelaxationDomains,
         targetDepth: Int,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): LpEmissionUpdate = prepare(domains, targetDepth, cancellation).also { it.commit() }
 
     fun prepare(
         domains: RelaxationDomains,
         targetDepth: Int,
-        cancellation: Cancellation = Cancellation.Never,
+        cancellation: ExecutionControl = ExecutionControl.Never,
         onWork: ((Long) -> Unit)? = null,
     ): LpEmissionUpdate {
         require(targetDepth >= 0)

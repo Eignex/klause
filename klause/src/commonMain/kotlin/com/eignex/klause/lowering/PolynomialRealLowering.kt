@@ -6,7 +6,8 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class PolynomialRealLowering(
@@ -45,7 +46,7 @@ internal class PolynomialRealLowering(
 
         fun sum(
             operands: List<PolynomialExpression>,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): PolynomialExpression {
             if (operands.all { it is PolynomialExpression.Constant }) {
                 return constant(
@@ -59,7 +60,7 @@ internal class PolynomialRealLowering(
 
         fun product(
             operands: List<PolynomialExpression>,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): PolynomialExpression {
             if (operands.all { it is PolynomialExpression.Constant }) {
                 return constant(
@@ -73,14 +74,14 @@ internal class PolynomialRealLowering(
 
         fun negate(
             operand: PolynomialExpression,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): PolynomialExpression =
             product(listOf(constant(BigFraction.MINUS_ONE), operand), cancellation)
 
         fun power(
             base: PolynomialExpression,
             exponent: Int,
-            cancellation: Cancellation = Cancellation.Never,
+            cancellation: ExecutionControl = ExecutionControl.Never,
         ): PolynomialExpression {
             require(exponent >= 0) { "negative polynomial exponent" }
             return when (exponent) {
@@ -108,7 +109,7 @@ internal class PolynomialRealLowering(
         private fun foldCoefficient(
             left: BigFraction,
             right: BigFraction,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             multiply: Boolean,
         ): BigFraction {
             cancellation.polynomialSourceCheckpoint()
@@ -171,8 +172,8 @@ internal class PolynomialConditional(
 
 internal class PolynomialSourceInterrupted : RuntimeException("polynomial source lowering interrupted")
 
-internal fun Cancellation.polynomialSourceCheckpoint(units: Long = 0) {
-    if (isCancelled()) throw PolynomialSourceInterrupted()
+internal fun ExecutionControl.polynomialSourceCheckpoint(units: Long = 0) {
+    if (pollStop()) throw PolynomialSourceInterrupted()
     if (units > 0) charge(units)
-    if (isCancelled()) throw PolynomialSourceInterrupted()
+    if (admission?.exhausted == true || pollStop()) throw PolynomialSourceInterrupted()
 }

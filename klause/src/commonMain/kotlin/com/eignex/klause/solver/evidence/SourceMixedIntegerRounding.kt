@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
 
@@ -11,7 +11,7 @@ private fun bounded(value: BigFraction): BigFraction {
 }
 
 internal fun mixedIntegerRounding(
-    row: SourceInequality, bounds: List<SourceInequality>, cancellation: Cancellation,
+    row: SourceInequality, bounds: List<SourceInequality>, cancellation: ExecutionControl,
     onArithmetic: (BigFraction, BigFraction) -> Unit = { _, _ -> },
 ): SourceInequality? {
     val coefficients = row.coefficients

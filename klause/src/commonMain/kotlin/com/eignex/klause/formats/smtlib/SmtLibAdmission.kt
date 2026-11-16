@@ -7,7 +7,7 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.solver.pipeline.SourceAttachment
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.io.CharSource
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -16,7 +16,7 @@ internal fun parseSmtLibSource(
     unboundedIntLo: Long,
     unboundedIntHi: Long,
     settings: ProblemSettings,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     semanticOverrides: SemanticOverrides,
 ): SmtLibProblem? {
     val semantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi, semanticOverrides)
@@ -43,7 +43,7 @@ internal fun lowerSmtReduction(
     unboundedIntLo: Long,
     unboundedIntHi: Long,
     settings: ProblemSettings,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     semantics: EffectiveSourceSemantics,
 ): SmtLibProblem {
     val loweredCommands = reduction.commands
@@ -119,7 +119,7 @@ internal fun lowerSmtReduction(
         encodingRealVarNames = result.realVarNames).withSourceWitnessValidation()
 }
 
-private class AdmissionSource(private val source: CharSource, private val cancellation: Cancellation) : CharSource {
+private class AdmissionSource(private val source: CharSource, private val cancellation: ExecutionControl) : CharSource {
     override fun next(): String? {
         if (cancellation()) throw PolynomialSourceInterrupted()
         return source.next()
@@ -131,7 +131,7 @@ private fun parseLinearAdmission(
     unboundedIntLo: Long,
     unboundedIntHi: Long,
     settings: ProblemSettings,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     semantics: EffectiveSourceSemantics,
     semanticDeclarations: Set<String>,
 ): SmtLibProblem {
@@ -159,7 +159,7 @@ private fun parseLinearAdmission(
 private fun buildLinearAdmission(
     builder: Compiler.Builder,
     commands: List<SExpr>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     semantics: EffectiveSourceSemantics,
     semanticDeclarations: Set<String>,
 ): SmtLibProblem {
@@ -181,7 +181,7 @@ private fun buildLinearAdmission(
 
 private fun <T> withSource(
     openSource: () -> CharSource,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     read: (CharSource) -> T,
 ): T {
     val source = openSource()

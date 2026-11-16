@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntDisjointSet
 
@@ -175,7 +175,7 @@ internal class ComponentLpSolver(
     }
 
     @Suppress("TooGenericExceptionCaught") // Retire every child when adoption fails, including native failures.
-    override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+    override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
         if (activeSolve != null) return false
         val previous = model.exactState ?: return false
         if (closed || !previous.sameMatrix(state) || token() || solvers.any { it !is RetainedLpSolver }) return false
@@ -228,11 +228,11 @@ internal class ComponentLpSolver(
         lastTermination = null
     }
 
-    fun prepareLogicals(token: Cancellation, workLimit: Long): Basis? {
+    fun prepareLogicals(token: ExecutionControl, workLimit: Long): Basis? {
         metrics = LpSolveMetrics()
         lastDegenerateColumns = 0
         lastColumns = 0
-        val stop = token or Cancellation { workLimit > 0L && currentWork >= workLimit }
+        val stop = token or ExecutionControl { workLimit > 0L && currentWork >= workLimit }
         for (solver in solvers) {
             val persistent = solver as? PersistentLpSolver ?: return null
             activeChild = solver
@@ -250,9 +250,9 @@ internal class ComponentLpSolver(
     @Suppress("TooGenericExceptionCaught") // New children are private until the complete local edit can publish.
     fun appendLocalRows(
         state: LpExactState,
-        token: Cancellation,
+        token: ExecutionControl,
         workLimit: Long,
-        engine: (LpModel, Cancellation, Long) -> PersistentLpSolver,
+        engine: (LpModel, ExecutionControl, Long) -> PersistentLpSolver,
     ): Boolean {
         check(!closed && activeSolve == null)
         metrics = LpSolveMetrics()
@@ -273,7 +273,7 @@ internal class ComponentLpSolver(
         var published = false
         var failure: Throwable? = null
         try {
-            val stop = token or Cancellation { workLimit > 0L && currentWork >= workLimit }
+            val stop = token or ExecutionControl { workLimit > 0L && currentWork >= workLimit }
             for (index in parts.indices) {
                 if (!changed[index]) continue
                 if (stop()) return false
@@ -325,7 +325,7 @@ internal class ComponentLpSolver(
 
     private fun localRowPlan(
         state: LpExactState,
-        token: Cancellation,
+        token: ExecutionControl,
         projection: LpProjectionMeter,
     ): Pair<LpModel, List<LpNeighborhood>>? {
         val previous = model.exactState ?: return null
@@ -552,7 +552,7 @@ internal class ComponentLpSolver(
         )
     }
 
-    override fun partialBoundDuals(cancellation: Cancellation): DoubleArray? {
+    override fun partialBoundDuals(cancellation: ExecutionControl): DoubleArray? {
         if (!currentAuthority() || cancellation()) return null
         if (lastTermination != LpFloatTermination.WORK && lastTermination != LpFloatTermination.PIVOTS) return null
         val results = blockResults ?: return null
@@ -569,7 +569,7 @@ internal class ComponentLpSolver(
         return duals.takeUnless { cancellation() }
     }
 
-    override fun partialPrimalGuidance(cancellation: Cancellation): LpPrimalGuidance? {
+    override fun partialPrimalGuidance(cancellation: ExecutionControl): LpPrimalGuidance? {
         val paused = !closed && model.exactState != null && activeSolve?.isAdvancing == false
         if ((!paused && !currentAuthority()) || cancellation()) return null
         val termination = lastTermination
@@ -600,7 +600,7 @@ internal class ComponentLpSolver(
         part: LpNeighborhood,
         result: FloatLpResult,
         guidance: LpPrimalGuidance,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): Boolean {
         if (result.primal.size != part.cols.size) return true
         for (column in result.primal.indices) {
@@ -618,7 +618,7 @@ internal class ComponentLpSolver(
         duals: DoubleArray,
         observer: LpCertificationObserver?,
         policy: LpCertificationPolicy,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         withAlternatives: Boolean,
         sharedMeter: MixedCertificateMeter?,
     ): ComponentLpDeductions? {
@@ -699,7 +699,7 @@ internal class ComponentLpSolver(
     override fun exactWitness(
         observer: LpCertificationObserver?,
         policy: LpCertificationPolicy,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
     ): ExactLpWitness? {
         if (!currentAuthority() || recessionDirection != null || cancellation()) return null
         val results = blockResults ?: return null
@@ -845,14 +845,14 @@ internal class ComponentLpSolver(
  */
 internal fun componentLpSolverOrNull(
     model: LpModel,
-    cancellation: Cancellation,
-    engine: (LpModel, Cancellation) -> LpSolver,
+    cancellation: ExecutionControl,
+    engine: (LpModel, ExecutionControl) -> LpSolver,
 ): ComponentLpSolverCapability? = componentLpSolverOrNull(model, cancellation, engine, ::ComponentLpSolver)
 
 internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     model: LpModel,
-    cancellation: Cancellation,
-    engine: (LpModel, Cancellation) -> LpSolver,
+    cancellation: ExecutionControl,
+    engine: (LpModel, ExecutionControl) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
     projection: LpProjectionMeter? = null,
 ): T? = componentLpSolverOrNull(model, cancellation, projection,
@@ -861,9 +861,9 @@ internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
 @Suppress("TooGenericExceptionCaught") // Construction owns every child it created, including after native failures.
 internal fun <T : ComponentLpSolverCapability> componentLpSolverOrNull(
     model: LpModel,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     projection: LpProjectionMeter?,
-    engine: (LpModel, Cancellation, Int) -> LpSolver,
+    engine: (LpModel, ExecutionControl, Int) -> LpSolver,
     component: (LpModel, List<LpNeighborhood>, List<LpSolver>, IntArray) -> T,
 ): T? {
     val n = model.n
@@ -930,7 +930,7 @@ private fun LpModel.componentRestrictions(
     blockCols: Array<IntArrayList>,
     blockRows: Array<IntArrayList>,
     rowIndex: LpRowIndex,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     projection: LpProjectionMeter?,
 ): List<LpNeighborhood>? {
     val parts = ArrayList<LpNeighborhood>(blockCols.size)

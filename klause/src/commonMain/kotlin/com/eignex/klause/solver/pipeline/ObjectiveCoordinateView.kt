@@ -10,7 +10,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.fitsLong
 
 internal class ObjectiveCoordinateView private constructor(
@@ -25,7 +25,7 @@ internal class ObjectiveCoordinateView private constructor(
             canonical: FinitePipelinePreparation,
             coordinates: FinitePipelinePreparation,
             hints: PreparedSourceHints?,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
         ): ObjectiveCoordinateView? {
             val mapping = canonical.sourceMapping ?: return null
             val privateMapping = coordinates.sourceMapping ?: return null

@@ -9,8 +9,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.SchedulingCancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.workScheduled
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -19,7 +18,7 @@ internal class MonotoneClausePrimal private constructor(
     private val solver: BacktrackSolver,
     private val objective: LinearObjective,
     private val params: BacktrackParams,
-    private val lifetime: Cancellation,
+    private val lifetime: ExecutionControl,
     private val variables: List<Int>,
     private val occurrences: Array<List<Clause>>,
     private val clauses: List<Clause>,
@@ -42,7 +41,7 @@ internal class MonotoneClausePrimal private constructor(
     private var trialSample: Sample? = null
     private var bestValue = Double.POSITIVE_INFINITY
     private var activeStart: TimeSource.Monotonic.ValueTimeMark? = null
-    private val phaseToken = object : SchedulingCancellation {
+    private val phaseToken = object : ExecutionControl() {
         override val workScheduled: Boolean get() = lifetime.workScheduled()
         override fun isCancelled(): Boolean = lifetime() || params.nodeBudget?.allowance?.exhausted() == true ||
             (!lifetime.workScheduled() &&
@@ -110,7 +109,7 @@ internal class MonotoneClausePrimal private constructor(
                 }
                 val nodes = if (sliceNodes < 0L) -1L else (sliceNodes - (work - startWork)).coerceAtLeast(0L)
                 val millis = (sliceMillis - start.elapsedNow().inWholeMilliseconds).coerceAtLeast(0L)
-                val cancellation = params.cancellation or phaseToken or Cancellation.after(millis.milliseconds)
+                val cancellation = params.cancellation or phaseToken or ExecutionControl.after(millis.milliseconds)
                 val outcome = walker.advance(cancellation, nodes) ?: return null
                 walkTrial = false
                 walkIndex++
@@ -258,7 +257,7 @@ internal class MonotoneClausePrimal private constructor(
     private fun finishPolishing(): Sample? {
         val candidate = checkNotNull(polishing)
         val values = candidate.bools
-        val budget = if (lifetime.workScheduled()) lifetime else lifetime or Cancellation.after(100.milliseconds)
+        val budget = if (lifetime.workScheduled()) lifetime else lifetime or ExecutionControl.after(100.milliseconds)
         while (polishingIndex < polishingVariables.size) {
             if (budget()) return null
             val pureVariable = polishingIndex < polishingPureCount
@@ -293,7 +292,7 @@ internal class MonotoneClausePrimal private constructor(
             solver: BacktrackSolver,
             objective: LinearObjective,
             params: BacktrackParams,
-            lifetime: Cancellation,
+            lifetime: ExecutionControl,
             activeBudgetMillis: Long = 5_000L,
         ): MonotoneClausePrimal? {
             val start = TimeSource.Monotonic.markNow()

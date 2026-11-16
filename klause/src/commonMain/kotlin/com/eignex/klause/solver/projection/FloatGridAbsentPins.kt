@@ -12,7 +12,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.lowering.approximateGridValue
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
@@ -46,7 +46,7 @@ internal fun prepareFloatGridAbsentPins(
     source: Problem,
     variables: List<FloatGridVariable>,
     primary: List<FloatGridColumn>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): FloatGridAbsentPins? {
     val columns = ArrayList<FloatGridColumn>(primary.size)
     val factors = ArrayList<Factor>()

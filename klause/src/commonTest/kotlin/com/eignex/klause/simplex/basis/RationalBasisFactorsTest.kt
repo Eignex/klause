@@ -1,7 +1,7 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -165,7 +165,7 @@ class RationalBasisFactorsTest {
         val matrix = matrix(listOf(3, 2, 1), listOf(1, 4, 2), listOf(2, 1, 5))
         for (after in listOf(0, 2)) {
             var polls = 0
-            val result = RationalBasisFactors.factor(matrix, cancellation = Cancellation { polls++ >= after })
+            val result = RationalBasisFactors.factor(matrix, cancellation = ExecutionControl { polls++ >= after })
             assertEquals(RationalBasisDecline.CANCELLED, assertIs<RationalBasisBuild.Declined>(result).reason)
             if (after > 0) assertTrue(result.stats.work > 0)
         }
@@ -175,7 +175,7 @@ class RationalBasisFactorsTest {
             val result = factors.solve(
                 List(3) { BigFraction.ONE },
                 transpose,
-                cancellation = Cancellation { polls++ >= 2 },
+                cancellation = ExecutionControl { polls++ >= 2 },
             )
             assertEquals(RationalBasisDecline.CANCELLED, assertIs<RationalBasisSolve.Declined>(result).reason)
             assertTrue(result.stats.work > 0)

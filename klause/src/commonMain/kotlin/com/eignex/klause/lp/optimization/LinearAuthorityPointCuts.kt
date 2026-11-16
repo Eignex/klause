@@ -6,7 +6,7 @@ import com.eignex.klause.lp.cut.selectNonparallelCuts
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
 import kotlin.math.sqrt
@@ -61,7 +61,7 @@ internal class LinearAuthorityPointCuts(
         counts[key] = (counts[key] ?: 0L) + amount
     }
 
-    private inner class Meter(private val cancellation: Cancellation) {
+    private inner class Meter(private val cancellation: ExecutionControl) {
         private val limit = minOf(65_536L, budget.funding?.availableWork ?: 65_536L)
         var work = 0L
         var allocation = 0L
@@ -95,7 +95,7 @@ internal class LinearAuthorityPointCuts(
         checked: Set<Int>,
         point: List<BigFraction>,
         installed: Set<Int>,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         adoptCurrent: Boolean = false,
     ): Set<Int> {
         adoptedCurrent = false

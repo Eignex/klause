@@ -6,7 +6,7 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -54,7 +54,7 @@ class PolynomialFormulaReductionTest {
         )
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
         var stopped = false
-        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { stopped })
         val preparing = PolynomialFormulaReduction.stages(formula, source.realCount, arithmetic)
         val initial = requireNotNull(preparing.next())
         assertNull(preparing.next())
@@ -321,7 +321,7 @@ class PolynomialFormulaReductionTest {
         )
         val formula = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
         var stopped = false
-        val arithmetic = PolynomialArithmetic(Cancellation { stopped })
+        val arithmetic = PolynomialArithmetic(ExecutionControl { stopped })
         val preparing = PolynomialFormulaReduction.prepare(formula, source.realCount, arithmetic)
         assertNull(preparing.next())
 

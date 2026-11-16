@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.polynomial
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -48,7 +48,7 @@ class PolynomialRemainderTest {
         val divisor = arithmetic.subtract(arithmetic.power(x, 2), Polynomial.ONE)
         var stopped = false
         val pending = preparePolynomialRemainder(polynomial, listOf(divisor),
-            PolynomialArithmetic(Cancellation { stopped }))
+            PolynomialArithmetic(ExecutionControl { stopped }))
         assertNull(pending.next())
 
         stopped = true
@@ -145,7 +145,7 @@ class PolynomialRemainderTest {
         val square = arithmetic.power(x, 2)
         val divisor = arithmetic.subtract(square, Polynomial.ONE)
         var stopped = false
-        val remainders = PolynomialRemainder(listOf(divisor), PolynomialArithmetic(Cancellation { stopped }))
+        val remainders = PolynomialRemainder(listOf(divisor), PolynomialArithmetic(ExecutionControl { stopped }))
         assertEquals(Polynomial.ONE, remainders.prepare(square).asSequence().filterNotNull().single())
 
         stopped = true

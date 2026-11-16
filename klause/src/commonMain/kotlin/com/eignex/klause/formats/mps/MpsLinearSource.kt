@@ -14,7 +14,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /**
  * Capture original MPS numbers and effective declarations before constructing an engine view.
@@ -22,7 +22,7 @@ import com.eignex.klause.util.Cancellation
  */
 fun MpsModel.toLinearSourceProblem(
     semanticOverrides: SemanticOverrides = SemanticOverrides(),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): LinearSourceProblem? {
     if (cancellation()) return null
     return captureLinearSource(semantics.resolve(semanticOverrides), cancellation)
@@ -34,7 +34,7 @@ fun MpsModel.toLinearSourceProblem(
  */
 fun LinearSourceProblem.checkMpsWitness(
     values: List<BigFraction>,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
 ): LinearSourceWitness? {
     require(semantics.declared.format == SourceFormat.MPS) { "MPS witness checking requires an MPS source" }
     return (checkLinearSourceWitness(this, values, cancellation) as? LinearSourceCheck.Accepted)?.witness
@@ -42,7 +42,7 @@ fun LinearSourceProblem.checkMpsWitness(
 
 internal fun MpsModel.captureLinearSource(
     policy: EffectiveSourceSemantics,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): LinearSourceProblem? {
     if (cancellation()) return null
     val numbers = sourceNumbers()

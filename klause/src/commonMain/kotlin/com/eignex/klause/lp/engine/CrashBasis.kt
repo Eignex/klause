@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs
 
 internal enum class CrashBasisDecline {
@@ -34,7 +34,7 @@ internal class CrashBasisAttempt(val basis: Basis?, val metrics: CrashBasisMetri
 @Suppress("CyclomaticComplexMethod", "LongMethod", "ReturnCount")
 internal fun triangularCrashBasis(
     model: LpModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     workLimit: Long = 0L,
 ): CrashBasisAttempt {
     require(workLimit >= 0L)

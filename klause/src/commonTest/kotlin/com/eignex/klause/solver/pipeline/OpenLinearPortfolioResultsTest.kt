@@ -21,7 +21,7 @@ import com.eignex.klause.solver.evidence.sourceProofContext
 import com.eignex.klause.solver.incumbent.EngineInvocation
 import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.test.Test
@@ -148,7 +148,7 @@ class OpenLinearPortfolioResultsTest {
         )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0))
         val request = OpenTheoryRequest(model, objective)
-        val context = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+        val context = assertNotNull(request.linearAuthorityContext(ExecutionControl.Never))
         val identity = ModelIdentity.of(model, objective)
         val binding = EngineInvocation(request.preparedPlan, identity, objective, scope = context.scope)
         val values = OpenSourceObjective(objective, context = context)
@@ -163,16 +163,16 @@ class OpenLinearPortfolioResultsTest {
         )
         val worker = PortfolioWorker.ofMinimize("linear", 0) { _, _, _, _ -> error("retained only") }
             .bindSource(SourceWorkerBinding(binding))
-        val results = OpenLinearPortfolioResults(binding, context, values, incumbents, Cancellation.Never)
+        val results = OpenLinearPortfolioResults(binding, context, values, incumbents, ExecutionControl.Never)
         results.retain(worker, AtomicReference<LinearPortfolioSearch?>(search))
 
-        val scalar = search.use { assertNotNull(it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }) }
+        val scalar = search.use { assertNotNull(it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> }) }
         assertNotNull(results.check(worker, search)).accepted()
         val folded = assertIs<OpenTheoryOptimum.Unbounded>(results.fold(scalar))
 
         val ray = assertIs<SourceClaim.Ray>(assertNotNull(folded.linearResult?.terminal).claim)
         assertTrue(ray.sample.exactReals?.single() != standing.exactReals?.single())
-        assertEquals(context.linearValue(ray.sample, Cancellation.Never), folded.value)
+        assertEquals(context.linearValue(ray.sample, ExecutionControl.Never), folded.value)
         assertEquals(ray.sample.exactReals?.single().toString(), folded.witness.realValue(0))
         assertSame(standing, folded.linearResult.incumbent)
         assertEquals(BigFraction.ofLong(-2), folded.linearResult.value)

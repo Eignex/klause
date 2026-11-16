@@ -2,7 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -164,7 +164,7 @@ class RefinementLifecycleTest {
                 private var current = assertNotNull(model.exactState)
                 override val lastPivots = 1
                 override val lastMetrics = LpSolveMetrics(workOps = 1L, pivots = 1)
-                override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
                     current = state
                     return delegate.adopt(state, token)
                 }
@@ -225,7 +225,7 @@ class RefinementLifecycleTest {
         val failure = IllegalStateException("adoption failed")
         val factory = persistentDecorator { delegate, _ ->
             object : PersistentLpSolver by delegate {
-                override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+                override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
                     if (fail) throw failure
                     return delegate.adopt(state, token)
                 }
@@ -333,7 +333,7 @@ class RefinementLifecycleTest {
         object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
                 model: LpModel,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
                 refactorUpdateLimit: Int,
                 iterationLimit: Int,
                 workLimit: Long,

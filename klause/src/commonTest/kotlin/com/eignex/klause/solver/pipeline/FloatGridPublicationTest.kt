@@ -18,7 +18,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.klause.solver.result.SolveStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -41,7 +41,7 @@ class FloatGridPublicationTest {
             listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
             declaredGridSemantics = true)).invocation
         val binding = assertNotNull(invocation.floatGrid)
-        val publication = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks({}, {}))
+        val publication = FloatGridPublication(binding, ExecutionControl.Never, null, FiniteSolveCallbacks({}, {}))
         publication.onSample(Sample(booleanArrayOf(), longArrayOf(1)))
 
         val result = publication.result(FinitePipelinePreparation(binding.projection.problem, null, { it }, null),
@@ -65,7 +65,7 @@ class FloatGridPublicationTest {
             listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
             declaredGridSemantics = true)).invocation
         val binding = assertNotNull(invocation.floatGrid)
-        val publication = FloatGridPublication(binding, Cancellation.Never, { it.approximateRealValue(0) <= 0.5 },
+        val publication = FloatGridPublication(binding, ExecutionControl.Never, { it.approximateRealValue(0) <= 0.5 },
             FiniteSolveCallbacks({}, {}))
         publication.onSample(Sample(booleanArrayOf(), longArrayOf(0)))
 
@@ -91,7 +91,8 @@ class FloatGridPublicationTest {
             List(3) { FloatGridVariable(SourceRealId(it)) }, FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val points = ArrayList<Sample>()
-        val publication = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks(points::add, {}))
+        val publication = FloatGridPublication(binding, ExecutionControl.Never, null,
+            FiniteSolveCallbacks(points::add, {}))
 
         publication.onSample(Sample(booleanArrayOf(), longArrayOf(0, 0, 1)))
         publication.onSample(Sample(booleanArrayOf(), longArrayOf(0, 0, 0)))
@@ -113,7 +114,7 @@ class FloatGridPublicationTest {
             SourceSetup.prepareSelectedFloatGrid(selection,
             listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
-        val publications = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks({}, {}))
+        val publications = FloatGridPublication(binding, ExecutionControl.Never, null, FiniteSolveCallbacks({}, {}))
         val preparation = FinitePipelinePreparation(binding.projection.problem, null, { it }, null)
         val firstNative = FiniteSolveOutcome.Completed(FiniteSolveVerdict.BEST_FOUND, SolveStats.EMPTY, 1,
             Sample(booleanArrayOf(), longArrayOf(0)), 0)
@@ -144,7 +145,7 @@ class FloatGridPublicationTest {
         val binding = assertNotNull(invocation.floatGrid)
         var stopped = false
         val points = ArrayList<Sample>()
-        val publications = FloatGridPublication(binding, Cancellation { stopped }, { stopped = true; true },
+        val publications = FloatGridPublication(binding, ExecutionControl { stopped }, { stopped = true; true },
             FiniteSolveCallbacks(points::add, {}))
         val native = FiniteSolveOutcome.Completed(FiniteSolveVerdict.SAT, SolveStats.EMPTY, 1,
             Sample(booleanArrayOf(), longArrayOf(1)), 0)
@@ -171,7 +172,7 @@ class FloatGridPublicationTest {
         val publications = ArrayList<Sample>()
 
         val execution = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
-            FiniteSolveRequest(shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+            FiniteSolveRequest(shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                 randomSeed = 0, defaultArms = 1, lpConfig = LpConfig.OFF,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
@@ -202,7 +203,8 @@ class FloatGridPublicationTest {
         val native = FiniteSolveOutcome.Completed(FiniteSolveVerdict.SAT, SolveStats.EMPTY, 1,
             Sample(booleanArrayOf(), longArrayOf(1, 0)), 0)
         val points = ArrayList<Sample>()
-        val publication = FloatGridPublication(binding, Cancellation.Never, null, FiniteSolveCallbacks(points::add, {}))
+        val publication = FloatGridPublication(binding, ExecutionControl.Never, null,
+            FiniteSolveCallbacks(points::add, {}))
 
         val result = publication.result(FinitePipelinePreparation(binding.projection.problem, null, { it }, null),
             Duration.ZERO, native)
@@ -227,7 +229,7 @@ class FloatGridPublicationTest {
         val points = ArrayList<Sample>()
 
         val execution = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
-            FiniteSolveRequest(shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, Cancellation.Never,
+            FiniteSolveRequest(shape, FiniteEngine.FIXED, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
                 randomSeed = 0, defaultArms = 1, lpConfig = LpConfig.OFF,
                 zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,

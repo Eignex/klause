@@ -6,8 +6,11 @@ import com.eignex.klause.solver.objective.BooleanObjectiveDelta
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.Objective
-import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ExactIntegerSum
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.StopPolling
+import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.pollStop
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
@@ -56,43 +59,64 @@ internal class LocalSearchProbe(
         problem.factors.any { it is Element && it.arrIsVars }
     }
 
-    private var scoringCancellation: Cancellation = Cancellation.Never
+    private var scoringCancellation: ExecutionControl = ExecutionControl.Never
     private var scoringCountdown = 0
+    private var scoringPolling: StopPolling? = null
+    private var scoringWork: WorkMeter? = null
 
-    fun scoringPick(cancellation: Cancellation, pick: () -> Move?): Move? {
+    fun scoringPick(cancellation: ExecutionControl, pick: () -> Move?): Move? {
         scoringCancellation = cancellation
+        scoringPolling = cancellation.stopPolling
+        scoringWork = state.inspectionWork
         scoringCountdown = 0
         return try {
             val timer = state.phaseTimer
-            if (timer == null) pick() else timer.measureScoringPick(pick)
+            if (cancellation.pollStop()) return null
+            val selected = if (timer == null) pick() else timer.measureScoringPick(pick)
+            if (cancellation.pollStop()) null else selected
         } catch (_: LocalSearchScoringInterrupted) {
             null
         } finally {
-            scoringCancellation = Cancellation.Never
+            scoringCancellation = ExecutionControl.Never
+            scoringPolling = null
+            scoringWork = null
         }
     }
 
     fun checkScoringWork() {
-        if (scoringCancellation === Cancellation.Never) return
-        state.inspectionWork?.charge(1L)
-        if (scoringCountdown-- > 0) return
+        scoringWork?.charge(1L)
+        if (scoringCancellation === ExecutionControl.Never) return
+        val polling = scoringPolling
+        if (polling != null) {
+            if (!polling.due(1)) return
+        } else if (scoringCountdown-- > 0) {
+            return
+        }
         scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
         if (scoringCancellation()) throw LocalSearchScoringInterrupted
     }
 
     fun checkWork() {
-        if (cancellable && scoringCancellation !== Cancellation.Never) {
-            state.inspectionWork?.charge(1L)
+        if (cancellable) {
+            scoringWork?.charge(1L)
+            if (scoringCancellation === ExecutionControl.Never) return
+            if (scoringPolling?.due(1) == false) return
             if (scoringCancellation()) throw LocalSearchScoringInterrupted
         }
     }
 
     private fun checkObjectiveProbeWork() {
-        val active = cancellable && scoringCancellation !== Cancellation.Never
-        if (active) state.inspectionWork?.charge(1L)
-        if (scoringCountdown-- > 0) return
+        if (!cancellable) return
+        scoringWork?.charge(1L)
+        if (scoringCancellation === ExecutionControl.Never) return
+        val polling = scoringPolling
+        if (polling != null) {
+            if (!polling.due(1)) return
+        } else if (scoringCountdown-- > 0) {
+            return
+        }
         scoringCountdown = LOCAL_SEARCH_OPERATION_BATCH - 1
-        if (active && scoringCancellation()) throw LocalSearchScoringInterrupted
+        if (scoringCancellation()) throw LocalSearchScoringInterrupted
     }
 
     // Pre-probe value of a functional objective the network does not maintain, valid while the assignment is

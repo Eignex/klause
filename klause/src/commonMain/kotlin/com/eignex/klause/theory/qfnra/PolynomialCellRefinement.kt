@@ -10,8 +10,9 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.serialArithmeticSource
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal sealed interface PolynomialCellScope {
@@ -171,7 +172,9 @@ internal class PolynomialCellRefinement(
     private var repeatedCount = 0L
     private var repairCount = 0L
     private var declineCount = 0L
-    private var spentWork = 0L
+    private var completedWork = 0L
+    private var pendingWork: () -> Long = { 0L }
+    private val spentWork get() = completedWork + pendingWork()
     val stats: PolynomialCellStats get() = PolynomialCellStats(
         candidateCount, cellCount, repeatedCount, repairCount, declineCount, spentWork,
     )
@@ -179,18 +182,25 @@ internal class PolynomialCellRefinement(
     val cells: List<CheckedPolynomialCell> get() = retained.toList()
     private var parentStopped = false
     private val meter = WorkMeter {
-        spentWork += it
+        completedWork += it
         parent.charge(it)
     }
-    private val token = object : Cancellation {
+    private val token = object : ExecutionControl() {
         override fun isCancelled(): Boolean {
             if (parent()) parentStopped = true
             return parentStopped || spentWork >= MAX_CELL_WORK
         }
         override fun deadline() = parent.deadline()
-        override fun workMeter(): WorkMeter = meter
+        override val accounting: WorkMeter get() = meter
+        override val admission get() = serialArithmeticSource(
+            parent,
+            { MAX_CELL_WORK - spentWork },
+            { completedWork += it },
+        )
     }
-    private val arithmetic = PolynomialArithmetic(token, limits)
+    private val arithmetic = PolynomialArithmetic(token, limits).also {
+        pendingWork = { it.execution.admittedWork }
+    }
     private val algebraic = AlgebraicArithmetic(arithmetic)
     private var sourceScope: PolynomialCellScope.Source? = null
     private var sourceAtoms: List<PolynomialAtom> = emptyList()
@@ -306,7 +316,8 @@ internal class PolynomialCellRefinement(
                 arithmetic.step()
                 retained.add(cell)
                 cellCount++
-                onCell(cell)
+                arithmetic.execution.handoff {
+                onCell(cell) }
                 feedback?.admit(cell, arithmetic)
             }
             value = next(variable, scope) ?: return null
@@ -353,8 +364,10 @@ internal class PolynomialCellRefinement(
     private fun <T> optional(block: () -> T): T? {
         if (spentWork >= MAX_CELL_WORK) return null
         return try {
-            arithmetic.step()
+            arithmetic.execution.operation {
+                arithmetic.step()
             block()
+        }
         } catch (stop: PolynomialInterrupted) {
             if (parentStopped) throw stop
             declineCount++

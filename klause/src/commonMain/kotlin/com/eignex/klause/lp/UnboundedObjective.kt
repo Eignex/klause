@@ -11,7 +11,7 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SourceLpWorkStats
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.magnitudeBitLength
 
@@ -37,7 +37,7 @@ internal fun Problem.objectiveUnboundedBelow(
     terms: IntArray,
     coefficients: LongArray,
     witness: ExactWitness,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     onWork: (SourceLpWorkStats) -> Unit,
 ): Boolean? {
     val budget = SourceLpBudget(onWork = onWork)
@@ -69,7 +69,7 @@ internal fun Problem.objectiveUnboundedBelow(
     }
 }
 
-private fun Problem.admitsDirectionPreparation(token: Cancellation): Boolean {
+private fun Problem.admitsDirectionPreparation(token: ExecutionControl): Boolean {
     if (numBoolVars > 512 || factors.size > 128) return false
     var terms = 0L
     var rows = 0L
@@ -158,7 +158,7 @@ private fun Problem.descentSidesClosed(terms: IntArray, coefficients: LongArray)
  * itself — which is also why a declared value set needs no reading here: a column declaring one is closed
  * on both sides, and no direction of the cone moves it.
  */
-private fun Problem.branchRowsAt(witness: ExactWitness, token: Cancellation): List<ExactRationalInequality>? {
+private fun Problem.branchRowsAt(witness: ExactWitness, token: ExecutionControl): List<ExactRationalInequality>? {
     val rows = ArrayList<ExactRationalInequality>()
     for (integer in 0 until numIntVars) {
         val column = numRealVars + integer

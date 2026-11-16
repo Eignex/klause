@@ -7,7 +7,9 @@ import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.conditionedLinearSupported
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -23,7 +25,7 @@ internal class SelectedEncoderRequest private constructor(
     val encoders: List<Encoder>,
     val fixedIntegers: Map<SourceIntId, BigInt>,
     val fixedBooleans: Map<SourceBoolId, Boolean>,
-    val cancellation: Cancellation,
+    val cancellation: ExecutionControl,
     val completeFiniteConditions: Boolean,
 ) {
     companion object {
@@ -34,19 +36,22 @@ internal class SelectedEncoderRequest private constructor(
             indices: List<Int>,
             fixedIntegers: Map<SourceIntId, BigInt>,
             fixedBooleans: Map<SourceBoolId, Boolean>,
-            cancellation: Cancellation,
+            cancellation: ExecutionControl,
             completeFiniteConditions: Boolean,
             onDecline: (EncoderDecline) -> Unit,
         ): SelectedEncoderRequest? {
             val stop = cancellation.encodingPreparationScope()
+            val polling = stop.bindStopControl()
+            val accounting = stop.accounting
+            val admission = stop.admission
             fun decline(reason: EncoderDecline): SelectedEncoderRequest? {
                 onDecline(reason)
                 return null
             }
             fun stopped(): Boolean {
-                if (stop()) return true
-                stop.charge(1)
-                return stop()
+                if (polling.pollStop()) return true
+                accounting?.charge(1)
+                return admission?.exhausted == true || polling.pollStop()
             }
             if (stop()) return decline(EncoderDecline.RESOURCE)
             val source = selection.problem
@@ -117,11 +122,12 @@ private fun PreparedFactorProjections.acceptsIntegerCondition(id: SourceIntId, v
     return value.fitsLong() && value.toLongExact() in domain
 }
 
-internal fun Cancellation.encodingPreparationScope(): Cancellation =
+internal fun ExecutionControl.encodingPreparationScope(): ExecutionControl =
     if (this is EncodingPreparationCancellation) this else EncodingPreparationCancellation(this)
 
 @OptIn(ExperimentalAtomicApi::class)
-private class EncodingPreparationCancellation(private val parent: Cancellation) : Cancellation {
+private class EncodingPreparationCancellation(private val parent: ExecutionControl) : ExecutionControl(parent) {
+    override val containingStop get() = parent
     private val stopped = AtomicBoolean(false)
 
     override fun isCancelled(): Boolean {
@@ -131,5 +137,6 @@ private class EncodingPreparationCancellation(private val parent: Cancellation) 
     }
 
     override fun deadline() = parent.deadline()
-    override fun workMeter() = parent.workMeter()
+    override val accounting get() = parent.accounting
+    override val admission get() = admissionFrom(parent)
 }

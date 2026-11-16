@@ -9,7 +9,7 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntIntMap
@@ -17,7 +17,7 @@ import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.rem
 
-internal class ParityInputRevision(problem: Problem, private val cancellation: Cancellation) {
+internal class ParityInputRevision(problem: Problem, private val cancellation: ExecutionControl) {
     private val boolColumns = MutableIntIntMap()
     private val intColumns = MutableIntIntMap()
     private val units = MutableIntIntMap()

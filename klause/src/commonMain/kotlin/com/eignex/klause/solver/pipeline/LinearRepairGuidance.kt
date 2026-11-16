@@ -3,7 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal class LinearRepairGuidance : AutoCloseable {
     class Hint internal constructor(
@@ -18,7 +18,7 @@ internal class LinearRepairGuidance : AutoCloseable {
     private var closed = false
 
     fun remember(source: SourceProofContext, point: Map<SourceCoordinate, Double>,
-        budget: SourceLpBudget, token: Cancellation): Boolean {
+        budget: SourceLpBudget, token: ExecutionControl): Boolean {
         if (closed || hint != null || point.isEmpty() || point.size > MAX_COLUMNS ||
             source.coordinateCount > MAX_COLUMNS || token()) return false
         val funding = budget.funding ?: return false

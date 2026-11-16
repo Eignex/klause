@@ -3,7 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -26,7 +26,8 @@ class SmtSourceModelTest {
 
     @Test
     fun `composite source binding should survive reduction solving and original checks`() {
-        val original = captureSmtSource(SExprReader("(declare-const word (_ BitVec 2))").readAll(), Cancellation.Never)
+        val original = captureSmtSource(SExprReader("(declare-const word (_ BitVec 2))").readAll(),
+            ExecutionControl.Never)
         val encoded = SExprReader("(declare-const low Bool) (declare-const high Bool) " +
             "(assert (not low)) (assert high)").readAll()
         val declaration = original.declarations.single()
@@ -38,7 +39,7 @@ class SmtSourceModelTest {
                 values.value("word") == SmtValue.BitVector("10")
             }))
         val source = lowerSmtReduction(reduction, Long.MIN_VALUE, Long.MAX_VALUE, ProblemSettings(),
-            Cancellation.Never, smtLibSemantics.resolve())
+            ExecutionControl.Never, smtLibSemantics.resolve())
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve()).assignment
 
         val model = source.reconstructModel(assignment::boolValue, assignment::intValue, assignment::realValue)
@@ -60,10 +61,10 @@ class SmtSourceModelTest {
 
     @Test
     fun `source endpoint overrides should not constrain generated declarations`() {
-        val original = captureSmtSource(SExprReader("(declare-const x Int)").readAll(), Cancellation.Never)
+        val original = captureSmtSource(SExprReader("(declare-const x Int)").readAll(), ExecutionControl.Never)
         val reduction = original.copy(commands = SExprReader("(declare-const x Int) " +
             "(declare-const private Int) (assert (= x 1)) (assert (= private 100))").readAll())
-        val source = lowerSmtReduction(reduction, 0, 2, ProblemSettings(), Cancellation.Never,
+        val source = lowerSmtReduction(reduction, 0, 2, ProblemSettings(), ExecutionControl.Never,
             resolveSmtLibSemantics(0, 2))
 
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve()).assignment
@@ -92,7 +93,7 @@ class SmtSourceModelTest {
         val source = SmtLib.parse("(declare-const flag Bool)")
 
         assertFailsWith<CancellationException> {
-            source.reconstructModel({ true }, { "0" }, { "0.0" }, Cancellation { true })
+            source.reconstructModel({ true }, { "0" }, { "0.0" }, ExecutionControl { true })
         }
     }
 }

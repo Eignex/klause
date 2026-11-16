@@ -566,6 +566,8 @@ discovery and stops posting chains when it fires.
 
 [PresolveBudget](../klause/src/commonMain/kotlin/com/eignex/klause/presolve/PresolveBudget.kt)
 owns one deterministic phase allowance across routing, passes, probes and rebuilds.
+Scans enforce quota independently of cancellation polling and share their containing
+worker's checkpoint countdown; accounting does not change that cadence.
 The CLI also bounds optional work by an elapsed ceiling; `presolve-work-limit=unlimited`
 removes only the work cap. Host speed can therefore affect which reductions finish.
 [Resource configuration](06-sessions.md#configuration-and-lifetime) owns these controls.
@@ -627,9 +629,10 @@ retains completed sound reductions and discards unfinished analysis. The followi
 families describe the premises and preservation guarantees of those reductions.
 Both lanes poll after entry charging and meter factor, column, term, signature
 and rewrite visits. Bound fusion, duplicate-column and subsumption scans accumulate
-those charges and flush them and poll the pass token every 64 visits or 4,096 units,
-and immediately at entry and before publishing, so a stop overruns by at most one
-stride. Duplicate-column aggregation, bound fusion and source duplicate/domination
+those charges and poll at bounded checkpoints. Native allowance-backed scans reserve
+credit before advancing and settle used credit at publication and exit. Standalone
+scans poll immediately at entry and before publishing.
+Duplicate-column aggregation, bound fusion and source duplicate/domination
 indexing discard unfinished transactions. Structural reduction
 retains only fully collected factor rewrites and their bound tightenings; factor
 hooks and structural-key construction remain atomic.

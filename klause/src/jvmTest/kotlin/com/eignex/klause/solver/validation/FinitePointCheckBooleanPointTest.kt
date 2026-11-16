@@ -6,7 +6,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test
@@ -23,7 +23,7 @@ class FinitePointCheckBooleanPointTest(private val point: String, private val fe
         )).bake()
         val candidate = Candidate(Sample(BooleanArray(3) { point[it] == '1' }, longArrayOf()), Unit)
 
-        val result = FinitePointCheck(model).check(candidate, Cancellation.Never)
+        val result = FinitePointCheck(model).check(candidate, ExecutionControl.Never)
 
         if (feasible) assertIs<Verification.Accepted<*, *>>(result)
         else assertIs<Verification.Rejected>(result)

@@ -9,7 +9,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.*
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -49,7 +49,7 @@ class ProblemBakingTest {
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 0),
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.GE, 0),
             )
-        val cancelled = Problem(0, 2, arrayOf(wide(), wide()), factors).bake(Cancellation { true })
+        val cancelled = Problem(0, 2, arrayOf(wide(), wide()), factors).bake(ExecutionControl { true })
         assertIs<PropagationResult.Implied>(cancelled.baked)
         for (v in 0..1) {
             assertEquals(-1_000_000, cancelled.rootIntDomain(v).min, "var $v")

@@ -14,9 +14,7 @@ import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.search.VarRef
-import com.eignex.klause.util.Cancellation
-import com.sun.management.OperatingSystemMXBean as SunOperatingSystemMXBean
-import com.sun.management.ThreadMXBean as SunThreadMXBean
+import com.eignex.klause.util.ExecutionControl
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -31,6 +29,8 @@ import java.util.Locale
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.milliseconds
+import com.sun.management.OperatingSystemMXBean as SunOperatingSystemMXBean
+import com.sun.management.ThreadMXBean as SunThreadMXBean
 
 /** The trajectory or charged-work quantity a fixed-work limit counts. */
 @Serializable
@@ -122,7 +122,7 @@ object FixedWorkSatMeasurement {
         index: Int,
         measured: Boolean,
         traceFile: File?,
-        deadline: Cancellation = Cancellation.after(request.deadlineMillis.milliseconds),
+        deadline: ExecutionControl = ExecutionControl.after(request.deadlineMillis.milliseconds),
     ): JsonObject {
         val writer = traceFile?.bufferedWriter()
         val trajectory = Trajectory(request.unit, request.limit, if (writer == null) 0 else request.traceRows, writer)
@@ -146,7 +146,7 @@ object FixedWorkSatMeasurement {
             if (model != null && !deadline()) {
                 val base = BacktrackCatalog.byLabel(request.recipe).build(request.seed, null)
                 val stop = if (request.unit == FixedWorkUnit.WORK) deadline else {
-                    deadline or Cancellation { trajectory.limitReached }
+                    deadline or ExecutionControl { trajectory.limitReached }
                 }
                 val params = base.copy(
                     nativeSat = true,
@@ -337,7 +337,7 @@ object FixedWorkSatMeasurement {
                 it.isThreadAllocatedMemoryEnabled }?.currentThreadAllocatedBytes?.takeIf { it >= 0L }
 
             fun collections(): Pair<Long, Long> = ManagementFactory.getGarbageCollectorMXBeans().fold(0L to 0L) {
-                    (count, millis), bean -> (count + bean.collectionCount.coerceAtLeast(0L)) to
+                    (count, millis), bean, -> (count + bean.collectionCount.coerceAtLeast(0L)) to
                     (millis + bean.collectionTime.coerceAtLeast(0L))
             }
 

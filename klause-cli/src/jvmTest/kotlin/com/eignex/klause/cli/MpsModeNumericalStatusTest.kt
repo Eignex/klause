@@ -1,10 +1,10 @@
 package com.eignex.klause.cli
 
+import org.junit.runner.RunWith
+import org.junit.runners.Parameterized
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
-import org.junit.runner.RunWith
-import org.junit.runners.Parameterized
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

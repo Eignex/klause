@@ -6,7 +6,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -53,7 +53,7 @@ internal class LpPreparationCache private constructor(
     fun prepare(
         selection: PreparedFactorProjections,
         objective: LinearObjective?,
-        token: Cancellation,
+        token: ExecutionControl,
         reuseIndexes: Boolean,
         reuseMetadata: Boolean,
         earned: Boolean,
@@ -95,7 +95,7 @@ internal class LpPreparationCache private constructor(
     fun recordConstruction(
         selection: PreparedFactorProjections,
         completedUnits: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         onWork: (Long) -> Unit,
     ): Boolean {
         val problem = selection.problem
@@ -128,7 +128,7 @@ internal class LpPreparationCache private constructor(
 /** Prepares or revalidates this view's LP source templates in its inherited preparation cache. */
 internal fun PreparedFactorProjections.prepareLpTemplates(
     objective: LinearObjective?,
-    token: Cancellation,
+    token: ExecutionControl,
     reuseIndexes: Boolean = true,
     reuseMetadata: Boolean = false,
     earned: Boolean = false,
@@ -140,7 +140,7 @@ internal fun PreparedFactorProjections.prepareLpTemplates(
 /** Funds later earned preparation with completed construction work on this view. */
 internal fun PreparedFactorProjections.recordLpConstruction(
     completedUnits: Long,
-    token: Cancellation,
+    token: ExecutionControl,
     onWork: (Long) -> Unit,
 ): Boolean = lpPreparation.recordConstruction(this, completedUnits, token, onWork)
 

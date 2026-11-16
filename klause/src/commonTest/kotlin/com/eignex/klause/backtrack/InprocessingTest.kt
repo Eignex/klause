@@ -15,7 +15,7 @@ import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -274,7 +274,7 @@ class InprocessingTest {
         val params = BacktrackParams()
         assertTrue(loop.onRestart(session, params))
 
-        val result = loop.refreshRoot(cp, context, params.copy(cancellation = Cancellation { true }))
+        val result = loop.refreshRoot(cp, context, params.copy(cancellation = ExecutionControl { true }))
 
         assertNull(result)
         assertEquals(0, pass.publications)
@@ -445,7 +445,7 @@ class InprocessingTest {
             repeat(2) { session.addLearnedClause(Clause(intArrayOf(4, 5)), 4) }
             val loop = Inprocessing(listOf(Subsumption(), RootProbingPass()), cadence = 1)
             val params = BacktrackParams(rootProbeBatch = 2, inprocessingSubsumeWork = 1L,
-                cancellation = Cancellation { session.learnedClauseCount > 2 })
+                cancellation = ExecutionControl { session.learnedClauseCount > 2 })
             assertNull(session.boolValue(0))
             assertNull(session.boolValue(1))
             assertNull(session.boolValue(2))

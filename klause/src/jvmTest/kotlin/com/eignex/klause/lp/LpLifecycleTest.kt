@@ -42,7 +42,7 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -97,7 +97,7 @@ private class LifecycleFactory : LpEngineFactory {
 
     override fun newGeneralSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         pricing: LpPricingOptions,
     ): LpSolver {
@@ -131,7 +131,7 @@ private class LifecycleFactory : LpEngineFactory {
             override fun exactWitness(
                 observer: LpCertificationObserver?,
                 policy: LpCertificationPolicy,
-                cancellation: Cancellation,
+                cancellation: ExecutionControl,
             ): ExactLpWitness? = delegate.exactWitness(observer, policy, cancellation)
 
             override fun close() = record.close(delegate::close, fails(record))
@@ -147,7 +147,7 @@ private class LifecycleFactory : LpEngineFactory {
         val delegate = ProductionLpEngineFactory.newRetainedComponentSolver(model, parts, solvers, isolated)
         val record = record(LifecycleKind.COMPONENT)
         return object : RetainedComponentLpSolverCapability by delegate {
-            override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+            override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
                 record.use()
                 return delegate.adopt(state, token)
             }
@@ -161,7 +161,7 @@ private class LifecycleFactory : LpEngineFactory {
 
     override fun newTableauSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         iterationLimit: Int,
         workLimit: Long,
         trackDegeneracy: Boolean,
@@ -193,7 +193,7 @@ private class LifecycleFactory : LpEngineFactory {
 
     override fun newPersistentSolver(
         model: LpModel,
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         refactorUpdateLimit: Int,
         iterationLimit: Int,
         workLimit: Long,
@@ -213,7 +213,7 @@ private class LifecycleFactory : LpEngineFactory {
         )
         val record = record(LifecycleKind.PERSISTENT)
         return object : PersistentLpSolver by delegate {
-            override fun prepareLogicals(token: Cancellation): Basis? {
+            override fun prepareLogicals(token: ExecutionControl): Basis? {
                 record.use()
                 return try {
                     delegate.prepareLogicals(token)
@@ -222,7 +222,7 @@ private class LifecycleFactory : LpEngineFactory {
                 }
             }
 
-            override fun adopt(state: LpExactState, token: Cancellation): Boolean {
+            override fun adopt(state: LpExactState, token: ExecutionControl): Boolean {
                 record.use()
                 return delegate.adopt(state, token)
             }
@@ -282,7 +282,7 @@ class LpLifecycleTest {
             params().copy(lpConfig = null),
         )
 
-        assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 1L) {})
+        assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceNodes = 1L) {})
         val beforeResume = factory.persistent.single()
         assertFalse(beforeResume.closed)
         val operations = beforeResume.operations
@@ -290,7 +290,7 @@ class LpLifecycleTest {
         // A slice can repay an earlier overrun without exploring.
         repeat(RESUME_ATTEMPTS) {
             if (beforeResume.operations == operations) {
-                assertNull(search.runSlice(Cancellation.Never, Long.MAX_VALUE, sliceNodes = 1L) {})
+                assertNull(search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, sliceNodes = 1L) {})
             }
         }
 
@@ -319,7 +319,7 @@ class LpLifecycleTest {
             Assumptions.None,
             decisionBudget = 2L,
             cutoff = Double.POSITIVE_INFINITY,
-            cancellation = Cancellation.Never,
+            cancellation = ExecutionControl.Never,
         )
 
         val failure = assertFailsWith<IllegalStateException> {
@@ -327,7 +327,7 @@ class LpLifecycleTest {
                 Assumptions.None,
                 decisionBudget = 2L,
                 cutoff = Double.POSITIVE_INFINITY,
-                cancellation = Cancellation.Never,
+                cancellation = ExecutionControl.Never,
             )
         }
 
@@ -345,7 +345,7 @@ class LpLifecycleTest {
         )
 
         val failure = assertFailsWith<IllegalStateException> {
-            search.runSlice(Cancellation.Never, 60_000) { error("callback failure") }
+            search.runSlice(ExecutionControl.Never, 60_000) { error("callback failure") }
         }
 
         assertEquals("callback failure", failure.message)
@@ -385,7 +385,7 @@ class LpLifecycleTest {
         val model = LpBuilder().apply { addVar(0L, 1L) }.build(Sense.MINIMIZE)
         engine.nodeSimplex = factory.newPersistentSolver(
             model,
-            Cancellation.Never,
+            ExecutionControl.Never,
             50,
             0,
             0L,

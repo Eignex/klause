@@ -83,7 +83,7 @@ class SolverInvocationTest {
 
             val staging = SourceStaging.parse(target)
             val result = SolverInvocation.withSourceInput(packed, Budget(10_000), staging = staging) {
-                    plain, remaining ->
+                    plain, remaining, ->
                 staged = plain
                 assertEquals(body, plain.readText())
                 assertEquals(staging.directory.canonicalFile, plain.parentFile.parentFile.canonicalFile)
@@ -112,7 +112,7 @@ class SolverInvocationTest {
             var ticks = 0L
 
             val result = SolverInvocation.withSourceInput(packed, Budget(5), nanoTime = { ticks++ * 1_000_000 }) {
-                    _, _ -> error("deadline exhausted")
+                    _, _, -> error("deadline exhausted")
             }
 
             assertNull(result.feasible)

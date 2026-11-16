@@ -6,7 +6,7 @@ import com.eignex.klause.factor.bool.Xor
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.emptyIntArray
 
 internal class PrivateRebuildAffine(
@@ -51,7 +51,7 @@ internal class PrivateRebuildAffine(
         return Sample(point, longArrayOf())
     }
 
-    fun preferredFreeCoordinates(cancellation: Cancellation): IntArray? {
+    fun preferredFreeCoordinates(cancellation: ExecutionControl): IntArray? {
         if (coordinates.size * 2L > PROPAGATION_WORK_PER_NODE) return emptyIntArray()
         cancellation.charge(coordinates.size * 2L + freeColumns + 8L)
         if (cancellation()) return null
@@ -72,7 +72,7 @@ internal class PrivateRebuildAffine(
     }
 
     fun planRows(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         triangular: PrivateRebuildParityRows?,
         onDecline: (String) -> Unit,
     ): RowPlan? {
@@ -105,7 +105,7 @@ internal class PrivateRebuildAffine(
         AffineXorSeed.initializationWork(coordinates.size, freeColumns) > Int.MAX_VALUE
     ) 0L else AffineXorSeed.modeledBytes(coordinates.size, rank, freeColumns)
 
-    fun jointRows(cancellation: Cancellation, rows: Array<Factor>): GaussianXor? {
+    fun jointRows(cancellation: ExecutionControl, rows: Array<Factor>): GaussianXor? {
         cancellation.charge(coordinates.size * 8L + rank * (words * 2L + 10L) + 32L)
         if (cancellation()) return null
         val used = BooleanArray(coordinates.size)
@@ -127,7 +127,7 @@ internal class PrivateRebuildAffine(
     }
 
     fun materializeRows(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         plan: RowPlan,
         triangular: PrivateRebuildParityRows?,
     ): Array<Factor>? {

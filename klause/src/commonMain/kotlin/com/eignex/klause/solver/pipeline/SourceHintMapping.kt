@@ -10,7 +10,7 @@ import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.retainedCoordinates
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.numbers.CheckedLongOverflowException
@@ -18,7 +18,7 @@ import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.subExact
 
-internal fun PreparedSourcePlan.sourceCoordinates(cancellation: Cancellation): VarRemap? {
+internal fun PreparedSourcePlan.sourceCoordinates(cancellation: ExecutionControl): VarRemap? {
     if (cancellation()) return null
     for (id in 0 until sourceRealCount) {
         cancellation.charge(1)
@@ -43,7 +43,7 @@ internal fun PreparedSourcePlan.sourceCoordinates(cancellation: Cancellation): V
     return VarRemap(bools, ints)
 }
 
-internal fun SearchHints.remapped(mapping: VarRemap, cancellation: Cancellation): SearchHints? {
+internal fun SearchHints.remapped(mapping: VarRemap, cancellation: ExecutionControl): SearchHints? {
     val groups = ArrayList<SearchGroup>(tiers.size)
     for (group in tiers) {
         cancellation.charge(1)
@@ -55,7 +55,7 @@ internal fun SearchHints.remapped(mapping: VarRemap, cancellation: Cancellation)
     return if (cancellation()) null else copy(tiers = groups)
 }
 
-internal fun SearchHints.remapped(mapping: SourceMapping, cancellation: Cancellation): SearchHints? {
+internal fun SearchHints.remapped(mapping: SourceMapping, cancellation: ExecutionControl): SearchHints? {
     val direct = mapping.retainedCoordinates(cancellation) ?: return null
     val translated = mapping.translatedCoordinates(cancellation) ?: return null
     val groups = ArrayList<SearchGroup>(tiers.size)
@@ -71,7 +71,7 @@ internal fun SearchHints.remapped(mapping: SourceMapping, cancellation: Cancella
     return if (cancellation()) null else copy(tiers = groups)
 }
 
-private fun SourceMapping.translatedCoordinates(cancellation: Cancellation): VarRemap? {
+private fun SourceMapping.translatedCoordinates(cancellation: ExecutionControl): VarRemap? {
     var translated = VarRemap(IntArray(source.numBoolVars) { it }, IntArray(source.numIntVars) { it })
     for (stage in stages) {
         val retained = stage.retainedCoordinates(cancellation) ?: return null
@@ -93,7 +93,7 @@ private fun SourceMapping.translatedCoordinates(cancellation: Cancellation): Var
     return if (cancellation()) null else translated
 }
 
-internal fun VarRemap.followedBy(next: VarRemap, cancellation: Cancellation): VarRemap? {
+internal fun VarRemap.followedBy(next: VarRemap, cancellation: ExecutionControl): VarRemap? {
     if (cancellation()) return null
     val bools = IntArray(boolCount)
     val ints = IntArray(intCount)
@@ -114,7 +114,7 @@ internal fun VarRemap.followedBy(next: VarRemap, cancellation: Cancellation): Va
     return VarRemap(bools, ints)
 }
 
-private fun mappedRoles(ids: IntArray, count: Int, rename: (Int) -> Int, cancellation: Cancellation): IntArray? {
+private fun mappedRoles(ids: IntArray, count: Int, rename: (Int) -> Int, cancellation: ExecutionControl): IntArray? {
     val result = IntArrayList(ids.size)
     for (id in ids) {
         cancellation.charge(1)
@@ -138,7 +138,7 @@ internal class AffineReconstruction(
  * source coordinates. Presolve preserves column slots, so the terms are direct target coordinates; a column
  * written by any other step, or rebuilt from a rebuilt column, has no direct reconstruction.
  */
-internal fun SourceMapping.affineReconstructions(cancellation: Cancellation): Map<Int, AffineReconstruction>? {
+internal fun SourceMapping.affineReconstructions(cancellation: ExecutionControl): Map<Int, AffineReconstruction>? {
     val retained = retainedCoordinates(cancellation) ?: return null
     val writes = MutableIntIntMap()
     val affine = HashMap<Int, RebuildStep.AffineValue>()
@@ -221,7 +221,7 @@ internal fun DefinitionHint.Linear.reconstructed(
 
 internal fun DefinitionHint.Comparison.reconstructed(
     reconstructions: Map<Int, AffineReconstruction>,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): DefinitionHint.Comparison? {
     if (coefficients.size != inputs.size || cancellation()) return null
     return try {

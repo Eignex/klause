@@ -3,10 +3,10 @@ package com.eignex.klause.cli
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.search.SearchComponentStop
 import com.eignex.klause.solver.search.SearchStopCause
-import kotlin.test.Test
-import kotlin.test.assertEquals
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 @RunWith(Parameterized::class)
 class SearchEventDescriptionTest(private val worker: String?) {

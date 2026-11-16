@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class LpDirectionalCost(val down: Double, val up: Double)
 
@@ -12,7 +12,7 @@ internal interface LpDirectionalCostSolver : LpSolver {
         pointModel: LpModel,
         columns: IntArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         charge: (Long) -> Unit,
     ): List<LpDirectionalCost?>?
 }

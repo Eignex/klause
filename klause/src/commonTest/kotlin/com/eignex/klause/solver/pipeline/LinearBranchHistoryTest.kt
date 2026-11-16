@@ -2,7 +2,7 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.shl
@@ -23,7 +23,7 @@ class LinearBranchHistoryTest {
             }
         }
 
-        val selected = history.select(listOf(first, second), Cancellation.Never)
+        val selected = history.select(listOf(first, second), ExecutionControl.Never)
 
         assertEquals(second, selected)
     }
@@ -35,7 +35,7 @@ class LinearBranchHistoryTest {
             repeat(2) { history.observe(second, true, BigFraction.ofLong(3)) }
             repeat(observations) { history.observe(second, false, BigFraction.ofLong(3)) }
 
-            val selected = history.select(listOf(first, second), Cancellation.Never)
+            val selected = history.select(listOf(first, second), ExecutionControl.Never)
 
             assertEquals(first, selected)
         }
@@ -52,7 +52,7 @@ class LinearBranchHistoryTest {
             history.observe(second.first to quarter, false, BigFraction.ofLong(3))
         }
 
-        val selected = history.select(listOf(first, second), Cancellation.Never)
+        val selected = history.select(listOf(first, second), ExecutionControl.Never)
 
         assertEquals(second, selected)
     }
@@ -66,7 +66,7 @@ class LinearBranchHistoryTest {
                 history.observe(second, false, gain)
             }
 
-            val selected = history.select(listOf(first, second), Cancellation.Never)
+            val selected = history.select(listOf(first, second), ExecutionControl.Never)
 
             assertEquals(first, selected)
         }
@@ -80,7 +80,7 @@ class LinearBranchHistoryTest {
             history.observe(second, false, BigFraction.ONE)
         }
 
-        val selected = history.select(listOf(first, second), Cancellation { true })
+        val selected = history.select(listOf(first, second), ExecutionControl { true })
 
         assertEquals(first, selected)
     }
@@ -94,7 +94,7 @@ class LinearBranchHistoryTest {
             history.observe(second, false, gain)
         }
 
-        val selected = history.select(listOf(first, second), Cancellation.Never)
+        val selected = history.select(listOf(first, second), ExecutionControl.Never)
 
         assertEquals(first, selected)
     }

@@ -14,13 +14,13 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class SourceNumericalCutoff(val value: BigFraction, val premise: String) {
     init { require(premise.isNotBlank()) }
     fun applyTo(
-        source: SourceProofContext, funding: SourceLpFunding, cancellation: Cancellation = Cancellation.Never,
+        source: SourceProofContext, funding: SourceLpFunding, cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceProofContext? {
         if (cancellation() || funding.paused || source.scope.objective == null || !source.affineObjectiveAvailable) {
             return null
@@ -107,7 +107,7 @@ internal data class SourceNumericalAcquisition(
 // The request names the delivered projection; inspection requires a prefix reader or an external observer.
 internal class SourceNumericalFeedback(
     private val funding: SourceLpFunding,
-    private val cancellation: Cancellation,
+    private val cancellation: ExecutionControl,
     private val latest: Boolean = true,
     val request: LinearAuthorityFeedbackRequest = LinearAuthorityFeedbackRequest.Full,
 ) {

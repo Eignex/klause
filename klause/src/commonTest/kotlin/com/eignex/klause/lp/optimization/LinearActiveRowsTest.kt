@@ -18,7 +18,7 @@ import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceRevision
 import com.eignex.klause.solver.evidence.SourceScope
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.shl
 import kotlin.test.Test
@@ -42,11 +42,11 @@ class LinearActiveRowsTest {
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
             "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.MINUS_ONE)),
         ), mapOf(bool to BigFraction.ONE))
-        val capture = LinearAuthorityCapture(1, 100_000L, 1_000_000L, Cancellation.Never)
+        val capture = LinearAuthorityCapture(1, 100_000L, 1_000_000L, ExecutionControl.Never)
         capture.record(source, null, null, null, LinearAuthorityResult())
 
         val replay = LinearAuthorityReplay.activeRows(capture.records.single(), 20_000_000L, 67_108_864L,
-            Cancellation.Never)
+            ExecutionControl.Never)
 
         val checked = assertNotNull(replay.query)
         assertEquals(scope, checked.context.scope)
@@ -63,13 +63,13 @@ class LinearActiveRowsTest {
         val source = SourceProofContext(scope, setOf(real, bool), mapOf(
             "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
         ), mapOf(bool to BigFraction.ONE))
-        val captures = listOf(null, LinearAuthorityCapture(1, 100_000L, 1_000_000L, Cancellation.Never))
+        val captures = listOf(null, LinearAuthorityCapture(1, 100_000L, 1_000_000L, ExecutionControl.Never))
 
         val work = captures.map { capture ->
             val funding = SourceLpFunding(20_000_000L, 67_108_864L).apply { grant(20_000_000L) }
             val budget = SourceLpBudget(funding = funding)
             LinearActiveRows(source, budget).use {
-                it.check(SourceCondition(), Cancellation.Never, capture = capture)
+                it.check(SourceCondition(), ExecutionControl.Never, capture = capture)
             }
             listOf(budget.operations.toLong(), funding.spent, funding.allocated,
                 budget.measuredPreparationWork, budget.measuredFloatWork, budget.measuredContinuationWork,
@@ -87,7 +87,7 @@ class LinearActiveRowsTest {
         ), mapOf(bool to BigFraction.ONE))
 
         val result = LinearActiveRows(source, SourceLpBudget()).use {
-            it.check(SourceCondition(), Cancellation.Never)
+            it.check(SourceCondition(), ExecutionControl.Never)
         }
 
         val evidence = assertNotNull(result.evidence)
@@ -104,9 +104,9 @@ class LinearActiveRowsTest {
         val budget = SourceLpBudget()
 
         LinearActiveRows(source, budget).use {
-            val first = it.check(SourceCondition(), Cancellation.Never)
+            val first = it.check(SourceCondition(), ExecutionControl.Never)
             val operations = budget.operations
-            val second = it.check(SourceCondition(bools = mapOf(0 to true)), Cancellation.Never)
+            val second = it.check(SourceCondition(bools = mapOf(0 to true)), ExecutionControl.Never)
 
             assertNull(first.evidence)
             assertTrue(second.unchanged)
@@ -114,7 +114,7 @@ class LinearActiveRowsTest {
             it.release()
             it.retract()
 
-            val restored = it.check(SourceCondition(), Cancellation.Never)
+            val restored = it.check(SourceCondition(), ExecutionControl.Never)
 
             assertTrue(restored.unchanged)
             assertEquals(operations, budget.operations)
@@ -132,12 +132,12 @@ class LinearActiveRowsTest {
         ), emptyMap())
 
         LinearActiveRows(source, SourceLpBudget(), SparseSourceLpPolicy(quantum = 1L)).use { checker ->
-            val first = checker.check(SourceCondition(bools = mapOf(0 to true)), Cancellation.Never)
+            val first = checker.check(SourceCondition(bools = mapOf(0 to true)), ExecutionControl.Never)
             assertTrue(first.paused)
-            var retracted = checker.check(SourceCondition(bools = mapOf(0 to false)), Cancellation.Never)
+            var retracted = checker.check(SourceCondition(bools = mapOf(0 to false)), ExecutionControl.Never)
             repeat(64) {
                 if (retracted.paused) {
-                    retracted = checker.check(SourceCondition(bools = mapOf(0 to false)), Cancellation.Never)
+                    retracted = checker.check(SourceCondition(bools = mapOf(0 to false)), ExecutionControl.Never)
                 }
             }
 
@@ -153,7 +153,7 @@ class LinearActiveRowsTest {
         ), emptyMap())
         val budget = SourceLpBudget(funding = SourceLpFunding(0L, 1024L))
 
-        val result = LinearActiveRows(source, budget).use { it.check(SourceCondition(), Cancellation.Never) }
+        val result = LinearActiveRows(source, budget).use { it.check(SourceCondition(), ExecutionControl.Never) }
 
         assertNull(result.evidence)
         assertEquals(0, budget.operations)
@@ -167,7 +167,7 @@ class LinearActiveRowsTest {
         val funding = SourceLpFunding(1L, 1024L).apply { grant(1L) }
         val budget = SourceLpBudget(funding = funding)
 
-        val result = LinearActiveRows(source, budget).use { it.check(SourceCondition(), Cancellation.Never) }
+        val result = LinearActiveRows(source, budget).use { it.check(SourceCondition(), ExecutionControl.Never) }
 
         assertTrue(result.paused)
         assertNull(result.evidence)
@@ -305,7 +305,7 @@ class LinearActiveRowsTest {
     fun `active projection should discard unresolved objective coefficients`() {
         val source = SourceProofContext(scope, setOf(real, bool), emptyMap(), mapOf(bool to BigFraction.ONE))
 
-        val numeric = assertNotNull(source.activeNumericContext(Cancellation.Never))
+        val numeric = assertNotNull(source.activeNumericContext(ExecutionControl.Never))
 
         assertEquals(emptyMap(), numeric.objective)
         assertEquals(BigFraction.ZERO, numeric.objectiveConstant)
@@ -318,7 +318,7 @@ class LinearActiveRowsTest {
             "wide" to SourcePremise(SourceInequality(mapOf(real to large), BigFraction.ZERO)),
         ), emptyMap())
 
-        val numeric = source.activeNumericContext(Cancellation.Never)
+        val numeric = source.activeNumericContext(ExecutionControl.Never)
 
         assertNull(numeric)
     }
@@ -345,7 +345,7 @@ class LinearActiveRowsTest {
         ), emptyMap())
         var polls = 0
 
-        val numeric = source.activeNumericContext(Cancellation { ++polls >= 3 })
+        val numeric = source.activeNumericContext(ExecutionControl { ++polls >= 3 })
 
         assertNull(numeric)
     }

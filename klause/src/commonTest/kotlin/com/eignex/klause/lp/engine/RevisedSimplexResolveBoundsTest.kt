@@ -4,7 +4,7 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -35,7 +35,7 @@ class RevisedSimplexResolveBoundsTest {
             assertNotNull(model.rebind(longArrayOf(2L, 0L), longArrayOf(10L, 10L)).authoritativeModel()),
             boundRevision = 1L,
         )
-        assertTrue(simplex.adopt(next, Cancellation.Never))
+        assertTrue(simplex.adopt(next, ExecutionControl.Never))
         val again = assertNotNull(simplex.resolveBounds())
 
         assertEquals(0, again.refactorizations)
@@ -49,7 +49,7 @@ class RevisedSimplexResolveBoundsTest {
         val changed = base()
         changed.csc.colVal[0] = -2L
 
-        assertFalse(simplex.adopt(LpExactState(assertNotNull(changed.authoritativeModel())), Cancellation.Never))
+        assertFalse(simplex.adopt(LpExactState(assertNotNull(changed.authoritativeModel())), ExecutionControl.Never))
         assertEquals(3.0, assertNotNull(simplex.resolveBounds()).objective)
     }
 
@@ -81,7 +81,7 @@ class RevisedSimplexResolveBoundsTest {
         }).use { solver ->
             assertNotNull(solver.solve())
             assertTrue(trail.assertBound(0, false, ExactLpSide(one), 1L))
-            assertTrue(solver.adopt(trail.state, Cancellation { cancelled }))
+            assertTrue(solver.adopt(trail.state, ExecutionControl { cancelled }))
             cancelDuringFtran = true
 
             val result = solver.resolveBounds()
@@ -115,7 +115,7 @@ class RevisedSimplexResolveBoundsTest {
             RevisedSimplex(child).use { solver ->
                 assertNotNull(solver.solve())
                 assertTrue(trail.pop(0))
-                assertTrue(solver.adopt(trail.state, Cancellation.Never))
+                assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
 
                 val result = assertNotNull(solver.resolveBounds())
 
@@ -157,7 +157,7 @@ class RevisedSimplexResolveBoundsTest {
             val before = forwardSolves
             assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 1L))
 
-            assertTrue(solver.adopt(trail.state, Cancellation.Never))
+            assertTrue(solver.adopt(trail.state, ExecutionControl.Never))
             val result = assertNotNull(solver.resolveBounds())
 
             assertEquals(before, forwardSolves)
@@ -200,7 +200,7 @@ class RevisedSimplexResolveBoundsTest {
             builder.addRow(intArrayOf(x), longArrayOf(1), Relation.GE, 1)
             var stopped = false
             val failure = IllegalStateException("cancel callback failed")
-            val cancellation = Cancellation {
+            val cancellation = ExecutionControl {
                 if (stopped && throws) throw failure
                 stopped
             }

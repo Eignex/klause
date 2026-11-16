@@ -28,7 +28,7 @@ import com.eignex.klause.solver.search.SearchConflictResolution
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchSession
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -109,7 +109,7 @@ internal object PreparedArithmeticLearningProfile {
     }
 
     private fun invoke(source: Int, route: Int, learning: Boolean): JsonObject {
-        val stop = Cancellation.after(2.seconds)
+        val stop = ExecutionControl.after(2.seconds)
         val original = if (source == 0) Opb.parse(sources[source]).toProblem().problem
             else parseFlatZinc(sources[source]).problem
         val codec = ProblemJson()
@@ -225,7 +225,7 @@ internal object PreparedArithmeticLearningProfile {
         }
     }
 
-    internal fun checkPoint(problem: Problem, sample: Sample, stop: Cancellation): Boolean {
+    internal fun checkPoint(problem: Problem, sample: Sample, stop: ExecutionControl): Boolean {
         val pinned = problem.withIntDomains(Array(problem.numIntVars) {
             val value = sample.intValue(it)
             check(value in requireNotNull(problem.intDomainOrNull(it)))

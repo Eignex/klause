@@ -16,6 +16,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryRequest
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
@@ -255,7 +256,7 @@ class MpsCompilerExactTest {
 
             val execution = OpenTheoryPipeline.execute(
                 OpenTheoryRequest(source.model),
-                TheoryParams(cancellation = { true }),
+                TheoryParams(cancellation = ExecutionControl { true }),
                 engine,
             )
 

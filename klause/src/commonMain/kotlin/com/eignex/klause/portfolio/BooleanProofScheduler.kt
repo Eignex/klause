@@ -19,7 +19,7 @@ import com.eignex.klause.solver.search.BooleanProofContext
 import com.eignex.klause.solver.search.BooleanProofTasks
 import com.eignex.klause.solver.search.BooleanTaskCheck
 import com.eignex.klause.solver.search.BooleanTaskLease
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class BooleanProofStep(
     val task: Int?,
@@ -101,7 +101,7 @@ internal class BooleanProofScheduler(
     }
 
     // One serialized coordinator owns the board; a worker retains its exact lease through every pause.
-    fun runSlice(worker: Int, cancellation: Cancellation, millis: Long, offeredWork: Long): BooleanProofStep {
+    fun runSlice(worker: Int, cancellation: ExecutionControl, millis: Long, offeredWork: Long): BooleanProofStep {
         check(!closed)
         require(worker in workers.indices && offeredWork > 0L && millis > 0L)
         witness?.let { return BooleanProofStep(null, sample = it) }
@@ -153,7 +153,7 @@ internal class BooleanProofScheduler(
     }
 
     fun run(
-        cancellation: Cancellation,
+        cancellation: ExecutionControl,
         workLimit: Long,
         baseSliceWork: Long = 5000L,
         maxSliceWork: Long = 150000L,

@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal data class LpDirectionalGain(val down: Double, val up: Double)
 
@@ -63,7 +63,7 @@ internal interface LpDirectionalProbeSolver {
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalGain>?
 }
@@ -74,7 +74,7 @@ internal interface LpDirectionalValueSolver {
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalValues>?
 }
@@ -104,7 +104,7 @@ internal class LpDirectionalProbes(
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalGain>? {
         val reference = parentObjective ?: run {
@@ -120,7 +120,7 @@ internal class LpDirectionalProbes(
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
     ): List<LpDirectionalValues>? = query(columns, splits, allowance, token, observe,
         ResultMapping(value = { objective -> objective.takeIf { it.isFinite() } }, pair = ::LpDirectionalValues))
@@ -131,7 +131,7 @@ internal class LpDirectionalProbes(
         columns: IntArray,
         splits: LongArray,
         allowance: Long,
-        token: Cancellation,
+        token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
         mapping: ResultMapping<T>,
     ): List<T>? {
@@ -185,7 +185,7 @@ internal class LpDirectionalProbes(
         endpoint: Long,
         upper: Boolean,
         budget: ProbeSession,
-        token: Cancellation,
+        token: ExecutionControl,
         value: (Double) -> Double?,
     ): Double? {
         if (token()) return budget.stop(LpProbeDecline.CANCELLED)

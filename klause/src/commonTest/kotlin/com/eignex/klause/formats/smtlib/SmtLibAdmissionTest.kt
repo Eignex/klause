@@ -7,7 +7,6 @@ import com.eignex.klause.ir.NonlinearIntegerProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
-import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
@@ -17,6 +16,7 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.TranscendentalProblem
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
@@ -25,8 +25,9 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.solver.pipeline.pipelineRoute
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.klause.util.withBoundedPolling
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
 import com.eignex.util.numbers.bigIntOf
@@ -40,6 +41,20 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SmtLibAdmissionTest {
+    @Test
+    fun `bounded polling should stop admission at its exact work allowance`() {
+        val budget = PresolveBudget(1)
+
+        assertFailsWith<CancellationException> {
+            SmtLib.parse(
+                "(declare-const x Real) (assert (= x 1)) (check-sat)",
+                cancellation = budget.slice(1).withBoundedPolling(),
+            )
+        }
+
+        assertEquals(1L, budget.spent())
+    }
+
     @Test
     fun `inconsistent integer scalar equations should retain a linear source`() {
         val source = SmtLib.parse(
@@ -151,7 +166,7 @@ class SmtLibAdmissionTest {
             override fun close() { closes++ }
         }
 
-        assertFailsWith<CancellationException> { SmtLib.parse(source, cancellation = Cancellation { true }) }
+        assertFailsWith<CancellationException> { SmtLib.parse(source, cancellation = ExecutionControl { true }) }
 
         assertEquals(0, reads)
         assertEquals(1, closes)
@@ -288,9 +303,9 @@ class SmtLibAdmissionTest {
     fun `cancellation during nonlinear bound closure should withhold source admission`() {
         var work = 0L
         var capturedWork: Long? = null
-        val stop = object : Cancellation {
+        val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = capturedWork?.let { work > it } == true
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
+            override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
         val input = runCatching { SmtLib.parse(
@@ -430,7 +445,7 @@ class SmtLibAdmissionTest {
     fun `cancellation after source exhaustion should withhold unused helper admission`() {
         var exhausted = false
         var opens = 0
-        val cancellation = Cancellation { exhausted }
+        val cancellation = ExecutionControl { exhausted }
 
         val input = runCatching { SmtLib.parse(
             {
@@ -500,7 +515,7 @@ class SmtLibAdmissionTest {
     fun `pre cancelled admission should not open a source`() {
         val input = runCatching { SmtLib.parse(
             { error("cancelled admission must not open a source") },
-            cancellation = Cancellation { true },
+            cancellation = ExecutionControl { true },
         ) }
 
         assertIs<CancellationException>(input.exceptionOrNull())
@@ -525,7 +540,7 @@ class SmtLibAdmissionTest {
                     }
                 }
             },
-            cancellation = Cancellation { stopped },
+            cancellation = ExecutionControl { stopped },
         ) }
 
         assertIs<CancellationException>(input.exceptionOrNull())
@@ -550,7 +565,7 @@ class SmtLibAdmissionTest {
                     }
                 }
             },
-            cancellation = Cancellation { stopped },
+            cancellation = ExecutionControl { stopped },
         ) }
 
         assertIs<CancellationException>(input.exceptionOrNull())
@@ -563,9 +578,9 @@ class SmtLibAdmissionTest {
         var opens = 0
         var closes = 0
         var charged = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 1
-            override fun workMeter(): WorkMeter = WorkMeter { charged += it }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
         val input = runCatching { SmtLib.parse(
@@ -633,7 +648,7 @@ class SmtLibAdmissionTest {
         var opens = 0
         var reads = 0
         var observed = false
-        val cancellation = Cancellation {
+        val cancellation = ExecutionControl {
             (reads == 1 && !observed).also { if (it) observed = true }
         }
 
@@ -661,9 +676,9 @@ class SmtLibAdmissionTest {
         var opens = 0
         var closes = 0
         var loweringWork = 0L
-        val cancellation = object : Cancellation {
+        val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = loweringWork > 0
-            override fun workMeter(): WorkMeter = WorkMeter { if (closes != 0) loweringWork += it }
+            override val accounting: WorkMeter get() = WorkMeter { if (closes != 0) loweringWork += it }
         }
 
         val input = runCatching { SmtLib.parse(

@@ -11,7 +11,7 @@ import com.eignex.klause.simplex.exact.ExactContinuation
 import com.eignex.klause.simplex.exact.ExactContinuationInput
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TimeSource
 
@@ -67,7 +67,7 @@ internal fun captureContinuationTarget(
     solver: LpSolver,
     result: FloatLpResult?,
     limits: ExactContinuationLimits,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): LpContinuationTarget {
     val budget = ContinuationBudget(admissionLimits(limits), cancellation)
     budget.phase = ContinuationPhase.ADMISSION
@@ -120,7 +120,7 @@ internal fun continueExactLp(
     model: LpModel,
     basis: Basis?,
     cache: LpExactContinuationCache = LpExactContinuationCache(),
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     limits: ExactContinuationLimits = ExactContinuationLimits(),
     shortPivots: Int = 20,
     fullEffort: Boolean = true,
@@ -189,7 +189,7 @@ internal fun continueExactLp(
                     },
                     cancellation = remaining.maxTimeNs?.let { cap ->
                         // The cap's remainder is a deadline, so a phase handed this token can budget a share of it.
-                        cancellation or Cancellation.until(
+                        cancellation or ExecutionControl.until(
                             TimeSource.Monotonic.markNow() + (cap - verification.elapsedNs).nanoseconds,
                         )
                     } ?: cancellation,
@@ -310,7 +310,7 @@ private fun selectContinuation(
     basis: Basis?,
     cache: LpExactContinuationCache,
     limits: ExactContinuationLimits,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
     exported: ExactContinuationMetrics,
 ): ContinuationSelection {
     val envelope = admissionLimits(limits)

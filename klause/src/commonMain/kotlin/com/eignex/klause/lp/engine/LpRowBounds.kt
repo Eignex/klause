@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 @Suppress("LongParameterList")
 internal class LpRowBound internal constructor(
@@ -58,7 +58,7 @@ internal data class LpRowBoundTerm(val column: Int, val coefficient: BigFraction
 
 internal fun mixedRowBounds(
     model: LpModel,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     observer: LpCertificationObserver? = null,
     meter: MixedCertificateMeter = MixedCertificateMeter(cancellation),
     affectedColumns: IntArray? = null,

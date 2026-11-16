@@ -4,7 +4,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.result.HintIndexOutcome
 import com.eignex.klause.solver.result.OpenHintUsageSink
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
@@ -282,7 +282,7 @@ internal class SourceClauseGuidance private constructor(
             .takeUnless { budget.stopped() }
     }
 
-    internal class Budget(private var entries: Int, private var visits: Long, private val stop: Cancellation) {
+    internal class Budget(private var entries: Int, private var visits: Long, private val stop: ExecutionControl) {
         val remainingVisits: Long get() = visits
 
         var outcome: HintIndexOutcome? = null

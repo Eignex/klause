@@ -27,7 +27,7 @@ import com.eignex.klause.solver.incumbent.ModelIdentity
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -59,7 +59,7 @@ class LinearPortfolioTerminalTest {
     )
     private val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
     private val request = OpenTheoryRequest(model, objective)
-    private val source = assertNotNull(request.linearAuthorityContext(Cancellation.Never))
+    private val source = assertNotNull(request.linearAuthorityContext(ExecutionControl.Never))
     private val identity = ModelIdentity.of(model, objective)
     private val binding = EngineInvocation(request.preparedPlan, identity, scope = source.scope)
 
@@ -80,7 +80,7 @@ class LinearPortfolioTerminalTest {
         assertFailsWith<IllegalArgumentException> { LinearPortfolioSearch(descent, foreign) }
 
         assertFailsWith<IllegalStateException> {
-            descent.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> }
+            descent.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> }
         }
     }
 
@@ -98,7 +98,7 @@ class LinearPortfolioTerminalTest {
         )
         val cost = LinearObjective(intCoefficients = longArrayOf(1))
         val pinnedRequest = OpenTheoryRequest(pinnedModel, cost)
-        val captured = assertNotNull(pinnedRequest.linearAuthorityContext(Cancellation.Never))
+        val captured = assertNotNull(pinnedRequest.linearAuthorityContext(ExecutionControl.Never))
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val original = SourceProofContext(
             captured.scope.copy(
@@ -122,7 +122,7 @@ class LinearPortfolioTerminalTest {
         )
         val search = LinearPortfolioSearch(RationalTheoryDescent(pinnedModel, cost, TheoryParams(), original), runtime)
 
-        search.use { it.runSlice(Cancellation.Never, Long.MAX_VALUE, -1) { _ -> } }
+        search.use { it.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1) { _ -> } }
 
         val claim = assertIs<SourceClaim.Optimal>(assertNotNull(search.result?.terminal).claim)
         assertEquals(SourceValue.Rational(BigFraction.ONE), claim.value)
@@ -171,7 +171,7 @@ class LinearPortfolioTerminalTest {
         )
         val cost = LinearObjective(intCoefficients = longArrayOf(-1))
         val mixedRequest = OpenTheoryRequest(mixed, cost)
-        val original = assertNotNull(mixedRequest.linearAuthorityContext(Cancellation.Never))
+        val original = assertNotNull(mixedRequest.linearAuthorityContext(ExecutionControl.Never))
         val runtime = EngineInvocation(mixedRequest.preparedPlan, ModelIdentity.of(mixed, cost), scope = original.scope)
 
         val accepted = acceptedTerminals(
@@ -212,7 +212,7 @@ class LinearPortfolioTerminalTest {
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
         val maximized = OpenTheoryRequest(upper, objective, maximize = true)
-        val original = assertNotNull(maximized.linearAuthorityContext(Cancellation.Never))
+        val original = assertNotNull(maximized.linearAuthorityContext(ExecutionControl.Never))
         val minimized = assertNotNull(maximized.minimizedObjective)
         val runtime = EngineInvocation(
             maximized.preparedPlan,
@@ -259,7 +259,7 @@ class LinearPortfolioTerminalTest {
             scope = original.scope,
         )
         val incumbents = PortfolioIncumbents<BigFraction>(
-            valueOf = { original.linearValue(it.sample, Cancellation.Never) },
+            valueOf = { original.linearValue(it.sample, ExecutionControl.Never) },
             improves = { candidate, standing -> candidate < standing },
             approximateValue = { value: BigFraction -> value.toDouble() },
             gain = { standing, candidate -> (standing - candidate).toDouble() },
@@ -288,17 +288,17 @@ class LinearPortfolioTerminalTest {
             }) { _, _, _, _ -> error("linear search is retained") }
                 .bindSource(SourceWorkerBinding(binding, provesResults = false))
         }
-        val terminal = LinearPortfolioTerminal(binding, source, Cancellation.Never) { accepted += it }
+        val terminal = LinearPortfolioTerminal(binding, source, ExecutionControl.Never) { accepted += it }
         val invocation = PortfolioInvocation(
             request.preparedPlan,
             listOf(factory),
             PortfolioInvocationControls(),
-            PortfolioEvidence(identity, source.linearWitnessVerifier(Cancellation.Never)).bindInvocation(binding),
+            PortfolioEvidence(identity, source.linearWitnessVerifier(ExecutionControl.Never)).bindInvocation(binding),
             objective,
         )
 
         val result = invocation.use {
-            it.minimize(Cancellation.Never, null, PortfolioIncumbents.exact(objective), terminal)
+            it.minimize(ExecutionControl.Never, null, PortfolioIncumbents.exact(objective), terminal)
         }
 
         assertTrue(accepted.isEmpty())
@@ -326,7 +326,8 @@ class LinearPortfolioTerminalTest {
                 request.preparedPlan,
                 listOf(factory),
                 PortfolioInvocationControls(),
-                PortfolioEvidence(identity, source.linearWitnessVerifier(Cancellation.Never)).bindInvocation(binding),
+                PortfolioEvidence(identity,
+                    source.linearWitnessVerifier(ExecutionControl.Never)).bindInvocation(binding),
                 objective,
             )
         }
@@ -355,16 +356,16 @@ class LinearPortfolioTerminalTest {
                 )
             }) { _, _, _, _ -> error("linear search is retained") }.bindSource(SourceWorkerBinding(runtime))
         }
-        val terminal = LinearPortfolioTerminal(runtime, original, Cancellation.Never) { accepted += it }
+        val terminal = LinearPortfolioTerminal(runtime, original, ExecutionControl.Never) { accepted += it }
         val invocation = PortfolioInvocation(
             request.preparedPlan,
             listOf(factory),
             controls,
-            PortfolioEvidence(ModelIdentity.of(model, cost), original.linearWitnessVerifier(Cancellation.Never))
+            PortfolioEvidence(ModelIdentity.of(model, cost), original.linearWitnessVerifier(ExecutionControl.Never))
                 .bindInvocation(runtime),
             cost,
         )
-        invocation.use { it.minimize(Cancellation.Never, null, incumbents, terminal) }
+        invocation.use { it.minimize(ExecutionControl.Never, null, incumbents, terminal) }
         return accepted
     }
 }
