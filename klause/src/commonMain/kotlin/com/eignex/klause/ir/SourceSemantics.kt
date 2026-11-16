@@ -92,7 +92,8 @@ sealed interface FloatSemantics {
 /**
  * Source feasibility slack `max(absolute, relative * scale)`. For a row, scale is the maximum
  * of the finite bound magnitude and the sum of absolute term activities; for a variable bound
- * it is the finite bound magnitude. Integrality is checked exactly, independently of this slack.
+ * it is the finite bound magnitude. A zero relative component makes the slack the same absolute
+ * amount at every magnitude. Integrality is checked exactly, independently of this slack.
  */
 data class SourceTolerance(
     /** Minimum permitted absolute slack in source units. */
@@ -105,14 +106,14 @@ data class SourceTolerance(
         require(relative.numerator.signum() >= 0) { "relative tolerance must be nonnegative" }
     }
 
-    /** Whether no source feasibility slack is permitted. */
+    /** Whether no source feasibility slack is permitted: both components are zero. */
     val isExact: Boolean get() = absolute.numerator.isZero() && relative.numerator.isZero()
 }
 
-// Slack of the formats that accept numerical results by default.
+// Slack of the formats that accept numerical results by default. It is absolute only, so a row's slack does not
+// grow with the magnitude of its terms; a caller who wants a scale-dependent slack overrides the relative part.
 internal val numericalSourceTolerance: SourceTolerance = SourceTolerance(
     absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000L)),
-    relative = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000L)),
 )
 
 /**

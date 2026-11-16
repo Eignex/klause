@@ -352,7 +352,10 @@ replaces its default independently, and explicit source bounds stay authoritativ
 Values accept exact decimals, scientific notation and rationals; a value that cannot
 be represented is rejected rather than rounded. Tolerance uses
 `max(absolute, relative * scale)` with exact integrality, as defined in
-[typed source semantics](02-model.md#typed-source-semantics). A nondefault effective
+[typed source semantics](02-model.md#typed-source-semantics). MPS and FlatZinc declare
+an absolute slack of `1/10000000` and a zero relative component, so the slack does not
+depend on the magnitude of a row; `--source-relative-tolerance` adds a slack that
+grows with it, and setting both components to zero checks exactly. A nondefault effective
 interpretation is printed as a protocol comment before results; it adds no proof
 authority. [FlatZinc floats](04-finite-formats.md#flatzinc-floats) define the grid contract.
 

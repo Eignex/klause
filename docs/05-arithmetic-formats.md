@@ -33,10 +33,11 @@ validation share one captured declaration snapshot, and results under replaced
 defaults identify that effective scope rather than claiming the file's own
 defaults.
 
-MPS defaults to `SourceTolerance(absolute=1/10000000, relative=1/10000000)`. Each
-component can be replaced independently, including by zero, which requires exact
-checks and certificates, including exact finite LP certification; a positive tolerance
-makes finite LP deductions numerical. `--exact` sets the tolerance to zero. The CLI captures one
+MPS defaults to `SourceTolerance(absolute=1/10000000)`: an absolute slack with no
+relative component. Each component can be replaced independently. Zero in both requires
+exact checks and certificates, including exact finite LP certification; a positive
+component makes finite LP deductions numerical. `--exact` sets the tolerance to zero.
+The CLI captures one
 [linear source snapshot](#source-correspondence) and registers it with the common
 invocation, which owns preparation, validation and result qualification. Slack and
 rendered objectives stay in source units when working rows are scaled.
@@ -73,7 +74,9 @@ contradiction.
 Witness checks use the original decimals with exact rational arithmetic. Rows
 permit `max(absolute, relative * max(abs(bound), sum(abs(a(i) * x(i)))))` and
 column bounds `max(absolute, relative * abs(bound))`; integrality stays exact.
-`LinearSourceWitness.exact` records whether the accepted point satisfies every row and
+Under the default policy both reduce to the absolute slack, so a row whose terms
+are large but cancel is held to the same slack as a row of small terms; a relative
+component makes the slack grow with that scale. `LinearSourceWitness.exact` records whether the accepted point satisfies every row and
 bound without slack. Cancellation withholds the point.
 
 For a checked point with at most 4,096 coordinates, rendering may snap residuals

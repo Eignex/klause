@@ -11,7 +11,7 @@ import com.eignex.klause.ir.numericalSourceTolerance
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 
-/** Decimal authority, wholly unranged declaration defaults and source feasibility slack. */
+/** Decimal authority, wholly unranged declaration defaults and an absolute source feasibility slack. */
 val mpsSemantics: SourceSemantics = SourceSemantics(
     format = SourceFormat.MPS,
     numericAuthority = NumericAuthority.DECIMAL_LITERALS,

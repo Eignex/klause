@@ -175,7 +175,10 @@ class MpsToleranceQualificationTest {
         val source = assertNotNull(Mps.parse(
             "ROWS\n N COST\n L R\nCOLUMNS\n M0 'MARKER' 'INTORG'\n I COST 1 R 1000000000\n" +
                 " J R -1000000000\n M1 'MARKER' 'INTEND'\nRHS\n RHS R -1\nENDATA",
-        ).toLinearSourceProblem())
+        ).toLinearSourceProblem(SemanticOverrides(feasibilityTolerance = SourceTolerance(
+            absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
+            relative = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000)),
+        ))))
 
         val qualified = source.toleranceQualification(Cancellation.Never)?.verify()
         val witness = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ONE)))
