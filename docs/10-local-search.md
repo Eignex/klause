@@ -264,6 +264,10 @@ supplies heuristic scores;
 complete grading and the canonical objective retain admission authority. Maintenance checks
 for the linear term view resume in batches of 256 definitions before move scoring.
 
+Reified cardinality and pseudo-Boolean invariants share signed aggregate flip
+accounting with their Boolean break/make helpers. Their truth predicates, initial
+aggregates and repair proposals remain factor-specific.
+
 Invariants substitute a new value into every position that reads the moved
 coordinate. Product residuals are computed exactly, with a private 128-bit
 temporary on overflow, so an overflowing product cannot satisfy a signed-word

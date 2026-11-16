@@ -307,6 +307,10 @@ default) return `Unknown(ResourceLimit)`; see
 portfolio worker keeps its root preparation between slices; see
 [portfolio preparation](12-portfolio.md#polynomial-root-preparation).
 
+The rational definition and support witness heuristics share bounded rational powers
+and scalar admission. Every check and multiplication retains the requesting
+polynomial arithmetic token; each heuristic owns its evaluation and early declines.
+
 #### Invocation ownership
 
 A pipeline request keeps an immutable source snapshot and can be reused; each

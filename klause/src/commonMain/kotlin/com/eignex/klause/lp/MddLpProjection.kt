@@ -26,12 +26,8 @@ internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
     val trans = transitions
     val starts = layerStarts
     val nspl = numStatesPerLayer
-    val outCols = Array(n) { arrayOfNulls<IntArrayList>(nspl[it]) }
-    val inCols = Array(n + 1) { arrayOfNulls<IntArrayList>(nspl[it]) }
-    val chanCols = Array(n) { IntArrayList() }
-    val chanVal = Array(n) { LongArrayList() }
+    val flow = LayeredFlowRows(n) { nspl[it] }
     val acceptingSet = IntHashSet(accepting.size).apply { for (a in accepting) add(a) }
-    val acceptCols = IntArrayList()
     val costArcs = IntArrayList()
     val costWeight = LongArrayList()
     for (layer in 0 until n) {
@@ -50,11 +46,8 @@ internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
                     presence = longArrayOf(seq[layer].toLong(), value),
                     definition = LpAuxiliaryColumn(listOf(p.toLong()), 1L, true),
                 )
-                (outCols[layer][src] ?: IntArrayList().also { outCols[layer][src] = it }).add(col)
-                (inCols[layer + 1][dst] ?: IntArrayList().also { inCols[layer + 1][dst] = it }).add(col)
-                chanCols[layer].add(col)
-                chanVal[layer].add(value)
-                if (layer == n - 1 && dst in acceptingSet) acceptCols.add(col)
+                flow.arc(layer, src, dst, col, value)
+                if (layer == n - 1 && dst in acceptingSet) flow.accepting.add(col)
                 if (stride == 4) {
                     costArcs.add(col)
                     costWeight.add(trans[p + 3])
@@ -63,45 +56,7 @@ internal fun Mdd.emitLpRelaxation(builder: RelaxationBuilder) {
             p += stride
         }
     }
-    val src = outCols[0][initial] ?: return
-    if (src.isEmpty()) return
-    builder.row(src.toIntArray(), LongArray(src.size) { 1L }, LinearOp.EQ, 1L, Contribution.HULL)
-    for (layer in 1 until n) {
-        reach[layer].forEach { state ->
-            val cols = IntArrayList()
-            val vals = LongArrayList()
-            outCols[layer][state]?.let {
-                for (k in 0 until it.size) {
-                    cols.add(it[k])
-                    vals.add(1L)
-                }
-            }
-            inCols[layer][state]?.let {
-                for (k in 0 until it.size) {
-                    cols.add(it[k])
-                    vals.add(-1L)
-                }
-            }
-            if (!cols.isEmpty()) {
-                builder.row(cols.toIntArray(), vals.toLongArray(), LinearOp.EQ, 0L, Contribution.HULL)
-            }
-        }
-    }
-    if (acceptCols.isEmpty()) return
-    builder.row(acceptCols.toIntArray(), LongArray(acceptCols.size) { 1L }, LinearOp.EQ, 1L, Contribution.HULL)
-    for (layer in 0 until n) {
-        val k = chanCols[layer].size
-        if (k == 0) return
-        val cols = IntArray(k + 1)
-        val vals = LongArray(k + 1)
-        for (i in 0 until k) {
-            cols[i] = chanCols[layer][i]
-            vals[i] = chanVal[layer][i]
-        }
-        cols[k] = builder.intColumn(seq[layer])
-        vals[k] = -1L
-        builder.row(cols, vals, LinearOp.EQ, 0L, Contribution.HULL)
-    }
+    if (!flow.emit(builder, seq, reach, initial)) return
     if (cost >= 0 && !costArcs.isEmpty()) {
         val k = costArcs.size
         val cols = IntArray(k + 1)

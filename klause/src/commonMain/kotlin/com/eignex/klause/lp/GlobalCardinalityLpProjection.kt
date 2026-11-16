@@ -4,7 +4,6 @@ import com.eignex.klause.factor.global.GlobalCardinality
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.values
 import com.eignex.util.collections.IntArrayList
-import com.eignex.util.collections.LongArrayList
 
 /**
  * One-hot selector model for the count-variable form `counts(k) = #{i : xs(i) = cover(k)}`: a one-hot
@@ -29,36 +28,15 @@ internal fun GlobalCardinality.emitLpRelaxation(builder: RelaxationBuilder) {
     // Long keys address cover values across the full value range.
     val selByCover = Array(cover.size) { IntArrayList() }
     for ((position, x) in xs.withIndex()) {
-        val box = builder.rootDomain(x)
-        val live = builder.liveDomain(x)
-        val sel = IntArrayList()
-        val selVal = LongArrayList()
-        box.values.forEach { v ->
-            // The selector z_xv is present while value v stays in x's live domain.
-            val z = builder.auxColumn(
-                0L,
-                if (live.contains(v)) 1L else 0L,
-                presence = longArrayOf(x.toLong(), v),
-                definition = LpAuxiliaryColumn(listOf(position.toLong(), v), 1L, true),
+        if (!builder.emitOneHotValues(
+                x,
+                definition = { value -> LpAuxiliaryColumn(listOf(position.toLong(), value), 1L, true) },
+                selector = { value, column ->
+                    val ci = coverIndexByValue.getOrDefault(value, -1)
+                    if (ci >= 0) selByCover[ci].add(column)
+                },
             )
-            sel.add(z)
-            selVal.add(v)
-            val ci = coverIndexByValue.getOrDefault(v, -1) // only cover values carry a count row
-            if (ci >= 0) selByCover[ci].add(z)
-        }
-        val k = sel.size
-        if (k == 0) return // a variable with no values in its root box — leave it to propagation
-        builder.row(sel.toIntArray(), LongArray(k) { 1L }, LinearOp.EQ, 1L, Contribution.HULL) // Σ_v z = 1
-        // Σ_v v·z − xs(i) = 0.
-        val cCols = IntArray(k + 1)
-        val cVals = LongArray(k + 1)
-        for (s in 0 until k) {
-            cCols[s] = sel[s]
-            cVals[s] = selVal[s]
-        }
-        cCols[k] = builder.intColumn(x)
-        cVals[k] = -1L
-        builder.row(cCols, cVals, LinearOp.EQ, 0L, Contribution.HULL)
+        ) return
     }
     // Σ_i z_{i,cover(k)} − counts(k) = 0 per cover value (a cover value in no domain forces 0).
     for (k in cover.indices) {
