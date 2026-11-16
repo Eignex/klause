@@ -376,6 +376,9 @@ arithmetic reduction; their original defining equalities remain in the encoded
 source. Closed arithmetic and certified function enclosures simplify exact floors
 without introducing a finite search window. Zero-division interpretations retain
 the selected ground results and one total default for later fixed-model queries.
+Constant substitution distinguishes lexical literals from quoted source names.
+Rational recognition uses an explicit work stack and the containing execution
+control for every node, including deeply nested negations and divisions.
 
 ### Polynomial source lowering
 

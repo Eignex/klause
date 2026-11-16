@@ -116,7 +116,7 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
             when (val frame = work.removeLast()) {
                 is Frame.Evaluate -> when (val node = frame.expression) {
                     is SExpr.Atom -> {
-                        val value = fixings[polynomialSymbol(node.text)] ?: node
+                        val value = fixingSymbol(node)?.let(fixings::get) ?: node
                         values.addLast(value)
                         ids.addLast(atomIds.getOrPut(node.text) { nextNode++ })
                     }
@@ -227,10 +227,10 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
     }
 
     private fun bind(expression: SExpr, candidate: SExpr) {
-        val symbol = (expression as? SExpr.Atom)?.text?.let(::polynomialSymbol) ?: return
+        val symbol = fixingSymbol(expression) ?: return
         if (symbol in fixings) return
         val declaration = scalarNames[symbol] ?: return
-        val value = (candidate as? SExpr.Atom)?.text?.let(::polynomialSymbol)?.let(fixings::get) ?: candidate
+        val value = fixingSymbol(candidate)?.let(fixings::get) ?: candidate
         if (declaration.second == "Bool") {
             if ((value as? SExpr.Atom)?.text in setOf("true", "false")) fixings[symbol] = value
         } else {
@@ -238,6 +238,15 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
             if (declaration.second == "Int" && number.den != com.eignex.util.numbers.BIG_ONE) return
             fixings[symbol] = constants.literal(number)
         }
+    }
+
+    private fun fixingSymbol(expression: SExpr): String? {
+        val spelling = (expression as? SExpr.Atom)?.text ?: return null
+        if (spelling.startsWith('|')) return polynomialSymbol(spelling)
+        if (spelling in setOf("true", "false") || spelling.startsWith('#')) return null
+        val parts = spelling.split('.')
+        if (parts.size in 1..2 && parts.all { it.isNotEmpty() && it.all { digit -> digit in '0'..'9' } }) return null
+        return polynomialSymbol(spelling)
     }
 
     private fun activation(parent: String?, condition: SExpr): String? {

@@ -312,6 +312,35 @@ class SmtArithmeticReductionTest {
         assertEquals(emptyList(), interpretation?.entries)
     }
 
+    @Test
+    fun `lexical literals should remain independent of quoted coordinate fixings`() {
+        val scripts = listOf(
+            "(declare-const |1| Int) (assert (= 1 2))",
+            "(declare-const |1| Int) (assert (= |1| 2)) (assert (= 1 2))",
+            "(declare-const |1.5| Real) (assert (= 1.5 2.5))",
+            "(declare-const |1.5| Real) (assert (= |1.5| 2.5)) (assert (= 1.5 2.5))",
+            "(declare-const |#b1| Int) (assert (= |#b1| 2)) (assert (= #b1 #b0))")
+
+        for (script in scripts) {
+            val result = solve(SmtLib.parse(script))
+
+            assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
+        }
+    }
+
+    @Test
+    fun `quoted numeric coordinates should retain their independently checked source value`() {
+        val original = SmtLib.parse("(declare-const |1| Int) (declare-const |2| Int) " +
+            "(assert (= |1| 2)) (assert (= |2| 3)) (assert (= (+ 1 |1| |2|) 6))")
+        val input = original.copy(sourceChecks = original.sourceChecks + SmtSourceCheck { values ->
+            values.integer("1") == "2" && values.integer("2") == "3"
+        }).withSourceWitnessValidation()
+
+        val result = solve(input)
+
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
+    }
+
     private fun solve(input: SmtLibProblem): FiniteSolveVerdict {
         val invocation = SourceSetup.prepare(SourceSetupRequest(input.source, ExecutionOperation.SATISFY,
             FiniteEngine.BACKTRACK))

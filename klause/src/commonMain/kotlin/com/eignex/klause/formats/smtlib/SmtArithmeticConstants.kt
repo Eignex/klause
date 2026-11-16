@@ -30,28 +30,46 @@ internal class SmtArithmeticConstants(private val control: ExecutionControl) {
         catch (_: TranscendentalInterrupted) { throw PolynomialSourceInterrupted() }
         catch (_: PolynomialInterrupted) { throw PolynomialSourceInterrupted() }
 
-    fun rational(expression: SExpr): BigFraction? = when (expression) {
-        is SExpr.Atom -> {
-            val parts = expression.text.split('.')
-            if (parts.size !in 1..2 || parts.any { it.isEmpty() || it.any { c -> c !in '0'..'9' } }) null else {
-                val numerator = parseBigInt(parts.joinToString(""))
-                var denominator = BigFraction.ONE
-                if (parts.size == 2) repeat(parts[1].length) {
-                    control.polynomialSourceCheckpoint(1)
-                    denominator = arithmetic.transcendental.multiply(denominator, BigFraction.ofLong(10))
+    fun rational(expression: SExpr): BigFraction? {
+        val work = ArrayDeque<Pair<SExpr, Boolean>>()
+        val values = ArrayDeque<BigFraction>()
+        work.addLast(expression to false)
+        while (work.isNotEmpty()) {
+            control.polynomialSourceCheckpoint(1)
+            val (node, combine) = work.removeLast()
+            when (node) {
+                is SExpr.Atom -> values.addLast(atomRational(node.text) ?: return null)
+                is SExpr.SList -> {
+                    val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
+                    if (head != "-" && head != "/" || head == "-" && node.items.size != 2 ||
+                        head == "/" && node.items.size != 3) return null
+                    if (!combine) {
+                        work.addLast(node to true)
+                        for (argument in node.items.drop(1).asReversed()) work.addLast(argument to false)
+                    } else {
+                        val last = values.removeLast()
+                        if (head == "-") values.addLast(last.negated()) else {
+                            if (last.isZero) return null
+                            values.addLast(arithmetic.transcendental.divide(values.removeLast(), last))
+                        }
+                    }
                 }
-                BigFraction.of(numerator, denominator.num)
             }
         }
-        is SExpr.SList -> {
-            val head = (expression.items.firstOrNull() as? SExpr.Atom)?.text
-            if (head == "-" && expression.items.size == 2) rational(expression.items[1])?.negated()
-            else if (head == "/" && expression.items.size == 3) {
-                val a = rational(expression.items[1])
-                val b = rational(expression.items[2])
-                if (a == null || b == null || b.isZero) null else arithmetic.transcendental.divide(a, b)
-            } else null
+        return values.single()
+    }
+
+    private fun atomRational(text: String): BigFraction? {
+        control.polynomialSourceCheckpoint(text.length.toLong())
+        val parts = text.split('.')
+        if (parts.size !in 1..2 || parts.any { it.isEmpty() || it.any { c -> c !in '0'..'9' } }) return null
+        val numerator = parseBigInt(parts.joinToString(""))
+        var denominator = BigFraction.ONE
+        if (parts.size == 2) repeat(parts[1].length) {
+            control.polynomialSourceCheckpoint(1)
+            denominator = arithmetic.transcendental.multiply(denominator, BigFraction.ofLong(10))
         }
+        return BigFraction.of(numerator, denominator.num)
     }
 
     fun literal(value: BigFraction): SExpr {
