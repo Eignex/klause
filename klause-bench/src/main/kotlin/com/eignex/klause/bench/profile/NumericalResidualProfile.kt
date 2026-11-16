@@ -34,7 +34,6 @@ import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.Base64
-import java.util.IdentityHashMap
 import kotlin.time.Duration.Companion.milliseconds
 
 internal object NumericalResidualProfile {
@@ -121,7 +120,7 @@ internal object NumericalResidualProfile {
             put("cliRoutingEquivalence", false)
             put("processors", Runtime.getRuntime().availableProcessors())
             put("runtimeDebug", System.getenv("KLAUSE_DEBUG"))
-            put("syntheticWorkEnabled", probe.syntheticWorkEnabled)
+            put("syntheticWorkEnabled", false)
             put("elapsedNs", elapsed)
             put("rawResult", result.javaClass.simpleName)
             put("objective", result.objectiveValue?.let(::JsonPrimitive) ?: JsonNull)
@@ -210,12 +209,7 @@ internal object NumericalResidualProfile {
         out.resolve("capture.json").writeText(report.toString())
     }
 
-    internal class Probe(
-        private val denseLimit: Int = 6,
-        private val observed: Boolean = true,
-        val syntheticWorkEnabled: Boolean = false,
-        private val auditBasis: Boolean = false,
-    ) {
+    internal class Probe {
         val phaseNs = linkedMapOf<String, Long>()
         val phaseCalls = linkedMapOf<String, Long>()
         val transformEntries = linkedMapOf<String, Long>()
@@ -225,24 +219,15 @@ internal object NumericalResidualProfile {
         val solves = ArrayList<JsonElement>()
         val builds = ArrayList<JsonElement>()
         val captures = ArrayList<Any>()
-        val basisResiduals = ArrayList<JsonElement>()
-        val basisSlices = ArrayList<JsonElement>()
         private var owners = 0
-        private val originals = IdentityHashMap<Any, Any>()
         val context: Any
-
-        fun unwrapped(owner: Any): Any = originals[owner] ?: owner
 
         init {
             val production = singleton(ENGINE + "ProductionLpEngineFactory")
             val factoryType = Class.forName(ENGINE + "LpEngineFactory")
             val factory = Proxy.newProxyInstance(factoryType.classLoader, arrayOf(factoryType)) { _, method, values ->
                 val arguments = values.orEmpty()
-                val owner = if (observed) {
-                    measured("owner-setup") { invoke(production, method, arguments) }
-                } else {
-                    invoke(production, method, arguments)
-                }
+                val owner = measured("owner-setup") { invoke(production, method, arguments) }
                 val numericalOwner = owner != null && method.name.startsWith("new") &&
                     owner.javaClass.simpleName.startsWith("RevisedSimplex")
                 if (!numericalOwner) {
@@ -256,19 +241,15 @@ internal object NumericalResidualProfile {
         }
 
         private fun wrapEngine(owner: Any, id: Int): Any {
-            if (observed) call(owner, "enableProgressTrace", true)
-            set(owner, "syntheticWorkEnabled", syntheticWorkEnabled)
-            set(field(field(owner, "refactorPolicy"), "config"), "syntheticWorkEnabled", syntheticWorkEnabled)
-            val basisFactory: (Any) -> Any = letBackend@{ matrix ->
+            call(owner, "enableProgressTrace", true)
+            set(owner, "syntheticWorkEnabled", false)
+            set(field(field(owner, "refactorPolicy"), "config"), "syntheticWorkEnabled", false)
+            val basisFactory: (Any) -> Any = { matrix ->
                 val type = Class.forName(BASIS + "KotlinBasisSolver")
                 val constructor = type.constructors.single { it.parameterCount == 10 }
                 val backend = measured("basis-setup") {
-                    constructor.newInstance(
-                        matrix, null, 0, 0.0, 0.0, false,
-                        denseLimit, if (denseLimit == 64) 0.0 else 0.5, 62, null,
-                    )
+                    constructor.newInstance(matrix, null, 0, 0.0, 0.0, false, 6, 0.5, 62, null)
                 }
-                if (!observed) return@letBackend backend
                 val pointers = call(matrix, "copyColumnPointers") as IntArray
                 val coefficients = call(matrix, "getValues") as DoubleArray
                 val basisType = Class.forName(BASIS + "BasisSolver")
@@ -277,9 +258,6 @@ internal object NumericalResidualProfile {
                     val phase = method.name
                     val transform = phase == "ftran" || phase == "btran"
                     val inputSupport = if (transform) call(requireNotNull(arguments[0]), "getCount") as Int else 0
-                    val rhs = if (transform && auditBasis && basisResiduals.size < 128) {
-                        call(requireNotNull(arguments[0]), "toDoubleArray") as DoubleArray
-                    } else null
                     val observation = if (phase == "refactorize" && builds.size < 4096) {
                         buildJsonObject {
                             put("owner", id)
@@ -313,16 +291,7 @@ internal object NumericalResidualProfile {
                         val entries = call(work, "getTransformEntries") as Long
                         transformEntries[phase] = (transformEntries[phase] ?: 0L) + entries
                         recordSolveWork(phase, arguments, inputSupport, work)
-                        if (rhs != null) {
-                            basisResiduals += buildJsonObject {
-                                put("phase", phase)
-                                put("updates", call(backend, "getUpdateCount") as Int)
-                                put("quality", json(call(backend, "solveQuality", rhs, arguments[0], phase == "btran")))
-                            }
-                        }
                     }
-                    if (auditBasis && ((phase == "refactorize" && result == true) ||
-                        (phase == "update" && result.toString() != "SINGULAR"))) recordBasisSlices(backend, phase)
                     if (phase == "update" && result.toString() != "SINGULAR") {
                         val spread = call(backend, "getRcond") as Double
                         if (spread.isFinite() && spread >= 0.0) {
@@ -342,7 +311,6 @@ internal object NumericalResidualProfile {
                 }
             }
             set(owner, "basisSolverFactory", basisFactory)
-            if (!observed) return owner
             val interfaces = owner.javaClass.interfaces
             return Proxy.newProxyInstance(owner.javaClass.classLoader, interfaces) { _, method, values ->
                 val operation = method.name.substringBefore('$')
@@ -365,7 +333,7 @@ internal object NumericalResidualProfile {
                     if (state != null && pivots >= 8 && captures.size < 2) captures += state
                 }
                 result
-            }.also { originals[it] = owner }
+            }
         }
 
         private fun <T> measured(phase: String, block: () -> T): T {
@@ -375,36 +343,6 @@ internal object NumericalResidualProfile {
             } finally {
                 phaseNs[phase] = (phaseNs[phase] ?: 0L) + System.nanoTime() - start
                 phaseCalls[phase] = (phaseCalls[phase] ?: 0L) + 1L
-            }
-        }
-
-        private fun recordBasisSlices(backend: Any, phase: String) {
-            if (basisSlices.size >= 16) return
-            val cache = field(backend, "cache")
-            val upper = requireNotNull(call(requireNotNull(call(cache, "getFt")), "getUpper"))
-            val columns = call(upper, "getColumns") as Array<*>
-            if (columns.isEmpty()) return
-            for (j in listOf(0, columns.size / 3, 2 * (columns.size / 3), columns.lastIndex).distinct()) {
-                if (basisSlices.size >= 16) break
-                val slice = requireNotNull(columns[j])
-                val indices = call(slice, "getIndices") as IntArray
-                val values = call(slice, "getValues") as DoubleArray
-                val offset = call(slice, "getOffset") as Int
-                val count = call(slice, "getCount") as Int
-                basisSlices += buildJsonObject {
-                    put("phase", phase)
-                    put("updates", call(backend, "getUpdateCount") as Int)
-                    put("dimension", columns.size)
-                    put("column", j)
-                    put("offset", offset)
-                    put("count", count)
-                    put("sampleCount", minOf(count, 64))
-                    put("indices", json(indices.copyOfRange(offset, offset + minOf(count, 64))))
-                    put("values", json(values.copyOfRange(offset, offset + minOf(count, 64))))
-                    put("indicesInBounds", (offset until offset + count).all { indices[it] in columns.indices })
-                    put("strictlySorted", (offset + 1 until offset + count).all { indices[it - 1] < indices[it] })
-                    put("finite", (offset until offset + count).all { values[it].isFinite() })
-                }
             }
         }
 
