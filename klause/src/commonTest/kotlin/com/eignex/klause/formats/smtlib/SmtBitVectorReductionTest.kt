@@ -85,7 +85,9 @@ class SmtBitVectorReductionTest {
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
         assertEquals(129, reduced.bitNames.getValue("x").size)
-        assertTrue(reduced.bitNames.getValue("x").all { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) })
+        assertTrue(reduced.bitNames.getValue("x").all {
+            assignment.boolValue(parsed.encodingBoolVarNames.getValue(it))
+        })
         assertTrue(reduced.checks.all { check -> check.check(
             { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
             { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },

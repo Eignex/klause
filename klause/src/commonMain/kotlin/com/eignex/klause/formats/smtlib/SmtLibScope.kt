@@ -17,7 +17,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
     }
     private sealed interface Frame {
         class Evaluate(val expression: SExpr, val locals: Locals?) : Frame
-        class Combine(val head: String, val count: Int, val signature: Signature?, val indexed: SExpr.SList? = null) : Frame
+        class Combine(
+            val head: String, val count: Int, val signature: Signature?, val indexed: SExpr.SList? = null,
+        ) : Frame
         class Let(val names: List<String>, val body: SExpr, val locals: Locals?) : Frame
         class Qualified(val expected: SmtSort) : Frame
     }
@@ -230,11 +232,15 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
                                 }
                                 is SExpr.SList -> {
                                     if (identifier.polynomialHead() != "_") return null
-                                    val key = identifier.items.map { (it as? SExpr.Atom)?.text ?: return null }.joinToString(" ")
+                                    val key = identifier.items.map {
+                                        (it as? SExpr.Atom)?.text ?: return null
+                                    }.joinToString(" ")
                                     work.addLast(Frame.Combine("($key)", node.items.size - 1, null, identifier))
                                 }
                             }
-                            for (argument in node.items.drop(1).asReversed()) work.addLast(Frame.Evaluate(argument, frame.locals))
+                            for (argument in node.items.drop(1).asReversed()) {
+                                work.addLast(Frame.Evaluate(argument, frame.locals))
+                            }
                             continue
                         }
                         val head = node.polynomialHead()

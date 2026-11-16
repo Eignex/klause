@@ -3,7 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -13,11 +13,11 @@ import kotlin.test.assertTrue
 class SmtLibBoundsTest {
     @Test
     fun `private quotient coordinates should retain their declared open bounds during inference`() {
-        val original = captureSmtSource(SExprReader("(declare-const x Int)").readAll(), Cancellation.Never)
+        val original = captureSmtSource(SExprReader("(declare-const x Int)").readAll(), ExecutionControl.Never)
         val commands = SExprReader("(declare-const x Int) (declare-const quotient Int) " +
             "(assert (= x 1)) (assert (= (+ (* 16 quotient) x) 241))").readAll()
         val source = lowerSmtReduction(original.copy(commands = commands), 0, 2, ProblemSettings(),
-            Cancellation.Never, resolveSmtLibSemantics(0, 2))
+            ExecutionControl.Never, resolveSmtLibSemantics(0, 2))
 
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve()).assignment
 

@@ -68,7 +68,8 @@ internal fun evaluateSmtBitVector(
     val left = number(leftBits)
     val right = number(rightBits)
     fun signed(value: BigInt, bits: List<Boolean>): BigInt = if (bits.last()) value - (BIG_ONE shl bits.size) else value
-    fun bitwise(operation: (Boolean, Boolean) -> Boolean): BigInt = number(leftBits.indices.map { operation(leftBits[it], rightBits[it]) })
+    fun bitwise(operation: (Boolean, Boolean) -> Boolean): BigInt =
+        number(leftBits.indices.map { operation(leftBits[it], rightBits[it]) })
     fun signedOverflow(value: BigInt): Boolean = value < -(modulus shr 1) || value >= modulus shr 1
     val predicate = when (operator) {
         "=" -> bitArguments.map(::number).distinct().size == 1
@@ -118,13 +119,17 @@ internal fun evaluateSmtBitVector(
             val a = signed(left, leftBits)
             val b = signed(right, rightBits)
             val remainder = if (b == BIG_ZERO) a else a % b
-            if (operator == "bvsmod" && remainder != BIG_ZERO && (a < BIG_ZERO) != (b < BIG_ZERO)) remainder + b else remainder
+            if (operator == "bvsmod" && remainder != BIG_ZERO && (a < BIG_ZERO) != (b < BIG_ZERO)) {
+                remainder + b
+            } else remainder
         }
         "bvshl" -> if (right >= bigIntOf(width)) BIG_ZERO else left shl right.toLongExact().toInt()
         "bvlshr" -> if (right >= bigIntOf(width)) BIG_ZERO else left shr right.toLongExact().toInt()
         "bvashr" -> {
             val a = signed(left, leftBits)
-            if (right >= bigIntOf(width)) if (a < BIG_ZERO) -BIG_ONE else BIG_ZERO else a shr right.toLongExact().toInt()
+            if (right >= bigIntOf(width)) {
+                if (a < BIG_ZERO) -BIG_ONE else BIG_ZERO
+            } else a shr right.toLongExact().toInt()
         }
         "bvcomp" -> if (left == right) BIG_ONE else BIG_ZERO
         "bvredor" -> if (leftBits.any { it }) BIG_ONE else BIG_ZERO

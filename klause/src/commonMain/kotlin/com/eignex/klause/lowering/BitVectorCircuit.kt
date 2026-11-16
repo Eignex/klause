@@ -24,7 +24,8 @@ internal class BitVectorCircuit<T>(private val gates: BitVectorGates<T>) {
 
     fun ite(condition: T, yes: List<T>, no: List<T>): List<T> = zip(yes, no) { a, b -> gates.ite(condition, a, b) }
 
-    fun equal(left: List<T>, right: List<T>): T = xor(left, right).fold(one) { acc, bit -> gates.and(acc, gates.not(bit)) }
+    fun equal(left: List<T>, right: List<T>): T =
+        xor(left, right).fold(one) { acc, bit -> gates.and(acc, gates.not(bit)) }
 
     fun unsignedLess(left: List<T>, right: List<T>): T {
         requireSameWidth(left, right)
@@ -118,7 +119,8 @@ internal class BitVectorCircuit<T>(private val gates: BitVectorGates<T>) {
         require(value.isNotEmpty() && amount >= 0)
         val distance = amount % value.size
         return List(value.size) { i ->
-            val source = if (right) (i.toLong() + distance) % value.size else (i.toLong() + value.size - distance) % value.size
+            val source = if (right) (i.toLong() + distance) % value.size
+                else (i.toLong() + value.size - distance) % value.size
             value[source.toInt()]
         }
     }

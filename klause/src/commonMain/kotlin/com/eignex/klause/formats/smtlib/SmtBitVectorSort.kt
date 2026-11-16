@@ -37,7 +37,8 @@ internal fun smtBitVectorOperatorSort(operator: String, arguments: List<SmtSort>
         "bvnand", "bvnor", "bvxnor", "bvsub", "bvudiv", "bvurem", "bvsdiv", "bvsrem", "bvsmod",
         "bvshl", "bvlshr", "bvashr" -> if (arguments.size == 2) first else null
         "bvult", "bvule", "bvugt", "bvuge", "bvslt", "bvsle", "bvsgt", "bvsge",
-        "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvusubo", "bvssubo", "bvsdivo" -> if (arguments.size == 2) SmtSort.Bool else null
+        "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvusubo", "bvssubo", "bvsdivo" ->
+            if (arguments.size == 2) SmtSort.Bool else null
         "bvnego" -> if (arguments.size == 1) SmtSort.Bool else null
         "bvcomp" -> if (arguments.size == 2) SmtSort.BitVector(1) else null
         "bvredor", "bvredand" -> if (arguments.size == 1) SmtSort.BitVector(1) else null
@@ -54,7 +55,9 @@ internal fun smtIndexedBitVectorSort(indexed: SExpr.SList, arguments: List<SmtSo
         if (text.isEmpty() || text.any { digit -> digit !in '0'..'9' }) return null
         text
     }
-    if (operator.startsWith("bv") && operator.drop(2).let { it.isNotEmpty() && it.all { digit -> digit in '0'..'9' } }) {
+    if (operator.startsWith("bv") && operator.drop(2).let {
+            it.isNotEmpty() && it.all { digit -> digit in '0'..'9' }
+        }) {
         if (arguments.isNotEmpty() || indices.size != 1) return null
         val sort = bitVectorSort(indices[0].toLongOrNull() ?: return null) ?: return null
         if (parseBigInt(operator.drop(2)).magnitudeBitLength() > sort.width) return null
@@ -81,4 +84,5 @@ internal fun smtIndexedBitVectorSort(indexed: SExpr.SList, arguments: List<SmtSo
     }
 }
 
-private fun bitVectorSort(width: Long): SmtSort.BitVector? = if (width in 1..Int.MAX_VALUE.toLong()) SmtSort.BitVector(width.toInt()) else null
+private fun bitVectorSort(width: Long): SmtSort.BitVector? =
+    if (width in 1..Int.MAX_VALUE.toLong()) SmtSort.BitVector(width.toInt()) else null

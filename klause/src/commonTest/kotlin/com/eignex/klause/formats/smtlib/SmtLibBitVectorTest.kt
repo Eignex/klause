@@ -134,7 +134,9 @@ class SmtLibBitVectorTest {
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
         assertEquals(SmtValue.BitVector("10"), parsed.reconstructModel(assignment).values.single().second)
-        assertFailsWith<UnsupportedSmtException> { SmtLib.parse("(assert (= ((as bvadd (_ BitVec 1)) #b01 #b01) #b0))") }
+        assertFailsWith<UnsupportedSmtException> {
+            SmtLib.parse("(assert (= ((as bvadd (_ BitVec 1)) #b01 #b01) #b0))")
+        }
         assertFailsWith<UnsupportedSmtException> { SmtLib.parse("(assert (= (as (bvadd #b0 #b1) (_ BitVec 1)) #b1))") }
     }
 

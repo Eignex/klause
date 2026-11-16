@@ -50,7 +50,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         data class Bits(val bits: List<SExpr>, val domains: List<SExpr> = emptyList()) : Value {
             override val type = Type.Bits(bits.size)
         }
-        data class Scalar(val expression: SExpr, override val type: Type.Scalar, val domains: List<SExpr> = emptyList()) : Value
+        data class Scalar(
+            val expression: SExpr, override val type: Type.Scalar, val domains: List<SExpr> = emptyList(),
+        ) : Value
     }
 
     private data class Macro(
@@ -135,11 +137,13 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             when (val expression = pending.removeLast()) {
                 is SExpr.Atom -> {
                     reserved.add(polynomialSymbol(expression.text))
-                    if (expression.text == "BitVec" || expression.text.startsWith("#b") || expression.text.startsWith("#x")) active = true
+                    if (expression.text == "BitVec" || expression.text.startsWith("#b") ||
+                        expression.text.startsWith("#x")) active = true
                 }
                 is SExpr.SList -> {
                     pending.addAll(expression.items)
-                    if (head(expression) == "_" && (expression.items.getOrNull(1) as? SExpr.Atom)?.text?.startsWith("bv") == true) active = true
+                    if (head(expression) == "_" &&
+                        (expression.items.getOrNull(1) as? SExpr.Atom)?.text?.startsWith("bv") == true) active = true
                 }
             }
         }
@@ -161,7 +165,8 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
                     val assumptions = command.items.getOrNull(1) as? SExpr.SList
                         ?: smtUnsupported("malformed check-sat-assuming")
                     val environment = Environment(values.toMap(), macros.toMap())
-                    output.add(form("check-sat-assuming", SExpr.SList(assumptions.items.map { scalar(evaluate(it, environment)) })))
+                    val reduced = assumptions.items.map { scalar(evaluate(it, environment)) }
+                    output.add(form("check-sat-assuming", SExpr.SList(reduced)))
                 }
                 else -> output.add(command)
             }
@@ -176,7 +181,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         val sortNode = command.items.getOrNull(if (function) 3 else 2) ?: smtUnsupported("missing declaration sort")
         if (function) {
             val parameters = command.items.getOrNull(2) as? SExpr.SList ?: smtUnsupported("missing parameter sorts")
-            if (parameters.items.isNotEmpty()) smtUnsupported("uninterpreted functions must be reduced before bitvectors")
+            if (parameters.items.isNotEmpty()) {
+                smtUnsupported("uninterpreted functions must be reduced before bitvectors")
+            }
         }
         val type = type(sortNode)
         values[key] = when (type) {
@@ -252,7 +259,8 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
                             val macro = frame.environment.macros[key]
                             when {
                                 text in setOf("true", "false") || text.startsWith("#b") ||
-                                    text.startsWith("#x") || text.firstOrNull()?.isDigit() == true -> results.add(literal(expression))
+                                    text.startsWith("#x") || text.firstOrNull()?.isDigit() == true ->
+                                    results.add(literal(expression))
                                 bound != null -> results.add(bound)
                                 macro != null && macro.parameters.isEmpty() -> {
                                     work.addLast(Frame.Check(macro.result))
@@ -270,16 +278,22 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
                                     smtUnsupported("qualification requires an identifier")
                                 }
                                 work.addLast(Frame.Check(type(qualified.items[2])))
-                                work.addLast(Frame.Eval(SExpr.SList(listOf(identifier) + expression.items.drop(1)), frame.environment))
+                                val normalized = SExpr.SList(listOf(identifier) + expression.items.drop(1))
+                                work.addLast(Frame.Eval(normalized, frame.environment))
                                 continue
                             }
                             val operator = head(expression)
                             when {
                                 operator == "let" -> {
-                                    val bindings = expression.items.getOrNull(1) as? SExpr.SList ?: smtUnsupported("malformed let")
-                                    val pairs = bindings.items.map { it as? SExpr.SList ?: smtUnsupported("malformed let binding") }
+                                    val bindings = expression.items.getOrNull(1) as? SExpr.SList
+                                        ?: smtUnsupported("malformed let")
+                                    val pairs = bindings.items.map {
+                                        it as? SExpr.SList ?: smtUnsupported("malformed let binding")
+                                    }
                                     val names = pairs.map { polynomialSymbol(symbol(it.items.getOrNull(0))) }
-                                    if (names.toSet().size != names.size || expression.items.size != 3) smtUnsupported("malformed let")
+                                    if (names.toSet().size != names.size || expression.items.size != 3) {
+                                        smtUnsupported("malformed let")
+                                    }
                                     work.addLast(Frame.BindLet(names, expression.items[2], frame.environment))
                                     for (pair in pairs.asReversed()) {
                                         if (pair.items.size != 2) smtUnsupported("malformed let binding")
@@ -299,9 +313,13 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
                                 }
                                 frame.environment.macros.containsKey(operator) -> {
                                     val macro = frame.environment.macros.getValue(operator!!)
-                                    if (expression.items.size - 1 != macro.parameters.size) smtUnsupported("wrong helper arity")
+                                    if (expression.items.size - 1 != macro.parameters.size) {
+                                        smtUnsupported("wrong helper arity")
+                                    }
                                     work.addLast(Frame.Call(macro, macro.parameters.size))
-                                    for (arg in expression.items.drop(1).asReversed()) work.addLast(Frame.Eval(arg, frame.environment))
+                                    for (arg in expression.items.drop(1).asReversed()) {
+                                        work.addLast(Frame.Eval(arg, frame.environment))
+                                    }
                                 }
                                 operator == "_" -> results.add(indexedLiteral(expression))
                                 else -> {
@@ -323,7 +341,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         if (indexed != null && head(indexed) == "as") {
             if (indexed.items.size != 3) smtUnsupported("malformed qualified identifier")
             val identifier = indexed.items[1]
-            if (identifier is SExpr.SList && head(identifier) != "_") smtUnsupported("qualification requires an identifier")
+            if (identifier is SExpr.SList && head(identifier) != "_") {
+                smtUnsupported("qualification requires an identifier")
+            }
             val result = combine(SExpr.SList(listOf(identifier) + expression.items.drop(1)), arguments)
             requireType(result, type(indexed.items[2]))
             return result
@@ -341,7 +361,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             if (operator == "=") {
                 for (i in 1 until bits.size) comparisons.add(circuit.equal(bits[i - 1], bits[i]))
             } else {
-                for (i in bits.indices) for (j in i + 1 until bits.size) comparisons.add(gates.not(circuit.equal(bits[i], bits[j])))
+                for (i in bits.indices) for (j in i + 1 until bits.size) {
+                    comparisons.add(gates.not(circuit.equal(bits[i], bits[j])))
+                }
             }
             val result = bool(comparisons.fold(one, gates::and))
             record(operator, emptyList(), arguments, result)
@@ -353,7 +375,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             val condition = observeScalar(arguments[0])
             if (bits(arguments[1]).size != bits(arguments[2]).size) smtUnsupported("bitvector width mismatch")
             val observedArguments = listOf(condition) + arguments.drop(1)
-            val result = Value.Bits(circuit.ite(scalar(condition), bits(arguments[1]), bits(arguments[2])), condition.domains)
+            val result = Value.Bits(
+                circuit.ite(scalar(condition), bits(arguments[1]), bits(arguments[2])), condition.domains,
+            )
             record(operator, emptyList(), observedArguments, result)
             return result
         }
@@ -372,7 +396,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
     private fun bitVectorOperation(operator: String, arguments: List<Value>): Value {
         if (operator in setOf("ubv_to_int", "sbv_to_int", "bv2nat", "bv2int")) {
             arity(arguments, 1)
-            val result = observeScalar(Value.Scalar(integerValue(bits(arguments[0]), operator == "sbv_to_int"), intType))
+            val result = observeScalar(Value.Scalar(
+                integerValue(bits(arguments[0]), operator == "sbv_to_int"), intType,
+            ))
             record(operator, emptyList(), arguments, result)
             return result
         }
@@ -470,7 +496,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         val value = bits(arguments[0])
         return Value.Bits(when (operator) {
             "extract" -> {
-                if (indices.size != 2 || indices[0] >= value.size || indices[1] > indices[0]) smtUnsupported("invalid extract indices")
+                if (indices.size != 2 || indices[0] >= value.size || indices[1] > indices[0]) {
+                    smtUnsupported("invalid extract indices")
+                }
                 circuit.extract(value, indices[0], indices[1])
             }
             "zero_extend", "sign_extend" -> {
@@ -506,7 +534,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         val text = expression.text
         if (text.startsWith("#b")) {
             val digits = text.drop(2)
-            if (digits.isEmpty() || digits.any { it != '0' && it != '1' }) smtUnsupported("invalid binary bitvector literal")
+            if (digits.isEmpty() || digits.any { it != '0' && it != '1' }) {
+                smtUnsupported("invalid binary bitvector literal")
+            }
             checkWidth(digits.length.toLong())
             return Value.Bits(digits.reversed().map { if (it == '1') one else zero })
         }
@@ -516,7 +546,9 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
                 smtUnsupported("invalid hexadecimal bitvector literal")
             }
             checkWidth(digits.length.toLong() * 4)
-            return Value.Bits(digits.reversed().flatMap { digit -> List(4) { if (digit.digitToInt(16) and (1 shl it) != 0) one else zero } })
+            return Value.Bits(digits.reversed().flatMap { digit ->
+                List(4) { if (digit.digitToInt(16) and (1 shl it) != 0) one else zero }
+            })
         }
         val type = when {
             text == "true" || text == "false" -> boolType
@@ -648,12 +680,16 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
     }
 
     private fun requireType(value: Value, expected: Type) {
-        if (value.type != expected && !(value.type == intType && expected == realType)) smtUnsupported("incompatible expression sort")
+        if (value.type != expected && !(value.type == intType && expected == realType)) {
+            smtUnsupported("incompatible expression sort")
+        }
     }
 
-    private fun bits(value: Value): List<SExpr> = (value as? Value.Bits)?.bits ?: smtUnsupported("expected bitvector term")
+    private fun bits(value: Value): List<SExpr> =
+        (value as? Value.Bits)?.bits ?: smtUnsupported("expected bitvector term")
 
-    private fun scalar(value: Value): SExpr = (value as? Value.Scalar)?.expression ?: smtUnsupported("bitvector used as scalar")
+    private fun scalar(value: Value): SExpr =
+        (value as? Value.Scalar)?.expression ?: smtUnsupported("bitvector used as scalar")
 
     private fun bool(expression: SExpr): Value = Value.Scalar(expression, boolType)
 
@@ -677,15 +713,19 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         return result
     }
 
-    private fun String.toBigIntOrNull(): BigInt? = if (isNotEmpty() && all { it in '0'..'9' }) parseBigInt(this) else null
+    private fun String.toBigIntOrNull(): BigInt? =
+        if (isNotEmpty() && all { it in '0'..'9' }) parseBigInt(this) else null
 
-    private fun symbol(expression: SExpr?): String = (expression as? SExpr.Atom)?.text ?: smtUnsupported("expected symbol")
+    private fun symbol(expression: SExpr?): String =
+        (expression as? SExpr.Atom)?.text ?: smtUnsupported("expected symbol")
 
-    private fun head(expression: SExpr): String? = ((expression as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text?.let(::polynomialSymbol)
+    private fun head(expression: SExpr): String? =
+        ((expression as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text?.let(::polynomialSymbol)
 
     private fun atom(text: String): SExpr.Atom = SExpr.Atom(text)
 
-    private fun form(operator: String, vararg arguments: SExpr): SExpr.SList = SExpr.SList(listOf(atom(operator)) + arguments)
+    private fun form(operator: String, vararg arguments: SExpr): SExpr.SList =
+        SExpr.SList(listOf(atom(operator)) + arguments)
 
     private companion object {
         const val MAX_WIDTH = 1_000_000
