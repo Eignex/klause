@@ -1,11 +1,36 @@
 package com.eignex.klause.cli
 
 import java.io.File
+import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class SmtLibSessionCliTest {
+    @Test
+    fun `an output channel open failure preserves stdout and command execution`() {
+        val source = File.createTempFile("smt-channel-failure", ".smt2")
+        val directory = Files.createTempDirectory("smt-channel").toFile()
+        val destination = File(directory, "missing/out")
+        source.writeText("""
+            (set-option :regular-output-channel "${destination.absolutePath}")
+            (echo "alive")
+        """.trimIndent())
+
+        try {
+            val output = captureStdout { assertEquals(0, runCli(arrayOf(source.absolutePath))) }
+            val lines = output.trim().lines()
+
+            assertEquals(2, lines.size)
+            assertTrue(lines[0].startsWith("(error "))
+            assertTrue("cannot open output channel" in lines[0])
+            assertEquals("\"alive\"", lines[1])
+        } finally {
+            source.delete()
+            directory.delete()
+        }
+    }
+
     @Test
     fun `verbose solver diagnostics honor the selected file destination`() {
         val source = File.createTempFile("smt-verbose", ".smt2")

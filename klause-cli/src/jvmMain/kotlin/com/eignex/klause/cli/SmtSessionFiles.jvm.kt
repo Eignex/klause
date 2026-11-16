@@ -12,7 +12,7 @@ internal actual fun openSmtSessionAppend(path: String): SmtSessionSink {
         BufferedWriter(OutputStreamWriter(FileOutputStream(path, true), Charsets.UTF_8))
     } catch (error: IOException) {
         throw UnsupportedSmtException("cannot open output channel '$path': ${error.message}").apply {
-            initCause(error)
+            addSuppressed(error)
         }
     }
     return object : SmtSessionSink {
