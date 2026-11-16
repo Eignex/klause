@@ -1,6 +1,5 @@
 package com.eignex.klause.bench.catalog
 
-import com.eignex.klause.bench.source.CorpusSelection
 import com.eignex.klause.bench.source.OrLibrary
 
 /**

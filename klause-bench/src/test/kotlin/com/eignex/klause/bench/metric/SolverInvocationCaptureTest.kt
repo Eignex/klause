@@ -57,7 +57,7 @@ class SolverInvocationCaptureTest {
         try {
             val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
                 captureDirectory = directory,
-                startProcess = { FakeProcess(trace.byteInputStream(), stdout = "sat\n") })
+                startProcess = { SolverInvocationFakeProcess(trace.byteInputStream(), stdout = "sat\n") })
 
             assertEquals(trace, directory.resolve("cli.stderr").readText())
             assertEquals("ls/a quarantined: conflict", result.stats[SolverInvocation.QUARANTINED])
@@ -76,7 +76,7 @@ class SolverInvocationCaptureTest {
         val trace = "x".repeat(20_000) + "\nklause MPS: declined\n"
 
         val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.PB_COMPETITION,
-            startProcess = { FakeProcess(trace.byteInputStream(), exit = 2) })
+            startProcess = { SolverInvocationFakeProcess(trace.byteInputStream(), exit = 2) })
 
         assertEquals("MPS: declined", result.stats["unsupported"])
         assertEquals("2", result.stats["exit"])
@@ -93,7 +93,7 @@ class SolverInvocationCaptureTest {
             val failure = assertFailsWith<SolverInvocation.Failure> {
                 SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.PB_COMPETITION,
                     captureDirectory = directory,
-                    startProcess = { FakeProcess(trace.byteInputStream(), exit = 7) })
+                    startProcess = { SolverInvocationFakeProcess(trace.byteInputStream(), exit = 7) })
             }
 
             assertNull(failure.result.stats["unsupported"])
@@ -114,7 +114,7 @@ class SolverInvocationCaptureTest {
         try {
             val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.PB_COMPETITION,
                 captureDirectory = directory,
-                startProcess = { FakeProcess("klause MPS: declined\n".byteInputStream(), exit = 2) })
+                startProcess = { SolverInvocationFakeProcess("klause MPS: declined\n".byteInputStream(), exit = 2) })
 
             assertEquals("MPS: declined", result.stats["unsupported"])
             assertTrue(result.stderrComplete)
@@ -133,7 +133,7 @@ class SolverInvocationCaptureTest {
         try {
             val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
                 captureDirectory = directory,
-                startProcess = { FakeProcess("partial\n".byteInputStream(), timeout = true) })
+                startProcess = { SolverInvocationFakeProcess("partial\n".byteInputStream(), timeout = true) })
 
             assertEquals("hard-timeout", result.stats["killed"])
             assertFalse(result.stderrComplete)
@@ -157,7 +157,7 @@ class SolverInvocationCaptureTest {
 
         val failure = assertFailsWith<SolverInvocation.Failure> {
             SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.PB_COMPETITION,
-                startProcess = { FakeProcess(stream, exit = 2) })
+                startProcess = { SolverInvocationFakeProcess(stream, exit = 2) })
         }
 
         assertNull(failure.result.stats["unsupported"])
@@ -173,7 +173,7 @@ class SolverInvocationCaptureTest {
                 captureDirectory = directory,
                 startProcess = {
                     directory.resolve("cli.stderr.json").mkdir()
-                    FakeProcess("complete\n".byteInputStream())
+                    SolverInvocationFakeProcess("complete\n".byteInputStream())
                 })
 
             assertTrue(result.stderrComplete)
@@ -192,7 +192,7 @@ class SolverInvocationCaptureTest {
             val failure = assertFailsWith<SolverInvocation.Failure> {
                 SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
                     captureDirectory = directory,
-                    startProcess = { FakeProcess("complete\n".byteInputStream()) })
+                    startProcess = { SolverInvocationFakeProcess("complete\n".byteInputStream()) })
             }
 
             assertNull(failure.result.stats["killed"])
@@ -216,7 +216,7 @@ class SolverInvocationCaptureTest {
 
         val result = SolverInvocation.invoke(listOf("fake"), SolverInvocation.Dialect.SMT_LIB,
             startProcess = {
-                FakeProcess("partial\n".byteInputStream(), timeout = true,
+                SolverInvocationFakeProcess("partial\n".byteInputStream(), timeout = true,
                     stdoutStream = stdout, onDestroy = { killed.countDown() })
             })
 
@@ -226,28 +226,28 @@ class SolverInvocationCaptureTest {
         assertFalse(result.stderrComplete)
         assertTrue(assertNotNull(result.stderrCapture).processKilled)
     }
+}
 
-    private class FakeProcess(
-        private val stderr: InputStream,
-        stdout: String = "",
-        private val exit: Int = 0,
-        private val timeout: Boolean = false,
-        private val stdoutStream: InputStream = ByteArrayInputStream(stdout.toByteArray()),
-        private val onDestroy: () -> Unit = {},
-    ) : Process() {
-        @Volatile private var destroyed = false
-        override fun getInputStream(): InputStream = stdoutStream
-        override fun getErrorStream(): InputStream = stderr
-        override fun getOutputStream(): ByteArrayOutputStream = ByteArrayOutputStream()
-        override fun waitFor(): Int = exit
-        override fun waitFor(timeout: Long, unit: TimeUnit): Boolean = !this.timeout || destroyed
-        override fun exitValue(): Int = if (isAlive()) throw IllegalThreadStateException() else exit
-        override fun isAlive(): Boolean = timeout && !destroyed
-        override fun descendants(): Stream<ProcessHandle> = Stream.empty()
-        override fun destroy() {
-            destroyed = true
-            onDestroy()
-        }
-        override fun destroyForcibly(): Process = apply { destroy() }
+internal class SolverInvocationFakeProcess(
+    private val stderr: InputStream,
+    stdout: String = "",
+    private val exit: Int = 0,
+    private val timeout: Boolean = false,
+    private val stdoutStream: InputStream = ByteArrayInputStream(stdout.toByteArray()),
+    private val onDestroy: () -> Unit = {},
+) : Process() {
+    @Volatile private var destroyed = false
+    override fun getInputStream(): InputStream = stdoutStream
+    override fun getErrorStream(): InputStream = stderr
+    override fun getOutputStream(): ByteArrayOutputStream = ByteArrayOutputStream()
+    override fun waitFor(): Int = exit
+    override fun waitFor(timeout: Long, unit: TimeUnit): Boolean = !this.timeout || destroyed
+    override fun exitValue(): Int = if (isAlive()) throw IllegalThreadStateException() else exit
+    override fun isAlive(): Boolean = timeout && !destroyed
+    override fun descendants(): Stream<ProcessHandle> = Stream.empty()
+    override fun destroy() {
+        destroyed = true
+        onDestroy()
     }
+    override fun destroyForcibly(): Process = apply { destroy() }
 }

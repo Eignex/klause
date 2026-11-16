@@ -640,7 +640,7 @@ class SolverInvocationTest {
         val stdout = metadata.entries.joinToString("\n") { prefix + it.key + "=" + it.value } + "\n"
 
         val result = SolverInvocation.invoke(listOf("fake"), mode,
-            startProcess = { FakeProcess("".byteInputStream(), stdout = stdout) })
+            startProcess = { SolverInvocationFakeProcess("".byteInputStream(), stdout = stdout) })
 
         metadata.forEach { (key, value) -> assertEquals(value, result.stats[key], key) }
         assertNull(result.feasible)
