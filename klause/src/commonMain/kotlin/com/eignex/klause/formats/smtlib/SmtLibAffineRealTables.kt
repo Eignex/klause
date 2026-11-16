@@ -150,7 +150,7 @@ internal class SmtLibAffineRealTables(cancellation: ExecutionControl, entryLimit
             if (trueLiteral >= 0 && literal == Lit.negate(trueLiteral)) return null
             val parts = if (Lit.variable(literal) in declared)
                 listOf(literal)
-                else
+            else
                 conjunctions[literal] ?: return null
             for (part in parts) {
                 work.spend()
@@ -165,29 +165,31 @@ internal class SmtLibAffineRealTables(cancellation: ExecutionControl, entryLimit
 
     private fun singleInput(entries: List<Case>): Boolean {
         var input = -1
-        for (entry in entries)
+        for (entry in entries) {
             for (literal in entry.cube) {
-            work.spend()
-            val variable = Lit.variable(literal)
-            if (input >= 0 && input != variable) return false
-            input = variable
+                work.spend()
+                val variable = Lit.variable(literal)
+                if (input >= 0 && input != variable) return false
+                input = variable
+            }
         }
         return true
     }
 
     private fun table(variable: Int, entries: List<Case>, channels: Map<Int, Channel>? = null): Table? {
         val support = HashSet<Int>()
-        for (entry in entries)
+        for (entry in entries) {
             for (literal in entry.cube) {
-            work.spend()
-            support.add(Lit.variable(literal))
-            if (support.size > MAX_INPUTS) return null
+                work.spend()
+                support.add(Lit.variable(literal))
+                if (support.size > MAX_INPUTS) return null
+            }
         }
         if (channels != null)
             for (input in support) {
-            work.spend()
-            if (input !in channels) return null
-        }
+                work.spend()
+                if (input !in channels) return null
+            }
         work.spend(support.size.toLong() * (MAX_INPUTS + 2L) + 1L)
         val inputs = support.sorted().toIntArray()
         val bitOfInput = HashMap<Int, Int>()

@@ -9,13 +9,19 @@ internal class PresolveScan(private val parent: ExecutionControl) :
     AutoCloseable {
     override val accounting = parent.accounting
     private val source = parent.admission
+
     @JvmField val physical = source?.withoutQuotaViews()
+
     @JvmField val budget = source?.quotaOwner as? PresolveBudget
+
     @JvmField val end = (budget?.spent() ?: 0L).let { spent ->
         spent + minOf(source?.quotaRemaining ?: Long.MAX_VALUE, Long.MAX_VALUE - spent)
     }
+
     @JvmField var countdown = 0
+
     @JvmField val polling = parent.stopPolling
+
     @JvmField var stopped = false
 
     override val admission get() = source

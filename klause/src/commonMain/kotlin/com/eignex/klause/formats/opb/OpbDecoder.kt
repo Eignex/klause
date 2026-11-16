@@ -172,7 +172,6 @@ internal object OpbDecoder {
 
         override fun newBool(): Int = problemBuilder.newBool()
 
-
         fun literalFor(term: OpbTerm): Int {
             if (term.literals.size == 1) return term.literals[0]
             val key = term.literals.sorted()
@@ -212,8 +211,6 @@ internal object OpbDecoder {
         }
         return value.toLongExact()
     }
-
-
 }
 
 /** Lower this parsed OPB document to a solver problem. */

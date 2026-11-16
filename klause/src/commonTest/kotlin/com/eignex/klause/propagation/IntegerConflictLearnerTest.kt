@@ -134,7 +134,8 @@ class IntegerConflictLearnerTest {
 
     @Test
     fun `prepared optimization should consume a guarded arithmetic consequence`() {
-        val program = parseFlatZinc("""
+        val program =
+            parseFlatZinc("""
             var bool: active;
             var 7..12: z;
             var 0..3: x;
@@ -171,7 +172,8 @@ class IntegerConflictLearnerTest {
 
     @Test
     fun `a prepared enumeration should reuse and retire its guarded arithmetic consequence`() {
-        val program = parseFlatZinc("""
+        val program =
+            parseFlatZinc("""
             var bool: active;
             var 7..12: z;
             var 0..3: x;
@@ -542,7 +544,7 @@ class IntegerConflictLearnerTest {
                     assertEquals(if (sign > 0) upper / 4 else -(upper / 4),
                         if (sign > 0) native.intDomain(0).max else native.intDomain(0).min)
                     val reason = if (sign > 0) native.explanationState.intMaxReason[0]
-                        else native.explanationState.intMinReason[0]
+                    else native.explanationState.intMinReason[0]
                     assertIs<LearnedIntegerPropagator>(native.explanationState.factorAt(reason))
                 }
             }

@@ -29,10 +29,12 @@ internal class FlatZincValues(
         { sample.boolValue(it) },
         { sample.exactIntValue(it).toString() },
         { sample.approximateRealValue(it) },
-        { id -> sample.exactReals?.get(id)?.toString() ?: sample.algebraicReals?.get(id)?.let { value ->
-            value.rational?.toString()
-                ?: "root(${value.rootIndex};[${value.definingCoefficients.joinToString(",")}])"
-        } },
+        { id ->
+            sample.exactReals?.get(id)?.toString() ?: sample.algebraicReals?.get(id)?.let { value ->
+                value.rational?.toString()
+                    ?: "root(${value.rootIndex};[${value.definingCoefficients.joinToString(",")}])"
+            }
+        },
     )
 
     constructor(assignment: OpenTheoryAssignment) : this(

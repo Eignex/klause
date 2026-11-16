@@ -24,9 +24,11 @@ internal class LinearFormulaLowering(private val cancellation: ExecutionControl)
         var clauses: List<List<LinearRow>> = listOf(emptyList())
         for (operand in operands) {
             val next = ArrayList<List<LinearRow>>()
-            for (left in clauses) for (right in operand) {
-                checkpoint(left.size.toLong() + right.size + 1)
-                next += left + right
+            for (left in clauses) {
+                for (right in operand) {
+                    checkpoint(left.size.toLong() + right.size + 1)
+                    next += left + right
+                }
             }
             clauses = next
         }
@@ -44,7 +46,7 @@ internal class LinearFormulaLowering(private val cancellation: ExecutionControl)
     fun checkpoint(units: Long = 1) {
         if (cancellation.pollStop()) throw LinearEncodingInterrupted()
         accounting?.charge(units)
-        if (admission?.exhausted == true ||cancellation.pollStop()) throw LinearEncodingInterrupted()
+        if (admission?.exhausted == true || cancellation.pollStop()) throw LinearEncodingInterrupted()
     }
 }
 

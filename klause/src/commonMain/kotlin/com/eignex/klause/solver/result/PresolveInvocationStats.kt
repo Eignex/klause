@@ -6,6 +6,7 @@ import kotlin.time.Duration
 enum class PresolveLane {
     /** Declared source bounds and factors. */
     SOURCE,
+
     /** Finite root domains, including construction and external stages. */
     FINITE,
 }
@@ -14,14 +15,19 @@ enum class PresolveLane {
 enum class PresolveInvocationOutcome {
     /** An applicability gate declined the reduction analysis. */
     ELIGIBILITY_SKIP,
+
     /** Analysis completed without a reduction. */
     COMPLETE_MISS,
+
     /** Completed reductions were retained. */
     CHANGED,
+
     /** Analysis proved infeasibility. */
     REFUTED,
+
     /** Analysis stopped; separately completed reductions can remain sound. */
     INTERRUPTED,
+
     /** A preparation operation completed. */
     COMPLETE,
 }

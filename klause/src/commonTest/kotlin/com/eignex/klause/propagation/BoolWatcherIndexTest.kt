@@ -39,7 +39,6 @@ class BoolWatcherIndexTest {
         }
     }
 
-
     @Test
     fun `blocker lists should stay aligned with watcher lists across watch moves`() {
         val clause = Clause(IntArray(4) { Lit.make(it, true) })

@@ -11,11 +11,15 @@ internal class SourceIntegerBounds(
     private val upper: Map<SourceCoordinate, BigFraction>,
 ) {
     fun status(pins: Map<SourceCoordinate, BigFraction>): IntegerPinStatus {
-        if (pins.any { (id, value) -> lower[id]?.let { it > value } == true ||
-                upper[id]?.let { it < value } == true }) return IntegerPinStatus.Inactive
-        return if (pins.all { (id, value) -> lower[id]?.let { it >= value } == true &&
-                upper[id]?.let { it <= value } == true }) IntegerPinStatus.Established
-            else IntegerPinStatus.Unresolved
+        if (pins.any { (id, value) ->
+                lower[id]?.let { it > value } == true ||
+                    upper[id]?.let { it < value } == true
+            }) return IntegerPinStatus.Inactive
+        return if (pins.all { (id, value) ->
+                lower[id]?.let { it >= value } == true &&
+                    upper[id]?.let { it <= value } == true
+            }) IntegerPinStatus.Established
+        else IntegerPinStatus.Unresolved
     }
 
     fun split(pins: Map<SourceCoordinate, BigFraction>): Pair<SourceCoordinate, BigFraction>? {

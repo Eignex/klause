@@ -179,19 +179,27 @@ private class PolynomialConsequenceRefutation(
             if (atom.relation != PolynomialRelation.EQ) continue
             val terms = atom.polynomial.terms
             val occurrences = HashMap<Int, Int>()
-            for (term in terms) for (variable in term.monomial.variables) {
-                arithmetic.step()
-                occurrences[variable] = (occurrences[variable] ?: 0) + 1
+            for (term in terms) {
+                for (variable in term.monomial.variables) {
+                    arithmetic.step()
+                    occurrences[variable] = (occurrences[variable] ?: 0) + 1
+                }
             }
-            for (term in terms) for (variable in term.monomial.variables) {
-                arithmetic.step()
-                if (variable in used || occurrences[variable] != 1 || term.monomial.exponent(variable) != 1) continue
-                val rank = listOf(term.monomial.variables.size, inputDegrees.getValue(variable),
-                    terms.size, index, variable)
-                val previous = best
-                if (previous == null || rank.indices.firstOrNull { arithmetic.step(); rank[it] != previous.rank[it] }
-                        ?.let { rank[it] < previous.rank[it] } == true
-                ) best = Pivot(index, variable, term, rank)
+            for (term in terms) {
+                for (variable in term.monomial.variables) {
+                    arithmetic.step()
+                    if (variable in used || occurrences[variable] != 1 || term.monomial.exponent(variable) != 1)
+                        continue
+                    val rank = listOf(term.monomial.variables.size, inputDegrees.getValue(variable),
+                        terms.size, index, variable)
+                    val previous = best
+                    if (previous == null || rank.indices.firstOrNull {
+                            arithmetic.step()
+                            rank[it] != previous.rank[it]
+                        }
+                            ?.let { rank[it] < previous.rank[it] } == true
+                    ) best = Pivot(index, variable, term, rank)
+                }
             }
         }
         return best
@@ -311,7 +319,10 @@ private class PolynomialConsequenceRefutation(
     }
 
     private fun reflected(center: Monomial, side: Monomial): Monomial? {
-        for (variable in side.variables) { arithmetic.step(); if (center.exponent(variable) == 0) return null }
+        for (variable in side.variables) {
+            arithmetic.step()
+            if (center.exponent(variable) == 0) return null
+        }
         val powers = LinkedHashMap<Int, Int>()
         for (variable in center.variables) {
             arithmetic.step()

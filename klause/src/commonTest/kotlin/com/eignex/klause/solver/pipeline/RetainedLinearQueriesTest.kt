@@ -60,7 +60,10 @@ class RetainedLinearQueriesTest {
         val queries = RetainedLinearQueries(model, TheoryParams(), null,
             hints = { _, _ -> SearchCandidateHints { false } }) { _, _ ->
             PlannedSearch(SearchSession(emptyList()), null, null, SearchInvocationResources(),
-                SearchCandidateHints { componentCalls++; true })
+                SearchCandidateHints {
+                    componentCalls++
+                    true
+                })
         }
 
         queries.use {
@@ -125,8 +128,12 @@ class RetainedLinearQueriesTest {
                 live = true
                 return ComponentResult.Consistent
             }
-            override fun retract(decisionLevel: Int) { live = false }
-            override fun close() { live = false }
+            override fun retract(decisionLevel: Int) {
+                live = false
+            }
+            override fun close() {
+                live = false
+            }
         }
         val resources = SearchInvocationResources().apply { ownComponent(component) }
         val queries = RetainedLinearQueries(model, TheoryParams(), null) { stop, _ ->

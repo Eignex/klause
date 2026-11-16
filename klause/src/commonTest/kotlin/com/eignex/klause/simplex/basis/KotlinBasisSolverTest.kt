@@ -298,7 +298,10 @@ class KotlinBasisSolverTest {
             val offer = assertNotNull(parent.factorCopy)
             var totalPolls = 0
             assertNotNull(offer.create(headings, units,
-                LuPivotPolicy(cancelled = { totalPolls++; false }), offer.additionalWork)).close()
+                LuPivotPolicy(cancelled = {
+                    totalPolls++
+                    false
+                }), offer.additionalWork)).close()
             for (stopAt in listOf(1, maxOf(1, totalPolls / 2), totalPolls).distinct()) {
                 val before = parent.basisOperationWork
                 var polls = 0
@@ -343,8 +346,12 @@ class KotlinBasisSolverTest {
                 for (transpose in listOf(false, true)) {
                     val expected = IndexedVector(3).also { it.scatter(doubleArrayOf(1.0, 2.0, 3.0)) }
                     val actual = IndexedVector(3).also { it.scatter(doubleArrayOf(1.0, 2.0, 3.0)) }
-                    if (transpose) { parent.btran(expected); child.btran(actual) } else {
-                        parent.ftran(expected); child.ftran(actual)
+                    if (transpose) {
+                        parent.btran(expected)
+                        child.btran(actual)
+                    } else {
+                        parent.ftran(expected)
+                        child.ftran(actual)
                     }
                     assertContentEquals(expected.toDoubleArray(), actual.toDoubleArray())
                 }
@@ -376,8 +383,12 @@ class KotlinBasisSolverTest {
                         val rhs = DoubleArray(n) { it + 1.0 }
                         val expected = IndexedVector(n).also { it.scatter(rhs) }
                         val actual = IndexedVector(n).also { it.scatter(rhs) }
-                        if (transpose) { cold.btran(expected); seeded.btran(actual) } else {
-                            cold.ftran(expected); seeded.ftran(actual)
+                        if (transpose) {
+                            cold.btran(expected)
+                            seeded.btran(actual)
+                        } else {
+                            cold.ftran(expected)
+                            seeded.ftran(actual)
                         }
                         for (i in 0 until n) assertEquals(expected[i], actual[i], 1e-10)
                     }

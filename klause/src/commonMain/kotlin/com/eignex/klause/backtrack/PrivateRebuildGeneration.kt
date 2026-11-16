@@ -207,8 +207,10 @@ internal class PrivateRebuildGeneration private constructor(
             if (parity != null) {
                 cancellation.charge(source.numBoolVars * 16L)
                 if (cancellation()) return null
-                for (variable in privateFixed.indices) privateFixed[variable]?.let { value ->
-                    residual.add(Clause(intArrayOf(Lit.make(variable, value))))
+                for (variable in privateFixed.indices) {
+                    privateFixed[variable]?.let { value ->
+                        residual.add(Clause(intArrayOf(Lit.make(variable, value))))
+                    }
                 }
             }
             if (learnedBinary != null) {
@@ -228,8 +230,8 @@ internal class PrivateRebuildGeneration private constructor(
                 return null
             }
             var mapping = SourceMapping(source, pinned, guarantees, lift = { sample ->
-                affine?.reconstruct(sample) ?:
-                    Sample(BooleanArray(fixed.size) { fixed[it] ?: sample.boolValue(it) }, longArrayOf())
+                affine?.reconstruct(sample)
+                    ?: Sample(BooleanArray(fixed.size) { fixed[it] ?: sample.boolValue(it) }, longArrayOf())
             })
             val neighborhood = admission?.let {
                 PrivateRebuildNeighborhood.prepare(pinned, it, cancellation) ?: return null

@@ -11,12 +11,14 @@ class NodeBudgetConcurrencyTest {
         val budget = NodeBudget(900L)
         val quotas = budget.quotas(4)
 
-        val workers = quotas.map { quota -> thread {
-            repeat(100) {
-                quota.spend()
-                quota.spendMoves(1L)
+        val workers = quotas.map { quota ->
+            thread {
+                repeat(100) {
+                    quota.spend()
+                    quota.spendMoves(1L)
+                }
             }
-        } }
+        }
         workers.forEach { it.join() }
 
         assertEquals(900L, budget.spent)

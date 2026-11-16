@@ -11,7 +11,6 @@ import com.eignex.klause.bench.runner.ResolvedProblem
 import com.eignex.klause.bench.source.CorpusFiles
 import com.eignex.klause.bench.source.SourceStaging
 import com.github.luben.zstd.ZstdOutputStreamNoFinalizer
-
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
@@ -52,13 +51,16 @@ class SolverInvocationTest {
     ) {
         val root = Files.createTempDirectory("solver-command").toFile()
         try {
-            val executable = root.resolve("klause-cli").apply { writeText("fixture"); setExecutable(true) }
+            val executable = root.resolve("klause-cli").apply {
+                writeText("fixture")
+                setExecutable(true)
+            }
             val source = root.resolve("source.cnf")
             val ref = ProblemRef("source", Format.DIMACS, ProblemSource.Prepared(source), Category.CSP,
                 Expected.Unknown)
             val entry = ResolvedProblem(ref, lazy { error("command construction must not parse the source") })
             val parameters = if (companion) listOf("companion-integers=true", "source-incumbent-completion=true")
-                else emptyList()
+            else emptyList()
             val settings = SolverInvocation.Settings(params = parameters,
                 verbose = requested.takeUnless { it == "auto" }?.toBooleanStrict())
 
@@ -83,7 +85,9 @@ class SolverInvocationTest {
 
             val staging = SourceStaging.parse(target)
             val result = SolverInvocation.withSourceInput(packed, Budget(10_000), staging = staging) {
-                    plain, remaining, ->
+                    plain,
+                    remaining,
+                ->
                 staged = plain
                 assertEquals(body, plain.readText())
                 assertEquals(staging.directory.canonicalFile, plain.parentFile.parentFile.canonicalFile)
@@ -112,7 +116,10 @@ class SolverInvocationTest {
             var ticks = 0L
 
             val result = SolverInvocation.withSourceInput(packed, Budget(5), nanoTime = { ticks++ * 1_000_000 }) {
-                    _, _, -> error("deadline exhausted")
+                    _,
+                    _,
+                ->
+                error("deadline exhausted")
             }
 
             assertNull(result.feasible)
@@ -375,7 +382,6 @@ class SolverInvocationTest {
             root.deleteRecursively()
         }
     }
-
 
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
@@ -820,7 +826,10 @@ class SolverInvocationTest {
 
         assertEquals(
             "ls/a quarantined: int 3 = 7 conflicts | bt/b quarantined: claimed infeasible against a verified incumbent",
-            StderrDiagnostics().apply { stderr.forEach(::accept); finish() }.quarantines,
+            StderrDiagnostics().apply {
+                stderr.forEach(::accept)
+                finish()
+            }.quarantines,
         )
         val unrelated = StderrDiagnostics().apply {
             "WARNING: Using incubator modules\n".forEach(::accept)

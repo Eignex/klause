@@ -101,10 +101,11 @@ internal class LinearAuthorityTraversal(
     private val propagateRefutations = useRefutationPropagation || useRefutationResolution
     private val refutations = if (useRefutationReuse || propagateRefutations)
         LinearRefutationReuse(source, budget, cancellation, resolve = useRefutationResolution) else null
+
     // A callback without an explicit request receives the full projection.
     private val feedback = if (useSupportBranching || onNumericalFeedback != null) {
         val callback = feedbackRequest ?: if (onNumericalFeedback != null) LinearAuthorityFeedbackRequest.Full
-            else LinearAuthorityFeedbackRequest()
+        else LinearAuthorityFeedbackRequest()
         SourceNumericalFeedback(requireNotNull(budget.funding), cancellation, latestFeedback,
             if (useSupportBranching) callback + LinearSupportBranching.REQUEST else callback)
             .also { it.attach(authority) }
@@ -147,23 +148,29 @@ internal class LinearAuthorityTraversal(
 
     fun observations(): Map<String, Long> = observations + activeRows?.observations.orEmpty() +
         authority.cutObservations().mapValues { (key, value) ->
-        if ("Max" in key || "Peak" in key) value else value - (initialCutObservations[key] ?: 0L)
-    } + mapOf(
-        "numericalPendingLeaves" to pending,
-        "numericalPeakPendingLeaves" to peakPending,
-        "numericalRetainedNodes" to retained,
-        "numericalLpPreparations" to authority.preparations,
-        "numericalLpReuses" to authority.reuses,
-    ) + (aggregateBranches?.let { mapOf("numericalAggregateBranchWork" to it.work,
-        "numericalAggregateBranchAllocation" to it.allocation,
-        "numericalAggregateBranchProposals" to it.proposals) } ?: emptyMap()) +
-        (feedback?.let { mapOf("numericalFeedbackCollections" to it.collections,
-        "numericalFeedbackLateCollections" to it.lateCollections,
-        "numericalFeedbackUnavailable" to it.unavailable,
-        "numericalFeedbackCutEvaluations" to it.evaluatedCuts,
-        "numericalFeedbackArithmeticTerms" to it.evaluatedTerms) } ?: emptyMap()) +
-        (supportBranching?.let { mapOf("numericalSupportConsultations" to it.consultations,
-            "numericalSupportSelections" to it.selections, "numericalSupportFallbacks" to it.fallbacks) }
+            if ("Max" in key || "Peak" in key) value else value - (initialCutObservations[key] ?: 0L)
+        } + mapOf(
+            "numericalPendingLeaves" to pending,
+            "numericalPeakPendingLeaves" to peakPending,
+            "numericalRetainedNodes" to retained,
+            "numericalLpPreparations" to authority.preparations,
+            "numericalLpReuses" to authority.reuses,
+        ) + (aggregateBranches?.let {
+            mapOf("numericalAggregateBranchWork" to it.work,
+                "numericalAggregateBranchAllocation" to it.allocation,
+                "numericalAggregateBranchProposals" to it.proposals)
+        } ?: emptyMap()) +
+        (feedback?.let {
+            mapOf("numericalFeedbackCollections" to it.collections,
+                "numericalFeedbackLateCollections" to it.lateCollections,
+                "numericalFeedbackUnavailable" to it.unavailable,
+                "numericalFeedbackCutEvaluations" to it.evaluatedCuts,
+                "numericalFeedbackArithmeticTerms" to it.evaluatedTerms)
+        } ?: emptyMap()) +
+        (supportBranching?.let {
+            mapOf("numericalSupportConsultations" to it.consultations,
+                "numericalSupportSelections" to it.selections, "numericalSupportFallbacks" to it.fallbacks)
+        }
             ?: emptyMap()) + refutations?.observations().orEmpty()
 
     private fun observe(stage: String) {
@@ -442,8 +449,8 @@ internal class LinearAuthorityTraversal(
                 queriedSource = it
             }
         val queried = if (useGuidance && useCuts && pointCuts) authority.advanceWithPointCuts(branch, cancellation)
-            else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
-            else authority.check(branch, cancellation)
+        else if (useGuidance) authority.advance(branch, cancellation, cuts = useCuts)
+        else authority.check(branch, cancellation)
         val strongestBound = strongerLinearBound(current.partialBound, queried.bound)
         val result = queried.copy(bound = strongestBound,
             cutBoundFamilies = if (strongestBound != null && strongestBound === current.partialBound) {
@@ -543,8 +550,8 @@ internal class LinearAuthorityTraversal(
             }
             val candidate = if (supportBranching != null && numericalFeedback != null)
                 supportBranching.select(numericalFeedback, result.fractional, cancellation)
-                else if (useBranchHistory) branchHistory.select(result.fractional, cancellation)
-                else result.fractional.firstOrNull()
+            else if (useBranchHistory) branchHistory.select(result.fractional, cancellation)
+            else result.fractional.firstOrNull()
             val selected = candidate?.floorSplit() ?: (coordinate to threshold)
             if (supportBranching == null && selected != result.split) observe("numericalHistorySelections")
             if (supportBranching != null && lateFeedback && candidate != result.fractional.firstOrNull()) {
@@ -554,7 +561,7 @@ internal class LinearAuthorityTraversal(
             splitCreated()
             observe("numericalFractionalSplits")
             return if (propagateRefutations && budget.funding?.paused == true) SearchNodeDisposition.Pause
-                else SearchNodeDisposition.Expand
+            else SearchNodeDisposition.Expand
         }
         if (result.evidence != null) return SearchNodeDisposition.Prune
         val guarded = branch.premises.values.filter { it.integerPins.isNotEmpty() }
@@ -569,7 +576,7 @@ internal class LinearAuthorityTraversal(
                 splitCreated()
                 observe("numericalIndicatorSplits")
                 return if (propagateRefutations && budget.funding?.paused == true) SearchNodeDisposition.Pause
-                    else SearchNodeDisposition.Expand
+                else SearchNodeDisposition.Expand
             }
         }
         return SearchNodeDisposition.Indeterminate
@@ -768,7 +775,7 @@ private class CoverageNode(val condition: SourceCondition) {
             SourceClaim.Refutation -> evidence.derivation
             is SourceClaim.Optimal -> (evidence.derivation as SourceDerivation.Optimum).bound
             is SourceClaim.Limit -> if (strict) (evidence.derivation as LinearApproach).strictBound
-                else result?.bound?.derivation
+            else result?.bound?.derivation
             else -> null
         }
     }

@@ -34,108 +34,114 @@ import kotlin.test.assertTrue
 class LpLearnedConflictTest {
     @Test
     fun `cancelled learned propagation should resume without redelivering accepted facts`() {
-        for (nativeSat in listOf(false, true)) for (pauses in listOf(0, 1, 2)) {
-            var cancelled = false
-            var remainingPauses = pauses
-            var issued = false
-            var acceptedBefore = 0
-            var acceptedLp = 0
-            var acceptedAfter = 0
-            var learnedCredits = 0
-            var nodeCredits = 0
-            val native = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()), nativeSat = nativeSat)
-            val cp = CpSearchComponent(native, branching = CpBranching.None)
-            val before = object : SearchComponent {
-                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-                    if (decision == SearchDecision.Bool(Lit.make(1, true))) acceptedBefore++
-                    return ComponentResult.Consistent
-                }
-            }
-            val after = object : SearchComponent {
-                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-                    if (decision == SearchDecision.Bool(Lit.make(1, true))) acceptedAfter++
-                    return ComponentResult.Consistent
-                }
-            }
-            LpPropagator(object : LpSearchPolicy {
-                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
-                    if (decision == SearchDecision.Bool(Lit.make(1, true))) {
-                        if (remainingPauses > 0) {
-                            remainingPauses--
-                            cancelled = true
-                            return ComponentResult.Indeterminate
-                        }
-                        acceptedLp++
+        for (nativeSat in listOf(false, true)) {
+            for (pauses in listOf(0, 1, 2)) {
+                var cancelled = false
+                var remainingPauses = pauses
+                var issued = false
+                var acceptedBefore = 0
+                var acceptedLp = 0
+                var acceptedAfter = 0
+                var learnedCredits = 0
+                var nodeCredits = 0
+                val native = PropagationSession(Problem(3, 0, emptyArray(), emptyArray()), nativeSat = nativeSat)
+                val cp = CpSearchComponent(native, branching = CpBranching.None)
+                val before = object : SearchComponent {
+                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                        if (decision == SearchDecision.Bool(Lit.make(1, true))) acceptedBefore++
+                        return ComponentResult.Consistent
                     }
-                    return ComponentResult.Consistent
                 }
-
-                override fun check(context: SearchContext): ComponentCheck =
-                    if (context.boolValue(0) == true || context.boolValue(1) == true) ComponentCheck.Feasible
-                    else ComponentCheck.Infeasible()
-            }).use { lp ->
-                val session = SearchSession(listOf(cp, before, lp, after), cancellation =
-                    ExecutionControl { cancelled })
-                assertIs<ComponentResult.Consistent>(session.initialize())
-                val run = session.openRun(
-                    3,
-                    modelContinuation = SearchModelContinuation.Chronological,
-                    nodePolicy = object : SearchNodePolicy {
-                        override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
-                            if (issued || context.boolValue(0) != false) return SearchNodeDisposition.Expand
-                            issued = true
-                            return SearchNodeDisposition.Backjump(LpLearnedConflict(
-                                Learned(intArrayOf(0, 2), native.decisionLevel, 2, intArrayOf(1, 2)), cp,
-                            ))
+                val after = object : SearchComponent {
+                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                        if (decision == SearchDecision.Bool(Lit.make(1, true))) acceptedAfter++
+                        return ComponentResult.Consistent
+                    }
+                }
+                LpPropagator(object : LpSearchPolicy {
+                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult {
+                        if (decision == SearchDecision.Bool(Lit.make(1, true))) {
+                            if (remainingPauses > 0) {
+                                remainingPauses--
+                                cancelled = true
+                                return ComponentResult.Indeterminate
+                            }
+                            acceptedLp++
                         }
-                    },
-                    observer = object : SearchRunObserver {
-                        override fun onLearnedConflict(conflict: SearchLearnedConflict) { learnedCredits++ }
-                        override fun onLearnedNodeBackjump() { nodeCredits++ }
-                    },
-                    lifecycle = object : SearchRunLifecycle {
-                        override fun onResume(context: SearchContext): SearchRunDisposition {
-                            if (issued) assertTrue(acceptedLp > 0)
-                            return SearchRunDisposition.Continue
+                        return ComponentResult.Consistent
+                    }
+
+                    override fun check(context: SearchContext): ComponentCheck =
+                        if (context.boolValue(0) == true || context.boolValue(1) == true) ComponentCheck.Feasible
+                        else ComponentCheck.Infeasible()
+                }).use { lp ->
+                    val session = SearchSession(listOf(cp, before, lp, after), cancellation =
+                        ExecutionControl { cancelled })
+                    assertIs<ComponentResult.Consistent>(session.initialize())
+                    val run = session.openRun(
+                        3,
+                        modelContinuation = SearchModelContinuation.Chronological,
+                        nodePolicy = object : SearchNodePolicy {
+                            override fun beforeBranch(context: SearchContext): SearchNodeDisposition {
+                                if (issued || context.boolValue(0) != false) return SearchNodeDisposition.Expand
+                                issued = true
+                                return SearchNodeDisposition.Backjump(LpLearnedConflict(
+                                    Learned(intArrayOf(0, 2), native.decisionLevel, 2, intArrayOf(1, 2)), cp,
+                                ))
+                            }
+                        },
+                        observer = object : SearchRunObserver {
+                            override fun onLearnedConflict(conflict: SearchLearnedConflict) {
+                                learnedCredits++
+                            }
+                            override fun onLearnedNodeBackjump() {
+                                nodeCredits++
+                            }
+                        },
+                        lifecycle = object : SearchRunLifecycle {
+                            override fun onResume(context: SearchContext): SearchRunDisposition {
+                                if (issued) assertTrue(acceptedLp > 0)
+                                return SearchRunDisposition.Continue
+                            }
+
+                            override fun onCancellation(context: SearchContext): SearchRunDisposition =
+                                SearchRunDisposition.Pause
+                        },
+                    )
+
+                    repeat(pauses) {
+                        assertIs<SearchRunEvent.Paused>(run.next())
+                        assertTrue(run.learnedPropagationPending)
+                        assertFalse(run.retainBooleanRoot(Lit.make(0, false)))
+                        assertEquals(1, acceptedBefore)
+                        assertEquals(0, acceptedAfter)
+                        assertEquals(1, native.learnedClauseCount)
+                        assertEquals(1, learnedCredits)
+                        assertEquals(1, nodeCredits)
+                        assertFalse(native.fixpointCancelled)
+                        assertIs<SearchRunEvent.Paused>(run.next())
+                        cancelled = false
+                    }
+
+                    val models = ArrayList<List<Boolean>>()
+                    repeat(6) { index ->
+                        val model = assertIs<SearchRunEvent.Satisfied>(run.next()).model
+                        models += List(3) { checkNotNull(model.valueOf(SearchBoolValue(it))) }
+                        if (index == 0) {
+                            assertEquals(1, acceptedBefore)
+                            assertEquals(1, acceptedLp)
+                            assertEquals(1, acceptedAfter)
                         }
-
-                        override fun onCancellation(context: SearchContext): SearchRunDisposition =
-                            SearchRunDisposition.Pause
-                    },
-                )
-
-                repeat(pauses) {
-                    assertIs<SearchRunEvent.Paused>(run.next())
-                    assertTrue(run.learnedPropagationPending)
-                    assertFalse(run.retainBooleanRoot(Lit.make(0, false)))
-                    assertEquals(1, acceptedBefore)
-                    assertEquals(0, acceptedAfter)
+                    }
+                    assertEquals(6, models.toSet().size)
+                    assertTrue(models.all { it[0] || it[1] })
+                    assertEquals(SearchRunEvent.Exhausted, run.next())
+                    assertFalse(run.learnedPropagationPending)
                     assertEquals(1, native.learnedClauseCount)
                     assertEquals(1, learnedCredits)
                     assertEquals(1, nodeCredits)
-                    assertFalse(native.fixpointCancelled)
-                    assertIs<SearchRunEvent.Paused>(run.next())
-                    cancelled = false
+                    assertNull(session.executionControls.stopCause)
                 }
-
-                val models = ArrayList<List<Boolean>>()
-                repeat(6) { index ->
-                    val model = assertIs<SearchRunEvent.Satisfied>(run.next()).model
-                    models += List(3) { checkNotNull(model.valueOf(SearchBoolValue(it))) }
-                    if (index == 0) {
-                        assertEquals(1, acceptedBefore)
-                        assertEquals(1, acceptedLp)
-                        assertEquals(1, acceptedAfter)
-                    }
-                }
-                assertEquals(6, models.toSet().size)
-                assertTrue(models.all { it[0] || it[1] })
-                assertEquals(SearchRunEvent.Exhausted, run.next())
-                assertFalse(run.learnedPropagationPending)
-                assertEquals(1, native.learnedClauseCount)
-                assertEquals(1, learnedCredits)
-                assertEquals(1, nodeCredits)
-                assertNull(session.executionControls.stopCause)
             }
         }
     }

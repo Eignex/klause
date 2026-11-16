@@ -519,16 +519,16 @@ internal class CoreGuidedSearch(
         val baked = queryModel ?: bakeQuery().also { queryModel = it }
         return try {
             val queryParams = params.copy(
-                    assumptions = requireNotNull(queryPins),
-                    cancellation = token,
-                    propagationCancelFloor = 0,
-                    maxDecisions = (
-                        minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE) -
-                            completedStats.search.nodes.sum.toLong()
+                assumptions = requireNotNull(queryPins),
+                cancellation = token,
+                propagationCancelFloor = 0,
+                maxDecisions = (
+                    minOf(params.maxDecisions, params.maxInstructions ?: Long.MAX_VALUE) -
+                        completedStats.search.nodes.sum.toLong()
                     ).coerceAtLeast(0L),
-                    clauseExchange = null,
-                    cutExchange = null,
-                )
+                clauseExchange = null,
+                cutExchange = null,
+            )
             val projected = coreRefinement == CoreRefinementMode.REASONS
             val solver = BacktrackSolver(baked)
             if (!resumableOpening && params.nativeSat != false && baked.isClausal()) {

@@ -155,7 +155,9 @@ class SelectedEncoderRequestTest {
             val builtin = BuiltInEncoderProvider.select(factor, target)
             if (factor === conditioned) {
                 Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0)), mapOf(SourceBoolId(0) to true)) {
-                        view, encoding, ->
+                        view,
+                        encoding,
+                    ->
                     installed++
                     builtin.install(view, encoding)
                 }
@@ -190,7 +192,9 @@ class SelectedEncoderRequestTest {
         val selected = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
             val builtin = BuiltInEncoderProvider.select(factor, target)
             Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0)), mapOf(SourceBoolId(0) to true)) {
-                    view, encoding, ->
+                    view,
+                    encoding,
+                ->
                 builtin.install(view, encoding)
             }
         }).prepare(source)

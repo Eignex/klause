@@ -114,7 +114,7 @@ internal class RetainedLinearQueries(
         if (scope.stop() || exhausted) return ExactNeighborhoodResult.Undecided
         if (sourceRefuted) return ExactNeighborhoodResult.Refuted
         val search = prepared() ?: return if (sourceRefuted) ExactNeighborhoodResult.Refuted
-            else ExactNeighborhoodResult.Undecided
+        else ExactNeighborhoodResult.Undecided
         val session = search.session
         if (model.numIntVars + model.numRealVars == 0 && !session.consumeCheck()) {
             return ExactNeighborhoodResult.Undecided
@@ -198,7 +198,7 @@ internal class RetainedLinearQueries(
             for ((coordinate, threshold) in bounds) {
                 if (scope.stop() || exhausted) return ComponentResult.Indeterminate
                 val term = SourceBoundTerm(if (coordinate < model.numIntVars) SearchIntValue(coordinate)
-                    else SearchRealValue(coordinate - model.numIntVars), BigFraction.ONE)
+                else SearchRealValue(coordinate - model.numIntVars), BigFraction.ONE)
                 val result = assertBound(session, listOf(term), threshold, upper)
                 if (result !is ComponentResult.Consistent) return result
             }
@@ -241,7 +241,7 @@ internal class RetainedLinearQueries(
                     if (context.boolValue(id) == true) threshold -= BigFraction.ofLong(objective.boolWeightValues[id])
                 }
                 if (terms.isEmpty()) return if (BigFraction.ZERO < threshold) SearchNodeDisposition.Expand
-                    else SearchNodeDisposition.Prune
+                else SearchNodeDisposition.Prune
                 return when (assertBound(session, terms, threshold, upper = true, strict = true)) {
                     ComponentResult.Consistent -> SearchNodeDisposition.Expand
                     is ComponentResult.Conflict -> SearchNodeDisposition.Prune
@@ -255,7 +255,7 @@ internal class RetainedLinearQueries(
         val integers = List(model.numIntVars) { requireNotNull(valueOf(SearchExactIntValue(SourceIntId(it)))) }
         val reals = List(model.numRealVars) { requireNotNull(valueOf(SearchExactRealValue(SourceRealId(it)))) }
         val finite = if (integers.all { it.fitsLong() }) LongArray(integers.size) { integers[it].toLongExact() }
-            else LongArray(0)
+        else LongArray(0)
         return Sample(BooleanArray(model.numBoolVars) { requireNotNull(valueOf(SearchBoolValue(it))) },
             finite,
             DoubleArray(reals.size) { reals[it].toDouble() }, exactReals = reals, exactInts = integers)

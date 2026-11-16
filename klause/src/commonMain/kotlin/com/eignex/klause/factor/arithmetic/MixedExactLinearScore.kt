@@ -124,7 +124,8 @@ internal class MixedExactLinearScore(
         score(state, activity(state, factorId, Term.ofRealVar(realVar), newValue)) - state.factorDegree[factorId]
 
     override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
-        score(state, (state.refPayload[factorId] as DoubleArray)[1], flippedBool = boolVar) - state.factorDegree[factorId]
+        score(state, (state.refPayload[factorId] as DoubleArray)[1], flippedBool = boolVar) -
+            state.factorDegree[factorId]
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         update(state, factorId, Term.ofIntVar(intVar), state.assignment.intValue(intVar).toDouble())

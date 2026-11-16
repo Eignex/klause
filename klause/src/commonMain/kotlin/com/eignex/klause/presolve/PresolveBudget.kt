@@ -128,13 +128,17 @@ class PresolveBudget(
     var probeCalls: Long = 0
         private set
 
-    internal fun recordRound() { rounds++ }
+    internal fun recordRound() {
+        rounds++
+    }
 
     internal fun recordPass(pass: PresolvePass) {
         calls[pass.id] = (calls[pass.id] ?: 0) + 1
     }
 
-    internal fun recordProbe() { probeCalls++ }
+    internal fun recordProbe() {
+        probeCalls++
+    }
 
     /** Work units charged so far; may exceed [allowance] by the last charge before a poll noticed. */
     fun spent(): Long = spent
@@ -166,10 +170,10 @@ class PresolveBudget(
      * lands here, whatever meter [outer] carries, and it keeps [outer]'s deadline.
      */
     fun orSpent(outer: ExecutionControl): ExecutionControl {
-        if(
-        outer is StopObserver && outer.budget === this &&(outer.token as? Metered) ?.budget === this) return outer
-        return observeStops(Metered( 0L , outer,
-    ))
+        if (
+            outer is StopObserver && outer.budget === this && (outer.token as? Metered) ?.budget === this) return outer
+        return observeStops(Metered( 0L, outer,
+        ))
     }
 
     internal fun observeStops(token: ExecutionControl): ExecutionControl =

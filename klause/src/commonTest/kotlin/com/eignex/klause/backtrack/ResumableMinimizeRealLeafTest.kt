@@ -110,28 +110,30 @@ class ResumableMinimizeRealLeafTest {
     @Test
     fun `primal repair should compare the authoritative scaled source objective across rounded ties`() {
         val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
-        for (sign in listOf(-1L, 1L)) for (offset in listOf(0L, 1L)) {
-            val fixture = UnresolvedRealLeafFixture(false)
-            fixture.acceptProof = { _, _ -> false }
-            val objective = LinearObjective(realCoefficients = doubleArrayOf(10.0 * sign))
-            val sourceValue = BigFraction.ofLong(5L * sign) + epsilon
-            val params = fixture.params.copy(toleranceCheck = FiniteSourceAcceptance(
-                { it.reals.single() == 0.5 }, false, { sourceValue },
-            ))
+        for (sign in listOf(-1L, 1L)) {
+            for (offset in listOf(0L, 1L)) {
+                val fixture = UnresolvedRealLeafFixture(false)
+                fixture.acceptProof = { _, _ -> false }
+                val objective = LinearObjective(realCoefficients = doubleArrayOf(10.0 * sign))
+                val sourceValue = BigFraction.ofLong(5L * sign) + epsilon
+                val params = fixture.params.copy(toleranceCheck = FiniteSourceAcceptance(
+                    { it.reals.single() == 0.5 }, false, { sourceValue },
+                ))
 
-            fixture.solver.openRepair(objective, params).use { repair ->
-                repair.beginExact(Assumptions.None, 100L,
-                    sourceValue + epsilon * BigFraction.ofLong(offset), ExecutionControl.Never)
-                val result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
+                fixture.solver.openRepair(objective, params).use { repair ->
+                    repair.beginExact(Assumptions.None, 100L,
+                        sourceValue + epsilon * BigFraction.ofLong(offset), ExecutionControl.Never)
+                    val result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
-                assertEquals(TerminationReason.Unsupported, result.reason)
-                if (offset > 0L) {
-                    val sample = assertNotNull(result.sample)
-                    assertEquals(sourceValue, exactSourceObjective(objective, sample, params.toleranceCheck))
-                    assertNull(sample.exactReals)
-                } else assertNull(result.sample)
+                    assertEquals(TerminationReason.Unsupported, result.reason)
+                    if (offset > 0L) {
+                        val sample = assertNotNull(result.sample)
+                        assertEquals(sourceValue, exactSourceObjective(objective, sample, params.toleranceCheck))
+                        assertNull(sample.exactReals)
+                    } else assertNull(result.sample)
+                }
+                assertEquals(fixture.opened, fixture.closed)
             }
-            assertEquals(fixture.opened, fixture.closed)
         }
     }
 

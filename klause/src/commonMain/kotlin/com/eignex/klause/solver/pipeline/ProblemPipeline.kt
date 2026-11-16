@@ -309,9 +309,9 @@ private fun Problem.pipelineRouteObserved(
         routed.nativeFiniteSource(projections, preparationStop)
     val finiteCompletion = nativeFiniteAfterBounds || (
         finiteIntegerRanges &&
-        objective?.realCoefficientValues?.any { it != 0.0 } != true &&
-        routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
-    )
+            objective?.realCoefficientValues?.any { it != 0.0 } != true &&
+            routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
+        )
     val arithmeticStop = if (routed.requiresPolynomialCompletion(projections, preferFinite = finiteCompletion)) {
         polynomialCancellation
     } else {
@@ -386,14 +386,14 @@ private fun Problem.pipelineRouteObserved(
 private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, stop: ExecutionControl): Boolean {
     if (numRealVars != 0 || stop()) return false
     ScanMeter(stop).use { scan ->
-    for (variable in 0 until numIntVars) {
-        if (!scan.visit(1) || !intBounds.hasLower(variable) || !intBounds.hasUpper(variable)) return false
+        for (variable in 0 until numIntVars) {
+            if (!scan.visit(1) || !intBounds.hasLower(variable) || !intBounds.hasUpper(variable)) return false
+        }
+        for (index in factors.indices) {
+            if (!scan.visit(1) || !finiteRealFactorSupported(index, projections)) return false
+        }
+        return scan.check()
     }
-    for (index in factors.indices) {
-        if (!scan.visit(1) || !finiteRealFactorSupported(index, projections)) return false
-    }
-    return scan.check()
-}
 }
 
 /**

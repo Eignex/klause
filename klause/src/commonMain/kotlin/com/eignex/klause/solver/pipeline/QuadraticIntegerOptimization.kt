@@ -105,8 +105,8 @@ fun OpenTheoryPipeline.minimize(
             if (engine == FiniteEngine.FIXED || (engine != FiniteEngine.MIXED && cores == 1)) {
                 result = QuadraticIntegerOptimization(request.problem, objective, params, engine, sense, native,
                     request.preparedPlan).also { worker ->
-                        worker.onAccepted = { point -> publication.accepted(point) }
-                    }.execute()
+                    worker.onAccepted = { point -> publication.accepted(point) }
+                }.execute()
             } else {
                 val budget = params.nodeBudget ?: controls.strategy.backtrack.nodeBudget
                     ?: controls.strategy.localSearch.nodeBudget
@@ -185,13 +185,21 @@ internal class QuadraticIntegerOptimization(
     private var neighborhood: QuadraticNeighborhoodCursor? = null
     private var operation: ExecutionControl = ExecutionControl.Never
     private val runtime = QuadraticWorkerRuntime(native, sense, { stats }, ::partial) {
-        try { traversal?.close() } finally {
-            try { neighborhood?.close() } finally { sink.stop() }
+        try {
+            traversal?.close()
+        } finally {
+            try {
+                neighborhood?.close()
+            } finally {
+                sink.stop()
+            }
         }
     }
     private var terminal: QuadraticOptimizationResult?
         get() = runtime.terminal
-        set(value) { runtime.terminal = value }
+        set(value) {
+            runtime.terminal = value
+        }
     var readIncumbent: () -> QuadraticIncumbent? = { null }
     var onAccepted: ((QuadraticIncumbent) -> Unit)? = null
     private val stats: SolveStats get() = neighborhood?.let { sink.snapshot().mergedWith(it.stats) } ?: sink.snapshot()
@@ -235,8 +243,14 @@ internal class QuadraticIntegerOptimization(
     fun execute(): QuadraticOptimizationResult = runtime.execute {
         initialize()
         when (engine) {
-            FiniteEngine.LOCAL_SEARCH -> { walk(false); partial() }
-            FiniteEngine.ALNS -> { walk(true); partial() }
+            FiniteEngine.LOCAL_SEARCH -> {
+                walk(false)
+                partial()
+            }
+            FiniteEngine.ALNS -> {
+                walk(true)
+                partial()
+            }
             FiniteEngine.MIXED -> error("mixed execution requires the shared invocation")
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> complete()
         }
@@ -268,7 +282,10 @@ internal class QuadraticIntegerOptimization(
         val stop = native.polynomial or controls.strategy.backtrack.cancellation or ExecutionControl {
             operation() || budget?.allowance?.exhausted() == true
         }
-        if (stop() || params.maximumCandidates == 0L) { terminal = partial(); return }
+        if (stop() || params.maximumCandidates == 0L) {
+            terminal = partial()
+            return
+        }
         val cursor: QuadraticIntegerTraversalCursor = traversal ?: kotlin.run {
             val component = QuadraticIntegerComponent(source, root, relaxation.arithmetic::step) { node, context ->
                 sink.search.observeNode(context.decisionLevel)
@@ -281,7 +298,10 @@ internal class QuadraticIntegerOptimization(
                     listOf(SearchDecision.Bool((id shl 1) or 1), SearchDecision.Bool(id shl 1))
                 }
             }, SearchDecisionBudget {
-                if (budget?.allowance?.exhausted() == true) false else { budget?.allowance?.spend(); true }
+                if (budget?.allowance?.exhausted() == true) false else {
+                    budget?.allowance?.spend()
+                    true
+                }
             }, stop, ::countedWork).also { traversal = it }
         }
         val event = cursor.advance(global, millis, work) { node ->
@@ -311,7 +331,7 @@ internal class QuadraticIntegerOptimization(
     private fun assumptions(): PolynomialCondition {
         fun pins(local: Boolean): PolynomialCondition {
             val worker = if (local) controls.strategy.localSearch.assumptions
-                else controls.strategy.backtrack.assumptions
+            else controls.strategy.backtrack.assumptions
             val fixed = worker.mergedWith(controls.strategy.assumptions)
             require(fixed.deductions.isEmpty) { "quadratic open integer assumptions require explicit pins" }
             require(fixed.bools.keys.all { it in 0 until source.boolCount }) { "quadratic Boolean pin out of range" }
@@ -395,7 +415,10 @@ internal class QuadraticIntegerOptimization(
                     }
                 },
                 decisionBudget = SearchDecisionBudget {
-                    if (budget?.allowance?.exhausted() == true) false else { budget?.allowance?.spend(); true }
+                    if (budget?.allowance?.exhausted() == true) false else {
+                        budget?.allowance?.spend()
+                        true
+                    }
                 }, nodePolicy = component,
             )
             while (!stop()) {
@@ -538,7 +561,7 @@ internal class QuadraticIntegerOptimization(
         val sample = Sample(
             assignment.bools,
             if (integers.all { it.fitsLong() }) LongArray(integers.size) { integers[it].toLongExact() }
-                else longArrayOf(),
+            else longArrayOf(),
             DoubleArray(reals.size) { id ->
                 val value = reals[id]
                 value.rational?.toDouble() ?: (value.lowerBound.toDouble() / 2 + value.upperBound.toDouble() / 2)
@@ -551,8 +574,10 @@ internal class QuadraticIntegerOptimization(
         proofs += proof
         val previous = limit
         val comparison = previous?.let { algebraic.compare(value, it) } ?: -1
-        if (comparison < 0) { limit = value; attained = closedAttained }
-        else if (comparison == 0) attained = attained || closedAttained
+        if (comparison < 0) {
+            limit = value
+            attained = closedAttained
+        } else if (comparison == 0) attained = attained || closedAttained
     }
 
     private fun better(left: AlgebraicReal, right: AlgebraicReal): Boolean = algebraic.compare(left, right).let {
@@ -630,7 +655,7 @@ internal class QuadraticIntegerOptimization(
             previous = incumbent
             neighborhoodPoint = null
             fun coordinate(id: Int): Int = if (id < source.integerCoordinates.size) source.integerCoordinates[id]
-                else source.realCoordinates[id - source.integerCoordinates.size]
+            else source.realCoordinates[id - source.integerCoordinates.size]
             val lower = neighborhood.lower.mapKeys { coordinate(it.key) }
             val upper = neighborhood.upper.mapKeys { coordinate(it.key) }
             if (neighborhood.bools.any { (id, value) -> root.bools[id]?.let { it != value } == true }) {

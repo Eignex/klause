@@ -211,7 +211,6 @@ class EngineParamsTest {
         }
     }
 
-
     private fun scenario(cores: Int, params: List<String> = emptyList(), mix: EngineMix = EngineMix.MIXED) =
         buildPortfolioScenario(
             EngineParams(params),

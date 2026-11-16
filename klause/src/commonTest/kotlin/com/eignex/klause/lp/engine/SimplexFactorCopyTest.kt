@@ -43,7 +43,11 @@ class SimplexFactorCopyTest {
                 owner.basicVar[0] = if (mismatch == "headings") 1 else 0
                 val copy = SimplexFactorCopy(matrix, offer, intArrayOf(0),
                     intArrayOf(if (mismatch == "column") 1 else 0),
-                    intArrayOf(when (mismatch) { "unit" -> 0; "sentinel" -> -2; else -> -1 }))
+                    intArrayOf(when (mismatch) {
+                        "unit" -> 0
+                        "sentinel" -> -2
+                        else -> -1
+                    }))
                 val target = if (mismatch == "matrix") {
                     SparseMatrix.ofColumns(1, 2, listOf(listOf(0 to 2.0), listOf(0 to 1.0)))
                 } else matrix

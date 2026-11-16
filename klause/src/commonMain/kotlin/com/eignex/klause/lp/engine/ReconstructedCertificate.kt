@@ -134,24 +134,26 @@ internal class ReconstructionMeter(
     var basisWork = 0L
     var basisDualRejection: ReconstructionDualRejection? = null
     val spentWork: Long get() = work
+
     @JvmField var work = 0L
     private var allocation = 0L
     private var maxBits = 0
+
     @JvmField val workLimit = limits.maxWork
+
     @JvmField var admittedUntil = 0L
 
     @Suppress("NOTHING_TO_INLINE") // The admitted work total also schedules the cold stop path.
-    inline
-
-    fun step(units: Long = 1L) {
+    inline fun step(units: Long = 1L) {
         if (units > admittedUntil - work) admit(units)
         work += units
     }
 
-    private fun admit(units: Long) { poll()
+    private fun admit(units: Long) {
+        poll()
         if (units > workLimit - work) throw ReconstructionStop(ReconstructionDecline.WORK)
         if (units > admittedUntil - work) admittedUntil =
-        work + units
+            work + units
     }
 
     fun require(condition: Boolean, reason: ReconstructionDecline) {
@@ -705,7 +707,10 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
             meter.phase = ReconstructionPhase.BASIS
             val layout = try {
                 LogicalBasisLayout.prepare(a.n, a.m, basis.basicVars, { a.matrix[it] },
-                    { work, bytes -> meter.step(work); if (bytes > 0L) meter.storage(bytes) },
+                    { work, bytes ->
+                        meter.step(work)
+                        if (bytes > 0L) meter.storage(bytes)
+                    },
                     { reason -> throw ReconstructionLayoutStop(reason) })
             } catch (stop: ReconstructionLayoutStop) {
                 meter.basisRepair = ReconstructionBasisMetrics(decline = stop.reason.name)

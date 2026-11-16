@@ -9,7 +9,6 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.*
 import com.eignex.klause.solver.objective.FunctionalObjective

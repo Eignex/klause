@@ -216,7 +216,10 @@ internal class LpSolveSession(
         previous?.close()
         if (cancellation()) return null
         return newRetainedLpSolver(model, cancellation, componentSplit, context.engineFactory, pricing, workLimit)
-            .also { it.deferUnscaledSourceDiagnostics(); solver = it }
+            .also {
+                it.deferUnscaledSourceDiagnostics()
+                solver = it
+            }
     }
 
     fun releaseSolvers() {
@@ -233,7 +236,9 @@ internal class LpSolveSession(
         val proofs = certification
         certification = LpCertificationSession(context, pricing)
         for (owner in listOfNotNull(previous, proofs)) {
-            try { owner.close() } catch (cleanup: Throwable) {
+            try {
+                owner.close()
+            } catch (cleanup: Throwable) {
                 if (failure == null) failure = cleanup else if (failure !== cleanup) failure.addSuppressed(cleanup)
             }
         }

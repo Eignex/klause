@@ -68,9 +68,15 @@ internal class PrivateRebuildParity private constructor(
             if (!session.canSimplifyRoot) return null
             val source = session.problem as? BakedProblem ?: return null
             if (source.numIntVars != 0 || source.numRealVars != 0 || source.numBoolVars > COLUMN_MASK ||
-                source.numFactors > MAX_FACTORS || source.numBoolVars < 3) { onDecline("Scope"); return null }
+                source.numFactors > MAX_FACTORS || source.numBoolVars < 3) {
+                onDecline("Scope")
+                return null
+            }
             val funded: (Long) -> Boolean = { work ->
-                if (visit(work)) true else { onDecline("Partial"); false }
+                if (visit(work)) true else {
+                    onDecline("Partial")
+                    false
+                }
             }
             var size = 2
             while (size < source.numFactors * 2) size *= 2
@@ -93,7 +99,10 @@ internal class PrivateRebuildParity private constructor(
             val table = Cubes(size, source.numFactors, funded, onDecline)
             if (!table.collect(source, if (conditioned) fixed else null)) return null
             val rowCount = table.countRows() ?: return null
-            if (rowCount == 0) { onDecline("NoRows"); return null }
+            if (rowCount == 0) {
+                onDecline("NoRows")
+                return null
+            }
             val covered = table.coverage() ?: return null
             val sourceRows = if (table.coveredClauses == source.numFactors) 0 else rowCount
             val words = (source.numBoolVars + 63) ushr 6
@@ -101,7 +110,10 @@ internal class PrivateRebuildParity private constructor(
             val indexBytes = source.numBoolVars * (rowWords * 8L + 8L)
             val bytes = tableBytes + rowCount * (words * 16L + 128L) + source.numBoolVars * 16L + indexBytes +
                 sourceRows * 25L + if (sourceRows == 0) 0L else 64L
-            if (table.entries * 512L + bytes > byteLimit) { onDecline("Memory"); return null }
+            if (table.entries * 512L + bytes > byteLimit) {
+                onDecline("Memory")
+                return null
+            }
             val initializationWork = source.numBoolVars * rowWords.toLong() +
                 rowCount * (words + 3L) + sourceRows * 3L
             if (!funded(initializationWork)) return null
@@ -111,7 +123,10 @@ internal class PrivateRebuildParity private constructor(
             val sourceRhs = if (sourceRows == 0) emptyIntArray() else IntArray(sourceRows)
             if (!table.populate(matrix, sourceKeys, sourceRhs)) return null
             val pins = matrix.derive(onDecline) ?: return null
-            if (pins == 0 && matrix.basis == null) { onDecline("NoPins"); return null }
+            if (pins == 0 && matrix.basis == null) {
+                onDecline("NoPins")
+                return null
+            }
             if (!funded(16L)) return null
             return PrivateRebuildParity(source, fixed, pins, rowCount, bytes, matrix.basis, matrix.triangularBasis,
                 sourceKeys, sourceRhs, table.sourceRowLiterals, covered, table.coveredClauses)
@@ -119,8 +134,9 @@ internal class PrivateRebuildParity private constructor(
 
         private fun pattern(key: Long, parity: Int): Int {
             val binary = key and COLUMN_MASK.toLong() == COLUMN_MASK.toLong()
-            return if (binary) { if (parity == 0) 0x9 else 0x6 }
-            else if (parity == 0) EVEN_MASK else ODD_MASK
+            return if (binary) {
+                if (parity == 0) 0x9 else 0x6
+            } else if (parity == 0) EVEN_MASK else ODD_MASK
         }
 
         private fun complete(key: Long, mask: Int, parity: Int): Boolean {
@@ -152,10 +168,16 @@ internal class PrivateRebuildParity private constructor(
                 for (index in source.factors.indices) {
                     if (!visit(4L)) return false
                     val factor = source.factors[index]
-                    if (factor !is Clause) { onDecline("Scope"); return false }
+                    if (factor !is Clause) {
+                        onDecline("Scope")
+                        return false
+                    }
                     val literals = factor.literals
                     entries += literals.size
-                    if (factor.tautological) { tags[index] = -2; continue }
+                    if (factor.tautological) {
+                        tags[index] = -2
+                        continue
+                    }
                     var width = literals.size
                     var a = if (width > 0) literals[0] else 0
                     var b = if (width > 1) literals[1] else 0
@@ -166,7 +188,10 @@ internal class PrivateRebuildParity private constructor(
                         var satisfied = false
                         for (literal in literals) {
                             val column = Lit.variable(literal)
-                            if (column >= source.numBoolVars) { onDecline("Scope"); return false }
+                            if (column >= source.numBoolVars) {
+                                onDecline("Scope")
+                                return false
+                            }
                             val value = fixed[column]
                             if (value == null) {
                                 when (width) {
@@ -177,17 +202,26 @@ internal class PrivateRebuildParity private constructor(
                                 width++
                             } else if (Lit.evaluate(literal, value)) satisfied = true
                         }
-                        if (satisfied) { tags[index] = -2; continue }
+                        if (satisfied) {
+                            tags[index] = -2
+                            continue
+                        }
                     }
                     if (width == 1) {
                         if (!visit(5L)) return false
-                        if (Lit.variable(a) >= source.numBoolVars) { onDecline("Scope"); return false }
+                        if (Lit.variable(a) >= source.numBoolVars) {
+                            onDecline("Scope")
+                            return false
+                        }
                         onDecline("AffineCoverageUnfixedUnit")
                         continue
                     }
                     if (width !in 2..3) {
                         if (!visit(literals.size + 1L)) return false
-                        if (!factor.allLiteralsBool(source.numBoolVars)) { onDecline("Scope"); return false }
+                        if (!factor.allLiteralsBool(source.numBoolVars)) {
+                            onDecline("Scope")
+                            return false
+                        }
                         onDecline("AffineCoverageWidth${width.coerceAtMost(8)}")
                         continue
                     }
@@ -204,9 +238,21 @@ internal class PrivateRebuildParity private constructor(
                 var a = first
                 var b = second
                 var c = third
-                if (a > b) { val swap = a; a = b; b = swap }
-                if (b > c) { val swap = b; b = c; c = swap }
-                if (a > b) { val swap = a; a = b; b = swap }
+                if (a > b) {
+                    val swap = a
+                    a = b
+                    b = swap
+                }
+                if (b > c) {
+                    val swap = b
+                    b = c
+                    c = swap
+                }
+                if (a > b) {
+                    val swap = a
+                    a = b
+                    b = swap
+                }
                 val left = Lit.variable(a)
                 val middle = Lit.variable(b)
                 val right = if (width == 3) Lit.variable(c) else COLUMN_MASK
@@ -214,7 +260,10 @@ internal class PrivateRebuildParity private constructor(
                     onDecline("Scope")
                     return false
                 }
-                if (left == middle || middle == right) { onDecline("AffineCoverageRepeatedColumn"); return true }
+                if (left == middle || middle == right) {
+                    onDecline("AffineCoverageRepeatedColumn")
+                    return true
+                }
                 val key = (left.toLong() shl (COLUMN_BITS * 2)) or
                     (middle.toLong() shl COLUMN_BITS) or right.toLong()
                 val forbidden = (if (Lit.isPositive(a)) 0 else 1) or
@@ -240,9 +289,11 @@ internal class PrivateRebuildParity private constructor(
                     if (!visit(12L)) return null
                     if (keys[slot] == EMPTY) continue
                     var covered = 0
-                    for (parity in 0..1) if (complete(keys[slot], masks[slot], parity)) {
-                        count++
-                        covered = covered or pattern(keys[slot], parity)
+                    for (parity in 0..1) {
+                        if (complete(keys[slot], masks[slot], parity)) {
+                            count++
+                            covered = covered or pattern(keys[slot], parity)
+                        }
                     }
                     coveredMasks[slot] = covered
                     if (masks[slot] and covered != masks[slot]) {
@@ -274,13 +325,16 @@ internal class PrivateRebuildParity private constructor(
                 for (slot in keys.indices) {
                     if (!visit(4L)) return false
                     if (keys[slot] == EMPTY) continue
-                    for (parity in 0..1) if (complete(keys[slot], masks[slot], parity)) {
-                        if (!matrix.add(keys[slot], parity xor 1)) return false
-                        if (sourceKeys.isEmpty()) continue
-                        if (!visit(4L)) return false
-                        sourceKeys[row] = keys[slot]
-                        sourceRhs[row++] = parity xor 1
-                        sourceRowLiterals += if (keys[slot] and COLUMN_MASK.toLong() == COLUMN_MASK.toLong()) 2 else 3
+                    for (parity in 0..1) {
+                        if (complete(keys[slot], masks[slot], parity)) {
+                            if (!matrix.add(keys[slot], parity xor 1)) return false
+                            if (sourceKeys.isEmpty()) continue
+                            if (!visit(4L)) return false
+                            sourceKeys[row] = keys[slot]
+                            sourceRhs[row++] = parity xor 1
+                            sourceRowLiterals +=
+                                if (keys[slot] and COLUMN_MASK.toLong() == COLUMN_MASK.toLong()) 2 else 3
+                        }
                     }
                 }
                 return true
@@ -422,7 +476,10 @@ internal class PrivateRebuildParity private constructor(
             private fun pins(rank: Int, onDecline: (String) -> Unit): Int? {
                 for (row in rank until masks.size) {
                     if (!visit(2L)) return null
-                    if (rhs[row] != 0) { onDecline("RefutationDeferred"); return null }
+                    if (rhs[row] != 0) {
+                        onDecline("RefutationDeferred")
+                        return null
+                    }
                 }
                 if (retainRows && rank > 0) {
                     if (!visit(rank * 4L + 16L)) return null

@@ -50,6 +50,6 @@ internal class QuadraticWitnessPublication(
         if (checked != SourceEvidenceCheck.Checked) return checked
         val value = expected.objective.evaluateExact(candidate.sample, arithmetic)
         return if (arithmetic.compare(value, candidate.value) == 0) SourceEvidenceCheck.Checked
-            else SourceEvidenceCheck.Rejected("quadratic witness value differs from its original source objective")
+        else SourceEvidenceCheck.Rejected("quadratic witness value differs from its original source objective")
     }
 }

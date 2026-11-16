@@ -585,7 +585,7 @@ internal class RootProbingPass : InprocessingPass {
         if (integer < 0) return Lit.negate(literal)
         val atomSpace = session.rootProbeVariableCount
         val unit = if (atMost) session.boundLeLit(integer, bound, false)
-            else session.boundGeLit(integer, bound, false)
+        else session.boundGeLit(integer, bound, false)
         if (session.rootProbeVariableCount > atomSpace) {
             // Conservatively charge parallel registry buffers and threshold-index growth.
             val atoms = session.rootProbeVariableCount - session.problem.numBoolVars

@@ -70,7 +70,9 @@ class DeferredCompanionSearchTest {
                         clock += 60.milliseconds
                         return null
                     }
-                    override fun close() { closed++ }
+                    override fun close() {
+                        closed++
+                    }
                 }
             }
             val bounded = BoundedCompanionSearch(deferred, "funded", activeLimit = 100.milliseconds, clock = clock)
@@ -96,7 +98,10 @@ class DeferredCompanionSearchTest {
     @Test
     fun `an unfunded start should retire without creating a native worker`() {
         var opened = 0
-        val search = DeferredCompanionSearch({ TerminationReason.BudgetExhausted }) { _, _ -> opened++; null }
+        val search = DeferredCompanionSearch({ TerminationReason.BudgetExhausted }) { _, _ ->
+            opened++
+            null
+        }
 
         val result = search.runSlice(ExecutionControl.Never, 100, 7) {}
         search.runSlice(ExecutionControl.Never, 100, 7) {}

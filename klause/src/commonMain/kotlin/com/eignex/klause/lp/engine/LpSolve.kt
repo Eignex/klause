@@ -863,9 +863,9 @@ private fun certifyLpResultWithin(
     }
     if (result == null &&
         (if (claim == LpClaim.ATTAINED_OPTIMUM)
-                numericalWitness == null || numericalBound == null
+            numericalWitness == null || numericalBound == null
         else
-                claim.needsMore(numericalBound, numericalWitness)) &&
+            claim.needsMore(numericalBound, numericalWitness)) &&
         ray == null && numericalConflict == null && conflict == null && !stopped()
     ) {
         refine()
@@ -1075,7 +1075,7 @@ internal fun exactLagrangian(
     multipliers: List<BigFraction>,
     cancellation: ExecutionControl = ExecutionControl.Never,
 ): BigFraction? {
-    if (cancellation() ||multipliers.size != model.m || !model.finiteExactInput()) return null
+    if (cancellation() || multipliers.size != model.m || !model.finiteExactInput()) return null
     val stride = PollStride()
     val y = model.objectiveMultipliers(multipliers)
     var value = model.exactConstant()
@@ -1084,12 +1084,13 @@ internal fun exactLagrangian(
         value += y[i] * model.exactRhs(i)
     }
     for (j in 0 until model.numVars) {
-        if (stride.due() &&cancellation()) return null
+        if (stride.due() && cancellation()) return null
         var reduced = model.exactCost(j)
         var stopped = false
         model.forEachRationalColumn(j) { row, a ->
             if (stride.due() && cancellation()) stopped = true
-            if (!stopped) reduced -= y[row] * a }
+            if (!stopped) reduced -= y[row] * a
+        }
         if (stopped) return null
         if (reduced.signum() > 0) {
             val side = model.exactBounds(j).lower ?: return null

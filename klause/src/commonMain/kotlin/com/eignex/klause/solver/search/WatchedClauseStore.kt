@@ -62,7 +62,10 @@ internal class WatchedClauseStore {
             if (value != null) signatureBytes += (value as IntArrayList).backingData.size.toLong() * Int.SIZE_BYTES
         }
         var payload = 0L
-        for (clause in clauses) { sample.step(); payload += clause.size.toLong() * Int.SIZE_BYTES }
+        for (clause in clauses) {
+            sample.step()
+            payload += clause.size.toLong() * Int.SIZE_BYTES
+        }
         sample.record(mapOf(
             "sharedLearnedObjects" to clauses.size.toLong(),
             "sharedLearnedPayloadBytes" to payload,

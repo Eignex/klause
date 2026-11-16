@@ -162,7 +162,9 @@ internal fun SourceProofContext.numericCoordinates(): List<SourceCoordinate> = c
     .filter { it.kind != SourceCoordinate.Kind.Boolean }.sortedWith(compareBy({ it.kind.ordinal }, { it.id }))
 
 internal fun SourceProofContext.pinnedConstant(): BigFraction = objective.entries.fold(objectiveConstant) {
-        sum, (id, value), ->
+        sum,
+        (id, value),
+    ->
     if (id.kind == SourceCoordinate.Kind.Boolean) {
         sum + if (scope.condition.bools.getValue(id.id)) value else BigFraction.ZERO
     } else sum

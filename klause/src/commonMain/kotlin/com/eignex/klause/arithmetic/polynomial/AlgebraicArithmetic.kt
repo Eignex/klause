@@ -26,7 +26,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
     fun roots(polynomial: RationalPolynomial): List<AlgebraicReal> = arithmetic.execution.operation {
         val defining = univariate.squareFree(polynomial)
         val intervals = univariate.isolate(defining)
-        if (intervals.any { arithmetic.step(); !it.isPoint }) rememberRootCount(defining, intervals.size)
+        if (intervals.any {
+                arithmetic.step()
+                !it.isPoint
+            }) rememberRootCount(defining, intervals.size)
         return@operation intervals.mapIndexed { index, interval ->
             AlgebraicReal(defining, index + 1, interval)
         }
@@ -388,25 +391,25 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
     fun evaluate(polynomial: Polynomial, coordinates: Map<Int, AlgebraicReal>): AlgebraicReal =
         arithmetic.execution.operation {
-        evaluateAt(polynomial) { variable, exponent ->
-            val coordinate = requireNotNull(coordinates[variable]) { "missing algebraic coordinate" }
-            power(coordinate, exponent)
+            evaluateAt(polynomial) { variable, exponent ->
+                val coordinate = requireNotNull(coordinates[variable]) { "missing algebraic coordinate" }
+                power(coordinate, exponent)
+            }
         }
-    }
 
     fun signAt(polynomial: Polynomial, coordinates: Map<Int, AlgebraicReal>): Int =
         arithmetic.execution.operation {
-        enclosedSignAt(polynomial, coordinates) ?: sign(evaluate(polynomial, coordinates))
-    }
+            enclosedSignAt(polynomial, coordinates) ?: sign(evaluate(polynomial, coordinates))
+        }
 
     fun enclosedSignAt(polynomial: Polynomial, coordinates: Map<Int, AlgebraicReal>): Int? =
         arithmetic.execution.operation {
-        enclosedSign {
-            encloseAt(polynomial) { variable, exponent ->
-                intervalPower(coordinates.getValue(variable).interval, exponent)
+            enclosedSign {
+                encloseAt(polynomial) { variable, exponent ->
+                    intervalPower(coordinates.getValue(variable).interval, exponent)
+                }
             }
         }
-    }
 
     fun pointEvaluation(coordinates: Map<Int, AlgebraicReal>): PointEvaluation = arithmetic.execution.operation {
         PointEvaluation(coordinates)
@@ -429,8 +432,8 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
         fun evaluate(polynomial: Polynomial): AlgebraicReal =
             arithmetic.execution.operation {
-            capturedConstantPoint()?.evaluate(polynomial) ?: evaluateAt(polynomial, ::power)
-        }
+                capturedConstantPoint()?.evaluate(polynomial) ?: evaluateAt(polynomial, ::power)
+            }
 
         fun signAt(polynomial: Polynomial): Int = arithmetic.execution.operation {
             capturedConstantPoint()?.let { return@operation sign(it.evaluate(polynomial)) }
@@ -453,7 +456,10 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
                 }
                 base.add(value)
             }
-            val direction = List(base.size) { arithmetic.step(); BigFraction.ZERO }
+            val direction = List(base.size) {
+                arithmetic.step()
+                BigFraction.ZERO
+            }
             val completed = AffineLineEvaluation(base, direction, this@AlgebraicArithmetic)
                 .at(rational(BigFraction.ZERO))
             arithmetic.step()
@@ -491,25 +497,27 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
     fun specialize(polynomial: Polynomial, variable: Int, coordinates: Map<Int, AlgebraicReal>): AlgebraicPolynomial =
         arithmetic.execution.operation {
-        val coefficients = arithmetic.coefficients(polynomial, variable)
-        val captured = captureSpecialization(coefficients, coordinates)
-            ?: return@operation this.polynomial(coefficients.map { evaluate(it, coordinates) })
-        val expressions = captured.coefficients
-        var size = expressions.size
-        while (size > 0 && signAt(expressions[size - 1], captured.base) == 0) size--
-        return@operation AlgebraicPolynomial(AlgebraicSpecialization(captured.base, expressions.take(size)))
-    }
+            val coefficients = arithmetic.coefficients(polynomial, variable)
+            val captured = captureSpecialization(coefficients, coordinates)
+                ?: return@operation this.polynomial(coefficients.map { evaluate(it, coordinates) })
+            val expressions = captured.coefficients
+            var size = expressions.size
+            while (size > 0 && signAt(expressions[size - 1], captured.base) == 0) size--
+            return@operation AlgebraicPolynomial(AlgebraicSpecialization(captured.base, expressions.take(size)))
+        }
 
     private fun captureSpecialization(
         coefficients: List<Polynomial>,
         coordinates: Map<Int, AlgebraicReal>,
     ): AlgebraicSpecialization? {
         var baseId: Int? = null
-        for (coefficient in coefficients) for (id in coefficient.variables) {
-            arithmetic.step()
-            if (requireNotNull(coordinates[id]).rational != null) continue
-            if (baseId != null && baseId != id) return captureSharedSpecialization(coefficients, coordinates)
-            baseId = id
+        for (coefficient in coefficients) {
+            for (id in coefficient.variables) {
+                arithmetic.step()
+                if (requireNotNull(coordinates[id]).rational != null) continue
+                if (baseId != null && baseId != id) return captureSharedSpecialization(coefficients, coordinates)
+                baseId = id
+            }
         }
         val id = baseId ?: return null
         val base = coordinates.getValue(id)
@@ -534,13 +542,15 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
     ): AlgebraicSpecialization? {
         return try {
             var base: AlgebraicReal? = null
-            for (coefficient in coefficients) for (id in coefficient.variables) {
-                arithmetic.step()
-                val value = coordinates.getValue(id)
-                if (value.rational != null) continue
-                val origin = value.image?.base ?: value
-                if (base != null && !sameIndexedRoot(base, origin)) return null
-                base = origin
+            for (coefficient in coefficients) {
+                for (id in coefficient.variables) {
+                    arithmetic.step()
+                    val value = coordinates.getValue(id)
+                    if (value.rational != null) continue
+                    val origin = value.image?.base ?: value
+                    if (base != null && !sameIndexedRoot(base, origin)) return null
+                    base = origin
+                }
             }
             val root = base ?: return null
             arithmetic.denseSize(root.definingPolynomial.degree)
@@ -580,24 +590,24 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
 
     fun evaluate(polynomial: AlgebraicPolynomial, value: AlgebraicReal): AlgebraicReal =
         arithmetic.execution.operation {
-        var result = rational(BigFraction.ZERO)
-        for (coefficient in polynomial.coefficients(this).asReversed()) {
-            result = add(multiply(result, value), coefficient)
+            var result = rational(BigFraction.ZERO)
+            for (coefficient in polynomial.coefficients(this).asReversed()) {
+                result = add(multiply(result, value), coefficient)
+            }
+            return@operation result
         }
-        return@operation result
-    }
 
     fun signAt(polynomial: AlgebraicPolynomial, value: AlgebraicReal): Int =
         arithmetic.execution.operation {
-        enclosedSign {
-            var result = RationalInterval(BigFraction.ZERO, BigFraction.ZERO)
-            for (coefficient in polynomial.coefficients(this).asReversed()) {
-                arithmetic.step()
-                result = intervalAdd(intervalMultiply(result, value.interval), coefficient.interval)
-            }
-            result
-        } ?: sign(evaluate(polynomial, value))
-    }
+            enclosedSign {
+                var result = RationalInterval(BigFraction.ZERO, BigFraction.ZERO)
+                for (coefficient in polynomial.coefficients(this).asReversed()) {
+                    arithmetic.step()
+                    result = intervalAdd(intervalMultiply(result, value.interval), coefficient.interval)
+                }
+                result
+            } ?: sign(evaluate(polynomial, value))
+        }
 
     fun roots(polynomial: AlgebraicPolynomial): List<AlgebraicReal> = arithmetic.execution.operation {
         arithmetic.step()
@@ -712,7 +722,7 @@ internal class AlgebraicArithmetic(val arithmetic: PolynomialArithmetic = Polyno
         val upper = arithmetic.power(Polynomial.constant(interval.upper), exponent).coefficient(Monomial.ONE)
         if (exponent and 1 != 0) return RationalInterval(lower, upper)
         val minimum = if (interval.lower.signum() <= 0 && interval.upper.signum() >= 0) BigFraction.ZERO
-            else if (lower <= upper) lower else upper
+        else if (lower <= upper) lower else upper
         return RationalInterval(minimum, if (lower >= upper) lower else upper)
     }
 

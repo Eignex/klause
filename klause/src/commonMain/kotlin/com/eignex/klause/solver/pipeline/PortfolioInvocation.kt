@@ -87,7 +87,9 @@ internal class PortfolioInvocation(
     private val objectiveBound: (() -> SourceEvidence?)? = null,
     policy: (List<PortfolioWorker>) -> PortfolioInvocationPolicy = { PortfolioInvocationPolicy() },
 ) : PortfolioExecutor {
-    init { require(factories.isNotEmpty()) { "portfolio invocation requires admitted arm factories" } }
+    init {
+        require(factories.isNotEmpty()) { "portfolio invocation requires admitted arm factories" }
+    }
     private val factories = factories.toList()
     private val preparationStages = preparationStages.toMap()
     private val started = TimeSource.Monotonic.markNow()
@@ -151,10 +153,10 @@ internal class PortfolioInvocation(
     } catch (failure: Throwable) {
         for (worker in workers.asReversed()) {
             runCatching { worker.close() }.exceptionOrNull()
-                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
+                ?.takeUnless { it === failure }?.let(failure::addSuppressed)
         }
         runCatching { resources.close() }.exceptionOrNull()
-                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
+            ?.takeUnless { it === failure }?.let(failure::addSuppressed)
         throw failure
     }
     private var closed = false
@@ -176,7 +178,7 @@ internal class PortfolioInvocation(
 
     override fun solve(cancellation: ExecutionControl): SolveResult {
         check(!closed) { "portfolio invocation is closed" }
-        return withPreparationStats(portfolio.solve(controls.cancellation .includingStop( cancellation)))
+        return withPreparationStats(portfolio.solve(controls.cancellation.includingStop( cancellation)))
     }
 
     override fun minimize(
@@ -187,7 +189,7 @@ internal class PortfolioInvocation(
         val incumbents = optimizationIncumbents
         val result = if (incumbents == null) portfolio.minimize(controls.cancellation
             .includingStop( cancellation), onImprovement)
-        else portfolio.minimize(controls.cancellation .includingStop( cancellation), onImprovement, incumbents)
+        else portfolio.minimize(controls.cancellation.includingStop( cancellation), onImprovement, incumbents)
         return withPreparationStats(result)
     }
 
@@ -199,7 +201,7 @@ internal class PortfolioInvocation(
         onAccepted: ((AcceptedPortfolioIncumbent<V>) -> Unit)? = null,
     ): MinimizeResult {
         check(!closed) { "portfolio invocation is closed" }
-        val result = portfolio.minimize(controls.cancellation .includingStop( cancellation), onImprovement,
+        val result = portfolio.minimize(controls.cancellation.includingStop( cancellation), onImprovement,
             incumbents, terminalCheck,
             onAccepted)
         return withPreparationStats(result)
@@ -234,7 +236,7 @@ internal class PortfolioInvocation(
             portfolio.close()
         } catch (failure: Throwable) {
             runCatching { resources.close() }.exceptionOrNull()
-                    ?.takeUnless { it === failure }?.let(failure::addSuppressed)
+                ?.takeUnless { it === failure }?.let(failure::addSuppressed)
             throw failure
         }
         resources.close()

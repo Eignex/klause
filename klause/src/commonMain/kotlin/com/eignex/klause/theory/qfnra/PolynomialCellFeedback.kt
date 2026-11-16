@@ -69,7 +69,10 @@ internal class PolynomialCellFeedback(
     private var candidateDeclines = 0L
     private var candidateParentStopped = false
     private val candidateArithmetic = parent?.let { caller ->
-        val meter = WorkMeter { units -> completedCandidateWork += units; caller.charge(units) }
+        val meter = WorkMeter { units ->
+            completedCandidateWork += units
+            caller.charge(units)
+        }
         PolynomialArithmetic(object : ExecutionControl() {
             override fun isCancelled(): Boolean {
                 if (caller()) candidateParentStopped = true
@@ -77,11 +80,11 @@ internal class PolynomialCellFeedback(
             }
             override fun deadline() = caller.deadline()
             override val accounting: WorkMeter get() = meter
-                override val admission get() = serialArithmeticSource(
-                    caller,
-                    { maximumCandidateWork - candidateWork },
-                    { completedCandidateWork += it },
-                )
+            override val admission get() = serialArithmeticSource(
+                caller,
+                { maximumCandidateWork - candidateWork },
+                { completedCandidateWork += it },
+            )
         }, limits).also { pendingCandidateWork = { it.execution.admittedWork } }
     }
     private val candidateAlgebraic = candidateArithmetic?.let(::AlgebraicArithmetic)
@@ -109,8 +112,14 @@ internal class PolynomialCellFeedback(
             return null
         }
         return producer ?: PolynomialCellScope.Region(source, condition, snapshot,
-            PolynomialBooleanRegion(premises.atoms.mapValues { step(arithmetic); it.value },
-                premises.bools.mapValues { step(arithmetic); it.value }), Any())
+            PolynomialBooleanRegion(premises.atoms.mapValues {
+                step(arithmetic)
+                it.value
+            },
+                premises.bools.mapValues {
+                    step(arithmetic)
+                    it.value
+                }), Any())
     }
 
     fun candidateRejection(
@@ -125,11 +134,11 @@ internal class PolynomialCellFeedback(
         val algebraic = checkNotNull(candidateAlgebraic)
         return try {
             arithmetic.execution.operation {
-            step(arithmetic)
-            val cells = arithmetic.execution.handoff(available)
-            repeat(cells.size) { step(arithmetic) }
-            rejection(required, scope, cells, arithmetic, algebraic, coordinates::get)?.also { candidateUses++ }
-        }
+                step(arithmetic)
+                val cells = arithmetic.execution.handoff(available)
+                repeat(cells.size) { step(arithmetic) }
+                rejection(required, scope, cells, arithmetic, algebraic, coordinates::get)?.also { candidateUses++ }
+            }
         } catch (stop: PolynomialInterrupted) {
             if (candidateParentStopped) throw stop
             candidateDeclines++

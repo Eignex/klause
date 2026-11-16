@@ -111,7 +111,6 @@ class ProblemPipelineTest {
         }
     }
 
-
     private fun withNValueOverOpenColumn(): Problem {
         val openHi = Bits(2).also { it.set(1) }
         return Problem(
@@ -195,7 +194,10 @@ class ProblemPipelineTest {
 
     @Test
     fun `optional bound work exhaustion should retain complete linear admission`() {
-        val open = Bits(2).also { it.set(0); it.set(1) }
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
@@ -219,7 +221,10 @@ class ProblemPipelineTest {
 
     @Test
     fun `containing cancellation after optional work should decline complete admission`() {
-        val open = Bits(2).also { it.set(0); it.set(1) }
+        val open = Bits(2).also {
+            it.set(0)
+            it.set(1)
+        }
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
@@ -278,7 +283,10 @@ class ProblemPipelineTest {
 
     @Test
     fun `optional stop should retain proved partial bounds for complete admission`() {
-        val open = Bits(3).also { it.set(1); it.set(2) }
+        val open = Bits(3).also {
+            it.set(1)
+            it.set(2)
+        }
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(5, 0, 0), null, open),

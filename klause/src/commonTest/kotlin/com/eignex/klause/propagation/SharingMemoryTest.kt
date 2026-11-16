@@ -108,42 +108,46 @@ class SharingMemoryTest {
 
     @Test
     fun `tiny allowances stop observations before completing either learned store`() {
-        for (native in listOf(false, true)) for (allowance in listOf(0L, 1L, 7L)) {
-            val session = PropagationSession(Problem(32, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(62, 63)))), nativeSat = native)
-            assertEquals(native, session.usesNativeSat)
-            repeat(8) { session.addLearnedClause(Clause(intArrayOf(it * 2, it * 2 + 2)), 2) }
-            val before = session.work
+        for (native in listOf(false, true)) {
+            for (allowance in listOf(0L, 1L, 7L)) {
+                val session = PropagationSession(Problem(32, 0, emptyArray(),
+                    arrayOf(Clause(intArrayOf(62, 63)))), nativeSat = native)
+                assertEquals(native, session.usesNativeSat)
+                repeat(8) { session.addLearnedClause(Clause(intArrayOf(it * 2, it * 2 + 2)), 2) }
+                val before = session.work
 
-            val sample = session.sharingMemory(maxWork = allowance)
+                val sample = session.sharingMemory(maxWork = allowance)
 
-            assertEquals(SharingMemoryStatus.PARTIAL, sample.status)
-            assertEquals(allowance, sample.work)
-            assertEquals(allowance, session.work - before)
-            assertNull(sample.completeValues)
-            assertEquals(8, session.learnedClauseCount)
+                assertEquals(SharingMemoryStatus.PARTIAL, sample.status)
+                assertEquals(allowance, sample.work)
+                assertEquals(allowance, session.work - before)
+                assertNull(sample.completeValues)
+                assertEquals(8, session.learnedClauseCount)
+            }
         }
     }
 
     @Test
     fun `cancellation sees each charged diagnostic visit before the next visit`() {
-        for (native in listOf(false, true)) for (allowance in listOf(5L, 80L)) {
-            var limit = Long.MAX_VALUE
-            lateinit var session: PropagationSession
-            session = PropagationSession(Problem(32, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(62, 63)))), nativeSat = native,
-                cancellation = ExecutionControl { limit != Long.MAX_VALUE && session.work >= limit })
-            assertEquals(native, session.usesNativeSat)
-            repeat(8) { session.addLearnedClause(Clause(intArrayOf(it * 2, it * 2 + 2)), 2) }
-            val before = session.work
-            limit = before + allowance
+        for (native in listOf(false, true)) {
+            for (allowance in listOf(5L, 80L)) {
+                var limit = Long.MAX_VALUE
+                lateinit var session: PropagationSession
+                session = PropagationSession(Problem(32, 0, emptyArray(),
+                    arrayOf(Clause(intArrayOf(62, 63)))), nativeSat = native,
+                    cancellation = ExecutionControl { limit != Long.MAX_VALUE && session.work >= limit })
+                assertEquals(native, session.usesNativeSat)
+                repeat(8) { session.addLearnedClause(Clause(intArrayOf(it * 2, it * 2 + 2)), 2) }
+                val before = session.work
+                limit = before + allowance
 
-            val sample = session.sharingMemory(maxWork = 10_000L)
+                val sample = session.sharingMemory(maxWork = 10_000L)
 
-            assertEquals(SharingMemoryStatus.PARTIAL, sample.status)
-            assertEquals(allowance, sample.work)
-            assertEquals(allowance, session.work - before)
-            assertNull(sample.completeValues)
+                assertEquals(SharingMemoryStatus.PARTIAL, sample.status)
+                assertEquals(allowance, sample.work)
+                assertEquals(allowance, session.work - before)
+                assertNull(sample.completeValues)
+            }
         }
     }
 

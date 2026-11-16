@@ -23,7 +23,9 @@ value class TheoryRealId(
     /** Position in the combined theory's real namespace. */
     val index: Int,
 ) {
-    init { require(index >= 0) }
+    init {
+        require(index >= 0)
+    }
 }
 
 /** Immutable source correspondence retained with one installed whole-factor relation. */
@@ -53,23 +55,31 @@ class EncodingAttribution internal constructor(
 
     /** Private affine reconstruction definitions, expanded into source coordinates before solving. */
     val affineAuxiliaries: List<EncodingAffineExpression> get() = affineDefinitions.toList()
+
     /** Private Boolean definitions, expanded into complete source comparisons before solving. */
     val linearGuards: List<LinearEncodingFormula> get() = guardDefinitions.toList()
 
     /** Source Boolean coordinates; linear targets retain their identity. */
     val booleans: List<SourceBoolId> get() = boolIds.toList()
+
     /** Source integer coordinates; linear targets retain their identity. */
     val integers: List<SourceIntId> get() = intIds.toList()
+
     /** Source real coordinates; linear targets retain their identity. */
     val reals: List<SourceRealId> get() = realIds.toList()
+
     /** Exact integer embeddings retaining their declared domains and source conditions. */
     val integerEmbeddings: Map<SourceIntId, TheoryRealId> get() = intMap.toMap()
+
     /** Original real coordinates represented in the private theory namespace. */
     val realEmbeddings: Map<SourceRealId, TheoryRealId> get() = realMap.toMap()
+
     /** Private defining coordinates omitted from source witness publication. */
     val auxiliaries: List<TheoryRealId> get() = auxiliaryIds.toList()
+
     /** Exact source integer pins supporting a conditioned relation. */
     val integerConditions: Map<SourceIntId, BigInt> get() = conditions.integers()
+
     /** Source Boolean pins supporting a conditioned relation. */
     val booleanConditions: Map<SourceBoolId, Boolean> get() = conditions.booleans()
 

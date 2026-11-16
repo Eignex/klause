@@ -181,7 +181,7 @@ internal object LpExplanation {
         cert.forEachIntegralSupport { column ->
             val variable = relaxation.colVarId.getOrNull(column) ?: -1
             val count = if (relaxation.colIsBool.getOrNull(column) == true) session.problem.numBoolVars
-                else session.problem.numIntVars
+            else session.problem.numIntVars
             if (variable !in 0 until count || relaxation.colRealId.getOrNull(column)?.let { it >= 0 } == true) {
                 integralSupport = false
             }

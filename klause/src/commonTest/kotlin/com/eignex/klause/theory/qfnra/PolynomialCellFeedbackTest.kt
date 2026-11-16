@@ -342,7 +342,7 @@ class PolynomialCellFeedbackTest {
             val feedback = PolynomialCellFeedback(source.formula, condition)
             assertNotNull(feedback.rejection(0, predicate, scope, one, listOf(cell), arithmetic, algebraic))
             val premises = if (numeric) PolynomialBooleanRegion(emptyMap(), mapOf(0 to false))
-                else PolynomialBooleanRegion(mapOf(0 to false), emptyMap())
+            else PolynomialBooleanRegion(mapOf(0 to false), emptyMap())
 
             val retracted = PolynomialCellScope.Region(source.formula, condition, snapshot, premises, owner)
 

@@ -98,7 +98,6 @@ class TablePropagatorTest {
         assertNull(reason)
     }
 
-
     @Test
     fun `indexed table deductions should be implied by their historical reasons`() {
         val tuples = LongArray(9 * 16 * 3) { cell ->

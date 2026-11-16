@@ -76,21 +76,25 @@ internal class LinearRefutationReuse(
     private var sourceShape: Pair<Long, Long>? = null
     private var sourceWidthDeclined = false
 
-    init { require(maximumEntries >= 0 && maximumBytes >= 0L && maximumAllocation >= 0L) }
+    init {
+        require(maximumEntries >= 0 && maximumBytes >= 0L && maximumAllocation >= 0L)
+    }
 
     fun observations(): Map<String, Long> = counts.mapKeys { "numericalRefutationReuse${it.key}" } +
         lifecycle.snapshot() + mapOf(
-        "numericalRefutationReuseRetained" to entries.size.toLong(),
-        "numericalRefutationReuseBytes" to retainedBytes,
-        "numericalRefutationReuseNameBytes" to nameBytes,
-        "numericalRefutationReusePeakBytes" to peakBytes,
-        "numericalRefutationReuseAllocation" to allocated,
-        "numericalRefutationReuseWork" to work,
-        "numericalRefutationReuseVerificationWork" to verificationWork,
-        "numericalRefutationReuseVerificationAllocation" to verificationAllocation,
-    )
+            "numericalRefutationReuseRetained" to entries.size.toLong(),
+            "numericalRefutationReuseBytes" to retainedBytes,
+            "numericalRefutationReuseNameBytes" to nameBytes,
+            "numericalRefutationReusePeakBytes" to peakBytes,
+            "numericalRefutationReuseAllocation" to allocated,
+            "numericalRefutationReuseWork" to work,
+            "numericalRefutationReuseVerificationWork" to verificationWork,
+            "numericalRefutationReuseVerificationAllocation" to verificationAllocation,
+        )
 
-    private fun observe(name: String) { counts[name] = (counts[name] ?: 0L) + 1L }
+    private fun observe(name: String) {
+        counts[name] = (counts[name] ?: 0L) + 1L
+    }
 
     fun name(coordinate: SourceCoordinate, threshold: BigFraction, positive: Int) {
         if (!resolve) return
@@ -298,8 +302,10 @@ internal class LinearRefutationReuse(
         if (size > 4096 || !spend(1L + size, 128L * size)) return null
         val literals = ArrayList<Int>()
         val openingBools = opening.bools
-        for ((id, value) in condition.bools) if (openingBools[id] != value) {
-            literals += (id shl 1) or if (value) 1 else 0
+        for ((id, value) in condition.bools) {
+            if (openingBools[id] != value) {
+                literals += (id shl 1) or if (value) 1 else 0
+            }
         }
         for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
             for ((coordinate, value) in bounds) {

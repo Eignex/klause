@@ -17,17 +17,32 @@ class LearnedCapRankingTest {
         var budget = ReclamationPreparation(0L, 64L, { false }, {})
         val policy = object : LearnedCapPolicy {
             override fun alive(index: Int): Boolean = alive[index]
-            override fun lbd(index: Int): Int { budget.visit(); return 9 - index }
-            override fun prepare(index: Int): Boolean { budget.visit(CAP_ROW_POLICY_WORK); return true }
-            override fun keep(index: Int): Boolean { classified[index]++; return false }
-            override fun retire(index: Int): Boolean { budget.visit(8L); alive[index] = false; return true }
+            override fun lbd(index: Int): Int {
+                budget.visit()
+                return 9 - index
+            }
+            override fun prepare(index: Int): Boolean {
+                budget.visit(CAP_ROW_POLICY_WORK)
+                return true
+            }
+            override fun keep(index: Int): Boolean {
+                classified[index]++
+                return false
+            }
+            override fun retire(index: Int): Boolean {
+                budget.visit(8L)
+                alive[index] = false
+                return true
+            }
             override fun visited() = Unit
         }
         var slices = 0
 
         while (ranking.passes == 0L && slices++ < 32) {
             budget = ReclamationPreparation(32L, 64L, { false }, {})
-            try { ranking.advance(1, 0, budget, policy) } catch (_: ReclamationPreparation.Deferred) { }
+            try {
+                ranking.advance(1, 0, budget, policy)
+            } catch (_: ReclamationPreparation.Deferred) { }
             assertTrue(budget.work <= 32L)
         }
 
@@ -45,10 +60,20 @@ class LearnedCapRankingTest {
         var budget = ReclamationPreparation(32L, 64L, { false }, {})
         val policy = object : LearnedCapPolicy {
             override fun alive(index: Int): Boolean = alive[index]
-            override fun lbd(index: Int): Int { budget.visit(); return 9 - index }
-            override fun prepare(index: Int): Boolean { budget.visit(CAP_ROW_POLICY_WORK); return true }
+            override fun lbd(index: Int): Int {
+                budget.visit()
+                return 9 - index
+            }
+            override fun prepare(index: Int): Boolean {
+                budget.visit(CAP_ROW_POLICY_WORK)
+                return true
+            }
             override fun keep(index: Int): Boolean = false
-            override fun retire(index: Int): Boolean { budget.visit(8L); alive[index] = false; return true }
+            override fun retire(index: Int): Boolean {
+                budget.visit(8L)
+                alive[index] = false
+                return true
+            }
             override fun visited() = Unit
         }
         assertFailsWith<ReclamationPreparation.Deferred> { ranking.advance(1, 0, budget, policy) }
@@ -76,10 +101,20 @@ class LearnedCapRankingTest {
         var budget = ReclamationPreparation(120L, 256L, { false }, {})
         val policy = object : LearnedCapPolicy {
             override fun alive(index: Int): Boolean = alive[index]
-            override fun lbd(index: Int): Int { budget.visit(); return index + 1 }
-            override fun prepare(index: Int): Boolean { budget.visit(CAP_ROW_POLICY_WORK); return true }
+            override fun lbd(index: Int): Int {
+                budget.visit()
+                return index + 1
+            }
+            override fun prepare(index: Int): Boolean {
+                budget.visit(CAP_ROW_POLICY_WORK)
+                return true
+            }
             override fun keep(index: Int): Boolean = false
-            override fun retire(index: Int): Boolean { budget.visit(8L); alive[index] = false; return true }
+            override fun retire(index: Int): Boolean {
+                budget.visit(8L)
+                alive[index] = false
+                return true
+            }
             override fun visited() = Unit
         }
         assertFailsWith<ReclamationPreparation.Deferred> { ranking.advance(4, 0, budget, policy) }

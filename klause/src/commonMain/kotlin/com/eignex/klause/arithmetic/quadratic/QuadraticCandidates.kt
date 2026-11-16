@@ -18,7 +18,10 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         val coefficients = rows.map { it.coefficients }
         val matrix = Array(size) { Array(size + 1) { BigFraction.ZERO } }
         for (i in 0 until model.dimension) {
-            for (j in 0 until model.dimension) { control.step(); matrix[i][j] = hessian[i][j] }
+            for (j in 0 until model.dimension) {
+                control.step()
+                matrix[i][j] = hessian[i][j]
+            }
             for ((j, row) in selected.withIndex()) {
                 control.step()
                 matrix[i][model.dimension + j] = coefficients[row][i]
@@ -26,10 +29,16 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             }
             matrix[i][size] = linear[i].negated()
         }
-        for ((j, row) in selected.withIndex()) { control.step(); matrix[model.dimension + j][size] = rows[row].rhs }
+        for ((j, row) in selected.withIndex()) {
+            control.step()
+            matrix[model.dimension + j][size] = rows[row].rhs
+        }
         val solution = eliminate(matrix) ?: return@operation null
         val multipliers = MutableList(rows.size) { BigFraction.ZERO }
-        for ((j, row) in selected.withIndex()) { control.step(); multipliers[row] = solution[model.dimension + j] }
+        for ((j, row) in selected.withIndex()) {
+            control.step()
+            multipliers[row] = solution[model.dimension + j]
+        }
         control.poll()
         return@operation QuadraticStationaryCertificate(solution.take(model.dimension), multipliers)
     }
@@ -57,7 +66,8 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         val coefficients = rows.map { row ->
             row.coefficients.let { values ->
                 control.execution.pollingCost(values.size)
-                DoubleArray(values.size) { values[it].toDouble() } }
+                DoubleArray(values.size) { values[it].toDouble() }
+            }
         }
         val rhs = DoubleArray(rows.size) { rows[it].rhs.toDouble() }
         if (hessian.any { row -> row.any { !it.isFinite() } } || linear.any { !it.isFinite() } ||
@@ -122,13 +132,13 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
 
     private fun dot(initial: Double, left: DoubleArray, right: DoubleArray): Double {
         if (left.isEmpty()) return initial
-        if(left.size == 1) control.step() else control.steps(left.size)
+        if (left.size == 1) control.step() else control.steps(left.size)
         return initial + koblas.dot(left, 0, right, 0, left.size)
     }
 
     private fun axpy(alpha: Double, source: DoubleArray, destination: DoubleArray) {
         if (source.isEmpty()) return
-        if(source.size == 1) control.step() else control.steps(source.size)
+        if (source.size == 1) control.step() else control.steps(source.size)
         koblas.axpy(destination, 0, alpha, source, 0, source.size)
     }
 
@@ -138,7 +148,10 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
         val pivots = mutableListOf<Int>()
         for (column in 0 until size) {
             control.step()
-            val pivot = (row until size).firstOrNull { control.step(); !matrix[it][column].isZero } ?: continue
+            val pivot = (row until size).firstOrNull {
+                control.step()
+                !matrix[it][column].isZero
+            } ?: continue
             val swap = matrix[row]
             matrix[row] = matrix[pivot]
             matrix[pivot] = swap
@@ -158,9 +171,15 @@ internal class QuadraticCandidates(private val control: QuadraticControl = Quadr
             pivots += column
             row++
         }
-        for (i in row until size) { control.step(); if (!matrix[i][size].isZero) return null }
+        for (i in row until size) {
+            control.step()
+            if (!matrix[i][size].isZero) return null
+        }
         val solution = MutableList(size) { BigFraction.ZERO }
-        for ((i, column) in pivots.withIndex()) { control.step(); solution[column] = matrix[i][size] }
+        for ((i, column) in pivots.withIndex()) {
+            control.step()
+            solution[column] = matrix[i][size]
+        }
         return solution
     }
 }

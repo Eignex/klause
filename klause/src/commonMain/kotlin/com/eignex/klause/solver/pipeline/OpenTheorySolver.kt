@@ -305,7 +305,7 @@ class OpenTheoryEngine internal constructor(
                 cancellation = cancellation,
                 budget = presolveBudget,
                 projections = projections,
-                presolveCancellation = presolveCancellation .withAccounting(cancellation).includingStop( cancellation),
+                presolveCancellation = presolveCancellation.withAccounting(cancellation).includingStop( cancellation),
                 capturedPlan = capturedPlan,
             )
         },
@@ -370,7 +370,7 @@ class OpenTheoryEngine internal constructor(
         nodePolicy: SearchNodePolicy,
     ): OpenTheoryStart {
         val work = state.work
-        val cancellation = params.timeout .withAccounting(params.cancellation).includingStop( params.cancellation)
+        val cancellation = params.timeout.withAccounting(params.cancellation).includingStop( params.cancellation)
         val stats = SolveStatsSink(backend = declaredRoute.backendName())
         stats.start()
         // Preparation reads the whole model, so a budget already spent is answered before that work
@@ -561,7 +561,7 @@ class OpenTheoryEngine internal constructor(
 
     /** The preparation allowance and the solve's own stop, whichever fires first. */
     private fun alsoStoppedBy(cancellation: ExecutionControl): ExecutionControl =
-        preparationCancellation .includingStop( cancellation)
+        preparationCancellation.includingStop( cancellation)
 
     private fun unknown(
         timedOut: Boolean,
@@ -575,7 +575,6 @@ class OpenTheoryEngine internal constructor(
         return OpenTheoryResult.Unknown(
             when {
                 timedOut || cause == SearchStopCause.Timeout -> TerminationReason.Timeout
-
 
                 budgetExhausted || state.work.exhausted || cause == SearchStopCause.WorkAllowance ||
                     cause == SearchStopCause.CheckAllowance || cause == SearchStopCause.DecisionAllowance ||

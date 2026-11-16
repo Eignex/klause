@@ -58,8 +58,13 @@ class BacktrackWorkerConfigTest {
                 objective = objective, lsObjective = null, definitionalSweep = null, onEvent = null,
                 pools = SharedPools(null, null, identity = ModelIdentity.of(problem, objective),
                     acceptedIncumbents = exchange))
-            witnesses += worker.use { it.improvements({ cutoffReads++; Double.POSITIVE_INFINITY },
-                ExecutionControl.Never).mapNotNull { it.objectiveValue }.toList() }
+            witnesses += worker.use {
+                it.improvements({
+                    cutoffReads++
+                    Double.POSITIVE_INFINITY
+                },
+                    ExecutionControl.Never).mapNotNull { it.objectiveValue }.toList()
+            }
             reads += cutoffReads
         }
 
@@ -97,7 +102,10 @@ class BacktrackWorkerConfigTest {
                 seed = 0L, lsLambda = 1.0, objective = objective, lsObjective = null,
                 definitionalSweep = null, onEvent = null,
                 pools = SharedPools(null, null, identity = identity,
-                    acceptedIncumbents = IncumbentSource { reads++; exchange.current() }))
+                    acceptedIncumbents = IncumbentSource {
+                        reads++
+                        exchange.current()
+                    }))
 
             worker.use { it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).last() }
 
@@ -126,7 +134,6 @@ class BacktrackWorkerConfigTest {
             assertSame(params, actual)
         }
     }
-
 
     private fun signalsOf(recipe: BacktrackRecipe, objective: LinearObjective?, pools: SharedPools): Set<Signal> {
         val problem = Problem(
@@ -222,6 +229,7 @@ class BacktrackWorkerConfigTest {
         assertTrue(SharingChannel.Clauses in sharing.channels)
         assertTrue(sharing.clauses.getValue("sessions") > 0L)
     }
+
     @Test
     fun `a worker should account for a consumed peer import and release its filter`() {
         for (objective in listOf(null, LinearObjective(boolWeights = longArrayOf(1L, 1L)))) {

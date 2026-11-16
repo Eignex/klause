@@ -43,10 +43,13 @@ internal class NumericalFrontierSnapshot(
         val numeric = template?.let { field(it, "numeric") as SourceProofContext }
         val verifierContext = if (numeric == null || queryContext == null) null else SourceProofContext(
             queryContext.scope, numeric.coordinates, numeric.premises, numeric.objective, numeric.objectiveConstant)
+
         @Suppress("UNCHECKED_CAST")
         val rows = retained?.let { field(it, "rows") as List<Any> }.orEmpty()
+
         @Suppress("UNCHECKED_CAST")
         val inactive = query?.let { field(it, "inactive") as Set<Int> }.orEmpty()
+
         @Suppress("UNCHECKED_CAST")
         val originals = template?.let { field(it, "rows") as List<Any> }.orEmpty()
         fun proof(value: SourceDerivation, depth: Int = 0): JsonObject {
@@ -56,10 +59,12 @@ internal class NumericalFrontierSnapshot(
                 when (value) {
                     is SourceDerivation.Premise -> put("id", value.id)
                     is SourceDerivation.Combination -> put("terms", buildJsonArray {
-                        value.terms.forEach { term -> add(buildJsonObject {
-                            put("weight", term.weight.toString())
-                            put("derivation", proof(term.derivation, depth + 1))
-                        }) }
+                        value.terms.forEach { term ->
+                            add(buildJsonObject {
+                                put("weight", term.weight.toString())
+                                put("derivation", proof(term.derivation, depth + 1))
+                            })
+                        }
                     })
                     is SourceDerivation.IntegerRounding -> put("row", proof(value.inequality, depth + 1))
                     is SourceDerivation.MixedIntegerRounding -> {
@@ -124,7 +129,7 @@ internal class NumericalFrontierSnapshot(
                     val after = ((own.claim as SourceClaim.Bound).value as SourceValue.Rational).value
                     val before = ((parent.claim as SourceClaim.Bound).value as SourceValue.Rational).value
                     val gain = if (context.scope.objective?.sense == ObjectiveSense.MINIMIZE) after - before
-                        else before - after
+                    else before - after
                     put("checkedBoundGain", gain.toString())
                 }
                 @Suppress("UNCHECKED_CAST")
@@ -150,7 +155,7 @@ internal class NumericalFrontierSnapshot(
                 result?.let { field(it, "evidence") } == null -> pending += buildJsonObject {
                     put("condition", condition(nodeCondition))
                     put("state", if (partial != null && result == null) "pending-separation"
-                        else if (result == null) "unvisited" else "unresolved")
+                    else if (result == null) "unvisited" else "unresolved")
                     best?.let {
                         put("bound", bound(it))
                         put("inherited", it.scope.condition != nodeCondition)
@@ -304,16 +309,18 @@ internal class NumericalFrontierSnapshot(
             put("sense", context.scope.objective?.sense?.name)
             put("condition", condition(context.scope.condition))
             put("premises", buildJsonArray {
-                context.premises.toSortedMap().forEach { (id, premise) -> add(buildJsonObject {
-                    put("id", id)
-                    put("coefficients", coefficients(premise.inequality.coefficients))
-                    put("rhs", premise.inequality.rhs.toString())
-                    put("strict", premise.inequality.strict)
-                    put("guards", buildJsonObject {
-                        premise.guards.toSortedMap().forEach { (key, value) -> put(key.toString(), value) }
+                context.premises.toSortedMap().forEach { (id, premise) ->
+                    add(buildJsonObject {
+                        put("id", id)
+                        put("coefficients", coefficients(premise.inequality.coefficients))
+                        put("rhs", premise.inequality.rhs.toString())
+                        put("strict", premise.inequality.strict)
+                        put("guards", buildJsonObject {
+                            premise.guards.toSortedMap().forEach { (key, value) -> put(key.toString(), value) }
+                        })
+                        put("integerPins", coefficients(premise.integerPins))
                     })
-                    put("integerPins", coefficients(premise.integerPins))
-                }) }
+                }
             })
         }
     }

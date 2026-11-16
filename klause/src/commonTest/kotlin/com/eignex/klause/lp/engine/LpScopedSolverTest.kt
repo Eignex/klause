@@ -203,7 +203,10 @@ class LpScopedSolverTest {
                 completed += it.completed
                 work += it.work
                 decline = it.decline
-                if (it.numerical?.parentValues == true) { seeded = true; owner.close() }
+                if (it.numerical?.parentValues == true) {
+                    seeded = true
+                    owner.close()
+                }
             }
 
             assertNull(gains)

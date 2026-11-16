@@ -187,7 +187,6 @@ class SmtLibAffineRealTablesTest {
         assertFailsWith<PolynomialSourceInterrupted> { capture.infer() }
     }
 
-
     @Test
     fun `a completed table survives exhaustion while a later table is still being prepared`() {
         val capture = SmtLibAffineRealTables(ExecutionControl.Never, entryLimit = 20_000)
@@ -203,11 +202,13 @@ class SmtLibAffineRealTablesTest {
             capture.conjunction(1000 + 2 * assignment, cube, trueLiteral = -1)
             capture.implication(intArrayOf(1000 + 2 * assignment, 200 + 2 * assignment.countOneBits()), -1)
         }
-        for (variable in 0 until 8) for (value in 0..1) {
-            val equality = 400 + 4 * variable + 2 * value
-            capture.equality(equality,
-                RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
-            capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
+        for (variable in 0 until 8) {
+            for (value in 0..1) {
+                val equality = 400 + 4 * variable + 2 * value
+                capture.equality(equality,
+                    RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
+                capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
+            }
         }
         capture.equality(900, RealComb(emptyMap(), mapOf(9 to BigFraction.ONE), BigFraction.ZERO))
         for (assignment in 0 until 256) {
@@ -229,11 +230,13 @@ class SmtLibAffineRealTablesTest {
     fun `a small capture allowance still completes a unit coefficient table`() {
         val capture = SmtLibAffineRealTables(ExecutionControl.Never, entryLimit = 512)
         capture.declarations(listOf(0, 1))
-        for (variable in 0 until 2) for (value in 0..1) {
-            val equality = 100 + 4 * variable + 2 * value
-            capture.equality(equality,
-                RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
-            capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
+        for (variable in 0 until 2) {
+            for (value in 0..1) {
+                val equality = 100 + 4 * variable + 2 * value
+                capture.equality(equality,
+                    RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
+                capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
+            }
         }
         for (value in 0..2) {
             capture.equality(200 + 2 * value,

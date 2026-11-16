@@ -85,9 +85,11 @@ internal fun PreparedFactorProjections.linearTheoryModel(
         return null
     }
     return EncodedTheoryModel(problem, factors.toTypedArray(),
-        problem.impliedFactorMask?.let { mask -> BooleanArray(factors.size) { local ->
-            mask[origins[local]]
-        } }, allocator.count)
+        problem.impliedFactorMask?.let { mask ->
+            BooleanArray(factors.size) { local ->
+                mask[origins[local]]
+            }
+        }, allocator.count)
 }
 
 internal fun PreparedFactorProjections.installLinearFactor(
@@ -197,7 +199,9 @@ private class LinearTheoryEncoding(
     override fun fixedInteger(id: SourceIntId): BigInt? = fixedIntegers[id]
     override fun fixedBoolean(id: SourceBoolId): Boolean? = fixedBooleans[id]
 
-    override fun linear(form: LinearForm) { linearFormula(LinearEncodingFormula.Relation(form)) }
+    override fun linear(form: LinearForm) {
+        linearFormula(LinearEncodingFormula.Relation(form))
+    }
 
     override fun linearFormula(formula: LinearEncodingFormula) {
         lowering.checkpoint()

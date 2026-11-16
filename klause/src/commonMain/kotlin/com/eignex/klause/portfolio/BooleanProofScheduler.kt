@@ -114,7 +114,7 @@ internal class BooleanProofScheduler(
                 val solver = solvers?.get(worker) ?: BacktrackSolver(problem)
                 val params = parameters[worker].copy(assumptions = Assumptions.None)
                 slot.search = if (satisfactionQueries) solver.openBooleanProof(params)
-                    else solver.openRepair(objective, params)
+                else solver.openRepair(objective, params)
             }
             val search = checkNotNull(slot.search)
             if (started[worker] !== lease) {

@@ -37,8 +37,10 @@ class SourceWitnessValidationTest {
                 ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
 
             SourceSetup.execute(SourceExecutionRequest(invocation,
-                finiteRequest = { FiniteSolveRequest(it,
-                    SourceFiniteControls.Backtrack(BacktrackParams(cancellation = control))) },
+                finiteRequest = {
+                    FiniteSolveRequest(it,
+                        SourceFiniteControls.Backtrack(BacktrackParams(cancellation = control)))
+                },
                 theory = TheoryParams(cancellation = control), presolveConfig = PresolveConfig.NONE))
 
             assertEquals(7L, checked)

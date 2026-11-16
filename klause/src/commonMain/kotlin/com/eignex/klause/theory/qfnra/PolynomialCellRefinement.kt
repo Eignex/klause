@@ -246,10 +246,19 @@ internal class PolynomialCellRefinement(
         if (premises.atoms.size + premises.bools.size > MAX_CELL_PREMISES ||
             reduction.atoms.size > MAX_CELL_PREMISES
         ) return@optional null
-        val atoms = reduction.atoms.map { arithmetic.step(); it }
+        val atoms = reduction.atoms.map {
+            arithmetic.step()
+            it
+        }
         val scope = PolynomialCellScope.Region(source, condition, snapshot,
-            PolynomialBooleanRegion(premises.atoms.mapValues { arithmetic.step(); it.value },
-                premises.bools.mapValues { arithmetic.step(); it.value }), Any())
+            PolynomialBooleanRegion(premises.atoms.mapValues {
+                arithmetic.step()
+                it.value
+            },
+                premises.bools.mapValues {
+                    arithmetic.step()
+                    it.value
+                }), Any())
         PolynomialCellRegion(scope, atoms)
     }
 
@@ -294,7 +303,10 @@ internal class PolynomialCellRefinement(
                 if (algebraic.compare(value, initial) != 0) repairCount++
                 return value
             }
-            val support = if (sourceAtoms.any { arithmetic.step(); it == rejected }) {
+            val support = if (sourceAtoms.any {
+                    arithmetic.step()
+                    it == rejected
+                }) {
                 checkNotNull(sourceScope)
             } else scope
             val known = reused
@@ -305,7 +317,10 @@ internal class PolynomialCellRefinement(
                     arithmetic.step()
                     it.variable == variable && (it.scope === scope || it.scope === sourceScope)
                 }
-                existing.any { arithmetic.step(); it.contains(value, algebraic) }
+                existing.any {
+                    arithmetic.step()
+                    it.contains(value, algebraic)
+                }
             }
             if (repeated) {
                 repeatedCount++
@@ -317,7 +332,8 @@ internal class PolynomialCellRefinement(
                 retained.add(cell)
                 cellCount++
                 arithmetic.execution.handoff {
-                onCell(cell) }
+                    onCell(cell)
+                }
                 feedback?.admit(cell, arithmetic)
             }
             value = next(variable, scope) ?: return null
@@ -349,7 +365,10 @@ internal class PolynomialCellRefinement(
             arithmetic.step()
             return (lower == null || algebraic.compare(value, lower) >= 0) &&
                 (upper == null || algebraic.compare(value, upper) <= 0) &&
-                cells.none { arithmetic.step(); it.contains(value, algebraic) }
+                cells.none {
+                    arithmetic.step()
+                    it.contains(value, algebraic)
+                }
         }
         for (boundary in distinct) if (accepted(boundary)) return boundary
         for (index in 0..distinct.size) {
@@ -366,8 +385,8 @@ internal class PolynomialCellRefinement(
         return try {
             arithmetic.execution.operation {
                 arithmetic.step()
-            block()
-        }
+                block()
+            }
         } catch (stop: PolynomialInterrupted) {
             if (parentStopped) throw stop
             declineCount++

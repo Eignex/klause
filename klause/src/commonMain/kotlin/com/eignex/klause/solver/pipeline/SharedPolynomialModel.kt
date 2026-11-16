@@ -112,13 +112,17 @@ internal class SharedPolynomialModel private constructor(
                         changed = true
                     }
                     if (participating[index]) {
-                        for (id in factor.intVars) if (!relevantIntegers[id]) {
-                            relevantIntegers[id] = true
-                            changed = true
+                        for (id in factor.intVars) {
+                            if (!relevantIntegers[id]) {
+                                relevantIntegers[id] = true
+                                changed = true
+                            }
                         }
-                        for (id in factor.boolVars) if (!relevantBooleans[id]) {
-                            relevantBooleans[id] = true
-                            changed = true
+                        for (id in factor.boolVars) {
+                            if (!relevantBooleans[id]) {
+                                relevantBooleans[id] = true
+                                changed = true
+                            }
                         }
                     }
                 }

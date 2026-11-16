@@ -53,8 +53,14 @@ internal fun tryPolynomialIntegerRecession(
     val candidates = QuadraticCandidates(control)
     fun certify(direction: List<BigFraction>): PolynomialIntegerRecession? {
         var scale = BIG_ONE
-        for (id in integers) { arithmetic.step(); scale *= direction[id].den }
-        val scaled = direction.map { arithmetic.step(); it * BigFraction.of(scale, BIG_ONE) }
+        for (id in integers) {
+            arithmetic.step()
+            scale *= direction[id].den
+        }
+        val scaled = direction.map {
+            arithmetic.step()
+            it * BigFraction.of(scale, BIG_ONE)
+        }
         val certificate = checker.unbounded(model, base, scaled) ?: return null
         check(integers.all { certificate.direction[it].den == BIG_ONE })
         arithmetic.step()
@@ -62,9 +68,11 @@ internal fun tryPolynomialIntegerRecession(
     }
     val targets = buildList {
         add(model.linear.map { it.negated() })
-        for (id in base.indices) for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
-            arithmetic.step()
-            add(List(base.size) { if (it == id) sign else BigFraction.ZERO })
+        for (id in base.indices) {
+            for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
+                arithmetic.step()
+                add(List(base.size) { if (it == id) sign else BigFraction.ZERO })
+            }
         }
     }
     for (target in targets) {

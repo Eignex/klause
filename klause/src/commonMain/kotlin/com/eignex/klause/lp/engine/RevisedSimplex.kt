@@ -703,7 +703,7 @@ internal class RevisedSimplex(
             ) {
                 factorCopyFailed = true
                 observations.termination = if (cancellation()) LpFloatTermination.CANCELLED
-                    else LpFloatTermination.NUMERICAL
+                else LpFloatTermination.NUMERICAL
                 return@profiled SimplexBasisRefactor.FAILED
             }
             hasImportedFactors = true
@@ -1919,8 +1919,8 @@ internal class RevisedSimplex(
     private fun lowerAt(column: Int): Double = artificialBounds.lowerAt(numerical, column)
     private fun upperAt(column: Int): Double = artificialBounds.upperAt(numerical, column)
 
-    private fun installArtificialBounds(): Boolean {
-        return artificialBounds.install(model, numerical, primalOperations, tolerance) {
+    private fun installArtificialBounds(): Boolean =
+        artificialBounds.install(model, numerical, primalOperations, tolerance) {
             if (dualFeasible()) {
                 true
             } else {
@@ -1929,7 +1929,6 @@ internal class RevisedSimplex(
                 false
             }
         }
-    }
 
     /**
      * The boxed solve cannot settle the real LP. Its basis rests on artificial seats the primal would only reseat
@@ -2334,8 +2333,10 @@ internal class RevisedSimplex(
             parentValuePreparation = valueWork,
             sharedBasisSource = copy?.sharesSource == true) { child, work, entries, view ->
             val order = if (orderWork > 0L) basisLifecycle.current?.orderHint() else null
-            val factors = copy?.let { SimplexFactorCopy(probeMatrix.columns, it, basis.basicVars,
-                basisLifecycle.columns, basisLifecycle.unitRows) }
+            val factors = copy?.let {
+                SimplexFactorCopy(probeMatrix.columns, it, basis.basicVars,
+                    basisLifecycle.columns, basisLifecycle.unitRows)
+            }
             RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
                 basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
                     basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
@@ -2397,19 +2398,21 @@ internal class RevisedSimplex(
             parentValuePreparation = valueWork,
             sharedBasisSource = copy?.sharesSource == true,
             factory = { child, work, entries, view ->
-            val order = if (orderWork > 0L) basisLifecycle.current?.orderHint() else null
-            val factors = copy?.let { SimplexFactorCopy(probeMatrix.columns, it, pointBasis.basicVars,
-                basisLifecycle.columns, basisLifecycle.unitRows) }
-            RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
-                basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
-                    basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
-                primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
-                singletonStart, initialScaling = view, initialMatrix = probeMatrix.takeIf { view != null },
-                allowUnscaledFallback = view == null, initialOrder = order, initialFactorCopy = factors,
-                reuseProbeValues = reuseProbeValues).also {
-                if (valueWork > 0L) it.seedProbeValues(this@RevisedSimplex, pointModel, sourceNumerical, pointBasis)
-            }
-        }).runValues(columns, splits, allowance - scan, token, observe)
+                val order = if (orderWork > 0L) basisLifecycle.current?.orderHint() else null
+                val factors = copy?.let {
+                    SimplexFactorCopy(probeMatrix.columns, it, pointBasis.basicVars,
+                        basisLifecycle.columns, basisLifecycle.unitRows)
+                }
+                RevisedSimplex(child, token, refactorUpdateLimit, iterationLimit, work, trackDegeneracy,
+                    basisSolverFactory, pricing.copy(basisEntryLimit = minOf(pricing.basisEntryLimit, entries),
+                        basisWorkLimit = minOf(pricing.basisWorkLimit, work)), reuseRationalOrder, scalingOptions,
+                    primalPricingTolerance, syntheticWorkEnabled, phaseOneLongSteps, phaseOneIncrementalValues,
+                    singletonStart, initialScaling = view, initialMatrix = probeMatrix.takeIf { view != null },
+                    allowUnscaledFallback = view == null, initialOrder = order, initialFactorCopy = factors,
+                    reuseProbeValues = reuseProbeValues).also {
+                    if (valueWork > 0L) it.seedProbeValues(this@RevisedSimplex, pointModel, sourceNumerical, pointBasis)
+                }
+            }).runValues(columns, splits, allowance - scan, token, observe)
     }
 
     private fun probeBasisDecline(source: LpProbeSource, token: ExecutionControl): LpProbeDecline? {

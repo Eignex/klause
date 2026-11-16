@@ -83,6 +83,7 @@ class SharingMemoryObservationTest {
 
         assertFailsWith<IllegalArgumentException> { sample.ownedPool(pool, 120L, 40L) }
     }
+
     @Test
     fun `many distinct owners and protection upgrades should fit the default observation grant`() {
         val owners = Array(384) { Any() }
@@ -156,6 +157,7 @@ class SharingMemoryObservationTest {
         assertEquals(1, memory.scratchEntries)
         assertNull(memory.completeValues)
     }
+
     @Test
     fun `protected ids with long shared hash prefixes should fit the default grant`() {
         val sample = SharingMemoryObservation(SharingMemoryObservation.DEFAULT_WORK,
@@ -216,5 +218,4 @@ class SharingMemoryObservationTest {
 
         assertFailsWith<IllegalArgumentException> { sample.ownedReferencesPool(pool, 120L, 40L) }
     }
-
 }

@@ -110,18 +110,20 @@ internal object FixedWorkSatSuite : BenchSuite {
 
     override fun plan(request: BenchRequest): List<BenchCase> {
         val options = Options.parse(request.parameters, planned = false)
-        return options.sources.flatMap { source -> options.seeds.map { seed ->
-            val key = "${options.measurement}/${options.unit.label}-${options.limit}/${source.path}/seed-$seed"
-            BenchCase("fixed-work-sat/$key",
-                request.parameters - "sources" - "seeds" +
-                    mapOf("source-path" to source.path, "sha256" to source.sha256, "seed" to "$seed"),
-                BenchResources(cpus = 1, memoryMiB = options.heapMiB + NATIVE_HEADROOM_MIB,
-                    timeoutSeconds = options.processSeconds + CASE_MARGIN_SECONDS),
-                inputs = listOf(BenchInput(source.path, BenchInputRoot.CORPUS, "model", source.sha256)),
-                attributes = mapOf("suite" to "fixed-work-sat", "problem" to source.path,
-                    "comparisonKey" to key, "pairKey" to key, "seed" to "$seed",
-                    "recordSchema" to FixedWorkSatMeasurement.SCHEMA))
-        } }
+        return options.sources.flatMap { source ->
+            options.seeds.map { seed ->
+                val key = "${options.measurement}/${options.unit.label}-${options.limit}/${source.path}/seed-$seed"
+                BenchCase("fixed-work-sat/$key",
+                    request.parameters - "sources" - "seeds" +
+                        mapOf("source-path" to source.path, "sha256" to source.sha256, "seed" to "$seed"),
+                    BenchResources(cpus = 1, memoryMiB = options.heapMiB + NATIVE_HEADROOM_MIB,
+                        timeoutSeconds = options.processSeconds + CASE_MARGIN_SECONDS),
+                    inputs = listOf(BenchInput(source.path, BenchInputRoot.CORPUS, "model", source.sha256)),
+                    attributes = mapOf("suite" to "fixed-work-sat", "problem" to source.path,
+                        "comparisonKey" to key, "pairKey" to key, "seed" to "$seed",
+                        "recordSchema" to FixedWorkSatMeasurement.SCHEMA))
+            }
+        }
     }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
@@ -254,8 +256,10 @@ internal object FixedWorkSatSuite : BenchSuite {
     private fun launch(argv: List<String>, context: BenchContext, ceilingSeconds: Long): Pair<Int?, Boolean> {
         val process = ProcessBuilder(argv).directory(context.outputDirectory.toFile()).redirectErrorStream(true)
             .redirectOutput(context.outputDirectory.resolve(LOG).toFile()).apply {
-                environment().keys.removeAll { it in setOf("JAVA_OPTS", "JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS",
-                    "JDK_JAVA_OPTIONS") }
+                environment().keys.removeAll {
+                    it in setOf("JAVA_OPTS", "JAVA_TOOL_OPTIONS", "_JAVA_OPTIONS",
+                        "JDK_JAVA_OPTIONS")
+                }
             }.start()
         fun kill() {
             process.descendants().forEach { it.destroyForcibly() }

@@ -293,5 +293,4 @@ class AssignmentTest {
 
         assertNull(replaced.semantics)
     }
-
 }

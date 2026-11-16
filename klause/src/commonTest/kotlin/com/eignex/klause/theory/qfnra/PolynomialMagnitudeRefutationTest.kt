@@ -173,5 +173,4 @@ class PolynomialMagnitudeRefutationTest {
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
     }
-
 }

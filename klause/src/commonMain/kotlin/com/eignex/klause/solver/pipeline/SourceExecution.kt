@@ -515,10 +515,12 @@ private fun executeCapturedSource(
             } else {
                 val prepared = native.withPresolve(
                     request.presolveConfig ?: route.request.presolveConfig,
-                    cancellation = route.request.presolveCancellation .withAccounting(
+                    cancellation = route.request.presolveCancellation.withAccounting(
                         if (request.presolveBudget !=
                             null
-                        ) { request.presolveCancellation } else {
+                        ) {
+                            request.presolveCancellation
+                        } else {
                             route.request.presolveCancellation
                         },
                     ).includingStop(request.presolveCancellation).includingStop(
@@ -535,23 +537,23 @@ private fun executeCapturedSource(
                 route.request
             } else {
                 PolynomialTheoryRequest(
-                route.request.problem,
-                route.preparedPlan.linearWorkingPlan(),
-            )
+                    route.request.problem,
+                    route.preparedPlan.linearWorkingPlan(),
+                )
             }
             val params = request.polynomial.boundTo(invocation)
             val objective = invocation.workingLinearObjective
             val source = original.prepareSource(
                 request.presolveConfig ?: PresolveConfig.DEFAULT,
                 objective?.let { if (invocation.maximizeSourceObjective) it.negated() else it },
-                request.presolveCancellation .includingStop( params.cancellation ).includingStop( params.timeout),
-                invocation.cancellation .includingStop( params.cancellation ).includingStop( params.timeout),
+                request.presolveCancellation.includingStop( params.cancellation ).includingStop( params.timeout),
+                invocation.cancellation.includingStop( params.cancellation ).includingStop( params.timeout),
                 request.presolveBudget,
             )
             if (source.infeasible) return SourceExecutionResult.Refuted(invocation).also {
                 it.preparationStats = source.stats
             }
-            val prepared = original.afterSourcePreparation(source, params.cancellation .includingStop( params.timeout))
+            val prepared = original.afterSourcePreparation(source, params.cancellation.includingStop( params.timeout))
                 ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
                     it.preparationStats = source.stats
                 }
@@ -610,21 +612,21 @@ private fun executeSourceHeuristic(
 )
 
 internal fun TheoryParams.boundTo(invocation: PreparedSourceInvocation): TheoryParams = copy(
-    cancellation = cancellation .withAccounting(
+    cancellation = cancellation.withAccounting(
         if (cancellation.accounting != null) cancellation else invocation.cancellation,
     ).includingStop( invocation.cancellation),
-    timeout = timeout .includingStop( invocation.containingDeadline(timeout)),
+    timeout = timeout.includingStop( invocation.containingDeadline(timeout)),
 )
 
 private fun PolynomialTheoryParams.boundTo(invocation: PreparedSourceInvocation): PolynomialTheoryParams = copy(
-    cancellation = cancellation .withAccounting(
+    cancellation = cancellation.withAccounting(
         if (cancellation.accounting != null) cancellation else invocation.cancellation,
     ).includingStop(invocation.cancellation),
-    timeout = timeout .includingStop( invocation.containingDeadline(timeout)),
+    timeout = timeout.includingStop( invocation.containingDeadline(timeout)),
 )
 
 private fun PreparedSourceInvocation.containingDeadline(timeout: ExecutionControl): ExecutionControl {
     val end =
-    cancellation.deadline()?: return ExecutionControl.Never
+        cancellation.deadline() ?: return ExecutionControl.Never
     return if (timeout.deadline() == end) ExecutionControl.Never else ExecutionControl.until(end)
 }

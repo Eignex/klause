@@ -99,10 +99,10 @@ class SourceExecutionPolicyTest {
     fun `deferred finite policy should retain containing controls and application hooks`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const b Bool) (assert b)").source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SmtLib.parse("(declare-const b Bool) (assert b)").source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            )
         )
         val budget = NodeBudget(7)
         val stop = ExecutionControl { true }
@@ -141,18 +141,18 @@ class SourceExecutionPolicyTest {
     fun `linear source preparation should receive typed presolve tuning`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
+                SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+            )
         )
 
         val request = SourceExecutionRequest(
             invocation, SourceExecutionPolicy(),
             ExecutionOptions(
-            ExecutionOption.affinePivotOrder(AffinePivotOrder.STABLE_ID),
-            ExecutionOption.presolveMaxRounds(2),
-        )
+                ExecutionOption.affinePivotOrder(AffinePivotOrder.STABLE_ID),
+                ExecutionOption.presolveMaxRounds(2),
+            )
         )
 
         val preparation = assertNotNull(request.presolveConfig)
@@ -165,16 +165,16 @@ class SourceExecutionPolicyTest {
     fun `presolve effort tuning should preserve implicit local search emphasis`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SmtLib.parse("(declare-const b Bool) (assert b)").source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.LOCAL_SEARCH,
-        )
+                SmtLib.parse("(declare-const b Bool) (assert b)").source,
+                ExecutionOperation.SATISFY,
+                FiniteEngine.LOCAL_SEARCH,
+            )
         )
         val request = SourceExecutionRequest(
             invocation, SourceExecutionPolicy(),
             ExecutionOptions(
-            ExecutionOption.presolveMaxRounds(2),
-        ),
+                ExecutionOption.presolveMaxRounds(2),
+            ),
             presolveConfig = PresolveConfig.DEFAULT
         )
 

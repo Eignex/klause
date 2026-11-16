@@ -193,7 +193,13 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     private fun <T : Any> own(source: SearchStream<T>, transform: (T) -> T = { it }): SearchStream<T> {
         val owned = PullSearchStream(
             pull = { if (source.hasNext()) transform(source.next()) else null },
-            release = { try { source.close() } finally { active = null } },
+            release = {
+                try {
+                    source.close()
+                } finally {
+                    active = null
+                }
+            },
             terminal = { source.isDone },
         )
         active = owned

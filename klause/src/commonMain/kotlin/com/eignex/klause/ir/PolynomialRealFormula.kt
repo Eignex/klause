@@ -4,14 +4,19 @@ package com.eignex.klause.ir
 enum class PolynomialRelation {
     /** Equality. */
     EQ,
+
     /** Disequality. */
     NE,
+
     /** Strictly less. */
     LT,
+
     /** Less or equal. */
     LE,
+
     /** Strictly greater. */
     GT,
+
     /** Greater or equal. */
     GE,
 }
@@ -23,11 +28,13 @@ sealed interface PolynomialRealFormula {
         /** Constant truth value. */
         val value: Boolean,
     ) : PolynomialRealFormula
+
     /** A Boolean coordinate in the owning scope. */
     data class BooleanVariable(
         /** Typed Boolean coordinate. */
         val id: SourceBoolId,
     ) : PolynomialRealFormula
+
     /** Exact polynomial comparison. */
     class Atom(
         /** Left expression. */
@@ -41,7 +48,6 @@ sealed interface PolynomialRealFormula {
         override fun hashCode(): Int = hash
         override fun equals(other: Any?): Boolean = other is Atom && polynomialFormulasEqual(this, other)
     }
-
 
     /** Logical complement of the complete operand. */
     class Not(
@@ -57,6 +63,7 @@ sealed interface PolynomialRealFormula {
     class And(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
         internal val operandCount: Int get() = values.size
+
         /** Captured operands in syntax order. */
         val operands: List<PolynomialRealFormula> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is And && polynomialFormulasEqual(this, other)
@@ -68,6 +75,7 @@ sealed interface PolynomialRealFormula {
     class Or(operands: List<PolynomialRealFormula>) : PolynomialRealFormula {
         private val values = operands.toTypedArray()
         internal val operandCount: Int get() = values.size
+
         /** Captured operands in syntax order. */
         val operands: List<PolynomialRealFormula> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Or && polynomialFormulasEqual(this, other)

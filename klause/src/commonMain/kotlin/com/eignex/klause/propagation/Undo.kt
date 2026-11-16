@@ -96,6 +96,7 @@ internal fun PropagationState.mark(): PropagationState.LevelMark {
 
 internal fun PropagationState.prepareMark(): Iterator<PropagationState.LevelMark?> = sequence {
     var visits = 0
+
     @Suppress("DoubleMutabilityForCollection") // lazily allocated when a snapshot is taken
     var payloads: MutableIntObjectMap<PropagationState.SnapshottablePayload>? = null
     // Only the tracked snapshottable slots need copying — no per-pin scan of every factor.

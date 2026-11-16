@@ -14,4 +14,4 @@ internal fun cancelledWhen(
     cancelled: () -> Boolean,
 ): ExecutionControl = PredicateExecutionControl(cancelled, deadlineOf, workScheduledOf, pollingOf)
 
-internal fun ExecutionControl.workScheduled(): Boolean =workScheduled
+internal fun ExecutionControl.workScheduled(): Boolean = workScheduled

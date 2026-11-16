@@ -50,7 +50,9 @@ class RootInprocessingSearchTest {
         for (native in listOf(false, true)) {
             var observedNative: Boolean? = null
             val exchange = object : ClauseExchange {
-                override fun onSearchStart(session: PropagationSession) { observedNative = session.usesNativeSat }
+                override fun onSearchStart(session: PropagationSession) {
+                    observedNative = session.usesNativeSat
+                }
                 override fun onRestart(session: PropagationSession) = Unit
             }
             val configured = params(native, exchange).copy(lubyRestartBase = null, inprocessingInterval = 1L,
@@ -194,8 +196,12 @@ class RootInprocessingSearchTest {
             var retained: PropagationSession? = null
             var rootValue: Boolean? = null
             val exchange = object : ClauseExchange {
-                override fun onRestart(session: PropagationSession) { retained = session }
-                override fun onSearchClose(session: PropagationSession) { rootValue = session.boolValue(2) }
+                override fun onRestart(session: PropagationSession) {
+                    retained = session
+                }
+                override fun onSearchClose(session: PropagationSession) {
+                    rootValue = session.boolValue(2)
+                }
             }
             val search = BacktrackSolver(problem().bake()).resumableSolve(params(native, exchange))
             val result = search.use {
@@ -217,7 +223,9 @@ class RootInprocessingSearchTest {
             var retained: PropagationSession? = null
             var observedLevel = -1
             val exchange = object : ClauseExchange {
-                override fun onSearchStart(session: PropagationSession) { retained = session }
+                override fun onSearchStart(session: PropagationSession) {
+                    retained = session
+                }
                 override fun onRestart(session: PropagationSession) = Unit
             }
             val peer = object : SearchComponent {
@@ -364,7 +372,9 @@ class RootInprocessingSearchTest {
             ))
             var retained: PropagationSession? = null
             val exchange = object : ClauseExchange {
-                override fun onRestart(session: PropagationSession) { retained = session }
+                override fun onRestart(session: PropagationSession) {
+                    retained = session
+                }
             }
 
             val result = BacktrackSolver(unsat.bake()).solve(params(native, exchange))

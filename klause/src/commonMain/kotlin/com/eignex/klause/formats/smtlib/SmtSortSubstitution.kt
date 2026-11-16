@@ -42,7 +42,10 @@ internal fun smtSortParameters(root: SmtSort, parameters: Set<String>, cancellat
     while (work.isNotEmpty()) {
         cancellation.polynomialSourceCheckpoint(1)
         when (val sort = work.removeLast()) {
-            is SmtSort.Array -> { work.addLast(sort.index); work.addLast(sort.element) }
+            is SmtSort.Array -> {
+                work.addLast(sort.index)
+                work.addLast(sort.element)
+            }
             is SmtSort.Uninterpreted -> {
                 if (sort.arguments.isEmpty() && polynomialSymbol(sort.name) in parameters) {
                     found += polynomialSymbol(sort.name)

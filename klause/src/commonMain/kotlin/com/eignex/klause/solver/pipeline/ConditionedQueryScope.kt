@@ -23,7 +23,7 @@ internal class ConditionedQueryScope(private val lifetime: ExecutionControl) : A
     ): T {
         check(!closed) { "conditioned query owner is closed" }
         val previous = invocation
-        invocation = previous .withAccounting(cancellation).includingStop( cancellation)
+        invocation = previous.withAccounting(cancellation).includingStop( cancellation)
         conditions += ExactNeighborhoodCondition(condition.bools.toMap(), condition.lower.toMap(),
             condition.upper.toMap(), condition.cutoff)
         return try {

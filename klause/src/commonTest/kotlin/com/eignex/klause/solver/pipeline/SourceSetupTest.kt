@@ -213,25 +213,25 @@ class SourceSetupTest {
         for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK)) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.OPTIMIZE,
-                engine,
-                objective,
-                maximize = true,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.OPTIMIZE,
+                    engine,
+                    objective,
+                    maximize = true,
+                )
             )
             val shape = invocation.finiteShape()
             val publications = ArrayList<Sample>()
 
             val result = FinitePipeline.solve(
                 FiniteSolveRequest(
-                shape, engine, PresolveConfig.NONE, false, false, ExecutionControl.Never,
-                presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
-                randomSeed = 3, defaultArms = 1, lpConfig = LpConfig.OFF,
-                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
-                solveBudgetMillis = null, allSolutions = false, solutionCap = null, deadlineExceeded = { false },
-                onEvent = null, onPortfolioEvent = null,
-            ),
+                    shape, engine, PresolveConfig.NONE, false, false, ExecutionControl.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions.parse(emptyList()),
+                    randomSeed = 3, defaultArms = 1, lpConfig = LpConfig.OFF,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null, deadlineExceeded = { false },
+                    onEvent = null, onPortfolioEvent = null,
+                ),
                 FiniteSolveCallbacks(publications::add, { publications += it.sample })
             )
 
@@ -239,8 +239,8 @@ class SourceSetupTest {
             assertEquals(
                 -13L,
                 assertNotNull(shape.linearObjective).evaluateLong(
-                Sample(BooleanArray(0), longArrayOf(2)),
-            )
+                    Sample(BooleanArray(0), longArrayOf(2)),
+                )
             )
             val outcome = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
             assertEquals(13L, objective.evaluateLong(assertNotNull(outcome.bestSample)))

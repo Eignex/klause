@@ -118,10 +118,14 @@ class LpBoundingTest {
         assertEquals(5.0, result.objectiveValue)
         val phases = result.stats.lp.phases
         assertTrue(phases.keys.any { it.startsWith("CUT_ROOT_") && it.endsWith("CONSTRUCTION") })
-        assertTrue(phases.any { (key, value) -> key.startsWith("CUT_ROOT_") &&
-            key.endsWith("ADMISSION") && (value.outcomes["ADMITTED"] ?: 0L) > 0L })
-        assertTrue(phases.any { (key, value) -> key.startsWith("CUT_ROOT_") &&
-            key.endsWith("SOLVE") && value.work > 0L })
+        assertTrue(phases.any { (key, value) ->
+            key.startsWith("CUT_ROOT_") &&
+                key.endsWith("ADMISSION") && (value.outcomes["ADMITTED"] ?: 0L) > 0L
+        })
+        assertTrue(phases.any { (key, value) ->
+            key.startsWith("CUT_ROOT_") &&
+                key.endsWith("SOLVE") && value.work > 0L
+        })
         assertTrue(phases.keys.any { it.startsWith("CUT_NODE_") && it.endsWith("RETIREMENT") })
     }
 

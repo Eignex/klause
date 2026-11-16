@@ -27,6 +27,7 @@ internal class LearnedPolicyRows(
 
     private val directory = MutableIntObjectIndex<Page>()
     private var primary: Page? = Page(INITIAL_CAPACITY, columns, objectColumns)
+
     // Every installed page after the first is reachable by its index, so a read never walks the directory.
     // The first chunk is the fixed reservation; a later chunk exists while one of its pages does and is the
     // shared empty chunk otherwise. Every read takes the same path, whatever the store has grown to.
@@ -250,7 +251,11 @@ internal class LearnedPolicyRows(
 
     fun resetRetirements(): Long {
         var work = 2L
-        fun clear(page: Page) { page.pending = 0; page.nextRetired = null; work += 2L }
+        fun clear(page: Page) {
+            page.pending = 0
+            page.nextRetired = null
+            work += 2L
+        }
         primary?.let(::clear)
         directory.forEach({ work += it }) { _, page -> clear(page) }
         retiredHead = null
@@ -284,7 +289,10 @@ internal class LearnedPolicyRows(
         allocatedBytes -= page.bytes
         page.values = emptyIntArray()
         page.admissions = longArrayOf()
-        if (objectColumns) { page.propagators = emptyArray(); page.payloads = emptyArray() }
+        if (objectColumns) {
+            page.propagators = emptyArray()
+            page.payloads = emptyArray()
+        }
         page.retained = 0
         page.pending = 0
         allocationIdentity = Any()
@@ -318,7 +326,10 @@ internal class LearnedPolicyRows(
         page.queued = 0
         if (page.retained != 0) return
         val slot = page.slot
-        if (slot == null) { check(primary === page); primary = null } else {
+        if (slot == null) {
+            check(primary === page)
+            primary = null
+        } else {
             check(directory.remove(slot, {}, {}))
             directoryIdentity = Any()
         }
@@ -349,21 +360,30 @@ internal class LearnedPolicyRows(
         require(count in 0..size)
         var work = 4L
         val retained = ((count.toLong() + PAGE_MASK) ushr PAGE_SHIFT).toInt()
-        if (count == 0) primary?.let { discard(it); work += 8L }
+        if (count == 0) primary?.let {
+            discard(it)
+            work += 8L
+        }
         if (count > 0 && count and PAGE_MASK != 0) {
             val last = pageAt((count - 1) ushr PAGE_SHIFT)
             if (last != null) {
                 val required = count and PAGE_MASK
                 last.retained = last.retained and ((1 shl required) - 1)
                 last.pending = last.pending and ((1 shl required) - 1)
-                if (last.retained == 0) { discard(last); work += 8L } else {
+                if (last.retained == 0) {
+                    discard(last)
+                    work += 8L
+                } else {
                     resize(last, required)
                     work += required * rowWork * 2L + 8L
                 }
             }
         }
         directory.forEach({ work += it }) { index, page ->
-            if (index >= retained) { discard(page); work += 8L }
+            if (index >= retained) {
+                discard(page)
+                work += 8L
+            }
         }
         var pending = retiredHead
         retiredHead = null
@@ -412,7 +432,10 @@ internal class LearnedPolicyRows(
         }
         primary?.let { observe(0, it) }
         val retained = directory.protectedCapacity({ units -> repeat(units.toInt()) { sample.step() } }) {
-            index, page, -> observe(index, page)
+                index,
+                page,
+            ->
+            observe(index, page)
         }
         sample.owned(this, 25L, protectedRows)
         sample.ownedReferences(this, 12L + chunkSize, protectedRows)

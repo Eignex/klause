@@ -57,7 +57,9 @@ internal class LearnedCapRanking(private val candidates: IntArrayList) {
         afterCleanup = Stage.Collect
     }
 
-    fun invalidateRetiredHandles() { retirementRevision++ }
+    fun invalidateRetiredHandles() {
+        retirementRevision++
+    }
 
     fun completedIndexedPass() {
         passes++

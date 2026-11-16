@@ -74,7 +74,9 @@ private fun PropagationState.generalCapPolicy(
         return retained || protected || (prop is ClausePropagator && prop.literals.size <= 1) ||
             learned.store[index, GeneralLearnedRows.STAGES] and 1 == 0
     }
-    override fun visited() { learned.capVisits++ }
+    override fun visited() {
+        learned.capVisits++
+    }
     override fun retire(index: Int): Boolean {
         val prop = learned.store[index]
         val pinned = if (prepared == index) protected else retainedReason(index)

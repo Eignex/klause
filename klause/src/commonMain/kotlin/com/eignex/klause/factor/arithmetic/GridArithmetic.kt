@@ -83,7 +83,9 @@ internal class GridProduct(val a: GridCoordinate, val b: GridCoordinate, overrid
 
 internal class GridPower(val base: GridCoordinate, val exponent: Int, override val output: GridCoordinate) :
     GridArithmetic {
-    init { require(exponent >= 0) }
+    init {
+        require(exponent >= 0)
+    }
 
     override val inputs: List<GridCoordinate> = listOf(base)
     override val variables: VarList = SpanIntVars(intArrayOf(base.variable, output.variable).distinct().toIntArray())

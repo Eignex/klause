@@ -43,7 +43,9 @@ internal class QuadraticNativeScope private constructor(
     val polynomial: ExecutionControl = Token(quadratic = false)
     val numerical: ExecutionControl = Token(quadratic = true)
 
-    init { require(maximumWorkerWork == null || maximumWorkerWork >= 0) }
+    init {
+        require(maximumWorkerWork == null || maximumWorkerWork >= 0)
+    }
 
     fun worker(slotId: Int, maximumWork: Long? = null): QuadraticNativeScope = ledger.lock.withLock {
         require(root == null && slotId >= 0) { "native workers belong to their containing scope" }
@@ -89,15 +91,17 @@ internal class QuadraticNativeScope private constructor(
         override val admission: ArithmeticWorkSource get() {
             val parentAccounting = stop.admission
             val parentMeter = stop.accounting
-            return object: ArithmeticWorkSource {
-            override val quotaOwner get () = parentAccounting?.quotaOwner
+            return object : ArithmeticWorkSource {
+                override val quotaOwner get() = parentAccounting?.quotaOwner
                 override val quotaRemaining get() = parentAccounting ?.quotaRemaining
                 override val quotaAvailable get() = parentAccounting?.quotaAvailable
                 override val exhausted get() = this@QuadraticNativeScope.exhausted || resource != null ||
                     root?.resource != null || parentAccounting?.exhausted == true
                 override fun reserve(maximum: Int): WorkReservation? =
-                    reserveWork(maximum, pools, parentAccounting) { record(it.toLong())
-                    if (parentAccounting?.metered != true) parentMeter?.charge(it.toLong()) }
+                    reserveWork(maximum, pools, parentAccounting) {
+                        record(it.toLong())
+                        if (parentAccounting?.metered != true) parentMeter?.charge(it.toLong())
+                    }
             }
         }
 

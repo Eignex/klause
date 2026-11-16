@@ -62,7 +62,10 @@ internal class NonlinearIntegerResidues(
 
     fun simplify(): PolynomialRealFormula = try {
         reserve(problem.integerCoordinates.size)
-        val integers = problem.integerCoordinates.map { step(); it }.toSet()
+        val integers = problem.integerCoordinates.map {
+            step()
+            it
+        }.toSet()
         val reduced = NonlinearIntegerResidueReduction(::step, ::reserve) { atom ->
             try {
                 val left = compile(atom.left, integers)
@@ -136,7 +139,10 @@ internal class NonlinearIntegerResidues(
         reserve(1)
         pending.addLast(problem.formula)
         reserve(problem.integerCoordinates.size)
-        val integers = problem.integerCoordinates.map { step(); it }.toSet()
+        val integers = problem.integerCoordinates.map {
+            step()
+            it
+        }.toSet()
         while (pending.isNotEmpty()) {
             step()
             when (val formula = pending.removeLast()) {

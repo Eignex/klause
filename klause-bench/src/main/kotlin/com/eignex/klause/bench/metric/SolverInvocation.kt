@@ -87,9 +87,9 @@ internal object SolverInvocation {
         val compiled = if (entry.ref.format == Format.MINIZINC) {
             SolveEvidence.fileHashes(
                 mapOf(
-            "flatzinc" to file,
-            "outputMapping" to MiniZincRunner().outputFile(file),
-        )
+                    "flatzinc" to file,
+                    "outputMapping" to MiniZincRunner().outputFile(file),
+                )
             ) + ("flatzincContentV1" to SolveEvidence.flatZincContentHash(file))
         } else {
             emptyMap()
@@ -362,8 +362,8 @@ internal object SolverInvocation {
         val stderr = StderrCapture(
             process.errorStream,
             captureDirectory?.let { directory ->
-            { directory.resolve("cli.stderr").outputStream() }
-        }
+                { directory.resolve("cli.stderr").outputStream() }
+            }
         ).start()
 
         val raw = StringBuilder()

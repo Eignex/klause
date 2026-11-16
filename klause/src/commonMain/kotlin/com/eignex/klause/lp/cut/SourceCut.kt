@@ -513,10 +513,12 @@ private class SourceCutMapper(
                             ),
                         )
                     }
-                    for (literal in premises.literalEntries()) facts.add(CutProofFact(
-                        CutPremise.Literal(literal),
-                        false,
-                    ))
+                    for (literal in premises.literalEntries()) {
+                        facts.add(CutProofFact(
+                            CutPremise.Literal(literal),
+                            false,
+                        ))
+                    }
                 }
                 weightedRows.add(CutWeightedRow(rowFact, row.multiplier))
             }

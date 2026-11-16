@@ -19,10 +19,12 @@ internal class PolynomialBooleanSigns(
         private set
 
     fun prepare(): Iterator<Boolean?> = sequence {
-        for (atom in atoms) for (variable in atom.polynomial.variables) {
-            arithmetic.step()
-            require(variable in 0 until Int.MAX_VALUE)
-            realCount = maxOf(realCount, variable + 1)
+        for (atom in atoms) {
+            for (variable in atom.polynomial.variables) {
+                arithmetic.step()
+                require(variable in 0 until Int.MAX_VALUE)
+                realCount = maxOf(realCount, variable + 1)
+            }
         }
         while (true) {
             arithmetic.step()

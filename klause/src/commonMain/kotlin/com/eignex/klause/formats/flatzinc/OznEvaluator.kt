@@ -16,10 +16,10 @@ internal class OznEvaluator(items: List<OznItem>) {
     private val output: OznItem.Output? = items.filterIsInstance<OznItem.Output>().singleOrNull()
 
     fun render(bindings: Map<String, OznValue>): String = try {
-            renderValues(bindings)
-        } catch (e: CheckedLongOverflowException) {
-            throw OznParseException("integer overflow in .ozn output: ${e.message}", e)
-        }
+        renderValues(bindings)
+    } catch (e: CheckedLongOverflowException) {
+        throw OznParseException("integer overflow in .ozn output: ${e.message}", e)
+    }
 
     private fun renderValues(bindings: Map<String, OznValue>): String {
         val ctx = Context(bindings, HashMap())

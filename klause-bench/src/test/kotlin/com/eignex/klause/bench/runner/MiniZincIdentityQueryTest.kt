@@ -182,7 +182,9 @@ class MiniZincIdentityQueryTest {
             check(!alive)
             return if (killed) 137 else exit
         }
-        override fun destroy() { destroyForcibly() }
+        override fun destroy() {
+            destroyForcibly()
+        }
         override fun destroyForcibly(): Process {
             check(!refusesKill) { "kill refused" }
             killed = true

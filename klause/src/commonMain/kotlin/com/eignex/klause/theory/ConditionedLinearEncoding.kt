@@ -84,8 +84,10 @@ internal fun PreparedFactorProjections.installConditionedLinearFactor(
         }
         val relations = installLinearFactor(index, EncodingTarget.LINEAR, pins, booleanPins,
             cancellation, allocator, onDecline) ?: return false
-        val guards = domains.map { (id, _) -> ExactSearchRow.of(intArrayOf(Term.ofIntVar(id.index)),
-            listOf(BigFraction.ONE), LinearOp.NE, BigFraction.of(checkNotNull(pins[id]), BIG_ONE)) }
+        val guards = domains.map { (id, _) ->
+            ExactSearchRow.of(intArrayOf(Term.ofIntVar(id.index)),
+                listOf(BigFraction.ONE), LinearOp.NE, BigFraction.of(checkNotNull(pins[id]), BIG_ONE))
+        }
         for (relation in relations) {
             lowering.checkpoint()
             val clauses = lowering.or(listOf(listOf(guards), lowering.relation(relation.linearForm)))

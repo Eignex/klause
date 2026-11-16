@@ -73,7 +73,10 @@ class PortfolioBuilderTest {
             btPool = listOf({ recipe }))
         val factory = PortfolioBuilder.factories(problem, scenario, objective, null, null, null,
             ProblemProfile.of(problem, true), numericalCompletion = false,
-            acceptedIncumbents = IncumbentSource { reads++; canonical.current() }).single()
+            acceptedIncumbents = IncumbentSource {
+                reads++
+                canonical.current()
+            }).single()
 
         val first = factory.materialize(0, 0L, null).use {
             it.improvements({ Double.POSITIVE_INFINITY }, ExecutionControl.Never).first()
@@ -191,7 +194,6 @@ class PortfolioBuilderTest {
             workers.forEach { it.close() }
         }
     }
-
 
     @Test
     fun `private objective coordinates should use the full slot beside the canonical primary`() {

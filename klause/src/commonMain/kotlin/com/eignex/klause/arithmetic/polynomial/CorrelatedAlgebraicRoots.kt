@@ -27,9 +27,18 @@ internal class CorrelatedAlgebraicRoots(private val algebraic: AlgebraicArithmet
         }
         // A null polynomial at an unselected conjugate makes the resultant identically zero.
         if (common.degree > 0) modulus = rational.divideExact(modulus, common)
-        val reduced = coefficients.map { arithmetic.step(); rational.divide(it, modulus).second }
-        if (reduced.all { arithmetic.step(); it.degree <= 0 }) {
-            return algebraic.roots(RationalPolynomial(reduced.map { arithmetic.step(); it[0] }))
+        val reduced = coefficients.map {
+            arithmetic.step()
+            rational.divide(it, modulus).second
+        }
+        if (reduced.all {
+                arithmetic.step()
+                it.degree <= 0
+            }) {
+            return algebraic.roots(RationalPolynomial(reduced.map {
+                arithmetic.step()
+                it[0]
+            }))
         }
         if (reduced.size == 2) {
             try {
@@ -158,7 +167,10 @@ internal class CorrelatedAlgebraicRoots(private val algebraic: AlgebraicArithmet
                 arithmetic.step()
                 val next = remainder(sequence[sequence.lastIndex - 1], sequence.last())
                 if (next.isEmpty()) return sequence
-                sequence.add(next.map { arithmetic.step(); negate(it) })
+                sequence.add(next.map {
+                    arithmetic.step()
+                    negate(it)
+                })
             }
         }
 

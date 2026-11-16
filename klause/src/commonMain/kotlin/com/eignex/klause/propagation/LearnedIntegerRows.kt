@@ -50,7 +50,7 @@ internal class LearnedIntegerRows : AbstractList<LearnedIntegerPropagator>() {
     override fun get(index: Int): LearnedIntegerPropagator {
         if (index !in 0 until size) throw IndexOutOfBoundsException("$index of $size")
         return checkNotNull(if (index < PAGE_SIZE) entries[index]
-            else checkNotNull(pages[(index - PAGE_SIZE) ushr PAGE_SHIFT])[(index - PAGE_SIZE) and PAGE_MASK])
+        else checkNotNull(pages[(index - PAGE_SIZE) ushr PAGE_SHIFT])[(index - PAGE_SIZE) and PAGE_MASK])
     }
 
     private fun setSlot(index: Int, row: LearnedIntegerPropagator?) {

@@ -31,10 +31,12 @@ internal fun PropagationState.sweepRetiredGeneralWatches(budget: ReclamationPrep
         budget.visit(0L)
         val literal = learned.watchCleanupLiteral
         val posting = if (literal < boolCount) index?.byLit?.get(literal)
-            else atoms.watchersByLit[literal - boolCount]
+        else atoms.watchersByLit[literal - boolCount]
         if (posting == null || learned.watchCleanupIndex >= posting.size) {
-            posting?.let { trimWatchPosting(it, if (literal < boolCount) index?.blockersByLit?.get(literal)
-                else null, budget) }
+            posting?.let {
+                trimWatchPosting(it, if (literal < boolCount) index?.blockersByLit?.get(literal)
+                else null, budget)
+            }
             learned.watchCleanupLiteral++
             learned.watchCleanupIndex = 0
         } else if (retiredLearnedFactor(posting[learned.watchCleanupIndex])) {

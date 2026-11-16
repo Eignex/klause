@@ -127,7 +127,7 @@ class ComponentPlanTest {
             val installations = mutableMapOf<EncodingTarget, Int>()
             val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
                 val selected = if (factor === global) Encoder(EncoderSupport.UNSUPPORTED)
-                    else BuiltInEncoderProvider.select(factor, target)
+                else BuiltInEncoderProvider.select(factor, target)
                 if (!selected.enforcesSource) selected else Encoder(selected.support) { view, encoding ->
                     installations[target] = (installations[target] ?: 0) + 1
                     selected.install(view, encoding)

@@ -112,7 +112,10 @@ internal class PolynomialAffineReduction private constructor(
                     inconsistent = true
                     break
                 }
-                val graph = equationalSection(equations, current.map { arithmetic.step(); it.polynomial }, arithmetic)
+                val graph = equationalSection(equations, current.map {
+                    arithmetic.step()
+                    it.polynomial
+                }, arithmetic)
                 if (graph == null) {
                     if (!graphChanges) break
                     normalizeConjunction = true
@@ -194,11 +197,13 @@ internal class PolynomialAffineReduction private constructor(
                     if ((coefficient.signum() > 0) == increasing) lower.add(bound) else upper.add(bound)
                 }
                 // Pairwise bounds characterize the fibre, including strict or coincident endpoints.
-                for (a in lower) for (b in upper) {
-                    arithmetic.step()
-                    next.add(PolynomialAtom(arithmetic.subtract(b.polynomial, a.polynomial),
-                        if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE))
-                    yield(null)
+                for (a in lower) {
+                    for (b in upper) {
+                        arithmetic.step()
+                        next.add(PolynomialAtom(arithmetic.subtract(b.polynomial, a.polynomial),
+                            if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE))
+                        yield(null)
+                    }
                 }
                 arithmetic.step()
                 fibres.add(AffineFibre(variable, null, lower.toList(), upper.toList()))
@@ -262,9 +267,18 @@ private fun endpoint(
 }
 
 private fun affineCoordinate(atoms: List<PolynomialAtom>, realCount: Int, arithmetic: PolynomialArithmetic): Int {
-    val blocked = BooleanArray(realCount) { arithmetic.step(); false }
-    val lower = IntArray(realCount) { arithmetic.step(); 0 }
-    val upper = IntArray(realCount) { arithmetic.step(); 0 }
+    val blocked = BooleanArray(realCount) {
+        arithmetic.step()
+        false
+    }
+    val lower = IntArray(realCount) {
+        arithmetic.step()
+        0
+    }
+    val upper = IntArray(realCount) {
+        arithmetic.step()
+        0
+    }
     for (atom in atoms) {
         arithmetic.step()
         val inequality = atom.relation != PolynomialRelation.EQ && atom.relation != PolynomialRelation.NE

@@ -928,5 +928,4 @@ class QfLiraSolverTest {
             assertIs<ComponentCheck.Feasible>(session.check())
         }
     }
-
 }

@@ -181,10 +181,12 @@ class SymmetryBreakingTest {
 
     @Test
     fun `objective symmetry should admit the Latin transpose without scalar pair orders`() {
-        val factors = (0 until 4).flatMap { i -> listOf(
-            AllDifferent(IntArray(4) { j -> 4 * i + j }),
-            AllDifferent(IntArray(4) { j -> 4 * j + i }),
-        ) }
+        val factors = (0 until 4).flatMap { i ->
+            listOf(
+                AllDifferent(IntArray(4) { j -> 4 * i + j }),
+                AllDifferent(IntArray(4) { j -> 4 * j + i }),
+            )
+        }
         val problem = Problem(0, 16, Array(16) { IntDomain(0, 3) }, factors).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(8, 1, 1, 1, 1, 4, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1))
         val context = PresolveContext.of(objective, transformObjective = true)
@@ -197,7 +199,10 @@ class SymmetryBreakingTest {
         assertEquals(1, delta.addedFactors.size)
         val point = longArrayOf(0, 1, 2, 3, 2, 3, 0, 1, 1, 2, 3, 0, 3, 0, 1, 2)
         val image = LongArray(16) { point[transpose[it]] }
-        val singlePair = point.copyOf().apply { this[1] = point[4]; this[4] = point[1] }
+        val singlePair = point.copyOf().apply {
+            this[1] = point[4]
+            this[4] = point[1]
+        }
         assertFalse(isFeasible(problem, BooleanArray(0), singlePair))
         assertTrue(isFeasible(problem, BooleanArray(0), image))
         val reduced = problem.withPassDelta(delta, BakeConfig.NONE)
@@ -245,7 +250,9 @@ class SymmetryBreakingTest {
             PresolveContext.of(objective),
             exact.copy(solutionSetSensitive = true),
             exact.copy(modelBreaksSymmetry = true),
-        )) assertTrue(pass.applyFinite(problem, context).isEmpty)
+        )) {
+            assertTrue(pass.applyFinite(problem, context).isEmpty)
+        }
         assertFalse(PresolveConfig.DEFAULT.resolved(pass, exact))
         assertFalse(PresolveConfig.parse("default,+objective-symmetry").forLocalSearch().resolved(pass, exact))
         assertFalse(PresolveConfig.parse("off,+objective-symmetry").resolved(

@@ -189,14 +189,18 @@ class Portfolio(
         }
     internal var initialHeuristicArms: Set<Int> = emptySet()
         set(value) {
-            require(value.all { it in workers.indices &&
-                workers[it].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns) })
+            require(value.all {
+                it in workers.indices &&
+                    workers[it].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns)
+            })
             field = value.toSet()
         }
     internal var initialHeuristicTargets: Set<Int>? = null
         set(value) {
-            require(value == null || value.all { it in workers.indices &&
-                workers[it].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns) })
+            require(value == null || value.all {
+                it in workers.indices &&
+                    workers[it].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns)
+            })
             field = value?.toSet()
         }
     internal var improvementProofShare: Double = 0.5
@@ -436,7 +440,7 @@ class Portfolio(
                 ), stats)
             } else {
                 SolveResult.Unknown(if (run.workLimitReached) TerminationReason.BudgetExhausted
-                    else TerminationReason.Cancelled, stats)
+                else TerminationReason.Cancelled, stats)
             }
         }
     }
@@ -697,9 +701,11 @@ class Portfolio(
             }
             if (proofKind != null) {
                 val checkingStarted = TimeSource.Monotonic.markNow()
-                val completed = terminal?.let { actual -> worker.evidenceInvocation?.let { invocation ->
-                    CompletedEngineResult.Minimize(invocation, actual, executionCutoff = observedCutoffs[arm])
-                } }
+                val completed = terminal?.let { actual ->
+                    worker.evidenceInvocation?.let { invocation ->
+                        CompletedEngineResult.Minimize(invocation, actual, executionCutoff = observedCutoffs[arm])
+                    }
+                }
                 claim.verified(evidenceVerification?.let { verifier ->
                     if (completed != null) verifier.proof(worker, proofKind, completed)
                     else Verification.Indeterminate("worker completion has no runtime invocation")
@@ -803,8 +809,8 @@ class Portfolio(
                 if (failure != null || (handle != null && terminal != null) ||
                     (
                         claim.indeterminate &&
-                        (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded)
-                    )
+                            (PortfolioReduction.isExhausted(terminal) || terminal is MinimizeResult.Unbounded)
+                        )
                 ) {
                     when (val stopped = terminal) {
                         is MinimizeResult.Unknown -> stopReasons.add(stopped.reason)
@@ -930,7 +936,9 @@ class Portfolio(
                 handle?.isDone, outcome))
         }
 
-        fun restrictAvailability(available: (Int) -> Boolean) { availability = available }
+        fun restrictAvailability(available: (Int) -> Boolean) {
+            availability = available
+        }
         private val started = runTimeSource.markNow()
         private val epoch = invocationStarted ?: started
         private val lock = Mutex(concurrent = lanes > 1)
@@ -941,7 +949,7 @@ class Portfolio(
             override val workScheduled: Boolean = true
             override fun isCancelled(): Boolean = cancellation()
             override val accounting get() = cancellation.accounting
-                override val admission get() = admissionFrom(cancellation)
+            override val admission get() = admissionFrom(cancellation)
         }
         val token: ExecutionControl = external.alsoStoppedBy(stopped)
         private val earnable = workers.map { it.signals }
@@ -997,8 +1005,10 @@ class Portfolio(
             }
             if (incumbentAvailabilityObserved && onProgress == null) return
             incumbentAvailabilityObserved = true
-            for (arm in workers.indices) if (!retired[arm]) {
-                lifecycle(arm, PortfolioLifecycleKind.INCUMBENT_AVAILABLE, version)
+            for (arm in workers.indices) {
+                if (!retired[arm]) {
+                    lifecycle(arm, PortfolioLifecycleKind.INCUMBENT_AVAILABLE, version)
+                }
             }
         }
 
@@ -1039,6 +1049,7 @@ class Portfolio(
         private val activeSince = arrayOfNulls<TimeMark>(workers.size)
         private val armWork = DoubleArray(workers.size)
         private val siblingWork = LongArray(workers.size)
+
         // The bounded early trial needs initial coverage once, across incumbent and proof-slice accounting resets.
         private val initialCoreCoverage = LongArray(workers.size)
         private var proofStarted = false
@@ -1110,9 +1121,11 @@ class Portfolio(
                 executing = true
                 if (initialIncumbentVersion > 0) incumbentAvailable(initialIncumbentVersion)
                 diagnostics?.onEvent?.invoke(PortfolioEvent.Started(diagnostics.seed, diagnostics.workLimit))
-                for ((arm, worker) in workers.withIndex()) if (diagnostics != null) {
-                    worker.sharingMeter?.onImport = { channel, cursor, count ->
-                        diagnostics.onEvent(PortfolioEvent.Imported(arm, channel, cursor, count))
+                for ((arm, worker) in workers.withIndex()) {
+                    if (diagnostics != null) {
+                        worker.sharingMeter?.onImport = { channel, cursor, count ->
+                            diagnostics.onEvent(PortfolioEvent.Imported(arm, channel, cursor, count))
+                        }
                     }
                 }
                 parallelRun(List(lanes) { index -> { lane(index, segment) } })
@@ -1209,7 +1222,7 @@ class Portfolio(
                     .minByOrNull { (it - nextPreparationArm + workers.size) % workers.size }
             }
             val owed = if (dedicated || earlyCore != null || probe != null) null
-                else owedArm(eligible) ?: owedCompleteArm(eligible)
+            else owedArm(eligible) ?: owedCompleteArm(eligible)
             val arm = when {
                 dedicated -> lane
 
@@ -1255,7 +1268,7 @@ class Portfolio(
                 segment = segmentIndex++,
             ).also { claim ->
                 claim.selectedPhase = if (feasibilityComplete) PortfolioPhase.IMPROVEMENT
-                    else PortfolioPhase.FEASIBILITY
+                else PortfolioPhase.FEASIBILITY
                 diagnostics?.onEvent?.invoke(PortfolioEvent.Selected(claim.segment, arm, workers[arm].label,
                     claim.sliceWork))
             }
@@ -1414,7 +1427,7 @@ class Portfolio(
             for (arm in eligibleArms) {
                 if (busy[arm] || retired[arm]) continue
                 val short = if (diagnostics != null) minShares[arm] * chargedWork - armWork[arm]
-                    else minShares[arm] * totalNanos - armNanos[arm]
+                else minShares[arm] * totalNanos - armNanos[arm]
                 if (short > deficit) {
                     owed = arm
                     deficit = short

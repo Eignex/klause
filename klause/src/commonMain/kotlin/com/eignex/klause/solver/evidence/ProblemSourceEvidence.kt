@@ -97,7 +97,7 @@ fun Problem.sourceProofContext(
                     val coefficients = inequality.columns.indices.associate { position ->
                         val column = inequality.columns[position]
                         val coordinate = if (column < numRealVars) SourceCoordinate(SourceCoordinate.Kind.Real, column)
-                            else SourceCoordinate(SourceCoordinate.Kind.Integer, column - numRealVars)
+                        else SourceCoordinate(SourceCoordinate.Kind.Integer, column - numRealVars)
                         coordinate to inequality.coefficients[position]
                     }
                     premises["factor/$factorId/row/$rowId/booleans/$bits/side/$side"] = SourcePremise(

@@ -127,10 +127,12 @@ internal fun nodeDualCertificate(
     }
     observer?.observe(LpCertifier.INTEGER, accepted != null, LpCertifierCost.Metered(meter.work - initialWork))
     if (cancellation()) return null
-    for (candidate in candidates) if (candidate !== accepted) {
-        onAdditionalCertificate?.invoke(
-            if (objectiveRows != null) IntegralObjectiveCertificate(candidate, objectiveRows) else candidate,
-        )
+    for (candidate in candidates) {
+        if (candidate !== accepted) {
+            onAdditionalCertificate?.invoke(
+                if (objectiveRows != null) IntegralObjectiveCertificate(candidate, objectiveRows) else candidate,
+            )
+        }
     }
     val selected = accepted ?: return null
     return if (objectiveRows != null) IntegralObjectiveCertificate(selected, objectiveRows) else selected
@@ -621,8 +623,8 @@ internal class MixedCertificateMeter(private val cancellation: ExecutionControl)
     fun protect(bytes: Long) = charge(0L, bytes)
 
     private fun charge(work: Long, bytes: Long) {
-        if (polling?.due(work.coerceAtMost(Int.MAX_VALUE.toLong()) .toInt()
-        ) ?: stride.due(work)
+        if (polling?.due(work.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+            ) ?: stride.due(work)
         ) poll ()
         if (work < 0L || bytes < 0L || work > 250_000L - this.work || bytes > 16L * 1024L * 1024L - allocation) {
             reason = "RESOURCE_LIMIT"

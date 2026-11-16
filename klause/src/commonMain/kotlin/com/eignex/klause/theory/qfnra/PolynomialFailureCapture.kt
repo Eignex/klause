@@ -80,7 +80,7 @@ internal class PolynomialFailureCapture {
         }
         firstSignConflict = copied + context.mapKeys { "context.${it.key}" } +
             operation.mapKeys { "operation.${it.key}" } + ("complete" to
-            listOf(scope, context, operation, copied).all { it["complete"] == "true" }.toString())
+                listOf(scope, context, operation, copied).all { it["complete"] == "true" }.toString())
     }
 
     fun refused(resource: String, arithmetic: PolynomialArithmetic) {

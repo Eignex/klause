@@ -318,14 +318,18 @@ class SourceExecutionTest {
         ))
 
         val first = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
-            stopped, finiteRequest = { shape -> FiniteSolveRequest(shape, SourceFiniteControls.Backtrack(
-                BacktrackParams(maxDecisions = 2L, nativeSat = false),
-            )) },
+            stopped, finiteRequest = { shape ->
+                FiniteSolveRequest(shape, SourceFiniteControls.Backtrack(
+                    BacktrackParams(maxDecisions = 2L, nativeSat = false),
+                ))
+            },
         )))
         val second = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
-            completed, finiteRequest = { shape -> FiniteSolveRequest(shape, SourceFiniteControls.Backtrack(
-                BacktrackParams(),
-            )) },
+            completed, finiteRequest = { shape ->
+                FiniteSolveRequest(shape, SourceFiniteControls.Backtrack(
+                    BacktrackParams(),
+                ))
+            },
         )))
 
         val retained = assertIs<MinimizeResult.BestFound>(first.result.nativeSourceMinimum)
@@ -651,6 +655,7 @@ class SourceExecutionTest {
         assertSame(source, result.invocation.source.originalSource)
         assertEquals(ExecutionOperation.ENUMERATE, result.invocation.operation)
     }
+
     @Test
     fun `a captured source deadline should retain its native timeout reason`() {
         val source = Problem(
@@ -672,5 +677,4 @@ class SourceExecutionTest {
         assertEquals(TerminationReason.Timeout, assertIs<OpenTheoryResult.Unknown>(native.result).reason)
         assertSame(source.semantics, result.semantics)
     }
-
 }

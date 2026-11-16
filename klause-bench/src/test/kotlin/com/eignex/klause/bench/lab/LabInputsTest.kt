@@ -123,6 +123,7 @@ class LabInputsTest {
             root.toFile().deleteRecursively()
         }
     }
+
     @ParameterizedTest
     @CsvSource("compiler,true", "include,false")
     fun `only compiler identities are shared within a plan and execution checks changed trees`(
@@ -180,5 +181,4 @@ class LabInputsTest {
             root.toFile().deleteRecursively()
         }
     }
-
 }

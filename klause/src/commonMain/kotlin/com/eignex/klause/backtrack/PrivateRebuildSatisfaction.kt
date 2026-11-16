@@ -171,7 +171,11 @@ internal class PrivateRebuildSatisfaction(
             privateByteLimit - attemptedBinaryPairs.size * Long.SIZE_BYTES.toLong(),
             visit = { work ->
                 if (work > allowance - spent || session.cancelRequested || lifetime() || rootCancellation()) false
-                else { spent += work; charge(work); true }
+                else {
+                    spent += work
+                    charge(work)
+                    true
+                }
             },
             onDecline = { reason ->
                 note("ParityDeclined$reason")

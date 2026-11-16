@@ -80,7 +80,9 @@ class LinearSourceAttributionTest(
                 attributed += objective
             }
 
-            override fun onLinearSourceResult(result: SourceExecutionResult) { retained = result }
+            override fun onLinearSourceResult(result: SourceExecutionResult) {
+                retained = result
+            }
             override fun onComplete(verdict: Verdict) = Unit
             override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) = Unit
         }
@@ -90,7 +92,9 @@ class LinearSourceAttributionTest(
         assertIs<SourceExecutionResult.Finite>(retained)
         assertTrue(points.isNotEmpty())
         assertEquals(if (statistics && accepted) points.distinct() else emptyList(), attributed)
-        assertTrue(points.all { it == BigFraction.ofLong(13) * BigFraction.ofLong(30).reciprocal() ||
-            it == BigFraction.ofLong(23) * BigFraction.ofLong(30).reciprocal() })
+        assertTrue(points.all {
+            it == BigFraction.ofLong(13) * BigFraction.ofLong(30).reciprocal() ||
+                it == BigFraction.ofLong(23) * BigFraction.ofLong(30).reciprocal()
+        })
     }
 }

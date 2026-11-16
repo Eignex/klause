@@ -37,13 +37,17 @@ internal object ClausePrimalBuffersSuite : BenchSuite {
         val seeds = (request.parameters["seeds"] ?: "1,3,7").split(',').map(String::toLong)
         require(groups.all { it in 2..22_000 } && costs.all { it in setOf(2, 64) })
         require(groups.size * costs.size * seeds.size in 1..32)
-        return groups.flatMap { size -> costs.flatMap { count -> seeds.map { seed ->
-            val id = "groups-$size/costs-$count/seed-$seed"
-            BenchCase(id, parameters = mapOf("groups" to "$size", "costs" to "$count", "seed" to "$seed"),
-                resources = BenchResources(1, 2048, 120),
-                attributes = mapOf("suite" to "clause-primal-buffers", "problem" to id,
-                    "comparisonKey" to id, "pairKey" to id, "recordSchema" to "clause-primal-buffers-v1"))
-        } } }
+        return groups.flatMap { size ->
+            costs.flatMap { count ->
+                seeds.map { seed ->
+                    val id = "groups-$size/costs-$count/seed-$seed"
+                    BenchCase(id, parameters = mapOf("groups" to "$size", "costs" to "$count", "seed" to "$seed"),
+                        resources = BenchResources(1, 2048, 120),
+                        attributes = mapOf("suite" to "clause-primal-buffers", "problem" to id,
+                            "comparisonKey" to id, "pairKey" to id, "recordSchema" to "clause-primal-buffers-v1"))
+                }
+            }
+        }
     }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {

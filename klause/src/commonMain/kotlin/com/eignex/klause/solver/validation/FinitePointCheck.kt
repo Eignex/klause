@@ -129,14 +129,14 @@ private fun pointPins(sample: Sample, cancellation: ExecutionControl): Assumptio
     val boolKeys = IntArray(sample.numBoolVars)
     val boolValues = BooleanArray(sample.numBoolVars)
     for (id in boolKeys.indices) {
-        if (stride.due() &&cancellation()) return null
+        if (stride.due() && cancellation()) return null
         boolKeys[id] = id
         boolValues[id] = sample.boolValue(id)
     }
     val intKeys = IntArray(sample.numIntVars)
     val intValues = LongArray(sample.numIntVars)
     for (id in intKeys.indices) {
-        if (stride.due() &&cancellation()) return null
+        if (stride.due() && cancellation()) return null
         intKeys[id] = id
         intValues[id] = sample.intValue(id)
     }

@@ -44,7 +44,8 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `a copied private search group should retain only original integer hints on source attachment`() {
-        val program = parseFlatZinc("""
+        val program =
+            parseFlatZinc("""
             var 1..2: i;
             var 0.0..1.0: grid;
             constraint float_le(grid, 0.5);
@@ -76,7 +77,8 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `source capture should retain original real products without materializing private buckets`() {
-        val program = parseFlatZinc("""
+        val program =
+            parseFlatZinc("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
@@ -96,7 +98,8 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `a requested legacy view should retain its original source across ordinary copies`() {
-        val program = parseFlatZinc("""
+        val program =
+            parseFlatZinc("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
@@ -123,7 +126,8 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `a foreign problem copy should drop its original float correspondence`() {
-        val program = parseFlatZinc("""
+        val program =
+            parseFlatZinc("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
@@ -140,7 +144,8 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `an explicit finite compatibility helper should bind its actual private problem to the original source`() {
-        val execution = parseFlatZincExecution("""
+        val execution =
+            parseFlatZincExecution("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
@@ -159,7 +164,8 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `a stopped compatibility request should not force the unbounded legacy getter`() {
-        val program = parseFlatZinc("""
+        val program =
+            parseFlatZinc("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);

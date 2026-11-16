@@ -272,8 +272,8 @@ class PolynomialStrategyAdaptersTest {
     @Test
     fun `pure real heuristic arms should repair coordinates before publishing algebraic witnesses`() {
         val input = SmtLibPolynomial.parse(
-                "(declare-const x Real) (assert (= (* x x) 2))",
-            ).realSource()
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ).realSource()
         val request = input.pipelineRequest()
         val params = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(
@@ -295,8 +295,8 @@ class PolynomialStrategyAdaptersTest {
     @Test
     fun `pure real heuristic arms should respect cancellation and exhausted node allowances`() {
         val input = SmtLibPolynomial.parse(
-                "(declare-const x Real) (assert (= (* x x) 2))",
-            ).realSource()
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ).realSource()
         val request = input.pipelineRequest()
         val controls = listOf(
             LocalSearchParams(cancellation = ExecutionControl { true }),

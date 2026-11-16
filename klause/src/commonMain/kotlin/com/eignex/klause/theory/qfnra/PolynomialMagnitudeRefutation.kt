@@ -80,7 +80,8 @@ private class PolynomialMagnitudeRefutation(
                 PolynomialRelation.LT, PolynomialRelation.LE -> 1
                 PolynomialRelation.GT, PolynomialRelation.GE -> -1
                 PolynomialRelation.EQ -> terms.firstOrNull {
-                    arithmetic.step(); it.monomial != Monomial.ONE
+                    arithmetic.step()
+                    it.monomial != Monomial.ONE
                 }?.coefficient?.signum() ?: continue
                 PolynomialRelation.NE -> continue
             }

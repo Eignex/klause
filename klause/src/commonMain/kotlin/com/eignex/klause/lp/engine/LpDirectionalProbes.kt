@@ -10,7 +10,15 @@ internal data class LpDirectionalValues(val down: Double, val up: Double)
 internal data class LpProbeSource(val model: LpModel, val basis: Basis)
 
 internal enum class LpProbeDecline {
-    CANCELLED, ALLOWANCE, OWNER, BUSY, STALE_POINT, NO_OPTIMUM, NO_POINT, SPLIT, CHILD,
+    CANCELLED,
+    ALLOWANCE,
+    OWNER,
+    BUSY,
+    STALE_POINT,
+    NO_OPTIMUM,
+    NO_POINT,
+    SPLIT,
+    CHILD,
 }
 
 internal enum class LpProbeReuse { INDEPENDENT, IDENTITY, SCALED }
@@ -240,7 +248,7 @@ internal class LpDirectionalProbes(
         if (offered <= 0L) return budget.stop(LpProbeDecline.ALLOWANCE)
         val entries = if (existing == null) minOf(factorEntryLimit,
             maxOf(factorEntries, (offered + orderPreparation + factorPreparation) / budget.remainingChildren / 4L))
-            else budget.entryLimit
+        else budget.entryLimit
         // Keep capacity for retiring factors after a stopped or cancelled solve.
         val solveGrant = offered - entries
         if (entries <= 0L || solveGrant <= 0L) return budget.stop(LpProbeDecline.ALLOWANCE)
@@ -265,7 +273,7 @@ internal class LpDirectionalProbes(
         try {
             try {
                 val result = if (existing == null) solver.solve(warm)
-                    else solver.resolveBounds(LpFloatAllowance(solveGrant, 0))
+                else solver.resolveBounds(LpFloatAllowance(solveGrant, 0))
                 if (result == null || !result.optimal || token()) {
                     return budget.stop(when {
                         token() -> LpProbeDecline.CANCELLED
@@ -309,11 +317,13 @@ internal class LpDirectionalProbes(
         val remainingChildren: Int get() = queries - completed
 
         fun remaining(): Long = if (preparation >= allowance || solving >= allowance - preparation) 0L
-            else allowance - preparation - solving
+        else allowance - preparation - solving
 
         fun overspent(): Boolean = preparation > allowance || solving > allowance - preparation
 
-        fun prepare(work: Long) { preparation += minOf(work, Long.MAX_VALUE - preparation) }
+        fun prepare(work: Long) {
+            preparation += minOf(work, Long.MAX_VALUE - preparation)
+        }
 
         fun record(solver: RevisedSimplex, scaling: Long, entries: Long, grant: Long, initial: Boolean) {
             val metrics = solver.lastMetrics

@@ -36,8 +36,6 @@ class LinearAuthoritySessionTest {
     }
     private val scope = SourceScope(SourceRevision("session-fixture", "exact-affine"))
 
-
-
     @Test
     fun `a grant pause during append inspection should resume within the admitted operation budget`() {
         val rows = listOf(
@@ -92,7 +90,7 @@ class LinearAuthoritySessionTest {
 
             val changed = assertNotNull(session.advance(
                 assertNotNull(LinearAuthorityModel.prepare(extended, 2, ExecutionControl.Never)), costs,
-                    BigFraction.ZERO,
+                BigFraction.ZERO,
                 scope, ExecutionControl.Never, SparseSourceLpPolicy(), observer) { guidance, _, _ -> guidance })
 
             assertEquals(BigFraction.ONE, assertNotNull(first.bound).value)

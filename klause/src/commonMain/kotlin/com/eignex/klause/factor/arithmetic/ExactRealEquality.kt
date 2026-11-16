@@ -46,26 +46,26 @@ private fun StructuralKeyBuilder.expression(node: ExactRealExpression) {
         ExactRealExpression.Pi -> int(1)
 
         is ExactRealExpression.Function -> {
-            int(2);
-            enum(node.function);
+            int(2)
+            enum(node.function)
             expression(node.argument)
         }
 
         is ExactRealExpression.Sum -> {
-            int(3);
-            int(node.operands.size);
+            int(3)
+            int(node.operands.size)
             node.operands.forEach(::expression)
         }
 
         is ExactRealExpression.Product -> {
-            int(4);
-            int(node.operands.size);
+            int(4)
+            int(node.operands.size)
             node.operands.forEach(::expression)
         }
 
         is ExactRealExpression.Power -> {
-            int(5);
-            int(node.exponent);
+            int(5)
+            int(node.exponent)
             expression(node.base)
         }
     }

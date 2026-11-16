@@ -64,8 +64,8 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
             SourceExecutionRequest(
                 invocation,
                 SourceExecutionPolicy(
-                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
-            )
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+                )
             )
         }
     }
@@ -118,5 +118,4 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
 
         assertEquals(false, request.prepareOnly)
     }
-
 }

@@ -73,6 +73,10 @@ jobs:
       - name: Start the installed JVM CLI
         run: klause-cli/build/install/klause-cli-jvm/bin/klause-cli --version
 
+      - name: Verify Kotlin sources are unchanged
+        if: always()
+        run: git diff --exit-code -- '*.kt' '*.kts'
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
@@ -182,6 +186,6 @@ jobs:
       - name: Run linter
         run: ./gradlew --refresh-dependencies lintDocs
 
-      - name: Show linter source changes
-        if: failure()
-        run: git diff -- '*.kt'
+      - name: Verify Kotlin sources are unchanged
+        if: always()
+        run: git diff --exit-code -- '*.kt' '*.kts'

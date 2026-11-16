@@ -44,6 +44,7 @@ sealed interface PolynomialExpression {
     class Sum(operands: List<PolynomialExpression>) : PolynomialExpression {
         private val values = operands.toTypedArray()
         internal val operandCount: Int get() = values.size
+
         /** Captured operands in syntax order. */
         val operands: List<PolynomialExpression> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Sum && polynomialExpressionsEqual(this, other)
@@ -55,6 +56,7 @@ sealed interface PolynomialExpression {
     class Product(operands: List<PolynomialExpression>) : PolynomialExpression {
         private val values = operands.toTypedArray()
         internal val operandCount: Int get() = values.size
+
         /** Captured operands in syntax order. */
         val operands: List<PolynomialExpression> get() = values.toList()
         override fun equals(other: Any?): Boolean = other is Product && polynomialExpressionsEqual(this, other)

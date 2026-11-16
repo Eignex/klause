@@ -40,9 +40,13 @@ internal class StderrCapture(
     private val diagnostics = StderrDiagnostics()
     private val stopped = AtomicBoolean(false)
     private val bytesRead = AtomicLong()
+
     @Volatile private var eof = false
+
     @Volatile private var readFailure: String? = null
+
     @Volatile private var artifactFailure: String? = null
+
     @Volatile private var artifactClosed = false
     private val thread = Thread(::drain, "klause-stderr").apply { isDaemon = true }
 
@@ -178,7 +182,7 @@ internal class StderrDiagnostics {
                 retain(char)
                 if (line.length < StderrCapture.DIAGNOSTIC_CAP) line.append(char) else lineTruncated = true
                 exceptionPosition = if (char == EXCEPTION[exceptionPosition]) exceptionPosition + 1
-                    else if (char == EXCEPTION[0]) 1 else 0
+                else if (char == EXCEPTION[0]) 1 else 0
                 if (exceptionPosition == EXCEPTION.length) {
                     crash = true
                     exceptionPosition = 0

@@ -148,7 +148,10 @@ class SmtLibSemanticsTest {
             assertFailsWith<IllegalArgumentException> { SmtLib.parse("", semanticOverrides = replacement) }
             var opened = false
             assertFailsWith<IllegalArgumentException> {
-                SmtLib.parse({ opened = true; StringCharSource("") }, semanticOverrides = replacement)
+                SmtLib.parse({
+                    opened = true
+                    StringCharSource("")
+                }, semanticOverrides = replacement)
             }
             assertFalse(opened)
         }

@@ -11,8 +11,7 @@ internal interface InterruptiblePropagator : Propagator {
 }
 
 internal class FinitePropagationWork {
-    private
-    var current = ExecutionControl.Never
+    private var current = ExecutionControl.Never
     var cancellation: ExecutionControl
         get() = current
         set(value) {
@@ -26,16 +25,17 @@ internal class FinitePropagationWork {
     private var never = true
     private var polling: StopPolling? = null
 
-    fun <T> withCancellation(value: ExecutionControl, operation:() -> T): T {
+    fun <T> withCancellation(value: ExecutionControl, operation: () -> T): T {
         val previous = current
         val previousPolling = polling
         val previousNever = never
-        cancellation= value
+        cancellation = value
         return try {
-            operation() } finally {
+            operation()
+        } finally {
             current = previous
             polling = previousPolling
-        never = previousNever
+            never = previousNever
             remaining = 63
         }
     }

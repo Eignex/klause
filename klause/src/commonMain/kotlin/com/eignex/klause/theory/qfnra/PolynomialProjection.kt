@@ -184,9 +184,11 @@ internal class PolynomialProjection private constructor(
                         if (variable !in equation.variables) lowerEquations.add(equation)
                     }
                     var independent = true
-                    for (polynomial in top) for (coordinate in polynomial.variables) {
-                        arithmetic.step()
-                        if (coordinate != variable) independent = false
+                    for (polynomial in top) {
+                        for (coordinate in polynomial.variables) {
+                            arithmetic.step()
+                            if (coordinate != variable) independent = false
+                        }
                     }
                     if (independent) {
                         // Rational univariate boundaries contribute no lower-coordinate projection.

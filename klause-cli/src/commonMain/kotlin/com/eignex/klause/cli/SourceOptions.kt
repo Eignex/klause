@@ -70,7 +70,7 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
         resolved = resolved.copy(
             floats = if (declared.floats == null) resolved.floats else FloatSemantics.Continuous,
             feasibilityTolerance = if (declared.feasibilityTolerance == null) resolved.feasibilityTolerance
-                else SourceTolerance(),
+            else SourceTolerance(),
         )
     }
     sourceSemantics = declared.resolve(resolved)

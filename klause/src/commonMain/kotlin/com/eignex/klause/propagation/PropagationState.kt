@@ -389,7 +389,7 @@ class PropagationState private constructor(
     internal var preparationIndexWork: Long = 0L
 
     internal fun preparationStatistics(): Map<String, Long> = if (preparationIndexWork == 0L) emptyMap()
-        else mapOf("propagationPreparationIndexWork" to preparationIndexWork)
+    else mapOf("propagationPreparationIndexWork" to preparationIndexWork)
     internal val finiteWork = FinitePropagationWork()
     internal var finiteMutationInterruptible = false
     internal var finiteMaintenanceActive = false
@@ -463,7 +463,9 @@ class PropagationState private constructor(
     }
     internal var refPayloadStore: ArrayList<Any?>
         get() = payloadOwner.values
-        set(value) { payloadOwner.values = value }
+        set(value) {
+            payloadOwner.values = value
+        }
 
     /** Indices in [refPayloadStore] currently holding a [SnapshottablePayload]. Maintained on every
      *  write through [refPayload] so [mark] visits only these slots instead of scanning the whole
@@ -485,7 +487,9 @@ class PropagationState private constructor(
                 if (!incremental && index >= baseFactorCount && nativeEngine == null) {
                     learned.store.payload(index - baseFactorCount)
                 } else refPayloadStore[index]
-            override fun add(index: Int, element: Any?) { refPayloadStore.add(index, element) }
+            override fun add(index: Int, element: Any?) {
+                refPayloadStore.add(index, element)
+            }
             override fun removeAt(index: Int): Any? = refPayloadStore.removeAt(index)
             override fun set(index: Int, element: Any?): Any? {
                 if (index !in 0 until size) throw IndexOutOfBoundsException("factor payload $index outside $size")

@@ -46,7 +46,7 @@ internal class LearnedClauseDb(
     var unitsPending = false
 
     private val rowStore = if (initializeRows) lazyOf(GeneralLearnedRows(rowOwner))
-        else lazy(LazyThreadSafetyMode.NONE) { GeneralLearnedRows(rowOwner) }
+    else lazy(LazyThreadSafetyMode.NONE) { GeneralLearnedRows(rowOwner) }
     val store: GeneralLearnedRows get() = rowStore.value
     val initializedStore: GeneralLearnedRows? get() = if (rowStore.isInitialized()) store else null
     internal var integerRows: LearnedIntegerRows? = null

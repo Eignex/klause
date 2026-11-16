@@ -53,9 +53,11 @@ internal class RealDifferenceSystem private constructor(
                 potentials = normalized.takeIf { values ->
                     values.all { it in -Long.MAX_VALUE / 8L..Long.MAX_VALUE / 8L }
                 }
-                Result.Feasible { List(graph.numVars - 1) { column ->
-                    BigFraction.of(bigIntOf(result.values[column] - zero), bigIntOf(scale))
-                } }
+                Result.Feasible {
+                    List(graph.numVars - 1) { column ->
+                        BigFraction.of(bigIntOf(result.values[column] - zero), bigIntOf(scale))
+                    }
+                }
             }
         }
     }

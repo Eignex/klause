@@ -80,8 +80,10 @@ class LpClaimTest {
             { it.deactivate(0L) },
             { it.push() },
             { it.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L), strict = true), 1L) },
-            { it.append(LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
-                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false) },
+            {
+                it.append(LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false)
+            },
         )
         for (edit in edits) {
             val builder = LpBuilder()

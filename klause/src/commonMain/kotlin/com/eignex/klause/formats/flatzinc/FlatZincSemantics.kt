@@ -77,7 +77,7 @@ private fun SemanticRational.binary64(role: String): Double {
         "$role cannot be represented exactly in binary64"
     }
     val scale = if (exponent <= 1022) Double.fromBits((1023L - exponent) shl 52)
-        else Double.fromBits(1L shl (1074 - exponent))
+    else Double.fromBits(1L shl (1074 - exponent))
     val value = numerator.toDouble() * scale
     require(value.isFinite() && BigFraction.ofDouble(value) == exact) {
         "$role cannot be represented exactly in binary64"

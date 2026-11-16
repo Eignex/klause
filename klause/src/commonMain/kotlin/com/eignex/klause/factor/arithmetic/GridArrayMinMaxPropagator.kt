@@ -36,10 +36,12 @@ internal class GridArrayMinMaxPropagator(private val factor: GridArrayMinMax) : 
     // An equality selected by excluding other operands needs every bound that justified those exclusions.
     private fun premises(state: PropagationState, atTrail: Int, atLevel: Int): IntArray {
         val literals = IntArrayList()
-        for (variable in factor.variables.ints) for (lower in listOf(false, true)) {
-            val value = state.boundAt(variable, lower, atTrail)
-            val literal = state.boundLiteral(variable, lower, value, atTrail, atLevel)
-            if (literal != Lit.NONE) literals.add(literal)
+        for (variable in factor.variables.ints) {
+            for (lower in listOf(false, true)) {
+                val value = state.boundAt(variable, lower, atTrail)
+                val literal = state.boundLiteral(variable, lower, value, atTrail, atLevel)
+                if (literal != Lit.NONE) literals.add(literal)
+            }
         }
         return literals.toIntArray()
     }
@@ -91,6 +93,6 @@ internal class GridArrayMinMaxPropagator(private val factor: GridArrayMinMax) : 
             else -> premises(state, state.undo.size, state.currentLevel)
         }
         return if (lower) state.tightenIntMin(variable, value.toLongExact(), reason)
-            else state.tightenIntMax(variable, value.toLongExact(), reason)
+        else state.tightenIntMax(variable, value.toLongExact(), reason)
     }
 }

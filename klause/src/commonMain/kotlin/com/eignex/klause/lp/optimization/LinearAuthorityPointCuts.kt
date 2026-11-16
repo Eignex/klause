@@ -233,7 +233,7 @@ internal class LinearAuthorityPointCuts(
                 if (id in installed) {
                     if (projected != null) forced += Scored(id, projected, norm, score)
                     observedInactive[id] = if (activity - checkNotNull(rhs) >= -CutPool.ACTIVE_TOLERANCE) 0
-                        else minOf(4, (inactiveScans[id] ?: 0) + 1)
+                    else minOf(4, (inactiveScans[id] ?: 0) + 1)
                 } else if (efficacy >= CutPool.MIN_EFFICACY) {
                     candidates += Scored(id, checkNotNull(projected), norm, score)
                 }

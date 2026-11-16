@@ -219,6 +219,7 @@ class ProbingTest {
 
         assertTrue(Presolve.probeSource(problem, cap, ExecutionControl.Never).isEmpty)
     }
+
     @Test
     fun `root fixed columns should not consume the candidate cap or emit redundant units`() {
         val problem = Problem(
@@ -330,8 +331,14 @@ class ProbingTest {
         var meterReads = 0
         val meter = WorkMeter { work += it }
         val token = object : ExecutionControl() {
-            override fun isCancelled(): Boolean { polls++; return false }
-            override val accounting: WorkMeter get() { meterReads++; return meter }
+            override fun isCancelled(): Boolean {
+                polls++
+                return false
+            }
+            override val accounting: WorkMeter get() {
+                meterReads++
+                return meter
+            }
         }
 
         val delta = Presolve.probeSource(problem, cap, token)
@@ -369,7 +376,10 @@ class ProbingTest {
         var polls = 0
         val meter = WorkMeter { work += it }
         val token = object : ExecutionControl() {
-            override fun isCancelled(): Boolean { polls++; return work >= 451L }
+            override fun isCancelled(): Boolean {
+                polls++
+                return work >= 451L
+            }
             override val accounting: WorkMeter get() = meter
         }
 

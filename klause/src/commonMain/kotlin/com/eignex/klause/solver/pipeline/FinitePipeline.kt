@@ -261,7 +261,7 @@ object FinitePipeline {
             problem = finiteModel,
             objective = outcome.objective ?: objective,
             reconstruct = if (mapping === outcome.mapping) outcome.reconstruct
-                else { sample -> mapping.reconstructFrom(finiteModel, sample) },
+            else { sample -> mapping.reconstructFrom(finiteModel, sample) },
             presolve = outcome.stats.copy(
                 effort = config.effortStats(request.presolveBudget, start.elapsedNow()),
             ),

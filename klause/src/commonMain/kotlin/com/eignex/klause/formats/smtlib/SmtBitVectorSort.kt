@@ -16,8 +16,8 @@ internal fun smtBitVectorLiteralSort(text: String): SmtSort? {
     }
     val digits = text.drop(2)
     if (digits.isEmpty() || digits.any {
-        if (radix == 2) it != '0' && it != '1' else it !in '0'..'9' && it !in 'a'..'f' && it !in 'A'..'F'
-    }) smtUnsupported("invalid bitvector literal")
+            if (radix == 2) it != '0' && it != '1' else it !in '0'..'9' && it !in 'a'..'f' && it !in 'A'..'F'
+        }) smtUnsupported("invalid bitvector literal")
     val width = digits.length.toLong() * if (radix == 2) 1 else 4
     if (width > Int.MAX_VALUE) smtUnsupported("bitvector literal width exceeds the encoding budget")
     return SmtSort.BitVector(width.toInt())

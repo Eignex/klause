@@ -3,7 +3,9 @@ package com.eignex.klause.arithmetic.transcendental
 import com.eignex.util.numbers.BigFraction
 
 internal data class RationalEnclosure(val lower: BigFraction, val upper: BigFraction) {
-    init { require(lower <= upper) }
+    init {
+        require(lower <= upper)
+    }
 
     val isPoint: Boolean get() = lower == upper
 

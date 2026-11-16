@@ -110,6 +110,7 @@ internal class LocalSearchEngine(
 
     // A finite projection may require theory-owned completion before publication.
     private val completion: CandidateCompletion? = completion
+
     // An exact rational completion need not have a zero-violation floating representation.
     private val continuousCompletion = completion != null && problem.numRealVars > 0 &&
         problem.numBoolVars == 0 && problem.numIntVars == 0
@@ -518,7 +519,13 @@ internal class LocalSearchEngine(
         var finished = false
         return minimizeStream(objective, params, warm, sink, onFinished = { finished = true })
             .filterNotNull().map { it.withSourceSemantics(problem.semantics) }.asSearchStream(
-                release = { try { if (!finished) sink.stop() } finally { ownership.release() } },
+                release = {
+                    try {
+                        if (!finished) sink.stop()
+                    } finally {
+                        ownership.release()
+                    }
+                },
                 terminal = { finished },
             )
     }

@@ -83,7 +83,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     fun retainRootProbe(probe: PropagationSession?): Boolean {
         val target = sharedNative ?: return false
         val sameSource = if (probe == null) sourceRoot && native == null
-            else native === probe && probe.problem === engine.problem && probe.decisionLevel == 0
+        else native === probe && probe.problem === engine.problem && probe.decisionLevel == 0
         if (!engine.retainedRootEnabled || !sameSource || !persistentState ||
             target.problem !== engine.problem || target.decisionLevel != 0 || shared?.decisionLevel != 0 ||
             engine.propagator.state?.depth != 0
@@ -267,7 +267,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         val core = engine.propagator
         if (!persistentState) core.reset()
         if (core.state == null && !core.install(base, base.authoritativeWithTemplates(engine.params.cancellation,
-            onWork = engine::noteNodeOverhead) {
+                onWork = engine::noteNodeOverhead) {
                 engine.sink.lp.observeTemplateUse(exactBounds = it)
             } ?: return null)
         ) return null
@@ -293,7 +293,7 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             if (!core.resetRoot()) {
                 cuts = newCuts()
                 if (!core.install(base, base.authoritativeWithTemplates(engine.params.cancellation,
-                    onWork = engine::noteNodeOverhead) {
+                        onWork = engine::noteNodeOverhead) {
                         engine.sink.lp.observeTemplateUse(exactBounds = it)
                     } ?: return null)
                 ) return null

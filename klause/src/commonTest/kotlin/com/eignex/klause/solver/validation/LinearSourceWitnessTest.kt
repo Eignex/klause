@@ -36,8 +36,8 @@ class LinearSourceWitnessTest {
             semantics = SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
-            )
+                    absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+                )
             ).resolve(),
         )
         val value = third - BigFraction.ofLong(2_000_000).reciprocal()
@@ -57,17 +57,17 @@ class LinearSourceWitnessTest {
             listOf(
                 LinearSourceRow(
                     listOf(
-                LinearSourceTerm(0, SemanticRational.ONE),
-                LinearSourceTerm(0, SemanticRational.ofLong(-1)),
-            ),
-                lower = SemanticRational.ONE
+                        LinearSourceTerm(0, SemanticRational.ONE),
+                        LinearSourceTerm(0, SemanticRational.ofLong(-1)),
+                    ),
+                    lower = SemanticRational.ONE
                 )
             ),
             semantics = SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                relative = SemanticRational.of(BIG_ONE, bigIntOf(10)),
-            )
+                    relative = SemanticRational.of(BIG_ONE, bigIntOf(10)),
+                )
             ).resolve(),
         )
 
@@ -84,8 +84,8 @@ class LinearSourceWitnessTest {
             semantics = SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                absolute = SemanticRational.ONE,
-            )
+                    absolute = SemanticRational.ONE,
+                )
             ).resolve(),
         )
 
@@ -101,10 +101,10 @@ class LinearSourceWitnessTest {
             listOf(LinearSourceVariable("guard", true), LinearSourceVariable("x", false)),
             listOf(
                 LinearSourceRow(
-                listOf(LinearSourceTerm(1, SemanticRational.ONE)),
-                lower = SemanticRational.ONE,
-                indicator = LinearSourceIndicator(0, true),
-            )
+                    listOf(LinearSourceTerm(1, SemanticRational.ONE)),
+                    lower = SemanticRational.ONE,
+                    indicator = LinearSourceIndicator(0, true),
+                )
             ),
         )
 
@@ -240,7 +240,10 @@ class LinearSourceWitnessTest {
             listOf(LinearSourceRow(List(128) { LinearSourceTerm(0, SemanticRational.ONE) })),
         )
         var polls = 0
-        val stop = ExecutionControl { polls++; false }
+        val stop = ExecutionControl {
+            polls++
+            false
+        }
 
         checkLinearSourceWitness(source, listOf(BigFraction.ZERO), stop)
 

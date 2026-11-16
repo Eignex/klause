@@ -20,9 +20,13 @@ class LabSdkRepositoryTest {
     private val checksum = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
     private val assets = listOf(LabSdkRepository.Asset("jar", 123, checksum))
 
-    @Test fun `fresh builds reuse the verified persistent repository without a request`() = withRepository { repository ->
+    @Test
+    fun `fresh builds reuse the verified persistent repository without a request`() = withRepository { repository ->
         var requests = 0
-        val first = LabSdkRepository(assets, { uri -> requests++; Response(uri, 200, bytes) }, token = { null })
+        val first = LabSdkRepository(assets, { uri ->
+            requests++
+            Response(uri, 200, bytes)
+        }, token = { null })
         first.stage(repository)
         val next = LabSdkRepository(assets, { error("warm build must not download") }, token = { null })
         assertEquals(repository, next.stage(repository))
@@ -41,7 +45,10 @@ class LabSdkRepositoryTest {
         Files.createDirectories(artifact(repository).parent)
         Files.writeString(artifact(repository), "old")
         var requests = 0
-        val cache = LabSdkRepository(assets, { uri -> requests++; Response(uri, 200, "wrong".toByteArray()) })
+        val cache = LabSdkRepository(assets, { uri ->
+            requests++
+            Response(uri, 200, "wrong".toByteArray())
+        })
         assertFailsWith<IllegalStateException> { cache.stage(repository) }
         assertEquals("old", Files.readString(artifact(repository)))
         assertEquals(1, requests)
@@ -72,7 +79,10 @@ class LabSdkRepositoryTest {
 
     @Test fun `too many requests stops even without quota headers`() = withRepository { repository ->
         var requests = 0
-        val cache = LabSdkRepository(assets, { uri -> requests++; Response(uri, 429) },
+        val cache = LabSdkRepository(assets, { uri ->
+            requests++
+            Response(uri, 429)
+        },
             pause = { error("must not retry a rate limit") })
         assertFailsWith<GradleException> { cache.stage(repository) }
         assertEquals(1, requests)
@@ -87,7 +97,10 @@ class LabSdkRepositoryTest {
     @Test fun `transient failures back off and stop after three attempts`() = withRepository { repository ->
         var requests = 0
         val pauses = mutableListOf<Long>()
-        val cache = LabSdkRepository(assets, { uri -> requests++; Response(uri, 504) }, pause = pauses::add)
+        val cache = LabSdkRepository(assets, { uri ->
+            requests++
+            Response(uri, 504)
+        }, pause = pauses::add)
         assertFailsWith<GradleException> { cache.stage(repository) }
         assertEquals(3, requests)
         assertEquals(listOf(1_000L, 2_000L), pauses)
@@ -105,7 +118,8 @@ class LabSdkRepositoryTest {
         assertContentEquals(bytes, Files.readAllBytes(artifact(repository)))
     }
 
-    @Test fun `redirects outside GitHub are refused before opening another connection`() = withRepository { repository ->
+    @Test
+    fun `redirects outside GitHub are refused before opening another connection`() = withRepository { repository ->
         var requests = 0
         val cache = LabSdkRepository(assets, { uri ->
             requests++

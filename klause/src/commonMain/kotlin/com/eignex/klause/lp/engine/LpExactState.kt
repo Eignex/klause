@@ -92,6 +92,7 @@ internal class LpExactState internal constructor(
     private var projectionColumns = intArrayOf()
     private var projectionCosts = intArrayOf()
     private var projectionObjective = false
+
     // Tokens identify adjacent scalar revisions without retaining a predecessor's state or cached vectors.
     private val scalarIdentity = Any()
     private var scalarPredecessor: Any? = null
@@ -132,9 +133,11 @@ internal class LpExactState internal constructor(
         meter.reserve(construction + comparisons * square,
             128L * entries + 1024L + 64L * words, matrix = false)
         var witness = 0L
-        for (assertion in activeAssertions) if (assertion.witness >= witness) {
-            if (assertion.witness == Long.MAX_VALUE) return null
-            witness = assertion.witness + 1L
+        for (assertion in activeAssertions) {
+            if (assertion.witness >= witness) {
+                if (assertion.witness == Long.MAX_VALUE) return null
+                witness = assertion.witness + 1L
+            }
         }
         val side = ExactLpSide(ExactLpNumber.of(BigFraction.ofLong(endpoint) - origin))
         return LpExactState(baseModel,
@@ -203,11 +206,11 @@ internal class LpExactState internal constructor(
                 val column = appended.column
                 val invalid = !model.column(column).bounds.consistent
                 inconsistent = if (source.inconsistent[column] == invalid) source.inconsistent
-                    else source.inconsistent.copyOf().also { it[column] = invalid }
+                else source.inconsistent.copyOf().also { it[column] = invalid }
                 val previousConflict = source.conflict?.column ?: -1
                 // Tightening one side cannot repair an existing conflict elsewhere.
                 firstConflict = if (!invalid) previousConflict else if (previousConflict < 0) column
-                    else minOf(column, previousConflict)
+                else minOf(column, previousConflict)
             } else {
                 inconsistent = if (touched.isEmpty()) source.inconsistent else source.inconsistent.copyOf()
                 for (j in touched) inconsistent[j] = !model.column(j).bounds.consistent
@@ -458,7 +461,7 @@ internal class LpExactState internal constructor(
                 previous.withBounds(model, projectionColumns, meter) ?: return null
             }
             val next = if (projectionObjective) bounded.withObjective(model, projectionCosts, meter) ?: return null
-                else bounded
+            else bounded
             meter.poll()
             vectors = next
             scalarsProjectable = true

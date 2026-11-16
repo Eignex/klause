@@ -156,7 +156,6 @@ class LpHintsTest {
         }
     }
 
-
     private fun recordedHints(lpValue: Double): LpHints {
         val p = Problem(
             numBoolVars = 0,

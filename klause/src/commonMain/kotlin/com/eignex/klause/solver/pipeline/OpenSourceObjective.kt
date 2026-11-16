@@ -68,8 +68,10 @@ internal class OpenSourceObjective(
             is MinimizeResult.Unknown -> result.reason
             else -> TerminationReason.BudgetExhausted
         }
-        val authority = context?.let { LinearOptimizationResult(it.scope, null, null,
-            pooled?.assignment, pooled?.objective?.source, reason, result.stats, it.semantics) }
+        val authority = context?.let {
+            LinearOptimizationResult(it.scope, null, null,
+                pooled?.assignment, pooled?.objective?.source, reason, result.stats, it.semantics)
+        }
         return OpenTheoryOptimum.Bounded(pooled?.assignment?.let { OpenTheoryAssignment.Sampled(it) },
             pooled?.objective?.source?.let(::minimizedSource), reason, result.stats, authority)
     }

@@ -132,10 +132,12 @@ class PreparedFactorProjections internal constructor(
             Array(factorIndices.size) { propagation[factorIndices[it]] },
             Array(factorIndices.size) { scoring[factorIndices[it]] },
             Array(factorIndices.size) { relaxation[factorIndices[it]] },
-            encoders.mapValues { (_, selected) -> Array(factorIndices.size) {
-                val encoder = selected[factorIndices[it]]
-                if (remap == null) encoder else encoder.remapped(remap)
-            } },
+            encoders.mapValues { (_, selected) ->
+                Array(factorIndices.size) {
+                    val encoder = selected[factorIndices[it]]
+                    if (remap == null) encoder else encoder.remapped(remap)
+                }
+            },
             preparation)
     }
 
@@ -158,9 +160,11 @@ class PreparedFactorProjections internal constructor(
             },
             Array(view.numFactors) {
                 if (it < problem.numFactors) relaxation[it] else providers.relaxation.select(view.factors[it])
-            }, encoders.mapValues { (target, selected) -> Array(view.numFactors) {
-                if (it < problem.numFactors) selected[it] else providers.encoder.select(view.factors[it], target)
-            } })
+            }, encoders.mapValues { (target, selected) ->
+                Array(view.numFactors) {
+                    if (it < problem.numFactors) selected[it] else providers.encoder.select(view.factors[it], target)
+                }
+            })
     }
 
     internal fun appended(view: Problem): PreparedFactorProjections {
@@ -195,9 +199,11 @@ class PreparedFactorProjections internal constructor(
             },
             Array(view.numFactors) {
                 if (it == last) providers.relaxation.select(view.factors[it]) else relaxation[it]
-            }, encoders.mapValues { (target, selected) -> Array(view.numFactors) {
-                if (it == last) providers.encoder.select(view.factors[it], target) else selected[it]
-            } })
+            }, encoders.mapValues { (target, selected) ->
+                Array(view.numFactors) {
+                    if (it == last) providers.encoder.select(view.factors[it], target) else selected[it]
+                }
+            })
     }
 
     internal fun requiresOriginalScoringCheck(factorId: Int): Boolean = scoring[factorId]?.builtIn == false &&

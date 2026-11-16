@@ -94,8 +94,12 @@ internal class NonlinearIntegerCells(
 
     fun clear() = entries.clear()
 
-    fun recordDuplicate() { duplicates++ }
-    fun recordAllowed() { allowed++ }
+    fun recordDuplicate() {
+        duplicates++
+    }
+    fun recordAllowed() {
+        allowed++
+    }
 
     fun propose(
         tuple: List<BigInt>,

@@ -30,10 +30,10 @@ import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.parseBigInt
-import com.eignex.util.numbers.remainderOf as bigRemainder
 import com.eignex.util.numbers.shr
 import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.toLong
+import com.eignex.util.numbers.remainderOf as bigRemainder
 
 internal sealed interface PolynomialValue {
     data class Boolean(val formula: PolynomialRealFormula) : PolynomialValue {

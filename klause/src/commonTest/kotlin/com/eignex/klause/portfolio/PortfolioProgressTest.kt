@@ -161,8 +161,8 @@ class PortfolioProgressTest {
         assertFailsWith<IllegalStateException> {
             Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1,
                 diagnostics = PortfolioDiagnostics(2), onProgress = {
-                if (it is PortfolioEvent.WorkerExit) error("sink failed")
-            }).use { it.minimize(ExecutionControl.Never) }
+                    if (it is PortfolioEvent.WorkerExit) error("sink failed")
+                }).use { it.minimize(ExecutionControl.Never) }
         }
 
         assertEquals(listOf(1, 1), searches.map { it.closes })
@@ -290,7 +290,10 @@ class PortfolioProgressTest {
 
         val result = Portfolio.thompson(workers, baseSliceWork = 1, maxSliceWork = 1, sliceGrowth = 1.0,
             diagnostics = PortfolioDiagnostics(3),
-            rewardPolicy = PortfolioRewardPolicy { observed += it; it.ordinaryReward }).use {
+            rewardPolicy = PortfolioRewardPolicy {
+                observed += it
+                it.ordinaryReward
+            }).use {
             it.minimize(ExecutionControl.Never)
         }
 
@@ -347,7 +350,10 @@ class PortfolioProgressTest {
         val result = Portfolio.thompson(listOf(trackingWorker("search", 0, search)),
             baseSliceWork = 1, sliceGrowth = 1.0, reseedStaleThreshold = 0,
             diagnostics = PortfolioDiagnostics(10),
-            rewardPolicy = PortfolioRewardPolicy { observations += it; it.ordinaryReward }).use {
+            rewardPolicy = PortfolioRewardPolicy {
+                observations += it
+                it.ordinaryReward
+            }).use {
             it.minimize(ExecutionControl.Never)
         }
 

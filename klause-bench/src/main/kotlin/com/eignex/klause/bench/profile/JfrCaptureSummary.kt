@@ -131,10 +131,12 @@ internal object JfrCaptureSummary : BenchSuite {
             put("sampledMethods", buildJsonArray {
                 for ((method, count) in methods.toList().sortedWith(
                     compareByDescending<Pair<String, Long>> { it.second }.thenBy { it.first },
-                )) add(buildJsonObject {
-                    put("method", method)
-                    put("samples", count)
-                })
+                )) {
+                    add(buildJsonObject {
+                        put("method", method)
+                        put("samples", count)
+                    })
+                }
             })
         }
     }

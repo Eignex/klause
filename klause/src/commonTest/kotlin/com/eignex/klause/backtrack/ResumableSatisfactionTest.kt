@@ -244,7 +244,9 @@ class ResumableSatisfactionTest {
         var native: PropagationSession? = null
         var closed = 0
         val exchange = object : ClauseExchange {
-            override fun onSearchStart(session: PropagationSession) { native = session }
+            override fun onSearchStart(session: PropagationSession) {
+                native = session
+            }
             override fun onRestart(session: PropagationSession) = Unit
         }
         val component = object : SearchComponent, AutoCloseable {
@@ -268,33 +270,38 @@ class ResumableSatisfactionTest {
 
     @Test
     fun `ordinary and resumed search should reclaim learned memory without restarts`() {
-        for (native in listOf(false, true)) for (resumed in listOf(false, true)) {
-            var injected = false
-            val exchange = object : ClauseExchange {
-                override fun onSearchStart(session: PropagationSession) {
-                    if (injected) return
-                    assertEquals(native, session.usesNativeSat)
-                    injected = true
-                    repeat(16) { session.addLearnedClause(Clause(intArrayOf(0, 1)), 9) }
+        for (native in listOf(false, true)) {
+            for (resumed in listOf(false, true)) {
+                var injected = false
+                val exchange = object : ClauseExchange {
+                    override fun onSearchStart(session: PropagationSession) {
+                        if (injected) return
+                        assertEquals(native, session.usesNativeSat)
+                        injected = true
+                        repeat(16) { session.addLearnedClause(Clause(intArrayOf(0, 1)), 9) }
+                    }
+                    override fun onRestart(session: PropagationSession) = Unit
                 }
-                override fun onRestart(session: PropagationSession) = Unit
-            }
-            val params = BacktrackParams(nativeSat = native, randomSeed = 1L, pbLearning = false,
-                clauseExchange = exchange, learnedMemoryBytes = 0L, learnedMemoryWork = 1_000_000L, maxDecisions = 100L)
-            val solver = BacktrackSolver(pigeonhole(3, 2).bake())
+                val params = BacktrackParams(nativeSat = native, randomSeed = 1L, pbLearning = false,
+                    clauseExchange = exchange, learnedMemoryBytes = 0L,
+                    learnedMemoryWork = 1_000_000L, maxDecisions = 100L)
+                val solver = BacktrackSolver(pigeonhole(3, 2).bake())
 
-            val result = if (resumed) solver.resumableSolve(params).use { search ->
-                var verdict: SolveResult? = null
-                repeat(100) { if (verdict == null) verdict = search.runSlice(ExecutionControl.Never,
-                    Long.MAX_VALUE, 1L) }
-                assertNotNull(verdict)
-            }
-            else solver.solve(params)
+                val result = if (resumed) solver.resumableSolve(params).use { search ->
+                    var verdict: SolveResult? = null
+                    repeat(100) {
+                        if (verdict == null) verdict = search.runSlice(ExecutionControl.Never,
+                            Long.MAX_VALUE, 1L)
+                    }
+                    assertNotNull(verdict)
+                }
+                else solver.solve(params)
 
-            assertIs<SolveResult.Unsat>(result)
-            assertEquals(0.0, result.stats.search.restarts.sum)
-            assertTrue(result.stats.search.learning.getValue("learnedMemoryRECLAIMED") > 0L)
-            assertTrue(result.stats.search.learning.getValue("learningClauseRetired") >= 16L)
+                assertIs<SolveResult.Unsat>(result)
+                assertEquals(0.0, result.stats.search.restarts.sum)
+                assertTrue(result.stats.search.learning.getValue("learnedMemoryRECLAIMED") > 0L)
+                assertTrue(result.stats.search.learning.getValue("learningClauseRetired") >= 16L)
+            }
         }
     }
 

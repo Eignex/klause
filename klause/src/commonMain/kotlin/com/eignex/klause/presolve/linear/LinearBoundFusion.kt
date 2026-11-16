@@ -134,9 +134,9 @@ internal object LinearBoundFusion {
         val constants = row.constants as? IntegralConstants ?: return null
         if (row.activator != LinearRow.ALWAYS || row.relation == LinearOp.NE) return null
         if ((0 until row.size).any {
-            visit(scan)
-            !Term.isInt(row.ref(it))
-        }) return null
+                visit(scan)
+                !Term.isInt(row.ref(it))
+            }) return null
         if (constants is IntegerConstants) {
             try {
                 return canonicalizeLong(row, constants, scan)
@@ -240,9 +240,9 @@ internal object LinearBoundFusion {
             it.key
         }.toIntArray()
         val key = if (coefficients.all {
-            visit(scan)
-            it.fitsLong()
-        }) {
+                visit(scan)
+                it.fitsLong()
+            }) {
             Terms(vars, LongArray(coefficients.size) {
                 visit(scan)
                 coefficients[it].toLongExact()

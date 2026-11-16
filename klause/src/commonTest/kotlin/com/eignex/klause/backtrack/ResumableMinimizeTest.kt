@@ -258,8 +258,9 @@ class ResumableMinimizeTest {
             (0 until 2).flatMap { group ->
                 (0 until 8).map { mask ->
                     val coefficients = IntArray(4) { v ->
-                        if (v == 0) { if (group == 0) 2 else -2 }
-                        else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                        if (v == 0) {
+                            if (group == 0) 2 else -2
+                        } else if (mask and (1 shl (v - 1)) == 0) 1 else -1
                     }
                     Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
                         (if (group == 0) 2 else -2) - coefficients.drop(1).count { it < 0 })
@@ -331,8 +332,9 @@ class ResumableMinimizeTest {
             (0 until 2).flatMap { group ->
                 (0 until 8).map { mask ->
                     val coefficients = IntArray(4) { v ->
-                        if (v == 0) { if (group == 0) 2 else -2 }
-                        else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                        if (v == 0) {
+                            if (group == 0) 2 else -2
+                        } else if (mask and (1 shl (v - 1)) == 0) 1 else -1
                     }
                     Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
                         (if (group == 0) 2 else -2) - coefficients.drop(1).count { it < 0 })
@@ -558,7 +560,7 @@ class ResumableMinimizeTest {
                 search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { offers.add(it.objective) }
 
                 val expected = if (branching) SearchDecision.IntAtMost(0, 0L)
-                    else SearchDecision.IntAtLeast(0, 1L)
+                else SearchDecision.IntAtLeast(0, 1L)
                 assertEquals(expected, attempts.first())
                 assertEquals(listOf(5.0, 4.0), offers)
                 val guidance = search.stats.lp.phases["PRIMAL_VALUE_GUIDANCE_ROOT"]?.outcomes

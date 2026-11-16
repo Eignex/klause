@@ -46,6 +46,7 @@ internal class LeafRealCompletion(
 
     private val encoders = problem.selectedFactorProjections()
     private val encoding = LinearCompletionEncoding(encoders)
+
     // The source's search within its tolerance, present when acceptance admits tolerance points.
     private val toleranceSearch = toleranceCheck.toleranceSearch()
     private val absCompletion = if (problem.factors.any { it is RealAbs } ||

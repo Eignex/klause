@@ -3,7 +3,17 @@ package com.eignex.klause.solver.incumbent
 import com.eignex.klause.util.ExecutionControl
 
 internal enum class IncumbentOfferEvent {
-    Segments, Offered, Coalesced, Checked, Installed, Rejected, Indeterminate, NotImproving, Dropped, Expired, Failed,
+    Segments,
+    Offered,
+    Coalesced,
+    Checked,
+    Installed,
+    Rejected,
+    Indeterminate,
+    NotImproving,
+    Dropped,
+    Expired,
+    Failed,
 }
 
 internal class BufferedIncumbentOffers<A, V>(

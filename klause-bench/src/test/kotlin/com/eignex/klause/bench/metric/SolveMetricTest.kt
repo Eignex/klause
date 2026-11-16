@@ -243,7 +243,10 @@ class SolveMetricTest {
 
         val (record, raw) = SolveMetric.solve(
             entry(), settings, budget, "now", "fixture",
-            installedBuild = { nanos += 30_000_000; null },
+            installedBuild = {
+                nanos += 30_000_000
+                null
+            },
             invoke = { _, supplied, allowance, _ ->
                 assertEquals(settings, supplied)
                 assertEquals(budget, allowance)

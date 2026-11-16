@@ -14,23 +14,25 @@ import kotlin.test.assertTrue
 class PolynomialAffineConsequencesTest {
     @Test
     fun `affine endpoints retain strictness beside nonlinear coordinate predicates`() {
-        for (lowerStrict in listOf(false, true)) for (upperStrict in listOf(false, true)) {
-            val arithmetic = PolynomialArithmetic()
-            val x = Polynomial.variable(0)
-            val y = Polynomial.variable(1)
-            val cube = arithmetic.power(x, 3)
-            val atoms = listOf(
-                PolynomialAtom(y, if (lowerStrict) PolynomialRelation.GT else PolynomialRelation.GE),
-                PolynomialAtom(arithmetic.subtract(cube, y),
-                    if (upperStrict) PolynomialRelation.GT else PolynomialRelation.GE),
-                PolynomialAtom(arithmetic.subtract(arithmetic.power(y, 2), Polynomial.ONE), PolynomialRelation.GE),
-            )
+        for (lowerStrict in listOf(false, true)) {
+            for (upperStrict in listOf(false, true)) {
+                val arithmetic = PolynomialArithmetic()
+                val x = Polynomial.variable(0)
+                val y = Polynomial.variable(1)
+                val cube = arithmetic.power(x, 3)
+                val atoms = listOf(
+                    PolynomialAtom(y, if (lowerStrict) PolynomialRelation.GT else PolynomialRelation.GE),
+                    PolynomialAtom(arithmetic.subtract(cube, y),
+                        if (upperStrict) PolynomialRelation.GT else PolynomialRelation.GE),
+                    PolynomialAtom(arithmetic.subtract(arithmetic.power(y, 2), Polynomial.ONE), PolynomialRelation.GE),
+                )
 
-            val consequences = preparePolynomialAffineConsequences(atoms, arithmetic)
-                .asSequence().filterNotNull().single()
+                val consequences = preparePolynomialAffineConsequences(atoms, arithmetic)
+                    .asSequence().filterNotNull().single()
 
-            assertEquals(listOf(PolynomialAtom(cube,
-                if (lowerStrict || upperStrict) PolynomialRelation.GT else PolynomialRelation.GE)), consequences)
+                assertEquals(listOf(PolynomialAtom(cube,
+                    if (lowerStrict || upperStrict) PolynomialRelation.GT else PolynomialRelation.GE)), consequences)
+            }
         }
     }
 

@@ -83,6 +83,7 @@ internal object Compiler {
         // by each active scope so it can be popped. A deeply nested formula unwinds its `let` chain
         // iteratively into these structures instead of recursing through the call stack.
         internal class ScopedBinding(val depth: Int, val binding: Binding)
+
         // Deferred Boolean values exclude their simultaneous peers and later caller-local shadows.
         internal class BindingSnapshot(val scope: BindingScope, val depth: Int)
         internal class BindingScope(val parent: BindingSnapshot? = null) {

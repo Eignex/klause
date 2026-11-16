@@ -60,11 +60,13 @@ object BuiltInEncoderProvider : EncoderProvider {
     }
     private val polynomialRows = Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
         val form = checkNotNull(view.linearForm)
-        val rows = form.rows.map { polynomialRow(it,
-            { id -> encoding.integer(SourceIntId(id)) },
-            { id -> encoding.real(SourceRealId(id)) }, encoding::conditional) }
+        val rows = form.rows.map {
+            polynomialRow(it,
+                { id -> encoding.integer(SourceIntId(id)) },
+                { id -> encoding.real(SourceRealId(id)) }, encoding::conditional)
+        }
         encoding.polynomial(if (form is LinearForm.Disjunction) PolynomialRealFormula.Or(rows)
-            else PolynomialRealFormula.And(rows))
+        else PolynomialRealFormula.And(rows))
         null
     }
     private val mixedProduct = Encoder(EncoderSupport.DIRECT) { view, encoding ->

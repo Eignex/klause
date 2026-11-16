@@ -4,9 +4,11 @@ import com.eignex.klause.solver.result.PortfolioLifecycleStats
 import com.eignex.klause.solver.result.PortfolioPhaseStats
 
 internal class PortfolioProgressLog(workers: List<PortfolioWorker>) {
-    private val phases = Array(workers.size) { Array(PortfolioPhase.entries.size) { phase ->
-        PortfolioPhaseStats(PortfolioPhase.entries[phase])
-    } }
+    private val phases = Array(workers.size) {
+        Array(PortfolioPhase.entries.size) { phase ->
+            PortfolioPhaseStats(PortfolioPhase.entries[phase])
+        }
+    }
     private val lifecycle = Array(workers.size) { arm ->
         PortfolioLifecycleStats(workers[arm].createdNanos, workers[arm].constructionNanos)
     }

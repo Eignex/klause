@@ -25,6 +25,7 @@ import com.eignex.util.numbers.times
 enum class DivisionConvention {
     /** Quotient rounds toward zero; a nonzero remainder has the dividend's sign. */
     TRUNCATING,
+
     /** Remainder is nonnegative and smaller than the divisor's magnitude. */
     EUCLIDEAN,
 }
@@ -60,7 +61,7 @@ class DivMod private constructor(
         this(dividend, null, divisor, quotient, remainder, convention)
 
     override val variables: VarList = IntVars(if (divisor == null) intArrayOf(dividend, quotient, remainder)
-        else intArrayOf(dividend, divisor, quotient, remainder))
+    else intArrayOf(dividend, divisor, quotient, remainder))
 
     override fun remap(mapping: VarRemap): Factor = DivMod(mapping.int(dividend), divisor?.let(mapping::int),
         constantDivisor, mapping.int(quotient), mapping.int(remainder), convention)

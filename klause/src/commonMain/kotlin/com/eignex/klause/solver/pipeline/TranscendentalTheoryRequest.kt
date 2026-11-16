@@ -113,7 +113,7 @@ private fun TranscendentalTheoryParams.supportsInvocation(engine: FiniteEngine):
     if (complete.componentFactory != null || complete.toleranceCheck != null) return false
     if (traversal && complete.onEvent != null) return false
     if (heuristic && (local.onEvent != null || local.initialAssignment != null ||
-        local.pooledIncumbents != null || local.lsObjective != null)) return false
+            local.pooledIncumbents != null || local.lsObjective != null)) return false
     val scopes = listOf(strategy.assumptions, complete.assumptions, local.assumptions)
     if (scopes.any { !it.deductions.isEmpty }) return false
     if (engine == FiniteEngine.MIXED && (!complete.assumptions.isEmpty || !local.assumptions.isEmpty)) return false

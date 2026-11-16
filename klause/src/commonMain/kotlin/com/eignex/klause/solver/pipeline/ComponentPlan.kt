@@ -278,7 +278,7 @@ class ComponentPlan internal constructor(
                     (
                         narrowed != null && narrowed.min >= declared.min && narrowed.max <= declared.max &&
                             narrowed == declared.withMinAtLeast(narrowed.min).withMaxAtMost(narrowed.max)
-                    ),
+                        ),
             ) {
                 "objective round must only narrow declared values"
             }
@@ -407,7 +407,9 @@ internal fun Problem.buildComponentPlan(
     val stop = cancellation.encodingPreparationScope()
     fun install(target: EncodingTarget, indices: List<Int>, onDecline: (EncoderDecline) -> Unit): Problem? =
         preparationBudget.observePreparation(PresolvePreparationStage.SOURCE_ROWS, PresolveLane.SOURCE, this, stop) {
-                token, _, ->
+                token,
+                _,
+            ->
             retained?.model(target, indices, token) ?: projections.requestEncoders(
                 target, indices, cancellation = token, completeFiniteConditions = true, onDecline = onDecline,
             )?.let {
@@ -468,13 +470,17 @@ internal fun Problem.buildComponentPlan(
                     factor.variables.reals.none { relevantReals[it] })
             ) continue
             encoded[index] = true
-            for (variable in factor.intVars) if (!relevantIntegers[variable]) {
-                relevantIntegers[variable] = true
-                changed = true
+            for (variable in factor.intVars) {
+                if (!relevantIntegers[variable]) {
+                    relevantIntegers[variable] = true
+                    changed = true
+                }
             }
-            for (variable in factor.variables.reals) if (!relevantReals[variable]) {
-                relevantReals[variable] = true
-                changed = true
+            for (variable in factor.variables.reals) {
+                if (!relevantReals[variable]) {
+                    relevantReals[variable] = true
+                    changed = true
+                }
             }
         }
     }

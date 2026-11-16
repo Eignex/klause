@@ -49,8 +49,10 @@ internal fun linearNeighborhoodInvocation(
                 index,
                 objective, stop, timeout = params.timeout, exhausted = { adapter.exhausted },
                 declined = { adapter.declined },
-                open = { adapter.search(adaptive, slot.seed,
-                    maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null) })
+                open = {
+                    adapter.search(adaptive, slot.seed,
+                        maximumImprovementMoves = if (adaptive) params.alnsIterations.toLong() else null)
+                })
                 .bindEvidence(identity, provesResults = false)
             worker
         }

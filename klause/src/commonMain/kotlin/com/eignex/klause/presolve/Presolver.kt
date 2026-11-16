@@ -215,10 +215,12 @@ object Presolver {
                         delta.addedFactors,
                         deductionsChanged = delta.bounds != null,
                     )
-                    for (inputs in linearInputs.values) inputs.recordDelta(
-                        current.factors, delta.droppedIndices, delta.addedFactors,
-                        deductionsChanged = delta.bounds != null,
-                    )
+                    for (inputs in linearInputs.values) {
+                        inputs.recordDelta(
+                            current.factors, delta.droppedIndices, delta.addedFactors,
+                            deductionsChanged = delta.bounds != null,
+                        )
+                    }
                     current = current.withSourcePassDelta(delta) ?: return@observeRoundPass PassOutcome.INFEASIBLE
                     ctx = ctx.withObjective(delta.objective)
                     booleanPins.record(invocation, delta.addedFactors, entrySize::isBooleanPinned)
@@ -503,9 +505,12 @@ object Presolver {
                 val token = (slice ?: ctx.cancellation).let { ctx.presolveBudget?.observeStops(it) ?: it }
                 return ctx.presolveBudget.observeRoundPass(
                     pass, PresolveLane.FINITE, token,
-                    { PresolveSizeStats(
-                        session.liveFactorCount, problem.numBoolVars, problem.numIntVars, reals = problem.numRealVars,
-                    ) },
+                    {
+                        PresolveSizeStats(
+                            session.liveFactorCount, problem.numBoolVars, problem.numIntVars,
+                            reals = problem.numRealVars,
+                        )
+                    },
                     { pass.namespaceEligible(problem, session.liveFactorCount) && incrementalEligible(pass, token) },
                 ) { invocation ->
                     // Before the context: [passOccurrence] is keyed against the factor list [passInput] fixes.

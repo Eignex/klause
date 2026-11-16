@@ -48,10 +48,10 @@ internal class LinearAuthorityQuery private constructor(
     ): Boolean = this.cuts == cuts && this.cutMask == cutMask &&
         this.checkUnselectedCuts == checkUnselectedCuts && this.retainMaskedCuts == retainMaskedCuts &&
         (source === other ||
-        (source.scope == other.scope &&
-            source.hasSameLinearData(other) &&
-            source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
-            source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker))
+            (source.scope == other.scope &&
+                source.hasSameLinearData(other) &&
+                source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
+                source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker))
 
     companion object {
         fun prepare(
@@ -137,14 +137,16 @@ internal class LinearAuthorityQuery private constructor(
             }
             for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
                 val sign = if (upper) BigFraction.ONE else BigFraction.MINUS_ONE
-                for ((id, value) in bounds) cited += SourceInequality(mapOf(id to sign), value * sign) to
-                    SourceDerivation.Assumption(id, upper)
+                for ((id, value) in bounds) {
+                    cited += SourceInequality(mapOf(id to sign), value * sign) to
+                        SourceDerivation.Assumption(id, upper)
+                }
             }
             val indices = template?.indices ?: coordinates.withIndex().associate { it.value to it.index }
             val rows = if (template == null) cited.map { it.first.row(indices) }
-                else template.rows + cited.drop(template.rows.size).map { it.first.row(indices) }
+            else template.rows + cited.drop(template.rows.size).map { it.first.row(indices) }
             val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
-                else BigFraction.MINUS_ONE
+            else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
             return LinearAuthorityQuery(source, coordinates, cited, rows, inactive,
                 unconditional && (inactive.isEmpty() || retainMaskedCuts),

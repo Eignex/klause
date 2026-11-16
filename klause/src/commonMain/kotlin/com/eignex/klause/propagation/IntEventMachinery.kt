@@ -86,7 +86,10 @@ internal class IntEventMachinery private constructor(
      *  so post-construction subscriptions go to the sparse [overflow]. */
     fun subscribeMidlife(packed: Int, fid: Int): Long {
         var work = 0L
-        val index = overflow ?: IntEventOverflow().also { overflow = it; work += 12L }
+        val index = overflow ?: IntEventOverflow().also {
+            overflow = it
+            work += 12L
+        }
         return work + index.subscribe(packed, fid)
     }
 
@@ -204,5 +207,4 @@ internal class IntEventMachinery private constructor(
             yield(IntEventMachinery(projection, false, offsets, flat, dirtyVars, dirtyMark))
         }
     }
-
 }

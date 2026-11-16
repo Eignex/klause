@@ -189,5 +189,5 @@ internal fun lowerGridPin(factor: Factor, column: FloatGridColumn, default: BigF
     }
     val variables = intArrayOf(column.coordinate.variable)
     return listOf(if (reifier == null) Linear(coefficients, variables, operation, bound)
-        else ReifiedLinear(reifier, coefficients, variables, operation, bound))
+    else ReifiedLinear(reifier, coefficients, variables, operation, bound))
 }

@@ -211,11 +211,10 @@ internal class SmtLibPolynomialCompiler(
         val conditionals = ArrayList<PolynomialConditional>()
         var functions: FunctionSourceLowering? = null
         val captureConditional: ((PolynomialConditional) -> Unit)? =
-            if (objective == null && !functionSyntax) null else {
-            conditional ->
-            conditionals.add(conditional)
-            functions?.capture(conditional)
-        }
+            if (objective == null && !functionSyntax) null else { conditional ->
+                conditionals.add(conditional)
+                functions?.capture(conditional)
+            }
         var lowering = PolynomialRealLowering(numericCount, captureConditional)
         if (functionSyntax) functions = FunctionSourceLowering(lowering, numericCount, boolNames.size, cancellation)
         var evaluator = SmtLibPolynomialEvaluator(

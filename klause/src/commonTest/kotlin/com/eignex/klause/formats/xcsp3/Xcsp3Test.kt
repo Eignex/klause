@@ -70,7 +70,6 @@ class Xcsp3Test {
         }
     }
 
-
     private fun sat(xml: String): IntArray {
         val r = BacktrackSolver(Xcsp3.parse(xml).problem.bake()).solve(BacktrackParams())
         assertTrue(r is SolveResult.Sat, "expected SAT, got $r")

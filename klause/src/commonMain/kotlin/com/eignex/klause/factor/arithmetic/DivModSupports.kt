@@ -48,7 +48,7 @@ internal class DivModSupports(relation: DivMod, state: PropagationState, availab
                     exact.first.toLongExact() to exact.second.toLongExact()
                 } ?: continue
                 val values = if (divisor == null) longArrayOf(av, outputs.first, outputs.second)
-                    else longArrayOf(av, checkNotNull(bv), outputs.first, outputs.second)
+                else longArrayOf(av, checkNotNull(bv), outputs.first, outputs.second)
                 if (roles.indices.any { role ->
                         (0 until role).any { previous ->
                             roles[previous] == roles[role] && values[previous] != values[role]

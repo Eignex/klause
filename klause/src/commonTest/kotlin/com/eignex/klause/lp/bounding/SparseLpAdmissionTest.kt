@@ -499,5 +499,4 @@ class SparseLpAdmissionTest {
         assertFalse(admission.plan.bounding)
         assertEquals(1L, requireNotNull(admission.sparseTrial).metrics["DeclineShape"])
     }
-
 }

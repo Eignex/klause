@@ -53,9 +53,11 @@ class BinaryObjectiveViewTest {
             assertEquals(1, view.numBoolVars)
             assertEquals(listOf(0L, 5L), view.objective.intCoefficients.toList())
             assertNull(view.objective.binaryIntegerSource)
-            for (binary in 0L..1L) for (integer in listOf(0L, 2L, 4L)) {
-                val sample = Sample(booleanArrayOf(binary == bound), longArrayOf(binary, integer))
-                assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
+            for (binary in 0L..1L) {
+                for (integer in listOf(0L, 2L, 4L)) {
+                    val sample = Sample(booleanArrayOf(binary == bound), longArrayOf(binary, integer))
+                    assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
+                }
             }
         }
     }
@@ -86,9 +88,11 @@ class BinaryObjectiveViewTest {
 
             assertEquals(2, view.numBoolVars)
             assertEquals(listOf(1L, 0L, 3L), view.objective.intCoefficients.toList())
-            for (a in 0L..1L) for (b in 0L..1L) {
-                val sample = Sample(booleanArrayOf(a == bound, b == 1L), longArrayOf(a, b, 2))
-                assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
+            for (a in 0L..1L) {
+                for (b in 0L..1L) {
+                    val sample = Sample(booleanArrayOf(a == bound, b == 1L), longArrayOf(a, b, 2))
+                    assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
+                }
             }
         }
     }

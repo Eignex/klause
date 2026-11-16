@@ -49,7 +49,7 @@ private data class QuadraticIntegerBound(
     val upper: Boolean,
 ) : SearchTheoryDecision {
     fun complement() = if (upper) copy(threshold = threshold + BIG_ONE, upper = false)
-        else error("integer split registration starts with an upper bound")
+    else error("integer split registration starts with an upper bound")
 }
 
 internal class QuadraticIntegerComponent(

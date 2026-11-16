@@ -154,13 +154,15 @@ internal object ExactFeasibilityCapture {
             return id
         }
         val sides = buildJsonArray {
-            for (column in 0 until count) for (upper in listOf(false, true)) {
-                val premise = call(lp, "activeBoundPremise", column, upper) as? SearchAtomPremise ?: continue
-                add(buildJsonObject {
-                    put("column", column)
-                    put("upper", upper)
-                    put("premise", visit(premise))
-                })
+            for (column in 0 until count) {
+                for (upper in listOf(false, true)) {
+                    val premise = call(lp, "activeBoundPremise", column, upper) as? SearchAtomPremise ?: continue
+                    add(buildJsonObject {
+                        put("column", column)
+                        put("upper", upper)
+                        put("premise", visit(premise))
+                    })
+                }
             }
         }
         return buildJsonObject {

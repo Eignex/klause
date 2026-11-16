@@ -17,7 +17,9 @@ internal class TranscendentalArithmetic(
     var work: Long = 0
         private set
 
-    init { require(maximumBits > 0 && (maximumWork == null || maximumWork >= 0)) }
+    init {
+        require(maximumBits > 0 && (maximumWork == null || maximumWork >= 0))
+    }
 
     fun step() {
         execution.step {
@@ -58,7 +60,7 @@ internal class TranscendentalArithmetic(
 
     fun add(left: RationalEnclosure, right: RationalEnclosure): RationalEnclosure = execution.operation {
         RationalEnclosure(
-        add(left.lower, right.lower), add(left.upper, right.upper),
+            add(left.lower, right.lower), add(left.upper, right.upper),
         )
     }
 

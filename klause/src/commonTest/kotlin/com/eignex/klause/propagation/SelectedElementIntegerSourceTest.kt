@@ -29,10 +29,10 @@ class SelectedElementIntegerSourceTest {
     fun `an unavailable shared selection premise should withhold native row admission`() {
         val native = PropagationSession(Problem(0, 6, arrayOf(IntDomain(0, 6), IntDomain(0, 12),
             IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 24), IntDomain(0, 1)), arrayOf(
-                Element(5, 3, longArrayOf(1, 2), true, 0),
-                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
-                Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
-            ))).apply { enableIntegerRowLearning() }
+            Element(5, 3, longArrayOf(1, 2), true, 0),
+            Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
+            Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
+        ))).apply { enableIntegerRowLearning() }
         val peer = object : SearchComponent {
             override fun initialize(context: SearchContext): ComponentResult =
                 context.publish(SearchDecision.IntAtMost(5, 0))
@@ -54,10 +54,10 @@ class SelectedElementIntegerSourceTest {
         for (offset in listOf(-2, 0, 1)) {
             val native = PropagationSession(Problem(1, 6, arrayOf(IntDomain(0, 6), IntDomain(0, 12),
                 IntDomain(0, 12), IntDomain(0, 12), IntDomain(0, 24), IntDomain(offset.toLong(), offset + 1L)), arrayOf(
-                    Element(5, 3, longArrayOf(1, 2), true, offset),
-                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
-                    Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
-                )), pbLearning = false).apply { enableIntegerRowLearning() }
+                Element(5, 3, longArrayOf(1, 2), true, offset),
+                Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 4), LinearOp.LE, 0),
+                Linear(intArrayOf(2, -1), intArrayOf(0, 3), LinearOp.LE, 0),
+            )), pbLearning = false).apply { enableIntegerRowLearning() }
             native.addLearnedClause(Clause(intArrayOf(Lit.make(0, true), Lit.make(0, false))), lbd = 3)
             val cp = CpSearchComponent(native, intArrayOf(4, 7, 9, 11, 13, 15))
             val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(1))

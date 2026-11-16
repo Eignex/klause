@@ -17,9 +17,9 @@ internal class LearnedIntegerPropagator(val row: IntegerConflictRow) : LearnedPr
 
     override fun propagate(state: PropagationState, factorId: Int): Boolean =
         !state.integerGuardTrueAt(row.guard) ||
-        // Eager reasons retain their historical atoms without a compactable lazy factor id.
-        propagateLinearBounds(state, row.coefficients, row.variables, LinearOp.LE, row.bound,
-            extraLit = row.guard xor 1, includeExtraLit = row.guard != Lit.NONE, factorId = -1)
+            // Eager reasons retain their historical atoms without a compactable lazy factor id.
+            propagateLinearBounds(state, row.coefficients, row.variables, LinearOp.LE, row.bound,
+                extraLit = row.guard xor 1, includeExtraLit = row.guard != Lit.NONE, factorId = -1)
 
     override fun conflictReason(state: PropagationState, factorId: Int): IntArray? =
         linear.conflictReason(state, factorId)?.let { reason ->

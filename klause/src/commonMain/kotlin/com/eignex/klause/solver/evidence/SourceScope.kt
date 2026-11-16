@@ -14,13 +14,17 @@ data class SourceCoordinate(
     enum class Kind {
         /** Boolean declaration. */
         Boolean,
+
         /** Integer declaration. */
         Integer,
+
         /** Real declaration. */
         Real,
     }
 
-    init { require(id >= 0) }
+    init {
+        require(id >= 0)
+    }
 }
 
 /** Declared semantics and revision identity of the original source. */
@@ -30,7 +34,9 @@ data class SourceRevision(
     /** Declared source semantics identifier. */
     val semantics: String,
 ) {
-    init { require(identity.isNotBlank() && semantics.isNotBlank()) }
+    init {
+        require(identity.isNotBlank() && semantics.isNotBlank())
+    }
 }
 
 /** Exact invocation or branch restrictions in original coordinates. */
@@ -44,10 +50,13 @@ class SourceCondition(
     private val capturedBools = bools.toMap()
     private val capturedLower = lower.toMap()
     private val capturedUpper = upper.toMap()
+
     /** Boolean pins. */
     val bools: Map<Int, Boolean> get() = capturedBools.toMap()
+
     /** Inclusive numeric lower bounds, including exact pins. */
     val lower: Map<SourceCoordinate, BigFraction> get() = capturedLower.toMap()
+
     /** Inclusive numeric upper bounds, including exact pins. */
     val upper: Map<SourceCoordinate, BigFraction> get() = capturedUpper.toMap()
 
@@ -83,13 +92,12 @@ class SourceCondition(
 
     override fun equals(other: Any?): Boolean = other is SourceCondition &&
         capturedBools == other.capturedBools && capturedLower == other.capturedLower &&
-            capturedUpper == other.capturedUpper && capturedIntegerRows == other.capturedIntegerRows
+        capturedUpper == other.capturedUpper && capturedIntegerRows == other.capturedIntegerRows
 
     override fun hashCode(): Int =
         31 * (31 * (31 * capturedBools.hashCode() + capturedLower.hashCode()) + capturedUpper.hashCode()) +
             capturedIntegerRows.hashCode()
 }
-
 
 /** Source objective identity and invocation direction. */
 data class SourceObjective(
@@ -98,7 +106,9 @@ data class SourceObjective(
     /** Invocation optimization direction. */
     val sense: ObjectiveSense,
 ) {
-    init { require(identity.isNotBlank()) }
+    init {
+        require(identity.isNotBlank())
+    }
 }
 
 /** Complete scope required for every retained source claim. */

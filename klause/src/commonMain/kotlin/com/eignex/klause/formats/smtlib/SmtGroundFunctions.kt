@@ -15,7 +15,7 @@ internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: Executi
             needed = head in setOf("declare-sort", "define-sort", "as") ||
                 (head == "define-fun" && expression.polynomialName(1) in setOf("let", "as", "_", "!")) ||
                 (head == "declare-fun" &&
-                (expression.items.getOrNull(2) as? SExpr.SList)?.items?.isNotEmpty() == true)
+                    (expression.items.getOrNull(2) as? SExpr.SList)?.items?.isNotEmpty() == true)
             for (item in expression.items) pending.addLast(item)
         }
     }
@@ -110,8 +110,10 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                     expression("<=", SExpr.Atom(name), upper)))
             }
         }
-        val query = output.indexOfFirst { it is SExpr.SList &&
-            it.polynomialHead() in setOf("check-sat", "check-sat-assuming", "get-model", "exit") }
+        val query = output.indexOfFirst {
+            it is SExpr.SList &&
+                it.polynomialHead() in setOf("check-sat", "check-sat-assuming", "get-model", "exit")
+        }
         output.addAll(if (query < 0) output.size else query, bounds)
         for ((name, function) in functions) {
             step()
@@ -253,7 +255,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                 is Frame.Combine -> {
                     val args = pop(frame.count)
                     values.addLast(if (frame.function == null) intern(frame.head, args)
-                        else apply(frame.function, args))
+                    else apply(frame.function, args))
                 }
                 is Frame.DefinedArguments -> if (frame.arguments.isNotEmpty()) {
                     val value = values.removeLast()
@@ -370,28 +372,30 @@ private data class GroundFunctionReconstruction(val parameters: List<SmtSort>,
 
 private class GroundFunctionCheck(private val applications: List<Pair<List<String>, String>>) : SmtSourceCheck {
     override fun check(values: SmtModelValues): Boolean {
-        for (first in applications.indices) for (second in first + 1 until applications.size) {
-            values.checkpoint()
-            val a = applications[first]
-            val b = applications[second]
-            var different = false
-            var unavailable = false
-            for (index in a.first.indices) {
+        for (first in applications.indices) {
+            for (second in first + 1 until applications.size) {
                 values.checkpoint()
-                when (values.equal(a.first[index], b.first[index])) {
-                    true -> Unit
-                    false -> {
-                        different = true
-                        break
+                val a = applications[first]
+                val b = applications[second]
+                var different = false
+                var unavailable = false
+                for (index in a.first.indices) {
+                    values.checkpoint()
+                    when (values.equal(a.first[index], b.first[index])) {
+                        true -> Unit
+                        false -> {
+                            different = true
+                            break
+                        }
+                        null -> unavailable = true
                     }
-                    null -> unavailable = true
                 }
-            }
-            if (different) continue
-            when (values.equal(a.second, b.second)) {
-                true -> Unit
-                false -> if (!unavailable) return false else throw SmtSourceCheckingUnavailable()
-                null -> throw SmtSourceCheckingUnavailable()
+                if (different) continue
+                when (values.equal(a.second, b.second)) {
+                    true -> Unit
+                    false -> if (!unavailable) return false else throw SmtSourceCheckingUnavailable()
+                    null -> throw SmtSourceCheckingUnavailable()
+                }
             }
         }
         return true

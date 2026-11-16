@@ -70,12 +70,12 @@ internal class EvidenceCertificate private constructor(
                 }
                 is MinimizeResult.Infeasible -> SourceClaim.Refutation
                 is MinimizeResult.Unbounded -> if (kind == EvidenceKind.Witness) SourceClaim.Witness(result.sample)
-                    else SourceClaim.Ray(result.sample,
+                else SourceClaim.Ray(result.sample,
                     result.direction.withIndex().associate { (id, step) ->
                         SourceCoordinate(SourceCoordinate.Kind.Real, id) to step
                     })
                 is MinimizeResult.BestFound -> if (kind == EvidenceKind.Bound) completed.cutoff
-                    else SourceClaim.Witness(result.sample)
+                else SourceClaim.Witness(result.sample)
                 is MinimizeResult.Unknown -> completed.cutoff
             }
         } ?: return SourceEvidenceCheck.Unavailable("completion has no actual claim of the requested kind")
@@ -121,7 +121,6 @@ internal class EvidenceCertificate private constructor(
             ) return null
             return EvidenceCertificate(model, kind, completion)
         }
-
     }
 }
 

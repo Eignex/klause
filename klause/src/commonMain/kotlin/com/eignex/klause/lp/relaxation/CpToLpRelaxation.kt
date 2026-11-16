@@ -1532,7 +1532,7 @@ internal class CpToLpRelaxation(
                         ?: continue
                 } else {
                     if (proof?.auxiliaryDefinitions?.any { (source, definition) ->
-                        !auxiliarySources.matches(source, definition) || definition !in colPresence
+                            !auxiliarySources.matches(source, definition) || definition !in colPresence
                         } == true || proof?.let { !cutProofApplies(it, problem, domains) } == true
                     ) {
                         continue

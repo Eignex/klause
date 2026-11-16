@@ -69,7 +69,7 @@ class LabSdkRepository(
             try {
                 return request(URI("https://api.github.com/repos/Eignex/eignex-lab/releases/assets/${asset.id}"))
             } catch (failure: IOException) {
-                if (attempt == 3 || failure is HttpFailure && !failure.retryable) {
+                if (attempt == 3 || (failure is HttpFailure && !failure.retryable)) {
                     throw GradleException("Could not stage the checksum-pinned lab SDK ${asset.extension}", failure)
                 }
                 pause(1_000L shl (attempt - 1))
@@ -96,14 +96,16 @@ class LabSdkRepository(
                 val status = connection.responseCode
                 if (status == 200) return connection.inputStream.use { it.readNBytes(MAXIMUM_BYTES + 1) }
                 if (status in setOf(301, 302, 303, 307, 308)) {
-                    uri = uri.resolve(connection.getHeaderField("Location") ?: error("Lab SDK redirect has no location"))
+                    uri =
+                        uri.resolve(connection.getHeaderField("Location") ?: error("Lab SDK redirect has no location"))
                 } else {
                     val remaining = connection.getHeaderField("X-RateLimit-Remaining")?.toLongOrNull()
                     val reset = connection.getHeaderField("X-RateLimit-Reset")?.toLongOrNull()
                     val retryAfter = connection.getHeaderField("Retry-After")
                     val limited = status == 429 || status == 403 || remaining == 0L || retryAfter != null
                     throw HttpFailure(
-                        "Lab SDK download returned HTTP $status from ${uri.host}; rate remaining ${remaining ?: "unknown"}" +
+                        "Lab SDK download returned HTTP $status from ${uri.host}; " +
+                            "rate remaining ${remaining ?: "unknown"}" +
                             (reset?.let { "; reset at epoch second $it" } ?: "") +
                             (if (limited) "; automatic retries stopped" else ""),
                         retryable = !limited && (status == 408 || status in 500..599),

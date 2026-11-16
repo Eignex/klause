@@ -142,7 +142,7 @@ private fun privateImage(
             val first = input.lo.pow(factor.exponent)
             val last = input.hi.pow(factor.exponent)
             interval(if (factor.exponent > 0 && factor.exponent and 1 == 0 && input.lo <= 0 && input.hi >= 0) 0.0
-                else minOf(first, last), maxOf(first, last))
+            else minOf(first, last), maxOf(first, last))
         }
         is RealAbs -> {
             val input = range(factor.operand) ?: return null

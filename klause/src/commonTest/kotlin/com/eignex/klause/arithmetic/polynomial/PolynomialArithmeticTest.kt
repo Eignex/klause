@@ -419,8 +419,11 @@ class PolynomialArithmeticTest {
     @Test
     fun `cancelled projection should publish no partial determinant`() {
         var work = 0
-        val cancelled = PolynomialArithmetic(object : ExecutionControl() { override fun isCancelled(): Boolean =work > 5
-            override val accounting = WorkMeter { work += it.toInt() } })
+        val cancelled =
+            PolynomialArithmetic(object : ExecutionControl() {
+                override fun isCancelled(): Boolean = work > 5
+                override val accounting = WorkMeter { work += it.toInt() }
+            })
 
         assertFailsWith<PolynomialInterrupted> { cancelled.resultant(arithmetic.power(x, 3), arithmetic.add(x, y), 0) }
         assertTrue(work > 5)

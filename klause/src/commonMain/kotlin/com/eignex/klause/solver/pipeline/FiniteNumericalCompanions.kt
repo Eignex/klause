@@ -67,8 +67,8 @@ internal fun finiteNumericalCompanionEligibility(
             add("binary-integers-required")
         }
         if (cost.columns <= requireNotNull(cost.maxColumns) && (0 until problem.numIntVars).any {
-            !problem.intBounds.hasLower(it) || !problem.intBounds.hasUpper(it)
-        }) {
+                !problem.intBounds.hasLower(it) || !problem.intBounds.hasUpper(it)
+            }) {
             add("finite-integer-bounds-required")
         }
         if (cost.columns > requireNotNull(cost.maxColumns) || cost.factors > requireNotNull(cost.maxFactors)) {
@@ -109,8 +109,10 @@ internal class FiniteNumericalCompanions private constructor(
         val binding = EngineInvocation(plan, identity, objective)
         fun factory(arm: Int, family: ArmFamily, create: (PortfolioWorkerSlot) -> PortfolioWorker) =
             PortfolioArmFactory(plan, arm, family,
-                binding = { SourceWorkerBinding(binding, sharingInvocation = binding,
-                    provesResults = it.permitsSourceProofs) }, create = create)
+                binding = {
+                    SourceWorkerBinding(binding, sharingInvocation = binding,
+                        provesResults = it.permitsSourceProofs)
+                }, create = create)
         fun local(slot: PortfolioWorkerSlot) = params.copy(
             randomSeed = slot.seed, nodeBudget = slot.nodeBudget,
             cancellation = cancellation or params.cancellation or slot.cancellation,
@@ -182,22 +184,24 @@ internal class FiniteNumericalCompanions private constructor(
             repairGuidance = repairGuidance,
             incumbentCompletionCheck = incumbentCompletionCheck,
             onObservation = onObservation?.let { report -> { observation -> report(slot.seed, observation) } },
-            onComparison = onComparison?.let { report -> { comparison ->
-                val pool = incumbents.exchange.current()
-                val candidate = comparison.candidateValue
-                val standing = pool?.objective
-                val disposition = if (comparison.phase != "discovery" || candidate == null)
-                    comparison.disposition else when {
-                    standing == null -> "pool-empty"
-                    candidate < standing -> "improving"
-                    candidate == standing -> "tied"
-                    else -> "dominated"
+            onComparison = onComparison?.let { report ->
+                { comparison ->
+                    val pool = incumbents.exchange.current()
+                    val candidate = comparison.candidateValue
+                    val standing = pool?.objective
+                    val disposition = if (comparison.phase != "discovery" || candidate == null)
+                        comparison.disposition else when {
+                        standing == null -> "pool-empty"
+                        candidate < standing -> "improving"
+                        candidate == standing -> "tied"
+                        else -> "dominated"
+                    }
+                    report(SearchEvent.CompanionComparison(comparison.condition, comparison.phase,
+                        if (comparison.phase == "external") readVersion else 0L, pool?.version ?: 0L,
+                        standing?.toString(), comparison.rawValue?.toString(), comparison.completedValue?.toString(),
+                        comparison.cutoff?.toString(), candidate?.toString(), disposition))
                 }
-                report(SearchEvent.CompanionComparison(comparison.condition, comparison.phase,
-                    if (comparison.phase == "external") readVersion else 0L, pool?.version ?: 0L,
-                    standing?.toString(), comparison.rawValue?.toString(), comparison.completedValue?.toString(),
-                    comparison.cutoff?.toString(), candidate?.toString(), disposition))
-            } }))
+            }))
         return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR, arm, objective,
             limits.cancellation, limits.timeout, { repair.exhausted },
             pendingIncumbentTrial = { repair.incumbentTrialPending },

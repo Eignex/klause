@@ -191,9 +191,9 @@ internal class ComponentLpSolver(
                     deductions.invalidate(index)
                 }
                 if (!(solvers[index] as RetainedLpSolver).adopt(
-                    checkNotNull(nextParts[index].model.exactState),
-                    token,
-                )) {
+                        checkNotNull(nextParts[index].model.exactState),
+                        token,
+                    )) {
                     close()
                     return false
                 }
@@ -301,10 +301,12 @@ internal class ComponentLpSolver(
             model = working
             parts = nextParts
             solvers = nextSolvers
-            for (index in parts.indices) if (changed[index]) {
-                reusable[index] = null
-                checkedBounds[index] = null
-                deductions.invalidate(index)
+            for (index in parts.indices) {
+                if (changed[index]) {
+                    reusable[index] = null
+                    checkedBounds[index] = null
+                    deductions.invalidate(index)
+                }
             }
             clearEvidence()
             published = true
@@ -313,7 +315,9 @@ internal class ComponentLpSolver(
         } catch (primary: Throwable) {
             failure = primary
             if (published) {
-                try { close() } catch (cleanup: Throwable) {
+                try {
+                    close()
+                } catch (cleanup: Throwable) {
                     if (cleanup !== primary) primary.addSuppressed(cleanup)
                 }
             }
@@ -463,8 +467,10 @@ internal class ComponentLpSolver(
         }
         for (k in solveOrder) {
             val part = parts[k]
-            val reused = reusable[k]?.takeIf { it.optimal && it.exactState === part.model.exactState &&
-                solvers[k].solvedExactState === part.model.exactState }
+            val reused = reusable[k]?.takeIf {
+                it.optimal && it.exactState === part.model.exactState &&
+                    solvers[k].solvedExactState === part.model.exactState
+            }
             if (reused == null && allowance != null) {
                 lastTermination = when {
                     allowance.work > 0L && metrics.workOps >= allowance.work -> LpFloatTermination.WORK

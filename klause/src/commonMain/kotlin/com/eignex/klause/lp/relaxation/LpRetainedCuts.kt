@@ -177,8 +177,10 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
             }
             for (binding in bindings) if (binding.id in retired) observe(binding.numeric.family, "PREMISE_OR_SELECTION")
             val priorIds = bindings.mapTo(HashSet()) { it.id }
-            for (binding in next) if (binding.id !in priorIds) {
-                observe(binding.numeric.family, "INSTALLED")
+            for (binding in next) {
+                if (binding.id !in priorIds) {
+                    observe(binding.numeric.family, "INSTALLED")
+                }
             }
             bindings = next.toList()
             depth = state.depth

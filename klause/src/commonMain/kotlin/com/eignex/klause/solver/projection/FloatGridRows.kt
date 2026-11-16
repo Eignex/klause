@@ -22,12 +22,12 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.remainderOf as bigRemainder
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.roundToLong
+import com.eignex.util.numbers.remainderOf as bigRemainder
 
 private class FloatGridRow(
     val integers: IntArray,
@@ -108,7 +108,7 @@ private fun lowerGridRow(
     val loweredBound = integerBound.word() ?: return null
     if (cancellation()) return null
     return listOf(if (reifier == null) Linear(coefficients, variables, operation, loweredBound)
-        else ReifiedLinear(reifier, coefficients, variables, operation, loweredBound))
+    else ReifiedLinear(reifier, coefficients, variables, operation, loweredBound))
 }
 
 private fun nearestInteger(value: BigFraction): BigInt {
@@ -189,7 +189,7 @@ internal fun lowerGridMinMax(
         val coordinate = columns.getValue(roles[index]).coordinate
         coordinates[index] = coordinate.variable
         steps[index] = if (coordinate.buckets > 1) (coordinate.upper - coordinate.lower) / (coordinate.buckets - 1)
-            else 0.0
+        else 0.0
         origins[index] = coordinate.lower
         constants[index] = coordinate.buckets == 1
     }

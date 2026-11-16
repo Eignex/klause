@@ -118,8 +118,12 @@ class FixedWorkSatMeasurementTest {
             fun variable(pigeon: Int, hole: Int) = pigeon * holes + hole + 1
             val clauses = buildList {
                 for (pigeon in 0 until pigeons) add((0 until holes).map { variable(pigeon, it) })
-                for (hole in 0 until holes) for (a in 0 until pigeons) for (b in a + 1 until pigeons) {
-                    add(listOf(-variable(a, hole), -variable(b, hole)))
+                for (hole in 0 until holes) {
+                    for (a in 0 until pigeons) {
+                        for (b in a + 1 until pigeons) {
+                            add(listOf(-variable(a, hole), -variable(b, hole)))
+                        }
+                    }
                 }
             }
             append("p cnf ${pigeons * holes} ${clauses.size}\n")

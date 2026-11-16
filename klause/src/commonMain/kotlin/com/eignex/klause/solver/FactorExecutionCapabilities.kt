@@ -19,12 +19,16 @@ import com.eignex.klause.propagation.difference.DifferenceSystem
 enum class PropagationCapability {
     /** No finite deduction implementation is available. */
     UNSUPPORTED,
+
     /** Deduction is deliberately absent; another source check must enforce the factor. */
     INERT,
+
     /** Deductions preserve every source solution. */
     SOUND_FILTERING,
+
     /** Deductions filter finite interval bounds. */
     BOUNDS_FILTERING,
+
     /** Deductions can remove interior finite-domain values. */
     DOMAIN_FILTERING,
 }
@@ -33,10 +37,13 @@ enum class PropagationCapability {
 enum class AssignmentCheckCapability {
     /** No assignment check is supplied by this role. */
     UNSUPPORTED,
+
     /** The role checks the exact source relation at a pinned assignment. */
     EXACT,
+
     /** A separate exact source completion must certify the assignment. */
     SOURCE_CERTIFICATION,
+
     /** Other installed source rows enforce this redundant role. */
     REDUNDANT,
 }
@@ -45,10 +52,13 @@ enum class AssignmentCheckCapability {
 enum class ScoringCapability {
     /** No scoring implementation is available. */
     UNSUPPORTED,
+
     /** This role contributes no score and requires another source check. */
     INERT,
+
     /** Scores and move deltas agree on discrete violation degree. */
     GRADED,
+
     /** Scores guide search but require exact source certification. */
     HEURISTIC,
 }
@@ -57,6 +67,7 @@ enum class ScoringCapability {
 enum class RelaxationCapability {
     /** This role emits no relaxation rows. */
     NONE,
+
     /** Emitted rows contain every source solution under their stated premises. */
     SOUND,
 }

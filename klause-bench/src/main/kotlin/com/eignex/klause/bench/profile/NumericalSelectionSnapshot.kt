@@ -59,46 +59,50 @@ internal class NumericalSelectionSnapshot(private val stop: ExecutionControl) {
         val instance = type.getField("INSTANCE").get(null)
         val run = type.declaredMethods.single { it.name == "run" }
         val parents = records(journal).asSequence().filter { field(it, "point") != null && rows(it).isNotEmpty() }
-            .distinctBy { record -> (field(record, "context") as SourceProofContext).scope to
-                rows(record).map { field(it, "inequality") } }.take(4)
+            .distinctBy { record ->
+                (field(record, "context") as SourceProofContext).scope to
+                    rows(record).map { field(it, "inequality") }
+            }.take(4)
         for (record in parents) {
             if (stop()) return
             val all = rows(record).indices.toSet()
             val installed = rows(record).filter { field(it, "installed") == true }
                 .mapTo(HashSet()) { field(it, "id") as Int }
-            for (name in listOf("disabled", "installed", "all")) for (repeat in 0..1) {
-                if (stop()) return
-                val mask = when (name) {
-                    "all" -> all
-                    "installed" -> installed
-                    else -> emptySet()
-                }
-                val replay = run.invoke(instance, record, mask,
-                    20_000_000L, 67_108_864L, stop)
-                emit(buildJsonObject {
-                    put("originalQuery", field(record, "id") as Int)
-                    put("mask", name)
-                    put("repeat", repeat)
-                    put("poolIdentity", "captured")
-                    put("capturedMask", buildJsonArray { mask.sorted().forEach { add(JsonPrimitive(it)) } })
-                    put("decline", field(replay, "decline") as String?)
-                    put("diagnosticOnly", true)
-                    put("maximumWork", 20_000_000L)
-                    put("maximumAllocation", 67_108_864L)
-                    put("maximumOperations", 1)
-                    put("operations", field(replay, "operations") as Int)
-                    put("work", field(replay, "work") as Long)
-                    put("allocation", field(replay, "allocation") as Long)
-                    put("stopped", field(replay, "stopped") as Boolean)
-                    field(replay, "query")?.let { put("query", query(it)) }
-                    @Suppress("UNCHECKED_CAST")
-                    put("queries", buildJsonArray {
-                        (field(replay, "queries") as List<Any>).forEach { add(query(it)) }
-                    })
-                    (field(replay, "strongestBound") as SourceEvidence?)?.let {
-                        put("strongestBound", evidence(field(record, "context") as SourceProofContext, it))
+            for (name in listOf("disabled", "installed", "all")) {
+                for (repeat in 0..1) {
+                    if (stop()) return
+                    val mask = when (name) {
+                        "all" -> all
+                        "installed" -> installed
+                        else -> emptySet()
                     }
-                })
+                    val replay = run.invoke(instance, record, mask,
+                        20_000_000L, 67_108_864L, stop)
+                    emit(buildJsonObject {
+                        put("originalQuery", field(record, "id") as Int)
+                        put("mask", name)
+                        put("repeat", repeat)
+                        put("poolIdentity", "captured")
+                        put("capturedMask", buildJsonArray { mask.sorted().forEach { add(JsonPrimitive(it)) } })
+                        put("decline", field(replay, "decline") as String?)
+                        put("diagnosticOnly", true)
+                        put("maximumWork", 20_000_000L)
+                        put("maximumAllocation", 67_108_864L)
+                        put("maximumOperations", 1)
+                        put("operations", field(replay, "operations") as Int)
+                        put("work", field(replay, "work") as Long)
+                        put("allocation", field(replay, "allocation") as Long)
+                        put("stopped", field(replay, "stopped") as Boolean)
+                        field(replay, "query")?.let { put("query", query(it)) }
+                        @Suppress("UNCHECKED_CAST")
+                        put("queries", buildJsonArray {
+                            (field(replay, "queries") as List<Any>).forEach { add(query(it)) }
+                        })
+                        (field(replay, "strongestBound") as SourceEvidence?)?.let {
+                            put("strongestBound", evidence(field(record, "context") as SourceProofContext, it))
+                        }
+                    })
+                }
             }
         }
     }
@@ -143,27 +147,29 @@ internal class NumericalSelectionSnapshot(private val stop: ExecutionControl) {
                 (field(record, "eligibility") as Map<String, Long>).forEach { (key, value) -> put(key, value) }
             })
             put("cuts", buildJsonArray {
-                rows(record).forEach { cut -> add(buildJsonObject {
-                    val row = field(cut, "inequality") as SourceInequality
-                    val derivation = field(cut, "derivation") as SourceDerivation
-                    put("id", field(cut, "id") as Int)
-                    put("owner", field(cut, "owner") as Int)
-                    put("family", (field(cut, "family") as Enum<*>?)?.name)
-                    put("mixed", field(cut, "mixed") as Boolean)
-                    put("owners", buildJsonArray {
-                        (field(cut, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
+                rows(record).forEach { cut ->
+                    add(buildJsonObject {
+                        val row = field(cut, "inequality") as SourceInequality
+                        val derivation = field(cut, "derivation") as SourceDerivation
+                        put("id", field(cut, "id") as Int)
+                        put("owner", field(cut, "owner") as Int)
+                        put("family", (field(cut, "family") as Enum<*>?)?.name)
+                        put("mixed", field(cut, "mixed") as Boolean)
+                        put("owners", buildJsonArray {
+                            (field(cut, "owners") as Set<Int>).sorted().forEach { add(JsonPrimitive(it)) }
+                        })
+                        put("installed", field(cut, "installed") as Boolean)
+                        put("ownerActive", field(cut, "ownerActive") as Boolean)
+                        put("checkedAtQuery", field(cut, "checked") as Boolean)
+                        put("violation", (field(cut, "violation") as BigFraction?)?.toString())
+                        put("coefficients", coefficients(row.coefficients))
+                        put("rhs", row.rhs.toString())
+                        put("strict", row.strict)
+                        put("derivation", proof(derivation))
+                        put("freshNativeCheck", SourceEvidenceVerifier(numeric).verify(SourceEvidence(numeric.scope,
+                            SourceClaim.Consequence(row), derivation), stop).toString())
                     })
-                    put("installed", field(cut, "installed") as Boolean)
-                    put("ownerActive", field(cut, "ownerActive") as Boolean)
-                    put("checkedAtQuery", field(cut, "checked") as Boolean)
-                    put("violation", (field(cut, "violation") as BigFraction?)?.toString())
-                    put("coefficients", coefficients(row.coefficients))
-                    put("rhs", row.rhs.toString())
-                    put("strict", row.strict)
-                    put("derivation", proof(derivation))
-                    put("freshNativeCheck", SourceEvidenceVerifier(numeric).verify(SourceEvidence(numeric.scope,
-                        SourceClaim.Consequence(row), derivation), stop).toString())
-                }) }
+                }
             })
             for (name in listOf("bound", "refutation", "siblingBound")) {
                 (field(record, name) as SourceEvidence?)?.let { put(name, evidence(context, it)) }

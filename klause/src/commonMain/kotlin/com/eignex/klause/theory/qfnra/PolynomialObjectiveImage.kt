@@ -91,8 +91,14 @@ internal fun solvePolynomialObjectiveImage(
             objective, PolynomialRelation.EQ, PolynomialExpression.Constant.of(BigFraction.ZERO.num),
         ), arithmetic).atoms.single().polynomial
         val remap = VarRemap(
-            IntArray(boolCount) { arithmetic.step(); it }, intArrayOf(),
-            IntArray(realCount) { arithmetic.step(); it + 1 },
+            IntArray(boolCount) {
+                arithmetic.step()
+                it
+            }, intArrayOf(),
+            IntArray(realCount) {
+                arithmetic.step()
+                it + 1
+            },
         )
         val imageVariable = PolynomialExpression.Variable(SourceRealId(0))
         val shiftedObjective = objective.remap(remap)
@@ -112,8 +118,8 @@ internal fun solvePolynomialObjectiveImage(
             val value = if (cell and 1L != 0L)
                 roots[root] else
                 algebraic.rational(
-                algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)),
-            )
+                    algebraic.sampleBetween(roots.getOrNull(root - 1), roots.getOrNull(root)),
+                )
             val query = PolynomialRealFormula.And(listOf(
                 image, algebraicFixing(imageVariable, value, arithmetic::step),
             ))

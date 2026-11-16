@@ -43,7 +43,7 @@ internal class RetainedLinearEncoding(
             origins += index
             covered[index] = true
         }
-        if (stop() ||indices.any { !covered[it] }) return null
+        if (stop() || indices.any { !covered[it] }) return null
         return EncodedTheoryModel(mapping.target, factors.toTypedArray(),
             mapping.target.impliedFactorMask?.let { mask -> BooleanArray(factors.size) { mask[origins[it]] } },
             mapping.target.numRealVars)

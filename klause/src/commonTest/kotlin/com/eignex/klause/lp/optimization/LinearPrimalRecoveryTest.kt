@@ -59,10 +59,12 @@ class LinearPrimalRecoveryTest {
         val third = BigFraction.ofLong(3).reciprocal()
         val wide = BigFraction.ofLong(9007199254740993L)
         val dyadic = checkNotNull(BigFraction.ofDouble(0.1))
-        val rows = listOf(third, wide, dyadic).flatMapIndexed { id, value -> listOf(
-            ExactRationalInequality(intArrayOf(id), listOf(BigFraction.ONE), value),
-            ExactRationalInequality(intArrayOf(id), listOf(BigFraction.MINUS_ONE), value.negated()),
-        ) }
+        val rows = listOf(third, wide, dyadic).flatMapIndexed { id, value ->
+            listOf(
+                ExactRationalInequality(intArrayOf(id), listOf(BigFraction.ONE), value),
+                ExactRationalInequality(intArrayOf(id), listOf(BigFraction.MINUS_ONE), value.negated()),
+            )
+        }
 
         val guess = listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3)), wide, dyadic)
         val point = recoverLinearPrimal(coordinates, guess, rows, emptySet(), ExecutionControl.Never,

@@ -240,7 +240,7 @@ internal class JointRepairNeighborhood private constructor(
                     if (cancellation() || ++entries > MAX_INDEX_ENTRIES) return null
                     if (coefficient.isZero || coordinate.kind == SourceCoordinate.Kind.Boolean) continue
                     val column = if (coordinate.kind == SourceCoordinate.Kind.Integer) coordinate.id
-                        else integers + coordinate.id
+                    else integers + coordinate.id
                     columns.add(column)
                 }
                 for (coordinate in premise.integerPins.keys) {

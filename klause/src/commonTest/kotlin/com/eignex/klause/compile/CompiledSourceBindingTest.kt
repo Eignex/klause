@@ -188,7 +188,9 @@ class CompiledSourceBindingTest {
     fun `an off grid absent default should decode and evaluate consistently in the finite facade`() {
         val schema = object : VariableSchema() {
             val x by optFloatVar(-1.0, 1.0, 2)
-            init { constraint(Not(x.present.toExpr())) }
+            init {
+                constraint(Not(x.present.toExpr()))
+            }
         }
         val compiled = schema.compile()
         val point = BacktrackSolver(compiled.problem.bake()).enumerate().single()
@@ -207,7 +209,9 @@ class CompiledSourceBindingTest {
     fun `disabled absent pinning should leave every requested grid value available`() {
         val schema = object : VariableSchema() {
             val x by optFloatVar(-1.0, 1.0, 2)
-            init { constraint(Not(x.present.toExpr())) }
+            init {
+                constraint(Not(x.present.toExpr()))
+            }
         }
         val compiled = schema.compile(semanticOverrides = SemanticOverrides(pinAbsentOptionalValues = false))
 
@@ -247,8 +251,8 @@ class CompiledSourceBindingTest {
         val objective = first.minimize(x)
 
         for (strategy in listOf(BacktrackSolver.source(second),
-                LocalSearchSolver.source(second), BacktrackSolver.source(second.sourceBinding.originalProblem),
-                LocalSearchSolver.source(second.sourceBinding.originalProblem))) {
+            LocalSearchSolver.source(second), BacktrackSolver.source(second.sourceBinding.originalProblem),
+            LocalSearchSolver.source(second.sourceBinding.originalProblem))) {
             assertFailsWith<IllegalArgumentException> { strategy.optimize(objective) }
             assertFailsWith<IllegalArgumentException> { strategy.optimizeOpen(objective) }
         }
@@ -291,7 +295,9 @@ class CompiledSourceBindingTest {
     fun `continuous schema policy should retain optional source defaults without grid geometry`() {
         val schema = object : VariableSchema() {
             val x by optFloatVar(-1.0, 1.0, 2)
-            init { constraint(Not(x.present.toExpr())) }
+            init {
+                constraint(Not(x.present.toExpr()))
+            }
         }
         val compiled = schema.compile(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous))
 

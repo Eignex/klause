@@ -241,37 +241,37 @@ class EncoderRoutingTest {
         )
         for (polynomialOwner in listOf(true, false)) {
             for (allowance in listOf(0L, 3L)) {
-            var installations = 0
-            var charged = 0L
-            val caller = object : ExecutionControl() {
-                override fun isCancelled(): Boolean = false
-                override val accounting: WorkMeter get() = WorkMeter { charged += it }
-            }
-            val providers = FactorProjectionProviders(
-                encoder = EncoderProvider { factor, target ->
-                    val selected = BuiltInEncoderProvider.select(factor, target)
-                    if (target != EncodingTarget.POLYNOMIAL) {
-                        selected
-                    } else {
-                        Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                            installations++
-                            selected.install(view, encoding)
+                var installations = 0
+                var charged = 0L
+                val caller = object : ExecutionControl() {
+                    override fun isCancelled(): Boolean = false
+                    override val accounting: WorkMeter get() = WorkMeter { charged += it }
+                }
+                val providers = FactorProjectionProviders(
+                    encoder = EncoderProvider { factor, target ->
+                        val selected = BuiltInEncoderProvider.select(factor, target)
+                        if (target != EncodingTarget.POLYNOMIAL) {
+                            selected
+                        } else {
+                            Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                                installations++
+                                selected.install(view, encoding)
+                            }
                         }
-                    }
-                },
-            )
+                    },
+                )
 
-            val result = BacktrackSolver.source(source).withProjectionProviders(providers)
-                .solve(PolynomialTheoryParams(maximumWork = allowance, cancellation =
-                    if (polynomialOwner) caller else ExecutionControl.Never,
-                        ),
+                val result = BacktrackSolver.source(source).withProjectionProviders(providers)
+                    .solve(PolynomialTheoryParams(maximumWork = allowance, cancellation =
+                        if (polynomialOwner) caller else ExecutionControl.Never,
+                    ),
                         TheoryParams(cancellation = if (polynomialOwner) ExecutionControl.Never else caller))
 
-            assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
-            assertEquals(if (allowance == 0L) 0 else 1, installations)
-            assertEquals(allowance, charged)
+                assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+                assertEquals(if (allowance == 0L) 0 else 1, installations)
+                assertEquals(allowance, charged)
+            }
         }
-    }
     }
 
     @Test

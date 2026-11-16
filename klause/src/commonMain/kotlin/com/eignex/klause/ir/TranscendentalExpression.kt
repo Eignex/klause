@@ -20,7 +20,9 @@ internal sealed interface TranscendentalExpression {
         val operands: List<TranscendentalExpression> get() = captured.toList()
     }
     data class Power(val base: TranscendentalExpression, val exponent: Int) : TranscendentalExpression {
-        init { require(exponent >= 0) }
+        init {
+            require(exponent >= 0)
+        }
     }
     data class Conditional(
         val condition: TranscendentalFormula,

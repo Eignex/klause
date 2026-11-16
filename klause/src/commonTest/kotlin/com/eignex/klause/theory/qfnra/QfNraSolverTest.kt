@@ -98,7 +98,10 @@ class QfNraSolverTest {
         val spent = work.spentWork
         var entered = false
 
-        work.probe { entered = true; null }
+        work.probe {
+            entered = true
+            null
+        }
 
         assertFalse(entered)
         assertEquals(spent, work.spentWork)
@@ -335,8 +338,7 @@ class QfNraSolverTest {
         val source = SmtLibPolynomial.parse(
             "$declarations (assert (= (* x0 x0) 2)) (assert (= (* x0 x1) 1))",
         )
-        lateinit
-        var query: QfNraQuery
+        lateinit var query: QfNraQuery
         query = QfNraQuery(source.formula, source.boolCount, source.realCount,
             QfNraParams(cancellation = ExecutionControl { query.stats.liftedCells > 0L }), PolynomialCondition())
         var result: QfNraResult? = null

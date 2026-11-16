@@ -128,9 +128,11 @@ internal class KnapsackLagrangianBound(
                 if (factor !== subProblem) others.add(factor)
                 if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
             }
-            for (f in others) for (lit in f.literals) {
-                local(Lit.variable(lit))
-                if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+            for (f in others) {
+                for (lit in f.literals) {
+                    local(Lit.variable(lit))
+                    if (++visits % CONSTRUCTION_BATCH_SIZE == 0) yield(Unit)
+                }
             }
             for (b in objective.boolWeightValues.indices) {
                 if (objective.boolWeightValues[b] != 0L) local(b)

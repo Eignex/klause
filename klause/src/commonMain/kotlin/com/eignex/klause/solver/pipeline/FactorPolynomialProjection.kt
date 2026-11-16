@@ -126,9 +126,18 @@ internal fun Problem.integerPolynomialProjection(
                     PolynomialRealLowering.constant(requireNotNull(BigFraction.ofDouble(endpoint))))
             }
         }
-        val integers = (0 until numIntVars).associate { checkpoint(); "i$it" to it }
-        val reals = (0 until numRealVars).associate { checkpoint(); "r$it" to (numIntVars + it) }
-        val booleans = (0 until numBoolVars).associate { checkpoint(); "b$it" to it }
+        val integers = (0 until numIntVars).associate {
+            checkpoint()
+            "i$it" to it
+        }
+        val reals = (0 until numRealVars).associate {
+            checkpoint()
+            "r$it" to (numIntVars + it)
+        }
+        val booleans = (0 until numBoolVars).associate {
+            checkpoint()
+            "b$it" to it
+        }
         val formula = lowering.formula(formulas)
         checkpoint()
         val native = NonlinearIntegerProblem(formula, lowering.realCount, numBoolVars,

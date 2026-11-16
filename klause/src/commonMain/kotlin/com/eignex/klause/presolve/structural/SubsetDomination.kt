@@ -36,6 +36,7 @@ internal class SubsetDomination {
         val width get() = signature.terms.size
         val anchor get() = signature.terms.first().first
     }
+
     // A factor is immutable, so its rows normalize once and the same occurrence reuses them in every later call.
     private class Normalized(val rows: List<Normal>, var call: Long)
     private data class Activity(val row: Signature, val endpoints: List<Long?>)

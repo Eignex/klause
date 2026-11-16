@@ -58,12 +58,12 @@ internal class SearchComponentOpening(
         ) return false
         ScanMeter (cancellation).use { scan ->
             if (!scan.check()) return null
-        for (factor in source.factors) {
-            if (!scan.visit(1L)) return null
-            if (factor is Cardinality && factor.max == 1 &&
-                factor.literals.size > 2) return if (scan.check()) true else null
-        }
-        return if (scan.check()) false else null
+            for (factor in source.factors) {
+                if (!scan.visit(1L)) return null
+                if (factor is Cardinality && factor.max == 1 &&
+                    factor.literals.size > 2) return if (scan.check()) true else null
+            }
+            return if (scan.check()) false else null
         }
     }
 

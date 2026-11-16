@@ -48,9 +48,13 @@ class SeparableObjectiveViewTest {
         val view = checkNotNull(SeparableObjectiveView.create(problem, source))
 
         assertEquals(listOf(2L, 1L, 1L, 0L, 0L, 0L), view.objective.intCoefficients.toList())
-        for (x in 0L..1L) for (y in 0L..1L) for (z in 0L..1L) {
-            val point = Sample(booleanArrayOf(), longArrayOf(x, y, z, x + y, x + z, 2 * x + y + z))
-            assertEquals(source.evaluateExact(point), view.objective.evaluateExact(point))
+        for (x in 0L..1L) {
+            for (y in 0L..1L) {
+                for (z in 0L..1L) {
+                    val point = Sample(booleanArrayOf(), longArrayOf(x, y, z, x + y, x + z, 2 * x + y + z))
+                    assertEquals(source.evaluateExact(point), view.objective.evaluateExact(point))
+                }
+            }
         }
     }
 
@@ -279,8 +283,8 @@ class SeparableObjectiveViewTest {
         var charged = 0L
         val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged >= 2
-            override val accounting = WorkMeter {units-> charged += units }
-            }
+            override val accounting = WorkMeter { units -> charged += units }
+        }
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0)),
         ).bake()

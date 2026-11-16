@@ -80,7 +80,7 @@ class FloatGridProjectionTest {
             assertEquals(listOf(BigFraction.ZERO), points.filter { !it.boolValue(0) }.map { it.exactReals?.single() })
             val present = points.filter { it.boolValue(0) }.map { it.exactReals?.single() }.toSet()
             val step = if (buckets == 1) BigFraction.ZERO
-                else BigFraction.ofLong(2) * BigFraction.ofLong(buckets - 1L).reciprocal()
+            else BigFraction.ofLong(2) * BigFraction.ofLong(buckets - 1L).reciprocal()
             assertEquals((0 until buckets).map {
                 BigFraction.ofLong(-1) + step * BigFraction.ofLong(it.toLong())
             }.toSet(), present)

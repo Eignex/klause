@@ -13,7 +13,9 @@ internal class NativeLearnedMetadata {
     val admissionWork: Long get() = rows.admissionWork
 
     operator fun get(index: Int, column: Int): Int = rows[index, column]
-    operator fun set(index: Int, column: Int, value: Int) { rows[index, column] = value }
+    operator fun set(index: Int, column: Int, value: Int) {
+        rows[index, column] = value
+    }
     fun rowValues(index: Int): IntArray = rows.rowValues(index)
     fun rowOffset(index: Int): Int = rows.rowOffset(index)
     fun admission(index: Int): Long = rows.admission(index)

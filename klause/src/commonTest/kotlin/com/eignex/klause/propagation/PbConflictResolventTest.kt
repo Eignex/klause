@@ -64,7 +64,9 @@ class PbConflictResolventTest {
             var restarted = false
             val restart = object : SearchRestartPolicy {
                 override fun shouldRestart(decisionsThisRun: Long): Boolean = mode == 3 && consumed && !restarted
-                override fun onRestart() { restarted = true }
+                override fun onRestart() {
+                    restarted = true
+                }
             }
             val observer = object : SearchRunObserver {
                 override fun onCommit(decision: SearchDecision, decisionLevel: Int) {

@@ -77,11 +77,11 @@ class SourceResultCapture private constructor(
             is SolveResult.Unknown -> return result
         }
         val proof = derivation ?: if (claim is SourceClaim.Witness) SourceDerivation.SourceWitness
-            else SourceDerivation.Unavailable("complete traversal derivation not captured")
+        else SourceDerivation.Unavailable("complete traversal derivation not captured")
         val payload = SourceResultEvidence(context.scope, listOf(SourceEvidence(context.scope, claim, proof)),
             listOf(SourceEngineAttestation(producer, claim))).withMappings(
-                context.scope, result.evidence?.mappings.orEmpty(),
-            )
+            context.scope, result.evidence?.mappings.orEmpty(),
+        )
         return when (result) {
             is SolveResult.Sat -> result.copy(evidence = payload)
             is SolveResult.Unsat -> result.copy(evidence = payload)

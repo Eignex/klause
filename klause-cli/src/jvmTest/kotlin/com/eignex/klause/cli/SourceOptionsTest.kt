@@ -208,5 +208,4 @@ class SourceOptionsTest {
             assertFalse(assertNotNull(common.sourceSemantics).isApproximate)
         }
     }
-
 }

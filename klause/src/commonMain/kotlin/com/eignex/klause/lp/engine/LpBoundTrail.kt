@@ -70,7 +70,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         var conflict = false
         val stride = PollStride()
         for (assertion in assertions) {
-            if ((stride.due() &&token()) || assertion.column !in lower.indices || assertion.depth != state.depth ||
+            if ((stride.due() && token()) || assertion.column !in lower.indices || assertion.depth != state.depth ||
                 (assertion.column >= state.model.n && !state.rows.row(assertion.column - state.model.n).active) ||
                 assertion.witness < 0L || !witnesses.add(assertion.witness) ||
                 state.boundRevision > Long.MAX_VALUE - count - 1L
@@ -297,7 +297,7 @@ internal class LpBoundTrail(initial: LpExactState) {
     ): Boolean {
         val staged = LpBoundTrail(state)
         val hidden = if (retired.isEmpty()) true else if (scoped) staged.suspend(retired, token)
-            else staged.deactivate(retired, token)
+        else staged.deactivate(retired, token)
         if (!hidden || !staged.append(columns, rows, scoped, token, permanentRows) ||
             (objective != null && !staged.replaceObjective(objective, token)) ||
             staged.assertBounds(assertions, token) is LpBoundBatchResult.Declined || token()

@@ -283,9 +283,11 @@ internal class LpEngine(
             solveContext,
             projections = projections,
             nodeWorkAllowance = if (rootProbe) {
-                { rootPrimalWorkBudget(sink.lp.standaloneWork).takeIf { it > 0L }?.let { root ->
-                    nodeQueryWorkBudget()?.let { minOf(root, it) } ?: root
-                } ?: nodeQueryWorkBudget() }
+                {
+                    rootPrimalWorkBudget(sink.lp.standaloneWork).takeIf { it > 0L }?.let { root ->
+                        nodeQueryWorkBudget()?.let { minOf(root, it) } ?: root
+                    } ?: nodeQueryWorkBudget()
+                }
             } else nodeWorkAllowance,
             containingWork = { work -> if (rootProbe) chargeWork(work) },
             sourcePreparation = sourcePreparation,
@@ -767,8 +769,10 @@ internal class LpEngine(
         val families = lpSeparators.mapTo(HashSet()) { it.family }
         if (params.lpPlan.gomoryEnabled) families.add(CutFamily.GOMORY)
         if (params.lpPlan.mirEnabled) families.add(CutFamily.MIR)
-        for (family in families) sink.lp.cutLifecycle.event(family, "APPLICABILITY",
-            if (supported) "SUPPORTED" else "UNSUPPORTED")
+        for (family in families) {
+            sink.lp.cutLifecycle.event(family, "APPLICABILITY",
+                if (supported) "SUPPORTED" else "UNSUPPORTED")
+        }
         lpLadder.setCutsSupported(supported)
         return supported
     }
@@ -1265,7 +1269,7 @@ internal class LpEngine(
         val prepared = preparedRootRelaxation?.takeIf(cpAdapter::isSourceRoot)
         preparedRootRelaxation = null
         val base = prepared ?: if (fixed != null) cpAdapter.sourceRootRelaxation(fixed, cancellation)
-            else cpAdapter.sourceRootRelaxation(relaxer, cancellation)
+        else cpAdapter.sourceRootRelaxation(relaxer, cancellation)
         return base?.let { cpAdapter.sourceRootCuts(it, selectedCuts, cancellation) }
             ?.also { it.sourceMap?.let(cutPool::remap) }
     }

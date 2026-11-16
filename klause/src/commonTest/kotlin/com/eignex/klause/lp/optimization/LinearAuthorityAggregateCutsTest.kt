@@ -57,7 +57,7 @@ class LinearAuthorityAggregateCutsTest {
         )) {
             LinearAuthority(SourceLpBudget(), retainLp = true, aggregateCuts = aggregate).use { authority ->
                 val result = if (selection) authority.advanceWithPointCuts(source, ExecutionControl.Never)
-                    else authority.advance(source, ExecutionControl.Never, cuts = true)
+                else authority.advance(source, ExecutionControl.Never, cuts = true)
 
                 assertEquals(SourceValue.Rational(expected),
                     assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
@@ -539,19 +539,19 @@ class LinearAuthorityAggregateCutsTest {
             val continuous = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
             val sign = if (upper) BigFraction.MINUS_ONE else BigFraction.ONE
             val condition = if (upper) SourceCondition(upper = mapOf(x to sign))
-                else SourceCondition(lower = mapOf(x to sign))
+            else SourceCondition(lower = mapOf(x to sign))
             val source = SourceProofContext(scope.copy(condition = condition),
                 setOf(x, y, real, a, b, continuous), linkedMapOf(
-                "unrelated left" to SourcePremise(SourceInequality(
-                    mapOf(a to BigFraction.ofLong(2), continuous to BigFraction.ONE), BigFraction.ofLong(3))),
-                "unrelated right" to SourcePremise(SourceInequality(
-                    mapOf(b to BigFraction.ofLong(2), continuous to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "scoped left" to SourcePremise(SourceInequality(
-                    mapOf(x to BigFraction.ofLong(3) * sign, real to BigFraction.ONE), BigFraction.ofLong(4))),
-                "scoped right" to SourcePremise(SourceInequality(
-                    mapOf(y to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "endpoint" to SourcePremise(SourceInequality(mapOf(x to sign.negated()), BigFraction.ZERO)),
-            ))
+                    "unrelated left" to SourcePremise(SourceInequality(
+                        mapOf(a to BigFraction.ofLong(2), continuous to BigFraction.ONE), BigFraction.ofLong(3))),
+                    "unrelated right" to SourcePremise(SourceInequality(
+                        mapOf(b to BigFraction.ofLong(2), continuous to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                    "scoped left" to SourcePremise(SourceInequality(
+                        mapOf(x to BigFraction.ofLong(3) * sign, real to BigFraction.ONE), BigFraction.ofLong(4))),
+                    "scoped right" to SourcePremise(SourceInequality(
+                        mapOf(y to BigFraction.ofLong(2), real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                    "endpoint" to SourcePremise(SourceInequality(mapOf(x to sign.negated()), BigFraction.ZERO)),
+                ))
             val point = mapOf(a to 0.75, b to 0.75, continuous to 1.5,
                 x to sign.toDouble(), y to 0.5, real to 1.0)
 
@@ -787,7 +787,7 @@ class LinearAuthorityAggregateCutsTest {
 
                 val expected = if (enabled) BigFraction.MINUS_ONE else if (paired)
                     BigFraction.ofLong(-4) * BigFraction.ofLong(3).reciprocal()
-                    else BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()
+                else BigFraction.ofLong(-3) * BigFraction.ofLong(2).reciprocal()
                 assertEquals(SourceValue.Rational(expected),
                     assertIs<SourceClaim.Bound>(assertNotNull(result.bound).claim).value)
                 assertEquals(SourceEvidenceCheck.Checked,
@@ -827,7 +827,7 @@ class LinearAuthorityAggregateCutsTest {
         for (upper in listOf(false, true)) {
             val sign = if (upper) BigFraction.MINUS_ONE else BigFraction.ONE
             val condition = if (upper) SourceCondition(upper = mapOf(x to sign))
-                else SourceCondition(lower = mapOf(x to sign))
+            else SourceCondition(lower = mapOf(x to sign))
             val source = SourceProofContext(scope.copy(condition = condition), setOf(x, y), linkedMapOf(
                 "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3) * sign,
                     y to BigFraction.ofLong(2)), BigFraction.ofLong(4))),
@@ -866,11 +866,11 @@ class LinearAuthorityAggregateCutsTest {
     fun `scoped integer cuts should retract and reactivate across numerical queries`() {
         val source = SourceProofContext(scope.copy(objective = SourceObjective("sum", ObjectiveSense.MINIMIZE)),
             setOf(x, y), linkedMapOf(
-            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
-                y to BigFraction.ofLong(2)), BigFraction.ofLong(4))),
-            "x-lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            "y-lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-        ), mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
+                "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(3),
+                    y to BigFraction.ofLong(2)), BigFraction.ofLong(4))),
+                "x-lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "y-lower" to SourcePremise(SourceInequality(mapOf(y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            ), mapOf(x to BigFraction.MINUS_ONE, y to BigFraction.MINUS_ONE))
         val scoped = source.atScope(source.scope.copy(
             condition = SourceCondition(lower = mapOf(x to BigFraction.ONE)),
         ))
@@ -986,9 +986,11 @@ class LinearAuthorityAggregateCutsTest {
         assertEquals(2L, observations["AggregateIntegerRowEligible"])
         assertEquals(1L, observations["AggregateIntegerBoundScanComplete"])
         assertEquals(2L, observations["AggregateIntegerBoundCoordinates"])
-        assertTrue(cuts.all { cut -> SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
-                SourceEvidenceCheck.Checked })
+        assertTrue(cuts.all { cut ->
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
+                SourceEvidenceCheck.Checked
+        })
     }
 
     @Test
@@ -1014,9 +1016,11 @@ class LinearAuthorityAggregateCutsTest {
         assertEquals(setOf(2, 3), cuts[1].owners)
         assertEquals(2L, observations["AggregateIntegerBoundScanComplete"])
         assertEquals(4L, observations["AggregateIntegerBoundCoordinates"])
-        assertTrue(cuts.all { cut -> SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
-                SourceEvidenceCheck.Checked })
+        assertTrue(cuts.all { cut ->
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
+                SourceEvidenceCheck.Checked
+        })
     }
 
     @Test
@@ -1535,9 +1539,11 @@ class LinearAuthorityAggregateCutsTest {
             limits = LinearAuthorityAggregateCuts.pointSourcePairLimits, point = point)
 
         assertEquals(16, cuts.size)
-        assertTrue(cuts.all { cut -> SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
-                SourceEvidenceCheck.Checked })
+        assertTrue(cuts.all { cut ->
+            SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)) ==
+                SourceEvidenceCheck.Checked
+        })
     }
 
     @Test
@@ -2043,11 +2049,11 @@ class LinearAuthorityAggregateCutsTest {
     @Test
     fun `half aggregation should decline an odd coefficient without a source or scoped integer bound`() {
         val source = SourceProofContext(scope, setOf(x, y, real), linkedMapOf(
-                "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
-                    real to BigFraction.ONE), BigFraction.ONE)),
-                "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
-                    real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
-            ))
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2),
+                real to BigFraction.ONE), BigFraction.ONE)),
+            "right" to SourcePremise(SourceInequality(mapOf(y to BigFraction.ofLong(3),
+                real to BigFraction.MINUS_ONE), BigFraction.ofLong(2))),
+        ))
         val observations = mutableMapOf<String, Long>()
 
         val cuts = LinearAuthorityAggregateCuts.prepareSourcePairs(source, ExecutionControl.Never,
@@ -2315,8 +2321,10 @@ class LinearAuthorityAggregateCutsTest {
         assertEquals(1L, observations["AggregateRetainedContinuation"])
         assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
         assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
-        for (cut in cuts) assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        for (cut in cuts) {
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
     }
 
     @Test
@@ -2410,8 +2418,10 @@ class LinearAuthorityAggregateCutsTest {
         assertEquals(1L, observations["AggregateRetainedContinuation"])
         assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
         assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
-        for (cut in cuts) assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        for (cut in cuts) {
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
     }
 
     @Test
@@ -2457,8 +2467,10 @@ class LinearAuthorityAggregateCutsTest {
         assertNull(observations["AggregateSupportLimit"])
         assertTrue((observations["AggregateWork"] ?: 0L) <= limits.work)
         assertTrue((observations["AggregateAllocation"] ?: 0L) <= limits.allocation)
-        for (cut in cuts) assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        for (cut in cuts) {
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
     }
 
     @Test
@@ -2569,8 +2581,10 @@ class LinearAuthorityAggregateCutsTest {
         ), cuts.map { it.inequality })
         assertEquals(listOf(setOf(0, 1), setOf(2, 3, 4, 5)), cuts.map { it.owners })
         assertNull(observations["AggregateContinuationInverseSkipped"])
-        for (cut in cuts) assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        for (cut in cuts) {
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
     }
 
     @Test
@@ -2638,8 +2652,10 @@ class LinearAuthorityAggregateCutsTest {
         val inequality = SourceInequality(mapOf(x to BigFraction.ONE, y to BigFraction.ONE), BigFraction.ONE)
         assertEquals(listOf(inequality, inequality), cuts.map { it.inequality })
         assertEquals(listOf(setOf(0, 1), setOf(2, 3, 4)), cuts.map { it.owners })
-        for (cut in cuts) assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        for (cut in cuts) {
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(
+                SourceEvidence(scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
+        }
     }
 
     @Test

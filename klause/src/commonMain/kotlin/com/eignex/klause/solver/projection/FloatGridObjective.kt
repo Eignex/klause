@@ -20,7 +20,9 @@ internal class FloatGridObjective(
     val scale: BigFraction,
     val offset: BigFraction,
 ) {
-    init { require(scale.signum() > 0) }
+    init {
+        require(scale.signum() > 0)
+    }
 
     fun sourceValue(nativeValue: Long, maximize: Boolean): BigFraction {
         val value = BigFraction.ofLong(nativeValue)

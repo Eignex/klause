@@ -344,9 +344,9 @@ internal object DuplicateColumns {
         val linear = factor.equivalentLinear { visit(scan) } ?: return factor
         val row = linear.integerConstants ?: return factor
         if (linear.vars.none {
-            visit(scan)
-            keepOf[it] != it
-        }) return factor
+                visit(scan)
+                keepOf[it] != it
+            }) return factor
         val keptVars = IntArrayList(linear.vars.size)
         val keptCoeffs = LongArrayList(linear.vars.size)
         for (i in linear.vars.indices) {

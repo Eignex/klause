@@ -418,7 +418,14 @@ data class OpenHintUsageStats(
 }
 
 internal enum class HintIndexOutcome {
-    NO_PROVIDER, ADMITTED, SOURCE_LIMIT, STORAGE, VISITS, INVALID_PRIMITIVE, STOPPED, ABORTED,
+    NO_PROVIDER,
+    ADMITTED,
+    SOURCE_LIMIT,
+    STORAGE,
+    VISITS,
+    INVALID_PRIMITIVE,
+    STOPPED,
+    ABORTED,
 }
 
 internal class OpenHintUsageSink {
@@ -451,9 +458,15 @@ internal class OpenHintUsageSink {
         indexes[outcome.ordinal] = before + minOf(1L, Long.MAX_VALUE - before)
     }
 
-    fun callerConsulted() { callerConsultations += minOf(1L, Long.MAX_VALUE - callerConsultations) }
-    fun callerSelected() { callerSelections += minOf(1L, Long.MAX_VALUE - callerSelections) }
-    fun componentConsulted() { componentConsultations += minOf(1L, Long.MAX_VALUE - componentConsultations) }
+    fun callerConsulted() {
+        callerConsultations += minOf(1L, Long.MAX_VALUE - callerConsultations)
+    }
+    fun callerSelected() {
+        callerSelections += minOf(1L, Long.MAX_VALUE - callerSelections)
+    }
+    fun componentConsulted() {
+        componentConsultations += minOf(1L, Long.MAX_VALUE - componentConsultations)
+    }
     fun componentSelected(primitive: Boolean?, gate: Boolean) {
         componentSelections += minOf(1L, Long.MAX_VALUE - componentSelections)
         if (primitive == true) primitiveSelections += minOf(1L, Long.MAX_VALUE - primitiveSelections)
@@ -464,12 +477,24 @@ internal class OpenHintUsageSink {
         if (admitted) clauseIndexesAdmitted += minOf(1L, Long.MAX_VALUE - clauseIndexesAdmitted)
         else clauseIndexesDeclined += minOf(1L, Long.MAX_VALUE - clauseIndexesDeclined)
     }
-    fun clauseConsulted() { clauseConsultations += minOf(1L, Long.MAX_VALUE - clauseConsultations) }
-    fun clauseSelected() { clauseSelections += minOf(1L, Long.MAX_VALUE - clauseSelections) }
-    fun clauseDeclined() { clauseDeclines += minOf(1L, Long.MAX_VALUE - clauseDeclines) }
-    fun pointUnavailable() { earlyPointUnavailable += minOf(1L, Long.MAX_VALUE - earlyPointUnavailable) }
-    fun variableUncovered() { forwardUncovered += minOf(1L, Long.MAX_VALUE - forwardUncovered) }
-    fun primitiveUnavailable() { primitiveProviderNone += minOf(1L, Long.MAX_VALUE - primitiveProviderNone) }
+    fun clauseConsulted() {
+        clauseConsultations += minOf(1L, Long.MAX_VALUE - clauseConsultations)
+    }
+    fun clauseSelected() {
+        clauseSelections += minOf(1L, Long.MAX_VALUE - clauseSelections)
+    }
+    fun clauseDeclined() {
+        clauseDeclines += minOf(1L, Long.MAX_VALUE - clauseDeclines)
+    }
+    fun pointUnavailable() {
+        earlyPointUnavailable += minOf(1L, Long.MAX_VALUE - earlyPointUnavailable)
+    }
+    fun variableUncovered() {
+        forwardUncovered += minOf(1L, Long.MAX_VALUE - forwardUncovered)
+    }
+    fun primitiveUnavailable() {
+        primitiveProviderNone += minOf(1L, Long.MAX_VALUE - primitiveProviderNone)
+    }
 
     fun sourceDimensions(booleans: Int, clauses: Int, primitives: Int) {
         sourceBooleansMax = maxHintObservation(sourceBooleansMax, booleans.toLong())

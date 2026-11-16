@@ -262,8 +262,10 @@ class BooleanProofPortfolioTest {
         val pinned = Problem(5, 0, emptyArray(), problem.factors + Clause(intArrayOf(Lit.make(1, true)))).bake()
         val pins = mapOf(0 to true)
         val scoped = context.copy(scope = context.scope.copy(condition = SourceCondition(bools = pins)))
-        val params = List(2) { BacktrackParams(nativeSat = false, variableSelector = InputOrder,
-            valueSelector = IndomainMin, assumptions = Assumptions(bools = pins)) }
+        val params = List(2) {
+            BacktrackParams(nativeSat = false, variableSelector = InputOrder,
+                valueSelector = IndomainMin, assumptions = Assumptions(bools = pins))
+        }
         BooleanProofPortfolio(pinned, scoped, listOf(1), params, probeFirst = true).use { tasks ->
             val first = tasks.open(0, ExecutionControl.Never)
             assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
@@ -377,9 +379,11 @@ class BooleanProofPortfolioTest {
         }).bake()
         for (native in listOf(false, true)) {
             val pool = SharedClausePool()
-            val params = List(2) { worker -> BacktrackParams(nativeSat = native,
-                variableSelector = InputOrder, valueSelector = IndomainMin,
-                clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned()) }
+            val params = List(2) { worker ->
+                BacktrackParams(nativeSat = native,
+                    variableSelector = InputOrder, valueSelector = IndomainMin,
+                    clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned())
+            }
             BooleanProofPortfolio(guarded, context, listOf(0), params, probeFirst = true).use { tasks ->
                 val first = tasks.open(0, ExecutionControl.Never)
                 assertNull(first.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L))
@@ -403,9 +407,11 @@ class BooleanProofPortfolioTest {
         }).bake()
         for (native in listOf(false, true)) {
             val pool = SharedClausePool()
-            val params = List(2) { worker -> BacktrackParams(randomSeed = worker.toLong(), nativeSat = native,
-                variableSelector = InputOrder, valueSelector = IndomainMin,
-                clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned()) }
+            val params = List(2) { worker ->
+                BacktrackParams(randomSeed = worker.toLong(), nativeSat = native,
+                    variableSelector = InputOrder, valueSelector = IndomainMin,
+                    clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned())
+            }
             BooleanProofPortfolio(guarded, context, listOf(1, 0), params).use { tasks ->
                 val first = tasks.open(0, ExecutionControl.Never)
                 val second = tasks.open(1, ExecutionControl.Never)
@@ -514,8 +520,10 @@ class BooleanProofPortfolioTest {
     @Test
     fun `a lane should publish source exhaustion only after every disjoint cube closes`() {
         val pool = SharedClausePool()
-        val params = List(2) { worker -> BacktrackParams(nativeSat = false,
-            clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned()) }
+        val params = List(2) { worker ->
+            BacktrackParams(nativeSat = false,
+                clauseExchange = PoolClauseExchange(pool, origin = worker).conditioned())
+        }
         BooleanProofPortfolio(problem, context, listOf(0, 1), params).use { tasks ->
             val first = tasks.open(0, ExecutionControl.Never)
             val second = tasks.open(1, ExecutionControl.Never)

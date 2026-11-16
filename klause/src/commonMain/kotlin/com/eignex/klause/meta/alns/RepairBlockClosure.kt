@@ -8,7 +8,15 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
 internal enum class RepairBlockDecline {
-    NoShape, Unavailable, UnsupportedShape, InvalidFrame, BlockedPin, Oversized, WorkLimit, Cancelled, Arithmetic,
+    NoShape,
+    Unavailable,
+    UnsupportedShape,
+    InvalidFrame,
+    BlockedPin,
+    Oversized,
+    WorkLimit,
+    Cancelled,
+    Arithmetic,
 }
 
 internal object RepairBlockInterrupted : RuntimeException()

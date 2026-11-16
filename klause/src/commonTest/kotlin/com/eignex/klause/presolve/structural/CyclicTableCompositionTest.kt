@@ -39,10 +39,12 @@ class CyclicTableCompositionTest {
             Table(intArrayOf(0, 1, 3), rows),
             Table(intArrayOf(2, 3), longArrayOf(0, 1, 0, 2, 1, 0, 1, 2, 2, 0, 2, 1)),
         )
-        for (variable in 0..3) for (value in 0L..2L) {
-            val domains = Array(4) { if (it == variable) IntDomain(value, value) else IntDomain(0, 2) }
-            val state = PropagationState(Problem(0, 4, domains, factors), Assumptions.None)
-            assertNull(state.runToFixpoint(allFactors = true))
+        for (variable in 0..3) {
+            for (value in 0L..2L) {
+                val domains = Array(4) { if (it == variable) IntDomain(value, value) else IntDomain(0, 2) }
+                val state = PropagationState(Problem(0, 4, domains, factors), Assumptions.None)
+                assertNull(state.runToFixpoint(allFactors = true))
+            }
         }
         val pairwise = ExtensionalComposition.reduce(
             factors, ExecutionControl.Never, ExtensionalComposition.Limits(cyclicAttempts = 0),
@@ -112,7 +114,10 @@ class CyclicTableCompositionTest {
         val left = Table(intArrayOf(0, 2), longArrayOf(0, 0, 1, 1))
         val right = Table(intArrayOf(1, 2), longArrayOf(0, 0, 1, 1))
         var work = 0
-        CyclicTableComposition.intersect(target, left, right, { work++; true }, 64)
+        CyclicTableComposition.intersect(target, left, right, {
+            work++
+            true
+        }, 64)
         for (allowance in 0 until work) {
             var remaining = allowance
 

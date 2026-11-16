@@ -189,7 +189,9 @@ class LocalSearchEngineCompletionTest {
             override val id = MoveSourceId("exhausted-finite-start-repair")
             override val phase = Phase.Infeasible
             override val pool = Pool.NoiseEligible
-            override fun generate(state: LocalSearchState, sink: MoveSink) { sink.addIntSet(0, 2) }
+            override fun generate(state: LocalSearchState, sink: MoveSink) {
+                sink.addIntSet(0, 2)
+            }
         }
         val search = LocalSearchEngine(LocalSearchModel.open(mixedProblem(finiteMinimum = 2)),
             strategy = SourceDrivenStrategy(listOf(ConfiguredSource(source)),

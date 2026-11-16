@@ -63,8 +63,10 @@ internal class PrivateRebuildClauseProjection private constructor(
             if (!visit((current.size + parent.size) * 4L + 4L)) return Result.Stopped
             val merged = IntArray(current.size + parent.size - 2)
             var used = 0
-            for (row in listOf(current, parent)) for (literal in row) {
-                if (Lit.variable(literal) != stage.variable) merged[used++] = literal
+            for (row in listOf(current, parent)) {
+                for (literal in row) {
+                    if (Lit.variable(literal) != stage.variable) merged[used++] = literal
+                }
             }
             if (merged.isEmpty()) return Result.Refuted
             // One source resolvent remains entailed after projection without expanding the learned database.

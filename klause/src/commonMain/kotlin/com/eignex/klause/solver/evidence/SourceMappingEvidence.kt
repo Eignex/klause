@@ -12,6 +12,7 @@ class SourceMappingEvidence(
     transformations: List<SourceTransformation?>,
 ) {
     private val captured = transformations.toList()
+
     /** Ordered source-to-target stages; a null entry represents missing capture. */
     val transformations: List<SourceTransformation?> get() = captured.toList()
 
@@ -31,7 +32,7 @@ class SourceMappingEvidence(
 
     private fun select(
         claim: SourceClaim, context: SourceProofContext, cancellation: ExecutionControl,
-            allowance: SourceProofAllowance,
+        allowance: SourceProofAllowance,
     ): Pair<SourceEvidence, SourceEvidenceCheck> {
         fun absent(reason: String) = SourceEvidence(source, claim, SourceDerivation.Unavailable(reason)) to
             SourceEvidenceCheck.Unavailable(reason)
@@ -92,7 +93,7 @@ private class MappingProofTranslation(
         val bound = claim is SourceClaim.Bound
         if (claim is SourceClaim.Bound) matchBound(source, target, transformations, terminal.claim, claim)
         var proof = if (terminal.claim is SourceClaim.Optimal) optimumBound(terminal, target, 0)
-            else terminal.derivation
+        else terminal.derivation
         var scope = target
         if (scope == source) return proof
         if (transformations.isEmpty()) missing("mapping has no captured transformation stages")

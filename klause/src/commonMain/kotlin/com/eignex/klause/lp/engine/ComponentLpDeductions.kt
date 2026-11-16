@@ -83,7 +83,9 @@ internal class ComponentLpDeductionCache(size: Int) {
                 var primary = try {
                     nodeDualCertificate(
                         part.model, result.duals, cancellation, observer,
-                        onAdditionalCertificate = if (withAlternatives) { { alternatives.add(it) } } else null,
+                        onAdditionalCertificate = if (withAlternatives) {
+                            { alternatives.add(it) }
+                        } else null,
                         sharedMeter = meter, scaleBits = scaleBits, requireIntegerPrimary = true,
                     )
                 } finally {
@@ -137,14 +139,16 @@ internal class ComponentLpDeductionCache(size: Int) {
             }
             val primary = CompositeDeduction(state, parts, children, owners, locals, bound)
             val alternatives = ArrayList<LpDeductionCertificate>()
-            for (index in children.indices) for (alternative in children[index].alternatives) {
-                meter.reserve(160L)
-                val alternativeBound = meter.add(
-                    meter.add(bound, children[index].primary.exactObjectiveBound().negated()),
-                    alternative.exactObjectiveBound(),
-                )
-                alternatives += CompositeDeduction(state, parts, children, owners, locals, alternativeBound,
-                    index, alternative)
+            for (index in children.indices) {
+                for (alternative in children[index].alternatives) {
+                    meter.reserve(160L)
+                    val alternativeBound = meter.add(
+                        meter.add(bound, children[index].primary.exactObjectiveBound().negated()),
+                        alternative.exactObjectiveBound(),
+                    )
+                    alternatives += CompositeDeduction(state, parts, children, owners, locals, alternativeBound,
+                        index, alternative)
+                }
             }
             meter.poll()
             accepted = true

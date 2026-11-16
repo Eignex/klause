@@ -77,7 +77,10 @@ internal class SharingMemoryObservation(
             step()
             if (owner.identity === identity && (owner.slots == 0L) == (slots == 0L)) {
                 if (pool) require(owner.bytes == bytes && owner.slots == slots)
-                if (shared && !owner.shared) { owner.shared = true; sharedBytes += owner.bytes }
+                if (shared && !owner.shared) {
+                    owner.shared = true
+                    sharedBytes += owner.bytes
+                }
                 val retained = minOf(protectedAmount, if (slots == 0L) owner.bytes else owner.slots)
                 if (retained > owner.protectedAmount) {
                     val added = retained - owner.protectedAmount
@@ -167,7 +170,9 @@ internal class SharingMemoryObservation(
         var right: Entry<T>? = null
     }
 
-    fun record(fields: Map<String, Long>) { values.putAll(fields) }
+    fun record(fields: Map<String, Long>) {
+        values.putAll(fields)
+    }
 
     fun snapshot(scan: () -> Unit): SharingMemorySnapshot {
         val status = try {
