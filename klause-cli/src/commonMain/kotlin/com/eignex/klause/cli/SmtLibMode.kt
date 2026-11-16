@@ -2,6 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.smtLibSemantics
+import com.eignex.klause.formats.smtlib.toSmtLib
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
@@ -67,14 +68,22 @@ internal object SmtLibMode : CliMode {
             return attachedSourceSolvable(
                 parsed.source,
                 common,
-                { assignment -> renderOpenTheoryModel(ints, bools, reals, assignment) },
+                { assignment ->
+                    parsed.reconstructModel(assignment::boolValue, assignment::intValue, { id ->
+                        assignment.symbolicRealValue(id)?.let(::smtSymbolicValue)
+                            ?: assignment.algebraicRealValue(id)?.let(::smtAlgebraicValue)
+                            ?: smtReal(assignment.realValue(id))
+                    }).toSmtLib()
+                },
                 admissionStart.elapsedNow().inWholeMilliseconds,
                 parsed.quadraticObjective,
                 parsed.sense,
                 objective = objective,
                 renderFinite = { sample ->
                     latestSourceObjective = objective?.evaluateExact(sample)
-                    renderModel(ints, bools, reals, sample)
+                    parsed.reconstructModel(sample::boolValue, { sample.intValue(it).toString() }, { id ->
+                        smtReal(requireNotNull(sample.exactReals) { "SMT model has no certified real values" }[id].toString())
+                    }).toSmtLib()
                 },
             )
         }

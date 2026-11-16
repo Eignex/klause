@@ -33,12 +33,30 @@ data class SmtLibProblem(
     val sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     /** Original exact quadratic objective, without conversion to a finite cost. */
     val quadraticObjective: QuadraticObjectiveSpec? = null,
+    /** Original declarations and their reconstruction recipes, excluding encoding auxiliaries. */
+    val sourceBindings: List<SmtSourceBinding> = scalarSmtBindings(intVarNames, boolVarNames, realVarNames),
+    /** Retained lexical source snapshot, independent of every lowered representation. */
+    val originalSource: SmtSourceSnapshot? = null,
+    internal val privateBindings: Map<String, SmtReconstruction> = emptyMap(),
+    /** Original-source checks contributed by composite reductions. */
+    val sourceChecks: List<SmtSourceCheck> = emptyList(),
+    internal val encodingIntVarNames: Map<String, Int> = intVarNames,
+    internal val encodingBoolVarNames: Map<String, Int> = boolVarNames,
+    internal val encodingRealVarNames: Map<String, Int> = realVarNames,
 ) : SourceSemanticsOwner {
     init {
         require(objective == null || quadraticObjective == null) { "SMT source has two objective bindings" }
     }
 
     override val semantics: EffectiveSourceSemantics get() = source.semantics
+
+    /** Reconstruct original values from a checked assignment in retained source coordinates. */
+    fun reconstructModel(
+        boolean: (Int) -> Boolean,
+        integer: (Int) -> String,
+        real: (Int) -> String,
+        cancellation: Cancellation = Cancellation.Never,
+    ): SmtSourceModel = reconstructSmtModel(this, boolean, integer, real, cancellation)
 
     internal val model: Problem get() = source.originalSource as? Problem
         ?: error("SMT source retains an exact formula")

@@ -31,8 +31,26 @@ internal fun parseSmtLibSource(
             }
             commands
         }
+        val reduction = captureSmtSource(commands, cancellation)
+        lowerSmtReduction(reduction, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics)
+    } catch (_: PolynomialSourceInterrupted) {
+        null
+    }
+}
+
+internal fun lowerSmtReduction(
+    reduction: SmtReduction,
+    unboundedIntLo: Long,
+    unboundedIntHi: Long,
+    settings: ProblemSettings,
+    cancellation: Cancellation,
+    semantics: EffectiveSourceSemantics,
+): SmtLibProblem {
+        val loweredCommands = reduction.commands
+        val semanticDeclarations = reduction.declarations.filter { it.parameters.isEmpty() &&
+            it.result in setOf(SmtSort.Int, SmtSort.Real) }.map { polynomialSymbol(it.name) }.toSet()
         val spellings = HashMap<String, String>()
-        for (expression in commands) {
+        for (expression in loweredCommands) {
             cancellation.polynomialSourceCheckpoint()
             val command = expression as? SExpr.SList ?: continue
             val head = (command.items.firstOrNull() as? SExpr.Atom)?.text
@@ -50,7 +68,11 @@ internal fun parseSmtLibSource(
             return original
         }
         val result = try {
-            parseLinearAdmission(commands, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics).let {
+            if (reduction.original?.terms?.any { it.operator in setOf("exp", "log", "sin", "cos", "pi") } == true) {
+                smtUnsupported("real functions require their original source domains")
+            }
+            parseLinearAdmission(loweredCommands, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics,
+                semanticDeclarations).let {
                 it.copy(intVarNames = sourceNames(it.intVarNames), boolVarNames = sourceNames(it.boolVarNames),
                     realVarNames = sourceNames(it.realVarNames))
             }
@@ -58,8 +80,8 @@ internal fun parseSmtLibSource(
             if (cancellation()) throw PolynomialSourceInterrupted()
             try {
                 val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
-                    allowFunctions = true, semantics = semantics)
-                for (command in commands) compiler.command(command)
+                    allowFunctions = true, semantics = semantics, semanticDeclarations = semanticDeclarations)
+                for (command in loweredCommands) compiler.command(command)
                 val captured = compiler.build()
                 val functions = captured.transcendental
                 if (functions != null) {
@@ -85,10 +107,16 @@ internal fun parseSmtLibSource(
                 throw factorFailure
             }
         }
-        if (cancellation()) null else result
-    } catch (_: PolynomialSourceInterrupted) {
-        null
-    }
+        cancellation.polynomialSourceCheckpoint()
+        val originals = reduction.declarations.filter { it.parameters.isEmpty() }.map { polynomialSymbol(it.name) }.toSet()
+        return result.copy(sourceBindings = reduction.bindings,
+            privateBindings = reduction.privateBindings, originalSource = reduction.original?.let(::SmtSourceSnapshot),
+            sourceChecks = reduction.checks,
+            intVarNames = result.intVarNames.filterKeys { polynomialSymbol(it) in originals },
+            boolVarNames = result.boolVarNames.filterKeys { polynomialSymbol(it) in originals },
+            realVarNames = result.realVarNames.filterKeys { polynomialSymbol(it) in originals },
+            encodingIntVarNames = result.intVarNames, encodingBoolVarNames = result.boolVarNames,
+            encodingRealVarNames = result.realVarNames)
 }
 
 private class AdmissionSource(private val source: CharSource, private val cancellation: Cancellation) : CharSource {
@@ -105,20 +133,19 @@ private fun parseLinearAdmission(
     settings: ProblemSettings,
     cancellation: Cancellation,
     semantics: EffectiveSourceSemantics,
+    semanticDeclarations: Set<String>,
 ): SmtLibProblem {
     val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings,
-        sourceCancellation = cancellation, semantics = semantics)
-    val scope = SmtLibScope(cancellation)
+        sourceCancellation = cancellation, semantics = semantics, semanticDeclarations = semanticDeclarations)
     for (command in commands) {
         builder.command(command.factorSourceSymbols(cancellation))
-        if (!scope.command(command)) smtUnsupported("source symbol or expression sort is invalid in its lexical scope")
     }
     return try {
-        buildLinearAdmission(builder, commands, cancellation, semantics)
+        buildLinearAdmission(builder, commands, cancellation, semantics, semanticDeclarations)
     } catch (refuted: SmtLibRefutedPremises) {
         // Refutation does not excuse unsupported syntax elsewhere in the source.
         val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
-            allowFunctions = true, semantics = semantics)
+            allowFunctions = true, semantics = semantics, semanticDeclarations = semanticDeclarations)
         for (command in commands) compiler.command(command)
         val captured = compiler.build()
         if (captured.transcendental?.hasObjective == true) {
@@ -134,11 +161,12 @@ private fun buildLinearAdmission(
     commands: List<SExpr>,
     cancellation: Cancellation,
     semantics: EffectiveSourceSemantics,
+    semanticDeclarations: Set<String>,
 ): SmtLibProblem {
     if (builder.objectiveSpec == null) return builder.build()
     var captureFailure: UnsupportedSmtException? = null
     val objective = try {
-        captureSmtSourceObjective(commands, cancellation, semantics)
+        captureSmtSourceObjective(commands, cancellation, semantics, semanticDeclarations)
     } catch (unsupported: UnsupportedSmtException) {
         captureFailure = unsupported
         null

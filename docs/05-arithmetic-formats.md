@@ -173,8 +173,12 @@ rejected.
 
 ### Lexical scope and refusals
 
-Admission checks declarations and expression sorts with an iterative lexical type
-walk. Integer-to-real promotion is allowed; Boolean/numeric and real-to-integer
+Admission captures one typed source before choosing factor or exact-formula
+lowering. Its iterative lexical walk interns terms by their resolved symbol,
+argument identities and structured sort, retaining a shared graph independently
+of either compiler. Sorts distinguish Boolean, integer, real, fixed-width words,
+arrays and named sort applications; recognizing a sort does not admit an encoding
+for its operators. Integer-to-real promotion is allowed; Boolean/numeric and real-to-integer
 coercions are rejected. Logic declarations do not choose a representation. Quoted
 and bare spellings of a symbol share one identity, and a negative numeral must be
 written `(- n)`. A semicolon starts a line comment even when it directly follows a
@@ -183,7 +187,22 @@ bare token.
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun`
 macros capture their definition scope and check argument sorts even for unused
 arguments; recursive helpers decline. Assertions see only the declarations visible
-at their command. The binding tables are discarded after lowering.
+at their command. Compiler binding tables are discarded after lowering; the owned
+typed source and original declaration order and spellings remain attached.
+
+Reduction passes carry transformed commands, original declarations, named private
+recipes and original-source checks together. Every pass and fallback charges the
+same cancellation token, so representation changes do not reset an encoding
+budget. Caller endpoint overrides apply only to original scalar declarations;
+private reduction coordinates keep the bounds supplied by their encoding.
+
+`SmtLibProblem.reconstructModel` reads retained scalar coordinates by name and
+composes source-owned recipes into scalar, word, function and constructor values.
+The CLI uses that surface for finite and open assignments and prints only original
+bindings. Composite reductions supply source checks which must accept the
+reconstructed values before rendering; the common pipeline still checks scalar
+arithmetic witnesses against their captured source. Interruption withholds the
+entire reconstructed model.
 
 ### Linear and conditional lowering
 

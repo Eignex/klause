@@ -16,9 +16,10 @@ internal fun captureSmtSourceObjective(
     commands: List<SExpr>,
     cancellation: Cancellation,
     semantics: EffectiveSourceSemantics,
+    semanticDeclarations: Set<String>? = null,
 ): SmtLibPolynomialProblem {
     val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
-        allowFunctions = true, semantics = semantics)
+        allowFunctions = true, semantics = semantics, semanticDeclarations = semanticDeclarations)
     for (command in commands) {
         cancellation.polynomialSourceCheckpoint(1)
         val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
