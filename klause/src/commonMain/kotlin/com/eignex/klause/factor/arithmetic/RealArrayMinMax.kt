@@ -45,16 +45,8 @@ class RealArrayMinMax(
         for (operand in xs) sink.realVar(operand)
     }
 
-    override val linearForm: LinearForm = LinearForm.Relaxation(
-        xs.map { operand ->
-            Linear(
-                intArrayOf(),
-                doubleArrayOf(),
-                intArrayOf(result, operand),
-                doubleArrayOf(1.0, -1.0),
-                if (max) LinearOp.GE else LinearOp.LE,
-                0.0,
-            )
-        },
-    )
+    override val linearForm: LinearForm = LinearForm.Relaxation(xs.map { operand ->
+        Linear(intArrayOf(), doubleArrayOf(), intArrayOf(result, operand), doubleArrayOf(1.0, -1.0),
+            if (max) LinearOp.GE else LinearOp.LE, 0.0)
+    })
 }

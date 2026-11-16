@@ -13,15 +13,17 @@ internal class ScanMeter(private val cancellation: ExecutionControl) : AutoClose
     @JvmField var reservation: WorkReservation? = null
     @JvmField var used = 0
     @JvmField var pending = 0L
-    @JvmField var stopped = false
+    @JvmField
+    var stopped = false
+        @Suppress("NOTHING_TO_INLINE") // Scalar scans keep only their local counters in the loop.
+    inline
 
-    @Suppress("NOTHING_TO_INLINE") // Scalar scans keep only their local counters in the loop.
-    inline fun visit(units: Long): Boolean {
+    fun visit(units: Long): Boolean {
         if (stopped) return false
         if ((polling?.due(1) ?: (remaining-- <= 0)) && !poll()) return false
         if (native == null) {
-            pending += minOf(units, Long.MAX_VALUE - pending)
-            return true
+        pending += minOf( units, Long.MAX_VALUE - pending)
+        return true
         }
         val held = reservation
         if (held != null && units <= held.capacity - used) {
@@ -29,8 +31,7 @@ internal class ScanMeter(private val cancellation: ExecutionControl) : AutoClose
             if (used == held.capacity) flush()
             return !stopped
         }
-        return admit(units)
-    }
+        return admit(units) }
 
     private fun admit(units: Long): Boolean {
         var left = units
@@ -39,7 +40,7 @@ internal class ScanMeter(private val cancellation: ExecutionControl) : AutoClose
             if (reservation == null) {
                 while (reservation == null) {
                     reservation = checkNotNull(native).reserve(65536)
-                    if (reservation == null && !check()) return false
+                    if (reservation == null && ! check()) return false
                 }
                 if (++grants == 64) {
                     if (!check()) return false
@@ -67,7 +68,7 @@ internal class ScanMeter(private val cancellation: ExecutionControl) : AutoClose
     private fun poll(): Boolean {
         remaining = 1023
         if (native == null) flush()
-        if (!stopped && (cancellation() || source?.exhausted == true)) stopped = true
+        if (!stopped && ( cancellation() || source?.exhausted == true)) stopped = true
         if (stopped) flush()
         return !stopped
     }
@@ -77,10 +78,11 @@ internal class ScanMeter(private val cancellation: ExecutionControl) : AutoClose
         val consumed = used
         reservation = null
         used = 0
-        held?.settle(consumed)
-        val completed = pending
+        held?.settle (consumed)
+        val completed =pending
         pending = 0L
-        if (completed > 0L) meter?.charge(completed)
+        if (completed > 0L)
+        meter?.charge(completed)
         if (source?.exhausted == true) stopped = true
     }
 

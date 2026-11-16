@@ -24,7 +24,6 @@ data class QuadraticOptimizationExecution(
     val semantics: EffectiveSourceSemantics? = null,
 ) {
     private var retainedPublication: QuadraticIncumbentPublication? = null
-
     /**
      * Latest accepted source publication. Render this incumbent before the terminal marker when present;
      * a limit or ray certificate can retain a different private witness that is not a new improvement.
@@ -77,43 +76,30 @@ fun OpenTheoryPipeline.minimize(
     }
     return publication.execute {
         var result: QuadraticOptimizationResult = QuadraticOptimizationResult.Unknown(
-            null,
-            native.reason(),
-            sense,
-            SolveStats.EMPTY,
+            null, native.reason(), sense, SolveStats.EMPTY,
         )
         if (!native.stopped) {
             val model = request.resolvedModel()
-            for (term in objective.terms) {
-                for (variable in listOfNotNull(term.first, term.second)) {
-                    require(
-                        when (variable) {
-                            is QuadraticVariable.Bool -> variable.id.index < request.problem.sourceBoolCount
-                            is QuadraticVariable.Int -> variable.id.index < model.source.numIntVars
-                            is QuadraticVariable.Real -> variable.id.index < request.problem.sourceRealCount
-                        },
-                    ) { "quadratic objective coordinate out of source range" }
-                }
+            for (term in objective.terms) for (variable in listOfNotNull(term.first, term.second)) {
+                require(when (variable) {
+                    is QuadraticVariable.Bool -> variable.id.index < request.problem.sourceBoolCount
+                    is QuadraticVariable.Int -> variable.id.index < model.source.numIntVars
+                    is QuadraticVariable.Real -> variable.id.index < request.problem.sourceRealCount
+                }) { "quadratic objective coordinate out of source range" }
             }
             result = try {
-                QuadraticStrategyAdapters(
-                    request, model, objective, sense, params, native, engine, cores,
-                    publication,
-                ).execute()
+                QuadraticStrategyAdapters(request, model, objective, sense, params, native, engine, cores,
+                    publication).execute()
             } catch (_: CancellationException) {
                 QuadraticOptimizationResult.Unknown(null, native.reason(), sense, SolveStats.EMPTY)
             }
         }
         QuadraticOptimizationExecution(
             request.publishSource(result, params, native.polynomial),
-            native.polynomialStats,
-            native.numericalWork,
-            native.work,
+            native.polynomialStats, native.numericalWork, native.work,
             if (result is QuadraticOptimizationResult.Unknown || result is QuadraticOptimizationResult.BestFound) {
                 native.declinedResource
-            } else {
-                native.resource
-            },
+            } else native.resource,
         ).also { it.retainPublication(acceptedSource) }
     }.withSourceSemantics(request.preparedPlan.sourceSemantics)
 }

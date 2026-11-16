@@ -25,10 +25,8 @@ internal class WideDivModInvariant(private val relation: WideDivMod) : Invariant
             ?: return compressViolation(Long.MAX_VALUE, state.violationSoftCap)
         val error = (expected.first - relation.quotient.evaluate(value)).abs() +
             (expected.second - relation.remainder.evaluate(value)).abs()
-        return compressViolation(
-            if (error > bigIntOf(Long.MAX_VALUE)) Long.MAX_VALUE else error.toLongExact(),
-            state.violationSoftCap,
-        )
+        return compressViolation(if (error > bigIntOf(Long.MAX_VALUE)) Long.MAX_VALUE else error.toLongExact(),
+            state.violationSoftCap)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
@@ -49,10 +47,8 @@ internal class WideDivModInvariant(private val relation: WideDivMod) : Invariant
         if (current == 0) return
         val constants = checkNotNull(identity.integralConstants)
         var residual = BIG_ZERO - constants.exactBound
-        for (i in identity.vars.indices) {
-            residual += constants.exactCoeff(i) *
-                bigIntOf(state.assignment.intValue(identity.vars[i]))
-        }
+        for (i in identity.vars.indices) residual += constants.exactCoeff(i) *
+            bigIntOf(state.assignment.intValue(identity.vars[i]))
         for (i in 0 until minOf(identity.vars.size, MAX_REPAIRS)) {
             val coefficient = constants.exactCoeff(i)
             if (coefficient.isZero()) continue
@@ -61,8 +57,7 @@ internal class WideDivModInvariant(private val relation: WideDivMod) : Invariant
             val variable = identity.vars[i]
             val value = target.toLongExact()
             if (value in state.rootDomains[variable] && value != state.assignment.intValue(variable) &&
-                grade(state) { if (it == variable) value else state.assignment.intValue(it) } <= current
-            ) {
+                grade(state) { if (it == variable) value else state.assignment.intValue(it) } <= current) {
                 sink.addChannelingIntSet(state, variable, value)
             }
         }

@@ -39,25 +39,16 @@ class NonlinearIntegerCellsTest {
             val arithmetic = PolynomialArithmetic()
             val algebraic = AlgebraicArithmetic(arithmetic)
             val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
-            val cell = assertNotNull(
-                CheckedPolynomialCell.rejected(
-                    scope.predicates.single(),
-                    scope,
-                    algebraic.rational(BigFraction.ofLong(rejected)),
-                    arithmetic,
-                    algebraic,
-                ),
-            )
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+                algebraic.rational(BigFraction.ofLong(rejected)), arithmetic, algebraic))
             val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
             cells.retain(cell)
 
             val proposal = cells.propose(listOf(bigIntOf(rejected)), PolynomialCondition(), emptySet(), algebraic)
 
             assertEquals(listOf(bigIntOf(expected)), proposal, predicate)
-            val window = PolynomialCondition(
-                lower = mapOf(0 to BigFraction.ofLong(rejected)),
-                upper = mapOf(0 to BigFraction.ofLong(rejected)),
-            )
+            val window = PolynomialCondition(lower = mapOf(0 to BigFraction.ofLong(rejected)),
+                upper = mapOf(0 to BigFraction.ofLong(rejected)))
             assertNull(cells.propose(listOf(bigIntOf(rejected)), window, emptySet(), algebraic), predicate)
         }
     }
@@ -69,20 +60,9 @@ class NonlinearIntegerCellsTest {
         val algebraic = AlgebraicArithmetic(arithmetic)
         val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
         val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
-        for (predicate in scope.predicates) {
-            for (value in listOf(BigFraction.ZERO, BigFraction.ONE)) {
-                cells.retain(
-                    assertNotNull(
-                        CheckedPolynomialCell.rejected(
-                            predicate,
-                            scope,
-                            algebraic.rational(value),
-                            arithmetic,
-                            algebraic,
-                        ),
-                    ),
-                )
-            }
+        for (predicate in scope.predicates) for (value in listOf(BigFraction.ZERO, BigFraction.ONE)) {
+            cells.retain(assertNotNull(CheckedPolynomialCell.rejected(predicate, scope,
+                algebraic.rational(value), arithmetic, algebraic)))
         }
 
         val proposal = cells.propose(listOf(bigIntOf(0)), PolynomialCondition(), emptySet(), algebraic)
@@ -97,17 +77,8 @@ class NonlinearIntegerCellsTest {
         val algebraic = AlgebraicArithmetic(arithmetic)
         val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
         val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
-        cells.retain(
-            assertNotNull(
-                CheckedPolynomialCell.rejected(
-                    scope.predicates.single(),
-                    scope,
-                    algebraic.rational(BigFraction.ZERO),
-                    arithmetic,
-                    algebraic,
-                ),
-            ),
-        )
+        cells.retain(assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+            algebraic.rational(BigFraction.ZERO), arithmetic, algebraic)))
 
         val proposal = cells.propose(listOf(bigIntOf(0)), PolynomialCondition(), setOf(listOf(bigIntOf(2))), algebraic)
 
@@ -130,15 +101,8 @@ class NonlinearIntegerCellsTest {
             val arithmetic = PolynomialArithmetic()
             val algebraic = AlgebraicArithmetic(arithmetic)
             val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
-            val cell = assertNotNull(
-                CheckedPolynomialCell.rejected(
-                    scope.predicates.single(),
-                    scope,
-                    algebraic.rational(BigFraction.ofLong(rejected)),
-                    arithmetic,
-                    algebraic,
-                ),
-            )
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+                algebraic.rational(BigFraction.ofLong(rejected)), arithmetic, algebraic))
             val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
             cells.retain(cell)
 
@@ -158,15 +122,8 @@ class NonlinearIntegerCellsTest {
             val algebraic = AlgebraicArithmetic(arithmetic)
             val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
             val point = BigFraction.of(bigIntOf(numerator), bigIntOf(2))
-            val cell = assertNotNull(
-                CheckedPolynomialCell.rejected(
-                    scope.predicates.single(),
-                    scope,
-                    algebraic.rational(point),
-                    arithmetic,
-                    algebraic,
-                ),
-            )
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+                algebraic.rational(point), arithmetic, algebraic))
             val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
             cells.retain(cell)
 
@@ -189,15 +146,8 @@ class NonlinearIntegerCellsTest {
             val arithmetic = PolynomialArithmetic()
             val algebraic = AlgebraicArithmetic(arithmetic)
             val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
-            val cell = assertNotNull(
-                CheckedPolynomialCell.rejected(
-                    scope.predicates.single(),
-                    scope,
-                    algebraic.rational(BigFraction.of(endpoint + direction, BIG_ONE)),
-                    arithmetic,
-                    algebraic,
-                ),
-            )
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+                algebraic.rational(BigFraction.of(endpoint + direction, BIG_ONE)), arithmetic, algebraic))
             val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
             cells.retain(cell)
 
@@ -206,15 +156,8 @@ class NonlinearIntegerCellsTest {
             assertTrue(excluded)
             assertFalse(cells.excludes(listOf(endpoint), algebraic))
             assertFalse(cells.excludes(listOf(endpoint - direction), algebraic))
-            assertEquals(
-                listOf(endpoint),
-                cells.propose(
-                    listOf(endpoint + direction),
-                    PolynomialCondition(),
-                    emptySet(),
-                    algebraic,
-                ),
-            )
+            assertEquals(listOf(endpoint), cells.propose(listOf(endpoint + direction),
+                PolynomialCondition(), emptySet(), algebraic))
         }
     }
 
@@ -227,24 +170,12 @@ class NonlinearIntegerCellsTest {
         val condition = PolynomialCondition()
         val scopes = listOf(
             PolynomialCellScope.Query(source.formula, condition, snapshot),
-            PolynomialCellScope.Region(
-                source.formula,
-                condition,
-                snapshot,
-                PolynomialBooleanRegion(mapOf(0 to true), emptyMap()),
-                Any(),
-            ),
+            PolynomialCellScope.Region(source.formula, condition, snapshot,
+                PolynomialBooleanRegion(mapOf(0 to true), emptyMap()), Any()),
         )
         for (scope in scopes) {
-            val cell = assertNotNull(
-                CheckedPolynomialCell.rejected(
-                    snapshot.atoms.single(),
-                    scope,
-                    algebraic.rational(BigFraction.ZERO),
-                    arithmetic,
-                    algebraic,
-                ),
-            )
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(snapshot.atoms.single(), scope,
+                algebraic.rational(BigFraction.ZERO), arithmetic, algebraic))
             val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
 
             cells.retain(cell)
@@ -260,15 +191,8 @@ class NonlinearIntegerCellsTest {
         val arithmetic = PolynomialArithmetic()
         val algebraic = AlgebraicArithmetic(arithmetic)
         val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
-        val cell = assertNotNull(
-            CheckedPolynomialCell.rejected(
-                scope.predicates.single(),
-                scope,
-                algebraic.rational(BigFraction.ZERO),
-                arithmetic,
-                algebraic,
-            ),
-        )
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+            algebraic.rational(BigFraction.ZERO), arithmetic, algebraic))
         val other = PolynomialRealFormula.And(listOf(source.formula))
         val cells = NonlinearIntegerCells(other, listOf(0), arithmetic)
 
@@ -286,15 +210,8 @@ class NonlinearIntegerCellsTest {
         val arithmetic = PolynomialArithmetic()
         val algebraic = AlgebraicArithmetic(arithmetic)
         val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
-        val cell = assertNotNull(
-            CheckedPolynomialCell.rejected(
-                scope.predicates.single(),
-                scope,
-                algebraic.rational(BigFraction.ZERO),
-                arithmetic,
-                algebraic,
-            ),
-        )
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+            algebraic.rational(BigFraction.ZERO), arithmetic, algebraic))
         val cells = NonlinearIntegerCells(source.formula, listOf(1), arithmetic)
 
         cells.retain(cell)
@@ -309,15 +226,8 @@ class NonlinearIntegerCellsTest {
         val arithmetic = PolynomialArithmetic()
         val algebraic = AlgebraicArithmetic(arithmetic)
         val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
-        val cell = assertNotNull(
-            CheckedPolynomialCell.rejected(
-                scope.predicates.single(),
-                scope,
-                algebraic.rational(BigFraction.ZERO),
-                arithmetic,
-                algebraic,
-            ),
-        )
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+            algebraic.rational(BigFraction.ZERO), arithmetic, algebraic))
         val cells = NonlinearIntegerCells(source.formula, listOf(0), arithmetic)
         cells.retain(cell)
         assertTrue(cells.excludes(listOf(bigIntOf(0)), algebraic))

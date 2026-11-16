@@ -44,16 +44,10 @@ internal object FrozenSourceSuite : BenchSuite {
                             id = "$suite/$problem/$engine/$seed/$repeat",
                             parameters = settings.caseParameters(engine, seed),
                             resources = settings.resources(),
-                            attributes = attributes + mapOf(
-                                "comparisonKey" to key,
-                                "pairKey" to key,
-                                "seed" to seed.toString(),
-                                "repeat" to repeat.toString(),
-                                "budgetMs" to settings.timeout.toString(),
-                                "recordSchema" to "solver-v1",
-                                "propagationControl" to "",
-                                "validationPolicy" to "reported-result-v1",
-                            ),
+                            attributes = attributes + mapOf("comparisonKey" to key, "pairKey" to key,
+                                "seed" to seed.toString(), "repeat" to repeat.toString(),
+                                "budgetMs" to settings.timeout.toString(), "recordSchema" to "solver-v1",
+                                "propagationControl" to "", "validationPolicy" to "reported-result-v1"),
                         )
                     }
                 }
@@ -67,20 +61,14 @@ internal object FrozenSourceSuite : BenchSuite {
         val identities = mapOf("model" to case.attributes.getValue("sourcePlainSha256")) +
             if (case.inputs.any { it.role == "data" }) {
                 mapOf("data" to case.attributes.getValue("sourceDataPlainSha256"))
-            } else {
-                emptyMap()
-            }
+            } else emptyMap()
         return if (identities.all { (role, expected) -> observed?.get(role)?.jsonPrimitive?.content == expected }) {
             result
-        } else {
-            result.copy(
-                status = BenchStatus.FAILED,
-                message = listOfNotNull(
-                    result.message,
-                    "Plain source identity missing or different from frozen input; original result retained",
-                )
-                    .joinToString("; "),
-            )
-        }
+        } else result.copy(
+            status = BenchStatus.FAILED,
+            message = listOfNotNull(result.message,
+                "Plain source identity missing or different from frozen input; original result retained")
+                .joinToString("; "),
+        )
     }
 }

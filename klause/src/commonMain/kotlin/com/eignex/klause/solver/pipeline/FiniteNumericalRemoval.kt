@@ -34,25 +34,11 @@ internal class FiniteNumericalRemoval(
     private val callerPins: Assumptions = Assumptions.None,
     private val definitions: InvariantNetwork? = null,
     val completion: Completion = Completion.None,
-) : DestroyOperator,
-    AutoCloseable {
+) : DestroyOperator, AutoCloseable {
     enum class Signal { Disagreement, Refutation }
     enum class Completion { None, SourceRows }
-    enum class Status {
-        Unavailable,
-        NoPoint,
-        Agreement,
-        EmptySupport,
-        Supported,
-        Incomplete,
-        Incompatible,
-        Unsupported,
-        Limited,
-        Cancelled,
-        Funding,
-        ClosureDeclined,
-        Closed,
-    }
+    enum class Status { Unavailable, NoPoint, Agreement, EmptySupport, Supported, Incomplete, Incompatible,
+        Unsupported, Limited, Cancelled, Funding, ClosureDeclined, Closed }
 
     private var center: Sample? = null
     private var scores = intArrayOf()
@@ -146,9 +132,7 @@ internal class FiniteNumericalRemoval(
                         query.scope.condition.bools[coordinate.id]?.let {
                             if (it) BigFraction.ONE else BigFraction.ZERO
                         }
-                    } else {
-                        null
-                    }
+                    } else null
                     if (relaxed == null) {
                         retire(Status.Unavailable)
                         unavailableReason = "missing-coordinate"
@@ -165,7 +149,6 @@ internal class FiniteNumericalRemoval(
                 }
                 status = if (scores.any { it != 0 }) Status.Supported else Status.Agreement
             }
-
             Signal.Refutation -> {
                 if (support !is SourceNumericalSupportResult.Available) {
                     retire(Status.Unavailable)
@@ -225,15 +208,9 @@ internal class FiniteNumericalRemoval(
             query.scope != source.scope.copy(condition = pins.sourceCondition()) ||
             query.coordinates != source.coordinates || query.objective != source.objective ||
             query.objectiveConstant != source.objectiveConstant || query.semantics != source.semantics ||
-            query.semanticsChecker !== source.semanticsChecker
-        ) {
-            return false
-        }
+            query.semanticsChecker !== source.semanticsChecker) return false
         if (callerPins.bools.any { (id, value) -> pins.boolValueOrNull(id) != value } ||
-            callerPins.ints.any { (id, value) -> pins.intValueOrNull(id) != value }
-        ) {
-            return false
-        }
+            callerPins.ints.any { (id, value) -> pins.intValueOrNull(id) != value }) return false
         val original = source.premises
         val conditioned = query.premises
         funding.charge(1L + original.size + conditioned.size)
@@ -249,8 +226,7 @@ internal class FiniteNumericalRemoval(
         val direction = source.scope.objective?.sense ?: return false
         if (!source.affineObjectiveAvailable || objective.boolWeightValues.size > model.numBoolVars ||
             objective.intCoefficientValues.size > model.numIntVars ||
-            objective.realCoefficientValues.any { it != 0.0 }
-        ) {
+            objective.realCoefficientValues.any { it != 0.0 }) {
             return false
         }
         val coefficients = source.objective
@@ -259,11 +235,8 @@ internal class FiniteNumericalRemoval(
         }
         if (source.objectiveConstant != original(objective.constant)) return false
         for (index in 0 until model.numBoolVars + model.numIntVars) {
-            val coefficient = if (index < model.numBoolVars) {
-                objective.boolWeightValues.getOrElse(index) { 0L }
-            } else {
-                objective.intCoefficientValues.getOrElse(index - model.numBoolVars) { 0L }
-            }
+            val coefficient = if (index < model.numBoolVars) objective.boolWeightValues.getOrElse(index) { 0L }
+                else objective.intCoefficientValues.getOrElse(index - model.numBoolVars) { 0L }
             if ((coefficients[coordinate(index)] ?: BigFraction.ZERO) != original(coefficient)) return false
         }
         return true
@@ -271,45 +244,28 @@ internal class FiniteNumericalRemoval(
 
     private fun coordinate(index: Int) = if (index < model.numBoolVars) {
         SourceCoordinate(SourceCoordinate.Kind.Boolean, index)
-    } else {
-        SourceCoordinate(SourceCoordinate.Kind.Integer, index - model.numBoolVars)
-    }
+    } else SourceCoordinate(SourceCoordinate.Kind.Integer, index - model.numBoolVars)
 
     private fun index(coordinate: SourceCoordinate): Int? = when (coordinate.kind) {
         SourceCoordinate.Kind.Boolean -> coordinate.id.takeIf { it in 0 until model.numBoolVars }
-
         SourceCoordinate.Kind.Integer -> coordinate.id.takeIf { it in 0 until model.numIntVars }
             ?.let { model.numBoolVars + it }
-
         SourceCoordinate.Kind.Real -> null
     }
 
-    private fun frozen(index: Int): Boolean = if (index < model.numBoolVars) {
-        callerPins.isFrozenBool(index)
-    } else {
-        callerPins.isFrozenInt(index - model.numBoolVars)
-    }
+    private fun frozen(index: Int): Boolean = if (index < model.numBoolVars) callerPins.isFrozenBool(index)
+        else callerPins.isFrozenInt(index - model.numBoolVars)
 
     private fun rootFixed(index: Int): Boolean = if (index < model.numBoolVars) {
         (model.baked as? PropagationResult.Implied)?.boolValueOrNull(index) != null
-    } else {
-        model.rootIntDomain(index - model.numBoolVars).isFixed
-    }
+    } else model.rootIntDomain(index - model.numBoolVars).isFixed
 
     private fun value(sample: Sample, index: Int): BigFraction = if (index < model.numBoolVars) {
         if (sample.boolValue(index)) BigFraction.ONE else BigFraction.ZERO
-    } else {
-        BigFraction.ofLong(sample.intValue(index - model.numBoolVars))
-    }
+    } else BigFraction.ofLong(sample.intValue(index - model.numBoolVars))
 
-    override fun destroy(
-        rng: Random,
-        problem: BakedProblem,
-        incumbent: Sample,
-        objective: LinearObjective,
-        fraction: Double,
-        assumptions: Assumptions,
-        cancellation: ExecutionControl,
+    override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample, objective: LinearObjective,
+        fraction: Double, assumptions: Assumptions, cancellation: ExecutionControl,
     ): FreedVars {
         if (!closed && assumptions != callerPins) {
             retire(Status.Incompatible)
@@ -318,31 +274,17 @@ internal class FiniteNumericalRemoval(
         return select(rng, problem, incumbent, objective, fraction, cancellation)
     }
 
-    override fun destroy(
-        rng: Random,
-        problem: BakedProblem,
-        incumbent: Sample,
-        objective: LinearObjective,
+    override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample, objective: LinearObjective,
         fraction: Double,
     ): FreedVars = select(rng, problem, incumbent, objective, fraction, ExecutionControl.Never)
 
-    private fun select(
-        rng: Random,
-        problem: BakedProblem,
-        incumbent: Sample,
-        objective: LinearObjective,
-        fraction: Double,
-        cancellation: ExecutionControl,
+    private fun select(rng: Random, problem: BakedProblem, incumbent: Sample, objective: LinearObjective,
+        fraction: Double, cancellation: ExecutionControl,
     ): FreedVars {
         if (closed) status = Status.Closed
         if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
-        if (!closed && (
-                problem !== model || objective !== this.objective ||
-                    (center != null && center !== incumbent)
-                )
-        ) {
-            retire(Status.Incompatible)
-        }
+        if (!closed && (problem !== model || objective !== this.objective ||
+                (center != null && center !== incumbent))) retire(Status.Incompatible)
         lastDecline = null
         lastCompletedInputs = intArrayOf()
         lastFilledInputs = 0
@@ -351,11 +293,8 @@ internal class FiniteNumericalRemoval(
             return FreedVars(intArrayOf(), intArrayOf())
         }
         if (status != Status.Supported) {
-            return closeSelection(
-                problem,
-                DestroyOperator.Random.destroy(rng, problem, incumbent, objective, fraction),
-                cancellation,
-            )
+            return closeSelection(problem,
+                DestroyOperator.Random.destroy(rng, problem, incumbent, objective, fraction), cancellation)
         }
         funding.charge(scores.size.toLong(), scores.size * 16L)
         if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
@@ -386,22 +325,13 @@ internal class FiniteNumericalRemoval(
                 funding.charge(1)
                 if (blocked(cancellation)) return FreedVars(intArrayOf(), intArrayOf())
                 if (!frozen(index) && scores[index] == weight && index !in selected &&
-                    (completion == Completion.None || !rootFixed(index))
-                ) {
-                    selected += index
-                }
+                    (completion == Completion.None || !rootFixed(index))) selected += index
                 if (selected.size == count) break
             }
         }
         lastFilledInputs = selected.size - lastCompletedInputs.size
-        return closeSelection(
-            problem,
-            FreedVars(
-                selected.filter { it < model.numBoolVars }.toIntArray(),
-                selected.filter { it >= model.numBoolVars }.map { it - model.numBoolVars }.toIntArray(),
-            ),
-            cancellation,
-        )
+        return closeSelection(problem, FreedVars(selected.filter { it < model.numBoolVars }.toIntArray(),
+            selected.filter { it >= model.numBoolVars }.map { it - model.numBoolVars }.toIntArray()), cancellation)
     }
 
     private fun closeSelection(problem: BakedProblem, requested: FreedVars, cancellation: ExecutionControl): FreedVars {
@@ -416,15 +346,8 @@ internal class FiniteNumericalRemoval(
         }
         val work = RepairBlockWork(stop, 65_536)
         return try {
-            val closedBlock = RepairBlockClosure.close(
-                model,
-                requested,
-                definitions,
-                callerPins,
-                4096,
-                4096,
-                work,
-            )
+            val closedBlock = RepairBlockClosure.close(model, requested, definitions, callerPins,
+                4096, 4096, work)
             if (blocked(cancellation)) FreedVars(intArrayOf(), intArrayOf()) else closedBlock.freed
         } catch (_: RepairBlockInterrupted) {
             if (!blocked(cancellation)) {

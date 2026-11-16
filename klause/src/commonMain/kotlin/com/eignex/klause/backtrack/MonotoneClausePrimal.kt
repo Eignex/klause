@@ -44,10 +44,8 @@ internal class MonotoneClausePrimal private constructor(
     private val phaseToken = object : ExecutionControl() {
         override val workScheduled: Boolean get() = lifetime.workScheduled()
         override fun isCancelled(): Boolean = lifetime() || params.nodeBudget?.allowance?.exhausted() == true ||
-            (
-                !lifetime.workScheduled() &&
-                    activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis
-                )
+            (!lifetime.workScheduled() &&
+                activeMillis + (activeStart?.elapsedNow()?.inWholeMilliseconds ?: 0L) >= activeBudgetMillis)
         override fun deadline() = lifetime.deadline()
     }
     private var closed = false
@@ -139,10 +137,7 @@ internal class MonotoneClausePrimal private constructor(
                 retireRepair()
                 val scope = if (bootstrap) purePins(next).first else next
                 val prepared = ClausePrimalProjection.prepare(
-                    solver.problem,
-                    scope,
-                    params.nativeSat,
-                    phaseToken,
+                    solver.problem, scope, params.nativeSat, phaseToken,
                 ) { literalWork += it }
                 val reduced = prepared.projection
                 if (reduced == null) {
@@ -182,13 +177,8 @@ internal class MonotoneClausePrimal private constructor(
             if (bootstrap) {
                 bootstrap = false
                 walk = ClausePrimalWalk(
-                    sample,
-                    clauses,
-                    objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] > 0L },
-                    params.assumptions,
-                    params.randomSeed,
-                    params.nodeBudget,
-                    phaseToken,
+                    sample, clauses, objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] > 0L },
+                    params.assumptions, params.randomSeed, params.nodeBudget, phaseToken,
                 )
                 continue
             }
@@ -202,19 +192,12 @@ internal class MonotoneClausePrimal private constructor(
 
     private fun openRepair(model: BacktrackSolver, assumptions: Assumptions): ResumableMinimize? = try {
         ResumableMinimize(
-            model,
-            LinearObjective(),
+            model, LinearObjective(),
             BacktrackPresets.satOptimized(
-                params.randomSeed,
-                inprocess = false,
-                cancellation = phaseToken,
+                params.randomSeed, inprocess = false, cancellation = phaseToken,
             ).copy(
-                assumptions = assumptions,
-                nativeSat = params.nativeSat,
-                pbLearning = false,
-                nodeBudget = params.nodeBudget,
-                targetPhasing = false,
-                valueSelector = IndomainMin,
+                assumptions = assumptions, nativeSat = params.nativeSat, pbLearning = false,
+                nodeBudget = params.nodeBudget, targetPhasing = false, valueSelector = IndomainMin,
             ),
             rebindable = true,
             ownsWorkDebt = false,
@@ -261,15 +244,11 @@ internal class MonotoneClausePrimal private constructor(
             if (clause.literals.any { literal ->
                     pins[Lit.variable(literal)]?.let { Lit.evaluate(literal, it) } == true
                 }
-            ) {
-                continue
-            }
+            ) continue
             for (literal in clause.literals) {
                 val variable = Lit.variable(literal)
-                if (variable !in pins) {
-                    polarity[variable] = polarity[variable] or
-                        if (Lit.isPositive(literal)) 1 else 2
-                }
+                if (variable !in pins) polarity[variable] = polarity[variable] or
+                    if (Lit.isPositive(literal)) 1 else 2
             }
         }
         return polarity
@@ -289,9 +268,7 @@ internal class MonotoneClausePrimal private constructor(
                         Lit.variable(literal) != variable && Lit.evaluate(literal, values[Lit.variable(literal)])
                     }
                 }
-            ) {
-                values[variable] = !values[variable]
-            }
+            ) values[variable] = !values[variable]
         }
         polishing = null
         val value = objective.evaluate(candidate)
@@ -322,9 +299,7 @@ internal class MonotoneClausePrimal private constructor(
             val problem = solver.problem
             if (problem.numIntVars != 0 || problem.numRealVars != 0 ||
                 objective.boolWeightValues.any { it < 0L } || objective.intCoefficientValues.any { it != 0L }
-            ) {
-                return null
-            }
+            ) return null
             val rootPins = (problem.rootDeductions as? PropagationResult.Implied)?.toAssumptions() ?: Assumptions.None
             val scopedParams = params.copy(assumptions = rootPins.mergedWith(params.assumptions))
             val costVariables = objective.boolWeightValues.indices.filter { objective.boolWeightValues[it] > 0L }
@@ -333,22 +308,16 @@ internal class MonotoneClausePrimal private constructor(
             if (costVariables.any { variable ->
                     variable >= problem.numBoolVars || params.assumptions.boolValueOrNull(variable) != null
                 }
-            ) {
-                return null
-            }
+            ) return null
             val variables = costVariables.filter { rootPins.boolValueOrNull(it) == null }
             if (variables.isEmpty()) return null
             val occurrences = Array(problem.numBoolVars) { mutableListOf<Clause>() }
             var literalWork = 0L
             val clauses = mutableListOf<Clause>()
             for (factor in problem.factors) {
-                if (lifetime() || (
-                        !lifetime.workScheduled() &&
-                            start.elapsedNow().inWholeMilliseconds >= activeBudgetMillis
-                        )
-                ) {
-                    return null
-                }
+                if (lifetime() || (!lifetime.workScheduled() &&
+                        start.elapsedNow().inWholeMilliseconds >= activeBudgetMillis)
+                ) return null
                 val clause = factor as? Clause ?: return null
                 clauses.add(clause)
                 for (literal in clause.literals) {
@@ -358,9 +327,7 @@ internal class MonotoneClausePrimal private constructor(
                     occurrences[variable].add(clause)
                     if (!Lit.isPositive(literal) &&
                         (objective.boolWeightValues.getOrNull(Lit.variable(literal)) ?: 0L) > 0L
-                    ) {
-                        return null
-                    }
+                    ) return null
                 }
             }
             return MonotoneClausePrimal(

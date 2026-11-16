@@ -57,12 +57,7 @@ internal fun ComponentPlan.search(
     theorySolveStop: ExecutionControl? = null,
     openHintFlips: Long? = null,
 ): PlannedSearch = PreparedSearchComponents(this, spec, cpDomains).open(
-    maxChecks,
-    cancellation,
-    learnedDb,
-    smtStats,
-    theorySolveStop,
-    openHintFlips,
+    maxChecks, cancellation, learnedDb, smtStats, theorySolveStop, openHintFlips,
 )
 
 internal class PreparedSearchComponents(
@@ -82,7 +77,6 @@ internal class PreparedSearchComponents(
 
     private val clauses = spec.factors.indices.filter { plan.factorOwner(it) == FactorOwner.SHARED }
         .mapNotNull { spec.factors[it] as? Clause }
-
     // CP owns its projected cardinalities; a second component would enforce them twice.
     private val cardinalities = spec.factors.indices
         .filter { plan.factorOwner(it) != FactorOwner.CP }
@@ -108,29 +102,16 @@ internal class PreparedSearchComponents(
             }
         }
         val boolean = descriptors.firstOrNull { it.responsibility == ComponentResponsibility.BOOLEAN }
-            ?: ExecutionComponentDescriptor(
-                "boolean",
-                ComponentResponsibility.BOOLEAN,
-                emptyList(),
-                emptyList(),
-                emptyList(),
-            )
+            ?: ExecutionComponentDescriptor("boolean", ComponentResponsibility.BOOLEAN, emptyList(),
+                emptyList(), emptyList())
         selected += PreparedSearchRegistration(spec, boolean) {
-            listOf(ClauseSearchComponent(clauses)) + if (cardinalities.isEmpty()) {
-                emptyList()
-            } else {
-                listOf(CardinalitySearchComponent(cardinalities))
-            }
+            listOf(ClauseSearchComponent(clauses)) + if (cardinalities.isEmpty()) emptyList()
+            else listOf(CardinalitySearchComponent(cardinalities))
         }
         plan.theoryComponentFactory(fragment) { exactSource }?.let { factory ->
             val descriptor = descriptors.firstOrNull { it.responsibility == ComponentResponsibility.COMPLETION }
-                ?: ExecutionComponentDescriptor(
-                    "arithmetic",
-                    ComponentResponsibility.COMPLETION,
-                    emptyList(),
-                    emptyList(),
-                    emptyList(),
-                )
+                ?: ExecutionComponentDescriptor("arithmetic", ComponentResponsibility.COMPLETION,
+                    emptyList(), emptyList(), emptyList())
             selected += PreparedSearchRegistration(spec, descriptor, factory)
         }
         selected.toList()

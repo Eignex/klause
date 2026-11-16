@@ -29,11 +29,9 @@ internal class SimplexSolveControl(
     private var chargedOps = 0L
     private var pricingPollOps = 0L
 
-    val cancellation: ExecutionControl = cancelledWhen(
-        { stopToken.deadline() },
+    val cancellation: ExecutionControl = cancelledWhen({ stopToken.deadline() },
         { stopToken.workScheduled },
-        { stopToken.stopPolling },
-    ) {
+        { stopToken.stopPolling }) {
         chargeWork()
         stopToken()
     }

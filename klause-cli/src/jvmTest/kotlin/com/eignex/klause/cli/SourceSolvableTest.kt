@@ -26,12 +26,8 @@ class SourceSolvableTest(private val direction: String) {
 
     @Test
     fun `finite source definitions should retain one invocation and publish original objective units`() {
-        val source = Problem.of(
-            0,
-            2,
-            arrayOf(IntDomain(0, 1), IntDomain(2, 3)),
-            arrayOf(Element(0, 1, longArrayOf(2, 3), arrIsVars = false, indexOffset = 0)),
-        )
+        val source = Problem.of(0, 2, arrayOf(IntDomain(0, 1), IntDomain(2, 3)),
+            arrayOf(Element(0, 1, longArrayOf(2, 3), arrIsVars = false, indexOffset = 0)))
         val maximize = direction == "maximize"
         val objective = LinearObjective(intCoefficients = longArrayOf(0, if (maximize) -1L else 1L))
         val common = CommonOptions().apply {
@@ -40,24 +36,16 @@ class SourceSolvableTest(private val direction: String) {
             randomSeed = 17L
             presolve = "none"
         }
-        val solvable = sourceSolvable(
-            source,
-            objective,
-            maximize,
-            common,
-            { "x=${it.intValue(1)}" },
-            { error("finite source selected open rendering") },
-            definedVars = intArrayOf(1),
-        )
+        val solvable = sourceSolvable(source, objective, maximize, common,
+            { "x=${it.intValue(1)}" }, { error("finite source selected open rendering") },
+            definedVars = intArrayOf(1))
         val points = mutableListOf<Pair<String, Long?>>()
         var completed: Verdict? = null
         val output = object : OutputProtocol by SmtLibOutput() {
             override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
                 points += rendered to objective
             }
-            override fun onComplete(verdict: Verdict) {
-                completed = verdict
-            }
+            override fun onComplete(verdict: Verdict) { completed = verdict }
         }
 
         SolveCore.solve(solvable, common, output)

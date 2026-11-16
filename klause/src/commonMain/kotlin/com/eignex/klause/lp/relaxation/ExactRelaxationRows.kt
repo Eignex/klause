@@ -26,18 +26,11 @@ internal class ExactRelaxationRows {
         premises: LpRowPremises?,
     ) {
         val negate = relation == Relation.GE
-        rows[builder.rowCount] = Row(
-            columns.copyOf(),
+        rows[builder.rowCount] = Row(columns.copyOf(),
             if (negate) coefficients.map { it.negated() } else coefficients.toList(),
-            if (negate) rhs.negated() else rhs,
-        )
-        builder.addRealRow(
-            columns,
-            coefficients.map { it.toDouble() }.toDoubleArray(),
-            relation,
-            rhs.toDouble(),
-            validity = premises,
-        )
+            if (negate) rhs.negated() else rhs)
+        builder.addRealRow(columns, coefficients.map { it.toDouble() }.toDoubleArray(), relation, rhs.toDouble(),
+            validity = premises)
     }
 
     fun project(model: LpModel, cancellation: ExecutionControl): LpModel? {
@@ -63,14 +56,12 @@ internal class ExactRelaxationRows {
             rhs[index] = ExactLpNumber.of(shifted)
         }
         val exact = ExactLpModel(
-            matrix.map { column -> column.sortedBy { it.row } },
-            rhs,
+            matrix.map { column -> column.sortedBy { it.row } }, rhs,
             List(model.numVars) { column ->
                 val source = original.column(column)
                 if (column - model.n in rows) source.copy(integral = false) else source
             },
-            List(model.m) { original.row(it) },
-            original.objective,
+            List(model.m) { original.row(it) }, original.objective,
         )
         return LpExactState(exact).toWorkingModel(LpProjectionMeter(cancellation = cancellation))
     }

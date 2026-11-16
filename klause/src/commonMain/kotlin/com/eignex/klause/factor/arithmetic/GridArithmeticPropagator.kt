@@ -11,10 +11,7 @@ internal class GridArithmeticPropagator(private val relation: GridArithmetic) : 
     override fun propagate(state: PropagationState, factorId: Int): Boolean {
         for (coordinate in relation.inputs + relation.output) {
             if (!state.tightenIntMin(coordinate.variable, 0L) ||
-                !state.tightenIntMax(coordinate.variable, coordinate.buckets - 1L)
-            ) {
-                return false
-            }
+                !state.tightenIntMax(coordinate.variable, coordinate.buckets - 1L)) return false
         }
         val inputs = relation.inputs.map { it.variable }.distinct()
         var pairs = 1L
@@ -46,10 +43,7 @@ internal class GridArithmeticPropagator(private val relation: GridArithmetic) : 
         for ((variable, supported) in supports) {
             if (supported.isEmpty()) return false
             if (!state.tightenIntMin(variable, supported.min(), reason) ||
-                !state.tightenIntMax(variable, supported.max(), reason)
-            ) {
-                return false
-            }
+                !state.tightenIntMax(variable, supported.max(), reason)) return false
             val span = state.intDomains[variable].spanOrNull(FILTER_LIMIT) ?: continue
             val candidates = LongArray(span.size) { span.valueAt(it) }
             for (value in candidates) {

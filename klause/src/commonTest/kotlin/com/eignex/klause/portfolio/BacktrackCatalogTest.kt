@@ -30,8 +30,7 @@ class BacktrackCatalogTest {
             Triple(Kind.CSP, ProblemClass.MixedInteger, true),
         )) {
             val facts = ProblemFacts(
-                ProblemFacts.assumed(kind, problemClass).profile,
-                extensionalSupports = tables,
+                ProblemFacts.assumed(kind, problemClass).profile, extensionalSupports = tables,
             ) { false }
 
             val recipes = BacktrackCatalog.ranked(kind, facts)
@@ -40,6 +39,7 @@ class BacktrackCatalogTest {
             assertFalse(recipes.any { it.label == "propagation-guided" })
         }
     }
+
 
     @Test
     fun `clausal satisfaction should lead with its clause only proof recipe`() {

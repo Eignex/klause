@@ -10,12 +10,7 @@ internal class HighDemandUnarySubset(
     val sourceTasks: IntArray,
 ) {
     private val unary = DisjunctivePropagator(
-        starts.distinct().toIntArray(),
-        starts,
-        durations,
-        emptyIntArray(),
-        emptyIntArray(),
-        starts.size,
+        starts.distinct().toIntArray(), starts, durations, emptyIntArray(), emptyIntArray(), starts.size,
         reasonPrefix = REASON_TAG,
     )
 
@@ -53,19 +48,13 @@ internal class HighDemandUnarySubset(
 internal fun Cumulative.highDemandUnarySubset(): HighDemandUnarySubset? {
     if (unary || n !in 4..128 || presents.isNotEmpty() || durationVars.isNotEmpty() ||
         resourceVars.isNotEmpty() || capacityVar >= 0 || capacity > (1L shl 20)
-    ) {
-        return null
-    }
+    ) return null
     // Two selected tasks exceed capacity whenever they overlap; zero-duration tasks occupy no time.
     val tasks = starts.indices.filter { durations[it] > 0 && resources[it] > capacity / 2 }
     if (tasks.size !in 3..32 || tasks.size == n ||
         tasks.any { resources[it] > capacity || durations[it] > HighDemandUnarySubset.WINDOW_LIMIT }
-    ) {
-        return null
-    }
+    ) return null
     return HighDemandUnarySubset(
-        tasks.map { starts[it] }.toIntArray(),
-        tasks.map { durations[it] }.toLongArray(),
-        tasks.toIntArray(),
+        tasks.map { starts[it] }.toIntArray(), tasks.map { durations[it] }.toLongArray(), tasks.toIntArray(),
     )
 }

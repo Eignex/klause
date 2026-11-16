@@ -16,8 +16,7 @@ internal class TheoryCompletion(
     private val model: Problem,
     params: TheoryParams,
     preparedSource: PreparedSourcePlan? = null,
-) : CandidateCompletion,
-    AutoCloseable {
+) : CandidateCompletion, AutoCloseable {
     private val adapter = OpenExactNeighborhood(model, params, preparedSource = preparedSource)
     val stats: SolveStats get() = adapter.stats
 

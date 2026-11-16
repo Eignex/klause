@@ -1,4 +1,5 @@
 package com.eignex.klause.localsearch
+
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.util.ExecutionControl

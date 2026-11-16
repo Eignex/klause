@@ -175,7 +175,10 @@ internal class Alns(
 
     private var activeSearch = false
 
-    private inner class IncumbentSeeds(private val objective: LinearObjective, private val params: LocalSearchParams) {
+    private inner class IncumbentSeeds(
+        private val objective: LinearObjective,
+        private val params: LocalSearchParams,
+    ) {
         private val exchange = pooledIncumbents ?: params.pooledIncumbents
         private var seenVersion = 0L
         private val toleranceCheck = incumbentToleranceCheck
@@ -277,11 +280,9 @@ internal class Alns(
         private var repairOpened = false
         private var closed = false
         private var currentCancellation = params.cancellation
-        private val repairCancellation = cancelledWhen(
-            { currentCancellation.deadline() },
+        private val repairCancellation = cancelledWhen({ currentCancellation.deadline() },
             { currentCancellation.workScheduled() },
-            { currentCancellation.stopPolling },
-        ) {
+            { currentCancellation.stopPolling }) {
             currentCancellation() || backtrackParams?.cancellation?.invoke() == true
         }
         private var iter = 0
@@ -301,9 +302,10 @@ internal class Alns(
             return true
         }
 
-        fun finished(params: LocalSearchParams): Boolean = iter >= maxIterations ||
-            params.maxInstructions?.let { telemetry.outerAllowance >= it } == true ||
-            params.nodeBudget?.allowance?.movesLeft() == 0L
+        fun finished(params: LocalSearchParams): Boolean =
+            iter >= maxIterations ||
+                params.maxInstructions?.let { telemetry.outerAllowance >= it } == true ||
+                params.nodeBudget?.allowance?.movesLeft() == 0L
 
         fun advance(
             params: LocalSearchParams,
@@ -341,9 +343,7 @@ internal class Alns(
                     maxFlips = iterFlips,
                     randomSeed = if (params.randomSeed != null || params.cancellation.workScheduled()) {
                         rng.nextLong()
-                    } else {
-                        null
-                    },
+                    } else null,
                     // The iteration's allowance is charged below, whatever its repair spends.
                     nodeBudget = null,
                 )
@@ -363,25 +363,12 @@ internal class Alns(
                     minDestroyFraction
                 }
                 val destroyed = destroyOperators[destroyIdx]
-                    .destroy(
-                        rng,
-                        inner.problem,
-                        incumbent,
-                        objective,
-                        destroyFraction,
-                        params.assumptions,
-                        params.cancellation,
-                    )
+                    .destroy(rng, inner.problem, incumbent, objective, destroyFraction,
+                        params.assumptions, params.cancellation)
                 val freed = RepairScope.effective(destroyed, params.assumptions, literalSweep, params.cancellation)
                 val attempt = repairTrace?.begin(
-                    "alns:$destroyIdx:$repairIdx",
-                    params.randomSeed,
-                    incumbent,
-                    incumbent,
-                    destroyed.bools,
-                    destroyed.ints,
-                    freed?.bools ?: intArrayOf(),
-                    freed?.ints ?: intArrayOf(),
+                    "alns:$destroyIdx:$repairIdx", params.randomSeed, incumbent, incumbent,
+                    destroyed.bools, destroyed.ints, freed?.bools ?: intArrayOf(), freed?.ints ?: intArrayOf(),
                 )
                 tracedRepair = attempt
                 if (attempt != null) {
@@ -519,9 +506,10 @@ internal class Alns(
     }
 
     @Suppress("TooGenericExceptionCaught", "UNCHECKED_CAST")
-    private inner class RetainedSearch(private val objective: LinearObjective, private val params: LocalSearchParams) :
-        InstructionSlicedSearch,
-        IncumbentBootstrapSearch {
+    private inner class RetainedSearch(
+        private val objective: LinearObjective,
+        private val params: LocalSearchParams,
+    ) : InstructionSlicedSearch, IncumbentBootstrapSearch {
         private val telemetry = AlnsStatsSink()
         private val seeds = IncumbentSeeds(objective, params)
         private var cpBootstrap: ResumableSearch? = null
@@ -543,10 +531,8 @@ internal class Alns(
         override val work: Long get() = (chargedInstructions / LS_INSTRUCTIONS_PER_WORK).toLong()
         override val preparationPending: Boolean
             get() = neighborhood == null && !closed &&
-                (
-                    cpBootstrap?.preparationPending == true || !lsAttempted ||
-                        (lsBootstrap?.isDone == false && lsBootstrap?.stats?.ls?.moves?.sum == 0.0)
-                    )
+                (cpBootstrap?.preparationPending == true || !lsAttempted ||
+                    (lsBootstrap?.isDone == false && lsBootstrap?.stats?.ls?.moves?.sum == 0.0))
 
         override val stats: SolveStats
             get() {
@@ -561,8 +547,7 @@ internal class Alns(
             sliceNodes: Long,
             onIncumbent: (MinimizeResult.WithSample) -> Unit,
         ): MinimizeResult? = runInstructionSlice(
-            global,
-            sliceMillis,
+            global, sliceMillis,
             if (sliceNodes < 0L) Long.MAX_VALUE else ceil(sliceNodes * LS_INSTRUCTIONS_PER_WORK).toLong(),
             onIncumbent,
         )
@@ -670,7 +655,6 @@ internal class Alns(
                         handle.runInstructionSlice(lsToken, Long.MAX_VALUE, sliceInstructions) {
                             acceptBootstrap(it.sample, onIncumbent)
                         }
-
                     null -> {
                         val bounded = lp.copy(
                             maxInstructions = minOf(lp.maxInstructions ?: Long.MAX_VALUE, sliceInstructions),
@@ -680,15 +664,10 @@ internal class Alns(
                         telemetry.bootstrapLsMoves += cold.stats.ls.moves.sum.toLong()
                         cold
                     }
-
                     else -> handle.runSlice(
-                        lsToken,
-                        Long.MAX_VALUE,
-                        if (sliceInstructions == Long.MAX_VALUE) {
-                            -1L
-                        } else {
-                            ceil(sliceInstructions / LS_INSTRUCTIONS_PER_WORK).toLong()
-                        },
+                        lsToken, Long.MAX_VALUE,
+                        if (sliceInstructions == Long.MAX_VALUE) -1L else
+                            ceil(sliceInstructions / LS_INSTRUCTIONS_PER_WORK).toLong(),
                     ) { acceptBootstrap(it.sample, onIncumbent) }
                 }
                 result?.assignment?.let { acceptBootstrap(it, onIncumbent) }
@@ -710,7 +689,10 @@ internal class Alns(
             }
         }
 
-        private fun observeBootstrapWork(cp: ResumableSearch? = cpBootstrap, ls: ResumableSearch? = lsBootstrap) {
+        private fun observeBootstrapWork(
+            cp: ResumableSearch? = cpBootstrap,
+            ls: ResumableSearch? = lsBootstrap,
+        ) {
             cp?.let { telemetry.bootstrapCpNodes = it.stats.search.nodes.sum.toLong() }
             ls?.let {
                 bootstrapStats = it.stats
@@ -798,14 +780,8 @@ internal class Alns(
         var repairNanos = 0L
 
         fun snapshot() = AlnsStats(
-            bootstrapCpNodes,
-            bootstrapLsMoves,
-            repairCpNodes,
-            repairLsMoves,
-            outerAllowance,
-            bootstrapCpMillis,
-            bootstrapLsMillis,
-            repairNanos / 1_000_000,
+            bootstrapCpNodes, bootstrapLsMoves, repairCpNodes, repairLsMoves, outerAllowance,
+            bootstrapCpMillis, bootstrapLsMillis, repairNanos / 1_000_000,
         )
     }
 

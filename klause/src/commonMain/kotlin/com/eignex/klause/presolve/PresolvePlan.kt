@@ -83,11 +83,7 @@ class PresolveConfig(
     /** Maximum rounds per source or finite pass schedule. */
     val maxRounds: Int = if (emphasis == PresolveEmphasis.OFF &&
         overrides.any { (pass, enabled) -> enabled && pass.stage == PresolvePass.Stage.PROBLEM }
-    ) {
-        PresolveEmphasis.DEFAULT.maxRounds
-    } else {
-        emphasis.maxRounds
-    },
+    ) PresolveEmphasis.DEFAULT.maxRounds else emphasis.maxRounds,
     /** Keep structured readers and binary partitions in affine and structural passes. */
     val preserveStructure: Boolean = false,
     /** Maximum factor/entry visits per rewrite impact observation; zero disables it. */
@@ -108,17 +104,18 @@ class PresolveConfig(
     fun probeTotalBudget(): Int = probeTotalBudgetOverride ?: emphasis.probeTotalBudget
 
     /** Return this plan with a different affine-elimination pivot order. */
-    fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveConfig = PresolveConfig(
-        emphasis,
-        overrides,
-        probeBudgetPerVarOverride,
-        probeTotalBudgetOverride,
-        pivotOrder,
-        abortFraction,
-        maxRounds,
-        preserveStructure,
-        structuralImpactLimit,
-    )
+    fun withAffinePivotOrder(pivotOrder: AffinePivotOrder): PresolveConfig =
+        PresolveConfig(
+            emphasis,
+            overrides,
+            probeBudgetPerVarOverride,
+            probeTotalBudgetOverride,
+            pivotOrder,
+            abortFraction,
+            maxRounds,
+            preserveStructure,
+            structuralImpactLimit,
+        )
 
     /** Return a request-local effort plan, keeping unspecified limits. */
     fun withEffort(

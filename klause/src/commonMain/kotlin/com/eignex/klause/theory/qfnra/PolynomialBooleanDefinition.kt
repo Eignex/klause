@@ -27,9 +27,7 @@ private class BooleanDefinitionFinder(
             arithmetic.step()
             if (state.value(index) != PolynomialFormula.TRUE || node !is FormulaNode.Junction ||
                 node.conjunction || node.children.size != 2
-            ) {
-                continue
-            }
+            ) continue
             val clause = term(node.children)
             if (clause != null) recordClause(clause) else recordAlternatives(node.children)
         }
@@ -54,9 +52,7 @@ private class BooleanDefinitionFinder(
         val second = term(right.children) ?: return
         if (first.variable != second.variable || first.atom != second.atom ||
             first.booleanTruth == second.booleanTruth || first.atomTruth == second.atomTruth
-        ) {
-            return
-        }
+        ) return
         record(DefinitionKey(first.variable, first.atom, first.booleanTruth == first.atomTruth))
     }
 
@@ -78,11 +74,8 @@ private class BooleanDefinitionFinder(
     private fun literal(index: Int): DefinitionLiteral {
         arithmetic.step()
         val node = nodes[index]
-        return if (node is FormulaNode.Not) {
-            DefinitionLiteral(nodes[node.child], false)
-        } else {
-            DefinitionLiteral(node, true)
-        }
+        return if (node is FormulaNode.Not) DefinitionLiteral(nodes[node.child], false)
+        else DefinitionLiteral(node, true)
     }
 
     private fun term(boolean: DefinitionLiteral, numeric: DefinitionLiteral): DefinitionTerm? {

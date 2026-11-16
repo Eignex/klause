@@ -38,10 +38,7 @@ internal fun prepareFactorQuadratic(
         }
     }
     val plan = request.boundCancellation.presolveBudget().observePreparation(
-        PresolvePreparationStage.SOURCE_ENCODER,
-        PresolveLane.SOURCE,
-        bounded,
-        polynomialStop,
+        PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, bounded, polynomialStop,
     ) { token, observation ->
         bounded.preparePolynomialExecutionPlan(
             original = source,
@@ -116,30 +113,17 @@ internal fun executeNativeSource(
                     affine?.let { if (invocation.maximizeSourceObjective) it.negated() else it }
                 } else {
                     // A nonlinear objective has no coefficient sign for dual fixing.
-                    LinearObjective(
-                        boolWeights = LongArray(model.numBoolVars) { 1L },
-                        intCoefficients = LongArray(model.numIntVars) { 1L },
-                    )
+                    LinearObjective(boolWeights = LongArray(model.numBoolVars) { 1L },
+                        intCoefficients = LongArray(model.numIntVars) { 1L })
                 }
-                native.request.prepareSource(
-                    request.presolveConfig ?: PresolveConfig.DEFAULT,
-                    protection,
-                    request.presolveCancellation,
-                    params.cancellation or params.timeout,
-                    request.presolveBudget,
-                    solutionSetSensitive = quadratic != null,
-                )
-            } else {
-                null
+                native.request.prepareSource(request.presolveConfig ?: PresolveConfig.DEFAULT, protection,
+                    request.presolveCancellation, params.cancellation or params.timeout, request.presolveBudget,
+                    solutionSetSensitive = quadratic != null)
+            } else null
+            if (source?.infeasible == true) return SourceExecutionResult.Refuted(invocation).also {
+                it.preparationStats = source.stats
             }
-            if (source?.infeasible == true) {
-                return SourceExecutionResult.Refuted(invocation).also {
-                    it.preparationStats = source.stats
-                }
-            }
-            val prepared = if (source == null) {
-                native.request
-            } else {
+            val prepared = if (source == null) native.request else {
                 native.request.afterSourcePreparation(source, params.cancellation or params.timeout)
                     ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
                         it.preparationStats = source.stats

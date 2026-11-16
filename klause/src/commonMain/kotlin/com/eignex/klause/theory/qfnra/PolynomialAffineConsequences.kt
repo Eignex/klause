@@ -53,43 +53,29 @@ internal fun preparePolynomialAffineConsequences(
         for (row in rows) {
             arithmetic.step()
             val remainder = arithmetic.subtract(row.atom.polynomial, arithmetic.scale(coordinate, row.coefficient))
-            val bound = ConsequenceBound(
-                arithmetic.scale(remainder, row.coefficient.reciprocal().negated()),
+            val bound = ConsequenceBound(arithmetic.scale(remainder, row.coefficient.reciprocal().negated()),
                 row.atom.relation == PolynomialRelation.GT || row.atom.relation == PolynomialRelation.LT,
-                row.support,
-            )
+                row.support)
             val increasing = row.atom.relation == PolynomialRelation.GE || row.atom.relation == PolynomialRelation.GT
             if ((row.coefficient.signum() > 0) == increasing) lower.add(bound) else upper.add(bound)
             yield(null)
         }
-        for (a in lower) {
-            for (b in upper) {
-                arithmetic.step()
-                val polynomial = arithmetic.subtract(b.polynomial, a.polynomial)
-                val support = polynomial.variables.size
-                if (support < maxOf(a.support, b.support)) {
-                    val atom = PolynomialAtom(
-                        polynomial,
-                        if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE,
-                    )
-                    val tautology = support == 0 && atom.holds(polynomial.coefficient(Monomial.ONE).signum())
-                    if (!tautology && seen.add(atom)) consequences.add(AffineConsequence(atom, support))
-                }
-                yield(null)
+        for (a in lower) for (b in upper) {
+            arithmetic.step()
+            val polynomial = arithmetic.subtract(b.polynomial, a.polynomial)
+            val support = polynomial.variables.size
+            if (support < maxOf(a.support, b.support)) {
+                val atom = PolynomialAtom(polynomial,
+                    if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE)
+                val tautology = support == 0 && atom.holds(polynomial.coefficient(Monomial.ONE).signum())
+                if (!tautology && seen.add(atom)) consequences.add(AffineConsequence(atom, support))
             }
+            yield(null)
         }
     }
-    val ordered = consequences.sortedWith { a, b ->
-        arithmetic.step()
-        a.support.compareTo(b.support)
-    }
+    val ordered = consequences.sortedWith { a, b -> arithmetic.step(); a.support.compareTo(b.support) }
     arithmetic.step()
-    yield(
-        ordered.map {
-            arithmetic.step()
-            it.atom
-        },
-    )
+    yield(ordered.map { arithmetic.step(); it.atom })
 }.iterator()
 
 private class ConsequenceInput(val atom: PolynomialAtom, val coefficient: BigFraction, val support: Int)

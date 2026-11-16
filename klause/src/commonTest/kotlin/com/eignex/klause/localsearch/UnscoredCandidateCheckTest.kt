@@ -45,16 +45,10 @@ class UnscoredCandidateCheckTest {
         val check = UnscoredCandidateCheck(Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf<Factor>(factor)).bake())
         check.check(Sample(BooleanArray(0), longArrayOf(2, 3, 6)), Assumptions.None, ExecutionControl.Never)
 
-        val refuted = check.check(
-            Sample(BooleanArray(0), longArrayOf(2, 3, 5)),
-            Assumptions.None,
-            ExecutionControl.Never,
-        )
-        val accepted = check.check(
-            Sample(BooleanArray(0), longArrayOf(1, 4, 4)),
-            Assumptions.None,
-            ExecutionControl.Never,
-        )
+        val refuted = check.check(Sample(BooleanArray(0), longArrayOf(2, 3, 5)), Assumptions.None,
+            ExecutionControl.Never)
+        val accepted = check.check(Sample(BooleanArray(0), longArrayOf(1, 4, 4)), Assumptions.None,
+            ExecutionControl.Never)
 
         assertIs<Completion.Refuted>(refuted)
         assertIs<Completion.Witness>(accepted)
@@ -71,11 +65,8 @@ class UnscoredCandidateCheckTest {
         }
         val check = UnscoredCandidateCheck(Problem(0, 3, Array(3) { IntDomain(0, 9) }, arrayOf<Factor>(factor)).bake())
 
-        val decided = check.check(
-            Sample(BooleanArray(0), longArrayOf(10, 1, 10)),
-            Assumptions.None,
-            ExecutionControl.Never,
-        )
+        val decided = check.check(Sample(BooleanArray(0), longArrayOf(10, 1, 10)), Assumptions.None,
+            ExecutionControl.Never)
 
         assertIs<Completion.Witness>(decided)
     }

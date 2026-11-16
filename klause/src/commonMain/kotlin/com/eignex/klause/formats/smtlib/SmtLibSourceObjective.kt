@@ -17,12 +17,8 @@ internal fun captureSmtSourceObjective(
     cancellation: ExecutionControl,
     semantics: EffectiveSourceSemantics,
 ): SmtLibPolynomialProblem {
-    val compiler = SmtLibPolynomialCompiler(
-        cancellation,
-        allowIntegers = true,
-        allowFunctions = true,
-        semantics = semantics,
-    )
+    val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
+        allowFunctions = true, semantics = semantics)
     for (command in commands) {
         cancellation.polynomialSourceCheckpoint(1)
         val head = ((command as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
@@ -42,16 +38,10 @@ internal fun SmtLibPolynomialProblem.bindObjective(
 ): SmtLibProblem {
     fun mapping(names: Map<String, Int>, retained: Map<String, Int>): IntArray {
         val canonical = retained.mapKeys { polynomialSymbol(it.key) }
-        return names.keys.map {
-            cancellation.polynomialSourceCheckpoint()
-            canonical.getValue(it)
-        }.toIntArray()
+        return names.keys.map { cancellation.polynomialSourceCheckpoint(); canonical.getValue(it) }.toIntArray()
     }
-    val remap = VarRemap(
-        mapping(boolVarNames, source.boolVarNames),
-        mapping(intVarNames, source.intVarNames),
-        mapping(realVarNames, source.realVarNames),
-    )
+    val remap = VarRemap(mapping(boolVarNames, source.boolVarNames), mapping(intVarNames, source.intVarNames),
+        mapping(realVarNames, source.realVarNames))
     val original = requireNotNull(objective).remap(remap)
     val affine = original.affineObjective(source, cancellation)
     return source.copy(objective = affine, quadraticObjective = if (affine == null) original else null)
@@ -93,15 +83,11 @@ private fun QuadraticObjectiveSpec.affineObjective(
                 if (BigFraction.ofDouble(value) != coefficient) return null
                 reals[variable.id.index] = value
             }
-
             is QuadraticVariable.Int, is QuadraticVariable.Bool -> {
                 if (coefficient.den != BIG_ONE || !coefficient.num.fitsLong()) return null
                 val value = coefficient.num.toLongExact()
-                if (variable is QuadraticVariable.Int) {
-                    integers[variable.id.index] = value
-                } else {
-                    booleans[(variable as QuadraticVariable.Bool).id.index] = value
-                }
+                if (variable is QuadraticVariable.Int) integers[variable.id.index] = value
+                else booleans[(variable as QuadraticVariable.Bool).id.index] = value
             }
         }
     }

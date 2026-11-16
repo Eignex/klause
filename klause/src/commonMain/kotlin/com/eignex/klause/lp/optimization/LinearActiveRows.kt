@@ -19,8 +19,9 @@ import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
-internal class LinearActiveRefutation(val conflict: SourceDerivation, val alternatives: Boolean = false) :
-    SourceDerivation.Extension
+internal class LinearActiveRefutation(
+    val conflict: SourceDerivation, val alternatives: Boolean = false,
+) : SourceDerivation.Extension
 
 internal data class LinearActiveResult(
     val evidence: SourceEvidence? = null,
@@ -51,9 +52,7 @@ internal class LinearActiveRows(
     val observations: Map<String, Long> get() = compositionObservations.toMap()
 
     fun check(
-        condition: SourceCondition,
-        cancellation: ExecutionControl,
-        begin: () -> Boolean = { true },
+        condition: SourceCondition, cancellation: ExecutionControl, begin: () -> Boolean = { true },
         capture: LinearAuthorityCapture? = null,
     ): LinearActiveResult {
         if (cancellation()) {
@@ -65,41 +64,26 @@ internal class LinearActiveRows(
         val resumed = pending?.takeIf { it.context.scope == branch.scope }
         val query = resumed ?: run {
             if (pending != null) invalidate()
-            val numeric = branch.activeNumericContext(
-                cancellation,
-                maximumWork = budget.funding?.availableWork ?: 100_000L,
-            ) { work, allocation ->
+            val numeric = branch.activeNumericContext(cancellation,
+                maximumWork = budget.funding?.availableWork ?: 100_000L) { work, allocation ->
                 budget.observe(preparation = work)
                 budget.funding?.charge(0L, allocation)
-            } ?: return LinearActiveResult(
-                paused = budget.funding?.paused == true,
-                captureDeclined = budget.funding?.paused != true && !cancellation(),
-            )
+            } ?: return LinearActiveResult(paused = budget.funding?.paused == true,
+                captureDeclined = budget.funding?.paused != true && !cancellation())
             if (budget.funding?.paused == true) return LinearActiveResult(paused = true)
-            val next = State(
-                numeric.premises.mapValues { it.value.inequality },
-                condition.lower,
-                condition.upper,
-                if (composeBranches) condition else null,
-            )
+            val next = State(numeric.premises.mapValues { it.value.inequality }, condition.lower, condition.upper,
+                if (composeBranches) condition else null)
             if (next == state && finished) return LinearActiveResult(unchanged = true)
             if (!begin()) return LinearActiveResult()
             state = next
             finished = false
             val consequences = if (composeBranches) {
                 val funded = ExecutionControl { cancellation() || budget.funding?.paused == true }
-                val prepared = LinearBooleanCutPreparation.prepare(
-                    branch,
-                    funded,
-                    { work, allocation ->
-                        budget.observe(preparation = work)
-                        budget.funding?.charge(0L, allocation)
-                    },
-                    LinearBooleanCutLimits(
-                        work = minOf(65_536L, budget.funding?.availableWork ?: 65_536L),
-                        allocation = minOf(1_048_576L, budget.funding?.remainingAllocation ?: 1_048_576L),
-                    ),
-                )
+                val prepared = LinearBooleanCutPreparation.prepare(branch, funded, { work, allocation ->
+                    budget.observe(preparation = work)
+                    budget.funding?.charge(0L, allocation)
+                }, LinearBooleanCutLimits(work = minOf(65_536L, budget.funding?.availableWork ?: 65_536L),
+                    allocation = minOf(1_048_576L, budget.funding?.remainingAllocation ?: 1_048_576L)))
                 val status = if (prepared.complete) "numericalBooleanCutComplete" else "numericalBooleanCutLimited"
                 compositionObservations[status] = (compositionObservations[status] ?: 0L) + 1L
                 val proofAllocation = branch.coordinateCount * 48L + branch.premiseCount * 64L
@@ -111,28 +95,21 @@ internal class LinearActiveRows(
                 var work = 0L
                 val allowance = minOf(100_000L, budget.funding?.availableWork ?: 100_000L)
                 val checks = SourceEvidenceVerifier(branch, maximumSteps = 100_000).verifyAll(
-                    prepared.consequences,
-                    ExecutionControl {
+                    prepared.consequences, ExecutionControl {
                         if (work >= allowance || funded() ||
-                            (budget.funding?.remainingAllocation ?: Long.MAX_VALUE) < 128L
-                        ) {
-                            true
-                        } else {
+                            (budget.funding?.remainingAllocation ?: Long.MAX_VALUE) < 128L) true else {
                             work++
                             budget.funding?.charge(0L, 128L)
                             funded()
                         }
-                    },
-                )
+                    })
                 budget.observe(boundCertification = work)
                 if (funded()) return LinearActiveResult(attempted = true, paused = budget.funding?.paused == true)
                 prepared.consequences.filterIndexed { index, _ -> checks[index] == SourceEvidenceCheck.Checked }.also {
                     compositionObservations["numericalBooleanCutChecked"] =
                         (compositionObservations["numericalBooleanCutChecked"] ?: 0L) + it.size
                 }
-            } else {
-                emptyList()
-            }
+            } else emptyList()
             LinearAuthorityQuery.prepare(numeric, null, cancellation, consequences = consequences)
                 ?.also { pending = it }
                 ?: return LinearActiveResult(attempted = true)
@@ -140,15 +117,8 @@ internal class LinearActiveRows(
         val zero = BigFraction.ZERO
         val costs = List(query.coordinates.size) { zero }
         ownerOpen = true
-        val guidance = lp.advance(
-            query.closureRows,
-            costs,
-            zero,
-            branch.scope,
-            cancellation,
-            query.inactive,
-            query.unconditionalRows,
-        )
+        val guidance = lp.advance(query.closureRows, costs, zero, branch.scope, cancellation,
+            query.inactive, query.unconditionalRows)
         if (cancellation()) {
             invalidate()
             return LinearActiveResult(attempted = resumed == null)
@@ -163,37 +133,22 @@ internal class LinearActiveRows(
                 if (allocation > (budget.funding?.remainingAllocation ?: Long.MAX_VALUE)) return null
                 budget.funding?.charge(0L, allocation)
             }
-            val proof = SourceDerivation.Combination(
-                weights.mapIndexedNotNull { id, weight ->
-                    if (weight.isZero) null else SourceDerivation.Combination.Term(weight, query.cited[id].second)
-                },
-            )
-            val evidence = SourceEvidence(
-                branch.scope,
-                SourceClaim.Refutation,
-                LinearActiveRefutation(proof, alternatives = composeBranches),
-            )
+            val proof = SourceDerivation.Combination(weights.mapIndexedNotNull { id, weight ->
+                if (weight.isZero) null else SourceDerivation.Combination.Term(weight, query.cited[id].second)
+            })
+            val evidence = SourceEvidence(branch.scope, SourceClaim.Refutation,
+                LinearActiveRefutation(proof, alternatives = composeBranches))
             var work = 0L
             val allowance = budget.funding?.availableWork ?: Long.MAX_VALUE
             val verdict = try {
-                SourceEvidenceVerifier(branch.withLinearAuthority()).verify(
-                    evidence,
-                    ExecutionControl {
-                        if (work >= allowance || (
-                                composeBranches && (
-                                    budget.funding?.paused == true ||
-                                        (budget.funding?.remainingAllocation ?: Long.MAX_VALUE) < 128L
-                                    )
-                                )
-                        ) {
-                            true
-                        } else {
-                            work++
-                            if (composeBranches) budget.funding?.charge(0L, 128L)
-                            cancellation()
-                        }
-                    },
-                )
+                SourceEvidenceVerifier(branch.withLinearAuthority()).verify(evidence, ExecutionControl {
+                    if (work >= allowance || (composeBranches && (budget.funding?.paused == true ||
+                            (budget.funding?.remainingAllocation ?: Long.MAX_VALUE) < 128L))) true else {
+                        work++
+                        if (composeBranches) budget.funding?.charge(0L, 128L)
+                        cancellation()
+                    }
+                })
             } finally {
                 budget.observe(conflictCertification = work)
             }
@@ -201,18 +156,9 @@ internal class LinearActiveRows(
         }
         var evidence = checked(guidance?.coordinateConflictWeights ?: guidance?.result?.conflictWeights)
         if (evidence == null && query.rows.any { it.strict } &&
-            budget.admitsDimensions(costs.size, query.rows.size.toLong())
-        ) {
-            evidence = checked(
-                lp.solve(
-                    query.rows,
-                    costs,
-                    zero,
-                    cancellation,
-                    query.inactive,
-                    claim = LpClaim.CONTRADICTION,
-                )?.conflictWeights,
-            )
+            budget.admitsDimensions(costs.size, query.rows.size.toLong())) {
+            evidence = checked(lp.solve(query.rows, costs, zero, cancellation, query.inactive,
+                claim = LpClaim.CONTRADICTION)?.conflictWeights)
         }
         if (cancellation()) {
             invalidate()
@@ -292,10 +238,7 @@ internal fun SourceProofContext.activeNumericContext(
         val coordinates = this.coordinates
         if (!visit(coordinates.size + booleans.size + lower.size + upper.size)) return null
         if (booleans.keys.any { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) !in coordinates } ||
-            (lower.keys + upper.keys).any { it !in coordinates }
-        ) {
-            return null
-        }
+            (lower.keys + upper.keys).any { it !in coordinates }) return null
         for (bound in lower.values + upper.values) {
             if (!visit() || !scalar(bound)) return null
         }
@@ -323,41 +266,30 @@ internal fun SourceProofContext.activeNumericContext(
                             if (!scalar(offset)) return null
                         }
                     }
-                } else {
-                    coefficients[coordinate] = coefficient
-                }
+                } else coefficients[coordinate] = coefficient
             }
             if (established) {
                 val rhs = premise.inequality.rhs - offset
                 if (!scalar(rhs)) return null
-                rows[id] = SourcePremise(
-                    SourceInequality(coefficients, rhs, premise.inequality.strict),
-                    guards,
-                    premise.integerPins,
-                )
+                rows[id] = SourcePremise(SourceInequality(coefficients, rhs, premise.inequality.strict),
+                    guards, premise.integerPins)
             }
         }
         if (work >= allowance) return null
         val bounds = if (!retainGuardedRows && rows.values.any { it.integerPins.isNotEmpty() }) {
             SourceProofContext(scope, coordinates, rows, emptyMap(), semantics = semantics)
                 .integerPinBounds(condition, ExecutionControl { !visit() }) ?: return null
-        } else {
-            null
-        }
+        } else null
         val active = linkedMapOf<String, SourcePremise>()
         for ((id, premise) in rows) {
             if (!visit()) return null
             if (retainGuardedRows || premise.integerPins.isEmpty() ||
-                bounds?.status(premise.integerPins) == IntegerPinStatus.Established
-            ) {
+                bounds?.status(premise.integerPins) == IntegerPinStatus.Established) {
                 active[id] = premise
             }
         }
-        return if (cancellation()) {
-            null
-        } else {
+        return if (cancellation()) null else
             SourceProofContext(scope, coordinates, active, emptyMap(), semantics = semantics)
-        }
     } finally {
         onPreparation(work, allocation)
     }

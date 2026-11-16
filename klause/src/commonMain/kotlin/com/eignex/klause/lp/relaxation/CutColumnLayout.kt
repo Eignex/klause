@@ -16,20 +16,18 @@ internal class CutColumnLayout private constructor(private val kinds: IntArray, 
     fun bind(map: CutSourceMap, cancellation: ExecutionControl, onWork: (Long) -> Unit): CutColumnBinding? {
         var work = 1L
         var matches = kinds.size == map.columnCount
-        if (matches) {
-            for (index in kinds.indices) {
-                if (cancellation()) {
-                    matches = false
-                    break
-                }
-                work++
-                val column = map.column(index)
-                if ((column?.source?.kind?.ordinal ?: -1) != kinds[index] ||
-                    (column?.source?.id ?: -1) != ids[index] || !canonical(column)
-                ) {
-                    matches = false
-                    break
-                }
+        if (matches) for (index in kinds.indices) {
+            if (cancellation()) {
+                matches = false
+                break
+            }
+            work++
+            val column = map.column(index)
+            if ((column?.source?.kind?.ordinal ?: -1) != kinds[index] ||
+                (column?.source?.id ?: -1) != ids[index] || !canonical(column)
+            ) {
+                matches = false
+                break
             }
         }
         onWork(work + if (matches) 4L else 0L)

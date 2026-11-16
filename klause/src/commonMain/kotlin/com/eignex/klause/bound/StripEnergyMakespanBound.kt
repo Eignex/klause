@@ -188,14 +188,8 @@ internal class StripEnergyMakespanBound(
             demands.add(dem)
         }
         if (starts.isEmpty()) return null
-        return Strip(
-            starts.toIntArray(),
-            durations.toLongArray(),
-            demands.toLongArray(),
-            view.capacity,
-            emptyIntArray(),
-            emptyLongArray(),
-        )
+        return Strip(starts.toIntArray(), durations.toLongArray(), demands.toLongArray(), view.capacity,
+            emptyIntArray(), emptyLongArray())
     }
 
     private suspend fun SequenceScope<Unit>.diffnStrip(
@@ -220,14 +214,8 @@ internal class StripEnergyMakespanBound(
         }
         if (starts.isEmpty()) return null
         val demandArray = demands.toLongArray()
-        return Strip(
-            starts.toIntArray(),
-            durations.toLongArray(),
-            demandArray,
-            0L,
-            perpendicular.toIntArray(),
-            demandArray,
-        )
+        return Strip(starts.toIntArray(), durations.toLongArray(), demandArray, 0L,
+            perpendicular.toIntArray(), demandArray)
     }
 }
 

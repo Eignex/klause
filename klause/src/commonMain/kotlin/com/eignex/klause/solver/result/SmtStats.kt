@@ -141,12 +141,13 @@ data class SmtStats(
     }
 }
 
-private fun mergeCompleteSearchCounts(first: Map<String, Long>?, second: Map<String, Long>?): Map<String, Long>? =
-    when {
-        first == null -> second
-        second == null -> first
-        else -> (first.keys + second.keys).associateWith { (first[it] ?: 0L) + (second[it] ?: 0L) }
-    }
+private fun mergeCompleteSearchCounts(
+    first: Map<String, Long>?, second: Map<String, Long>?,
+): Map<String, Long>? = when {
+    first == null -> second
+    second == null -> first
+    else -> (first.keys + second.keys).associateWith { (first[it] ?: 0L) + (second[it] ?: 0L) }
+}
 
 /** Mutable exact-SMT telemetry for one top-level open-theory request. */
 internal class SmtStatsSink {
@@ -167,10 +168,8 @@ internal class SmtStatsSink {
     fun observeContinuationRejection(key: String, count: Long) {
         require(count > 0L)
         val before = continuation.declines[key] ?: 0L
-        continuation = continuation.copy(
-            declines = continuation.declines +
-                (key to (before + minOf(count, Long.MAX_VALUE - before))),
-        )
+        continuation = continuation.copy(declines = continuation.declines +
+            (key to (before + minOf(count, Long.MAX_VALUE - before))))
     }
 
     private var conflicts = 0L

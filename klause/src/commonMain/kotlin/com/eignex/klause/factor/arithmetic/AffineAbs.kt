@@ -55,15 +55,10 @@ internal class AbsAffineValue(coefficients: Map<Int, BigInt>, val constant: BigI
         }
         val kept = terms.filterValues { it != BIG_ZERO }
         val direction = if (op == LinearOp.GE) -BIG_ONE else BIG_ONE
-        return LinearRow.ofColumns(
-            kept.keys.toIntArray(),
-            intArrayOf(),
-            WideConstants(
-                WideConsts(kept.values.map { direction * it }.toTypedArray()),
-                direction * (sign * other.constant - constant),
-            ),
-            if (op == LinearOp.GE) LinearOp.LE else op,
-        )
+        return LinearRow.ofColumns(kept.keys.toIntArray(), intArrayOf(),
+            WideConstants(WideConsts(kept.values.map { direction * it }.toTypedArray()),
+                direction * (sign * other.constant - constant)),
+            if (op == LinearOp.GE) LinearOp.LE else op)
     }
 
     private val constantDigits = constant.toString().map { it.code }.toIntArray()
@@ -83,10 +78,8 @@ internal class AbsAffineValue(coefficients: Map<Int, BigInt>, val constant: BigI
 }
 
 internal class AffineAbs(val operand: AbsAffineValue, val result: AbsAffineValue) : Factor {
-    override val variables: VarList = IntVars(
-        (operand.coefficients.keys + result.coefficients.keys)
-            .distinct().sorted().toIntArray(),
-    )
+    override val variables: VarList = IntVars((operand.coefficients.keys + result.coefficients.keys)
+        .distinct().sorted().toIntArray())
 
     override fun remap(mapping: VarRemap): Factor = AffineAbs(operand.remap(mapping), result.remap(mapping))
 
@@ -99,10 +92,8 @@ internal class AffineAbs(val operand: AbsAffineValue, val result: AbsAffineValue
 
     override val structuralKeyWeight: Int get() = operand.keyWeight + result.keyWeight + 2
 
-    override val linearForm: LinearForm = LinearForm.Relaxation(
-        listOf(
-            result.comparedTo(operand, BIG_ONE, LinearOp.GE),
-            result.comparedTo(operand, -BIG_ONE, LinearOp.GE),
-        ),
-    )
+    override val linearForm: LinearForm = LinearForm.Relaxation(listOf(
+        result.comparedTo(operand, BIG_ONE, LinearOp.GE),
+        result.comparedTo(operand, -BIG_ONE, LinearOp.GE),
+    ))
 }

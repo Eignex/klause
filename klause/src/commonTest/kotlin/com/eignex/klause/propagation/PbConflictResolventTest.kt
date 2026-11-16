@@ -27,11 +27,8 @@ import kotlin.test.assertTrue
 class PbConflictResolventTest {
     @Test
     fun `cancellation should withhold the learned result`() {
-        val state = PropagationState(
-            Problem(2, 1, arrayOf(IntDomain(0, 10)), emptyArray()),
-            Assumptions.None,
-            pbLearning = true,
-        )
+        val state = PropagationState(Problem(2, 1, arrayOf(IntDomain(0, 10)), emptyArray()),
+            Assumptions.None, pbLearning = true)
         state.currentLevel = 1
         state.pinBool(0, true)
         state.pinBool(1, true)
@@ -48,29 +45,15 @@ class PbConflictResolventTest {
         for (mode in 0..3) {
             val booleanCount = if (mode == 3) 6 else 5
             val factors = buildList<Factor> {
-                add(
-                    Cardinality(
-                        intArrayOf(
-                            Lit.make(0, false),
-                            Lit.make(2, true),
-                            Lit.make(3, true),
-                            Lit.make(4, true),
-                        ),
-                        min = 2,
-                        max = 4,
-                    ),
-                )
+                add(Cardinality(intArrayOf(Lit.make(0, false), Lit.make(2, true),
+                    Lit.make(3, true), Lit.make(4, true)), min = 2, max = 4))
                 add(Clause(intArrayOf(Lit.make(1, true), Lit.make(2, false))))
                 add(Clause(intArrayOf(Lit.make(1, true), Lit.make(3, false))))
                 if (mode >= 2) add(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5))
             }
             val native = PropagationSession(
-                Problem(
-                    booleanCount,
-                    if (mode == 0) 0 else 1,
-                    if (mode == 0) emptyArray() else arrayOf(IntDomain(0, 10)),
-                    factors.toTypedArray(),
-                ),
+                Problem(booleanCount, if (mode == 0) 0 else 1,
+                    if (mode == 0) emptyArray() else arrayOf(IntDomain(0, 10)), factors.toTypedArray()),
                 pbLearning = true,
             )
             if (mode == 3) assertIs<PropagationResult.Implied>(native.seed(Assumptions.None.withBool(5, true)))
@@ -81,9 +64,7 @@ class PbConflictResolventTest {
             var restarted = false
             val restart = object : SearchRestartPolicy {
                 override fun shouldRestart(decisionsThisRun: Long): Boolean = mode == 3 && consumed && !restarted
-                override fun onRestart() {
-                    restarted = true
-                }
+                override fun onRestart() { restarted = true }
             }
             val observer = object : SearchRunObserver {
                 override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
@@ -92,9 +73,7 @@ class PbConflictResolventTest {
                         val fid = state.boolReason[variable]
                         if (fid >= state.baseFactorCount && fid < state.totalFactorCount &&
                             state.factorAt(fid) is PseudoBooleanPropagator
-                        ) {
-                            consumed = true
-                        }
+                        ) consumed = true
                     }
                 }
             }
@@ -109,14 +88,8 @@ class PbConflictResolventTest {
                     )
                 }
             }
-            assertIs<SearchResult.Satisfied>(
-                shared.solve(
-                    booleanCount,
-                    SearchSolveParams(restart = restart),
-                    booleanBranching = brancher,
-                    observer = observer,
-                ),
-            )
+            assertIs<SearchResult.Satisfied>(shared.solve(booleanCount, SearchSolveParams(restart = restart),
+                booleanBranching = brancher, observer = observer))
 
             assertTrue(native.explanationState.learned.store.any { it is PseudoBooleanPropagator }, "mode=$mode")
             assertTrue(consumed, "mode=$mode")
@@ -133,11 +106,8 @@ class PbConflictResolventTest {
     @Test
     fun `an atom introduced only by a pivot reason should retain clause fallback`() {
         for (late in listOf(false, true)) {
-            val state = PropagationState(
-                Problem(3, 1, arrayOf(IntDomain(0, 10)), emptyArray()),
-                Assumptions.None,
-                pbLearning = true,
-            )
+            val state = PropagationState(Problem(3, 1, arrayOf(IntDomain(0, 10)), emptyArray()),
+                Assumptions.None, pbLearning = true)
             state.undoLogging = true
             val atom = if (late) -1 else state.atomVarGe(0, 5)
             assertTrue(state.setIntMinAsDecision(0, 5))
@@ -159,18 +129,10 @@ class PbConflictResolventTest {
 
     @Test
     fun `a mixed feasible witness should satisfy the connected source relation`() {
-        val native = PropagationSession(
-            Problem(
-                2,
-                1,
-                arrayOf(IntDomain(0, 10)),
-                arrayOf(
-                    Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
-                ),
-            ),
-            pbLearning = true,
-        )
+        val native = PropagationSession(Problem(2, 1, arrayOf(IntDomain(0, 10)), arrayOf(
+            Cardinality.exactlyOne(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
+        )), pbLearning = true)
         val shared = SearchSession(listOf(CpSearchComponent(native)), atoms = SearchAtomRegistry(2))
 
         assertIs<ComponentResult.Consistent>(shared.initialize())
@@ -182,17 +144,9 @@ class PbConflictResolventTest {
 
     @Test
     fun `a seed atom should not enter Boolean assertion indexing`() {
-        val native = PropagationSession(
-            Problem(
-                1,
-                1,
-                arrayOf(IntDomain(0, 10)),
-                arrayOf(
-                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
-                ),
-            ),
-            pbLearning = true,
-        )
+        val native = PropagationSession(Problem(1, 1, arrayOf(IntDomain(0, 10)), arrayOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
+        )), pbLearning = true)
         assertIs<PropagationResult.Implied>(native.pinIntAtLeast(0, 6))
 
         val conflict = assertIs<PropagationResult.Unsat>(native.pinBool(0, true))

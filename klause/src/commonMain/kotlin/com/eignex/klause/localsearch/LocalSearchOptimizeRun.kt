@@ -16,8 +16,7 @@ internal class LocalSearchOptimizeRun(
     control: LocalSearchRunControl,
     release: () -> Unit,
     private val semantics: EffectiveSourceSemantics,
-) : LocalSearchRun<MinimizeResult>(sink, control, release),
-    InstructionSlicedSearch {
+) : LocalSearchRun<MinimizeResult>(sink, control, release), InstructionSlicedSearch {
     private var started = false
 
     override val work: Long get() = control.work
@@ -31,12 +30,7 @@ internal class LocalSearchOptimizeRun(
         instructionsPerWork: Double,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? = executeSlice(
-        global,
-        sliceMillis,
-        sliceInstructions,
-        sliceWork,
-        onIncumbent,
-        instructionsPerWork,
+        global, sliceMillis, sliceInstructions, sliceWork, onIncumbent, instructionsPerWork,
     )
 
     override fun runSlice(
@@ -45,11 +39,7 @@ internal class LocalSearchOptimizeRun(
         sliceNodes: Long,
         onIncumbent: (MinimizeResult.WithSample) -> Unit,
     ): MinimizeResult? = executeSlice(
-        global,
-        sliceMillis,
-        LocalSearchRunControl.instructionAllowance(sliceNodes),
-        sliceNodes,
-        onIncumbent,
+        global, sliceMillis, LocalSearchRunControl.instructionAllowance(sliceNodes), sliceNodes, onIncumbent,
     )
 
     override fun runInstructionSlice(
@@ -90,16 +80,12 @@ internal class LocalSearchOptimizeRun(
             if (!started) {
                 sink.timedOut = true
                 sink.stop()
-                return finish(
-                    MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
-                        .withSourceSemantics(semantics),
-                )
+                return finish(MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
+                    .withSourceSemantics(semantics))
             }
             // The suspended loop checks its containing allowance before making another move.
             control.allowCompletion()
-        } else if (!control.hasSliceAllowance) {
-            return null
-        }
+        } else if (!control.hasSliceAllowance) return null
         started = true
         val live = checkNotNull(cursor)
         while (live.hasNext()) {

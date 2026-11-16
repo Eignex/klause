@@ -26,11 +26,9 @@ internal class QuadraticModel(
     init {
         require(capturedHessian.size == dimension && capturedHessian.all { it.size == dimension })
         require(capturedRows.all { it.coefficients.size == dimension })
-        require(
-            capturedHessian.indices.all { i ->
-                capturedHessian.indices.all { j -> capturedHessian[i][j] == capturedHessian[j][i] }
-            },
-        )
+        require(capturedHessian.indices.all { i ->
+            capturedHessian.indices.all { j -> capturedHessian[i][j] == capturedHessian[j][i] }
+        })
     }
 }
 

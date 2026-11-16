@@ -81,9 +81,7 @@ internal class RootProbeImplications {
                 reasonGeneration == session.learnedRetirementGeneration
             val literals = if (reason >= 0 && currentReason) {
                 session.rootClauseLiterals(reason, 2, includePermanent = true)
-            } else {
-                null
-            }
+            } else null
             reasonChecked = true
             if (literals != null && literals.size == 2 && key(literals[0], literals[1]) == pending) {
                 budget.note("ImplicationDirect")
@@ -109,13 +107,8 @@ internal class RootProbeImplications {
         admissions++
         clearPending()
         val before = session.work
-        session.addRootDerivedClause(
-            Clause(intArrayOf((pair ushr Int.SIZE_BITS).toInt(), pair.toInt())),
-            2,
-            OWN_ORIGIN,
-            false,
-            ownedLiterals = true,
-        )
+        session.addRootDerivedClause(Clause(intArrayOf((pair ushr Int.SIZE_BITS).toInt(), pair.toInt())),
+            2, OWN_ORIGIN, false, ownedLiterals = true)
         budget.note("AttachmentWork", session.work - before + ADMISSION_WORK)
         budget.note("Binaries")
         return true
@@ -177,7 +170,8 @@ internal class RootProbeImplications {
             minOf(params.learnedMemoryScratchBytes, params.learnedMemoryBytes ?: Long.MAX_VALUE) >=
             HISTORY_BYTES + 2L * Int.SIZE_BYTES + ALTERNATIVE_BYTES
 
-    private fun key(a: Int, b: Int): Long = (minOf(a, b).toLong() shl Int.SIZE_BITS) or maxOf(a, b).toLong()
+    private fun key(a: Int, b: Int): Long =
+        (minOf(a, b).toLong() shl Int.SIZE_BITS) or maxOf(a, b).toLong()
 
     companion object {
         private const val ADMISSION_LIMIT = 64

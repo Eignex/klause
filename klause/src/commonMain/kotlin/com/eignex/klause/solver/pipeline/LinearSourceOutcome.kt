@@ -238,7 +238,6 @@ internal fun executeLinearSource(
     }
     when (result) {
         is SourceExecutionResult.Prepared -> return result
-
         is SourceExecutionResult.Finite -> (result.result.outcome as? FiniteSolveOutcome.Completed)?.let { completed ->
             val point = sample(completed.bestSample)
             native = when (completed.verdict) {
@@ -384,11 +383,9 @@ internal fun executeLinearSource(
     val bound = when (result) {
         is SourceExecutionResult.Linear -> (result.result as? OpenTheoryExecution.Optimize)?.result?.linearResult?.bound
             ?.let { prepared.qualifyBound(it, nativeClaimsUnrestricted) }
-
         is SourceExecutionResult.Finite -> result.result.nativeObjectiveBound?.let {
             prepared.qualifyBound(it.evidence, nativeClaimsUnrestricted, it)
         }
-
         else -> null
     }
     val snapshot = LinearSourceOutcome(

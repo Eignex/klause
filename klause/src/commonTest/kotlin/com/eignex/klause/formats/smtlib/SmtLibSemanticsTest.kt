@@ -44,12 +44,9 @@ class SmtLibSemanticsTest {
 
     @Test
     fun `finite Long extrema should remain distinct from open integer bounds`() {
-        val overrides = SemanticOverrides(
-            undeclaredIntegers = BoundsOverride(
-                BoundOverride.Value(Long.MIN_VALUE),
-                BoundOverride.Value(Long.MAX_VALUE),
-            ),
-        )
+        val overrides = SemanticOverrides(undeclaredIntegers = BoundsOverride(
+            BoundOverride.Value(Long.MIN_VALUE), BoundOverride.Value(Long.MAX_VALUE),
+        ))
 
         val source = SmtLib.parse("(declare-const x Int)", semanticOverrides = overrides)
 
@@ -83,12 +80,9 @@ class SmtLibSemanticsTest {
     @Test
     fun `rational real declaration endpoints should preserve exact source feasibility`() {
         val third = SemanticRational.of(bigIntOf(1), bigIntOf(3))
-        val overrides = SemanticOverrides(
-            undeclaredReals = BoundsOverride(
-                BoundOverride.Value(third),
-                BoundOverride.Value(third),
-            ),
-        )
+        val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(
+            BoundOverride.Value(third), BoundOverride.Value(third),
+        ))
         val source = SmtLib.parse("(declare-const x Real) (assert (< x (/ 1 3)))", semanticOverrides = overrides)
 
         val result = BacktrackSolver.source(source.model).solve()
@@ -99,11 +93,9 @@ class SmtLibSemanticsTest {
 
     @Test
     fun `polynomial fallback should enforce caller bounds beside original nonlinear constraints`() {
-        val overrides = SemanticOverrides(
-            undeclaredReals = BoundsOverride(
-                upper = BoundOverride.Value(SemanticRational.ZERO),
-            ),
-        )
+        val overrides = SemanticOverrides(undeclaredReals = BoundsOverride(
+            upper = BoundOverride.Value(SemanticRational.ZERO),
+        ))
         val input = SmtLib.parse(
             "(declare-const x Real) (assert (= (* x x) 1)) (assert (> x 0))",
             semanticOverrides = overrides,
@@ -156,10 +148,7 @@ class SmtLibSemanticsTest {
             assertFailsWith<IllegalArgumentException> { SmtLib.parse("", semanticOverrides = replacement) }
             var opened = false
             assertFailsWith<IllegalArgumentException> {
-                SmtLib.parse({
-                    opened = true
-                    StringCharSource("")
-                }, semanticOverrides = replacement)
+                SmtLib.parse({ opened = true; StringCharSource("") }, semanticOverrides = replacement)
             }
             assertFalse(opened)
         }

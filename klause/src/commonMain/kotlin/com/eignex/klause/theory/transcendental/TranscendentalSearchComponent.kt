@@ -15,8 +15,11 @@ import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.util.ExecutionControl
 
-internal data class TranscendentalSplit(val coordinate: Int, val boundary: BigFraction, val atMost: Boolean) :
-    SearchTheoryDecision
+internal data class TranscendentalSplit(
+    val coordinate: Int,
+    val boundary: BigFraction,
+    val atMost: Boolean,
+) : SearchTheoryDecision
 
 internal class TranscendentalSearchComponent(
     private val source: TranscendentalProblem,
@@ -24,8 +27,7 @@ internal class TranscendentalSearchComponent(
     private val root: TranscendentalCondition = TranscendentalCondition(),
     private val maximumDepth: Int = 12,
     rootUnknown: Boolean = false,
-) : SearchBrancher,
-    SearchBranchProposal {
+) : SearchBrancher, SearchBranchProposal {
     override val branchKind: SearchBranchKind get() = SearchBranchKind.Arithmetic
 
     val witnessKey = SearchModelKey(TranscendentalWitness::class)
@@ -57,21 +59,15 @@ internal class TranscendentalSearchComponent(
     override fun check(context: SearchContext): ComponentCheck = when (evaluate(context)) {
         is TranscendentalCheckResult.Witness -> if ((0 until source.boolCount).all { context.boolValue(it) != null }) {
             ComponentCheck.Feasible
-        } else {
-            ComponentCheck.Indeterminate
-        }
-
+        } else ComponentCheck.Indeterminate
         TranscendentalCheckResult.Refuted -> ComponentCheck.Infeasible()
-
         else -> ComponentCheck.Indeterminate
     }
 
     override fun nextBranch(context: SearchContext): List<SearchDecision>? {
         if (evaluate(context) is TranscendentalCheckResult.Witness || decisions.size >= maximumDepth ||
             source.numericCount == 0 || service.exhausted || context.cancelled()
-        ) {
-            return null
-        }
+        ) return null
         val condition = condition(context)
         val candidates = (0 until source.numericCount).filter {
             condition.rational.lower[it] == null || condition.rational.lower[it] != condition.rational.upper[it]
@@ -127,9 +123,7 @@ internal class TranscendentalSearchComponent(
         }
         val bools = (0 until source.boolCount).mapNotNull { id -> context.boolValue(id)?.let { id to it } }.toMap()
         return TranscendentalCondition(
-            PolynomialCondition(root.rational.bools + bools, lower, upper),
-            strictLower,
-            strictUpper,
+            PolynomialCondition(root.rational.bools + bools, lower, upper), strictLower, strictUpper,
         )
     }
 }

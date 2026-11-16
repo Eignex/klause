@@ -33,7 +33,6 @@ internal class CompoundTally {
         offered++
         when {
             frozen -> pinRejected++
-
             else -> {
                 if (kept < parts) trimmed++
                 if (kept < 2) collapsed++ else admitted++

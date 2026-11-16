@@ -105,11 +105,8 @@ internal class LpScalingView private constructor(
             return 2L * bounds + costs + (if (applied) bounds + costs else 0L) +
                 (if (bounds > 0L) 2L * numVars else 0L) + (if (costs > 0L) numVars.toLong() else 0L)
         }
-        return if (applied) {
-            6L * next.m + 16L * next.numVars + 64L
-        } else {
-            2L * next.m + 8L * next.numVars + 32L
-        }
+        return if (applied) 6L * next.m + 16L * next.numVars + 64L
+            else 2L * next.m + 8L * next.numVars + 32L
     }
 
     /** Refresh vectors under the immutable matrix scale. Null leaves this view untouched. */

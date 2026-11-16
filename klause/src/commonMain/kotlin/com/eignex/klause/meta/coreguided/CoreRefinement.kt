@@ -32,9 +32,7 @@ internal object CoreRefinement {
     ): IntArray {
         if (literals.size !in 2..32 || problem.numBoolVars.toLong() + problem.numIntVars > 4_096L ||
             problem.numFactors > 4_096 || cancellation()
-        ) {
-            return literals
-        }
+        ) return literals
         val providers = problem.projectionProviders
         if (providers != null && providers != FactorProjectionProviders.Default) return literals
         var entries = problem.numBoolVars.toLong() + problem.numIntVars + problem.numFactors

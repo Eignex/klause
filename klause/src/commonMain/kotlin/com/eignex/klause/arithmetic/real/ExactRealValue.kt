@@ -7,13 +7,10 @@ import com.eignex.klause.simplex.exact.BigFraction
 enum class ExactRealFunction {
     /** Real exponential. */
     EXP,
-
     /** Natural logarithm on strictly positive reals. */
     LOG,
-
     /** Real sine in radians. */
     SIN,
-
     /** Real cosine in radians. */
     COS,
 }
@@ -40,7 +37,6 @@ sealed interface ExactRealExpression {
     /** Exact addition of all operands. */
     class Sum internal constructor(operands: List<ExactRealExpression>) : ExactRealExpression {
         private val captured = operands.toList()
-
         /** Independent operand list. */
         val operands: List<ExactRealExpression> get() = captured.toList()
     }
@@ -48,7 +44,6 @@ sealed interface ExactRealExpression {
     /** Exact multiplication of all operands. */
     class Product internal constructor(operands: List<ExactRealExpression>) : ExactRealExpression {
         private val captured = operands.toList()
-
         /** Independent operand list. */
         val operands: List<ExactRealExpression> get() = captured.toList()
     }
@@ -61,9 +56,7 @@ sealed interface ExactRealExpression {
         /** Nonnegative exponent. */
         val exponent: Int,
     ) : ExactRealExpression {
-        init {
-            require(exponent >= 0)
-        }
+        init { require(exponent >= 0) }
     }
 }
 

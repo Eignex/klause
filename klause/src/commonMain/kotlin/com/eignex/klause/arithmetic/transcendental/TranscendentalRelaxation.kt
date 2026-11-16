@@ -23,15 +23,11 @@ internal fun TranscendentalArithmetic.expRelaxation(
     val leastFactor = add(BigFraction.ONE, add(domain.lower, anchor.negated()))
     val correction = if (leastFactor.signum() < 0) {
         multiply(add(atAnchor.upper, atAnchor.lower.negated()), leastFactor)
-    } else {
-        BigFraction.ZERO
-    }
+    } else BigFraction.ZERO
     return TranscendentalRelaxation(
-        domain,
-        atAnchor.lower,
+        domain, atAnchor.lower,
         add(multiply(atAnchor.lower, add(BigFraction.ONE, anchor.negated())), correction),
-        slope,
-        add(left.upper, multiply(slope, domain.lower).negated()),
+        slope, add(left.upper, multiply(slope, domain.lower).negated()),
     )
 }
 
@@ -46,10 +42,7 @@ internal fun TranscendentalArithmetic.logRelaxation(
     val right = log(RationalEnclosure.point(domain.upper), terms)
     val slope = divide(add(right.lower, left.lower.negated()), add(domain.upper, domain.lower.negated()))
     return TranscendentalRelaxation(
-        domain,
-        slope,
-        add(left.lower, multiply(slope, domain.lower).negated()),
-        divide(BigFraction.ONE, anchor),
-        add(atAnchor.upper, BigFraction.MINUS_ONE),
+        domain, slope, add(left.lower, multiply(slope, domain.lower).negated()),
+        divide(BigFraction.ONE, anchor), add(atAnchor.upper, BigFraction.MINUS_ONE),
     )
 }

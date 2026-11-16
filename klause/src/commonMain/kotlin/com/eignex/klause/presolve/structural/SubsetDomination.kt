@@ -36,7 +36,6 @@ internal class SubsetDomination {
         val width get() = signature.terms.size
         val anchor get() = signature.terms.first().first
     }
-
     // A factor is immutable, so its rows normalize once and the same occurrence reuses them in every later call.
     private class Normalized(val rows: List<Normal>, var call: Long)
     private data class Activity(val row: Signature, val endpoints: List<Long?>)
@@ -109,18 +108,9 @@ internal class SubsetDomination {
         val activities = ArrayList<Pair<Row, Activity>>(candidates.size)
         for (candidate in candidates) {
             if (!scan.track(candidate.width)) return factors
-            val activity = Activity(
-                candidate.signature,
-                candidate.signature.terms.map { (v, coefficient) ->
-                    if (!ranges.isClosed(v)) {
-                        null
-                    } else if (coefficient >= 0L) {
-                        ranges.max(v)
-                    } else {
-                        ranges.min(v)
-                    }
-                },
-            )
+            val activity = Activity(candidate.signature, candidate.signature.terms.map { (v, coefficient) ->
+                if (!ranges.isClosed(v)) null else if (coefficient >= 0L) ranges.max(v) else ranges.min(v)
+            })
             active.add(activity)
             activities.add(candidate to activity)
         }
@@ -236,9 +226,7 @@ internal class SubsetDomination {
         if (!row.isIntegerOnly || !row.isLongUnconditional || row.bound == Long.MIN_VALUE ||
             (row.relation != LinearOp.LE && row.relation != LinearOp.GE) ||
             (0 until row.size).any { row.coeff(it) == Long.MIN_VALUE }
-        ) {
-            return null
-        }
+        ) return null
         val coefficients = LongArray(row.size) { row.coeff(it) }
         val gcd = maxOf(1L, PresolveShared.gcdOf(coefficients))
         val sign = if (row.relation == LinearOp.LE) 1L else -1L

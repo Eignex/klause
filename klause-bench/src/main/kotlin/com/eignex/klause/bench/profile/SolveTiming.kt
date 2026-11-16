@@ -50,10 +50,8 @@ object SolveTiming {
         val out = System.getenv("OUT")?.let(::File) ?: File("build/profile-out")
         val timings = measure(args.toList(), out)
         val walls = timings.runs.map { it.wallMs }.sorted()
-        println(
-            "${timings.suite}/${timings.problem}: ${walls.size} run(s), wall ms min=${walls.first()} " +
-                "median=${walls[walls.size / 2]} max=${walls.last()}",
-        )
+        println("${timings.suite}/${timings.problem}: ${walls.size} run(s), wall ms min=${walls.first()} " +
+            "median=${walls[walls.size / 2]} max=${walls.last()}")
         timings.runs.forEachIndexed { i, r ->
             println("  run ${i + 1}: ${r.wallMs} ms feasible=${r.feasible} objective=${r.objective} proven=${r.proven}")
         }

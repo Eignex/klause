@@ -3,13 +3,8 @@ package com.eignex.klause.solver.search
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal class LearnedIndex<V : Any> {
-    private class Node<V>(
-        val key: Long,
-        var value: V,
-        var left: Node<V>? = null,
-        var right: Node<V>? = null,
-        var height: Int = 1,
-    )
+    private class Node<V>(val key: Long, var value: V, var left: Node<V>? = null,
+        var right: Node<V>? = null, var height: Int = 1)
     private var root: Node<V>? = null
     var size: Int = 0
         private set
@@ -37,9 +32,7 @@ internal class LearnedIndex<V : Any> {
             if (if (descending) node.key < after else node.key > after) {
                 found = node.value
                 node = if (descending) node.right else node.left
-            } else {
-                node = if (descending) node.left else node.right
-            }
+            } else node = if (descending) node.left else node.right
         }
         return found
     }
@@ -79,21 +72,10 @@ internal class LearnedIndex<V : Any> {
     }
 
     private fun insert(node: Node<V>?, key: Long, value: V): Node<V> {
-        if (node == null) {
-            size++
-            return Node(key, value)
-        }
+        if (node == null) { size++; return Node(key, value) }
         return when {
-            key < node.key -> {
-                node.left = insert(node.left, key, value)
-                balance(node)
-            }
-
-            key > node.key -> {
-                node.right = insert(node.right, key, value)
-                balance(node)
-            }
-
+            key < node.key -> { node.left = insert(node.left, key, value); balance(node) }
+            key > node.key -> { node.right = insert(node.right, key, value); balance(node) }
             else -> node.also { it.value = value }
         }
     }
@@ -102,18 +84,10 @@ internal class LearnedIndex<V : Any> {
         node ?: return null
         when {
             key < node.key -> node.left = delete(node.left, key)
-
             key > node.key -> node.right = delete(node.right, key)
-
             else -> {
-                if (node.left == null) {
-                    size--
-                    return node.right
-                }
-                if (node.right == null) {
-                    size--
-                    return node.left
-                }
+                if (node.left == null) { size--; return node.right }
+                if (node.right == null) { size--; return node.left }
                 var successor = checkNotNull(node.right)
                 while (successor.left != null) successor = checkNotNull(successor.left)
                 val replacement = Node(successor.key, successor.value, node.left, delete(node.right, successor.key))
@@ -155,9 +129,7 @@ internal class LearnedIndex<V : Any> {
     }
 
     private fun height(node: Node<V>?): Int = node?.height ?: 0
-    private fun update(node: Node<V>) {
-        node.height = 1 + maxOf(height(node.left), height(node.right))
-    }
+    private fun update(node: Node<V>) { node.height = 1 + maxOf(height(node.left), height(node.right)) }
 }
 
 internal class SharedReclamationBudget(
@@ -195,9 +167,7 @@ internal class SharedReclamationBudget(
         poll()
     }
 
-    private fun poll() {
-        if (cancelled()) throw Stopped(true)
-    }
+    private fun poll() { if (cancelled()) throw Stopped(true) }
 
     val canResume: Boolean get() = !blockedScratch && blockedWork <= allowance
     class Stopped(val cancelled: Boolean) : RuntimeException()

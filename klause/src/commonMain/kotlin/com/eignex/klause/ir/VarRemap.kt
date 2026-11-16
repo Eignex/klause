@@ -2,6 +2,7 @@ package com.eignex.klause.ir
 
 import com.eignex.util.arrays.emptyIntArray
 
+
 /** Owned renumbering of source variables: `newId = map(oldId)`, one captured table per namespace. */
 class VarRemap private constructor(bools: IntArray, ints: IntArray, reals: IntArray, borrowed: Boolean) {
     /** Capture the caller's source renumbering tables. */

@@ -36,20 +36,18 @@ import kotlin.test.assertTrue
 class CapturedRealToleranceTest {
     private val tenth = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(10)))
 
-    private fun source(vararg factors: Factor, tolerance: SourceTolerance = tenth, reals: Int = 1,
+    private fun source(
+        vararg factors: Factor,
+        tolerance: SourceTolerance = tenth,
+        reals: Int = 1,
         ints: Int = 0,
         bools: Int = 0,
-        lower: Double = 0.0) = Problem.of(
-        bools, ints, Array(ints) {IntDomain(0, 1) },
-        arrayOf(*factors),
-        numRealVars = reals,
-        realLower = DoubleArray(reals) { lower },
-        realUpper = DoubleArray(reals) { 1.0 },
-        semantics = SourceSemantics(
-            SourceFormat.IR,
-            floats = FloatSemantics.Continuous,
-            feasibilityTolerance = tolerance
-        ).resolve()
+        lower: Double = 0.0,
+    ) = Problem.of(
+        bools, ints, Array(ints) { IntDomain(0, 1) }, arrayOf(*factors), numRealVars = reals,
+        realLower = DoubleArray(reals) { lower }, realUpper = DoubleArray(reals) { 1.0 },
+        semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
+            feasibilityTolerance = tolerance).resolve(),
     )
 
     private fun row(op: LinearOp, bound: Double, strict: Boolean = false, real: Int = 0) =
@@ -83,7 +81,7 @@ class CapturedRealToleranceTest {
     @Test
     fun `a strict row should hold exactly at the accepted point`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.LE, 0.25, strict = true)), ExecutionControl.Never)
+            capturedRealAcceptance(source(row(LinearOp.LE, 0.25, strict = true)), ExecutionControl.Never),
         )
 
         assertFalse(accepts(point(0.25)))
@@ -106,12 +104,11 @@ class CapturedRealToleranceTest {
     }
 
 
-    private
-        val residuals = mapOf(
-        "abs" to ( source(RealAbs(0, 1), reals = 2) to doubleArrayOf(0.5, 0.58, 0.65)),
-        "max" to( source(RealArrayMinMax(2, intArrayOf(0, 1), max = true), reals = 3) to
+    private val residuals = mapOf(
+        "abs" to (source(RealAbs(0, 1), reals = 2) to doubleArrayOf(0.5, 0.58, 0.65)),
+        "max" to (source(RealArrayMinMax(2, intArrayOf(0, 1), max = true), reals = 3) to
             doubleArrayOf(0.5, 0.25, 0.58, 0.65)),
-        "min" to(source(RealArrayMinMax(2, intArrayOf(0, 1), max = false), reals = 3) to
+        "min" to (source(RealArrayMinMax(2, intArrayOf(0, 1), max = false), reals = 3) to
             doubleArrayOf(0.5, 0.25, 0.33, 0.4)),
         "variable selection" to (source(RealElement(0, 2, intArrayOf(0, 1)), reals = 3, ints = 1) to
             doubleArrayOf(0.5, 0.25, 0.58, 0.65)),
@@ -121,7 +118,7 @@ class CapturedRealToleranceTest {
             doubleArrayOf(0.5, 0.58, 0.65)),
         "real product" to (source(ContinuousProduct(0, 1, 2), reals = 3) to doubleArrayOf(0.5, 0.5, 0.33, 0.4)),
         "power" to (source(Power(Power.Coordinate.Real(SourceRealId(0)), 2, Power.Coordinate.Real(SourceRealId(1))),
-            reals = 2) to doubleArrayOf(0.5, 0.33, 0.4))
+            reals = 2) to doubleArrayOf(0.5, 0.33, 0.4)),
     )
 
     // Each point puts its last coordinate, the relation's result, at the given value.
@@ -195,7 +192,8 @@ class CapturedRealToleranceTest {
     @Test
     fun `an odd power of a negative base should keep its sign within the slack`() {
         val cube = Power(Power.Coordinate.Real(SourceRealId(0)), 3, Power.Coordinate.Real(SourceRealId(1)))
-        val accepts = assertNotNull(capturedRealAcceptance(source(cube, reals = 2, lower = -1.0), ExecutionControl.Never))
+        val accepts = assertNotNull(capturedRealAcceptance(source(cube, reals = 2, lower = -1.0),
+            ExecutionControl.Never))
 
         assertEquals(listOf(true, false), listOf(accepts(point(-0.5, -0.2)), accepts(point(-0.5, 0.125))))
     }
@@ -228,7 +226,8 @@ class CapturedRealToleranceTest {
     @Test
     fun `a relation without a tolerance reading in another component should leave a row within the slack accepted`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unreadRelation(1, 2), reals = 3), ExecutionControl.Never)
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unreadRelation(1, 2), reals = 3),
+                ExecutionControl.Never),
         )
 
         assertTrue(accepts(point(0.3, 0.5, 0.5)))
@@ -237,7 +236,8 @@ class CapturedRealToleranceTest {
     @Test
     fun `a relation without a tolerance reading should hold exactly in its own component`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unreadRelation(1, 2), reals = 3), ExecutionControl.Never)
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unreadRelation(1, 2), reals = 3),
+                ExecutionControl.Never),
         )
 
         assertFalse(accepts(point(0.25, 0.5, 0.45)))
@@ -248,8 +248,8 @@ class CapturedRealToleranceTest {
         val accepts = assertNotNull(
             capturedRealAcceptance(
                 source(row(LinearOp.EQ, 0.45), unreadRelation(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
-                ExecutionControl.Never
-            )
+                ExecutionControl.Never,
+            ),
         )
 
         assertFalse(accepts(point(0.5, 0.5, 0.25)))
@@ -258,7 +258,8 @@ class CapturedRealToleranceTest {
     @Test
     fun `a relation without a tolerance reading that holds exactly should be accepted in its own component`() {
         val accepts = assertNotNull(
-            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unreadRelation(1, 2), reals = 3), ExecutionControl.Never)
+            capturedRealAcceptance(source(row(LinearOp.EQ, 0.25), unreadRelation(1, 2), reals = 3),
+                ExecutionControl.Never),
         )
 
         assertTrue(accepts(point(0.25, 0.5, 0.5)))
@@ -269,8 +270,8 @@ class CapturedRealToleranceTest {
         val accepts = assertNotNull(
             capturedRealAcceptance(
                 source(row(LinearOp.EQ, 0.5), unreadRelation(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
-                ExecutionControl.Never
-            )
+                ExecutionControl.Never,
+            ),
         )
 
         assertTrue(accepts(point(0.5, 0.5, 0.3)))
@@ -280,7 +281,7 @@ class CapturedRealToleranceTest {
     fun `a declaration should hold exactly in a component without a tolerance reading`() {
         val accepts = assertNotNull(
             capturedRealAcceptance(source(unreadRelation(0, 1), row(LinearOp.EQ, 0.25, real = 2), reals = 3),
-                ExecutionControl.Never)
+                ExecutionControl.Never),
         )
 
         assertFalse(accepts(point(1.05, 1.05, 0.25)))
@@ -292,8 +293,8 @@ class CapturedRealToleranceTest {
         val accepts = assertNotNull(
             capturedRealAcceptance(
                 source(row(LinearOp.EQ, 0.45), link, unreadRelation(1, 2), row(LinearOp.EQ, 0.25, real = 3), reals = 4),
-                ExecutionControl.Never
-            )
+                ExecutionControl.Never,
+            ),
         )
 
         assertFalse(accepts(point(0.5, 0.5, 0.5, 0.25)))
@@ -305,7 +306,7 @@ class CapturedRealToleranceTest {
         val exact = Linear(intArrayOf(0), doubleArrayOf(-1.0), intArrayOf(1), doubleArrayOf(1.0), LinearOp.EQ, 0.0)
         val accepts = assertNotNull(
             capturedRealAcceptance(source(tolerant, exact, unreadRelation(1, 2), reals = 3, ints = 1),
-                ExecutionControl.Never)
+                ExecutionControl.Never),
         )
 
         assertTrue(accepts(point(0.3, 0.0, 0.0, ints = longArrayOf(0))))
@@ -326,7 +327,7 @@ class CapturedRealToleranceTest {
 
 // `abs(x(a)) = abs(x(b))` as a disjunction of two equalities, a relation without a tolerance reading.
 internal fun unreadRelation(a: Int, b: Int): Factor = object : Factor by Linear(
-    intArrayOf(), doubleArrayOf(), intArrayOf(a, b), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0
+    intArrayOf(), doubleArrayOf(), intArrayOf(a, b), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0,
 ) {
     override val linearForm: LinearForm = LinearForm.Disjunction(listOf(1.0, -1.0).map { sign ->
         LinearRow.ofColumns(intArrayOf(), intArrayOf(a, b),

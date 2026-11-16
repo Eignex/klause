@@ -260,13 +260,8 @@ internal class LpScopedSolver(
         it.replaceRows(retired, columns, rows, scoped, token, permanentRows, objective, assertions)
     }
 
-    fun compact(token: ExecutionControl = cancellation): Boolean = compact(
-        LpLayoutRemap(
-            state.model.n,
-            state.rows,
-        ),
-        token,
-    )
+    fun compact(token: ExecutionControl = cancellation): Boolean = compact(LpLayoutRemap(state.model.n,
+        state.rows), token)
 
     fun compact(remap: LpLayoutRemap, token: ExecutionControl = cancellation): Boolean =
         edit(token, compaction = remap) { it.compact(remap, token) }
@@ -352,12 +347,7 @@ internal class LpScopedSolver(
         }
         val current = solver as LpDirectionalProbeSolver
         val values = current.directionalGains(
-            pointModel,
-            columns,
-            splits,
-            allowance,
-            token,
-            observe,
+            pointModel, columns, splits, allowance, token, observe,
         )
         if (values != null) {
             val changed = when {
@@ -396,12 +386,7 @@ internal class LpScopedSolver(
             return null
         }
         return (solver as LpDirectionalValueSolver).directionalValues(
-            source,
-            columns,
-            splits,
-            allowance,
-            token,
-            observe,
+            source, columns, splits, allowance, token, observe,
         )
     }
 
@@ -438,19 +423,11 @@ internal class LpScopedSolver(
                 solveStarted = true
                 val queryAllowance = allowance ?: if (current is ComponentLpSolver) {
                     LpFloatAllowance(workLimit, iterationLimit)
-                } else {
-                    null
-                }
+                } else null
                 observeFloatQuery(current, current === previous, queryAllowance, token, LpQueryRoute.SCOPED_FLOAT)
-                (
-                    if (warm == null) {
-                        current.resolveBounds(
-                            queryAllowance,
-                        )
-                    } else {
-                        current.solve(warm)
-                    }
-                    ).also {
+                (if (warm == null) current.resolveBounds(
+                    queryAllowance,
+                ) else current.solve(warm)).also {
                     lastFloatTermination = current.lastTermination
                 }
             } catch (primary: Throwable) {
@@ -513,15 +490,8 @@ internal class LpScopedSolver(
                 closeOwner(current)
                 return null
             }
-            observeFloatQuery(
-                current,
-                current === previous,
-                allowance,
-                token,
-                LpQueryRoute.SCOPED_CONTINUATION,
-                quantum,
-                retainFundingStop,
-            )
+            observeFloatQuery(current, current === previous, allowance, token,
+                LpQueryRoute.SCOPED_CONTINUATION, quantum, retainFundingStop)
             pending = PendingFloat(current.openSolve(allowance, retainFundingStop), allowance)
             pendingFloat = pending
         }
@@ -566,12 +536,10 @@ internal class LpScopedSolver(
         val observer = context.onQuery ?: return
         val model = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return
         check(querySequence < Long.MAX_VALUE) { "LP query sequence exhausted" }
-        val query = LpQueryObservation(
-            checkNotNull(queryOwner), ++querySequence, model, retained,
+        val query = LpQueryObservation(checkNotNull(queryOwner), ++querySequence, model, retained,
             allowance?.work ?: workLimit, null, 0.0, false, null, pricing, componentSplit,
             route, allowance != null, allowance?.iterations ?: iterationLimit, quantum, retainFundingStop,
-            refactorUpdateLimit, trackDegeneracy,
-        ) { current.continuationBasis(model) }
+            refactorUpdateLimit, trackDegeneracy) { current.continuationBasis(model) }
         try {
             observer(query)
         } finally {
@@ -754,9 +722,7 @@ internal class LpScopedSolver(
         if (append) solver?.let { recordPendingAppendSolve(it) }
         val warm = if (append) {
             (solver as? PersistentLpSolver)?.retainedBasis()?.extended(state.model, next.state.model)
-        } else {
-            null
-        }
+        } else null
         val expected = if (compaction != null) {
             // Seat the disappearing logicals in an isolated old-size owner before deleting their slots.
             val staging = prepared(state, token) ?: return false
@@ -773,14 +739,8 @@ internal class LpScopedSolver(
             IntArray(next.state.model.m) { next.state.model.n + it }
         }
         val initialComponents = componentSplit && solver == null && components == null && compaction == null
-        val replacement = prepared(
-            next.state,
-            token,
-            append,
-            warm,
-            replacementWorkLimit,
-            allowComponents = initialComponents,
-        ) ?: return false
+        val replacement = prepared(next.state, token, append, warm, replacementWorkLimit,
+            allowComponents = initialComponents) ?: return false
         var published = false
         var failure: Throwable? = null
         try {
@@ -820,16 +780,9 @@ internal class LpScopedSolver(
         token: ExecutionControl,
     ): Boolean = try {
         components.appendLocalRows(next, token, workLimit) { part, childToken, childWork ->
-            newPersistentLpSolver(
-                part,
-                childToken,
-                refactorUpdateLimit,
-                iterationLimit,
-                childWork,
-                trackDegeneracy,
-                context.engineFactory,
-                componentPricing(part, next.model.n, components.rowOnlyRows),
-            )
+            newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
+                childWork, trackDegeneracy, context.engineFactory,
+                componentPricing(part, next.model.n, components.rowOnlyRows))
         }
     } catch (primary: Throwable) {
         solver = null
@@ -966,55 +919,37 @@ internal class LpScopedSolver(
             if (workBudget > 0L && projection.work >= workBudget) return null
             candidate = if (allowComponents && warm == null) {
                 componentLpSolverOrNull(
-                    working,
-                    token,
-                    projection,
+                    working, token, projection,
                     { part, childToken, rowOnlyRows ->
                         val remaining = if (workBudget > 0L) workBudget - projection.work else 0L
                         if (workBudget > 0L && remaining <= 0L) throw LpProjectionStop()
-                        newPersistentLpSolver(
-                            part,
-                            childToken,
-                            refactorUpdateLimit,
-                            iterationLimit,
-                            remaining,
-                            trackDegeneracy,
-                            context.engineFactory,
-                            componentPricing(part, working.n, rowOnlyRows),
-                        )
+                        newPersistentLpSolver(part, childToken, refactorUpdateLimit, iterationLimit,
+                            remaining, trackDegeneracy, context.engineFactory,
+                            componentPricing(part, working.n, rowOnlyRows))
                     },
                     ::ComponentLpSolver,
                 )
-            } else {
-                null
-            }
+            } else null
             val remainingWork = if (workBudget > 0L) workBudget - projection.work else 0L
             if (workBudget > 0L && remainingWork <= 0L) return null
-            if (candidate == null) {
-                candidate = newPersistentLpSolver(
-                    working,
-                    token,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    remainingWork,
-                    trackDegeneracy,
-                    context.engineFactory,
-                    pricing,
-                )
-            }
+            if (candidate == null) candidate = newPersistentLpSolver(
+                working,
+                token,
+                refactorUpdateLimit,
+                iterationLimit,
+                remainingWork,
+                trackDegeneracy,
+                context.engineFactory,
+                pricing,
+            )
             createdOwners++
             peakOwners = maxOf(peakOwners, createdOwners - closedOwners)
             if (!candidate.adopt(next, token)) return null
             val basis = try {
                 when (val current = candidate) {
-                    is PersistentLpSolver -> if (warm == null) {
-                        current.prepareLogicals(token)
-                    } else {
+                    is PersistentLpSolver -> if (warm == null) current.prepareLogicals(token) else
                         current.prepareBasis(warm, token)
-                    }
-
                     is ComponentLpSolver -> current.prepareLogicals(token, remainingWork)
-
                     else -> null
                 }
             } finally {
@@ -1022,15 +957,9 @@ internal class LpScopedSolver(
                 constructionWork = saturated(constructionWork, candidate.lastMetrics.preparationOps)
                 preparationRefactorizations += candidate.lastRefactorizations
             } ?: return null
-            if (!basis.validFor(next.model) || (
-                    warm == null &&
-                        (
-                            basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
-                                basis.status.indices.any {
-                                    (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n)
-                                }
-                            )
-                    ) ||
+            if (!basis.validFor(next.model) || (warm == null &&
+                    (basis.basicVars.indices.any { basis.basicVars[it] != next.model.n + it } ||
+                        basis.status.indices.any { (basis.status[it] == VarStatus.BASIC) != (it >= next.model.n) })) ||
                 token()
             ) {
                 return null

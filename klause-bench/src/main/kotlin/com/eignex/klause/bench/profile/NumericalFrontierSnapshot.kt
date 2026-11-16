@@ -41,24 +41,12 @@ internal class NumericalFrontierSnapshot(
         val query = field(authority, "query")
         val queryContext = query?.let { field(it, "context") as SourceProofContext }
         val numeric = template?.let { field(it, "numeric") as SourceProofContext }
-        val verifierContext = if (numeric == null || queryContext == null) {
-            null
-        } else {
-            SourceProofContext(
-                queryContext.scope,
-                numeric.coordinates,
-                numeric.premises,
-                numeric.objective,
-                numeric.objectiveConstant,
-            )
-        }
-
+        val verifierContext = if (numeric == null || queryContext == null) null else SourceProofContext(
+            queryContext.scope, numeric.coordinates, numeric.premises, numeric.objective, numeric.objectiveConstant)
         @Suppress("UNCHECKED_CAST")
         val rows = retained?.let { field(it, "rows") as List<Any> }.orEmpty()
-
         @Suppress("UNCHECKED_CAST")
         val inactive = query?.let { field(it, "inactive") as Set<Int> }.orEmpty()
-
         @Suppress("UNCHECKED_CAST")
         val originals = template?.let { field(it, "rows") as List<Any> }.orEmpty()
         fun proof(value: SourceDerivation, depth: Int = 0): JsonObject {
@@ -67,28 +55,17 @@ internal class NumericalFrontierSnapshot(
                 put("kind", value::class.simpleName)
                 when (value) {
                     is SourceDerivation.Premise -> put("id", value.id)
-
-                    is SourceDerivation.Combination -> put(
-                        "terms",
-                        buildJsonArray {
-                            value.terms.forEach { term ->
-                                add(
-                                    buildJsonObject {
-                                        put("weight", term.weight.toString())
-                                        put("derivation", proof(term.derivation, depth + 1))
-                                    },
-                                )
-                            }
-                        },
-                    )
-
+                    is SourceDerivation.Combination -> put("terms", buildJsonArray {
+                        value.terms.forEach { term -> add(buildJsonObject {
+                            put("weight", term.weight.toString())
+                            put("derivation", proof(term.derivation, depth + 1))
+                        }) }
+                    })
                     is SourceDerivation.IntegerRounding -> put("row", proof(value.inequality, depth + 1))
-
                     is SourceDerivation.MixedIntegerRounding -> {
                         put("row", proof(value.inequality, depth + 1))
                         put("bounds", JsonArray(value.bounds.map { proof(it, depth + 1) }))
                     }
-
                     else -> error("unsupported retained source cut derivation")
                 }
             }
@@ -96,39 +73,25 @@ internal class NumericalFrontierSnapshot(
         return buildJsonObject {
             put("independentProofCheck", false)
             queryContext?.let { put("scope", scope(it.scope)) }
-            put(
-                "rows",
-                buildJsonArray {
-                    rows.forEachIndexed { index, cut ->
-                        require(!stop())
-                        val row = field(cut, "inequality") as SourceInequality
-                        val derivation = field(cut, "derivation") as SourceDerivation
-                        add(
-                            buildJsonObject {
-                                put("owner", field(cut, "owner") as Int)
-                                put("mixed", field(cut, "mixed") as Boolean)
-                                put("active", query != null && originals.size + index !in inactive)
-                                put("coefficients", coefficients(row.coefficients))
-                                put("rhs", row.rhs.toString())
-                                put("derivation", proof(derivation))
-                                put(
-                                    "sourceCheck",
-                                    verifierContext?.let {
-                                        SourceEvidenceVerifier(it).verify(
-                                            SourceEvidence(
-                                                it.scope,
-                                                SourceClaim.Consequence(row),
-                                                derivation,
-                                            ),
-                                            stop,
-                                        ).toString()
-                                    },
-                                )
-                            },
-                        )
-                    }
-                },
-            )
+            put("rows", buildJsonArray {
+                rows.forEachIndexed { index, cut ->
+                    require(!stop())
+                    val row = field(cut, "inequality") as SourceInequality
+                    val derivation = field(cut, "derivation") as SourceDerivation
+                    add(buildJsonObject {
+                        put("owner", field(cut, "owner") as Int)
+                        put("mixed", field(cut, "mixed") as Boolean)
+                        put("active", query != null && originals.size + index !in inactive)
+                        put("coefficients", coefficients(row.coefficients))
+                        put("rhs", row.rhs.toString())
+                        put("derivation", proof(derivation))
+                        put("sourceCheck", verifierContext?.let {
+                            SourceEvidenceVerifier(it).verify(SourceEvidence(it.scope,
+                                SourceClaim.Consequence(row), derivation), stop).toString()
+                        })
+                    })
+                }
+            })
         }
     }
 
@@ -148,69 +111,46 @@ internal class NumericalFrontierSnapshot(
             val best = listOfNotNull(inherited, own).reduceOrNull { left, right ->
                 val before = ((left.claim as SourceClaim.Bound).value as SourceValue.Rational).value
                 val after = ((right.claim as SourceClaim.Bound).value as SourceValue.Rational).value
-                if (if (context.scope.objective?.sense == ObjectiveSense.MINIMIZE) {
-                        after > before
-                    } else {
-                        after < before
-                    }
-                ) {
-                    right
-                } else {
-                    left
-                }
+                if (if (context.scope.objective?.sense == ObjectiveSense.MINIMIZE) after > before
+                    else after < before) right else left
             }
             val closure = field(node, "coveredBound", optional = true) as SourceEvidence?
             val split = field(node, "split")
-            if (result != null) {
-                branches += buildJsonObject {
-                    put("condition", condition(nodeCondition))
-                    own?.let { put("bound", bound(it)) }
-                    parent?.let { put("parentBound", bound(it)) }
-                    if (own != null && parent != null) {
-                        val after = ((own.claim as SourceClaim.Bound).value as SourceValue.Rational).value
-                        val before = ((parent.claim as SourceClaim.Bound).value as SourceValue.Rational).value
-                        val gain = if (context.scope.objective?.sense == ObjectiveSense.MINIMIZE) {
-                            after - before
-                        } else {
-                            before - after
-                        }
-                        put("checkedBoundGain", gain.toString())
-                    }
-                    @Suppress("UNCHECKED_CAST")
-                    val candidates = field(result, "fractional", optional = true)
-                        as? List<Pair<SourceCoordinate, BigFraction>>
-                    put("fractional", coefficients(candidates.orEmpty().toMap()))
-                    if (split != null && field(split, "coordinate", optional = true) != null) {
-                        put("coordinate", (field(split, "coordinate") as SourceCoordinate).id)
-                        put("threshold", field(split, "threshold").toString())
-                    }
-                    put("terminal", (field(result, "evidence") as SourceEvidence?)?.claim?.let { it::class.simpleName })
-                    put("boundClosed", closure != null)
+            if (result != null) branches += buildJsonObject {
+                put("condition", condition(nodeCondition))
+                own?.let { put("bound", bound(it)) }
+                parent?.let { put("parentBound", bound(it)) }
+                if (own != null && parent != null) {
+                    val after = ((own.claim as SourceClaim.Bound).value as SourceValue.Rational).value
+                    val before = ((parent.claim as SourceClaim.Bound).value as SourceValue.Rational).value
+                    val gain = if (context.scope.objective?.sense == ObjectiveSense.MINIMIZE) after - before
+                        else before - after
+                    put("checkedBoundGain", gain.toString())
                 }
+                @Suppress("UNCHECKED_CAST")
+                val candidates = field(result, "fractional", optional = true)
+                    as? List<Pair<SourceCoordinate, BigFraction>>
+                put("fractional", coefficients(candidates.orEmpty().toMap()))
+                if (split != null && field(split, "coordinate", optional = true) != null) {
+                    put("coordinate", (field(split, "coordinate") as SourceCoordinate).id)
+                    put("threshold", field(split, "threshold").toString())
+                }
+                put("terminal", (field(result, "evidence") as SourceEvidence?)?.claim?.let { it::class.simpleName })
+                put("boundClosed", closure != null)
             }
             when {
                 closure != null -> covered += buildJsonObject {
                     put("condition", condition(nodeCondition))
                     put("bound", bound(closure))
                 }
-
                 split != null -> {
                     walk(checkNotNull(field(split, "below")), best, own)
                     walk(checkNotNull(field(split, "above")), best, own)
                 }
-
                 result?.let { field(it, "evidence") } == null -> pending += buildJsonObject {
                     put("condition", condition(nodeCondition))
-                    put(
-                        "state",
-                        if (partial != null && result == null) {
-                            "pending-separation"
-                        } else if (result == null) {
-                            "unvisited"
-                        } else {
-                            "unresolved"
-                        },
-                    )
+                    put("state", if (partial != null && result == null) "pending-separation"
+                        else if (result == null) "unvisited" else "unresolved")
                     best?.let {
                         put("bound", bound(it))
                         put("inherited", it.scope.condition != nodeCondition)
@@ -221,10 +161,8 @@ internal class NumericalFrontierSnapshot(
         walk(checkNotNull(field(checkNotNull(field(invocation, "component")), "root")), null)
         check(nodes == stages.getValue("numericalRetainedNodes"))
         check(pending.size.toLong() == stages.getValue("numericalPendingLeaves"))
-        check(
-            covered.size.toLong() == (stages["numericalIncumbentBoundClosures"] ?: 0L) +
-                (stages["numericalInheritedBoundClosures"] ?: 0L),
-        )
+        check(covered.size.toLong() == (stages["numericalIncumbentBoundClosures"] ?: 0L) +
+            (stages["numericalInheritedBoundClosures"] ?: 0L))
         return buildJsonObject {
             put("retainedNodes", nodes)
             put("pending", JsonArray(pending))
@@ -247,15 +185,8 @@ internal class NumericalFrontierSnapshot(
                     capturedScope.condition.upper[id]?.let { it <= value } == true
                 },
         ) { "captured bound has a foreign source scope" }
-        val scoped = SourceProofContext(
-            evidence.scope,
-            context.coordinates,
-            context.premises,
-            context.objective,
-            context.objectiveConstant,
-            LinearAuthoritySemantics(context),
-            context.semantics,
-        )
+        val scoped = SourceProofContext(evidence.scope, context.coordinates, context.premises,
+            context.objective, context.objectiveConstant, LinearAuthoritySemantics(context), context.semantics)
         check(SourceEvidenceVerifier(scoped).verify(evidence, stop) == SourceEvidenceCheck.Checked) {
             "captured bound does not recheck in its original scope"
         }
@@ -286,44 +217,32 @@ internal class NumericalFrontierSnapshot(
                 type("com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest"),
                 Boolean::class.javaPrimitiveType, Function0::class.java, Function0::class.java,
                 Boolean::class.javaPrimitiveType, type("com.eignex.klause.solver.pipeline.LinearIncumbentSharing"),
-                Function3::class.java, type("com.eignex.klause.solver.pipeline.LinearRepairGuidance"),
-            )
+                Function3::class.java, type("com.eignex.klause.solver.pipeline.LinearRepairGuidance"))
         }
 
         fun open(
-            context: SourceProofContext,
-            params: TheoryParams,
-            history: Boolean = false,
-            frontier: Boolean = false,
-            activeRows: Boolean = false,
-            supportBranching: Boolean = false,
-            latestFeedback: Boolean = true,
-            fullFeedback: Boolean = false,
-            aggregateBranching: Boolean = false,
+            context: SourceProofContext, params: TheoryParams, history: Boolean = false, frontier: Boolean = false,
+            activeRows: Boolean = false, supportBranching: Boolean = false, latestFeedback: Boolean = true,
+            fullFeedback: Boolean = false, aggregateBranching: Boolean = false,
         ): Any {
             val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
             val fundingType = Class.forName("com.eignex.klause.lp.SourceLpFunding")
             val funding = fundingType.getDeclaredConstructor(
-                Long::class.javaPrimitiveType,
-                Long::class.javaPrimitiveType,
+                Long::class.javaPrimitiveType, Long::class.javaPrimitiveType,
             ).newInstance(params.sourceLpWorkLimit, params.sourceLpAllocationLimit)
             val requestType = Class.forName("com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest")
-            val request = if (fullFeedback) {
-                requestType.getField("Companion").get(null).let { companion ->
-                    companion.javaClass.getMethod("getFull").invoke(companion)
-                }
-            } else {
-                null
-            }
-            return invocationConstructor().newInstance(
-                context, params, { null }, state, history, null, frontier, false,
+            val request = if (fullFeedback) requestType.getField("Companion").get(null).let { companion ->
+                companion.javaClass.getMethod("getFull").invoke(companion)
+            } else null
+            return invocationConstructor().newInstance(context, params, { null }, state, history, null, frontier, false,
                 funding, frontier && params.sourceCuts, activeRows, supportBranching, null, latestFeedback,
-                request, aggregateBranching, null, null, false, null, null, null,
-            )
+                request, aggregateBranching, null, null, false, null, null, null)
         }
 
-        fun run(invocation: Any, onProgress: (Any) -> Unit = {}, onIncumbent: (Sample, BigFraction) -> Unit): Any {
+        fun run(
+            invocation: Any, onProgress: (Any) -> Unit = {}, onIncumbent: (Sample, BigFraction) -> Unit,
+        ): Any {
             val advance = invocation.javaClass.methods.single { it.name == "runSlice" && it.parameterCount == 4 }
             while (true) {
                 val result = advance.invoke(invocation, ExecutionControl.Never, Long.MAX_VALUE, 64L, onIncumbent)
@@ -362,25 +281,20 @@ internal class NumericalFrontierSnapshot(
         }
 
         fun condition(value: SourceCondition): JsonObject = buildJsonObject {
-            put(
-                "bools",
-                buildJsonObject {
-                    value.bools.toSortedMap().forEach { (id, pin) -> put(id.toString(), pin) }
-                },
-            )
+            put("bools", buildJsonObject {
+                value.bools.toSortedMap().forEach { (id, pin) -> put(id.toString(), pin) }
+            })
             put("lower", coefficients(value.lower))
             put("upper", coefficients(value.upper))
         }
 
         fun coefficients(values: Map<SourceCoordinate, BigFraction>): JsonArray = buildJsonArray {
             values.entries.sortedWith(compareBy({ it.key.kind.ordinal }, { it.key.id })).forEach { (id, value) ->
-                add(
-                    buildJsonObject {
-                        put("kind", id.kind.name)
-                        put("id", id.id)
-                        put("value", value.toString())
-                    },
-                )
+                add(buildJsonObject {
+                    put("kind", id.kind.name)
+                    put("id", id.id)
+                    put("value", value.toString())
+                })
             }
         }
 
@@ -389,34 +303,18 @@ internal class NumericalFrontierSnapshot(
             put("constant", context.objectiveConstant.toString())
             put("sense", context.scope.objective?.sense?.name)
             put("condition", condition(context.scope.condition))
-            put(
-                "premises",
-                buildJsonArray {
-                    context.premises.toSortedMap().forEach { (id, premise) ->
-                        add(
-                            buildJsonObject {
-                                put("id", id)
-                                put("coefficients", coefficients(premise.inequality.coefficients))
-                                put("rhs", premise.inequality.rhs.toString())
-                                put("strict", premise.inequality.strict)
-                                put(
-                                    "guards",
-                                    buildJsonObject {
-                                        premise.guards.toSortedMap().forEach { (key, value) ->
-                                            put(
-                                                key
-                                                    .toString(),
-                                                value,
-                                            )
-                                        }
-                                    },
-                                )
-                                put("integerPins", coefficients(premise.integerPins))
-                            },
-                        )
-                    }
-                },
-            )
+            put("premises", buildJsonArray {
+                context.premises.toSortedMap().forEach { (id, premise) -> add(buildJsonObject {
+                    put("id", id)
+                    put("coefficients", coefficients(premise.inequality.coefficients))
+                    put("rhs", premise.inequality.rhs.toString())
+                    put("strict", premise.inequality.strict)
+                    put("guards", buildJsonObject {
+                        premise.guards.toSortedMap().forEach { (key, value) -> put(key.toString(), value) }
+                    })
+                    put("integerPins", coefficients(premise.integerPins))
+                }) }
+            })
         }
     }
 }

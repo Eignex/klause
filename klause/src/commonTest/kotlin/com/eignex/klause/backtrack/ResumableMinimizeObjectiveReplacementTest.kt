@@ -111,13 +111,8 @@ class ResumableMinimizeObjectiveReplacementTest {
                 assertTrue(offered.all { it >= 2L })
                 assertEquals(if (assumptions.numInts > 0) 3L else 2L, result.sample.ints[0])
                 second.replacingObjective(objective, params).use { third ->
-                    val restored = assertIs<MinimizeResult.Optimal>(
-                        third.runSlice(
-                            ExecutionControl.Never,
-                            1000L,
-                            256L,
-                        ) {},
-                    )
+                    val restored = assertIs<MinimizeResult.Optimal>(third.runSlice(ExecutionControl.Never,
+                        1000L, 256L) {})
                     assertEquals(0L, restored.sample.ints[0])
                 }
             }

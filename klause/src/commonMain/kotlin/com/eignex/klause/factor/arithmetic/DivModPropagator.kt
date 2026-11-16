@@ -34,20 +34,10 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         val remainderLimit = magnitude - BIG_ONE
         val nonnegative = relation.convention == DivisionConvention.EUCLIDEAN || a.min >= 0L
         val nonpositive = relation.convention == DivisionConvention.TRUNCATING && a.max <= 0L
-        if (!tighten(
-                state,
-                relation.remainder,
-                if (nonnegative) BIG_ZERO else BIG_ZERO - remainderLimit,
-                if (nonpositive) BIG_ZERO else remainderLimit,
-                reason,
-            )
-        ) {
-            return false
-        }
+        if (!tighten(state, relation.remainder, if (nonnegative) BIG_ZERO else BIG_ZERO - remainderLimit,
+                if (nonpositive) BIG_ZERO else remainderLimit, reason)) return false
         // Within each nonzero divisor sign, quotient extrema lie at operand interval endpoints.
-        val divisors = if (constant != null) {
-            listOf(constant)
-        } else {
+        val divisors = if (constant != null) listOf(constant) else {
             val domain = checkNotNull(b)
             val endpoints = arrayListOf(domain.min, domain.max)
             if (domain.min <= -1L) endpoints += kotlin.math.min(domain.max, -1L)
@@ -55,10 +45,8 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
             endpoints.filter { it != 0L }.distinct().map(::bigIntOf)
         }
         val quotients = divisors.flatMap { value ->
-            listOf(
-                checkNotNull(relation.outputs(bigIntOf(a.min), value)).first,
-                checkNotNull(relation.outputs(bigIntOf(a.max), value)).first,
-            )
+            listOf(checkNotNull(relation.outputs(bigIntOf(a.min), value)).first,
+                checkNotNull(relation.outputs(bigIntOf(a.max), value)).first)
         }
         val lowerQ = quotients.reduce { first, second -> minOf(first, second) }
         val upperQ = quotients.reduce { first, second -> maxOf(first, second) }
@@ -68,27 +56,11 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         val products = divisors.flatMap { value -> listOf(value * bigIntOf(q.min), value * bigIntOf(q.max)) }
         val lowerProduct = products.reduce { first, second -> minOf(first, second) }
         val upperProduct = products.reduce { first, second -> maxOf(first, second) }
-        if (!tighten(
-                state,
-                relation.dividend,
-                lowerProduct + bigIntOf(r.min),
-                upperProduct + bigIntOf(r.max),
-                reason,
-            )
-        ) {
-            return false
-        }
+        if (!tighten(state, relation.dividend, lowerProduct + bigIntOf(r.min),
+                upperProduct + bigIntOf(r.max), reason)) return false
         val currentA = state.intDomains[relation.dividend]
-        if (!tighten(
-                state,
-                relation.remainder,
-                bigIntOf(currentA.min) - upperProduct,
-                bigIntOf(currentA.max) - lowerProduct,
-                reason,
-            )
-        ) {
-            return false
-        }
+        if (!tighten(state, relation.remainder, bigIntOf(currentA.min) - upperProduct,
+                bigIntOf(currentA.max) - lowerProduct, reason)) return false
         if (divisor != null && !filterDivisor(state, divisor, reason)) return false
         return filterTuples(state, factorId, reason)
     }
@@ -101,26 +73,10 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
             else -> BIG_ZERO
         }
         val currentB = state.intDomains[divisor]
-        if (currentB.min > 0L && !tighten(
-                state,
-                divisor,
-                minimumMagnitude + BIG_ONE,
-                bigIntOf(currentB.max),
-                reason,
-            )
-        ) {
-            return false
-        }
-        if (currentB.max < 0L && !tighten(
-                state,
-                divisor,
-                bigIntOf(currentB.min),
-                BIG_ZERO - minimumMagnitude - BIG_ONE,
-                reason,
-            )
-        ) {
-            return false
-        }
+        if (currentB.min > 0L && !tighten(state, divisor, minimumMagnitude + BIG_ONE,
+                bigIntOf(currentB.max), reason)) return false
+        if (currentB.max < 0L && !tighten(state, divisor, bigIntOf(currentB.min),
+                BIG_ZERO - minimumMagnitude - BIG_ONE, reason)) return false
         val currentQ = state.intDomains[relation.quotient]
         if (currentQ.min == currentQ.max && currentQ.min != 0L) {
             val dividend = state.intDomains[relation.dividend]
@@ -139,9 +95,7 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         val divisors = relation.divisor?.let { state.intDomains[it].spanOrNull(MAX_PAIRS.toLong()) ?: return true }
         if (dividends.size.toLong() * (divisors?.size ?: 1) > MAX_PAIRS) return true
         val cached = state.refPayload[factorId] as? DivModSupports
-        val supports = if (cached != null && cached.covers(state)) {
-            cached
-        } else {
+        val supports = if (cached != null && cached.covers(state)) cached else {
             val available = MAX_CACHED_CELLS - state.divModSupportCells + (cached?.storageCells ?: 0)
             DivModSupports(relation, state, available).also {
                 if (it.retained) {
@@ -165,13 +119,8 @@ internal class DivModPropagator(private val relation: DivMod) : Propagator {
         }
     }
 
-    private fun tighten(
-        state: PropagationState,
-        variable: Int,
-        lower: BigInt,
-        upper: BigInt,
-        reason: IntArray?,
-    ): Boolean {
+    private fun tighten(state: PropagationState, variable: Int, lower: BigInt, upper: BigInt,
+        reason: IntArray?): Boolean {
         val domain = state.intDomains[variable]
         if (lower > bigIntOf(domain.max) || upper < bigIntOf(domain.min)) return false
         if (lower > bigIntOf(domain.min) && !state.tightenIntMin(variable, lower.toLongExact(), reason)) return false

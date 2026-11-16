@@ -34,19 +34,14 @@ import kotlin.test.assertTrue
 class PresolverTest {
     @Test
     fun `parity should consume pins resolved by a later clause pass in either lane`() {
-        val problem = Problem(
-            6,
-            0,
-            emptyArray(),
-            listOf(
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(4, true))),
-                Clause(intArrayOf(Lit.make(2, true), Lit.make(4, false))),
-                Clause(intArrayOf(Lit.make(3, false), Lit.make(5, true))),
-                Clause(intArrayOf(Lit.make(3, false), Lit.make(5, false))),
-            ),
-        )
+        val problem = Problem(6, 0, emptyArray(), listOf(
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
+            Clause(intArrayOf(Lit.make(2, true), Lit.make(4, true))),
+            Clause(intArrayOf(Lit.make(2, true), Lit.make(4, false))),
+            Clause(intArrayOf(Lit.make(3, false), Lit.make(5, true))),
+            Clause(intArrayOf(Lit.make(3, false), Lit.make(5, false))),
+        ))
         for (producer in listOf(PresolvePass.ELIMINATE_BOOL_VARS, PresolvePass.SUBSUME_CLAUSES)) {
             for (lane in PresolveLane.entries) {
                 val budget = PresolveBudget(Long.MAX_VALUE)
@@ -57,7 +52,6 @@ class PresolverTest {
                     PresolveLane.SOURCE -> Presolver.runSource(problem, config, context).also {
                         assertTrue(it.infeasible)
                     }.passesFired
-
                     PresolveLane.FINITE -> Presolver.run(problem.bake(), config, context).also {
                         assertTrue(it.infeasible)
                     }.passesFired
@@ -74,52 +68,37 @@ class PresolverTest {
 
     @Test
     fun `source parity should stay parked after BVE produces unrelated pins`() {
-        val problem = Problem(
-            6,
-            0,
-            emptyArray(),
-            listOf(
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
-                Clause(intArrayOf(Lit.make(4, true), Lit.make(5, true))),
-                Clause(intArrayOf(Lit.make(4, true), Lit.make(5, false))),
-            ),
-        )
+        val problem = Problem(6, 0, emptyArray(), listOf(
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
+            Clause(intArrayOf(Lit.make(4, true), Lit.make(5, true))),
+            Clause(intArrayOf(Lit.make(4, true), Lit.make(5, false))),
+        ))
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val prepared = Presolver.runSource(
-            problem,
-            PresolveConfig.parse("off,+xor-units,+bve"),
+            problem, PresolveConfig.parse("off,+xor-units,+bve"),
             PresolveContext(objectiveBoolCoeffs = mapOf(4 to 1L), presolveBudget = budget),
         )
 
         assertFalse(prepared.infeasible)
         assertEquals(listOf(PresolvePass.ELIMINATE_BOOL_VARS), prepared.passesFired)
         assertEquals(1, budget.passCalls["xor-units"])
-        assertTrue(
-            prepared.problem.factors.filterIsInstance<Clause>().any {
-                it.literals.contentEquals(intArrayOf(Lit.make(4, true)))
-            },
-        )
+        assertTrue(prepared.problem.factors.filterIsInstance<Clause>().any {
+            it.literals.contentEquals(intArrayOf(Lit.make(4, true)))
+        })
     }
 
     @Test
     fun `source parity should stay parked with unchanged premises`() {
-        val problem = Problem(
-            4,
-            0,
-            emptyArray(),
-            listOf(
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
-                Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
-            ),
-        )
+        val problem = Problem(4, 0, emptyArray(), listOf(
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true)), 0),
+            Xor(intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(3, true)), 0),
+        ))
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val prepared = Presolver.runSource(
-            problem,
-            PresolveConfig.parse("off,+xor-units"),
-            PresolveContext(presolveBudget = budget),
+            problem, PresolveConfig.parse("off,+xor-units"), PresolveContext(presolveBudget = budget),
         )
 
         assertSame(problem, prepared.problem)
@@ -138,37 +117,25 @@ class PresolverTest {
 
             val reduced = if (schedule == "source") {
                 Presolver.runSource(problem, config, context).problem
-            } else {
-                Presolver.run(problem.bake(), config, context).problem
-            }
+            } else Presolver.run(problem.bake(), config, context).problem
 
             val row = reduced.factors.filterIsInstance<Linear>().single()
             assertEquals(listOf(-1L), (0 until row.size).map { row.coeff(it) })
             assertEquals(0L, row.bound)
-            assertTrue(
-                budget.invocations.filter { it.pass == "strengthen" }.any {
-                    it.outcome == PresolveInvocationOutcome.CHANGED
-                },
-            )
+            assertTrue(budget.invocations.filter { it.pass == "strengthen" }.any {
+                it.outcome == PresolveInvocationOutcome.CHANGED
+            })
         }
     }
 
     @Test
     fun `strengthening should consume endpoints tightened by later Diophantine reduction`() {
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(
-                IntDomain(0, 2),
-                IntDomain(0, 4),
-                IntDomain(0, 2),
-                IntDomain(0, 4),
-            ),
-            listOf(
-                Linear(intArrayOf(5, 3, 3), intArrayOf(0, 1, 2), LinearOp.LE, 22),
-                Linear(intArrayOf(2, 3), intArrayOf(1, 3), LinearOp.EQ, 12),
-            ),
-        )
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(0, 2), IntDomain(0, 4), IntDomain(0, 2), IntDomain(0, 4),
+        ), listOf(
+            Linear(intArrayOf(5, 3, 3), intArrayOf(0, 1, 2), LinearOp.LE, 22),
+            Linear(intArrayOf(2, 3), intArrayOf(1, 3), LinearOp.EQ, 12),
+        ))
         for (schedule in listOf("source", "incremental", "rebuilt")) {
             val budget = PresolveBudget(Long.MAX_VALUE)
             val config = PresolveConfig.parse(
@@ -176,11 +143,8 @@ class PresolverTest {
             )
             val context = PresolveContext(presolveBudget = budget)
 
-            val reduced = if (schedule == "source") {
-                Presolver.runSource(problem, config, context).problem
-            } else {
-                Presolver.run(problem.bake(), config, context).problem
-            }
+            val reduced = if (schedule == "source") Presolver.runSource(problem, config, context).problem
+            else Presolver.run(problem.bake(), config, context).problem
 
             val row = reduced.factors.filterIsInstance<Linear>().single { it.op == LinearOp.LE }
             assertEquals(listOf(1L, 1L, 1L), (0 until row.size).map { row.coeff(it) })
@@ -190,56 +154,35 @@ class PresolverTest {
 
     @Test
     fun `sparsification should consume an equality exposed by later product reduction`() {
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(
-                IntDomain(3, 3),
-                IntDomain(0, 2),
-                IntDomain(0, 6),
-                IntDomain(0, 4),
-            ),
-            listOf(
-                Product(0, 1, 2),
-                Linear(intArrayOf(3, -1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 2),
-            ),
-        )
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(3, 3), IntDomain(0, 2), IntDomain(0, 6), IntDomain(0, 4),
+        ), listOf(
+            Product(0, 1, 2),
+            Linear(intArrayOf(3, -1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 2),
+        ))
         for (schedule in listOf("source", "incremental", "rebuilt")) {
             val config = PresolveConfig.parse(
                 "off,+sparsify,+structural" + if (schedule == "rebuilt") ",+bce" else "",
             )
 
-            val reduced = if (schedule == "source") {
-                Presolver.runSource(problem, config).problem
-            } else {
-                Presolver.run(problem.bake(), config).problem
-            }
+            val reduced = if (schedule == "source") Presolver.runSource(problem, config).problem
+            else Presolver.run(problem.bake(), config).problem
 
-            assertTrue(
-                reduced.factors.filterIsInstance<Linear>().any {
-                    it.vars.contentEquals(intArrayOf(3)) &&
-                        it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
-                },
-            )
+            assertTrue(reduced.factors.filterIsInstance<Linear>().any {
+                it.vars.contentEquals(intArrayOf(3)) &&
+                    it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
+            })
         }
     }
 
     @Test
     fun `sparsification should consume late equalities after its measured cost backoff`() {
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(
-                IntDomain(1, 1),
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 4),
-            ),
-            listOf(
-                NValue(0, IntArray(32) { 1 + it % 2 }),
-                Linear(intArrayOf(1, -1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 2),
-            ),
-        )
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(1, 1), IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 4),
+        ), listOf(
+            NValue(0, IntArray(32) { 1 + it % 2 }),
+            Linear(intArrayOf(1, -1, 1), intArrayOf(1, 2, 3), LinearOp.LE, 2),
+        ))
         for (schedule in listOf("source", "incremental", "rebuilt")) {
             val budget = PresolveBudget(Long.MAX_VALUE)
             val config = PresolveConfig.parse(
@@ -247,19 +190,14 @@ class PresolverTest {
             )
             val context = PresolveContext(presolveBudget = budget)
 
-            val reduced = if (schedule == "source") {
-                Presolver.runSource(problem, config, context).problem
-            } else {
-                Presolver.run(problem.bake(), config, context).problem
-            }
+            val reduced = if (schedule == "source") Presolver.runSource(problem, config, context).problem
+            else Presolver.run(problem.bake(), config, context).problem
 
-            assertTrue(
-                (reduced as? BakedProblem)?.rootIntDomain(3)?.max == 2L ||
-                    reduced.factors.filterIsInstance<Linear>().any {
-                        it.vars.contentEquals(intArrayOf(3)) &&
-                            it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
-                    },
-            )
+            assertTrue((reduced as? BakedProblem)?.rootIntDomain(3)?.max == 2L ||
+                reduced.factors.filterIsInstance<Linear>().any {
+                it.vars.contentEquals(intArrayOf(3)) &&
+                    it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
+            })
             assertEquals(
                 listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.CHANGED),
                 budget.invocations.filter { it.pass == "sparsify" }.map { it.outcome },
@@ -269,32 +207,21 @@ class PresolverTest {
 
     @Test
     fun `linear misses should stay parked across many unrelated Boolean eliminations`() {
-        val problem = Problem(
-            64,
-            2,
-            Array(2) { IntDomain(0, 2) },
-            listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
-            ) + (0 until 32).flatMap { v ->
-                listOf(
-                    Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, true))),
-                    Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, false))),
-                )
-            },
-        )
+        val problem = Problem(64, 2, Array(2) { IntDomain(0, 2) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
+        ) + (0 until 32).flatMap { v -> listOf(
+            Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, true))),
+            Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, false))),
+        ) })
         for (lane in PresolveLane.entries) {
             val budget = PresolveBudget(Long.MAX_VALUE)
             val context = PresolveContext(
-                objectiveBoolCoeffs = (0 until 32).associate { 2 * it to 1L },
-                presolveBudget = budget,
+                objectiveBoolCoeffs = (0 until 32).associate { 2 * it to 1L }, presolveBudget = budget,
             )
             val config = PresolveConfig.parse("off,+strengthen,+sparsify,+bve")
 
-            val fired = if (lane == PresolveLane.SOURCE) {
-                Presolver.runSource(problem, config, context).passesFired
-            } else {
-                Presolver.run(problem.bake(), config, context).passesFired
-            }
+            val fired = if (lane == PresolveLane.SOURCE) Presolver.runSource(problem, config, context).passesFired
+            else Presolver.run(problem.bake(), config, context).passesFired
 
             assertEquals(listOf(PresolvePass.ELIMINATE_BOOL_VARS), fired)
             assertEquals(1, budget.passCalls["sparsify"])
@@ -305,9 +232,7 @@ class PresolverTest {
     @Test
     fun `a SAC refutation during incremental materialization should be terminal`() {
         val source = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
+            0, 4, Array(4) { IntDomain(0, 1) },
             listOf(
                 Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
                 Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
@@ -318,8 +243,7 @@ class PresolverTest {
         assertIs<PropagationResult.Implied>(source.baked)
 
         val prepared = Presolver.run(
-            source,
-            PresolveConfig.parse("off,+strengthen"),
+            source, PresolveConfig.parse("off,+strengthen"),
             PresolveContext.EMPTY.withBakeConfig(BakeConfig(probeIntBounds = true)),
         )
 
@@ -331,9 +255,7 @@ class PresolverTest {
     @Test
     fun `a completed root refutation should survive an empty finite schedule`() {
         val source = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 1) },
+            0, 3, Array(3) { IntDomain(0, 1) },
             listOf(
                 Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
                 Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
@@ -356,9 +278,7 @@ class PresolverTest {
     @Test
     fun `explicit source strengthening under off should refute an indivisible equality`() {
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 2)),
+            0, 1, arrayOf(IntDomain(0, 2)),
             listOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
         )
 
@@ -376,9 +296,7 @@ class PresolverTest {
     @Test
     fun `explicit finite strengthening under off should reduce coefficients`() {
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3)),
         ).bake()
 
@@ -393,18 +311,14 @@ class PresolverTest {
     @Test
     fun `an explicit zero round cap should suppress enabled source and finite passes`() {
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(2, 2), intArrayOf(0, 1), LinearOp.LE, 3)),
         )
         val baked = problem.bake()
         for (config in listOf(
             PresolveConfig.parse("off,+strengthen").withEffort(maxRounds = 0),
             PresolveConfig(
-                PresolveEmphasis.OFF,
-                mapOf(PresolvePass.STRENGTHEN_COEFFICIENTS to true),
-                maxRounds = 0,
+                PresolveEmphasis.OFF, mapOf(PresolvePass.STRENGTHEN_COEFFICIENTS to true), maxRounds = 0,
             ),
             PresolveConfig.parse("off"),
             PresolveConfig.parse("off,-strengthen"),

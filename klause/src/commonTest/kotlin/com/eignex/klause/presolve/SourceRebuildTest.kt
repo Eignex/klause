@@ -23,16 +23,11 @@ class SourceRebuildTest {
     @Test
     fun `integer literal reconstruction should read restored literals before truncating their namespace`() {
         for (positive in listOf(false, true)) {
-            val rebuild = SourceRebuilds.compose(
-                listOf(
-                    SourceRebuilds(listOf(RebuildStep.AffineValue(1, 2, intArrayOf(0), longArrayOf(3), 1))),
-                    SourceRebuilds(
-                        listOf(RebuildStep.IntegerFromLiteral(0, Lit.make(2, positive))),
-                        sourceBoolVars = 1,
-                    ),
-                    SourceRebuilds(listOf(RebuildStep.CopyLiteral(2, Lit.make(3, true))), sourceBoolVars = 3),
-                ),
-            )
+            val rebuild = SourceRebuilds.compose(listOf(
+                SourceRebuilds(listOf(RebuildStep.AffineValue(1, 2, intArrayOf(0), longArrayOf(3), 1))),
+                SourceRebuilds(listOf(RebuildStep.IntegerFromLiteral(0, Lit.make(2, positive))), sourceBoolVars = 1),
+                SourceRebuilds(listOf(RebuildStep.CopyLiteral(2, Lit.make(3, true))), sourceBoolVars = 3),
+            ))
             val sample = Sample(booleanArrayOf(true, false, false, true), longArrayOf(0, 0))
             val expected = if (positive) longArrayOf(1, 5) else longArrayOf(0, 2)
 
@@ -50,8 +45,7 @@ class SourceRebuildTest {
         val huge = bigIntOf(Long.MAX_VALUE) + BIG_ONE
         val sample = Sample(booleanArrayOf(true), longArrayOf(), exactInts = listOf(BIG_ZERO, huge))
         val rebuild = SourceRebuilds(
-            listOf(RebuildStep.IntegerFromLiteral(0, Lit.make(0, true))),
-            sourceBoolVars = 0,
+            listOf(RebuildStep.IntegerFromLiteral(0, Lit.make(0, true))), sourceBoolVars = 0,
         )
 
         val restored = assertNotNull(rebuild.asSampleLift())(sample)
@@ -69,12 +63,8 @@ class SourceRebuildTest {
             SourceRebuilds(listOf(RebuildStep.AffineValue(0, 1, intArrayOf(1), longArrayOf(1), 1))),
         )
         val rebuild = SourceRebuilds.compose(passes)
-        val sample = Sample(
-            booleanArrayOf(false, true),
-            longArrayOf(0, 1),
-            doubleArrayOf(0.5),
-            listOf(BigFraction.of(bigIntOf(1), bigIntOf(2))),
-        )
+        val sample = Sample(booleanArrayOf(false, true), longArrayOf(0, 1),
+            doubleArrayOf(0.5), listOf(BigFraction.of(bigIntOf(1), bigIntOf(2))))
 
         val finite = assertNotNull(rebuild.asSampleLift())(sample)
         val open = rebuild.lift(OpenTheoryAssignment.Sampled(sample), 2, 2)
@@ -94,11 +84,9 @@ class SourceRebuildTest {
         val huge = bigIntOf(Long.MAX_VALUE) + BIG_ONE
         val exact = listOf(huge)
         val sample = Sample(booleanArrayOf(false, true, true, false), longArrayOf(), exactInts = exact)
-        val rebuild = SourceRebuilds(
-            LinearOp.entries.mapIndexed { index, op ->
-                RebuildStep.ComparisonValue(index, 0, op, Long.MAX_VALUE)
-            },
-        )
+        val rebuild = SourceRebuilds(LinearOp.entries.mapIndexed { index, op ->
+            RebuildStep.ComparisonValue(index, 0, op, Long.MAX_VALUE)
+        })
 
         val restored = assertNotNull(rebuild.asSampleLift())(sample)
         val open = rebuild.lift(OpenTheoryAssignment.Sampled(sample), 4, 1)

@@ -16,12 +16,8 @@ class SmtLibBooleanDefinitionsTest {
     @Test
     fun `cancelled empty Boolean definitions should not emit a constant`() {
         for (conjunction in listOf(false, true)) {
-            val builder = Compiler.Builder(
-                DEFAULT_UNBOUNDED_INT_LO,
-                DEFAULT_UNBOUNDED_INT_HI,
-                strictBounds = false,
-                sourceCancellation = ExecutionControl { true },
-            )
+            val builder = Compiler.Builder(DEFAULT_UNBOUNDED_INT_LO, DEFAULT_UNBOUNDED_INT_HI,
+                strictBounds = false, sourceCancellation = ExecutionControl { true })
 
             assertFailsWith<PolynomialSourceInterrupted> {
                 if (conjunction) builder.reifyAnd(emptyList()) else builder.reifyOr(emptyList())

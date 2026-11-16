@@ -45,9 +45,7 @@ internal class LinearToleranceQualification(
                 (nominalLow != null && (low == null || low < lowerPoint(nominalLow, integers[index])!!)) ||
                     (nominalHigh != null && (high == null || high > upperPoint(nominalHigh, integers[index])!!))
             }
-        ) {
-            return false
-        }
+        ) return false
         return rows.indices.all { rowUnchanged(it, ranges) } && !stopped()
     }
 
@@ -93,9 +91,7 @@ internal class LinearToleranceQualification(
                 if (terms.isEmpty()) {
                     if (row.lower?.let { BigFraction.ZERO < it - slack(it) } == true ||
                         row.upper?.let { BigFraction.ZERO > it + slack(it) } == true
-                    ) {
-                        emptyAcceptedSet = true
-                    }
+                    ) emptyAcceptedSet = true
                 } else if (terms.size == 1 && relative < BigFraction.ONE) {
                     val (column, coefficient) = terms.single()
                     val lower = row.lower?.let { acceptedLower(it) / coefficient }
@@ -129,15 +125,11 @@ internal class LinearToleranceQualification(
 
     private fun lowerPoint(value: BigFraction?, integer: Boolean): BigFraction? = if (integer) {
         value?.let { BigFraction.of(it.ceilInteger(), BIG_ONE) }
-    } else {
-        value
-    }
+    } else value
 
     private fun upperPoint(value: BigFraction?, integer: Boolean): BigFraction? = if (integer) {
         value?.let { BigFraction.of(-it.negated().ceilInteger(), BIG_ONE) }
-    } else {
-        value
-    }
+    } else value
 
     private fun rowUnchanged(index: Int, ranges: List<Pair<BigFraction?, BigFraction?>>): Boolean {
         if (stopped()) return false
@@ -146,9 +138,7 @@ internal class LinearToleranceQualification(
                 val (low, high) = ranges[column]
                 (low != null && value < low) || (high != null && value > high)
             }
-        ) {
-            return true
-        }
+        ) return true
         val lo = row.lower
         val hi = row.upper
         if (lo == null && hi == null) return true
@@ -169,9 +159,7 @@ internal class LinearToleranceQualification(
         fun permittedSlack(bound: BigFraction, activity: BigFraction): BigFraction? {
             val magnitude = lattice.maximumMagnitude ?: if (lattice.absoluteActivity && relative < BigFraction.ONE) {
                 activity.absolute()
-            } else {
-                return null
-            }
+            } else return null
             return slack(bound, magnitude)
         }
         // Slack below the first excluded lattice point cannot admit a nominally invalid integer activity.
@@ -224,25 +212,12 @@ internal class LinearToleranceQualification(
             if (!relative.isZero) {
                 val (low, high) = ranges[column]
                 val positive = coefficient.signum() > 0
-                nonnegative = nonnegative && (
-                    if (positive) {
-                        low?.signum()?.let { it >= 0 }
-                    } else {
-                        high?.signum()?.let { it <= 0 }
-                    }
-                    ) == true
-                nonpositive = nonpositive && (
-                    if (positive) {
-                        high?.signum()?.let { it <= 0 }
-                    } else {
-                        low?.signum()?.let { it >= 0 }
-                    }
-                    ) == true
-                magnitude = if (low == null || high == null) {
-                    null
-                } else {
+                nonnegative = nonnegative && (if (positive) low?.signum()?.let { it >= 0 } else
+                    high?.signum()?.let { it <= 0 }) == true
+                nonpositive = nonpositive && (if (positive) high?.signum()?.let { it <= 0 } else
+                    low?.signum()?.let { it >= 0 }) == true
+                magnitude = if (low == null || high == null) null else
                     magnitude?.plus(coefficient.absolute() * larger(low.absolute(), high.absolute()))
-                }
             }
         }
         var divisor = BIG_ZERO
@@ -250,11 +225,8 @@ internal class LinearToleranceQualification(
             if (stopped()) return null
             divisor = divisor.gcd((coefficient * BigFraction.of(denominator, BIG_ONE)).num.abs())
         }
-        return RowLattice(
-            BigFraction.of(divisor, denominator),
-            magnitude,
-            coefficients.count { !it.isZero } == 1 || nonnegative || nonpositive,
-        )
+        return RowLattice(BigFraction.of(divisor, denominator), magnitude,
+            coefficients.count { !it.isZero } == 1 || nonnegative || nonpositive)
     }
 }
 

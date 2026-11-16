@@ -49,14 +49,12 @@ class Xcsp3TableTest {
 
     @Test
     fun `negative tables should preserve values beyond the 32-bit range`() {
-        val source = Xcsp3.parse(
-            """
+        val source = Xcsp3.parse("""
             <instance type="CSP">
               <variables><var id="x">4294967296..4294967297</var></variables>
               <constraints><extension><list>x</list><conflicts>4294967296</conflicts></extension></constraints>
             </instance>
-            """.trimIndent(),
-        )
+            """.trimIndent())
 
         val result = BacktrackSolver(source.problem.bake()).solve(BacktrackParams())
 
@@ -85,10 +83,8 @@ class Xcsp3TableTest {
 
     @Test
     fun `table cells should retain signed 64-bit limits`() {
-        assertEquals(
-            listOf(Long.MIN_VALUE, Long.MAX_VALUE),
-            rows("${Long.MIN_VALUE} ${Long.MAX_VALUE}", 1).lo.toList(),
-        )
+        assertEquals(listOf(Long.MIN_VALUE, Long.MAX_VALUE),
+            rows("${Long.MIN_VALUE} ${Long.MAX_VALUE}", 1).lo.toList())
     }
 
     @Test

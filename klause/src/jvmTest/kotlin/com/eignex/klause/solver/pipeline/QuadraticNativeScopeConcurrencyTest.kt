@@ -17,19 +17,17 @@ class QuadraticNativeScopeConcurrencyTest {
         val workers = List(4) { scope.worker(it) }
         val completed = AtomicLong()
 
-        val threads = workers.map { worker ->
-            thread {
-                val arithmetic = PolynomialArithmetic(worker.polynomial)
-                try {
-                    while (true) {
-                        arithmetic.multiply(Polynomial.ONE, Polynomial.ONE)
-                        completed.incrementAndGet()
-                    }
-                } catch (_: PolynomialInterrupted) {
-                    // The containing limit terminates every cursor.
+        val threads = workers.map { worker -> thread {
+            val arithmetic = PolynomialArithmetic(worker.polynomial)
+            try {
+                while (true) {
+                    arithmetic.multiply(Polynomial.ONE, Polynomial.ONE)
+                    completed.incrementAndGet()
                 }
+            } catch (_: PolynomialInterrupted) {
+                // The containing limit terminates every cursor.
             }
-        }
+        } }
         threads.forEach { it.join() }
 
         assertEquals(800L, scope.work)
@@ -43,14 +41,12 @@ class QuadraticNativeScopeConcurrencyTest {
         val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = 800))
         val workers = List(4) { scope.worker(it) }
 
-        val threads = workers.map { worker ->
-            thread {
-                repeat(100) {
-                    worker.polynomial.charge(1)
-                    worker.numerical.charge(1)
-                }
+        val threads = workers.map { worker -> thread {
+            repeat(100) {
+                worker.polynomial.charge(1)
+                worker.numerical.charge(1)
             }
-        }
+        } }
         threads.forEach { it.join() }
 
         assertEquals(800L, scope.work)
@@ -64,11 +60,9 @@ class QuadraticNativeScopeConcurrencyTest {
         val scope = QuadraticNativeScope(PolynomialTheoryParams())
         val workers = List(4) { scope.worker(it) }
 
-        val threads = workers.map { worker ->
-            thread {
-                repeat(100) { worker.observe(QfNraStats(1, 2, 0, Long.MAX_VALUE, 1, 0, 1)) }
-            }
-        }
+        val threads = workers.map { worker -> thread {
+            repeat(100) { worker.observe(QfNraStats(1, 2, 0, Long.MAX_VALUE, 1, 0, 1)) }
+        } }
         threads.forEach { it.join() }
 
         val stats = scope.polynomialStats

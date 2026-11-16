@@ -55,12 +55,9 @@ internal fun LinearRow.specializeLinear(truth: Boolean, fixed: Map<Int, Boolean>
     val op = if (truth) relation else relation.complemented()
     if (truth && this is Linear) return this
     if (fixed.isEmpty() && (0 until size).any {
-            visit()
-            Term.isBool(ref(it))
-        }
-    ) {
-        return null
-    }
+        visit()
+        Term.isBool(ref(it))
+    }) return null
     val isStrict = if (truth) strict else !strict
     val variables = ArrayList<Int>()
     return when (val c = constants) {
@@ -156,19 +153,13 @@ internal fun integralLinear(
     val relation = if (negate) LinearOp.LE else op
     val variables = terms.keys.toIntArray()
     return if (rhs.fitsLong() && normalized.all {
+        visit()
+        it.fitsLong()
+    }) {
+        Linear(LongArray(normalized.size) {
             visit()
-            it.fitsLong()
-        }
-    ) {
-        Linear(
-            LongArray(normalized.size) {
-                visit()
-                normalized[it].toLongExact()
-            },
-            variables,
-            relation,
-            rhs.toLongExact(),
-        )
+            normalized[it].toLongExact()
+        }, variables, relation, rhs.toLongExact())
     } else {
         Linear(variables, normalized, relation, rhs)
     }

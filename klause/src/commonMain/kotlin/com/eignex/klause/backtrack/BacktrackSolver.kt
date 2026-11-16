@@ -139,10 +139,8 @@ class BacktrackSolver internal constructor(
         val handle = ResumableMinimize(
             this,
             objective,
-            params.copy(
-                objectiveBoundSupplier = { activeCutoff },
-                cancellation = handleCancellation.withLifetime(handleCancellation),
-            ),
+            params.copy(objectiveBoundSupplier = { activeCutoff },
+                cancellation = handleCancellation.withLifetime(handleCancellation)),
             rebindable = true,
             exactObjectiveBoundSupplier = { activeExactCutoff.takeIf { exactCompletion } },
         )
@@ -169,14 +167,8 @@ class BacktrackSolver internal constructor(
                 cutoff: BigFraction,
                 cancellation: ExecutionControl,
             ) {
-                beginFragment(
-                    assumptions,
-                    decisionBudget,
-                    SourceObjectiveScore(cutoff.toDouble(), cutoff).pruningBound,
-                    cutoff,
-                    true,
-                    cancellation,
-                )
+                beginFragment(assumptions, decisionBudget,
+                    SourceObjectiveScore(cutoff.toDouble(), cutoff).pruningBound, cutoff, true, cancellation)
             }
 
             private fun beginFragment(
@@ -194,9 +186,7 @@ class BacktrackSolver internal constructor(
                         exactCutoff <= checkNotNull(activeExactCutoff)
                     } else if (exactCutoff == null && cutoff == Double.POSITIVE_INFINITY) {
                         activeExactCutoff == null && activeCutoff == Double.POSITIVE_INFINITY
-                    } else {
-                        cutoff <= activeCutoff
-                    }
+                    } else cutoff <= activeCutoff
                     require(!cutoff.isNaN() && monotone) {
                         "repair objective cutoff must be non-increasing"
                     }
@@ -287,11 +277,8 @@ class BacktrackSolver internal constructor(
 
     /** Open a satisfaction search that pauses and resumes across slices. See [ResumableSolve]. */
     override fun resumableSolve(params: BacktrackParams): ResumableSolve =
-        if (PrivateRebuildSatisfaction.eligible(problem, params)) {
-            PrivateRebuildSatisfaction(this, params)
-        } else {
-            ResumableSatisfaction(this, params)
-        }
+        if (PrivateRebuildSatisfaction.eligible(problem, params)) PrivateRebuildSatisfaction(this, params)
+        else ResumableSatisfaction(this, params)
 
     /**
      * The verdict a satisfaction [outcome] stands for, stopping [sink] for its counters.
@@ -418,7 +405,6 @@ class BacktrackSolver internal constructor(
                                 window.addLast(outcome.sample)
                             }
                         }
-
                         else -> ended = true
                     }
                 }
@@ -444,12 +430,10 @@ class BacktrackSolver internal constructor(
                         cursor.releaseForSequenceYield()
                         event.result
                     }
-
                     is StepEvent.Terminal -> {
                         finished = true
                         event.result
                     }
-
                     StepEvent.Paused -> null
                 }
             },

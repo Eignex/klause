@@ -11,14 +11,8 @@ import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.toLongExact
 
 internal fun OpenTheoryAssignment.toSample(model: Problem, invocation: EngineInvocation? = null): Sample {
-    require(
-        invocation == null || (
-            (
-                invocation.sourceModel.sameModel(ModelIdentity.of(model)) ||
-                    invocation.preparedPlan.model === model
-                ) && invocation.model.sameModel(ModelIdentity.of(model))
-            ),
-    ) {
+    require(invocation == null || ((invocation.sourceModel.sameModel(ModelIdentity.of(model)) ||
+        invocation.preparedPlan.model === model) && invocation.model.sameModel(ModelIdentity.of(model)))) {
         "theory witness invocation has a different source"
     }
     val ints = List(model.numIntVars) { parseBigInt(intValue(it)) }
@@ -31,13 +25,8 @@ internal fun OpenTheoryAssignment.toSample(model: Problem, invocation: EngineInv
         exactInts = ints,
     ).also { sample ->
         sample.witnessCertificate = invocation?.let { binding ->
-            EvidenceCertificate.published(
-                CompletedEnginePublication.Witness(
-                    binding,
-                    sample,
-                    binding.executionObjective?.evaluateExact(sample)?.toDouble(),
-                ),
-            )
+            EvidenceCertificate.published(CompletedEnginePublication.Witness(binding, sample,
+                binding.executionObjective?.evaluateExact(sample)?.toDouble()))
         }
     }
 }

@@ -27,9 +27,7 @@ internal class FloatGridColumn(
 
     fun value(index: Long): BigFraction? = if (coordinate.contains(index)) {
         origin + step * BigFraction.ofLong(index)
-    } else {
-        null
-    }
+    } else null
 }
 
 internal class FloatGridDefinition(
@@ -52,11 +50,8 @@ internal class FloatGridDefinition(
         stop.charge(columns.size.toLong() + retained.size + origins.size)
         if (stop()) return FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
         val mapping = FloatGridMapping(source, target, columns, retained, origins, owner, stop)
-        return if (stop()) {
-            FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
-        } else {
-            FloatGridPreparation.Prepared(target, mapping)
-        }
+        return if (stop()) FloatGridPreparation.Declined(FloatGridDecline.RESOURCE)
+        else FloatGridPreparation.Prepared(target, mapping)
     }
 }
 
@@ -82,22 +77,16 @@ internal class FloatGridMapping(
         require(this.retainedReals.size == source.numRealVars)
         require(origins.size == target.numFactors && origins.all { it in source.factors.indices })
         require(bySource.size == capturedColumns.size)
-        require(
-            privateCoordinates.map { it.variable }.toSet() ==
-                (source.numIntVars until target.numIntVars).toSet(),
-        )
-        require(
-            capturedColumns.all {
-                it.source.index in 0 until source.numRealVars &&
-                    it.coordinate.variable in source.numIntVars until target.numIntVars &&
-                    this.retainedReals[it.source.index] == -1
-            },
-        )
-        require(
-            (0 until source.numRealVars).all {
-                it in bySource || this.retainedReals[it] in 0 until target.numRealVars
-            },
-        )
+        require(privateCoordinates.map { it.variable }.toSet() ==
+            (source.numIntVars until target.numIntVars).toSet())
+        require(capturedColumns.all {
+            it.source.index in 0 until source.numRealVars &&
+                it.coordinate.variable in source.numIntVars until target.numIntVars &&
+                this.retainedReals[it.source.index] == -1
+        })
+        require((0 until source.numRealVars).all {
+            it in bySource || this.retainedReals[it] in 0 until target.numRealVars
+        })
         require(this.retainedReals.filter { it >= 0 }.distinct().size == target.numRealVars)
         require(origins.toSet().size == source.numFactors)
     }
@@ -134,10 +123,8 @@ internal class FloatGridMapping(
         require(sample.coordinateFrame == null || sample.coordinateFrame === target) {
             "float reconstruction belongs to a different coordinate frame"
         }
-        require(
-            sample.numBoolVars == target.numBoolVars && sample.numIntVars == target.numIntVars &&
-                sample.numRealVars == target.numRealVars,
-        ) { "float reconstruction needs a complete private assignment" }
+        require(sample.numBoolVars == target.numBoolVars && sample.numIntVars == target.numIntVars &&
+            sample.numRealVars == target.numRealVars) { "float reconstruction needs a complete private assignment" }
         val stop = guardedCancellation(cancellation)
         if (stop()) return null
         val values = arrayOfNulls<BigFraction>(source.numRealVars)
@@ -169,11 +156,8 @@ internal class FloatGridMapping(
             values.indices.map { id ->
                 stop.charge(1)
                 if (stop()) return null
-                if (id in bySource) {
-                    ExactRealValue(ExactRealExpression.Algebraic(scalar(requireNotNull(values[id]))))
-                } else {
-                    original[retainedReals[id]]
-                }
+                if (id in bySource) ExactRealValue(ExactRealExpression.Algebraic(scalar(requireNotNull(values[id]))))
+                else original[retainedReals[id]]
             }
         }
         val bools = BooleanArray(source.numBoolVars)
@@ -189,15 +173,8 @@ internal class FloatGridMapping(
             ints[id] = sample.intValue(id)
         }
         if (stop()) return null
-        val result = Sample(
-            bools,
-            ints,
-            approximate,
-            exact,
-            sample.exactInts?.take(source.numIntVars),
-            algebraic,
-            symbolic,
-        )
+        val result = Sample(bools, ints, approximate, exact, sample.exactInts?.take(source.numIntVars),
+            algebraic, symbolic)
             .withSourceSemantics(source.semantics)
             .withCoordinateFrame(source)
         return if (stop()) null else result
@@ -206,7 +183,5 @@ internal class FloatGridMapping(
 
 // A rational leaf needs no arithmetic context with a separate work allowance.
 private fun scalar(value: BigFraction): AlgebraicReal = AlgebraicReal(
-    RationalPolynomial(listOf(value.negated(), BigFraction.ONE)),
-    1,
-    RationalInterval(value, value),
+    RationalPolynomial(listOf(value.negated(), BigFraction.ONE)), 1, RationalInterval(value, value),
 )

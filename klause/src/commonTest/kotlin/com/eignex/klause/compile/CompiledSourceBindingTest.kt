@@ -65,21 +65,16 @@ class CompiledSourceBindingTest {
             val compiled = schema.compile(semanticOverrides = SemanticOverrides(pinAbsentOptionalValues = pinAbsent))
             val helper = compiled.minimize(schema.x.value)
 
-            val result = assertIs<OpenTheoryResult.Sat>(
-                LocalSearchSolver.source(compiled).solve(
-                    LocalSearchParams(maxFlips = 1000, randomSeed = 17),
-                ),
-            )
+            val result = assertIs<OpenTheoryResult.Sat>(LocalSearchSolver.source(compiled).solve(
+                LocalSearchParams(maxFlips = 1000, randomSeed = 17)))
             val point = assertIs<OpenTheoryAssignment.Sampled>(result.assignment).sample
 
             assertSame(compiled.sourceBinding.originalProblem, point.coordinateFrame)
             assertNull(compiled.decode(schema.x, point))
             assertEquals(if (pinAbsent) 0.0 else 1.0, abs(compiled.decode(schema.x.value, point)))
             assertEquals(if (pinAbsent) 0.0 else 1.0, compiled.decode(schema.y, point))
-            assertEquals(
-                QuadraticVariable.Real(assertNotNull(compiled.sourceRealId(schema.x.value))),
-                compiled.sourceObjective(helper).terms.single().first,
-            )
+            assertEquals(QuadraticVariable.Real(assertNotNull(compiled.sourceRealId(schema.x.value))),
+                compiled.sourceObjective(helper).terms.single().first)
         }
     }
 
@@ -90,11 +85,8 @@ class CompiledSourceBindingTest {
         val helper = compiled.maximize(x).copy(constant = 7)
         val objective = compiled.sourceObjective(helper)
         val strategy = BacktrackSolver.source(compiled)
-        val scope = SourceScope(
-            SourceRevision("compiled-helper", "klause-ir-exact-v1"),
-            Assumptions.None.sourceCondition(),
-            SourceObjective("cost", ObjectiveSense.MINIMIZE),
-        )
+        val scope = SourceScope(SourceRevision("compiled-helper", "klause-ir-exact-v1"),
+            Assumptions.None.sourceCondition(), SourceObjective("cost", ObjectiveSense.MINIMIZE))
         val capture = assertNotNull(strategy.source.quadraticSourceResultCapture(scope, objective))
         val result = strategy.optimize(helper).result
 
@@ -107,13 +99,11 @@ class CompiledSourceBindingTest {
     @Test
     fun `a complete original source arm should retain a point outside its compatibility grid`() {
         val x = FloatHandle("x", 0.0, 1.0)
-        val compiled = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(0.0, 1.0, 2),
-                "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -1.0)),
-                "square" to NamedConstraint((x * x) eq 0.25),
-            ),
-        ).compile()
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, 2),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -1.0)),
+            "square" to NamedConstraint((x * x) eq 0.25),
+        )).compile()
 
         val result = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(compiled).solve())
 
@@ -123,13 +113,11 @@ class CompiledSourceBindingTest {
 
     @Test
     fun `private grid exhaustion should retain an incomplete source result`() {
-        val compiled = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(0.0, 1.0, 2),
-                "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -1.0)),
-                "half" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.EQ, 0.5)),
-            ),
-        ).compile()
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, 2),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -1.0)),
+            "half" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.EQ, 0.5)),
+        )).compile()
 
         val result = assertIs<OpenTheoryResult.Unknown>(LocalSearchSolver.source(compiled).solve())
 
@@ -139,20 +127,10 @@ class CompiledSourceBindingTest {
     @Test
     fun `source adapters should retain real declarations beside a selected compatibility grid`() {
         val x = FloatHandle("x", -1.0, 1.0)
-        val compiled = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(-1.0, 1.0, 3),
-                "different" to NamedConstraint(
-                    FloatLinearConstraint(
-                        doubleArrayOf(1.0),
-                        listOf("x"),
-                        IntCmpOp
-                            .NE,
-                        0.0,
-                    ),
-                ),
-            ),
-        ).compile()
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(-1.0, 1.0, 3),
+            "different" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.NE, 0.0)),
+        )).compile()
         val original = compiled.sourceBinding.originalProblem
         val compatibility = compiled.problem
 
@@ -172,33 +150,15 @@ class CompiledSourceBindingTest {
     @Test
     fun `decoding should distinguish original private and unbound frames by identity`() {
         val x = FloatHandle("x", -1.0, 1.0)
-        val definition = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(-1.0, 1.0, 3),
-                "different" to NamedConstraint(
-                    FloatLinearConstraint(
-                        doubleArrayOf(1.0),
-                        listOf("x"),
-                        IntCmpOp
-                            .NE,
-                        0.0,
-                    ),
-                ),
-            ),
-        )
+        val definition = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(-1.0, 1.0, 3),
+            "different" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.NE, 0.0)),
+        ))
         val compiled = definition.compile()
         val other = definition.compile()
-        val original = assertNotNull(
-            compiled.sourceBinding.bindOriginalSample(
-                Sample(
-                    booleanArrayOf(),
-                    longArrayOf(),
-                    doubleArrayOf(0.25),
-                    listOf(BigFraction.ofLong(4).reciprocal()),
-                ),
-                ExecutionControl.Never,
-            ),
-        )
+        val original = assertNotNull(compiled.sourceBinding.bindOriginalSample(
+            Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.25),
+                listOf(BigFraction.ofLong(4).reciprocal())), ExecutionControl.Never))
         val unbound = Sample(booleanArrayOf(), longArrayOf(2))
         val privatePoint = unbound.withCoordinateFrame(compiled.problem)
 
@@ -228,9 +188,7 @@ class CompiledSourceBindingTest {
     fun `an off grid absent default should decode and evaluate consistently in the finite facade`() {
         val schema = object : VariableSchema() {
             val x by optFloatVar(-1.0, 1.0, 2)
-            init {
-                constraint(Not(x.present.toExpr()))
-            }
+            init { constraint(Not(x.present.toExpr())) }
         }
         val compiled = schema.compile()
         val point = BacktrackSolver(compiled.problem.bake()).enumerate().single()
@@ -249,9 +207,7 @@ class CompiledSourceBindingTest {
     fun `disabled absent pinning should leave every requested grid value available`() {
         val schema = object : VariableSchema() {
             val x by optFloatVar(-1.0, 1.0, 2)
-            init {
-                constraint(Not(x.present.toExpr()))
-            }
+            init { constraint(Not(x.present.toExpr())) }
         }
         val compiled = schema.compile(semanticOverrides = SemanticOverrides(pinAbsentOptionalValues = false))
 
@@ -265,20 +221,10 @@ class CompiledSourceBindingTest {
     @Test
     fun `a copied float helper should retain exact source coefficients and constants`() {
         val x = FloatHandle("x", 2.0, 4.0)
-        val compiled = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(2.0, 4.0, 3),
-                "different" to NamedConstraint(
-                    FloatLinearConstraint(
-                        doubleArrayOf(1.0),
-                        listOf("x"),
-                        IntCmpOp
-                            .NE,
-                        3.0,
-                    ),
-                ),
-            ),
-        ).compile()
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(2.0, 4.0, 3),
+            "different" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.NE, 3.0)),
+        )).compile()
         val objective = compiled.minimize(x).copy(intCoefficients = longArrayOf(9_007_199_254_740_993L), constant = 7)
 
         val exact = compiled.sourceObjective(objective)
@@ -300,12 +246,9 @@ class CompiledSourceBindingTest {
         val second = definition.compile()
         val objective = first.minimize(x)
 
-        for (strategy in listOf(
-            BacktrackSolver.source(second),
-            LocalSearchSolver.source(second),
-            BacktrackSolver.source(second.sourceBinding.originalProblem),
-            LocalSearchSolver.source(second.sourceBinding.originalProblem),
-        )) {
+        for (strategy in listOf(BacktrackSolver.source(second),
+                LocalSearchSolver.source(second), BacktrackSolver.source(second.sourceBinding.originalProblem),
+                LocalSearchSolver.source(second.sourceBinding.originalProblem))) {
             assertFailsWith<IllegalArgumentException> { strategy.optimize(objective) }
             assertFailsWith<IllegalArgumentException> { strategy.optimizeOpen(objective) }
         }
@@ -314,26 +257,15 @@ class CompiledSourceBindingTest {
     @Test
     fun `exact source optimization should preserve a negated helper and explicit maximization sense`() {
         val x = FloatHandle("x", 2.0, 4.0)
-        val compiled = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(2.0, 4.0, 3),
-                "different" to NamedConstraint(
-                    FloatLinearConstraint(
-                        doubleArrayOf(1.0),
-                        listOf("x"),
-                        IntCmpOp
-                            .NE,
-                        3.0,
-                    ),
-                ),
-            ),
-        ).compile()
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(2.0, 4.0, 3),
+            "different" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.NE, 3.0)),
+        )).compile()
         val weight = 9_007_199_254_740_993L
         val objective = compiled.maximize(x).copy(intCoefficients = longArrayOf(-weight), constant = 7)
 
         val result = assertIs<QuadraticOptimizationResult.Optimal>(
-            BacktrackSolver.source(compiled).optimize(objective, sense = ObjectiveSense.MAXIMIZE).result,
-        )
+            BacktrackSolver.source(compiled).optimize(objective, sense = ObjectiveSense.MAXIMIZE).result)
 
         assertEquals(BigFraction.ofLong(7 - 2 * weight), result.incumbent.value.rational)
         assertEquals(2.0, compiled.decode(x, result.incumbent.sample))
@@ -344,20 +276,10 @@ class CompiledSourceBindingTest {
     @Test
     fun `the open objective interface should explicitly decline a rounded real weight`() {
         val x = FloatHandle("x", 2.0, 4.0)
-        val compiled = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(2.0, 4.0, 3),
-                "different" to NamedConstraint(
-                    FloatLinearConstraint(
-                        doubleArrayOf(1.0),
-                        listOf("x"),
-                        IntCmpOp
-                            .NE,
-                        3.0,
-                    ),
-                ),
-            ),
-        ).compile()
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(2.0, 4.0, 3),
+            "different" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.NE, 3.0)),
+        )).compile()
         val objective = compiled.minimize(x).copy(intCoefficients = longArrayOf(9_007_199_254_740_993L))
 
         val result = assertIs<OpenTheoryExecution.Optimize>(BacktrackSolver.source(compiled).optimizeOpen(objective))
@@ -369,9 +291,7 @@ class CompiledSourceBindingTest {
     fun `continuous schema policy should retain optional source defaults without grid geometry`() {
         val schema = object : VariableSchema() {
             val x by optFloatVar(-1.0, 1.0, 2)
-            init {
-                constraint(Not(x.present.toExpr()))
-            }
+            init { constraint(Not(x.present.toExpr())) }
         }
         val compiled = schema.compile(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous))
 

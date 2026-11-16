@@ -133,7 +133,8 @@ internal class ArithmeticExecution(
             } else {
                 this.quantum = previousQuantum
                 untilPoll = minOf(untilPoll, previousQuantum)
-                reservation?.let { admittedUntil = minOf(admittedUntil, used + minOf(previousQuantum, it.capacity - used)) }
+                reservation?.let { admittedUntil = minOf(admittedUntil, used + minOf(previousQuantum,
+                    it.capacity - used)) }
             }
         }
     }

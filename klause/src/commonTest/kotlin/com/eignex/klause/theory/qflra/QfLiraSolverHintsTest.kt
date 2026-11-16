@@ -505,15 +505,8 @@ class QfLiraSolverHintsTest {
             realLower = doubleArrayOf(0.0),
             realUpper = doubleArrayOf(0.0),
             factors = arrayOf(
-                ReifiedRealLinear(
-                    0,
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.LE,
-                    0.0,
-                ),
+                ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+                    LinearOp.LE, 0.0),
             ),
         )
         val work = listOf(false, true).map { incremental ->
@@ -790,12 +783,8 @@ class QfLiraSolverHintsTest {
             ExactLiraSearchComponent(partialModel()).use { component ->
                 component.observeWith(stats)
                 if (complete) component.observeCompleteTraversal()
-                val hints = assertNotNull(
-                    component.partialPointHints(
-                        ExecutionControl.Never,
-                        defaultOpening = true,
-                    ),
-                ).second
+                val hints = assertNotNull(component.partialPointHints(ExecutionControl.Never, defaultOpening =
+                    true)).second
                 assertNull(hints.preferredBool(0))
                 val session = SearchSession(listOf(component), atoms = SearchAtomRegistry(2))
                 assertIs<ComponentResult.Consistent>(session.initialize())

@@ -10,10 +10,8 @@ class IntegerBoundProvenanceTest {
     @Test
     fun `a raw endpoint should decline a stronger sparse landing`() {
         for (lower in listOf(false, true)) {
-            val state = PropagationState(
-                Problem(0, 1, arrayOf(IntDomain(0, 8).excludeValue(4)), emptyArray()),
-                Assumptions.None,
-            )
+            val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 8).excludeValue(4)), emptyArray()),
+                Assumptions.None)
             state.undoLogging = true
             assertTrue(if (lower) state.tightenIntMin(0, 4) else state.tightenIntMax(0, 4))
 
@@ -23,10 +21,8 @@ class IntegerBoundProvenanceTest {
 
     @Test
     fun `a raw endpoint should decline clipped historical exclusions`() {
-        val state = PropagationState(
-            Problem(0, 1, arrayOf(IntDomain(0, 8).excludeValue(4)), emptyArray()),
-            Assumptions.None,
-        )
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 8).excludeValue(4)), emptyArray()),
+            Assumptions.None)
         state.undoLogging = true
         assertTrue(state.tightenIntMax(0, 3))
 
@@ -47,10 +43,8 @@ class IntegerBoundProvenanceTest {
 
     @Test
     fun `a sparse endpoint walk should decline outside its allowance`() {
-        val state = PropagationState(
-            Problem(0, 1, arrayOf(IntDomain(0, 1000).excludeValue(2)), emptyArray()),
-            Assumptions.None,
-        )
+        val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 1000).excludeValue(2)), emptyArray()),
+            Assumptions.None)
 
         assertFalse(state.rawIntegerEndpointSupported(0, lower = false, requested = 3, trail = 0))
     }

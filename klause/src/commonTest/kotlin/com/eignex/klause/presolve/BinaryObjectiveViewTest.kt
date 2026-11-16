@@ -44,12 +44,8 @@ class BinaryObjectiveViewTest {
     @Test
     fun `mixed costs should reuse signed binary channels and retain nonbinary terms`() {
         for (bound in listOf(0L, 1L)) {
-            val problem = Problem(
-                1,
-                2,
-                arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
-                listOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, bound)),
-            ).bake()
+            val problem = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
+                listOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, bound))).bake()
             val original = LinearObjective(longArrayOf(7), longArrayOf(-3, 5), constant = 11)
 
             val view = checkNotNull(BinaryObjectiveView.create(problem, original, allowMixedObjective = true))
@@ -57,11 +53,9 @@ class BinaryObjectiveViewTest {
             assertEquals(1, view.numBoolVars)
             assertEquals(listOf(0L, 5L), view.objective.intCoefficients.toList())
             assertNull(view.objective.binaryIntegerSource)
-            for (binary in 0L..1L) {
-                for (integer in listOf(0L, 2L, 4L)) {
-                    val sample = Sample(booleanArrayOf(binary == bound), longArrayOf(binary, integer))
-                    assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
-                }
+            for (binary in 0L..1L) for (integer in listOf(0L, 2L, 4L)) {
+                val sample = Sample(booleanArrayOf(binary == bound), longArrayOf(binary, integer))
+                assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
             }
         }
     }
@@ -83,25 +77,18 @@ class BinaryObjectiveViewTest {
             0L to LinearObjective(intCoefficients = longArrayOf(1, 2, 3), constant = Long.MAX_VALUE),
         )
         for ((bound, original) in objectives) {
-            val problem = Problem(
-                2,
-                3,
-                arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)),
-                listOf(
-                    ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, bound),
-                    ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
-                ),
-            ).bake()
+            val problem = Problem(2, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)), listOf(
+                ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, bound),
+                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+            )).bake()
 
             val view = checkNotNull(BinaryObjectiveView.create(problem, original, allowMixedObjective = true))
 
             assertEquals(2, view.numBoolVars)
             assertEquals(listOf(1L, 0L, 3L), view.objective.intCoefficients.toList())
-            for (a in 0L..1L) {
-                for (b in 0L..1L) {
-                    val sample = Sample(booleanArrayOf(a == bound, b == 1L), longArrayOf(a, b, 2))
-                    assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
-                }
+            for (a in 0L..1L) for (b in 0L..1L) {
+                val sample = Sample(booleanArrayOf(a == bound, b == 1L), longArrayOf(a, b, 2))
+                assertEquals(original.evaluateExact(sample), view.objective.evaluateExact(sample))
             }
         }
     }
@@ -109,12 +96,8 @@ class BinaryObjectiveViewTest {
     @Test
     fun `rewrite cost should reconstruct a projected binary cost within a mixed objective`() {
         for (order in listOf(AffinePivotOrder.MARKOWITZ, AffinePivotOrder.REWRITE_COST)) {
-            val source = Problem(
-                1,
-                2,
-                arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
-                listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)),
-            )
+            val source = Problem(1, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 4)),
+                listOf(ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1)))
             val original = LinearObjective(intCoefficients = longArrayOf(3, 5), constant = 7)
             val config = PresolveConfig.parse("off,+binary-columns").withAffinePivotOrder(order)
 
@@ -133,15 +116,10 @@ class BinaryObjectiveViewTest {
 
     @Test
     fun `an unprojected mixed binary cost should stay protected during column substitution`() {
-        val source = Problem(
-            2,
-            3,
-            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)),
-            listOf(
-                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
-                ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
-            ),
-        )
+        val source = Problem(2, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 4)), listOf(
+            ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
+            ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.EQ, 1),
+        ))
         val original = LinearObjective(longArrayOf(Long.MAX_VALUE, 0), longArrayOf(1, 2, 3))
         val config = PresolveConfig.parse("off,+binary-columns").withAffinePivotOrder(AffinePivotOrder.REWRITE_COST)
 
@@ -158,9 +136,7 @@ class BinaryObjectiveViewTest {
     @Test
     fun `objective symmetry should consume substituted signed Boolean costs`() {
         val source = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 1) },
+            0, 3, Array(3) { IntDomain(0, 1) },
             listOf(Linear(longArrayOf(1, 1, 1), intArrayOf(0, 1, 2), LinearOp.GE, 1)),
         )
         val original = LinearObjective(intCoefficients = longArrayOf(-3, -3, -3), constant = 7)
@@ -179,9 +155,7 @@ class BinaryObjectiveViewTest {
     fun `signed channels should preserve costs without adding literals`() {
         for (bound in listOf(0L, 1L)) {
             val problem = Problem(
-                1,
-                1,
-                arrayOf(IntDomain(0, 1)),
+                1, 1, arrayOf(IntDomain(0, 1)),
                 listOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, bound)),
             ).bake()
             val original = LinearObjective(longArrayOf(7), longArrayOf(-3), constant = 11)
@@ -212,9 +186,7 @@ class BinaryObjectiveViewTest {
     @Test
     fun `overflowing signed reuse should retain exact costs through a fresh channel`() {
         val problem = Problem(
-            1,
-            1,
-            arrayOf(IntDomain(0, 1)),
+            1, 1, arrayOf(IntDomain(0, 1)),
             listOf(ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 0)),
         ).bake()
         val objectives = listOf(
@@ -248,13 +220,8 @@ class BinaryObjectiveViewTest {
     @Test
     fun `continuous models without a Boolean consumer should retain their objective form`() {
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 1)),
-            emptyList(),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
+            0, 1, arrayOf(IntDomain(0, 1)), emptyList(),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
         ).bake()
 
         val view = BinaryObjectiveView.create(problem, LinearObjective(intCoefficients = longArrayOf(1)))
@@ -275,16 +242,12 @@ class BinaryObjectiveViewTest {
     fun `mixed integer readers should admit the core worker and preserve source costs`() {
         val original = LinearObjective(intCoefficients = longArrayOf(3, 5), constant = -2)
         val source = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
             listOf(Linear(longArrayOf(2, 2, 1), intArrayOf(0, 1, 2), LinearOp.GE, 3)),
         )
-        val config = PresolveConfig(
-            overrides = PresolvePass.entries.associateWith {
-                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-            },
-        )
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
         val outcome = PresolvePipeline.run(source, original, config, false)
         val objective = checkNotNull(outcome.objective)
         val problem = outcome.problem.bake()
@@ -313,17 +276,13 @@ class BinaryObjectiveViewTest {
     fun `approximate and solution sensitive invocations should retain integer costs`() {
         val original = LinearObjective(intCoefficients = longArrayOf(3, 5))
         val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, emptyList())
-        val approximate = source.withSourceSemantics(
-            SourceSemantics(
-                SourceFormat.IR,
-                feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
-            ).resolve(),
-        )
-        val config = PresolveConfig(
-            overrides = PresolvePass.entries.associateWith {
-                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-            },
-        )
+        val approximate = source.withSourceSemantics(SourceSemantics(
+            SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ofLong(1)),
+        ).resolve())
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
         for ((problem, sensitive) in listOf(approximate to false, source to true)) {
             val outcome = PresolvePipeline.run(problem, original, config, sensitive)
             assertEquals(original, outcome.objective ?: original)
@@ -334,28 +293,18 @@ class BinaryObjectiveViewTest {
     @Test
     fun `Boolean cutoffs should preserve mixed integer feasibility and signed costs`() {
         val source = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
             listOf(Linear(longArrayOf(2, 2, 1), intArrayOf(0, 1, 2), LinearOp.GE, 3)),
         ).bake()
         val original = LinearObjective(intCoefficients = longArrayOf(-3, 5), constant = 7)
-        val transformed = checkNotNull(
-            BinaryColumnSubstitution.substitute(
-                source,
-                setOf(0, 1),
-                BakeConfig.NONE,
-                original,
-            ),
-        )
+        val transformed = checkNotNull(BinaryColumnSubstitution.substitute(
+            source, setOf(0, 1), BakeConfig.NONE, original,
+        ))
         val objective = checkNotNull(transformed.objective)
 
-        val result = assertIs<MinimizeResult.Optimal>(
-            BacktrackSolver(transformed.problem).minimize(
-                objective,
-                BacktrackParams(nativeSat = false, pbObjectiveCutoff = true),
-            ),
-        )
+        val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(transformed.problem).minimize(
+            objective, BacktrackParams(nativeSat = false, pbObjectiveCutoff = true),
+        ))
         val sample = transformed.reconstruct(result.sample)
 
         assertEquals(4L, original.evaluateLong(sample))
@@ -365,9 +314,7 @@ class BinaryObjectiveViewTest {
     @Test
     fun `shared opposite channels should coalesce their signed costs exactly`() {
         val problem = Problem(
-            1,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            1, 2, Array(2) { IntDomain(0, 1) },
             listOf(
                 ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
                 ReifiedLinear(0, longArrayOf(1), intArrayOf(1), LinearOp.EQ, 0),
@@ -388,38 +335,23 @@ class BinaryObjectiveViewTest {
     @Test
     fun `source execution should retain original objective direction and coordinates`() {
         val source = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(-3, 5), constant = 7)
-        val config = PresolveConfig(
-            overrides = PresolvePass.entries.associateWith {
-                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-            },
-        )
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
         for (maximize in listOf(false, true)) {
-            val invocation = SourceSetup.prepare(
-                SourceSetupRequest(
-                    SourceAttachment(source),
-                    ExecutionOperation.OPTIMIZE,
-                    FiniteEngine.BACKTRACK,
-                    objective,
-                    maximize,
-                ),
-            )
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SourceAttachment(source), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK, objective, maximize,
+            ))
             val policy = SourceExecutionPolicy(portfolioArms = 1, explicitPresolve = true)
 
-            val result = assertIs<SourceExecutionResult.Finite>(
-                SourceSetup.execute(
-                    SourceExecutionRequest(
-                        invocation,
-                        presolveConfig = config,
-                        finiteRequest = { shape -> policy.finiteRequest(shape, FiniteEngine.BACKTRACK, config) },
-                    ),
-                ),
-            )
+            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
+                invocation, presolveConfig = config,
+                finiteRequest = { shape -> policy.finiteRequest(shape, FiniteEngine.BACKTRACK, config) },
+            )))
             val optimum = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
             val sample = checkNotNull(optimum.bestSample)
 
@@ -442,32 +374,20 @@ class BinaryObjectiveViewTest {
                 emptyList()
             }
             val source = BakedProblem(
-                numBoolVars = 1,
-                numIntVars = 2,
-                intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 2)),
-                factors = factors,
+                numBoolVars = 1, numIntVars = 2,
+                intDomains = arrayOf(IntDomain(0, 1), IntDomain(0, 2)), factors = factors,
                 seedDeductions = PropagationResult.Implied(
-                    intArrayOf(0),
-                    booleanArrayOf(true),
-                    intArrayOf(),
-                    longArrayOf(),
+                    intArrayOf(0), booleanArrayOf(true), intArrayOf(), longArrayOf(),
                 ),
             )
             val original = LinearObjective(longArrayOf(5), longArrayOf(3))
-            val transformed = checkNotNull(
-                BinaryColumnSubstitution.substitute(
-                    source,
-                    setOf(0),
-                    BakeConfig.NONE,
-                    original,
-                ),
-            )
+            val transformed = checkNotNull(BinaryColumnSubstitution.substitute(
+                source, setOf(0), BakeConfig.NONE, original,
+            ))
 
-            val result = assertIs<MinimizeResult.Optimal>(
-                BacktrackSolver(transformed.problem).minimize(
-                    checkNotNull(transformed.objective),
-                ),
-            )
+            val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(transformed.problem).minimize(
+                checkNotNull(transformed.objective),
+            ))
             val restored = transformed.reconstruct(result.sample)
 
             assertTrue(restored.boolValue(0))
@@ -478,26 +398,19 @@ class BinaryObjectiveViewTest {
     @Test
     fun `a clausal binary cost view should execute ordinary LP bounding`() {
         val source = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
         )
         val original = LinearObjective(intCoefficients = longArrayOf(1, 2))
-        val config = PresolveConfig(
-            overrides = PresolvePass.entries.associateWith {
-                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
-            },
-        )
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS
+        })
         val prepared = PresolvePipeline.run(source, original, config, false)
         val objective = checkNotNull(prepared.objective)
 
-        val result = assertIs<MinimizeResult.Optimal>(
-            BacktrackSolver(prepared.problem.bake()).minimize(
-                objective,
-                BacktrackParams(lpConfig = LpConfig.AGGRESSIVE),
-            ),
-        )
+        val result = assertIs<MinimizeResult.Optimal>(BacktrackSolver(prepared.problem.bake()).minimize(
+            objective, BacktrackParams(lpConfig = LpConfig.AGGRESSIVE),
+        ))
 
         assertEquals(1L, original.evaluateLong(prepared.reconstruct(result.sample)))
         assertTrue(result.stats.lp.rootPasses.sum > 0.0)
@@ -506,21 +419,14 @@ class BinaryObjectiveViewTest {
     @Test
     fun `substituted objective columns should reconstruct every original cost`() {
         val source = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1)),
         ).bake()
         val original = LinearObjective(intCoefficients = longArrayOf(-3, 5), constant = 7)
 
-        val transformed = checkNotNull(
-            BinaryColumnSubstitution.substitute(
-                source,
-                setOf(0, 1),
-                BakeConfig.NONE,
-                original,
-            ),
-        )
+        val transformed = checkNotNull(BinaryColumnSubstitution.substitute(
+            source, setOf(0, 1), BakeConfig.NONE, original,
+        ))
         val objective = checkNotNull(transformed.objective)
         val samples = BacktrackSolver(transformed.problem).enumerate().toList()
 

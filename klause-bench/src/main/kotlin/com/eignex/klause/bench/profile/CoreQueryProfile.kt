@@ -72,219 +72,165 @@ internal object CoreQueryProfile {
                     val sourceBaked = source.bake()
                     val preparationStart = System.nanoTime()
                     val beforePreparation = bean.getThreadAllocatedBytes(thread)
-                    val ordinary = if (prepared) {
-                        FinitePipeline.prepare(
-                            FinitePipelineRequest(
-                                source,
-                                FiniteEngine.BACKTRACK,
-                                objective,
-                                cancellation = ExecutionControl.after(2.seconds),
-                            ),
-                        )
-                    } else {
-                        null
-                    }
+                    val ordinary = if (prepared) FinitePipeline.prepare(FinitePipelineRequest(
+                        source, FiniteEngine.BACKTRACK, objective, cancellation = ExecutionControl.after(2.seconds),
+                    )) else null
                     val preparationNs = System.nanoTime() - preparationStart
                     val preparationBytes = bean.getThreadAllocatedBytes(thread) - beforePreparation
                     val model = ordinary?.problem as? BakedProblem ?: sourceBaked
                     val cost = ordinary?.objective ?: objective
                     val repeats = if (confirmation) 1..1 else 0..2
-                    for (repeat in repeats) {
-                        for (policy in listOf(
-                            "ordinary",
-                            "stratified",
-                            "root-fixed",
-                            "refined",
-                            "projected",
-                        )) {
-                            val rootCostStart = System.nanoTime()
-                            val rootCostBytes = bean.getThreadAllocatedBytes(thread)
-                            val root = deductions.get(model) as? PropagationResult.Implied
-                            val coefficients = cost.boolWeights
-                            var offset = cost.constant
-                            var removed = 0
-                            for (variable in coefficients.indices) {
-                                val weight = coefficients[variable]
-                                val fixed = root?.boolValueOrNull(variable)
-                                if (weight != 0L && fixed == (weight < 0L)) {
-                                    if (fixed == true) offset += weight
-                                    coefficients[variable] = 0L
-                                    removed++
-                                }
+                    for (repeat in repeats) for (policy in listOf(
+                        "ordinary", "stratified", "root-fixed", "refined", "projected",
+                    )) {
+                        val rootCostStart = System.nanoTime()
+                        val rootCostBytes = bean.getThreadAllocatedBytes(thread)
+                        val root = deductions.get(model) as? PropagationResult.Implied
+                        val coefficients = cost.boolWeights
+                        var offset = cost.constant
+                        var removed = 0
+                        for (variable in coefficients.indices) {
+                            val weight = coefficients[variable]
+                            val fixed = root?.boolValueOrNull(variable)
+                            if (weight != 0L && fixed == (weight < 0L)) {
+                                if (fixed == true) offset += weight
+                                coefficients[variable] = 0L
+                                removed++
                             }
-                            val queryCost = if (policy == "root-fixed") {
-                                cost.copy(
-                                    boolWeights = coefficients,
-                                    constant = offset,
-                                )
-                            } else {
-                                cost
-                            }
-                            val rootCostNs = if (policy == "root-fixed") System.nanoTime() - rootCostStart else 0L
-                            val rootCostAllocation = if (policy == "root-fixed") {
-                                bean.getThreadAllocatedBytes(thread) - rootCostBytes
-                            } else {
-                                0L
-                            }
-                            val history = ArrayList<JsonObject>()
-                            var search: ResumableSearch? = null
-                            var observedCores = 0L
-                            var observedModel: Any? = null
-                            var observedSofts: IntArray? = null
-                            fun observe() {
-                                val live = search ?: return
-                                val count = cores.getLong(live)
-                                if (count != observedCores) {
-                                    history += buildJsonObject {
-                                        put("event", "core")
-                                        put("index", count)
-                                        put("literals", ints(core.get(live) as IntArray))
-                                        put("floor", live.stats.coreGuided.lowerBound.toString())
-                                    }
-                                    observedCores = count
-                                }
-                                val baked = queryModel.get(live)
-                                val pins = softs.get(live) as IntArray
-                                if (baked != null && (
-                                        baked !== observedModel ||
-                                            observedSofts?.contentEquals(pins) != true
-                                        )
-                                ) {
-                                    history += buildJsonObject {
-                                        put("event", "query")
-                                        put("softs", ints(pins))
-                                    }
-                                    observedModel = baked
-                                    observedSofts = pins.copyOf()
-                                }
-                            }
-                            val timeout = ExecutionControl.after(2.seconds)
-                            val stop = timeout or ExecutionControl {
-                                observe()
-                                false
-                            }
-                            val params = BacktrackParams(
-                                variableSelector = InputOrder,
-                                valueSelector = IndomainMin,
-                                cancellation = stop,
-                                nativeSat = false,
-                            )
-                            val started = System.nanoTime()
-                            val before = bean.getThreadAllocatedBytes(thread)
-                            val handle = constructor.newInstance(
-                                model,
-                                queryCost,
-                                params,
-                                policy == "stratified",
-                                null,
-                                2_000L,
-                                TimeSource.Monotonic,
-                                refinementMode(
-                                    when (policy) {
-                                        "refined" -> "DELETION"
-                                        "projected" -> "REASONS"
-                                        else -> "NONE"
-                                    },
-                                ),
-                            ) as ResumableSearch
-                            search = handle
-                            val result = handle.use { it.runSlice(stop, 2_000L, -1L) {} }
-                            observe()
-                            val elapsed = System.nanoTime() - started
-                            val bytes = bean.getThreadAllocatedBytes(thread) - before
-                            val candidate = (result as? MinimizeResult.WithSample)?.sample
-                            val point = candidate?.let { ordinary?.reconstruct?.invoke(it) ?: it }
-                            val sourceAccepted = point?.let { checkPoint(sourceBaked, it) }
-                            if (point != null) check(sourceAccepted == true)
-                            val record = buildJsonObject {
-                                put("sourceSha256", sha256(sourceText.encodeToByteArray()))
-                                put("objectiveSha256", sha256(weights.joinToString(",").encodeToByteArray()))
-                                put("sourceObjectivePairSha256", identity)
-                                put("unrelated", unrelated)
-                                put("prepared", prepared)
-                                put("policy", policy)
-                                put("repeat", repeat)
-                                put("warmup", repeat == 0)
-                                put("preparationNs", preparationNs)
-                                put("preparationThreadBytes", preparationBytes)
-                                put("preparedBooleans", model.numBoolVars)
-                                put("preparedFactors", model.numFactors)
-                                put("presolveStats", ordinary?.presolve.toString())
-                                put("rootSatisfiedCostPins", removed)
-                                put("elapsedNsIncludingDisposal", elapsed + rootCostNs)
-                                put("threadBytesIncludingDisposal", bytes + rootCostAllocation)
-                                put("nativeResult", result?.javaClass?.simpleName)
-                                put("sourceAccepted", sourceAccepted)
-                                put("sourceObjective", point?.let { objective.evaluateLong(it) })
-                                put("cores", handle.stats.coreGuided.cores)
-                                put("largestCore", handle.stats.coreGuided.largestCore)
-                                put("floor", handle.stats.coreGuided.lowerBound.toString())
-                                put("work", handle.work)
-                                put("nodes", handle.stats.search.nodes.sum)
-                                put("propagation", handle.stats.search.propagationWork.sum)
-                                put("history", JsonArray(history))
-                                put("independentProofCheck", false)
-                            }
-                            output.appendLine(record.toString())
-                            output.flush()
                         }
+                        val queryCost = if (policy == "root-fixed") cost.copy(boolWeights = coefficients,
+                            constant = offset) else cost
+                        val rootCostNs = if (policy == "root-fixed") System.nanoTime() - rootCostStart else 0L
+                        val rootCostAllocation = if (policy == "root-fixed") {
+                            bean.getThreadAllocatedBytes(thread) - rootCostBytes
+                        } else 0L
+                        val history = ArrayList<JsonObject>()
+                        var search: ResumableSearch? = null
+                        var observedCores = 0L
+                        var observedModel: Any? = null
+                        var observedSofts: IntArray? = null
+                        fun observe() {
+                            val live = search ?: return
+                            val count = cores.getLong(live)
+                            if (count != observedCores) {
+                                history += buildJsonObject {
+                                    put("event", "core")
+                                    put("index", count)
+                                    put("literals", ints(core.get(live) as IntArray))
+                                    put("floor", live.stats.coreGuided.lowerBound.toString())
+                                }
+                                observedCores = count
+                            }
+                            val baked = queryModel.get(live)
+                            val pins = softs.get(live) as IntArray
+                            if (baked != null && (baked !== observedModel ||
+                                    observedSofts?.contentEquals(pins) != true)
+                            ) {
+                                history += buildJsonObject {
+                                    put("event", "query")
+                                    put("softs", ints(pins))
+                                }
+                                observedModel = baked
+                                observedSofts = pins.copyOf()
+                            }
+                        }
+                        val timeout = ExecutionControl.after(2.seconds)
+                        val stop = timeout or ExecutionControl { observe(); false }
+                        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+                            cancellation = stop, nativeSat = false)
+                        val started = System.nanoTime()
+                        val before = bean.getThreadAllocatedBytes(thread)
+                        val handle = constructor.newInstance(model, queryCost, params, policy == "stratified", null,
+                            2_000L, TimeSource.Monotonic, refinementMode(when (policy) {
+                                "refined" -> "DELETION"
+                                "projected" -> "REASONS"
+                                else -> "NONE"
+                            })) as ResumableSearch
+                        search = handle
+                        val result = handle.use { it.runSlice(stop, 2_000L, -1L) {} }
+                        observe()
+                        val elapsed = System.nanoTime() - started
+                        val bytes = bean.getThreadAllocatedBytes(thread) - before
+                        val candidate = (result as? MinimizeResult.WithSample)?.sample
+                        val point = candidate?.let { ordinary?.reconstruct?.invoke(it) ?: it }
+                        val sourceAccepted = point?.let { checkPoint(sourceBaked, it) }
+                        if (point != null) check(sourceAccepted == true)
+                        val record = buildJsonObject {
+                            put("sourceSha256", sha256(sourceText.encodeToByteArray()))
+                            put("objectiveSha256", sha256(weights.joinToString(",").encodeToByteArray()))
+                            put("sourceObjectivePairSha256", identity)
+                            put("unrelated", unrelated)
+                            put("prepared", prepared)
+                            put("policy", policy)
+                            put("repeat", repeat)
+                            put("warmup", repeat == 0)
+                            put("preparationNs", preparationNs)
+                            put("preparationThreadBytes", preparationBytes)
+                            put("preparedBooleans", model.numBoolVars)
+                            put("preparedFactors", model.numFactors)
+                            put("presolveStats", ordinary?.presolve.toString())
+                            put("rootSatisfiedCostPins", removed)
+                            put("elapsedNsIncludingDisposal", elapsed + rootCostNs)
+                            put("threadBytesIncludingDisposal", bytes + rootCostAllocation)
+                            put("nativeResult", result?.javaClass?.simpleName)
+                            put("sourceAccepted", sourceAccepted)
+                            put("sourceObjective", point?.let { objective.evaluateLong(it) })
+                            put("cores", handle.stats.coreGuided.cores)
+                            put("largestCore", handle.stats.coreGuided.largestCore)
+                            put("floor", handle.stats.coreGuided.lowerBound.toString())
+                            put("work", handle.work)
+                            put("nodes", handle.stats.search.nodes.sum)
+                            put("propagation", handle.stats.search.propagationWork.sum)
+                            put("history", JsonArray(history))
+                            put("independentProofCheck", false)
+                        }
+                        output.appendLine(record.toString())
+                        output.flush()
                     }
                     val pins = Assumptions(bools = (0 until model.numBoolVars).associateWith { false })
                     for (minimize in listOf(false, true)) {
                         val started = System.nanoTime()
-                        val result = BacktrackSolver(model).satisfyUnderAssumptions(
-                            pins,
-                            BacktrackParams(cancellation = ExecutionControl.after(2.seconds)),
-                            minimize,
-                        )
+                        val result = BacktrackSolver(model).satisfyUnderAssumptions(pins,
+                            BacktrackParams(cancellation = ExecutionControl.after(2.seconds)), minimize)
                         out.resolve("helper-$unrelated-$prepared-$minimize.txt").writeText(
                             "elapsedNs=${System.nanoTime() - started}\n$result\n",
                         )
                     }
-                    for (repeat in repeats) {
-                        for (lp in listOf(false, true)) {
-                            val started = System.nanoTime()
-                            val before = bean.getThreadAllocatedBytes(thread)
-                            val result = BacktrackSolver(model).minimize(
-                                cost,
-                                BacktrackParams(
-                                    variableSelector = InputOrder,
-                                    valueSelector = IndomainMin,
-                                    nativeSat = true,
-                                    cancellation = ExecutionControl.after(2.seconds),
-                                    lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null,
-                                    lpPlan = LpPlan(bounding = lp),
-                                ),
-                            )
-                            val elapsed = System.nanoTime() - started
-                            val bytes = bean.getThreadAllocatedBytes(thread) - before
-                            val point = (result as? MinimizeResult.WithSample)?.sample?.let {
-                                ordinary?.reconstruct?.invoke(it) ?: it
-                            }
-                            val accepted = point?.let { checkPoint(sourceBaked, it) }
-                            if (point != null) check(accepted == true)
-                            out.resolve("ordinary.jsonl").appendText(
-                                buildJsonObject {
-                                    put("sourceSha256", sha256(sourceText.encodeToByteArray()))
-                                    put("objectiveSha256", sha256(weights.joinToString(",").encodeToByteArray()))
-                                    put("sourceObjectivePairSha256", identity)
-                                    put("unrelated", unrelated)
-                                    put("prepared", prepared)
-                                    put("repeat", repeat)
-                                    put("warmup", repeat == 0)
-                                    put("lp", lp)
-                                    put("elapsedNsIncludingDisposal", elapsed)
-                                    put("threadBytesIncludingDisposal", bytes)
-                                    put("nativeResult", result.javaClass.simpleName)
-                                    put("sourceAccepted", accepted)
-                                    put("sourceObjective", point?.let { objective.evaluateLong(it) })
-                                    put("nodes", result.stats.search.nodes.sum)
-                                    put("propagation", result.stats.search.propagationWork.sum)
-                                    put("lpStats", result.stats.lp.toString())
-                                    put("independentProofCheck", false)
-                                }.toString() + "\n",
-                            )
+                    for (repeat in repeats) for (lp in listOf(false, true)) {
+                        val started = System.nanoTime()
+                        val before = bean.getThreadAllocatedBytes(thread)
+                        val result = BacktrackSolver(model).minimize(cost, BacktrackParams(
+                            variableSelector = InputOrder, valueSelector = IndomainMin, nativeSat = true,
+                            cancellation = ExecutionControl.after(2.seconds),
+                            lpConfig = if (lp) LpConfig(LpEmphasis.DEFAULT) else null,
+                            lpPlan = LpPlan(bounding = lp),
+                        ))
+                        val elapsed = System.nanoTime() - started
+                        val bytes = bean.getThreadAllocatedBytes(thread) - before
+                        val point = (result as? MinimizeResult.WithSample)?.sample?.let {
+                            ordinary?.reconstruct?.invoke(it) ?: it
                         }
+                        val accepted = point?.let { checkPoint(sourceBaked, it) }
+                        if (point != null) check(accepted == true)
+                        out.resolve("ordinary.jsonl").appendText(buildJsonObject {
+                            put("sourceSha256", sha256(sourceText.encodeToByteArray()))
+                            put("objectiveSha256", sha256(weights.joinToString(",").encodeToByteArray()))
+                            put("sourceObjectivePairSha256", identity)
+                            put("unrelated", unrelated)
+                            put("prepared", prepared)
+                            put("repeat", repeat)
+                            put("warmup", repeat == 0)
+                            put("lp", lp)
+                            put("elapsedNsIncludingDisposal", elapsed)
+                            put("threadBytesIncludingDisposal", bytes)
+                            put("nativeResult", result.javaClass.simpleName)
+                            put("sourceAccepted", accepted)
+                            put("sourceObjective", point?.let { objective.evaluateLong(it) })
+                            put("nodes", result.stats.search.nodes.sum)
+                            put("propagation", result.stats.search.propagationWork.sum)
+                            put("lpStats", result.stats.lp.toString())
+                            put("independentProofCheck", false)
+                        }.toString() + "\n")
                     }
                 }
             }

@@ -18,13 +18,7 @@ internal class LearnedIntegerRows : AbstractList<LearnedIntegerPropagator>() {
             val slot = (size - PAGE_SIZE) and PAGE_MASK
             val page = pages.getOrNull(index)
             val directory = if (index >= pages.size) pages.size * 3L + 1L else 0L
-            val allocation = if (page == null) {
-                1L
-            } else if (slot == page.size) {
-                page.size * 3L + 1L
-            } else {
-                0L
-            }
+            val allocation = if (page == null) 1L else if (slot == page.size) page.size * 3L + 1L else 0L
             return 8L + directory + allocation
         }
     val trimmingWork: Long
@@ -55,21 +49,13 @@ internal class LearnedIntegerRows : AbstractList<LearnedIntegerPropagator>() {
 
     override fun get(index: Int): LearnedIntegerPropagator {
         if (index !in 0 until size) throw IndexOutOfBoundsException("$index of $size")
-        return checkNotNull(
-            if (index < PAGE_SIZE) {
-                entries[index]
-            } else {
-                checkNotNull(pages[(index - PAGE_SIZE) ushr PAGE_SHIFT])[(index - PAGE_SIZE) and PAGE_MASK]
-            },
-        )
+        return checkNotNull(if (index < PAGE_SIZE) entries[index]
+            else checkNotNull(pages[(index - PAGE_SIZE) ushr PAGE_SHIFT])[(index - PAGE_SIZE) and PAGE_MASK])
     }
 
     private fun setSlot(index: Int, row: LearnedIntegerPropagator?) {
-        if (index < PAGE_SIZE) {
-            entries[index] = row
-        } else {
-            checkNotNull(pages[(index - PAGE_SIZE) ushr PAGE_SHIFT])[(index - PAGE_SIZE) and PAGE_MASK] = row
-        }
+        if (index < PAGE_SIZE) entries[index] = row
+        else checkNotNull(pages[(index - PAGE_SIZE) ushr PAGE_SHIFT])[(index - PAGE_SIZE) and PAGE_MASK] = row
     }
 
     fun admit(row: LearnedIntegerPropagator) {

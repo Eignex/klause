@@ -6,10 +6,8 @@ import com.eignex.klause.ir.Lit
 enum class BooleanTaskCheck {
     /** No refutation accepted, including a witness, cancellation or an incomplete check. */
     Unresolved,
-
     /** Scoped native refutation; independent proof verification remains unavailable. */
     NativeRefutation,
-
     /** A separately supplied independent checker accepted this scoped refutation. */
     IndependentlyCheckedRefutation,
 }
@@ -37,30 +35,27 @@ class BooleanTaskLease internal constructor(
  * [splitVariables] are unpinned original source Boolean IDs; the executor owns validated translation
  * into its private mapping before asserting the cube together with the complete caller condition.
  */
-class BooleanProofTasks(context: BooleanProofContext, splitVariables: List<Int>) {
+class BooleanProofTasks(
+    context: BooleanProofContext,
+    splitVariables: List<Int>,
+) {
     private val identity = Any()
     private val variables = splitVariables.also { require(it.size <= 12) }.toList()
     private var epoch = 0L
     private var nextAttempt = 0L
     private val owners: Array<BooleanTaskLease?>
     private val closures: Array<BooleanTaskCheck>
-
     /** Current authority; changed only through [replaceContext]. */
     var context: BooleanProofContext = context
         private set
-
     /** Number of disjoint regions in this board. */
     val size: Int get() = owners.size
-
     /** Regions awaiting an owner. */
     val pending: Int get() = owners.indices.count { owners[it] == null && closures[it] == BooleanTaskCheck.Unresolved }
-
     /** Regions closed by either native or independently checked refutations. */
     val closed: Int get() = closures.count { it != BooleanTaskCheck.Unresolved }
-
     /** Exhaustive native coverage only, without an independent UNSAT or optimality claim. */
     val nativeCoverageComplete: Boolean get() = closed == size
-
     /** Every region has an independently checked scoped refutation. */
     val independentlyCheckedCoverageComplete: Boolean
         get() = closures.all { it == BooleanTaskCheck.IndependentlyCheckedRefutation }

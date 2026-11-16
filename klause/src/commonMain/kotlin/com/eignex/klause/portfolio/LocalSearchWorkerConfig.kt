@@ -37,7 +37,8 @@ internal class LocalSearchWorkerConfig private constructor(
     private val numericalCompletion: Boolean,
     private val toleranceCheck: ((Sample) -> Boolean)?,
     private val bufferedPublications: Boolean,
-) : WorkerConfig {
+) :
+    WorkerConfig {
 
     constructor(
         recipe: LocalSearchRecipe,
@@ -47,67 +48,31 @@ internal class LocalSearchWorkerConfig private constructor(
         numericalCompletion: Boolean = false,
     ) : this(recipe, nodeBudget, reportResiduals, reportPhaseTimes, numericalCompletion, null, false)
 
-    fun withBufferedPublications(): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
-        recipe,
-        nodeBudget,
-        reportResiduals,
-        reportPhaseTimes,
-        numericalCompletion,
-        toleranceCheck,
-        true,
-    )
+    fun withBufferedPublications(): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes,
+            numericalCompletion, toleranceCheck, true)
 
-    fun withToleranceCheck(check: (Sample) -> Boolean): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
-        recipe,
-        nodeBudget,
-        reportResiduals,
-        reportPhaseTimes,
-        numericalCompletion,
-        check,
-        bufferedPublications,
-    )
+    fun withToleranceCheck(check: (Sample) -> Boolean): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes,
+            numericalCompletion, check, bufferedPublications)
 
-    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = LocalSearchWorkerConfig(
-        recipe,
-        budget,
-        reportResiduals,
-        reportPhaseTimes,
-        numericalCompletion,
-        toleranceCheck,
-        bufferedPublications,
-    )
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
+        LocalSearchWorkerConfig(recipe, budget, reportResiduals, reportPhaseTimes,
+            numericalCompletion, toleranceCheck, bufferedPublications)
 
-    fun withNumericalCompletion(): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
-        recipe,
-        nodeBudget,
-        reportResiduals,
-        reportPhaseTimes,
-        true,
-        toleranceCheck,
-        bufferedPublications,
-    )
+    fun withNumericalCompletion(): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, reportPhaseTimes, true,
+            toleranceCheck, bufferedPublications)
 
     override val label: String get() = recipe.label
 
-    override fun withLsResiduals(): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
-        recipe,
-        nodeBudget,
-        true,
-        reportPhaseTimes,
-        numericalCompletion,
-        toleranceCheck,
-        bufferedPublications,
-    )
+    override fun withLsResiduals(): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, true, reportPhaseTimes,
+            numericalCompletion, toleranceCheck, bufferedPublications)
 
-    override fun withLsPhaseTimes(): LocalSearchWorkerConfig = LocalSearchWorkerConfig(
-        recipe,
-        nodeBudget,
-        reportResiduals,
-        true,
-        numericalCompletion,
-        toleranceCheck,
-        bufferedPublications,
-    )
+    override fun withLsPhaseTimes(): LocalSearchWorkerConfig =
+        LocalSearchWorkerConfig(recipe, nodeBudget, reportResiduals, true,
+            numericalCompletion, toleranceCheck, bufferedPublications)
 
     internal fun materializeObjectiveCoordinates(
         view: ObjectiveCoordinateView,
@@ -145,10 +110,8 @@ internal class LocalSearchWorkerConfig private constructor(
         onEvent: ((worker: String, event: SearchEvent) -> Unit)?,
         pools: SharedPools?, // solutions only: local search neither learns nor consumes clauses or cuts
     ): PortfolioWorker {
-        if (!numericalCompletion && problem.numRealVars > 0) {
-            problem.fixedDiscreteSample()?.let { fixed ->
-                return finiteExactNeighborhoodWorker(problem, fixed, objective, nodeBudget, false, seed + index, armId)
-            }
+        if (!numericalCompletion && problem.numRealVars > 0) problem.fixedDiscreteSample()?.let { fixed ->
+            return finiteExactNeighborhoodWorker(problem, fixed, objective, nodeBudget, false, seed + index, armId)
         }
         val evidenceModel = ModelIdentity.of(problem, objective)
         val matchedPools = pools?.takeIf { it.identity?.matches(evidenceModel) != false }

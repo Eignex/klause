@@ -65,7 +65,7 @@ class ArithmeticExecutionTest {
         val adapted = object : ExecutionControl(token) {
             override val admission = object : ArithmeticWorkSource {
                 override val exhausted get() = selected.exhausted
-                override fun reserve(maximum: Int) = selected.reserve(maximum)
+        override fun reserve(maximum: Int) = selected.reserve(maximum)
             }
         }
         val cursor = ArithmeticExecution(ExecutionControl(adapted)) { error("allowance") }
@@ -107,7 +107,7 @@ class ArithmeticExecutionTest {
     }
 
     @Test
-    fun `replacing a stop predicate should retain the accounting owner allowance`() {
+    fun `replacing a stop predicate should retain the accounting owner allowance`(){
         val owned = ArithmeticExecution(ExecutionControl.Never.withAccounting(token)) { error("allowance") }
 
         assertFailsWith<IllegalStateException> {
@@ -117,10 +117,9 @@ class ArithmeticExecutionTest {
         assertEquals(100L, pool.spent)
     }
 
-    @Test
-    fun `checkpoint cost should observe a stop without spending additional work`() {
-        assertFailsWith<IllegalStateException> {
-            execution.operation(8) {
+    @Test fun `checkpoint cost should observe a stop without spending additional work`() {
+            assertFailsWith<IllegalStateException> {
+            execution.operation(8){
                 execution.step()
                 stopped = true
                 execution.pollingCost(8)
@@ -128,9 +127,8 @@ class ArithmeticExecutionTest {
         }
 
         assertEquals(1L, pool.spent)
-        assertEquals(99, assertNotNull(pool.reserve(100)).capacity)
-    }
-
+        assertEquals(99, assertNotNull( pool.reserve(100)).capacity)
+        }
     @Test
     fun `bulk admission should stop at the exact containing allowance`() {
         var admitted = 0
@@ -141,8 +139,7 @@ class ArithmeticExecutionTest {
 
         assertEquals(100, admitted)
         assertEquals(100L, pool.spent)
-        assertTrue(pool.exhausted)
-    }
+        assertTrue(pool.exhausted) }
 
     @Test
     fun `pure checkpoints should spend no work`() {
@@ -277,14 +274,12 @@ class ArithmeticExecutionTest {
 
     @Test
     fun `a prepared operation should settle before every pause`() {
-        val pending = execution.iterator(
-            sequence {
-                repeat(3) {
-                    execution.step()
-                    yield(it)
-                }
-            }.iterator(),
-        )
+        val pending = execution.iterator(sequence {
+            repeat(3) {
+                execution.step()
+                yield(it)
+            }
+        }.iterator())
 
         assertEquals(0, pending.next())
         assertEquals(1L, pool.spent)
@@ -311,10 +306,7 @@ class ArithmeticExecutionTest {
     fun `opaque accounting should remain independent of operation checkpoints`() {
         val events = ArrayList<String>()
         val opaque = object : ExecutionControl() {
-            override fun isCancelled(): Boolean {
-                events += "poll"
-                return false
-            }
+            override fun isCancelled(): Boolean { events += "poll"; return false }
             override val accounting: WorkMeter get() = WorkMeter { events += "charge:$it" }
         }
         val legacy = ArithmeticExecution(opaque) { error("cancelled") }
@@ -323,6 +315,6 @@ class ArithmeticExecutionTest {
             repeat(2) { legacy.step { events += "local" } }
         }
 
-        assertEquals(listOf("poll", "local", "charge:1", "local", "charge:1", "poll"), events)
+        assertEquals( listOf("poll", "local", "charge:1", "local", "charge:1", "poll"), events)
     }
 }

@@ -40,9 +40,7 @@ internal class LeafRealCompletion(
     private val toleranceCheck: ((Sample) -> Boolean)?,
     private val context: LpSolveContext = if (!toleranceCheck.permitsToleranceOptimum()) {
         LpSolveContext.Production.copy(sparsePointRecovery = true)
-    } else {
-        LpSolveContext.Production
-    },
+    } else LpSolveContext.Production,
 ) : CandidateCompletion {
     constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
 
@@ -51,14 +49,15 @@ internal class LeafRealCompletion(
     // The source's search within its tolerance, present when acceptance admits tolerance points.
     private val toleranceSearch = toleranceCheck.toleranceSearch()
     private val absCompletion = if (problem.factors.any { it is RealAbs } ||
-        (toleranceSearch != null && problem.requiresRealCompletionSearch())) AbsRealCompletion(problem) else null
+        (toleranceSearch != null && problem.requiresRealCompletionSearch())
+    ) AbsRealCompletion(problem) else null
     private val realFactors = problem.factors.indices.filter { problem.factors[it].variables.reals.isNotEmpty() }
         .toIntArray()
     var observeLp: ((LpVerdict, LpStats) -> Unit)? = null
     var observeFloat: ((Sample) -> Unit)? = null
 
     override fun complete(candidate: Sample, cancellation: ExecutionControl): Completion {
-        val realObjective =objective != null && objective.realCoefficientValues.any { it != 0.0 }
+        val realObjective = objective != null && objective.realCoefficientValues.any { it != 0.0 }
         val search = toleranceSearch?.takeIf { !realObjective }
             ?: return absCompletion?.takeIf { !realObjective }?.let { exactSearch(it, candidate, cancellation, 0L) }
                 ?: linearCompletion(candidate, cancellation)
@@ -76,7 +75,7 @@ internal class LeafRealCompletion(
             is ToleranceSearchResult.Undecided -> Completion.Undecided(work)
             // Without the search the candidate keeps the verdict of its floating and exact completions.
             ToleranceSearchResult.Unavailable ->
-            absCompletion?.let { exactSearch(it, candidate, cancellation, work) } ?: floating
+                absCompletion?.let { exactSearch(it, candidate, cancellation, work) } ?: floating
             is ToleranceSearchResult.Witness -> {
                 val tolerant = candidate.copy(reals = DoubleArray(found.reals.size) { found.reals[it].toDouble() },
                     exactReals = found.reals)
@@ -97,45 +96,33 @@ internal class LeafRealCompletion(
         cancellation: ExecutionControl,
         spent: Long,
     ): Completion {
-                val checked = search.complete(candidate, cancellation)
-                val work = spent + movesFor(checked.work.toDouble())
-                return when (val result = checked.result) {
-                    is AbsRealCompletion.Result.Witness -> {
-                        val coordinates = DoubleArray(result.reals.size) { result.reals[it].toDouble() }
-                        val sample = candidate.copy(reals = coordinates, exactReals = result.reals)
-                        if (verifyRealCoordinates(problem, sample) is Verification.Accepted)
-                            Completion.Witness(sample, work) else {
-                            Completion.Undecided(work)
-                        }
-                    }
-
-                    AbsRealCompletion.Result.Refuted -> Completion.Refuted(realFactors,
-                        work
-                    )
-
-                    AbsRealCompletion.Result.Undecided -> Completion.Undecided(work)
-                }
+        val checked = search.complete(candidate, cancellation)
+        val work = spent + movesFor(checked.work.toDouble())
+        return when (val result = checked.result) {
+            is AbsRealCompletion.Result.Witness -> {
+                val coordinates = DoubleArray(result.reals.size) { result.reals[it].toDouble() }
+                val sample = candidate.copy(reals = coordinates, exactReals = result.reals)
+                if (verifyRealCoordinates(problem, sample) is Verification.Accepted) Completion.Witness(sample, work)
+                else Completion.Undecided(work)
             }
+            AbsRealCompletion.Result.Refuted -> Completion.Refuted(realFactors, work)
+            AbsRealCompletion.Result.Undecided -> Completion.Undecided(work)
+        }
+    }
 
     private fun linearCompletion(candidate: Sample, cancellation: ExecutionControl): Completion {
         val encoded = encoding.modelFor(candidate, cancellation) ?: return Completion.Undecided(movesFor(0.0))
         val sink = LpStatsSink(LpRoute.STANDALONE)
-        val check = if (observeFloat == null) {
-            toleranceCheck
-        } else {
-            FiniteSourceAcceptance(
-                { sample ->
-                    observeFloat?.invoke(sample)
-                    toleranceCheck?.invoke(sample) == true
-                },
-                toleranceCheck.permitsToleranceOptimum(),
+        val check = if (observeFloat == null) toleranceCheck else FiniteSourceAcceptance(
+            { sample ->
+                observeFloat?.invoke(sample)
+                toleranceCheck?.invoke(sample) == true
+            },
+            toleranceCheck.permitsToleranceOptimum(),
             search = toleranceSearch,
-            )
-        }
-        val real = leafRealFeasibility(
-            problem, objective, candidate, cancellation, sink = sink,
-            context = context, toleranceCheck = check, encoders = encoders, sourceEncoding = encoded,
         )
+        val real = leafRealFeasibility(problem, objective, candidate, cancellation, sink = sink,
+            context = context, toleranceCheck = check, encoders = encoders, sourceEncoding = encoded)
         val stats = sink.snapshot()
         val pointWork = stats.phases["EXACT_POINT_RECOVERY_STANDALONE"]?.work?.toDouble() ?: 0.0
         val work = movesFor(stats.standaloneWorkOps.sum + stats.componentWorkOps.sum + pointWork)
@@ -149,9 +136,7 @@ internal class LeafRealCompletion(
                 val completed = candidate.copy(reals = real.reals, exactReals = null)
                 if (toleranceCheck?.invoke(completed) == true && !cancellation()) {
                     Completion.Witness(completed, work)
-                } else {
-                    Completion.Undecided(work)
-                }
+                } else Completion.Undecided(work)
             }
 
             // The rows the proof combines are what the candidate's discrete part cannot satisfy together.

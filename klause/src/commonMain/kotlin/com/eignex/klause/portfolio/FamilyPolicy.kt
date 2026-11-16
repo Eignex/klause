@@ -122,7 +122,8 @@ internal class FamilyPolicy(
      * An explicit [reward] prices zero-yield segments of every family after an incumbent.
      * [weight] scales fading and evidence by paid exposure; a unit retains the ordinary segment update.
      */
-    fun record(family: ArmFamily, progressed: Boolean, plateau: Boolean, reward: Double? = null, weight: Double = 1.0) {
+    fun record(family: ArmFamily, progressed: Boolean, plateau: Boolean,
+        reward: Double? = null, weight: Double = 1.0) {
         require(reward == null || reward in 0.0..1.0) { "family reward must be in [0, 1]" }
         require(weight.isFinite() && weight >= 0.0) { "family evidence weight must be finite and nonnegative" }
         if (weight == 0.0) return

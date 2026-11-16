@@ -13,25 +13,15 @@ class PrimalPhaseOneRatioTest {
             val builder = LpBuilder()
             val x = builder.addVar(0L, 10L, cost = if (fromUpper) -1L else 1L)
             for (rhs in listOf(1L, 3L)) {
-                builder.addRow(
-                    intArrayOf(x),
-                    longArrayOf(1L),
-                    if (fromUpper) Relation.LE else Relation.GE,
-                    if (fromUpper) 10L - rhs else rhs,
-                )
+                builder.addRow(intArrayOf(x), longArrayOf(1L),
+                    if (fromUpper) Relation.LE else Relation.GE, if (fromUpper) 10L - rhs else rhs)
             }
             val model = builder.build(Sense.MINIMIZE)
-            val warm = Basis(
-                intArrayOf(1, 2),
-                arrayOf(if (fromUpper) VarStatus.AT_UPPER else VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC),
-            )
+            val warm = Basis(intArrayOf(1, 2),
+                arrayOf(if (fromUpper) VarStatus.AT_UPPER else VarStatus.AT_LOWER, VarStatus.BASIC, VarStatus.BASIC))
             for (longSteps in listOf(false, true)) {
-                RevisedSimplex(
-                    model,
-                    scalingOptions = LpScalingOptions(enabled = false),
-                    phaseOneLongSteps = longSteps,
-                    phaseOneIncrementalValues = false,
-                ).use { solver ->
+                RevisedSimplex(model, scalingOptions = LpScalingOptions(enabled = false),
+                    phaseOneLongSteps = longSteps, phaseOneIncrementalValues = false).use { solver ->
                     val result = assertNotNull(solver.solvePrimal(warm))
 
                     assertEquals(if (fromUpper) 7.0 else 3.0, result.primal.single(), 1e-9)
@@ -53,11 +43,8 @@ class PrimalPhaseOneRatioTest {
         val model = builder.build(Sense.MINIMIZE)
         for (incremental in listOf(false, true)) {
             for (updates in listOf(1, 64)) {
-                RevisedSimplex(
-                    model,
-                    refactorUpdateLimit = updates,
-                    phaseOneIncrementalValues = incremental,
-                ).use { solver ->
+                RevisedSimplex(model, refactorUpdateLimit = updates,
+                    phaseOneIncrementalValues = incremental).use { solver ->
                     val result = assertNotNull(solver.solvePrimal())
                     val checked = verifyExactBasis(model, result.basis)
 
@@ -91,13 +78,9 @@ class PrimalPhaseOneRatioTest {
         }
         val model = builder.build(Sense.MINIMIZE)
 
-        val step = assertNotNull(
-            PrimalPhaseOneRatio(2).choose(
-                model,
-                LpScalingView.create(model, LpScalingOptions(enabled = false)), intArrayOf(1, 2),
-                doubleArrayOf(-1.0, -3.0), doubleArrayOf(-1.0, -1.0), 1.0, 2.0, 1e-7, LpWork(),
-            ),
-        )
+        val step = assertNotNull(PrimalPhaseOneRatio(2).choose(model,
+            LpScalingView.create(model, LpScalingOptions(enabled = false)), intArrayOf(1, 2),
+            doubleArrayOf(-1.0, -3.0), doubleArrayOf(-1.0, -1.0), 1.0, 2.0, 1e-7, LpWork()))
 
         assertEquals(2.0, step.length)
         assertEquals(-1, step.leaving)

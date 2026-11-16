@@ -89,10 +89,7 @@ internal class RoundedDuals(val scaleBits: Int, val scale: Long, val mult: LongA
  *  dual is non-finite or its scaled value escapes the exactly-representable range (so [roundToLong]
  *  recovers the true nearest integer). */
 internal fun roundDuals(
-    model: LpModel,
-    y: DoubleArray,
-    scaleBits: Int = DEFAULT_SCALE_BITS,
-    inspect: (() -> Unit)? = null,
+    model: LpModel, y: DoubleArray, scaleBits: Int = DEFAULT_SCALE_BITS, inspect: (() -> Unit)? = null,
 ): RoundedDuals? {
     val m = model.m
     if (y.size != m) return null
@@ -268,19 +265,13 @@ internal fun integerCertify(
 ): IntegerCertificate? = integerCertifyUnchecked(model, y, scaleBits).also { certificate ->
     observer?.let {
         val arithmetic = LpScanCount(model).apply { scan() }.cost()
-        it.observe(
-            LpCertifier.INTEGER,
-            certificate != null,
-            LpCertifierCost.Metered(arithmetic.work + (certificate?.authorityStorageUnits ?: 0L)),
-        )
+        it.observe(LpCertifier.INTEGER, certificate != null,
+            LpCertifierCost.Metered(arithmetic.work + (certificate?.authorityStorageUnits ?: 0L)))
     }
 }
 
 internal fun integerCertifyUnchecked(
-    model: LpModel,
-    y: DoubleArray,
-    scaleBits: Int,
-    allowMixed: Boolean = false,
+    model: LpModel, y: DoubleArray, scaleBits: Int, allowMixed: Boolean = false,
     scan: (() -> Unit)? = null,
 ): IntegerCertificate? {
     val integers = IntegerLpView.create(model) ?: return null
@@ -306,13 +297,7 @@ internal fun integerCertifyUnchecked(
         if (j >= n) {
             dot.addLong(mult[j - n]) // slack column j is the unit vector e_{j−n}
         } else {
-            if (!integers.forEachCoefficient(j) { i, a ->
-                    scan?.invoke()
-                    dot.addProduct(mult[i], a)
-                }
-            ) {
-                return null
-            }
+            if (!integers.forEachCoefficient(j) { i, a -> scan?.invoke(); dot.addProduct(mult[i], a) }) return null
         }
         dAcc.subtract(dot)
         if (!dAcc.fitsLong()) return null // reduced cost too large to evaluate ⇒ keep node (sound)
@@ -334,10 +319,7 @@ internal fun integerCertifyUnchecked(
 // endpoint. The complete Lagrangian is evaluated with the repaired vector; no tolerance or feasibility claim is
 // involved.
 private fun repairedMultipliers(
-    model: IntegerLpView,
-    mult: LongArray,
-    scale: Long,
-    scan: (() -> Unit)? = null,
+    model: IntegerLpView, mult: LongArray, scale: Long, scan: (() -> Unit)? = null,
 ): LongArray? {
     var repaired: LongArray? = null
     for (i in 0 until model.m) {
@@ -416,10 +398,8 @@ internal class IntegerLpView private constructor(private val model: LpModel) {
             if (!model.finiteExactInput()) return null
             val source = model.exactState?.model
             if (source == null && model.hasContinuous) return null
-            if (requireObjectiveUnits && source != null && (
-                    source.objective.scale.value != BigFraction.ONE ||
-                        !source.objective.externalConstant.value.isZero
-                    )
+            if (requireObjectiveUnits && source != null && (source.objective.scale.value != BigFraction.ONE ||
+                    !source.objective.externalConstant.value.isZero)
             ) {
                 return null
             }

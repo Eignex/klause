@@ -41,11 +41,7 @@ class SourceAttachment private constructor(
         definitionHints: List<DefinitionHint> = emptyList(),
         searchHints: SearchHints? = null,
     ) : this(
-        problem,
-        null,
-        definitionHints,
-        searchHints,
-        problem.settings,
+        problem, null, definitionHints, searchHints, problem.settings,
         SourceDefinitionReferences(definedVars, boolFolds),
     )
 

@@ -39,20 +39,14 @@ internal fun sourceDefinitionSweep(
         if (++visits % INITIALIZATION_BATCH == 0 && cancellation()) return null
         val claims = if (hint is DefinitionHint.Boolean) booleanClaims else integerClaims
         if (claims.getOrDefault(hint.output, 0) != 1) continue
-        if (hint is DefinitionHint.Integer && (
-                !problem.intBounds.hasLower(hint.output) ||
-                    problem.intBounds.lower(hint.output) == Long.MIN_VALUE
-                )
-        ) {
-            continue
-        }
+        if (hint is DefinitionHint.Integer && (!problem.intBounds.hasLower(hint.output) ||
+                problem.intBounds.lower(hint.output) == Long.MIN_VALUE)
+        ) continue
         val node = sourceDefinitionNode(problem, hint) ?: continue
         val outputs = if (node.outIsBool) problem.numBoolVars else problem.numIntVars
         if (node.out !in 0 until outputs || node.intInputs.any { it !in 0 until problem.numIntVars } ||
             node.boolInputs.any { it !in 0 until problem.numBoolVars }
-        ) {
-            continue
-        }
+        ) continue
         nodes.add(node)
     }
     val ordered = orderedDefinitions(problem, nodes, cancellation)
@@ -62,20 +56,13 @@ internal fun sourceDefinitionSweep(
 private fun sourceDefinitionNode(problem: Problem, hint: DefinitionHint): SweepNode? = when (hint) {
     is DefinitionHint.BooleanValue -> LiteralIntDefinition(hint.output, hint.literal)
 
-    is DefinitionHint.Element -> if ((hint.variables == null) == (hint.values == null)) {
-        null
-    } else {
+    is DefinitionHint.Element -> if ((hint.variables == null) == (hint.values == null)) null else
         SweepNode.ElementDef(hint.output, hint.index, hint.variables, hint.values, hint.offset)
-    }
 
     is DefinitionHint.Comparison -> {
         if (hint.coefficients.size != hint.inputs.size ||
             (hint.strict && hint.relation != LinearOp.LE && hint.relation != LinearOp.GE)
-        ) {
-            null
-        } else {
-            CapturedBooleanDefinition(hint)
-        }
+        ) null else CapturedBooleanDefinition(hint)
     }
 
     is DefinitionHint.Membership -> CapturedBooleanDefinition(hint)
@@ -92,7 +79,8 @@ internal fun DefinitionHint.Operand.nativeOperand(): FunctionalObjective.Operand
     is DefinitionHint.Operand.Constant -> FunctionalObjective.Operand.c(value)
 }
 
-internal fun DefinitionHint.Operand.variableOrNull(): Int? = (this as? DefinitionHint.Operand.Variable)?.id
+internal fun DefinitionHint.Operand.variableOrNull(): Int? =
+    (this as? DefinitionHint.Operand.Variable)?.id
 
 internal class CapturedBooleanDefinition(private val hint: DefinitionHint.Boolean) : SweepNode {
     override val out: Int get() = hint.output
@@ -115,9 +103,7 @@ internal class CapturedBooleanDefinition(private val hint: DefinitionHint.Boolea
                 LinearOp.GE -> if (source.strict) comparison > 0 else comparison >= 0
             }
         }
-
         is DefinitionHint.Membership -> intOf(source.input) in checkNotNull(members)
-
         else -> error("a Boolean source predicate is required")
     }
 

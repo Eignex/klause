@@ -7,13 +7,8 @@ internal fun TheoryParams.strategyQuotas(count: Int, complete: Boolean): List<Th
     val decisions = nativeWorkerAllowances(count, maxDecisions, completeSlots)
     val flips = heuristicWorkerAllowances(count, maxFlips, completeSlots)
     val instructions = maxInstructions?.let { heuristicWorkerAllowances(count, it, completeSlots) }
-    return List(count) { index ->
-        copy(
-            openWorkLimit = work[index],
-            maxLeaves = leaves[index],
-            maxDecisions = decisions[index],
-            maxFlips = flips[index],
-            maxInstructions = instructions?.get(index),
-        )
-    }
+    return List(count) { index -> copy(
+        openWorkLimit = work[index], maxLeaves = leaves[index], maxDecisions = decisions[index],
+        maxFlips = flips[index], maxInstructions = instructions?.get(index),
+    ) }
 }

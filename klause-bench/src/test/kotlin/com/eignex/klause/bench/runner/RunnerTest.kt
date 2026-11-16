@@ -23,13 +23,8 @@ class RunnerTest {
     @ValueSource(strings = ["invalid source", "p wcnf 1 1 10\n10 1 0\n", "p wcnf 0 1 10\n7 0\n"])
     fun `weighted subprocess metadata should not parse the source`(text: String, @TempDir root: Path) {
         val source = root.resolve("source.wcnf").toFile().apply { writeText(text) }
-        val ref = ProblemRef(
-            "weighted",
-            Format.WCNF,
-            ProblemSource.Prepared(source),
-            Category.OPTIMIZATION,
-            Expected.Unknown,
-        )
+        val ref = ProblemRef("weighted", Format.WCNF, ProblemSource.Prepared(source),
+            Category.OPTIMIZATION, Expected.Unknown)
 
         val entry = InProcessRunner.resolve(ref)
 
@@ -42,13 +37,8 @@ class RunnerTest {
         val source = root.resolve("source.wcnf").toFile().apply {
             writeText("p wcnf 2 3 100\n5 1 0\n7 -2 0\n11 0\n")
         }
-        val ref = ProblemRef(
-            "weighted",
-            Format.WCNF,
-            ProblemSource.Prepared(source),
-            Category.OPTIMIZATION,
-            Expected.Unknown,
-        )
+        val ref = ProblemRef("weighted", Format.WCNF, ProblemSource.Prepared(source),
+            Category.OPTIMIZATION, Expected.Unknown)
         val entry = InProcessRunner.resolve(ref)
 
         val objective = assertNotNull(entry.objective)
@@ -61,13 +51,8 @@ class RunnerTest {
     @Test
     fun `weighted in process consumers should reject malformed input`(@TempDir root: Path) {
         val source = root.resolve("source.wcnf").toFile().apply { writeText("invalid source") }
-        val ref = ProblemRef(
-            "weighted",
-            Format.WCNF,
-            ProblemSource.Prepared(source),
-            Category.OPTIMIZATION,
-            Expected.Unknown,
-        )
+        val ref = ProblemRef("weighted", Format.WCNF, ProblemSource.Prepared(source),
+            Category.OPTIMIZATION, Expected.Unknown)
         val entry = InProcessRunner.resolve(ref)
 
         assertFailsWith<DimacsFormatException> { entry.objective }

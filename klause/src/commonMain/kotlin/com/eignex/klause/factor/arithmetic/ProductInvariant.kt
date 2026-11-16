@@ -120,9 +120,7 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
     private fun proposeIfImproving(state: LocalSearchState, intVar: Int, value: Long, sink: MoveSink) {
         if (residualAfterSet(state, intVar, value) <=
             residual(state.assignment.intValue(a), state.assignment.intValue(b), state.assignment.intValue(result))
-        ) {
-            sink.addChannelingIntSet(state, intVar, value)
-        }
+        ) sink.addChannelingIntSet(state, intVar, value)
     }
 
     private fun proposeClosestOperand(

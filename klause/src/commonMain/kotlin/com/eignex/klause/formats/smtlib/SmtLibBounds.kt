@@ -72,13 +72,10 @@ internal fun Compiler.Builder.hasOpenProductOperand(): Boolean {
         if (sourceCancellation()) throw PolynomialSourceInterrupted()
         val (node, visited) = pending.removeLast()
         when (node) {
-            is SExpr.Atom -> operands.addLast(
-                ProductOperand(
-                    constant = node.text.firstOrNull()?.isDigit() == true,
-                    open = intNames[node.text]?.let { intDomains[it] is PresolveDomain.Open } == true,
-                ),
-            )
-
+            is SExpr.Atom -> operands.addLast(ProductOperand(
+                constant = node.text.firstOrNull()?.isDigit() == true,
+                open = intNames[node.text]?.let { intDomains[it] is PresolveDomain.Open } == true,
+            ))
             is SExpr.SList -> {
                 if (!visited) {
                     pending.addLast(node to true)
@@ -94,12 +91,10 @@ internal fun Compiler.Builder.hasOpenProductOperand(): Boolean {
                     else -> false
                 }
                 if (nonlinear && open) return true
-                operands.addLast(
-                    ProductOperand(
-                        constant = head in setOf("+", "-", "*", "/", "^") && children.all { it.constant },
-                        open = open,
-                    ),
-                )
+                operands.addLast(ProductOperand(
+                    constant = head in setOf("+", "-", "*", "/", "^") && children.all { it.constant },
+                    open = open,
+                ))
             }
         }
     }
@@ -114,20 +109,12 @@ internal fun Compiler.Builder.closeProductBounds() {
     if (productBoundsClosed || intDomains.none { it is PresolveDomain.Open }) return
     productBoundsClosed = true
     sourceCancellation.polynomialSourceCheckpoint()
-    val premises = Problem(
-        settings = settings,
-        numBoolVars = 0,
-        intBounds = modelIntBounds(),
+    val premises = Problem(settings = settings, numBoolVars = 0, intBounds = modelIntBounds(),
         factors = Array(boundPremises.size) { index ->
             val row = boundPremises[index]
-            ExactLinear.of(
-                IntArray(row.vars.size) { Term.ofIntVar(row.vars[it]) },
-                row.coeffs.map { BigFraction.ofLong(it) },
-                row.op,
-                BigFraction.ofLong(row.bound),
-            )
-        },
-    )
+            ExactLinear.of(IntArray(row.vars.size) { Term.ofIntVar(row.vars[it]) },
+                row.coeffs.map { BigFraction.ofLong(it) }, row.op, BigFraction.ofLong(row.bound))
+        })
     val outcome = premises.closeOpenBounds(sourceCancellation)
     sourceCancellation.polynomialSourceCheckpoint()
     val closed = when (outcome) {

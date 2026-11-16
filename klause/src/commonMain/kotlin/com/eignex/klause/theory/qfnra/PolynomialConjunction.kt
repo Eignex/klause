@@ -37,9 +37,8 @@ internal fun preparePolynomialConjunction(
             val positive = coefficient.signum() > 0
             val signs = relationSigns(atom.relation).let { if (positive) it else negateSigns(it) }
             val previous = groups[key]
-            if (previous == null) {
-                groups[key] = ConjunctiveSigns(polynomial, positive, signs)
-            } else {
+            if (previous == null) groups[key] = ConjunctiveSigns(polynomial, positive, signs)
+            else {
                 previous.signs = previous.signs and signs
                 changed = true
                 if (previous.signs == 0) {
@@ -107,9 +106,7 @@ private fun prepareEqualityRemainders(
                 yield(PolynomialConjunction(emptyList(), true, true))
                 return@sequence
             }
-        } else {
-            result.add(PolynomialAtom(polynomial, atom.relation))
-        }
+        } else result.add(PolynomialAtom(polynomial, atom.relation))
         yield(null)
     }
     yield(PolynomialConjunction(result, false, changed))

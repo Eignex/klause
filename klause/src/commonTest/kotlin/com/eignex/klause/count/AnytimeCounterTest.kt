@@ -96,8 +96,7 @@ class AnytimeCounterTest {
         val result = solver.exactCount(ExactCountConfig(maxChecks = 3L)).last()
 
         assertEquals(
-            Count(2L, 2L, 2L, exact = true, confidence = 1.0, semantics = solver.problem.semantics),
-            result,
+            Count(2L, 2L, 2L, exact = true, confidence = 1.0, semantics = solver.problem.semantics), result,
         )
     }
 
@@ -184,8 +183,7 @@ class AnytimeCounterTest {
             val result = solver.exactCount(config).last()
 
             assertEquals(
-                Count(1L, 1L, 1L, exact = true, confidence = 1.0, semantics = solver.problem.semantics),
-                result,
+                Count(1L, 1L, 1L, exact = true, confidence = 1.0, semantics = solver.problem.semantics), result,
             )
         }
     }
@@ -197,8 +195,7 @@ class AnytimeCounterTest {
         val result = solver.exactCount(ExactCountConfig(maxChecks = 1L)).last()
 
         assertEquals(
-            Count(1L, 1L, 1L, exact = true, confidence = 1.0, semantics = solver.problem.semantics),
-            result,
+            Count(1L, 1L, 1L, exact = true, confidence = 1.0, semantics = solver.problem.semantics), result,
         )
     }
 
@@ -216,8 +213,7 @@ class AnytimeCounterTest {
             val result = solver.exactCount(ExactCountConfig(samplingSet = projection, maxChecks = 1L)).last()
 
             assertEquals(
-                Count(0L, 0L, 0L, exact = true, confidence = 1.0, semantics = solver.problem.semantics),
-                result,
+                Count(0L, 0L, 0L, exact = true, confidence = 1.0, semantics = solver.problem.semantics), result,
             )
         }
     }

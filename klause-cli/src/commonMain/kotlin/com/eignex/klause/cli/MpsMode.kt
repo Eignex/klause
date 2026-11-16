@@ -113,9 +113,7 @@ internal fun renderMpsSourceWitness(
     val original = witness.values
     val values = if (reconstruct && original.size <= 4096) {
         checkedIntegralMpsSource(witness, original, cancellation)?.values ?: original
-    } else {
-        original
-    }
+    } else original
     return buildString {
         append("v")
         for (index in variables.indices) append(" ${variables[index].name}=${exactMpsNumber(values[index])}")
@@ -163,9 +161,7 @@ internal class MpsOutput(
             certified && (result.result.outcome as? FiniteSolveOutcome.Completed)?.bestSample?.let {
                 it.numRealVars == 0 || it.exactReals != null
             } == true
-        } else {
-            qualified.nativeConclusion == LinearSourceConclusion.OPTIMAL
-        }
+        } else qualified.nativeConclusion == LinearSourceConclusion.OPTIMAL
     }
 
     override fun onSolutionObjective(objective: Long?) {
@@ -189,10 +185,8 @@ internal class MpsOutput(
 
     override fun formatArithmeticObjective(objective: SourceValue): String = when (objective) {
         is SourceValue.Rational -> exactMpsNumber(objective.value)
-
         is SourceValue.Algebraic -> objective.value.rational?.let(::exactMpsNumber)
             ?: arithmeticObjectiveText(objective)
-
         is SourceValue.Extension -> arithmeticObjectiveText(objective)
     }
 
@@ -204,46 +198,38 @@ internal class MpsOutput(
             Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
             Verdict.UNKNOWN -> "s UNKNOWN"
         }
-    } else {
-        when (verdict) {
-            Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
-                when {
-                    best == null -> "s UNKNOWN"
-                    verdict == Verdict.OPTIMAL -> "s OPTIMUM FOUND"
-                    else -> "s SATISFIABLE"
-                }
-
-            Verdict.UNBOUNDED -> when {
-                exactSourceWitness() != false -> "s UNBOUNDED"
-                best != null -> "s SATISFIABLE"
-                else -> "s UNKNOWN"
+    } else when (verdict) {
+        Verdict.SATISFIABLE, Verdict.BEST_FOUND, Verdict.OPTIMAL ->
+            when {
+                best == null -> "s UNKNOWN"
+                verdict == Verdict.OPTIMAL -> "s OPTIMUM FOUND"
+                else -> "s SATISFIABLE"
             }
 
-            Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
-
-            Verdict.UNKNOWN -> "s UNKNOWN"
+        Verdict.UNBOUNDED -> when {
+            exactSourceWitness() != false -> "s UNBOUNDED"
+            best != null -> "s SATISFIABLE"
+            else -> "s UNKNOWN"
         }
+
+        Verdict.UNSATISFIABLE -> "s UNSATISFIABLE"
+
+        Verdict.UNKNOWN -> "s UNKNOWN"
     }
 
     override fun lpStatisticPairs(stats: SolveStats): List<Pair<String, String>> {
         val pairs = super.lpStatisticPairs(stats)
         val qualified = linearSource
-        val key = if (qualified != null) {
-            when {
-                !qualified.nativeClaimsUnrestricted -> "restrictedModelLpRootBound"
-                qualified.nominalSourceExact && qualified.claimsCoverTolerance -> "lpRootBound"
-                qualified.nominalSourceExact -> "nominalSourceLpRootBound"
-                else -> "workingModelLpRootBound"
-            }
-        } else {
-            "lpRootBound"
-        }
+        val key = if (qualified != null) when {
+            !qualified.nativeClaimsUnrestricted -> "restrictedModelLpRootBound"
+            qualified.nominalSourceExact && qualified.claimsCoverTolerance -> "lpRootBound"
+            qualified.nominalSourceExact -> "nominalSourceLpRootBound"
+            else -> "workingModelLpRootBound"
+        } else "lpRootBound"
         val scoped = pairs.map { (name, value) -> (if (name == "lpRootBound") key else name) to value }
         return if (pairs.any { it.first == "lpRootBound" }) {
             scoped + ("${key}Scale" to (qualified?.objectiveScale?.toString() ?: "1"))
-        } else {
-            pairs
-        }
+        } else pairs
     }
 
     override fun keepStat(key: String): Boolean = true
@@ -253,19 +239,15 @@ internal class MpsOutput(
             if (best == null) return null
             if (verdict == Verdict.OPTIMAL && source.conclusion == LinearSourceConclusion.OPTIMAL) {
                 val attained = source.incumbent?.objective?.let { it == source.acceptedObjectiveBound } == true ||
-                    (
-                        source.nominalSourceExact && source.claimsCoverTolerance && source.incumbent?.exact == true &&
-                            nativeOptimumExact
-                        )
+                    (source.nominalSourceExact && source.claimsCoverTolerance && source.incumbent?.exact == true &&
+                        nativeOptimumExact)
                 val status = if (source.numericalClaims && !attained) "tolerance-optimum" else "attained-optimum"
                 return "optimizationStatus=$status"
             }
             if (source.nativeConclusion != LinearSourceConclusion.OPTIMAL) return null
             val status = if (source.nominalSourceExact && source.incumbent?.exact == true && nativeOptimumExact) {
                 "attained-optimum"
-            } else {
-                "tolerance-optimum"
-            }
+            } else "tolerance-optimum"
             return "${source.nativeScope()}OptimizationStatus=$status"
         }
         if (verdict != Verdict.OPTIMAL || best == null) return null
@@ -287,9 +269,7 @@ internal class MpsOutput(
         }
         val declarationQualification = if (effectiveDeclarations) {
             "MPS source scope=effective declaration defaults"
-        } else {
-            null
-        }
+        } else null
         return listOfNotNull(declarationQualification, witnessQualification, cause)
             .joinToString("; ").ifEmpty { null }
     }
@@ -306,41 +286,28 @@ internal class MpsOutput(
         }
         val qualification = when {
             !source.nativeClaimsUnrestricted && source.nativeConclusion in setOf(
-                LinearSourceConclusion.OPTIMAL,
-                LinearSourceConclusion.UNSATISFIABLE,
+                LinearSourceConclusion.OPTIMAL, LinearSourceConclusion.UNSATISFIABLE,
             ) -> "$scope terminal does not cover the unrestricted source"
-
             source.numericalClaims && source.nativeConclusion == LinearSourceConclusion.OPTIMAL &&
                 source.conclusion != LinearSourceConclusion.OPTIMAL ->
                 "$scope optimum lacks a checked consistent terminal source point"
-
             source.numericalClaims && source.nativeConclusion == LinearSourceConclusion.UNSATISFIABLE &&
                 source.conclusion != LinearSourceConclusion.UNSATISFIABLE ->
                 "$scope refutation conflicts with an accepted source witness"
-
             source.nativeConclusion == LinearSourceConclusion.UNSATISFIABLE &&
                 source.conclusion != LinearSourceConclusion.UNSATISFIABLE ->
                 "$scope refutation; tolerance-accepted feasibility unproved"
-
             source.nativeConclusion == LinearSourceConclusion.OPTIMAL &&
                 source.conclusion != LinearSourceConclusion.OPTIMAL ->
                 "$scope optimization result; tolerance-accepted optimality unproved"
-
             source.nativeConclusion == LinearSourceConclusion.UNBOUNDED &&
                 source.conclusion != LinearSourceConclusion.UNBOUNDED ->
                 "$scope unboundedness; source recession proof unproved"
-
             else -> null
         }
         val numerical = if (source.numericalClaims && source.conclusion in setOf(
-                LinearSourceConclusion.OPTIMAL,
-                LinearSourceConclusion.UNSATISFIABLE,
-            )
-        ) {
-            "MPS numerical status under configured tolerances"
-        } else {
-            null
-        }
+                LinearSourceConclusion.OPTIMAL, LinearSourceConclusion.UNSATISFIABLE,
+            )) "MPS numerical status under configured tolerances" else null
         return listOfNotNull(declaration, numerical, qualification, witness, cause)
             .joinToString("; ").ifEmpty { null }
     }

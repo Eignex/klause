@@ -132,8 +132,7 @@ class SearchRun internal constructor(
                     is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
 
                     ComponentResult.Indeterminate -> return finish(
-                        SearchRunEvent.Indeterminate.Component,
-                        SearchComponentStop.Site.ModelBlock,
+                        SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.ModelBlock,
                     )
                 }
             }
@@ -168,8 +167,7 @@ class SearchRun internal constructor(
                         SearchLearnedConflictResult.Indeterminate -> {
                             if (learnedPropagationPending) return pauseLearnedPropagation()
                             return finish(
-                                SearchRunEvent.Indeterminate.Component,
-                                SearchComponentStop.Site.LearnedConflict,
+                                SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.LearnedConflict,
                             )
                         }
 
@@ -179,8 +177,7 @@ class SearchRun internal constructor(
                 }
 
                 SearchNodeDisposition.Indeterminate -> return finish(
-                    SearchRunEvent.Indeterminate.Component,
-                    SearchComponentStop.Site.NodePolicy,
+                    SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.NodePolicy,
                 )
 
                 // Nothing was decided at this node yet, so the frame stack resumes here unchanged.
@@ -317,8 +314,7 @@ class SearchRun internal constructor(
                         is ComponentResult.Conflict -> return finish(SearchRunEvent.Exhausted)
 
                         ComponentResult.Indeterminate -> return finish(
-                            SearchRunEvent.Indeterminate.Component,
-                            SearchComponentStop.Site.ModelBlock,
+                            SearchRunEvent.Indeterminate.Component, SearchComponentStop.Site.ModelBlock,
                         )
                     }
                 }
@@ -571,11 +567,7 @@ class SearchRun internal constructor(
             }
             if (recordComponentStops) {
                 componentStop = SearchComponentStop(
-                    site,
-                    stopCause,
-                    session.cancelled(),
-                    sawIndeterminate,
-                    session.decisionLevel,
+                    site, stopCause, session.cancelled(), sawIndeterminate, session.decisionLevel,
                 )
             }
         }
@@ -636,23 +628,14 @@ class SearchRun internal constructor(
         if (modelContinuation != SearchModelContinuation.Chronological || queryRoot != minimumDecisionLevel ||
             !started || terminal != null || sawIndeterminate || pendingModel != null || lastModel != null ||
             consumedModel || pendingCancellation || retryingAssertion || learnedPropagationPending ||
-            budgetInterrupted
-        ) {
-            return false
-        }
+            budgetInterrupted) return false
         val frame = frames.firstOrNull() ?: return false
         if (frame.level != minimumDecisionLevel || session.decisionLevel <= frame.level ||
-            frame.decisions.size != 2
-        ) {
-            return false
-        }
+            frame.decisions.size != 2) return false
         val selected = frame.decisions.getOrNull(frame.next - 1) as? SearchDecision.Bool ?: return false
         val opposite = frame.decisions.getOrNull(2 - frame.next) as? SearchDecision.Bool ?: return false
         if (selected.literal != literal || opposite.literal != (literal xor 1) ||
-            session.boolValue(literal ushr 1) != (literal and 1 == 0)
-        ) {
-            return false
-        }
+            session.boolValue(literal ushr 1) != (literal and 1 == 0)) return false
         // The peer owns the complementary region; descendant frames and their charged work stay here.
         frames.removeAt(0)
         queryRoot = frame.level + 1

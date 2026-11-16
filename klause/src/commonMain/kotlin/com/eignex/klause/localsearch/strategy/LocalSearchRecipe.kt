@@ -54,12 +54,8 @@ class LocalSearchRecipe(
 
     /** A copy selecting [guidance], with a distinct telemetry label. */
     fun withObjectiveGuidance(guidance: ObjectiveGuidance): LocalSearchRecipe = LocalSearchRecipe(
-        "$label/${guidance.name.lowercase()}",
-        strategy,
-        optimizeStrategy,
-        perMoveInvariants,
-        seedImplicitOnRestart,
-        guidance,
+        "$label/${guidance.name.lowercase()}", strategy, optimizeStrategy, perMoveInvariants,
+        seedImplicitOnRestart, guidance,
     )
 
     /** A copy whose sources axis is [transform]ed (the editable list of configured move sources). */

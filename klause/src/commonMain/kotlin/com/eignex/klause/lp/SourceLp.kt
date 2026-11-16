@@ -47,9 +47,7 @@ internal class SourceLpSparseAdmission internal constructor(
 ) : AutoCloseable {
     internal var closed = false
         private set
-    override fun close() {
-        closed = true
-    }
+    override fun close() { closed = true }
 }
 
 internal class SourceLpBudget(
@@ -107,10 +105,8 @@ internal class SourceLpBudget(
         measuredContinuationWork += minOf(continuation, Long.MAX_VALUE - measuredContinuationWork)
         measuredRefinementWork += minOf(refinement, Long.MAX_VALUE - measuredRefinementWork)
         measuredBoundCertificationWork += minOf(boundCertification, Long.MAX_VALUE - measuredBoundCertificationWork)
-        measuredConflictCertificationWork += minOf(
-            conflictCertification,
-            Long.MAX_VALUE - measuredConflictCertificationWork,
-        )
+        measuredConflictCertificationWork += minOf(conflictCertification,
+            Long.MAX_VALUE - measuredConflictCertificationWork)
         if (activeStart == null) publish()
     }
 
@@ -182,10 +178,8 @@ internal class SourceLpBudget(
         prepare: (ExecutionControl) -> SourceLpInput?,
         onDecline: (String) -> Unit = {},
         block: (ExecutionControl) -> T?,
-    ): T? = runAdmitted(
-        emptyList(), 0, cancellation, emptyList(), emptyList(), false, block, prepare,
-        onDecline = onDecline,
-    )
+    ): T? = runAdmitted(emptyList(), 0, cancellation, emptyList(), emptyList(), false, block, prepare,
+        onDecline = onDecline)
 
     fun <T> runSparse(
         cancellation: ExecutionControl,
@@ -194,12 +188,7 @@ internal class SourceLpBudget(
     ): T? {
         var prepared: SparseSourceLp? = null
         return runAdmitted(
-            emptyList(),
-            0,
-            cancellation,
-            emptyList(),
-            emptyList(),
-            false,
+            emptyList(), 0, cancellation, emptyList(), emptyList(), false,
             block = { token -> prepared?.let { block(it, token) } },
             sparse = { token -> prepare(token).also { prepared = it.prepared } },
         )
@@ -224,16 +213,8 @@ internal class SourceLpBudget(
     ): T? {
         require(admission.budget === this)
         if (admission.closed) return null
-        return runAdmitted(
-            emptyList(),
-            0,
-            cancellation,
-            emptyList(),
-            emptyList(),
-            false,
-            block = { token -> block(admission.prepared, token) },
-            resumed = admission,
-        )
+        return runAdmitted(emptyList(), 0, cancellation, emptyList(), emptyList(), false,
+            block = { token -> block(admission.prepared, token) }, resumed = admission)
     }
 
     fun admitsDimensions(variables: Int, rows: Long): Boolean =
@@ -503,11 +484,8 @@ internal class SourceLp(
                     if (current.assertBounds(assertions, token) is LpBoundBatchResult.Declined) return@run null
                     val refinementBefore = current.refinementCache.work
                     val solved = try {
-                        current.solve(
-                            token = token,
-                            observer = observer,
-                            claim = if (activity == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
-                        )
+                        current.solve(token = token, observer = observer,
+                            claim = if (activity == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM)
                     } finally {
                         budget.observe(
                             floatWork = current.lastMetrics.workOps,

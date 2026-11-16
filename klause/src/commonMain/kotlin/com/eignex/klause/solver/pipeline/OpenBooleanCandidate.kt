@@ -55,8 +55,7 @@ internal class SourceConjunctionHints private constructor(
     private val gates: MutableMap<Int, Gate>,
     private val stop: ExecutionControl,
     private val usage: OpenHintUsageSink?,
-) : SearchCandidateHints,
-    AutoCloseable {
+) : SearchCandidateHints, AutoCloseable {
     private var clauses: SourceClauseGuidance? = null
     private var available: (() -> Boolean)? = null
     private var knownBool: (Int) -> Boolean? = { null }
@@ -98,9 +97,7 @@ internal class SourceConjunctionHints private constructor(
         private val primitiveValues = HashMap<Int, Boolean?>()
         private val knownValues = HashMap<Int, Boolean?>()
 
-        init {
-            reserve(2)
-        }
+        init { reserve(2) }
 
         fun visit(count: Int = 1): Boolean {
             if (count > MAX_INDEX_ENTRIES - visits) {
@@ -270,8 +267,7 @@ internal class SourceConjunctionHints private constructor(
                 if (available != null && maxClauseEntries > 0) {
                     val budget = SourceClauseGuidance.Budget(
                         minOf(maxClauseEntries, MAX_INDEX_ENTRIES - inputs.size),
-                        MAX_INDEX_ENTRIES - preparationVisits,
-                        stop,
+                        MAX_INDEX_ENTRIES - preparationVisits, stop,
                     )
                     shared = budget
                     if (!budget.reserve(3)) {
@@ -317,11 +313,8 @@ internal class SourceConjunctionHints private constructor(
                     return visits <= MAX_INDEX_ENTRIES && !stopped(stop, count)
                 }
                 fun visitDecline(): SourceConjunctionHints? = decline(
-                    shared?.outcome ?: if (visits > MAX_INDEX_ENTRIES) {
-                        HintIndexOutcome.VISITS
-                    } else {
-                        HintIndexOutcome.STOPPED
-                    },
+                    shared?.outcome ?: if (visits > MAX_INDEX_ENTRIES) HintIndexOutcome.VISITS
+                    else HintIndexOutcome.STOPPED,
                 )
                 for (clause in clauses) {
                     if (!visit()) return visitDecline()
@@ -370,10 +363,7 @@ internal class SourceConjunctionHints private constructor(
                         if (!canonical) {
                             var width = count
                             var levels = 0
-                            while (width > 0) {
-                                width = width ushr 1
-                                levels++
-                            }
+                            while (width > 0) { width = width ushr 1; levels++ }
                             val sortingWork = count.toLong() * levels
                             if (!visit(sortingWork.toInt())) return visitDecline()
                             operands.sort()

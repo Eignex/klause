@@ -37,10 +37,8 @@ class ContinuousProduct private constructor(
     }
 
     override val variables: VarList = finiteChoices?.takeIf { it.hasGuards }?.let { choices ->
-        MixedVars(
-            boolVars = IntArray(choices.size) { Lit.variable(choices.literalAt(it)) }.distinct().toIntArray(),
-            reals = intArrayOf(a, b, result).distinct().toIntArray(),
-        )
+        MixedVars(boolVars = IntArray(choices.size) { Lit.variable(choices.literalAt(it)) }.distinct().toIntArray(),
+            reals = intArrayOf(a, b, result).distinct().toIntArray())
     } ?: RealVars(intArrayOf(a, b, result).distinct().toIntArray())
 
     override fun remap(mapping: VarRemap): Factor =
@@ -82,15 +80,10 @@ internal class ContinuousProductChoices(val operand: Int, values: DoubleArray, g
     fun valueAt(index: Int): Double = captured[index]
     fun literalAt(index: Int): Int = checkNotNull(literals)[index]
 
-    fun remap(mapping: VarRemap): ContinuousProductChoices = ContinuousProductChoices(
-        mapping.real(operand),
-        captured,
-        literals?.let { source ->
-            IntArray(source.size) {
-                Lit.make(mapping.bool(Lit.variable(source[it])), Lit.isPositive(source[it]))
-            }
-        },
-    )
+    fun remap(mapping: VarRemap): ContinuousProductChoices = ContinuousProductChoices(mapping.real(operand), captured,
+        literals?.let { source -> IntArray(source.size) {
+            Lit.make(mapping.bool(Lit.variable(source[it])), Lit.isPositive(source[it]))
+        } })
 
     fun nearest(value: Double): Double {
         if (!value.isFinite() || captured.isEmpty()) return Double.NaN

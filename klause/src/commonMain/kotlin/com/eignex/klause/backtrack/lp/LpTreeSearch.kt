@@ -69,10 +69,8 @@ internal fun LpEngine.lbTreeSearch(
     val token = object : ExecutionControl() {
         override fun isCancelled(): Boolean {
             accountPropagation()
-            return stop() || (
-                params.lpPlan.rootBudgetFraction > 0.0 &&
-                    workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)
-                ) ||
+            return stop() || (params.lpPlan.rootBudgetFraction > 0.0 &&
+                workSpentExceeds(params.lpPlan.rootMaxWork, sink.lp.standaloneWork)) ||
                 lpWorkAllowanceSpent(sink.lp.standaloneWork)
         }
         override fun deadline() = stop.deadline()
@@ -84,9 +82,7 @@ internal fun LpEngine.lbTreeSearch(
         return dive.use {
             val leafSolver = if (problem.numRealVars > 0 && complete == null) {
                 LeafRealSolver(problem, objective, params.lpPlan.componentSplit, sink.lp, solveContext, pricingOptions)
-            } else {
-                null
-            }
+            } else null
             leafSolver.use {
                 val relaxer = dive.lpRelaxer ?: return null
                 val cp = CpSearchComponent(PropagationSession(problem, token), branching = CpBranching.None)
@@ -100,7 +96,6 @@ internal fun LpEngine.lbTreeSearch(
                 var bestValue: BigFraction? = null
                 var best: Sample? = null
                 val tried = HashSet<String>()
-
                 // A leaf of this tree passed its own propagation; only its real columns still need the exact LP.
                 fun offer(discrete: Sample): Boolean {
                     if (token()) return false
@@ -120,9 +115,7 @@ internal fun LpEngine.lbTreeSearch(
                             ?: requireNotNull(leafSolver).solve(sample, token, toleranceCheck, work)
                         when (leaf.verdict) {
                             LpVerdict.FEASIBLE, LpVerdict.ATTAINED_OPTIMUM, LpVerdict.UNBOUNDED,
-                            LpVerdict.TOLERANCE_OPTIMUM,
-                            -> Unit
-
+                            LpVerdict.TOLERANCE_OPTIMUM, -> Unit
                             else -> return false
                         }
                         if (leaf.verdict == LpVerdict.TOLERANCE_OPTIMUM && toleranceCheck == null) return false
@@ -144,9 +137,7 @@ internal fun LpEngine.lbTreeSearch(
                 dive.cpAdapter.branching = {
                     val fractional = split?.takeIf { problem.numRealVars > 0 && !it.boolean }
                     val alternatives = fractional?.nearestIntegerAlternatives()
-                    if (alternatives != null) {
-                        alternatives
-                    } else {
+                    if (alternatives != null) alternatives else {
                         val variable = (0 until problem.numIntVars).firstOrNull { session.intDomain(it).valueCount > 1 }
                         if (variable == null) {
                             null
@@ -189,9 +180,7 @@ internal fun LpEngine.lbTreeSearch(
                             result?.takeIf { it.optimal }?.primal
                                 ?.takeIf { it.size == model.n && it.all(Double::isFinite) }
                                 ?.map { requireNotNull(BigFraction.ofDouble(it)) }
-                        } else {
-                            null
-                        }
+                        } else null
                         if (point == null) return SearchNodeDisposition.Expand
                         dive.noteNodeOverhead(point.size.toLong())
                         targets = relaxation.colVarId.indices.mapNotNull { column ->
@@ -209,20 +198,14 @@ internal fun LpEngine.lbTreeSearch(
                             if (relaxation.colIsBool[column]) {
                                 if (session.boolValue(variable) != null || value <= BigFraction.ZERO ||
                                     value >= BigFraction.ONE
-                                ) {
-                                    continue
-                                }
+                                ) continue
                             } else {
                                 val upper = value.ceilLong() ?: continue
                                 val domain = session.intDomain(variable)
                                 if (upper <= domain.min || upper > domain.max) continue
                             }
-                            split = LpFractionalBranch(
-                                variable,
-                                value,
-                                relaxation.colIsBool[column],
-                                registered = false,
-                            )
+                            split = LpFractionalBranch(variable, value,
+                                relaxation.colIsBool[column], registered = false)
                             break
                         }
                         return SearchNodeDisposition.Expand
@@ -261,9 +244,7 @@ private fun LpFractionalBranch.nearestIntegerAlternatives(): List<SearchDecision
     val up = SearchDecision.IntAtLeast(variable, upper)
     return if (BigFraction.ofLong(upper) - value < value - BigFraction.ofLong(lower)) {
         listOf(up, down)
-    } else {
-        listOf(down, up)
-    }
+    } else listOf(down, up)
 }
 
 internal class LpRootNodeResult(val model: LpModel, val float: FloatLpResult?)

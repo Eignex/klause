@@ -13,10 +13,8 @@ internal class LpCutStats(private val record: (String, LpPhaseStats) -> Unit) {
         "CUT_${recipe.name}_${kind?.let { "${it.name}_" }.orEmpty()}${family.name}_$stage"
 
     fun event(family: CutFamily, stage: String, outcome: String, count: Long = 1L) {
-        record(
-            key(family, stage),
-            LpPhaseStats(calls = count, outcomes = mapOf(outcome to count)),
-        )
+        record(key(family, stage),
+            LpPhaseStats(calls = count, outcomes = mapOf(outcome to count)))
     }
 
     fun shared(stage: String, delta: LpPhaseStats) {
@@ -29,14 +27,8 @@ internal class LpCutStats(private val record: (String, LpPhaseStats) -> Unit) {
         try {
             return block().also { outcome = "COMPLETED" }
         } finally {
-            record(
-                key(family, stage),
-                LpPhaseStats(
-                    calls = 1L,
-                    nanos = started.elapsedNow().inWholeNanoseconds,
-                    outcomes = mapOf(outcome to 1L),
-                ),
-            )
+            record(key(family, stage), LpPhaseStats(calls = 1L,
+                nanos = started.elapsedNow().inWholeNanoseconds, outcomes = mapOf(outcome to 1L)))
         }
     }
 
@@ -46,14 +38,8 @@ internal class LpCutStats(private val record: (String, LpPhaseStats) -> Unit) {
         try {
             return block().also { outcome = if (it == null) "DECLINED" else "COMPLETED" }
         } finally {
-            shared(
-                stage,
-                LpPhaseStats(
-                    calls = 1L,
-                    nanos = started.elapsedNow().inWholeNanoseconds,
-                    outcomes = mapOf(outcome to 1L),
-                ),
-            )
+            shared(stage, LpPhaseStats(calls = 1L, nanos = started.elapsedNow().inWholeNanoseconds,
+                outcomes = mapOf(outcome to 1L)))
         }
     }
 }

@@ -56,10 +56,8 @@ internal class SharedObjectiveBound(
                 if (model == null) return@withLock 0.0
                 val verifier = ModelEvidenceVerifier<Unit, Double>(expected, CandidateVerifier.trusting())
                 if (verifier.verify(ModelEvidence.Bound(model, value, certificate), invocation?.scope, invocation) !is
-                        Verification.Accepted
-                ) {
-                    return@withLock 0.0
-                }
+                    Verification.Accepted
+                ) return@withLock 0.0
             }
             val raise = if (value > lb && lb.isFinite()) value - lb else 0.0
             if (value > lb) lb = value

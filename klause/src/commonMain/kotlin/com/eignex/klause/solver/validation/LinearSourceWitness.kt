@@ -41,7 +41,7 @@ internal fun checkLinearSourceWitness(
     fun stoppedAfterVisit(): Boolean {
         stop.charge(1L)
         visits++
-        return (visits % SOURCE_POINT_POLL_BATCH == 0) && stop()
+        return ( visits % SOURCE_POINT_POLL_BATCH == 0) && stop()
     }
     val tolerance = source.semantics.effective.feasibilityTolerance ?: SourceTolerance()
     val absolute = BigFraction.of(tolerance.absolute.numerator, tolerance.absolute.denominator)

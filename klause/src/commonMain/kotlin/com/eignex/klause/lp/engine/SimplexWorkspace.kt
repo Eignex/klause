@@ -23,7 +23,6 @@ internal class SimplexWorkspace(m: Int, numVars: Int) {
     val touchedColumns = IntArray(numVars)
     val columnEpochs = IntArray(numVars)
     val reconcileQueue = IntArrayList(m)
-
     // A backend can reuse the form it produced when the same carrier reaches an update.
     // Separate roles retain that identity instead of overwriting one shared vector.
     val spikeVec = IndexedVector(m)

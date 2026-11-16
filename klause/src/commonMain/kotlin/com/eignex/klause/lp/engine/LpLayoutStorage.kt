@@ -30,11 +30,8 @@ internal class LpLayoutStorage private constructor(
         var retained = columnUnits
         var retired = 0L
         for (row in rowUnits.indices) {
-            if (rows.row(row).active || rows.row(row).suspendedAt != null) {
-                retained += rowUnits[row]
-            } else {
-                retired += rowUnits[row]
-            }
+            if (rows.row(row).active || rows.row(row).suspendedAt != null) retained += rowUnits[row]
+            else retired += rowUnits[row]
         }
         return LpLayoutWeight(retained, retired)
     }

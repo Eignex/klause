@@ -165,19 +165,15 @@ internal fun Compiler.Builder.elementVarMatrix(
     definedVars.add(v)
     factors.add(
         Linear(
-            longArrayOf(nCols.toLong(), 1L, -1L),
-            intArrayOf(i, j, index),
-            LinearOp.EQ,
-            nCols.toLong() * rowOff + colOff,
+            longArrayOf(nCols.toLong(), 1L, -1L), intArrayOf(i, j, index),
+            LinearOp.EQ, nCols.toLong() * rowOff + colOff,
         ),
     )
     factors.add(
         Element(
-            idx = index,
-            result = v,
+            idx = index, result = v,
             arr = LongArray(cells.toInt()) { rows[it / nCols][it % nCols].toLong() },
-            arrIsVars = true,
-            indexOffset = 0,
+            arrIsVars = true, indexOffset = 0,
         ),
     )
 }
@@ -875,15 +871,8 @@ internal fun Compiler.Builder.minMax(e: XmlElement, max: Boolean) {
     definedVars.add(m)
     defineExtreme(m, vars, max)
     if (index != null) {
-        factors.add(
-            Element(
-                singleTermVar(index.textContent),
-                m,
-                vars.widenToLong(),
-                arrIsVars = true,
-                indexOffset = selectionOffset(e),
-            ),
-        )
+        factors.add(Element(singleTermVar(index.textContent), m, vars.widenToLong(),
+            arrIsVars = true, indexOffset = selectionOffset(e)))
     }
     if (condition != null && target == null) postCondition(intArrayOf(1), intArrayOf(m), condition)
 }
@@ -954,15 +943,9 @@ internal fun Compiler.Builder.eqValue01(x: Int, value: Long): Int {
     val indicator = litTo01(literal)
     // Typed like FlatZinc's `int_eq_reif`/`bool2int`, so local search maintains the indicator from its variable
     // without depending on the factor-shape inference recognising the reified rows.
-    definitionHints.add(
-        DefinitionHint.Comparison(
-            eq,
-            longArrayOf(1),
-            arrayOf(DefinitionHint.Operand.Variable(x)),
-            value,
-            LinearOp.EQ,
-        ),
-    )
+    definitionHints.add(DefinitionHint.Comparison(
+        eq, longArrayOf(1), arrayOf(DefinitionHint.Operand.Variable(x)), value, LinearOp.EQ,
+    ))
     definitionHints.add(DefinitionHint.BooleanValue(indicator, literal))
     classes.define(indicator, start)
     return indicator.also { byValue.put(value, it) }

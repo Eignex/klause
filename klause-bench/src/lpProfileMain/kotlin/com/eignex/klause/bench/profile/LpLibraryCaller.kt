@@ -70,8 +70,8 @@ internal fun libraryCaller(options: Map<String, String>) {
         println("s SATISFIABLE")
         println(
             compiled.columns.zip(witness.values).joinToString(" ", prefix = "v ") { (column, value) ->
-                "${column.name}=$value"
-            },
+            "${column.name}=$value"
+        }
         )
     }
     println("c libraryElapsedNs=${started.elapsedNow().inWholeNanoseconds}")

@@ -81,10 +81,8 @@ enum class FlatZincSearchValueSelector {
 fun FlatZincSearchHints.toSearchHints(): SearchHints = SearchHints(
     tiers = tiers.map { tier ->
         SearchGroup(
-            tier.boolVars.copyOf(),
-            tier.intVars.copyOf(),
-            tier.varSelector.toSelection(),
-            tier.valueSelector.toSelection(),
+            tier.boolVars.copyOf(), tier.intVars.copyOf(),
+            tier.varSelector.toSelection(), tier.valueSelector.toSelection(),
         )
     },
     fallbackVarSelector = fallbackVarSelector.toSelection(),

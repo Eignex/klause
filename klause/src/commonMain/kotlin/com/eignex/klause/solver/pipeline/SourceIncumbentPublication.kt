@@ -13,12 +13,14 @@ data class SourceIncumbentPublication(
     val value: SourceValue,
 )
 
-internal class SourcePublicationObserver( callback: ((SourceIncumbentPublication) -> Unit)?) {
+internal class SourcePublicationObserver(callback: ((SourceIncumbentPublication) -> Unit)?) {
     private val observer = IncumbentPublicationObserver(callback)
 
     val latest: SourceIncumbentPublication? get() = observer.latest
+
     fun accepted(sample: Sample, value: SourceValue, version: Long = observer.version + 1) {
-        observer.accepted( SourceIncumbentPublication(version, sample, value), version)
+        observer.accepted(SourceIncumbentPublication(version, sample, value), version)
     }
+
     fun <T> execute(action: () -> T): T = observer.execute(action)
 }

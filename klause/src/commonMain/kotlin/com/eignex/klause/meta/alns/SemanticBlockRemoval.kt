@@ -38,30 +38,18 @@ internal class SemanticBlockRemoval(
     var lastRequested: FreedVars? = null
         private set
 
-    override fun destroy(
-        rng: Random,
-        problem: BakedProblem,
-        incumbent: Sample,
-        objective: LinearObjective,
-        fraction: Double,
+    override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample,
+        objective: LinearObjective, fraction: Double,
     ): FreedVars = destroy(rng, problem, incumbent, objective, fraction, Assumptions.None, ExecutionControl.Never)
 
-    override fun destroy(
-        rng: Random,
-        problem: BakedProblem,
-        incumbent: Sample,
-        objective: LinearObjective,
-        fraction: Double,
-        assumptions: Assumptions,
-        cancellation: ExecutionControl,
+    override fun destroy(rng: Random, problem: BakedProblem, incumbent: Sample,
+        objective: LinearObjective, fraction: Double, assumptions: Assumptions, cancellation: ExecutionControl,
     ): FreedVars = observed(cancellation) { work ->
         if (incumbent.numBoolVars != problem.numBoolVars || incumbent.numIntVars != problem.numIntVars ||
             incumbent.numRealVars != problem.numRealVars || problem.numRealVars != 0 ||
             problem.numBoolVars.toLong() + problem.numIntVars > Int.MAX_VALUE ||
             !fraction.isFinite() || fraction !in 0.0..1.0
-        ) {
-            work.stop(RepairBlockDecline.InvalidFrame)
-        }
+        ) work.stop(RepairBlockDecline.InvalidFrame)
         work.charge()
         if (problem.numFactors == 0) work.stop(RepairBlockDecline.NoShape)
         val nominal = (fraction * (problem.numBoolVars.toLong() + problem.numIntVars)).toInt().coerceAtLeast(1)
@@ -79,31 +67,21 @@ internal class SemanticBlockRemoval(
                     }
                     for (variable in factor.vars) roles.int(variable)
                 }
-
                 kind == Kind.Resource && factor is Cumulative -> {
                     if (factor.starts.size < 2) continue
                     resourceWindow(factor, incumbent, nominal, rng, roles, work)
                 }
-
                 kind == Kind.Placement && factor is Diffn -> {
                     if (factor.n < 2) continue
                     placementWindow(factor, incumbent, rng, roles, work)
                 }
-
                 else -> continue
             }
             var closed: ClosedRepairBlock
             do {
                 val before = roles.size
-                closed = RepairBlockClosure.close(
-                    problem,
-                    roles.freed(),
-                    definitions,
-                    assumptions,
-                    maxInputs,
-                    maxVariables,
-                    work,
-                )
+                closed = RepairBlockClosure.close(problem, roles.freed(), definitions, assumptions,
+                    maxInputs, maxVariables, work)
                 expandPackets(problem, closed.freed, roles, work)
             } while (roles.size != before)
             if (closed.searchedInputs == 0) work.stop(RepairBlockDecline.Unavailable)
@@ -114,21 +92,11 @@ internal class SemanticBlockRemoval(
         work.stop(if (unsupported) RepairBlockDecline.UnsupportedShape else RepairBlockDecline.NoShape)
     }
 
-    fun closeControl(
-        problem: BakedProblem,
-        requested: FreedVars,
-        assumptions: Assumptions,
+    fun closeControl(problem: BakedProblem, requested: FreedVars, assumptions: Assumptions,
         cancellation: ExecutionControl,
     ): FreedVars = observed(cancellation) { work ->
-        val closed = RepairBlockClosure.close(
-            problem,
-            requested,
-            definitions,
-            assumptions,
-            maxInputs,
-            maxVariables,
-            work,
-        )
+        val closed = RepairBlockClosure.close(problem, requested, definitions, assumptions,
+            maxInputs, maxVariables, work)
         if (closed.searchedInputs == 0) work.stop(RepairBlockDecline.Unavailable)
         lastSearchedInputs = closed.searchedInputs
         lastRequested = requested
@@ -188,20 +156,12 @@ internal class SemanticBlockRemoval(
         factor.heightVars?.let { roles.int(it[index]) }
     }
 
-    private fun resourceWindow(
-        factor: Cumulative,
-        center: Sample,
-        nominal: Int,
-        rng: Random,
-        roles: Roles,
-        work: RepairBlockWork,
+    private fun resourceWindow(factor: Cumulative, center: Sample, nominal: Int, rng: Random,
+        roles: Roles, work: RepairBlockWork,
     ) {
         val count = factor.starts.size
         if (count > maxVariables) work.stop(RepairBlockDecline.Oversized)
-        val starts = LongArray(count) {
-            work.charge()
-            center.intValue(factor.starts[it])
-        }
+        val starts = LongArray(count) { work.charge(); center.intValue(factor.starts[it]) }
         val order = (0 until count).sortedWith { left, right ->
             work.charge()
             starts[left].compareTo(starts[right]).takeIf { it != 0 } ?: left.compareTo(right)
@@ -266,9 +226,7 @@ internal class SemanticBlockRemoval(
                         factor.durationVars.getOrNull(index)?.let { it in inputs } == true ||
                         factor.resourceVars.getOrNull(index)?.let { it in inputs } == true ||
                         factor.presents.getOrNull(index)?.let { Lit.variable(it) in boolInputs } == true
-                    ) {
-                        task(factor, index, roles)
-                    }
+                    ) task(factor, index, roles)
                 }
             }
             if (kind == Kind.Placement && factor is Diffn) {
@@ -277,9 +235,7 @@ internal class SemanticBlockRemoval(
                     if (factor.xs[index] in inputs || factor.ys[index] in inputs ||
                         factor.widthVars?.get(index)?.let { it in inputs } == true ||
                         factor.heightVars?.get(index)?.let { it in inputs } == true
-                    ) {
-                        rectangle(factor, index, roles)
-                    }
+                    ) rectangle(factor, index, roles)
                 }
             }
         }

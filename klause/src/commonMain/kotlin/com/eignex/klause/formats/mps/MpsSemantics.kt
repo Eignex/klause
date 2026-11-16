@@ -45,11 +45,7 @@ internal fun MpsModel.effectiveVariableBounds(
         }
         bounds += if (original.first.finiteMps()?.fraction == replacement.first?.fraction &&
             original.second.finiteMps()?.fraction == replacement.second?.fraction
-        ) {
-            original
-        } else {
-            replacement
-        }
+        ) original else replacement
     }
     return bounds.takeUnless { cancellation() }
 }

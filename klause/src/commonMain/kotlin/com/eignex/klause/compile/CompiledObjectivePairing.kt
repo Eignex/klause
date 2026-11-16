@@ -55,34 +55,24 @@ internal class CompiledObjectivePairing private constructor(
             replacement.realCoefficientValues.mapIndexed { id, value ->
                 if (id in previous.realCoefficientValues.indices &&
                     value.toBits() == previous.realCoefficientValues[id].toBits()
-                ) {
-                    realWeights[id]
-                } else {
-                    coefficient(value)
-                }
+                ) realWeights[id] else coefficient(value)
             },
-            if (replacement.constant == previous.constant) {
-                constant
-            } else {
-                QuadraticCoefficient.ofLong(replacement.constant)
-            },
+            if (replacement.constant == previous.constant) constant
+            else QuadraticCoefficient.ofLong(replacement.constant),
             snapshot(replacement),
         )
     }
 
-    override fun negated(): SourceObjectivePairing = CompiledObjectivePairing(
-        owner, booleans, integers, reals,
-        booleanWeights.map { it?.negated() }, integerWeights.map { it?.negated() },
-        realWeights.map { it?.negated() }, constant.negated(), native.negated(),
-    )
+    override fun negated(): SourceObjectivePairing =
+        CompiledObjectivePairing(owner, booleans, integers, reals,
+            booleanWeights.map { it?.negated() }, integerWeights.map { it?.negated() },
+            realWeights.map { it?.negated() }, constant.negated(), native.negated())
 
     private fun requireNative(objective: LinearObjective) {
-        require(
-            objective.constant == native.constant &&
-                objective.boolWeightValues.contentEquals(native.boolWeightValues) &&
-                objective.intCoefficientValues.contentEquals(native.intCoefficientValues) &&
-                objective.realCoefficientValues.contentEquals(native.realCoefficientValues),
-        ) {
+        require(objective.constant == native.constant &&
+            objective.boolWeightValues.contentEquals(native.boolWeightValues) &&
+            objective.intCoefficientValues.contentEquals(native.intCoefficientValues) &&
+            objective.realCoefficientValues.contentEquals(native.realCoefficientValues)) {
             "objective coefficients do not retain their compiled pairing"
         }
     }
@@ -119,8 +109,5 @@ private fun coefficient(value: Double): QuadraticCoefficient? = BigFraction.ofDo
 private fun QuadraticCoefficient.negated(): QuadraticCoefficient = QuadraticCoefficient.of(-numerator, denominator)
 
 private fun snapshot(objective: LinearObjective): LinearObjective = LinearObjective(
-    objective.boolWeightValues,
-    objective.intCoefficientValues,
-    objective.constant,
-    objective.realCoefficientValues,
+    objective.boolWeightValues, objective.intCoefficientValues, objective.constant, objective.realCoefficientValues,
 )

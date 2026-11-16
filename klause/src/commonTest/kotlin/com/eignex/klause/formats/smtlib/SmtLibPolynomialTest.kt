@@ -174,14 +174,8 @@ class SmtLibPolynomialTest {
 
         val operands = assertIs<PolynomialDistinct>(parsed.formula).operands
 
-        assertEquals(
-            listOf(
-                PolynomialExpression.Variable(SourceRealId(0)),
-                PolynomialExpression.Variable(SourceRealId(1)),
-                PolynomialExpression.Constant.of(bigIntOf(0)),
-            ),
-            operands,
-        )
+        assertEquals(listOf(PolynomialExpression.Variable(SourceRealId(0)),
+            PolynomialExpression.Variable(SourceRealId(1)), PolynomialExpression.Constant.of(bigIntOf(0))), operands)
     }
 
     @Test

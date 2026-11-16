@@ -51,11 +51,8 @@ class HarnessRecordingTest {
     @ValueSource(booleans = [false, true])
     fun `unrepresentable timestamp reads are unavailable`(arithmeticOverflow: Boolean) {
         val result = HarnessRecording.instantText {
-            if (arithmeticOverflow) {
-                throw ArithmeticException("long overflow")
-            } else {
-                throw DateTimeException("instant outside supported range")
-            }
+            if (arithmeticOverflow) throw ArithmeticException("long overflow")
+            else throw DateTimeException("instant outside supported range")
         }
 
         assertNull(result)

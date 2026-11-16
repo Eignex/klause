@@ -139,32 +139,16 @@ class LinearApproachTest {
     fun `numeric projection should retain integer premise activation across scopes`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val row = SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)
-        val original = SourceProofContext(
-            scope,
-            setOf(real, integer),
-            mapOf(
-                "pinned" to SourcePremise(row, emptyMap(), mapOf(integer to BigFraction.ONE)),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
+        val original = SourceProofContext(scope, setOf(real, integer), mapOf(
+            "pinned" to SourcePremise(row, emptyMap(), mapOf(integer to BigFraction.ONE)),
+        ), mapOf(real to BigFraction.ONE))
 
         val checks = listOf(1L, 0L, 1L).map { value ->
             val pinned = BigFraction.ofLong(value)
-            val current = original.atScope(
-                scope.copy(
-                    condition = SourceCondition(
-                        lower = mapOf(integer to pinned),
-                        upper = mapOf(integer to pinned),
-                    ),
-                ),
-            ).numericContext()
-            SourceEvidenceVerifier(current).verify(
-                SourceEvidence(
-                    current.scope,
-                    SourceClaim.Consequence(row),
-                    SourceDerivation.Premise("pinned"),
-                ),
-            )
+            val current = original.atScope(scope.copy(condition = SourceCondition(
+                lower = mapOf(integer to pinned), upper = mapOf(integer to pinned)))).numericContext()
+            SourceEvidenceVerifier(current).verify(SourceEvidence(current.scope,
+                SourceClaim.Consequence(row), SourceDerivation.Premise("pinned")))
         }
 
         assertEquals(SourceEvidenceCheck.Checked, checks[0])
@@ -175,11 +159,8 @@ class LinearApproachTest {
     @Test
     fun `numeric projection should withhold source extension authority`() {
         val numeric = source.numericContext()
-        val evidence = SourceEvidence(
-            scope,
-            SourceClaim.Bound(BigFraction.ZERO, strict = true),
-            LinearPinnedObjective(SourceDerivation.Premise("positive")),
-        )
+        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ZERO, strict = true),
+            LinearPinnedObjective(SourceDerivation.Premise("positive")))
 
         val checked = SourceEvidenceVerifier(numeric).verify(evidence)
 

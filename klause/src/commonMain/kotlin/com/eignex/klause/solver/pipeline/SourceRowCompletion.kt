@@ -89,15 +89,8 @@ internal class SourceRowCompletion(
                 required[guards.size + position] = entry.value
             }
             val row = built.size
-            built += Row(
-                id,
-                inputs,
-                values.requireNoNulls(),
-                premise.inequality.rhs,
-                premise.inequality.strict,
-                conditions,
-                required.requireNoNulls(),
-            )
+            built += Row(id, inputs, values.requireNoNulls(), premise.inequality.rhs, premise.inequality.strict,
+                conditions, required.requireNoNulls())
             for ((position, input) in inputs.withIndex()) {
                 rowLists[input].add(row)
                 positionLists[input].add(position)
@@ -181,12 +174,8 @@ internal class SourceRowCompletion(
         val quotient = over * magnitude.reciprocal()
         val ceiling = quotient.ceilInteger()
         val integral = quotient.den == BIG_ONE
-        val steps = if (!ceiling.fitsLong()) {
-            Long.MAX_VALUE
-        } else {
-            ceiling.toLongExact().let {
-                if (row.strict && integral && it < Long.MAX_VALUE) it + 1 else it
-            }
+        val steps = if (!ceiling.fitsLong()) Long.MAX_VALUE else ceiling.toLongExact().let {
+            if (row.strict && integral && it < Long.MAX_VALUE) it + 1 else it
         }
         return shift(center, input, -coefficient.signum(), steps.coerceAtLeast(1L))
     }
@@ -230,22 +219,16 @@ internal class SourceRowCompletion(
 
     private fun centerValue(sample: Sample, index: Int): BigFraction = if (index < model.numBoolVars) {
         if (sample.boolValue(index)) BigFraction.ONE else BigFraction.ZERO
-    } else {
-        BigFraction.ofLong(sample.intValue(index - model.numBoolVars))
-    }
+    } else BigFraction.ofLong(sample.intValue(index - model.numBoolVars))
 
     private fun coordinate(index: Int) = if (index < model.numBoolVars) {
         SourceCoordinate(SourceCoordinate.Kind.Boolean, index)
-    } else {
-        SourceCoordinate(SourceCoordinate.Kind.Integer, index - model.numBoolVars)
-    }
+    } else SourceCoordinate(SourceCoordinate.Kind.Integer, index - model.numBoolVars)
 
     private fun index(coordinate: SourceCoordinate): Int? = when (coordinate.kind) {
         SourceCoordinate.Kind.Boolean -> coordinate.id.takeIf { it in 0 until model.numBoolVars }
-
         SourceCoordinate.Kind.Integer -> coordinate.id.takeIf { it in 0 until model.numIntVars }
             ?.let { model.numBoolVars + it }
-
         SourceCoordinate.Kind.Real -> null
     }
 }

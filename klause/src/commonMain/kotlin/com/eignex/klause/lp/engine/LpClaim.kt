@@ -7,8 +7,7 @@ internal enum class LpClaim(val phase: LpSolvePhase) {
     BOUND(LpSolvePhase.CLAIM_BOUND),
     CONTRADICTION(LpSolvePhase.CLAIM_CONTRADICTION),
     FEASIBLE_COMPLETION(LpSolvePhase.CLAIM_FEASIBLE_COMPLETION),
-    ATTAINED_OPTIMUM(LpSolvePhase.CLAIM_ATTAINED_OPTIMUM),
-    ;
+    ATTAINED_OPTIMUM(LpSolvePhase.CLAIM_ATTAINED_OPTIMUM),;
 
     fun consumed(observer: LpCertificationObserver?) {
         observer?.observePhase(LpPhaseMetrics(LpSolvePhase.CLAIM_CONSUMPTION, name, 0L))
@@ -30,8 +29,10 @@ internal enum class LpClaim(val phase: LpSolvePhase) {
 }
 
 // Inclusive request costs are a view of the existing ledger, not additional work charges.
-internal class LpClaimObservation(private val claim: LpClaim, private val delegate: LpCertificationObserver) :
-    LpCertificationObserver by delegate {
+internal class LpClaimObservation(
+    private val claim: LpClaim,
+    private val delegate: LpCertificationObserver,
+) : LpCertificationObserver by delegate {
     private val started = TimeSource.Monotonic.markNow()
     private var work = 0L
     private var refusal: String? = null
@@ -64,13 +65,9 @@ internal class LpClaimObservation(private val claim: LpClaim, private val delega
     fun finish(result: CertifiedLpResult, reused: Boolean = false) {
         val outcome = when {
             reused -> "REUSED"
-
             claim.satisfiedBy(result) -> "SATISFIED"
-
             result.verdict == LpVerdict.INFEASIBLE -> "CONTRADICTION"
-
             result.floatOptimum != null -> "TOLERANCE_ACCEPTED"
-
             else -> refusal ?: result.reconstruction?.let {
                 if (it.dualRejection != null) "MISSING_BOUND_SIDE" else it.decline?.name
             } ?: result.refinement?.decline?.name ?: "NO_REQUIRED_PACKAGE"

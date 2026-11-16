@@ -35,27 +35,21 @@ internal class LpRowBound internal constructor(
     fun forEachSupport(action: (Int, Boolean) -> Unit) {
         if (lattice) {
             action(column, !upper)
-            for (term in terms) {
-                if (term.column != column) {
-                    action(term.column, true)
-                    action(term.column, false)
-                }
+            for (term in terms) if (term.column != column) {
+                action(term.column, true)
+                action(term.column, false)
             }
             return
         }
-        for (term in terms) {
-            if (term.column != column) {
-                action(term.column, minimum == (term.coefficient.signum() > 0))
-            }
+        for (term in terms) if (term.column != column) {
+            action(term.column, minimum == (term.coefficient.signum() > 0))
         }
     }
 
     fun forEachIntegralSupport(action: (Int) -> Unit) {
         if (!lattice) return
-        for (term in terms) {
-            if (term.column < authority.model.n && authority.model.column(term.column).integral) {
-                action(term.column)
-            }
+        for (term in terms) if (term.column < authority.model.n && authority.model.column(term.column).integral) {
+            action(term.column)
         }
     }
 }
@@ -220,16 +214,12 @@ internal fun projectRowBound(
         val weaker = if (minimum) meter.less(contribution, residual) else meter.less(residual, contribution)
         if (weaker ||
             (contribution == residual && (!strict || previous.strict))
-        ) {
-            return null
-        }
+        ) return null
     }
     val normalized = meter.read(residual * meter.read(term.coefficient.reciprocal()))
     val origin = meter.read(state.model.column(term.column).origin.value)
     val value = meter.read(normalized + origin)
     meter.reserve(96L)
-    return LpRowBound(
-        state, row, term.column, upper, value, strict, minimum, terms,
-        companionRow = companionRow, definingRows = definingRows,
-    )
+    return LpRowBound(state, row, term.column, upper, value, strict, minimum, terms,
+        companionRow = companionRow, definingRows = definingRows)
 }

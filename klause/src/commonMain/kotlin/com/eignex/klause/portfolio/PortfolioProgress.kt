@@ -4,10 +4,8 @@ package com.eignex.klause.portfolio
 enum class PortfolioPhase {
     /** Search before the first accepted source witness. */
     FEASIBILITY,
-
     /** Search with an accepted source incumbent. */
     IMPROVEMENT,
-
     /** An accepted terminal source claim; native authority is not independent checking. */
     PROOF_CLOSURE,
 }
@@ -60,22 +58,16 @@ fun interface PortfolioRewardPolicy {
 enum class PortfolioLifecycleKind {
     /** Worker factory completed. */
     CREATED,
-
     /** First query offered to the retained engine, including preparation. */
     FIRST_QUERY,
-
     /** A source-accepted incumbent exists while the worker is live. */
     INCUMBENT_AVAILABLE,
-
     /** Worker read a shared incumbent version. */
     INCUMBENT_READ,
-
     /** Worker accepted a shared incumbent into its private state. */
     INCUMBENT_IMPORTED,
-
     /** A private bound or center consumer used an accepted imported incumbent. */
     INCUMBENT_CONSUMED,
-
     /** Worker retired or its containing invocation ended. */
     RETIRED,
 }

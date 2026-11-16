@@ -42,28 +42,20 @@ internal class LinearAuthorityQuery private constructor(
     }
 
     fun matches(
-        other: SourceProofContext,
-        cuts: Boolean = false,
-        cutMask: Set<Int>? = null,
+        other: SourceProofContext, cuts: Boolean = false, cutMask: Set<Int>? = null,
         checkUnselectedCuts: Boolean = true,
         retainMaskedCuts: Boolean = false,
     ): Boolean = this.cuts == cuts && this.cutMask == cutMask &&
         this.checkUnselectedCuts == checkUnselectedCuts && this.retainMaskedCuts == retainMaskedCuts &&
-        (
-            source === other ||
-                (
-                    source.scope == other.scope &&
-                        source.hasSameLinearData(other) &&
-                        source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
-                        source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker
-                    )
-            )
+        (source === other ||
+        (source.scope == other.scope &&
+            source.hasSameLinearData(other) &&
+            source.affineObjectiveAvailable == other.affineObjectiveAvailable &&
+            source.semantics == other.semantics && source.semanticsChecker === other.semanticsChecker))
 
     companion object {
         fun prepare(
-            source: SourceProofContext,
-            template: LinearAuthorityTemplate?,
-            cancellation: ExecutionControl,
+            source: SourceProofContext, template: LinearAuthorityTemplate?, cancellation: ExecutionControl,
             maximumCutProofSteps: Int = 100_000,
             onCutWork: (Long) -> Unit = {},
             cutMask: Set<Int>? = null,
@@ -77,9 +69,7 @@ internal class LinearAuthorityQuery private constructor(
             val premises = numeric.premises
             val integerBounds = if (premises.values.any { it.integerPins.isNotEmpty() }) {
                 numeric.integerPinBounds(source.scope.condition, cancellation) ?: return null
-            } else {
-                null
-            }
+            } else null
             val cited = ArrayList<Pair<SourceInequality, SourceDerivation>>()
             val inactive = HashSet<Int>()
             var unconditional = true
@@ -103,20 +93,15 @@ internal class LinearAuthorityQuery private constructor(
                 (checkUnselectedCuts || cutMask == null || id in cutMask) &&
                     cuts[id].owners.none { it in inactive }
             }
-            val checks = if (active.isEmpty()) {
-                emptyList()
-            } else {
+            val checks = if (active.isEmpty()) emptyList() else {
                 SourceEvidenceVerifier(numeric.atScope(source.scope), maximumSteps = maximumCutProofSteps)
-                    .verifyAll(
-                        active.map { id ->
-                            val cut = cuts[id]
-                            SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
-                        },
-                        ExecutionControl {
-                            cutVerificationWork++
-                            cancellation()
-                        },
-                    )
+                    .verifyAll(active.map { id ->
+                        val cut = cuts[id]
+                        SourceEvidence(source.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)
+                    }, ExecutionControl {
+                        cutVerificationWork++
+                        cancellation()
+                    })
             }
             onCutWork(cutVerificationWork)
             val accepted = active.indices.filter { checks[it] == SourceEvidenceCheck.Checked }
@@ -124,25 +109,19 @@ internal class LinearAuthorityQuery private constructor(
             val cutFamilies = HashMap<Int, CutFamily>()
             for ((id, cut) in cuts.withIndex()) {
                 if (cancellation()) return null
-                onCut(
-                    cut.family,
-                    when {
-                        !checkUnselectedCuts && cutMask != null && id !in cutMask -> "RETIRED_CANDIDATE"
-                        id !in active -> "INACTIVE_PREMISE"
-                        id !in accepted -> "VERIFICATION_DECLINED"
-                        cutMask != null && id !in cutMask -> "UNSELECTED"
-                        else -> "INSTALLED"
-                    },
-                    1L,
-                )
+                onCut(cut.family, when {
+                    !checkUnselectedCuts && cutMask != null && id !in cutMask -> "RETIRED_CANDIDATE"
+                    id !in active -> "INACTIVE_PREMISE"
+                    id !in accepted -> "VERIFICATION_DECLINED"
+                    cutMask != null && id !in cutMask -> "UNSELECTED"
+                    else -> "INSTALLED"
+                }, 1L)
                 if (cutMask != null && id !in cutMask && !retainMaskedCuts) continue
                 if (id in accepted && (cutMask == null || id in cutMask)) {
                     cutFamilies[cited.size] = cut.family
                     activeCuts++
                     if (cut.mixed) activeMixedCuts++
-                } else {
-                    inactive += cited.size
-                }
+                } else inactive += cited.size
                 cited += cut.inequality to cut.derivation
             }
             for (evidence in consequences) {
@@ -158,31 +137,21 @@ internal class LinearAuthorityQuery private constructor(
             }
             for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
                 val sign = if (upper) BigFraction.ONE else BigFraction.MINUS_ONE
-                for ((id, value) in bounds) {
-                    cited += SourceInequality(mapOf(id to sign), value * sign) to
-                        SourceDerivation.Assumption(id, upper)
-                }
+                for ((id, value) in bounds) cited += SourceInequality(mapOf(id to sign), value * sign) to
+                    SourceDerivation.Assumption(id, upper)
             }
             val indices = template?.indices ?: coordinates.withIndex().associate { it.value to it.index }
-            val rows = if (template == null) {
-                cited.map { it.first.row(indices) }
-            } else {
-                template.rows + cited.drop(template.rows.size).map { it.first.row(indices) }
-            }
-            val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) {
-                BigFraction.ONE
-            } else {
-                BigFraction.MINUS_ONE
-            }
+            val rows = if (template == null) cited.map { it.first.row(indices) }
+                else template.rows + cited.drop(template.rows.size).map { it.first.row(indices) }
+            val sign = if (source.scope.objective?.sense == ObjectiveSense.MINIMIZE) BigFraction.ONE
+                else BigFraction.MINUS_ONE
             val costs = coordinates.map { sign * (numeric.objective[it] ?: BigFraction.ZERO) }
-            return LinearAuthorityQuery(
-                source, coordinates, cited, rows, inactive,
+            return LinearAuthorityQuery(source, coordinates, cited, rows, inactive,
                 unconditional && (inactive.isEmpty() || retainMaskedCuts),
                 costs, numeric.objectiveConstant * sign, sign, template?.cuts != null, activeCuts, activeMixedCuts,
                 cutMask?.toSet(), checkUnselectedCuts, accepted.toSet(),
                 accepted.filterTo(HashSet()) { cutMask == null || it in cutMask },
-                cutFamilies.toMap(), retainMaskedCuts,
-            )
+                cutFamilies.toMap(), retainMaskedCuts)
         }
     }
 }

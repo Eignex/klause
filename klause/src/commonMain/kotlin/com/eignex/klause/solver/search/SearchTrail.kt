@@ -44,18 +44,14 @@ internal class SearchTrail {
             if (sample.retain(arrays, literals)) payload += literals.size.toLong() * Int.SIZE_BYTES
             sample.owned(literals, literals.size.toLong() * Int.SIZE_BYTES, protected = true)
         }
-        sample.record(
-            mapOf(
-                "sharedReasonPayloadBytes" to payload,
-                "sharedReasonIndexCapacityBytes" to boolReasons.primitiveCapacityBytes,
-                "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
-            ),
-        )
+        sample.record(mapOf(
+            "sharedReasonPayloadBytes" to payload,
+            "sharedReasonIndexCapacityBytes" to boolReasons.primitiveCapacityBytes,
+            "sharedReasonReferenceSlots" to boolReasons.referenceCapacity.toLong(),
+        ))
         sample.owned(boolReasons, boolReasons.primitiveCapacityBytes, protected = true)
         sample.ownedReferences(
-            boolReasons.valueStorageIdentity,
-            boolReasons.referenceCapacity.toLong(),
-            protected = true,
+            boolReasons.valueStorageIdentity, boolReasons.referenceCapacity.toLong(), protected = true,
         )
         sample.ownedReferences(pendingAssertions, pendingAssertions.capacity.toLong(), protected = true)
         for (assertion in pendingAssertions) {
@@ -161,7 +157,11 @@ internal class SearchTrail {
         return ComponentResult.Consistent
     }
 
-    fun updateIntFact(decision: SearchDecision, premise: SearchAtomPremise, context: SearchContext): ComponentResult {
+    fun updateIntFact(
+        decision: SearchDecision,
+        premise: SearchAtomPremise,
+        context: SearchContext,
+    ): ComponentResult {
         val variable = decision.intVariable()
         val prior = intFacts[variable]
         val values = when (decision) {

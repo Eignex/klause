@@ -29,8 +29,7 @@ internal class LinearBranchHistory {
     }
 
     fun select(
-        candidates: List<Pair<SourceCoordinate, BigFraction>>,
-        cancellation: ExecutionControl,
+        candidates: List<Pair<SourceCoordinate, BigFraction>>, cancellation: ExecutionControl,
     ): Pair<SourceCoordinate, BigFraction>? {
         var selected = candidates.firstOrNull()
         var best = 0.0

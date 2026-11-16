@@ -23,12 +23,10 @@ internal fun lowerQuadraticObjective(
     }
     fun multiply(left: QuadraticTerms, right: QuadraticTerms): QuadraticTerms? {
         val result = LinkedHashMap<List<Int>, BigFraction>()
-        for ((first, a) in left) {
-            for ((second, b) in right) {
-                step()
-                if (first.size + second.size > 2) return null
-                add(result, (first + second).sorted(), a * b)
-            }
+        for ((first, a) in left) for ((second, b) in right) {
+            step()
+            if (first.size + second.size > 2) return null
+            add(result, (first + second).sorted(), a * b)
         }
         return result
     }
@@ -56,26 +54,20 @@ internal fun lowerQuadraticObjective(
                 val value = BigFraction.of(node.numerator, node.denominator)
                 if (value == BigFraction.ZERO) emptyMap() else mapOf(emptyList<Int>() to value)
             }
-
             is PolynomialExpression.Variable -> {
                 if (node.id.index !in sourceVariables) return null
                 mapOf(listOf(node.id.index) to BigFraction.ONE)
             }
-
             is PolynomialExpression.Sum -> LinkedHashMap<List<Int>, BigFraction>().also { result ->
-                for (child in children) {
-                    for ((powers, coefficient) in values.getValue(child)) {
-                        add(result, powers, coefficient)
-                    }
+                for (child in children) for ((powers, coefficient) in values.getValue(child)) {
+                    add(result, powers, coefficient)
                 }
             }
-
             is PolynomialExpression.Product -> {
                 var product = unit
                 for (child in children) product = multiply(product, values.getValue(child)) ?: return null
                 product
             }
-
             is PolynomialExpression.Power -> {
                 var power = unit
                 var factor = values.getValue(node.base)
@@ -95,8 +87,7 @@ internal fun lowerQuadraticObjective(
     val objective = terms.filterKeys { it.isNotEmpty() }.map { (powers, coefficient) ->
         step()
         QuadraticObjectiveTerm(
-            QuadraticCoefficient.of(coefficient.num, coefficient.den),
-            sourceVariables.getValue(powers[0]),
+            QuadraticCoefficient.of(coefficient.num, coefficient.den), sourceVariables.getValue(powers[0]),
             powers.getOrNull(1)?.let(sourceVariables::getValue),
         )
     }

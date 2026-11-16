@@ -51,9 +51,7 @@ private class AffineIndexInference(
                 if (factor.isIndexRead(v)) {
                     indexUse[v] = true
                     if (factor is Element) elementUse[v] = true
-                } else {
-                    nonIndexCount[v]++
-                }
+                } else nonIndexCount[v]++
             }
         }
         for (fid in factors.indices) {
@@ -112,16 +110,12 @@ private class AffineIndexInference(
 
     private fun Factor.isIndexRead(v: Int): Boolean {
         return when (this) {
-            is Element -> idx == v && result != v && (
-                !arrIsVars || arr.none {
-                    if (cancellation.definitionStopped()) return false
-                    it == v.toLong()
-                }
-                )
-
+            is Element -> idx == v && result != v && (!arrIsVars || arr.none {
+                if (cancellation.definitionStopped()) return false
+                it == v.toLong()
+            })
             is ReifiedLinear -> op == LinearOp.EQ && vars.size == 1 && vars[0] == v &&
                 integerConstants?.coeff(0) == 1L
-
             else -> false
         }
     }

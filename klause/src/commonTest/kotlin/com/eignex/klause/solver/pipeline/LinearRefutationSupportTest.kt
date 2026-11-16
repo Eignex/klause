@@ -21,13 +21,8 @@ class LinearRefutationSupportTest {
     fun `stopped support selection should not publish a partial reason`() {
         val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
         session.initialize()
-        val x = assertNotNull(
-            SourceBoundAtom.integerSplit(
-                session,
-                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
-                BigFraction.ZERO,
-            ),
-        )
+        val x = assertNotNull(SourceBoundAtom.integerSplit(session,
+            listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), BigFraction.ZERO))
 
         val selected = linearRefutationSupport(SourceCondition(), emptyList(), SourceCondition(), x.negative) {
             false
@@ -41,50 +36,24 @@ class LinearRefutationSupportTest {
         for (endpoint in listOf(BigFraction.ZERO, BigFraction.MINUS_ONE, BigFraction.ONE)) {
             val session = SearchSession(emptyList(), atoms = SearchAtomRegistry(0))
             session.initialize()
-            val x = assertNotNull(
-                SourceBoundAtom.integerSplit(
-                    session,
-                    listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)),
-                    endpoint,
-                ),
-            )
-            val y = assertNotNull(
-                SourceBoundAtom.integerSplit(
-                    session,
-                    listOf(SourceBoundTerm(SearchIntValue(1), BigFraction.ONE)),
-                    BigFraction.ZERO,
-                ),
-            )
-            val z = assertNotNull(
-                SourceBoundAtom.integerSplit(
-                    session,
-                    listOf(SourceBoundTerm(SearchIntValue(2), BigFraction.ONE)),
-                    BigFraction.ZERO,
-                ),
-            )
+            val x = assertNotNull(SourceBoundAtom.integerSplit(session,
+                listOf(SourceBoundTerm(SearchIntValue(0), BigFraction.ONE)), endpoint))
+            val y = assertNotNull(SourceBoundAtom.integerSplit(session,
+                listOf(SourceBoundTerm(SearchIntValue(1), BigFraction.ONE)), BigFraction.ZERO))
+            val z = assertNotNull(SourceBoundAtom.integerSplit(session,
+                listOf(SourceBoundTerm(SearchIntValue(2), BigFraction.ONE)), BigFraction.ZERO))
             val assertions = listOf(SearchDecision.Theory(z.positive), SearchDecision.Theory(x.positive))
             assertions.forEach { session.push(it) }
-            val support = SourceCondition(
-                upper = mapOf(
-                    SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ZERO,
-                    SourceCoordinate(SourceCoordinate.Kind.Integer, 1) to BigFraction.ZERO,
-                ),
-            )
+            val support = SourceCondition(upper = mapOf(
+                SourceCoordinate(SourceCoordinate.Kind.Integer, 0) to BigFraction.ZERO,
+                SourceCoordinate(SourceCoordinate.Kind.Integer, 1) to BigFraction.ZERO))
 
             val selected = linearRefutationSupport(SourceCondition(), assertions, support, y.negative)
 
-            if (endpoint > BigFraction.ZERO) {
-                assertNull(selected)
-            } else {
+            if (endpoint > BigFraction.ZERO) assertNull(selected) else {
                 assertEquals(listOf(assertions.last()), selected)
-                val reason = assertNotNull(
-                    session.explainAtoms(
-                        SearchAtomPremise.All(
-                            assertNotNull(selected).map { SearchAtomPremise.Asserted(it) },
-                        ),
-                        SearchDecision.Theory(y.negative),
-                    ),
-                )
+                val reason = assertNotNull(session.explainAtoms(SearchAtomPremise.All(
+                    assertNotNull(selected).map { SearchAtomPremise.Asserted(it) }), SearchDecision.Theory(y.negative)))
                 assertEquals(setOf(y.negative.literal, x.negative.literal), reason.literals.toSet())
             }
         }

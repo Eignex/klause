@@ -30,16 +30,10 @@ class LpPassiveVariableChoiceTest {
     @Test
     fun `a matching passive commitment is attributed once`() {
         for ((baseline, proposal, decision) in listOf(
-            Triple(
-                LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25),
-                LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 1.75),
-                SearchDecision.IntAtLeast(1, 2L),
-            ),
-            Triple(
-                LpPassiveVariableChoice.Candidate(VarRef.Bool(0), 0.25),
-                LpPassiveVariableChoice.Candidate(VarRef.Bool(1), 0.75),
-                SearchDecision.Bool(2),
-            ),
+            Triple(LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25),
+                LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 1.75), SearchDecision.IntAtLeast(1, 2L)),
+            Triple(LpPassiveVariableChoice.Candidate(VarRef.Bool(0), 0.25),
+                LpPassiveVariableChoice.Candidate(VarRef.Bool(1), 0.75), SearchDecision.Bool(2)),
         )) {
             val events = ArrayList<String>()
             val choice = LpPassiveVariableChoice(true, events::add, {})
@@ -79,10 +73,7 @@ class LpPassiveVariableChoiceTest {
             val events = ArrayList<String>()
             val choice = LpPassiveVariableChoice(true, events::add, { if (!duringRead) fresh = false })
 
-            val selected = choice.select(proposal, baseline, 1, { fresh }, {
-                fresh = false
-                true
-            })
+            val selected = choice.select(proposal, baseline, 1, { fresh }, { fresh = false; true })
 
             assertEquals(baseline.variable, selected)
             assertNull(choice.nominatedVariable)
@@ -121,13 +112,8 @@ class LpPassiveVariableChoiceTest {
         )) {
             val events = ArrayList<String>()
             val choice = LpPassiveVariableChoice(true, events::add, {})
-            choice.select(
-                LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75),
-                LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25),
-                1,
-                { true },
-                { true },
-            )
+            choice.select(LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75),
+                LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25), 1, { true }, { true })
             choice.branch(variable, stamp)
 
             choice.commit(decision)
@@ -141,13 +127,8 @@ class LpPassiveVariableChoiceTest {
     fun `clearing a passive nomination prevents its commitment`() {
         val events = ArrayList<String>()
         val choice = LpPassiveVariableChoice(true, events::add, {})
-        choice.select(
-            LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75),
-            LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25),
-            1,
-            { true },
-            { true },
-        )
+        choice.select(LpPassiveVariableChoice.Candidate(VarRef.IntVar(1), 0.75),
+            LpPassiveVariableChoice.Candidate(VarRef.IntVar(0), 0.25), 1, { true }, { true })
         choice.branch(VarRef.IntVar(1), 1)
 
         choice.clear()

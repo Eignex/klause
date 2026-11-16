@@ -48,41 +48,29 @@ import kotlin.test.assertTrue
 class FinitePipelineTest {
     @Test
     fun `disabled source templates should leave presolve LP solving active`() {
-        val source = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 10) },
-            arrayOf<Factor>(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
-                Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
-            ),
-        )
+        val source = Problem(0, 4, Array(4) { IntDomain(0, 10) }, arrayOf<Factor>(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
+            Linear(intArrayOf(1, 1), intArrayOf(2, 3), LinearOp.GE, 3),
+        ))
 
-        val result = FinitePipeline.prepare(
-            FinitePipelineRequest(
-                source,
-                FiniteEngine.BACKTRACK,
-                objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1)),
-                presolveConfig = PresolveConfig.parse("off,+lp-harvest"),
-                sourcePreparation = LpSourcePreparation.DISABLED,
-            ),
-        )
+        val result = FinitePipeline.prepare(FinitePipelineRequest(
+            source, FiniteEngine.BACKTRACK,
+            objective = LinearObjective(intCoefficients = longArrayOf(1, 1, 1, 1)),
+            presolveConfig = PresolveConfig.parse("off,+lp-harvest"),
+            sourcePreparation = LpSourcePreparation.DISABLED,
+        ))
 
         val stats = assertNotNull(result.presolve).lpStats
         assertTrue(stats.rootPasses.sum > 0.0)
         assertTrue(stats.phases.keys.none { it.startsWith("TEMPLATE_PREPARATION_") })
-        assertTrue(
-            stats.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
-                .all { phase -> phase.outcomes.values.all { it == 0L } },
-        )
+        assertTrue(stats.phases.filterKeys { it.startsWith("TEMPLATE_ASSEMBLY_") }.values
+            .all { phase -> phase.outcomes.values.all { it == 0L } })
     }
 
     @Test
     fun `completed root SAC refutations should survive finite projection and optional stops`() {
         val source = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 1) },
+            0, 3, Array(3) { IntDomain(0, 1) },
             listOf(
                 Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
                 Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
@@ -90,10 +78,7 @@ class FinitePipelineTest {
             ),
         )
         val specs = listOf(
-            "default",
-            "off,+probe-int-holes",
-            "off,+probe-int-holes,+strengthen",
-            "default,+probe-int-holes",
+            "default", "off,+probe-int-holes", "off,+probe-int-holes,+strengthen", "default,+probe-int-holes",
         )
         for (spec in specs) {
             for (stopAfterRefutation in listOf(false, true)) {
@@ -104,12 +89,8 @@ class FinitePipelineTest {
 
                 val preparation = FinitePipeline.prepare(
                     FinitePipelineRequest(
-                        source,
-                        FiniteEngine.BACKTRACK,
-                        presolveConfig = PresolveConfig.parse(spec),
-                        cancellation = token,
-                        solveCancellation = ExecutionControl.Never,
-                        presolveBudget = budget,
+                        source, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.parse(spec),
+                        cancellation = token, solveCancellation = ExecutionControl.Never, presolveBudget = budget,
                     ),
                 )
 
@@ -124,9 +105,7 @@ class FinitePipelineTest {
     @Test
     fun `interrupted root SAC should leave finite preparation indeterminate`() {
         val source = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 1) },
+            0, 3, Array(3) { IntDomain(0, 1) },
             listOf(
                 Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
                 Table(intArrayOf(1, 2), longArrayOf(0, 1, 1, 0)),
@@ -138,11 +117,9 @@ class FinitePipelineTest {
 
             val preparation = FinitePipeline.prepare(
                 FinitePipelineRequest(
-                    source,
-                    FiniteEngine.BACKTRACK,
-                    presolveConfig = PresolveConfig.parse(spec),
-                    cancellation = ExecutionControl { budget.probeCalls > 0L },
-                    solveCancellation = ExecutionControl.Never,
+                    source, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.parse(spec),
+                    cancellation = ExecutionControl { budget.probeCalls > 0L }, solveCancellation =
+                        ExecutionControl.Never,
                     presolveBudget = budget,
                 ),
             )
@@ -156,20 +133,15 @@ class FinitePipelineTest {
     @Test
     fun `the engine bake should report containing work after the elective allowance is spent`() {
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 5) },
+            0, 2, Array(2) { IntDomain(0, 5) },
             arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
         val budget = PresolveBudget(0L)
 
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-                problem,
-                FiniteEngine.BACKTRACK,
-                presolveConfig = PresolveConfig.NONE,
-                cancellation = budget.orSpent(ExecutionControl.Never),
-                solveCancellation = ExecutionControl.Never,
+                problem, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
+                cancellation = budget.orSpent(ExecutionControl.Never), solveCancellation = ExecutionControl.Never,
                 presolveBudget = budget,
             ),
         )
@@ -189,8 +161,7 @@ class FinitePipelineTest {
 
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-                problem,
-                FiniteEngine.BACKTRACK,
+                problem, FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.parse("off,+strengthen"),
                 presolveBudget = budget,
             ),
@@ -203,8 +174,7 @@ class FinitePipelineTest {
         assertTrue(effort.invocations.isNotEmpty())
         assertTrue(effort.invocations.all { it.outcome == PresolveInvocationOutcome.COMPLETE_MISS })
         assertEquals(
-            setOf(PresolveLane.SOURCE, PresolveLane.FINITE),
-            effort.invocations.map { it.lane }.toSet(),
+            setOf(PresolveLane.SOURCE, PresolveLane.FINITE), effort.invocations.map { it.lane }.toSet(),
         )
         assertEquals(budget.spent(), effort.work)
     }
@@ -216,8 +186,7 @@ class FinitePipelineTest {
 
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-                problem,
-                FiniteEngine.BACKTRACK,
+                problem, FiniteEngine.BACKTRACK,
                 presolveConfig = PresolveConfig.parse("off,+strengthen"),
                 cancellation = budget.orSpent(ExecutionControl.Never),
                 solveCancellation = ExecutionControl.Never,
@@ -466,10 +435,8 @@ class FinitePipelineTest {
     fun `explicit comparison folding should fold a disjunction over 0-1 columns`() {
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-                binaryDisjunction(),
-                FiniteEngine.BACKTRACK,
-                presolveConfig = PresolveConfig.parse("default,+comparison-clause"),
-                explicitPresolveConfig = true,
+                binaryDisjunction(), FiniteEngine.BACKTRACK,
+                presolveConfig = PresolveConfig.parse("default,+comparison-clause"), explicitPresolveConfig = true,
             ),
         )
 

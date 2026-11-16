@@ -100,11 +100,9 @@ class FlatZincProgram(
         semantics: EffectiveSourceSemantics = this.semantics,
         definitionHints: List<DefinitionHint> = this.definitionHints,
     ): FlatZincProgram {
-        val copied = FlatZincProgram(
-            problem, solve, boolVarsByName, intVarsByName, floatVarsByName,
+        val copied = FlatZincProgram(problem, solve, boolVarsByName, intVarsByName, floatVarsByName,
             arraysByName, outputItems, searchHints, enumLabelsByVar, setVarsByName, floatRepresentations,
-            semantics, definitionHints,
-        )
+            semantics, definitionHints)
         retainedSource?.copyFor(copied)?.let { copied.retainSource(it) }
         return copied
     }
@@ -163,8 +161,7 @@ class FlatZincProgram(
     }
 
     override fun toString(): String = publicFields().zip(FIELD_NAMES).joinToString(
-        prefix = "FlatZincProgram(",
-        postfix = ")",
+        prefix = "FlatZincProgram(", postfix = ")",
     ) { (value, name) -> "$name=$value" }
 
     private companion object {

@@ -18,18 +18,10 @@ internal val flatZincSetGlobalCases: List<Triple<String, String, String?>> = lis
     Triple("set_lt", "set_lt({},s)$SET_MEMBERSHIP", null),
     Triple("set_lt_reif", "set_lt_reif({},{1},b); constraint bool2int(b,x)", null),
     Triple("array_set_element", "array_set_element(x,[{1},{}],{1})", "Element"),
-    Triple(
-        "array_var_set_element",
-        "array_var_set_element(x,[s,t],{1}); " +
-            "constraint set_eq(s,{1}); constraint set_eq(t,{})",
-        "Element",
-    ),
-    Triple(
-        "all_disjoint",
-        "all_disjoint([s,{1}]); constraint set_in_reif(1,s,b); " +
-            "constraint bool_not(b,c); constraint bool2int(c,x)",
-        null,
-    ),
+    Triple("array_var_set_element", "array_var_set_element(x,[s,t],{1}); " +
+        "constraint set_eq(s,{1}); constraint set_eq(t,{})", "Element"),
+    Triple("all_disjoint", "all_disjoint([s,{1}]); constraint set_in_reif(1,s,b); " +
+        "constraint bool_not(b,c); constraint bool2int(c,x)", null),
     Triple("set_partition_into", "set_partition_into([s],{1})$SET_MEMBERSHIP", null),
     Triple("set_in_reif-false", "set_in_reif(1,{},b)$NEGATED_SET_RESULT", null),
     Triple("set_subset_reif-false", "set_subset_reif({1},{},b)$NEGATED_SET_RESULT", null),

@@ -56,20 +56,11 @@ internal class SmtLibPolynomialProblem(
     val boolVarNames: Map<String, Int> get() = bools.toMap()
 }
 
-internal fun SmtLibPolynomialProblem.realSource(
-    semantics: EffectiveSourceSemantics = smtLibSemantics.resolve(),
-): PolynomialRealProblem {
+internal fun SmtLibPolynomialProblem.realSource(semantics: EffectiveSourceSemantics = smtLibSemantics.resolve()):
+    PolynomialRealProblem {
     require(intVarNames.isEmpty()) { "real source contains integer declarations" }
-    return PolynomialRealProblem(
-        formula,
-        realCount,
-        boolCount,
-        sourceRealCount,
-        sourceBoolCount,
-        realVarNames,
-        boolVarNames,
-        semantics,
-    )
+    return PolynomialRealProblem(formula, realCount, boolCount, sourceRealCount, sourceBoolCount,
+        realVarNames, boolVarNames, semantics)
 }
 
 internal object SmtLibPolynomial {
@@ -80,11 +71,7 @@ internal object SmtLibPolynomial {
         allowIntegers: Boolean,
         allowFunctions: Boolean,
     ): SmtLibPolynomialProblem = parse(
-        text,
-        cancellation,
-        allowIntegers,
-        allowFunctions,
-        smtLibSemantics.resolve(),
+        text, cancellation, allowIntegers, allowFunctions, smtLibSemantics.resolve(),
     )
 
     fun parse(
@@ -93,11 +80,7 @@ internal object SmtLibPolynomial {
         allowIntegers: Boolean,
         allowFunctions: Boolean,
     ): SmtLibPolynomialProblem = parse(
-        source,
-        cancellation,
-        allowIntegers,
-        allowFunctions,
-        smtLibSemantics.resolve(),
+        source, cancellation, allowIntegers, allowFunctions, smtLibSemantics.resolve(),
     )
 
     fun parse(
@@ -106,7 +89,8 @@ internal object SmtLibPolynomial {
         allowIntegers: Boolean = false,
         allowFunctions: Boolean = false,
         semantics: EffectiveSourceSemantics = smtLibSemantics.resolve(),
-    ): SmtLibPolynomialProblem = parse(StringCharSource(text), cancellation, allowIntegers, allowFunctions, semantics)
+    ): SmtLibPolynomialProblem =
+        parse(StringCharSource(text), cancellation, allowIntegers, allowFunctions, semantics)
 
     fun parse(
         source: CharSource,
@@ -159,7 +143,6 @@ internal class SmtLibPolynomialCompiler(
                 command.polynomialSize(3)
                 declare(command.polynomialName(1), command.polynomialAtom(2))
             }
-
             "declare-fun" -> {
                 command.polynomialSize(4)
                 val parameters = command.items[2] as? SExpr.SList ?: smtUnsupported("malformed declare-fun arguments")
@@ -168,40 +151,32 @@ internal class SmtLibPolynomialCompiler(
                 }
                 declare(command.polynomialName(1), command.polynomialAtom(3))
             }
-
             "define-fun" -> define(command)
-
             "assert" -> {
                 command.polynomialSize(2)
                 assertions.add(command.items[1] to environment)
             }
-
             "minimize", "maximize" -> {
                 command.polynomialSize(2)
                 if (objective != null) smtUnsupported("multiple polynomial objectives are unsupported")
                 objective = command.items[1] to environment
                 objectiveSense = if (head == "minimize") ObjectiveSense.MINIMIZE else ObjectiveSense.MAXIMIZE
             }
-
             "set-logic" -> {
                 command.polynomialSize(2)
                 command.polynomialName(1)
             }
-
             "set-info", "set-option" -> command.polynomialSize(3)
-
             "check-sat" -> {
                 command.polynomialSize(1)
                 querySeen = true
             }
-
             "check-sat-assuming" -> {
                 command.polynomialSize(2)
                 val assumptions = command.items[1] as? SExpr.SList ?: smtUnsupported("malformed polynomial assumptions")
                 for (assumption in assumptions.items) {
                     val atom = when (assumption) {
                         is SExpr.Atom -> assumption
-
                         is SExpr.SList -> {
                             assumption.polynomialSize(2)
                             if (assumption.polynomialHead() != "not") {
@@ -218,19 +193,15 @@ internal class SmtLibPolynomialCompiler(
                 }
                 querySeen = true
             }
-
             "get-model" -> command.polynomialSize(1)
-
             "get-objectives" -> {
                 command.polynomialSize(1)
                 if (objective == null) smtUnsupported("get-objectives requires an objective")
             }
-
             "exit" -> {
                 command.polynomialSize(1)
                 exited = true
             }
-
             else -> smtUnsupported("unsupported polynomial command '$head'")
         }
     }
@@ -239,27 +210,18 @@ internal class SmtLibPolynomialCompiler(
         val conditionals = ArrayList<PolynomialConditional>()
         var functions: FunctionSourceLowering? = null
         val captureConditional: ((PolynomialConditional) -> Unit)? =
-            if (objective == null && !functionSyntax) {
-                null
-            } else {
-                { conditional ->
-                    conditionals.add(conditional)
-                    functions?.capture(conditional)
-                }
-            }
+            if (objective == null && !functionSyntax) null else {
+            conditional ->
+            conditionals.add(conditional)
+            functions?.capture(conditional)
+        }
         var lowering = PolynomialRealLowering(numericCount, captureConditional)
         if (functionSyntax) functions = FunctionSourceLowering(lowering, numericCount, boolNames.size, cancellation)
         var evaluator = SmtLibPolynomialEvaluator(
-            lowering,
-            allowWidePowers = allowIntegers,
-            cancellation = cancellation,
-            functions = functions,
+            lowering, allowWidePowers = allowIntegers, cancellation = cancellation, functions = functions,
         )
         val declarationBounds = smtPolynomialDeclarationBounds(
-            semantics,
-            intNames.values,
-            realNames.values,
-            cancellation,
+            semantics, intNames.values, realNames.values, cancellation,
         )
         var formulas = assertions.map { (expression, environment) ->
             evaluator.evaluate(expression, environment).boolean()
@@ -271,13 +233,8 @@ internal class SmtLibPolynomialCompiler(
         val sourceFunctions = functions
         if (sourceFunctions?.hasFunctions == true) {
             val source = TranscendentalProblem(
-                sourceFunctions.formula(PolynomialRealFormula.And(formulas)),
-                intNames,
-                realNames,
-                boolNames,
-                objectiveValue?.let { sourceFunctions.expression(it.expression) },
-                objectiveSense,
-                semantics,
+                sourceFunctions.formula(PolynomialRealFormula.And(formulas)), intNames, realNames, boolNames,
+                objectiveValue?.let { sourceFunctions.expression(it.expression) }, objectiveSense, semantics,
             )
             return SmtLibPolynomialProblem(
                 lowering.formula(formulas), lowering.realCount, sourceFunctions.boolCount, numericCount, boolNames.size,
@@ -291,9 +248,7 @@ internal class SmtLibPolynomialCompiler(
             conditionals.clear()
             lowering = PolynomialRealLowering(numericCount, captureConditional)
             evaluator = SmtLibPolynomialEvaluator(
-                lowering,
-                allowWidePowers = allowIntegers,
-                cancellation = cancellation,
+                lowering, allowWidePowers = allowIntegers, cancellation = cancellation,
             )
             formulas = assertions.map { (expression, environment) ->
                 evaluator.evaluate(expression, environment).boolean()
@@ -305,13 +260,7 @@ internal class SmtLibPolynomialCompiler(
         }
         val captured = objectiveValue?.let {
             SmtLibQuadraticObjective.capture(
-                it.expression,
-                intNames,
-                realNames,
-                boolNames.size,
-                lowering.realCount,
-                conditionals,
-                cancellation,
+                it.expression, intNames, realNames, boolNames.size, lowering.realCount, conditionals, cancellation,
             )
         }
         return SmtLibPolynomialProblem(
@@ -325,14 +274,11 @@ internal class SmtLibPolynomialCompiler(
         unusedName(name)
         val value = when (sort) {
             "Real" -> PolynomialValue.Real.variable(numericCount).also { realNames[name] = numericCount }
-
             "Int" -> {
                 if (!allowIntegers) smtUnsupported("unsupported polynomial sort 'Int'")
                 PolynomialValue.Real.variable(numericCount, integer = true).also { intNames[name] = numericCount }
             }
-
             "Bool" -> PolynomialValue.Boolean.variable(boolNames.size).also { boolNames[name] = boolNames.size }
-
             else -> smtUnsupported("unsupported polynomial sort '$sort'")
         }
         bindings.declare(name, value)
@@ -359,43 +305,24 @@ internal class SmtLibPolynomialCompiler(
         val resultSort = polynomialSort(command.polynomialAtom(3))
         if (resultSort == Sort.INT && !allowIntegers) smtUnsupported("unsupported polynomial sort 'Int'")
         val macro = PolynomialMacro(
-            names,
-            sorts,
-            resultSort,
-            command.items[4],
+            names, sorts, resultSort, command.items[4],
             environment,
         )
         val parametersForValidation = names.mapIndexed { index, parameter ->
-            parameter to if (sorts[index] == Sort.BOOL) {
-                PolynomialValue.Boolean.variable(index)
-            } else {
-                PolynomialValue.Real.variable(index, integer = sorts[index] == Sort.INT)
-            }
+            parameter to if (sorts[index] == Sort.BOOL) PolynomialValue.Boolean.variable(index)
+            else PolynomialValue.Real.variable(index, integer = sorts[index] == Sort.INT)
         }.toMap()
         val validationLowering = PolynomialRealLowering(numericCount + names.size)
-        val validationFunctions = if (allowFunctions && functionSyntax) {
-            FunctionSourceLowering(
-                validationLowering,
-                numericCount + names.size,
-                boolNames.size + names.size,
-                cancellation,
-            )
-        } else {
-            null
-        }
+        val validationFunctions = if (allowFunctions && functionSyntax) FunctionSourceLowering(
+            validationLowering, numericCount + names.size, boolNames.size + names.size, cancellation,
+        ) else null
         val value = SmtLibPolynomialEvaluator(
-            validationLowering,
-            validateOnly = true,
-            allowWidePowers = allowIntegers,
-            cancellation = cancellation,
-            functions = validationFunctions,
+            validationLowering, validateOnly = true,
+            allowWidePowers = allowIntegers, cancellation = cancellation, functions = validationFunctions,
         ).evaluate(
-            macro.body,
-            macro.environment.withValues(parametersForValidation),
+            macro.body, macro.environment.withValues(parametersForValidation),
         )
-        if (macro.resultSort == Sort.BOOL) {
-            value.boolean()
-        } else if (value !is PolynomialValue.Real ||
+        if (macro.resultSort == Sort.BOOL) value.boolean() else if (value !is PolynomialValue.Real ||
             (macro.resultSort == Sort.INT && !value.integer)
         ) {
             smtUnsupported("polynomial macro result must be Real")
@@ -442,8 +369,10 @@ internal fun SExpr.SList.polynomialName(index: Int): String {
     return text
 }
 
-private class PolynomialSourceInput(private val source: CharSource, private val cancellation: ExecutionControl) :
-    CharSource {
+private class PolynomialSourceInput(
+    private val source: CharSource,
+    private val cancellation: ExecutionControl,
+) : CharSource {
     private var chunk = ""
     private var offset = 0
 
@@ -465,7 +394,6 @@ private fun SExpr.hasFunctionSyntax(cancellation: ExecutionControl): Boolean {
         cancellation.polynomialSourceCheckpoint()
         when (val node = pending.removeLast()) {
             is SExpr.Atom -> if (node.text == "pi") return true
-
             is SExpr.SList -> {
                 val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
                 if (head in setOf("exp", "log", "sin", "cos", "pi")) return true

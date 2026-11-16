@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.util.arrays.emptyIntArray
 
+
 /**
  * A constraint learned during search and stored in the [LearnedClauseDb]: a [Propagator] that also
  * exposes its variable footprint, which conflict-factor extraction ([PropagationState.extractConflictFactors])

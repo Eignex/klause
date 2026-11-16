@@ -60,9 +60,7 @@ internal class ComponentLpDeductionCache(size: Int) {
             }
             if (state.model.objective.scale.value != BigFraction.ONE ||
                 !state.model.objective.externalConstant.value.isZero || !model.hasIntegralObjective()
-            ) {
-                return null
-            }
+            ) return null
             if (duals.size != model.m) return null
             val scaleBits = dualRoundingScaleBits(duals, inspect = meter::step) ?: return null
             meter.poll()
@@ -84,18 +82,9 @@ internal class ComponentLpDeductionCache(size: Int) {
                 val alternatives = ArrayList<LpDeductionCertificate>(2)
                 var primary = try {
                     nodeDualCertificate(
-                        part.model,
-                        result.duals,
-                        cancellation,
-                        observer,
-                        onAdditionalCertificate = if (withAlternatives) {
-                            { alternatives.add(it) }
-                        } else {
-                            null
-                        },
-                        sharedMeter = meter,
-                        scaleBits = scaleBits,
-                        requireIntegerPrimary = true,
+                        part.model, result.duals, cancellation, observer,
+                        onAdditionalCertificate = if (withAlternatives) { { alternatives.add(it) } } else null,
+                        sharedMeter = meter, scaleBits = scaleBits, requireIntegerPrimary = true,
                     )
                 } finally {
                     childWork += meter.work - beforeWork
@@ -133,13 +122,8 @@ internal class ComponentLpDeductionCache(size: Int) {
                     owners[column] = index
                     locals[column] = part.model.slackCol(row)
                 }
-                bound = meter.add(
-                    bound,
-                    meter.add(
-                        children[index].primary.exactObjectiveBound(),
-                        part.model.exactConstant().negated(),
-                    ),
-                )
+                bound = meter.add(bound, meter.add(children[index].primary.exactObjectiveBound(),
+                    part.model.exactConstant().negated()))
             }
             for (column in isolated) {
                 meter.step()
@@ -153,24 +137,14 @@ internal class ComponentLpDeductionCache(size: Int) {
             }
             val primary = CompositeDeduction(state, parts, children, owners, locals, bound)
             val alternatives = ArrayList<LpDeductionCertificate>()
-            for (index in children.indices) {
-                for (alternative in children[index].alternatives) {
-                    meter.reserve(160L)
-                    val alternativeBound = meter.add(
-                        meter.add(bound, children[index].primary.exactObjectiveBound().negated()),
-                        alternative.exactObjectiveBound(),
-                    )
-                    alternatives += CompositeDeduction(
-                        state,
-                        parts,
-                        children,
-                        owners,
-                        locals,
-                        alternativeBound,
-                        index,
-                        alternative,
-                    )
-                }
+            for (index in children.indices) for (alternative in children[index].alternatives) {
+                meter.reserve(160L)
+                val alternativeBound = meter.add(
+                    meter.add(bound, children[index].primary.exactObjectiveBound().negated()),
+                    alternative.exactObjectiveBound(),
+                )
+                alternatives += CompositeDeduction(state, parts, children, owners, locals, alternativeBound,
+                    index, alternative)
             }
             meter.poll()
             accepted = true
@@ -179,11 +153,8 @@ internal class ComponentLpDeductionCache(size: Int) {
             return null
         } finally {
             timer.finish("COMPONENT_${if (accepted) "COMPLETE" else "DECLINED"}", meter.work - initialWork - childWork)
-            observer?.observe(
-                LpCertifier.INTEGER,
-                accepted,
-                LpCertifierCost.Metered(meter.work - initialWork - childWork),
-            )
+            observer?.observe(LpCertifier.INTEGER, accepted,
+                LpCertifierCost.Metered(meter.work - initialWork - childWork))
         }
     }
 

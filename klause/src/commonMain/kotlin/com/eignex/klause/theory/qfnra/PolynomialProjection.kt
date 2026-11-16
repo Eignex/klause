@@ -44,15 +44,8 @@ internal class PolynomialProjection private constructor(
             nonzeroVariables: Set<Int> = emptySet(),
             nonzeroPolynomials: List<Polynomial> = emptyList(),
         ): PolynomialProjection {
-            val pending = prepare(
-                polynomials,
-                variableCount,
-                arithmetic,
-                requiredZeroes,
-                preferredOrder,
-                nonzeroVariables,
-                nonzeroPolynomials,
-            )
+            val pending = prepare(polynomials, variableCount, arithmetic,
+                requiredZeroes, preferredOrder, nonzeroVariables, nonzeroPolynomials)
             while (true) pending.next()?.let { return it }
         }
 
@@ -98,11 +91,9 @@ internal class PolynomialProjection private constructor(
                 require(variable in 0 until variableCount)
             }
             val inputs = HashSet<Polynomial>()
-            if (requiredZeroes.isNotEmpty() || nonzeroPolynomials.isNotEmpty()) {
-                for (polynomial in polynomials) {
-                    arithmetic.step()
-                    inputs.add(polynomial)
-                }
+            if (requiredZeroes.isNotEmpty() || nonzeroPolynomials.isNotEmpty()) for (polynomial in polynomials) {
+                arithmetic.step()
+                inputs.add(polynomial)
             }
             for (equation in requiredZeroes) {
                 arithmetic.step()
@@ -120,40 +111,22 @@ internal class PolynomialProjection private constructor(
             for (level in variableCount - 1 downTo 0) {
                 arithmetic.step()
                 if (exclusions == null || inconsistentEquations(equations, arithmetic)) {
-                    yield(
-                        PolynomialProjection(
-                            Array(variableCount) { emptyList() },
-                            IntArray(variableCount) { it },
-                            arrayOfNulls(variableCount),
-                            arrayOfNulls(variableCount),
-                            arithmetic,
-                            true,
-                            sectionCount,
-                        ),
-                    )
+                    yield(PolynomialProjection(Array(variableCount) { emptyList() },
+                        IntArray(variableCount) { it }, arrayOfNulls(variableCount),
+                        arrayOfNulls(variableCount), arithmetic, true, sectionCount))
                     return@sequence
                 }
                 equations = projectionFamily(equations, arithmetic)
                 val section = equationalSection(equations, pending, arithmetic)
                 if (section != null && section.variable in nonzero && section.replacement.isZero) {
-                    yield(
-                        PolynomialProjection(
-                            Array(variableCount) { emptyList() },
-                            IntArray(variableCount) { it },
-                            arrayOfNulls(variableCount),
-                            arrayOfNulls(variableCount),
-                            arithmetic,
-                            true,
-                            sectionCount,
-                        ),
-                    )
+                    yield(PolynomialProjection(Array(variableCount) { emptyList() },
+                        IntArray(variableCount) { it }, arrayOfNulls(variableCount),
+                        arrayOfNulls(variableCount), arithmetic, true, sectionCount))
                     return@sequence
                 }
                 val root = if (section == null) {
                     rootSection(equations, preference, available, nonzero, arithmetic)
-                } else {
-                    null
-                }
+                } else null
                 while (fallback >= 0 && !available[order[fallback]]) {
                     arithmetic.step()
                     fallback--
@@ -181,9 +154,7 @@ internal class PolynomialProjection private constructor(
                         arithmetic.step()
                         val value = if (variable in polynomial.variables) {
                             arithmetic.substitute(polynomial, variable, section.replacement)
-                        } else {
-                            polynomial
-                        }
+                        } else polynomial
                         rewritten[polynomial] = value
                         projected.add(value)
                         yield(null)
@@ -213,11 +184,9 @@ internal class PolynomialProjection private constructor(
                         if (variable !in equation.variables) lowerEquations.add(equation)
                     }
                     var independent = true
-                    for (polynomial in top) {
-                        for (coordinate in polynomial.variables) {
-                            arithmetic.step()
-                            if (coordinate != variable) independent = false
-                        }
+                    for (polynomial in top) for (coordinate in polynomial.variables) {
+                        arithmetic.step()
+                        if (coordinate != variable) independent = false
                     }
                     if (independent) {
                         // Rational univariate boundaries contribute no lower-coordinate projection.
@@ -234,38 +203,17 @@ internal class PolynomialProjection private constructor(
                         if (projected == null) yield(null)
                     }
                     equations = lowerEquations + projected.equations
-                    pending = boundaryFamily(
-                        lower + projected.polynomials,
-                        equations + exclusions.orEmpty(),
-                        arithmetic,
-                    )
+                    pending = boundaryFamily(lower + projected.polynomials,
+                        equations + exclusions.orEmpty(), arithmetic)
                 }
             }
             arithmetic.step()
             if (exclusions == null || inconsistentEquations(equations, arithmetic)) {
-                yield(
-                    PolynomialProjection(
-                        Array(variableCount) { emptyList() },
-                        IntArray(variableCount) { it },
-                        arrayOfNulls(variableCount),
-                        arrayOfNulls(variableCount),
-                        arithmetic,
-                        true,
-                        sectionCount,
-                    ),
-                )
-            } else {
-                yield(
-                    PolynomialProjection(
-                        levels,
-                        variables,
-                        sections,
-                        roots,
-                        arithmetic,
-                        equationalSections = sectionCount,
-                    ),
-                )
-            }
+                yield(PolynomialProjection(Array(variableCount) { emptyList() },
+                    IntArray(variableCount) { it }, arrayOfNulls(variableCount),
+                    arrayOfNulls(variableCount), arithmetic, true, sectionCount))
+            } else yield(PolynomialProjection(levels, variables, sections, roots, arithmetic,
+                equationalSections = sectionCount))
         }.iterator()
     }
 }
@@ -300,7 +248,10 @@ private fun rootSection(
     return best
 }
 
-private fun monomialLeaders(polynomial: Polynomial, arithmetic: PolynomialArithmetic): Map<Int, PolynomialTerm?> {
+private fun monomialLeaders(
+    polynomial: Polynomial,
+    arithmetic: PolynomialArithmetic,
+): Map<Int, PolynomialTerm?> {
     val degrees = HashMap<Int, Int>()
     val leaders = LinkedHashMap<Int, PolynomialTerm?>()
     for (term in polynomial.terms) {
@@ -312,9 +263,7 @@ private fun monomialLeaders(polynomial: Polynomial, arithmetic: PolynomialArithm
             if (degree > previous) {
                 degrees[variable] = degree
                 leaders[variable] = term
-            } else if (degree == previous) {
-                leaders[variable] = null
-            }
+            } else if (degree == previous) leaders[variable] = null
         }
     }
     return leaders
@@ -379,12 +328,10 @@ private fun boundaryFamily(
             arithmetic.step()
             distinct.add(Polynomial.variable(variable))
         }
-        val primitive = Polynomial.of(
-            terms.map { term ->
-                arithmetic.step()
-                PolynomialTerm(checkNotNull(term.monomial.quotient(factor)), term.coefficient)
-            },
-        )
+        val primitive = Polynomial.of(terms.map { term ->
+            arithmetic.step()
+            PolynomialTerm(checkNotNull(term.monomial.quotient(factor)), term.coefficient)
+        })
         if (primitive.mainVariable != null) distinct.add(primitive)
     }
     return distinct.toList()
@@ -427,19 +374,14 @@ private fun eliminate(
         arithmetic.step()
         val coefficients = arithmetic.coefficients(polynomial, variable)
         projected.addAll(coefficients)
-        val reducta = if (polynomial == equation) {
-            listOf(polynomial)
-        } else {
-            reducta(polynomial, coefficients, variable, arithmetic)
-        }
+        val reducta = if (polynomial == equation) listOf(polynomial)
+        else reducta(polynomial, coefficients, variable, arithmetic)
         families.add(reducta)
         if (equation != null && polynomial != equation) continue
         for (reductum in reducta) {
             arithmetic.step()
             val pending = arithmetic.preparePrincipalSubresultants(
-                reductum,
-                arithmetic.derivative(reductum, variable),
-                variable,
+                reductum, arithmetic.derivative(reductum, variable), variable,
             )
             var result: List<Polynomial>? = null
             while (result == null) {

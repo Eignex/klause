@@ -73,11 +73,7 @@ internal class QuadraticSourceRelaxation(
         return try {
             val conditioned = condition.apply(formula, boolCount, numericCount, arithmetic::step)
             tryPolynomialIntegerRecession(
-                conditioned,
-                objective,
-                assignment,
-                integers,
-                arithmetic,
+                conditioned, objective, assignment, integers, arithmetic,
                 QuadraticControl(numerical, maximumMatrixCells = params.maximumMatrixCells),
             )
         } catch (_: QuadraticInterrupted) {
@@ -99,12 +95,9 @@ internal class QuadraticSourceRelaxation(
             arithmetic.step()
             val points = if (proposed.bools.isEmpty()) {
                 fixedPoints ?: polynomialPointFixings(formula, arithmetic::step).also { fixedPoints = it }
-            } else {
-                polynomialPointFixings(
-                    PolynomialBooleanCondition.apply(formula, proposed.bools, arithmetic::step),
-                    arithmetic::step,
-                )
-            }
+            } else polynomialPointFixings(
+                PolynomialBooleanCondition.apply(formula, proposed.bools, arithmetic::step), arithmetic::step,
+            )
             val lower = proposed.lower.toMutableMap()
             val upper = proposed.upper.toMutableMap()
             for ((id, value) in points) {
@@ -113,22 +106,13 @@ internal class QuadraticSourceRelaxation(
                 upper[id] = upper[id]?.let { if (it < value) it else value } ?: value
             }
             val condition = PolynomialCondition(proposed.bools, lower, upper)
-            if (lower.any { (id, value) ->
-                    arithmetic.step()
-                    upper[id]?.let { value > it } == true
-                }
-            ) {
+            if (lower.any { (id, value) -> arithmetic.step(); upper[id]?.let { value > it } == true }) {
                 return QuadraticRelaxationResult.Infeasible(condition)
             }
             val conditioned = condition.apply(formula, boolCount, numericCount, arithmetic::step)
             val convex = try {
                 tryConvexPolynomialOptimum(
-                    conditioned,
-                    objective,
-                    boolCount,
-                    numericCount,
-                    condition.bools,
-                    arithmetic,
+                    conditioned, objective, boolCount, numericCount, condition.bools, arithmetic,
                     QuadraticControl(numerical, maximumMatrixCells = params.maximumMatrixCells),
                 )
             } catch (stop: QuadraticInterrupted) {
@@ -137,55 +121,32 @@ internal class QuadraticSourceRelaxation(
             }
             if (convex != null) {
                 QuadraticRelaxationResult.Minimum(
-                    convex.assignment,
-                    algebraic.rational(convex.certificate.bound.value),
-                    true,
-                    QuadraticEngineDerivation.Both(
-                        QuadraticEngineDerivation.Condition(condition),
-                        QuadraticEngineDerivation.Convex(convex),
-                    ),
+                    convex.assignment, algebraic.rational(convex.certificate.bound.value), true,
+                    QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                        QuadraticEngineDerivation.Convex(convex)),
                 )
             } else {
                 val result = solvePolynomialObjectiveImage(
-                    formula,
-                    objective,
-                    boolCount,
-                    numericCount,
-                    QfNraParams(polynomial, polynomialLimits = limits),
-                    condition,
+                    formula, objective, boolCount, numericCount,
+                    QfNraParams(polynomial, polynomialLimits = limits), condition,
                 )
                 native.observe(result.stats)
                 when (result) {
                     is PolynomialObjectiveResult.Optimum -> QuadraticRelaxationResult.Minimum(
-                        result.assignment,
-                        result.value,
-                        true,
-                        QuadraticEngineDerivation.Both(
-                            QuadraticEngineDerivation.Condition(condition),
-                            QuadraticEngineDerivation.Image(result.evidence),
-                        ),
+                        result.assignment, result.value, true,
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
-
                     is PolynomialObjectiveResult.Infimum -> QuadraticRelaxationResult.Minimum(
-                        result.incumbent,
-                        result.value,
-                        false,
-                        QuadraticEngineDerivation.Both(
-                            QuadraticEngineDerivation.Condition(condition),
-                            QuadraticEngineDerivation.Image(result.evidence),
-                        ),
+                        result.incumbent, result.value, false,
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
-
                     is PolynomialObjectiveResult.Unbounded -> QuadraticRelaxationResult.Unbounded(
-                        result.incumbent,
-                        QuadraticEngineDerivation.Both(
-                            QuadraticEngineDerivation.Condition(condition),
-                            QuadraticEngineDerivation.Image(result.evidence),
-                        ),
+                        result.incumbent, QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
-
                     is PolynomialObjectiveResult.Infeasible -> QuadraticRelaxationResult.Infeasible(condition)
-
                     is PolynomialObjectiveResult.Unknown -> {
                         if (mandatory) result.resource?.let(native::decline)
                         QuadraticRelaxationResult.Unknown(result.resource)

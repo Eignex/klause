@@ -29,12 +29,10 @@ internal class FlatZincValues(
         { sample.boolValue(it) },
         { sample.exactIntValue(it).toString() },
         { sample.approximateRealValue(it) },
-        { id ->
-            sample.exactReals?.get(id)?.toString() ?: sample.algebraicReals?.get(id)?.let { value ->
-                value.rational?.toString()
-                    ?: "root(${value.rootIndex};[${value.definingCoefficients.joinToString(",")}])"
-            }
-        },
+        { id -> sample.exactReals?.get(id)?.toString() ?: sample.algebraicReals?.get(id)?.let { value ->
+            value.rational?.toString()
+                ?: "root(${value.rootIndex};[${value.definingCoefficients.joinToString(",")}])"
+        } },
     )
 
     constructor(assignment: OpenTheoryAssignment) : this(
@@ -42,10 +40,9 @@ internal class FlatZincValues(
         assignment::intValue,
         { id ->
             val algebraic = assignment.algebraicRealValue(id)
-            if (algebraic != null) {
-                algebraic.rational?.toDouble()
-                    ?: (algebraic.lowerBound.toDouble() / 2 + algebraic.upperBound.toDouble() / 2)
-            } else {
+            if (algebraic != null) algebraic.rational?.toDouble()
+                ?: (algebraic.lowerBound.toDouble() / 2 + algebraic.upperBound.toDouble() / 2)
+            else {
                 val parts = assignment.realValue(id).split('/')
                 BigFraction.of(
                     parseBigInt(parts[0]),
@@ -127,11 +124,8 @@ internal fun writeFlatZincExactCoordinates(
             }
         }
         for ((name, b) in program.floatVarsByName) {
-            val value = if (b.lpOnly) {
-                sample.exactRealValue(b.varId)
-            } else {
+            val value = if (b.lpOnly) sample.exactRealValue(b.varId) else
                 BigFraction.ofDouble(sample.floatValue(b))?.toString()
-            }
             sb.append("% $prefix: $name = $value;\n")
         }
         if (outputObjective) {
@@ -140,11 +134,8 @@ internal fun writeFlatZincExactCoordinates(
                 val value = if (b?.lpOnly == true) {
                     sample.exactRealValue(b.varId)
                 } else {
-                    if (b != null) {
-                        BigFraction.ofDouble(sample.floatValue(b))?.toString()
-                    } else {
+                    if (b != null) BigFraction.ofDouble(sample.floatValue(b))?.toString() else
                         renderScalar(program, sample, name)
-                    }
                 }
                 sb.append("% $prefix: _objective = $value;\n")
             }

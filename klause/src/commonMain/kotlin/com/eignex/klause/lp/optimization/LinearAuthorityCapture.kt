@@ -24,10 +24,7 @@ internal data class LinearAuthorityFeedbackRequest(
     enum class Cuts { None, Installed, All }
 
     operator fun plus(other: LinearAuthorityFeedbackRequest) = LinearAuthorityFeedbackRequest(
-        point || other.point,
-        maxOf(cuts, other.cuts),
-        refutation || other.refutation,
-    )
+        point || other.point, maxOf(cuts, other.cuts), refutation || other.refutation)
 
     fun covers(other: LinearAuthorityFeedbackRequest): Boolean =
         (point || !other.point) && cuts >= other.cuts && (refutation || !other.refutation)
@@ -213,10 +210,8 @@ internal class LinearAuthorityCapture(
         return true
     }
 
-    private fun scalar(value: BigFraction): Boolean = spend(
-        1L,
-        64L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L,
-    )
+    private fun scalar(value: BigFraction): Boolean = spend(1L,
+        64L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() + 7L) / 8L)
 
     private fun row(value: SourceInequality): Boolean = spend(1L + value.supportSize, 96L + value.supportSize * 48L) &&
         scalar(value.rhs) &&
@@ -231,8 +226,7 @@ internal class LinearAuthorityCapture(
         val archiving = archive
         val closed = archiveClosed
         if (values.size != coordinates.size || !spend(values.size.toLong(), values.size * 48L) ||
-            !values.all(::scalar)
-        ) {
+            !values.all(::scalar)) {
             // An archived record omits a point it cannot afford; delivery reports the oversized query instead.
             archive = archiving
             archiveClosed = closed
@@ -245,20 +239,14 @@ internal class LinearAuthorityCapture(
         if (depth >= 64 || !spend(1L, 64L)) return false
         return when (value) {
             is SourceDerivation.Premise -> spend(0L, value.id.length * 2L)
-
             is SourceDerivation.Assumption -> true
-
             is SourceDerivation.Combination -> value.terms.all {
                 scalar(it.weight) && proof(it.derivation, depth + 1)
             }
-
             is SourceDerivation.IntegerRounding -> proof(value.inequality, depth + 1)
-
             is SourceDerivation.MixedIntegerRounding -> proof(value.inequality, depth + 1) &&
                 value.bounds.all { proof(it, depth + 1) }
-
             is SourceDerivation.BooleanSplit -> proof(value.whenFalse, depth + 1) && proof(value.whenTrue, depth + 1)
-
             is SourceDerivation.Import -> {
                 val claim = value.evidence.claim as? SourceClaim.Consequence ?: return false
                 val condition = value.evidence.scope.condition
@@ -266,13 +254,9 @@ internal class LinearAuthorityCapture(
                     (condition.lower.values + condition.upper.values).all(::scalar) && row(claim.inequality) &&
                     proof(value.evidence.derivation, depth + 1)
             }
-
             is LinearPinnedObjective -> proof(value.bound, depth + 1)
-
             is LinearPinnedRefutation -> proof(value.conflict, depth + 1)
-
             is LinearActiveRefutation -> proof(value.conflict, depth + 1)
-
             else -> false
         }
     }
@@ -310,51 +294,31 @@ internal class LinearAuthorityCapture(
         val numeric = numericSource ?: template?.numeric ?: source
         if (shared) {
             // A requested record holds the source context, scope, query lists and point map whole; it copies none.
-            val references = if (!full) {
-                8L
-            } else {
-                1L + source.premises.size + numeric.coordinates.size +
-                    numeric.objective.size + (if (numeric !== source) numeric.premises.size else 0)
-            }
+            val references = if (!full) 8L else 1L + source.premises.size + numeric.coordinates.size +
+                numeric.objective.size + (if (numeric !== source) numeric.premises.size else 0)
             if (!spend(references, references * 16L)) return
         } else {
             for ((id, premise) in source.premises) {
                 if (!spend(1L, 96L + id.length * 2L) || !row(premise.inequality) ||
                     !spend(premise.guards.size.toLong(), premise.guards.size * 48L) ||
-                    !premise.integerPins.values.all(::scalar)
-                ) {
-                    return
-                }
+                    !premise.integerPins.values.all(::scalar)) return
             }
-            if (numeric !== source) {
-                for (premise in numeric.premises.values) {
-                    if (!row(premise.inequality)) return
-                }
+            if (numeric !== source) for (premise in numeric.premises.values) {
+                if (!row(premise.inequality)) return
             }
             if (!spend(numeric.coordinates.size.toLong(), numeric.coordinates.size * 48L) ||
-                !numeric.objective.values.all(::scalar) || !scalar(numeric.objectiveConstant)
-            ) {
-                return
-            }
+                !numeric.objective.values.all(::scalar) || !scalar(numeric.objectiveConstant)) return
         }
         val condition = source.scope.condition
-        if (full && (
-                !spend(condition.bools.size.toLong(), condition.bools.size * 48L) ||
-                    !(condition.lower.values + condition.upper.values).all(::scalar)
-                )
-        ) {
-            return
-        }
+        if (full && (!spend(condition.bools.size.toLong(), condition.bools.size * 48L) ||
+            !(condition.lower.values + condition.upper.values).all(::scalar))) return
         val generationScope = template?.numeric?.scope?.takeIf { full }
         if (generationScope != null) {
             if (!spend(1L, 128L)) return
             if (generationScope != source.scope) {
                 val retained = generationScope.condition
                 if (!spend(retained.bools.size.toLong(), retained.bools.size * 48L) ||
-                    !(retained.lower.values + retained.upper.values).all(::scalar)
-                ) {
-                    return
-                }
+                    !(retained.lower.values + retained.upper.values).all(::scalar)) return
             }
         }
         val values = point?.takeIf { projection.point }
@@ -363,22 +327,15 @@ internal class LinearAuthorityCapture(
         val cited = if (full) query?.cited.orEmpty() else emptyList()
         if (shared) {
             if (!spend(cited.size.toLong(), cited.size * 16L)) return
-        } else {
-            for ((inequality, derivation) in cited) {
-                if (!row(inequality) || !proof(derivation)) return
-            }
+        } else for ((inequality, derivation) in cited) {
+            if (!row(inequality) || !proof(derivation)) return
         }
         val candidates = ArrayList<LinearAuthorityCapturedCut>()
         val definitions = template?.cuts?.rows.orEmpty()
         val ids = when (projection.cuts) {
             LinearAuthorityFeedbackRequest.Cuts.All -> definitions.indices.toList()
-
-            LinearAuthorityFeedbackRequest.Cuts.Installed -> if (query == null) {
-                emptyList()
-            } else {
+            LinearAuthorityFeedbackRequest.Cuts.Installed -> if (query == null) emptyList() else
                 query.installedCuts.filter { it in definitions.indices && it in query.checkedCuts }.sorted()
-            }
-
             LinearAuthorityFeedbackRequest.Cuts.None -> emptyList()
         }
         for (id in ids) {
@@ -390,30 +347,25 @@ internal class LinearAuthorityCapture(
             if (!shared && (!row(cut.inequality) || !proof(cut.derivation))) return
             var violation: BigFraction? = null
             if (projection.cuts == LinearAuthorityFeedbackRequest.Cuts.All && values != null &&
-                cut.inequality.coefficients.keys.all { it in values }
-            ) {
+                cut.inequality.coefficients.keys.all { it in values }) {
                 violation = violation(values, cut.inequality) ?: return
             }
-            candidates += LinearAuthorityCapturedCut(
-                id, cut.owner, cut.inequality, cut.derivation,
+            candidates += LinearAuthorityCapturedCut(id, cut.owner, cut.inequality, cut.derivation,
                 query != null && id in query.installedCuts, ownerActive,
-                query != null && id in query.checkedCuts, violation, cut.owners, cut.family, cut.mixed,
-            )
+                query != null && id in query.checkedCuts, violation, cut.owners, cut.family, cut.mixed)
         }
         val refutation = result.evidence?.takeIf { it.claim == SourceClaim.Refutation }
         val retainedRefutation = refutation?.takeIf { projection.refutation }
         for (evidence in listOfNotNull(result.bound, retainedRefutation)) {
             if (if (full) !proof(evidence.derivation) else !spend(1L, 16L)) return
         }
-        val captured = LinearAuthorityCapturedQuery(
-            (attempted - 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+        val captured = LinearAuthorityCapturedQuery((attempted - 1L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
             source, numeric.atScope(source.scope),
             query?.coordinates.orEmpty().let { if (full) it.toList() else it },
             cited.toList(), query?.inactive.orEmpty().let { if (full) it.toSet() else it },
             if (full) values?.toMap() else values, candidates.toList(),
             if (full) template?.cuts?.observations.orEmpty().toMap() else emptyMap(), result.bound,
-            retainedRefutation,
-            when {
+            retainedRefutation, when {
                 refutation != null -> "checked-refutation"
                 open && query != null -> "active-no-refutation"
                 open -> "open-booleans"
@@ -421,9 +373,7 @@ internal class LinearAuthorityCapture(
                 point == null && !pointWithheld -> "point-unavailable"
                 result.bound == null -> "bound-unavailable"
                 else -> "completed"
-            },
-            projection = projection, generationScope = generationScope,
-        )
+            }, projection = projection, generationScope = generationScope)
         if (archive) {
             retained += captured
             recordedAttempt = attempted
@@ -458,21 +408,13 @@ internal class LinearAuthorityCapture(
         val value = ((record.bound?.claim as? SourceClaim.Bound)?.value as? SourceValue.Rational)?.value
         val disposition = when {
             value == null -> "bound-unavailable"
-
             incumbent == null -> "incumbent-absent"
-
             if (scope.objective?.sense == ObjectiveSense.MINIMIZE) value >= incumbent else value <= incumbent ->
                 "incumbent-dominating"
-
             else -> "weak-bound"
         }
-        val linked = record.copy(
-            parent = parent,
-            siblingBound = sibling,
-            incumbent = incumbent,
-            parentQuery = retained.lastOrNull { it.context.scope == parent }?.id,
-            boundDisposition = disposition,
-        )
+        val linked = record.copy(parent = parent, siblingBound = sibling, incumbent = incumbent,
+            parentQuery = retained.lastOrNull { it.context.scope == parent }?.id, boundDisposition = disposition)
         if (archive && archived != null) retained[retained.lastIndex] = linked
         if (live && current != null) delivered = linked
     }
@@ -482,17 +424,10 @@ internal class LinearAuthorityCapture(
         fun missing(reason: LinearAuthorityCutViolation.Reason) = LinearAuthorityCutViolation.Unavailable(reason)
         when (query.projection.cuts) {
             LinearAuthorityFeedbackRequest.Cuts.None -> return missing(LinearAuthorityCutViolation.Reason.Unrequested)
-
             LinearAuthorityFeedbackRequest.Cuts.All -> return cut.violation?.let {
                 LinearAuthorityCutViolation.Available(it)
-            } ?: missing(
-                if (values == null) {
-                    LinearAuthorityCutViolation.Reason.NoPoint
-                } else {
-                    LinearAuthorityCutViolation.Reason.Uncovered
-                },
-            )
-
+            } ?: missing(if (values == null) LinearAuthorityCutViolation.Reason.NoPoint
+                else LinearAuthorityCutViolation.Reason.Uncovered)
             LinearAuthorityFeedbackRequest.Cuts.Installed -> Unit
         }
         val base = deliveredBase
@@ -513,13 +448,11 @@ internal class LinearAuthorityCapture(
         live = true
         try {
             violation(values, cut.inequality)?.let { return LinearAuthorityCutViolation.Available(it) }
-            return missing(
-                when {
-                    stop() -> LinearAuthorityCutViolation.Reason.Cancelled
-                    !live -> LinearAuthorityCutViolation.Reason.Oversized
-                    else -> LinearAuthorityCutViolation.Reason.Limit
-                },
-            )
+            return missing(when {
+                stop() -> LinearAuthorityCutViolation.Reason.Cancelled
+                !live -> LinearAuthorityCutViolation.Reason.Oversized
+                else -> LinearAuthorityCutViolation.Reason.Limit
+            })
         } finally {
             archive = archiving
             live = delivering
@@ -535,10 +468,7 @@ internal class LinearAuthorityCapture(
         for ((coordinate, coefficient) in inequality.coefficients) {
             val value = values.getValue(coordinate)
             if (coefficient.num.magnitudeBitLength() + value.num.magnitudeBitLength() > 4096 ||
-                coefficient.den.magnitudeBitLength() + value.den.magnitudeBitLength() > 4096
-            ) {
-                return null
-            }
+                coefficient.den.magnitudeBitLength() + value.den.magnitudeBitLength() > 4096) return null
             evaluatedTerms++
             val product = coefficient * value
             if (!scalar(product) || !canAdd(activity, product)) return null

@@ -25,14 +25,8 @@ internal data class NonlinearIntegerResidueCounts(
     val excluded: Long = 0,
 ) {
     operator fun plus(other: NonlinearIntegerResidueCounts): NonlinearIntegerResidueCounts =
-        NonlinearIntegerResidueCounts(
-            rings + other.rings,
-            tuples + other.tuples,
-            work + other.work,
-            refuted + other.refuted,
-            declined + other.declined,
-            excluded + other.excluded,
-        )
+        NonlinearIntegerResidueCounts(rings + other.rings, tuples + other.tuples, work + other.work,
+            refuted + other.refuted, declined + other.declined, excluded + other.excluded)
 }
 
 // Every node denotes an integer numerator divided by its positive, assignment-independent denominator.
@@ -42,11 +36,8 @@ internal class NonlinearIntegerResidues(
     private val arithmetic: PolynomialArithmetic,
     limits: PolynomialLimits,
 ) {
-    private val capacity = minOf(
-        MAX_CELLS,
-        limits.maxDenseCoefficients ?: MAX_CELLS,
-        (limits.maxMatrixCells ?: MAX_CELLS.toLong()).coerceAtMost(MAX_CELLS.toLong()).toInt(),
-    )
+    private val capacity = minOf(MAX_CELLS, limits.maxDenseCoefficients ?: MAX_CELLS,
+        (limits.maxMatrixCells ?: MAX_CELLS.toLong()).coerceAtMost(MAX_CELLS.toLong()).toInt())
     private val nodes = ArrayList<ResidueNode>()
     private val indices = HashMap<ResidueExpressionKey, Int>()
     private val variables = LinkedHashMap<Int, Int>()
@@ -71,10 +62,7 @@ internal class NonlinearIntegerResidues(
 
     fun simplify(): PolynomialRealFormula = try {
         reserve(problem.integerCoordinates.size)
-        val integers = problem.integerCoordinates.map {
-            step()
-            it
-        }.toSet()
+        val integers = problem.integerCoordinates.map { step(); it }.toSet()
         val reduced = NonlinearIntegerResidueReduction(::step, ::reserve) { atom ->
             try {
                 val left = compile(atom.left, integers)
@@ -92,16 +80,9 @@ internal class NonlinearIntegerResidues(
             }
         }.reduce(problem.formula)
         step()
-        stats = stats.copy(
-            excluded = stats.excluded + reduced.excluded,
+        stats = stats.copy(excluded = stats.excluded + reduced.excluded,
             refuted = stats.refuted + if (reduced.excluded > 0 &&
-                (reduced.formula as? PolynomialRealFormula.Constant)?.value == false
-            ) {
-                1
-            } else {
-                0
-            },
-        )
+                (reduced.formula as? PolynomialRealFormula.Constant)?.value == false) 1 else 0)
         reduced.formula
     } catch (_: ResidueDecline) {
         stats = stats.copy(declined = stats.declined + 1)
@@ -118,25 +99,24 @@ internal class NonlinearIntegerResidues(
         multivariate = false
     }
 
-    private fun refutesPrepared(): Boolean = if (!multivariate) {
-        false
-    } else {
-        reserve(nodes.size * 3 + nodes.sumOf { it.args.size } + equations.size * 2 + variables.size)
-        var refuted = false
-        for (imagesOnly in listOf(true, false)) {
-            for (modulus in MODULI) {
-                step()
-                if (!hasSupport(modulus, imagesOnly)) {
-                    // A final containing poll is required before publishing a completed negative fact.
+    private fun refutesPrepared(): Boolean =
+        if (!multivariate) false else {
+            reserve(nodes.size * 3 + nodes.sumOf { it.args.size } + equations.size * 2 + variables.size)
+            var refuted = false
+            for (imagesOnly in listOf(true, false)) {
+                for (modulus in MODULI) {
                     step()
-                    refuted = true
-                    break
+                    if (!hasSupport(modulus, imagesOnly)) {
+                        // A final containing poll is required before publishing a completed negative fact.
+                        step()
+                        refuted = true
+                        break
+                    }
                 }
+                if (refuted) break
             }
-            if (refuted) break
+            refuted
         }
-        refuted
-    }
 
     private fun step() {
         if (stats.work >= MAX_WORK) throw ResidueDecline()
@@ -156,10 +136,7 @@ internal class NonlinearIntegerResidues(
         reserve(1)
         pending.addLast(problem.formula)
         reserve(problem.integerCoordinates.size)
-        val integers = problem.integerCoordinates.map {
-            step()
-            it
-        }.toSet()
+        val integers = problem.integerCoordinates.map { step(); it }.toSet()
         while (pending.isNotEmpty()) {
             step()
             when (val formula = pending.removeLast()) {
@@ -168,7 +145,6 @@ internal class NonlinearIntegerResidues(
                     val children = formula.operands
                     pending.addAll(children)
                 }
-
                 is PolynomialRealFormula.Atom -> if (formula.relation == PolynomialRelation.EQ) {
                     val left = compile(formula.left, integers)
                     val right = compile(formula.right, integers)
@@ -178,7 +154,6 @@ internal class NonlinearIntegerResidues(
                     reserve(2)
                     equations.add(left to right)
                 }
-
                 else -> Unit
             }
         }
@@ -220,32 +195,20 @@ internal class NonlinearIntegerResidues(
             val args = children.map { indices.getValue(ResidueExpressionKey(it)) }
             val denominator = when (expression) {
                 is PolynomialExpression.Constant -> expression.denominator
-
                 is PolynomialExpression.Power -> power(nodes[args.single()].denominator, expression.exponent)
-
                 is PolynomialExpression.Sum -> args.fold(BIG_ONE) { value, child ->
                     commonDenominator(value, nodes[child].denominator)
                 }
-
                 else -> args.fold(BIG_ONE) { value, child -> multiply(value, nodes[child].denominator) }
             }
             val variable = if (expression is PolynomialExpression.Variable) {
                 if (expression.id.index !in integers) throw ResidueUnsupported()
                 variables.getOrPut(expression.id.index) { variables.size }
-            } else {
-                -1
-            }
+            } else -1
             indices[key] = nodes.size
-            nodes.add(
-                ResidueNode(
-                    expression,
-                    denominator,
-                    args,
-                    variable,
-                    if (variable >= 0) variable else args.minOfOrNull { nodes[it].firstVariable } ?: Int.MAX_VALUE,
-                    if (variable >= 0) variable else args.maxOfOrNull { nodes[it].lastVariable } ?: -1,
-                ),
-            )
+            nodes.add(ResidueNode(expression, denominator, args, variable,
+                if (variable >= 0) variable else args.minOfOrNull { nodes[it].firstVariable } ?: Int.MAX_VALUE,
+                if (variable >= 0) variable else args.maxOfOrNull { nodes[it].lastVariable } ?: -1))
         }
         return indices.getValue(ResidueExpressionKey(root))
     }
@@ -292,13 +255,9 @@ internal class NonlinearIntegerResidues(
             step()
             val expression = node.expression
             if (expression is PolynomialExpression.Constant) constants[id] = residue(expression.numerator)
-            if (expression is PolynomialExpression.Sum) {
-                node.args.map { child ->
-                    residue(node.denominator / nodes[child].denominator)
-                }
-            } else {
-                emptyList()
-            }
+            if (expression is PolynomialExpression.Sum) node.args.map { child ->
+                residue(node.denominator / nodes[child].denominator)
+            } else emptyList()
         }
         val equalityScales = equations.map { (left, right) ->
             val denominator = commonDenominator(nodes[left].denominator, nodes[right].denominator)
@@ -314,23 +273,17 @@ internal class NonlinearIntegerResidues(
                 step()
                 values[id] = when (val expression = node.expression) {
                     is PolynomialExpression.Constant -> constants[id]
-
                     is PolynomialExpression.Variable -> tuple[node.variable]
-
                     is PolynomialExpression.Sum -> node.args.indices.fold(0) { value, index ->
                         step()
                         (value + values[node.args[index]] * scales[id][index]) % modulus
                     }
-
                     is PolynomialExpression.Product -> node.args.fold(1) { value, child ->
                         step()
                         value * values[child] % modulus
                     }
-
                     is PolynomialExpression.Power -> modularPower(
-                        values[node.args.single()],
-                        expression.exponent,
-                        modulus,
+                        values[node.args.single()], expression.exponent, modulus,
                     )
                 }
             }
@@ -369,19 +322,15 @@ internal class NonlinearIntegerResidues(
             step()
             images[id] = when (val expression = node.expression) {
                 is PolynomialExpression.Constant -> 1 shl constants[id]
-
                 is PolynomialExpression.Variable -> (1 shl modulus) - 1
-
                 is PolynomialExpression.Power -> mapImage(images[node.args.single()], modulus) {
                     modularPower(it, expression.exponent, modulus)
                 }
-
                 is PolynomialExpression.Sum -> node.args.indices.fold(1) { image, index ->
                     combineImages(image, images[node.args[index]], modulus) { a, b ->
                         (a + b * scales[id][index]) % modulus
                     }
                 }
-
                 is PolynomialExpression.Product -> node.args.fold(2) { image, child ->
                     combineImages(image, images[child], modulus) { a, b -> a * b % modulus }
                 }

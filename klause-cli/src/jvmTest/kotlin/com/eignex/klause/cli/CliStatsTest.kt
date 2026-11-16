@@ -46,15 +46,8 @@ import kotlin.time.Duration
 class CliStatsTest {
     @Test
     fun `arm output should lead with the role the arm declares`() {
-        val arm = ArmSchedule(
-            label = "bt/lp-default",
-            segments = 1,
-            work = 1,
-            meanReward = 0.0,
-            failures = 0,
-            credit = emptyMap(),
-            role = "lp-bounding",
-        )
+        val arm = ArmSchedule(label = "bt/lp-default", segments = 1, work = 1, meanReward = 0.0,
+            failures = 0, credit = emptyMap(), role = "lp-bounding")
 
         val line = portfolioStatPairs(SolveStats(portfolio = PortfolioStats(arms = listOf(arm))))
             .toMap().getValue("arm.bt/lp-default")
@@ -64,18 +57,9 @@ class CliStatsTest {
 
     @Test
     fun `arm output should distinguish queued incumbent offers checks and installations`() {
-        val arm = ArmSchedule(
-            label = "ls/cbls/fixed",
-            segments = 1,
-            work = 1,
-            meanReward = 0.0,
-            failures = 0,
-            credit = emptyMap(),
-            sharing = SharingStats(
-                incumbents =
-                mapOf("offered" to 7L, "coalesced" to 5L, "checked" to 2L, "installed" to 1L)
-            ),
-        )
+        val arm = ArmSchedule(label = "ls/cbls/fixed", segments = 1, work = 1, meanReward = 0.0,
+            failures = 0, credit = emptyMap(), sharing = SharingStats(incumbents =
+            mapOf("offered" to 7L, "coalesced" to 5L, "checked" to 2L, "installed" to 1L)))
 
         val line = portfolioStatPairs(SolveStats(portfolio = PortfolioStats(arms = listOf(arm))))
             .toMap().getValue("arm.ls/cbls/fixed")
@@ -88,14 +72,10 @@ class CliStatsTest {
 
     @Test
     fun `heuristic start statistics should retain work and completion by invocation`() {
-        val stats = SolveStats(
-            portfolio = PortfolioStats(
-                heuristicStarts = listOf(
+        val stats = SolveStats(portfolio = PortfolioStats(heuristicStarts = listOf(
             HeuristicStartStats(5L, mapOf("ls/fixed" to 2L, "ls/other" to 0L), false),
             HeuristicStartStats(5L, mapOf("ls/fixed" to 6L), true, 7L),
-        )
-            )
-        )
+        )))
 
         val pairs = portfolioStatPairs(stats).toMap()
 
@@ -114,34 +94,18 @@ class CliStatsTest {
 
         val pairs = portfolioStatPairs(stats).toMap().filterKeys { it.startsWith("booleanProof.") }
 
-        assertEquals(
-            mapOf(
-            "booleanProof.0.tasks" to "2",
-            "booleanProof.0.nativeRefutations" to "2",
-            "booleanProof.0.probeSegments" to "1",
-            "booleanProof.0.probeWork" to "5000",
-            "booleanProof.0.workerWork" to "22000",
-            "booleanProof.0.retainedProbes" to "1",
-        ),
-            pairs
-        )
+        assertEquals(mapOf("booleanProof.0.tasks" to "2", "booleanProof.0.nativeRefutations" to "2",
+            "booleanProof.0.probeSegments" to "1", "booleanProof.0.probeWork" to "5000",
+            "booleanProof.0.workerWork" to "22000", "booleanProof.0.retainedProbes" to "1"), pairs)
     }
 
     @Test
     fun `geometric counters remain absent until a consumer requests qualification`() {
         for (requested in listOf(false, true)) {
-            val stats = SolveStats(
-                run = RunStats(backend = "ls"),
-                ls = if (requested) {
-                LocalSearchStats(
-                geometricProposalRuns = SumResult(1.0),
-                geometricProposalDeclines = SumResult(2.0),
+            val stats = SolveStats(run = RunStats(backend = "ls"), ls = if (requested) LocalSearchStats(
+                geometricProposalRuns = SumResult(1.0), geometricProposalDeclines = SumResult(2.0),
                 geometricProposalCandidates = SumResult(3.0),
-            )
-            } else {
-                LocalSearchStats()
-            }
-            )
+            ) else LocalSearchStats())
 
             val pairs = lsStatPairs(stats, 1L).toMap()
 
@@ -165,19 +129,15 @@ class CliStatsTest {
         assertEquals("6", pairs["valueProbeCappedOrders"])
     }
 
+
     @Test
     fun `board restart outcomes should be emitted only after a completed observation`() {
         for (observed in listOf(false, true)) {
             val stats = SolveStats(
                 run = RunStats(backend = "ls"),
-                ls = if (observed) {
-                    LocalSearchStats(
-                    boardRestartChanges = SumResult(2.0),
-                    boardRestartDeclines = SumResult(3.0),
-                )
-                } else {
-                    LocalSearchStats()
-                },
+                ls = if (observed) LocalSearchStats(
+                    boardRestartChanges = SumResult(2.0), boardRestartDeclines = SumResult(3.0),
+                ) else LocalSearchStats(),
             )
 
             val pairs = lsStatPairs(stats, 1L).toMap()
@@ -636,16 +596,12 @@ class CliStatsTest {
     @Test
     fun `ls refutation stages should be emitted only with complete attribution`() {
         for (attributed in listOf(0, 2, 3)) {
-            val stats = SolveStats(
-                run = RunStats(backend = "ls"),
-                ls = LocalSearchStats(
-                completions = SumResult(4.0),
-                completionsRefuted = SumResult(3.0),
+            val stats = SolveStats(run = RunStats(backend = "ls"), ls = LocalSearchStats(
+                completions = SumResult(4.0), completionsRefuted = SumResult(3.0),
                 completionsPrecheckRefuted = SumResult(if (attributed > 0) 1.0 else 0.0),
                 completionsProviderRefuted = SumResult(if (attributed == 3) 2.0 else 0.0),
                 completionsPostcheckRefuted = SumResult(if (attributed == 2) 1.0 else 0.0),
-            )
-            )
+            ))
 
             val pairs = lsStatPairs(stats, solveTimeMs = 0).toMap()
 
@@ -702,15 +658,8 @@ class CliStatsTest {
         val stats = SolveStats(
             run = RunStats(backend = "exact-lira"),
             openTheory = OpenTheoryWorkStats(openTheoryChecks = 5),
-            smt = SmtStats(
-                sourceLp = SourceLpWorkStats(
-                operations = 2,
-                modeledWork = 7,
-                floatWork = 3,
-                boundCertificationWork = 11,
-                conflictCertificationWork = 13,
-            )
-            ),
+            smt = SmtStats(sourceLp = SourceLpWorkStats(operations = 2, modeledWork = 7, floatWork = 3,
+                boundCertificationWork = 11, conflictCertificationWork = 13)),
         )
 
         val pairs = openTheoryStatPairs(stats, solveTimeMs = 0).toMap()

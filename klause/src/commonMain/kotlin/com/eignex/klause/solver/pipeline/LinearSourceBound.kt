@@ -26,9 +26,7 @@ internal fun finiteObjectiveBound(evidence: SourceEvidence?, mapping: SourceMapp
     if (evidence.scope.condition != SourceCondition() ||
         evidence.scope.objective?.sense != ObjectiveSense.MINIMIZE ||
         mapping?.guarantees?.let { !it.objective || !it.reconstructability } == true
-    ) {
-        return null
-    }
+    ) return null
     return FiniteObjectiveBound(evidence, mapping?.objectiveAdjustment?.sourceValue(value) ?: value)
 }
 
@@ -42,9 +40,7 @@ internal fun PreparedLinearSource.qualifyBound(
     val expected = if (finite == null) objective.sense else ObjectiveSense.MINIMIZE
     if (!view.exact || !unrestricted || evidence.scope.condition != SourceCondition() ||
         evidence.scope.objective?.sense != expected
-    ) {
-        return null
-    }
+    ) return null
     var value = finite?.value ?: (claim.value as? SourceValue.Rational)?.value ?: return null
     if (finite != null && objective.sense == ObjectiveSense.MAXIMIZE) value = value.negated()
     return LinearSourceBound(value * view.objectiveScale.reciprocal(), objective.sense, claim.strict)

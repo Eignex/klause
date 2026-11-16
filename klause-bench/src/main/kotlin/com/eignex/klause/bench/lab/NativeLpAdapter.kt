@@ -55,60 +55,42 @@ internal object NativeLpSuite : BenchSuite {
         val started = System.nanoTime()
         val report = context.outputDirectory.resolve("report")
         Files.createDirectories(report)
-        Files.writeString(
-            context.outputDirectory.resolve("input.json"),
-            BenchProtocol.json.encodeToString(BenchCase.serializer(), case),
-        )
+        Files.writeString(context.outputDirectory.resolve("input.json"),
+            BenchProtocol.json.encodeToString(BenchCase.serializer(), case))
         val record = record(case, context)
         val adapter = ComparisonProvenance.current
-        val identities = ComparisonProvenance.Identities(
-            adapter.harness,
-            adapter.libraries + record.buildProvenance?.runtime.orEmpty().mapKeys { "native/${it.key}" },
-        )
+        val identities = ComparisonProvenance.Identities(adapter.harness,
+            adapter.libraries + record.buildProvenance?.runtime.orEmpty().mapKeys { "native/${it.key}" })
         val provenance = record.buildProvenance?.let { it.copy(harness = it.harness + identities.retained) }
-        val retained = record.copy(
-            stats = record.stats + mapOf(
-                "cliRuntime" to "kotlin-native-linux-x86_64",
-                "nativeAdapterElapsedNs" to (System.nanoTime() - started).toString(),
-                "nativeGcPolicy" to "compiled-default",
-            ),
-            buildProvenance = provenance,
-            buildFingerprint = provenance?.fingerprint,
+        val retained = record.copy(stats = record.stats + mapOf(
+            "cliRuntime" to "kotlin-native-linux-x86_64",
+            "nativeAdapterElapsedNs" to (System.nanoTime() - started).toString(),
+            "nativeGcPolicy" to "compiled-default",
+        ), buildProvenance = provenance, buildFingerprint = provenance?.fingerprint,
             comparisonControls = KlauseLabSuite.comparisonControls(case) + buildMap {
-                put("series", "${case.parameters["comparison-series"] ?: "sdk-v1"}-native-lp")
-                put("cliRuntime", "kotlin-native-linux-x86_64")
-                put("heap-mib", "not-applicable-native")
-                put("gc", "kotlin-native-compiled-default")
-                put("harnessHeapMiB", "512")
-                provenance?.let { build ->
-                    put(
-                        "runtimeFingerprint",
-                        ComparisonProvenance.runtimeFingerprint(build.copy(distribution = emptyMap())),
-                    )
-                    put("harnessFingerprint", identities.harnessFingerprint)
-                    put("libraryFingerprint", identities.libraryFingerprint)
-                }
-            },
-        )
-        Files.writeString(
-            report.resolve("solve-record.json"),
-            Reports.json.encodeToString(SolveRecord.serializer(), retained),
-        )
-        Files.writeString(
-            context.outputDirectory.resolve("runtime.json"),
-            buildJsonObject {
-                put("scope", "whole-cli-native")
-                put(
-                    "adapterScope",
-                    "input verification, source decoding, binary/runtime hashing, CLI, witness decoding",
-                )
-                put("processors", case.resources.cpus)
-                put("memoryMiB", case.resources.memoryMiB)
-                put("nativeGcPolicy", "compiled-default")
-                put("harnessRuntime", "JVM; separately retained in buildProvenance.harness")
-                put("sourceChecking", "lab independent checker; feasible point authority only")
-            }.toString(),
-        )
+            put("series", "${case.parameters["comparison-series"] ?: "sdk-v1"}-native-lp")
+            put("cliRuntime", "kotlin-native-linux-x86_64")
+            put("heap-mib", "not-applicable-native")
+            put("gc", "kotlin-native-compiled-default")
+            put("harnessHeapMiB", "512")
+            provenance?.let { build ->
+                put("runtimeFingerprint",
+                    ComparisonProvenance.runtimeFingerprint(build.copy(distribution = emptyMap())))
+                put("harnessFingerprint", identities.harnessFingerprint)
+                put("libraryFingerprint", identities.libraryFingerprint)
+            }
+        })
+        Files.writeString(report.resolve("solve-record.json"),
+            Reports.json.encodeToString(SolveRecord.serializer(), retained))
+        Files.writeString(context.outputDirectory.resolve("runtime.json"), buildJsonObject {
+            put("scope", "whole-cli-native")
+            put("adapterScope", "input verification, source decoding, binary/runtime hashing, CLI, witness decoding")
+            put("processors", case.resources.cpus)
+            put("memoryMiB", case.resources.memoryMiB)
+            put("nativeGcPolicy", "compiled-default")
+            put("harnessRuntime", "JVM; separately retained in buildProvenance.harness")
+            put("sourceChecking", "lab independent checker; feasible point authority only")
+        }.toString())
         val error = KlauseLabSuite.failure(retained)
         return BenchResult(
             case.id,
@@ -122,13 +104,9 @@ internal object NativeLpSuite : BenchSuite {
 
     private fun record(case: BenchCase, context: BenchContext): SolveRecord {
         val p = case.parameters
-        val ref = ProblemRef(
-            case.attributes.getValue("problem"),
-            Format.valueOf(case.attributes.getValue("format")),
+        val ref = ProblemRef(case.attributes.getValue("problem"), Format.valueOf(case.attributes.getValue("format")),
             ProblemSource.Prepared(LabInputs.path(case.inputs.single { it.role == "model" }, context).toFile()),
-            Category.valueOf(case.attributes.getValue("category")),
-            Expected.Unknown,
-        )
+            Category.valueOf(case.attributes.getValue("category")), Expected.Unknown)
         val report = context.outputDirectory.resolve("report")
         val settings = SolverInvocation.Settings(
             engine = p.getValue("engine").takeUnless { it == "default" },
@@ -147,47 +125,24 @@ internal object NativeLpSuite : BenchSuite {
         return runCatching {
             LabInputs.verify(case, context)
             val executable = NativeCliBuild.executable()
-            identity = NativeCliBuild.capture(
-                harness = NativeCliBuild.harnessIdentity(),
-                environment = System.getenv() + ("KLAUSE_DEBUG" to p.getValue("debug")),
-            )
+            identity = NativeCliBuild.capture(harness = NativeCliBuild.harnessIdentity(),
+                environment = System.getenv() + ("KLAUSE_DEBUG" to p.getValue("debug")))
             SolverInvocation.klauseCliDefect(executable)?.let { error(it) }
             val entry = Runners.resolve(ref, settings.exact)
-            SolveMetric.solve(
-                entry,
-                settings,
-                budget,
-                timestamp,
-                sha,
-                installedBuild = { identity },
+            SolveMetric.solve(entry, settings, budget, timestamp, sha, installedBuild = { identity },
                 invoke = { current, options, allowance, optimize ->
                     SolverInvocation.withSourceInput(CorpusFetcher.resolve(current.ref.source), allowance) {
-                            file,
-                            remaining,
-                        ->
-                        val command = SolverInvocation.klauseCommand(
-                            current,
-                            options,
-                            remaining,
-                            optimize,
-                            file,
-                            executable,
-                        )
-                        SolverInvocation.invoke(
-                            command,
-                            SolverInvocation.dialectFor(current.ref.format),
+                            file, remaining, ->
+                        val command = SolverInvocation.klauseCommand(current, options, remaining, optimize,
+                            file, executable)
+                        SolverInvocation.invoke(command, SolverInvocation.dialectFor(current.ref.format),
                             hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000,
-                            captureDirectory = options.captureDirectory,
-                            measureResources = options.measureResources,
-                            startProcess = { argv ->
-                                ProcessBuilder(argv).apply {
-                                    environment()["KLAUSE_DEBUG"] = p.getValue("debug")
-                                }.start()
-                            },
-                        ).copy(buildProvenance = identity)
+                            captureDirectory = options.captureDirectory, measureResources = options.measureResources,
+                            startProcess = { argv -> ProcessBuilder(argv).apply {
+                                environment()["KLAUSE_DEBUG"] = p.getValue("debug")
+                            }.start() }).copy(buildProvenance = identity)
                     }
-                },
-            ).first
+                }).first
         }.getOrElse { failure ->
             SolveMetric.loadFailureRecord(ref, settings, budget, timestamp, sha, failure).copy(
                 buildProvenance = identity,

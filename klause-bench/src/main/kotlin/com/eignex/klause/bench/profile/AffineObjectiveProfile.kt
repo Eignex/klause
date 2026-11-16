@@ -61,10 +61,8 @@ internal object AffineObjectiveProfile {
         for ((index, request) in requests.withIndex()) {
             val options = request.associate { it.substringBefore('=') to it.substringAfter('=') }
             val required = setOf("suite", "problem", "sha256")
-            require(
-                options.keys.containsAll(required) &&
-                    (options.keys - required - setOf("presolve", "pivotOrder")).isEmpty(),
-            )
+            require(options.keys.containsAll(required) &&
+                (options.keys - required - setOf("presolve", "pivotOrder")).isEmpty())
             val order = options["pivotOrder"]?.let { AffinePivotOrder.valueOf(it.uppercase()) }
                 ?: AffinePivotOrder.MARKOWITZ
             val presolve = (options["presolve"]?.let { PresolveConfig.parse(it) } ?: PresolveConfig.DEFAULT)
@@ -76,19 +74,13 @@ internal object AffineObjectiveProfile {
             val directory = out.resolve("$index").apply { mkdirs() }
             directory.resolve("source.mps").writeBytes(bytes)
             for (exact in listOf(false, true)) {
-                val original = requireNotNull(
-                    Mps.parse(bytes.decodeToString()).toLinearSourceProblem(
-                        if (exact) SemanticOverrides(feasibilityTolerance = SourceTolerance()) else SemanticOverrides(),
-                    ),
-                )
-                val invocation = SourceSetup.prepare(
-                    SourceSetupRequest(
-                        SourceAttachment(original, ProblemSettings()),
-                        ExecutionOperation.OPTIMIZE,
-                        FiniteEngine.BACKTRACK,
-                        maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE,
-                    ),
-                )
+                val original = requireNotNull(Mps.parse(bytes.decodeToString()).toLinearSourceProblem(
+                    if (exact) SemanticOverrides(feasibilityTolerance = SourceTolerance()) else SemanticOverrides(),
+                ))
+                val invocation = SourceSetup.prepare(SourceSetupRequest(
+                    SourceAttachment(original, ProblemSettings()), ExecutionOperation.OPTIMIZE, FiniteEngine.BACKTRACK,
+                    maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE,
+                ))
                 val plan = requireNotNull(invocation.preparedPlan)
                 val model = requireNotNull(plan.model)
                 val objective = requireNotNull(MpsLpAdmission.preparedObjective(plan))
@@ -98,34 +90,27 @@ internal object AffineObjectiveProfile {
                         row.isLongUnconditional && row.isIntegerOnly && row.relation == LinearOp.EQ &&
                             row.size == 2 && row.coeff(0) in -1L..1L && row.coeff(0) != 0L &&
                             row.coeff(1) == -row.coeff(0)
-                    }.map { row ->
-                        buildJsonObject {
-                            put("factor", factor)
-                            put("row", row(row))
-                            put("objective", objective.toString())
-                            put(
-                                "bothObjectiveColumns",
-                                (0 until row.size).all {
-                                    objective.intCoefficients.getOrElse(Term.intVar(row.ref(it))) { 0L } != 0L
-                                },
-                            )
-                        }
-                    }
+                    }.map { row -> buildJsonObject {
+                        put("factor", factor)
+                        put("row", row(row))
+                        put("objective", objective.toString())
+                        put("bothObjectiveColumns", (0 until row.size).all {
+                            objective.intCoefficients.getOrElse(Term.intVar(row.ref(it))) { 0L } != 0L
+                        })
+                    } }
                 }
                 directory.resolve("translation-rows-$exact.json").writeText(JsonArray(candidates).toString())
                 for (rewrite in listOf(false, true)) {
                     val stop = ExecutionControl.after(8.seconds)
                     val budget = PresolveBudget(550_000_000L)
                     val started = System.nanoTime()
-                    val prepared = FinitePipeline.prepare(
-                        FinitePipelineRequest(
-                            model, FiniteEngine.BACKTRACK, objective,
-                            presolveConfig = presolve,
-                            explicitPresolveConfig = options.keys.any { it == "presolve" || it == "pivotOrder" },
-                            cancellation = stop, solveCancellation = stop, presolveBudget = budget,
-                            preparedPlan = plan, transformObjective = rewrite,
-                        ),
-                    )
+                    val prepared = FinitePipeline.prepare(FinitePipelineRequest(
+                        model, FiniteEngine.BACKTRACK, objective,
+                        presolveConfig = presolve,
+                        explicitPresolveConfig = options.keys.any { it == "presolve" || it == "pivotOrder" },
+                        cancellation = stop, solveCancellation = stop, presolveBudget = budget,
+                        preparedPlan = plan, transformObjective = rewrite,
+                    ))
                     val elapsed = System.nanoTime() - started
                     directory.resolve("residual-$exact-$rewrite.json")
                         .writeText(snapshot(prepared.problem, prepared.objective ?: objective).toString())
@@ -161,8 +146,7 @@ internal object AffineObjectiveProfile {
                 if (stop()) break
                 val bytes = CorpusFiles.open(CorpusFetcher.resolve(reference.source)).use { it.readBytes() }
                 val source = Mps.parse(bytes.decodeToString()).toLinearSourceProblem(
-                    SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-                    cancellation = stop,
+                    SemanticOverrides(feasibilityTolerance = SourceTolerance()), cancellation = stop,
                 ) ?: break
                 val variables = source.variables
                 val objective = source.objective?.terms.orEmpty().associate { it.column to it.coefficient }
@@ -170,9 +154,7 @@ internal object AffineObjectiveProfile {
                     val terms = row.terms
                     if (row.indicator != null || row.lower == null || row.lower != row.upper || terms.size != 2 ||
                         terms.any { !variables[it.column].integer }
-                    ) {
-                        return@mapIndexedNotNull null
-                    }
+                    ) return@mapIndexedNotNull null
                     val a = BigFraction.of(terms[0].coefficient.numerator, terms[0].coefficient.denominator)
                     val b = BigFraction.of(terms[1].coefficient.numerator, terms[1].coefficient.denominator)
                     if (a == BigFraction.ZERO || a != b.negated()) return@mapIndexedNotNull null
@@ -184,25 +166,15 @@ internal object AffineObjectiveProfile {
                         put("offset", offset.toString())
                         put("columns", JsonArray(terms.map { JsonPrimitive(it.column) }))
                         put("names", JsonArray(terms.map { JsonPrimitive(variables[it.column].name) }))
-                        put(
-                            "weights",
-                            JsonArray(
-                                terms.map {
-                                    val weight = objective[it.column]
-                                    JsonPrimitive(
-                                        weight?.let { value ->
-                                            BigFraction.of(value.numerator, value.denominator).toString()
-                                        } ?: "0",
-                                    )
-                                },
-                            ),
-                        )
-                        put(
-                            "bothObjectiveColumns",
-                            terms.all {
-                                objective[it.column]?.numerator?.let { value -> value != BIG_ZERO } == true
-                            },
-                        )
+                        put("weights", JsonArray(terms.map {
+                            val weight = objective[it.column]
+                            JsonPrimitive(weight?.let { value ->
+                                BigFraction.of(value.numerator, value.denominator).toString()
+                            } ?: "0")
+                        }))
+                        put("bothObjectiveColumns", terms.all {
+                            objective[it.column]?.numerator?.let { value -> value != BIG_ZERO } == true
+                        })
                     }
                 }
                 if (translations.isNotEmpty()) out.resolve("$index.mps").writeBytes(bytes)
@@ -231,64 +203,32 @@ internal object AffineObjectiveProfile {
         put("reals", model.numRealVars)
         put("realLower", JsonArray(model.realLower.map { JsonPrimitive(it.toString()) }))
         put("realUpper", JsonArray(model.realUpper.map { JsonPrimitive(it.toString()) }))
-        put(
-            "semantics",
-            buildJsonObject {
-                put("declared", model.semantics.declared.toString())
-                put("effective", model.semantics.effective.toString())
-            },
-        )
-        put(
-            "integerBounds",
-            buildJsonArray {
-                for (variable in 0 until model.numIntVars) {
-                    add(
-                        buildJsonObject {
-                            put("lower", model.intBounds.lowerAsBigInteger(variable)?.toString())
-                            put("upper", model.intBounds.upperAsBigInteger(variable)?.toString())
-                        },
-                    )
-                }
-            },
-        )
-        put(
-            "domains",
-            buildJsonArray {
-                for (variable in 0 until model.numIntVars) {
-                    add(
-                        JsonPrimitive(
-                            model.intDomainOrNull(variable)
-                                .toString(),
-                        ),
-                    )
-                }
-            },
-        )
-        if (model is BakedProblem) {
-            put(
-                "rootDomains",
-                buildJsonArray {
-                    for (domain in model.rootIntDomains()) add(JsonPrimitive(domain.toString()))
-                },
-            )
-        }
-        put(
-            "factors",
-            buildJsonArray {
-                for (factor in model.factors) {
-                    add(
-                        buildJsonObject {
-                            put("kind", factor::class.simpleName)
-                            put("intVars", JsonArray(factor.intVars.map { JsonPrimitive(it) }))
-                            put("boolVars", JsonArray(factor.boolVars.map { JsonPrimitive(it) }))
-                            put("key", factor.structuralKey().toString())
-                            put("form", factor.linearForm?.let { it::class.simpleName })
-                            put("rows", JsonArray(factor.linearRows.map(::row)))
-                        },
-                    )
-                }
-            },
-        )
+        put("semantics", buildJsonObject {
+            put("declared", model.semantics.declared.toString())
+            put("effective", model.semantics.effective.toString())
+        })
+        put("integerBounds", buildJsonArray {
+            for (variable in 0 until model.numIntVars) add(buildJsonObject {
+                put("lower", model.intBounds.lowerAsBigInteger(variable)?.toString())
+                put("upper", model.intBounds.upperAsBigInteger(variable)?.toString())
+            })
+        })
+        put("domains", buildJsonArray {
+            for (variable in 0 until model.numIntVars) add(JsonPrimitive(model.intDomainOrNull(variable).toString()))
+        })
+        if (model is BakedProblem) put("rootDomains", buildJsonArray {
+            for (domain in model.rootIntDomains()) add(JsonPrimitive(domain.toString()))
+        })
+        put("factors", buildJsonArray {
+            for (factor in model.factors) add(buildJsonObject {
+                put("kind", factor::class.simpleName)
+                put("intVars", JsonArray(factor.intVars.map { JsonPrimitive(it) }))
+                put("boolVars", JsonArray(factor.boolVars.map { JsonPrimitive(it) }))
+                put("key", factor.structuralKey().toString())
+                put("form", factor.linearForm?.let { it::class.simpleName })
+                put("rows", JsonArray(factor.linearRows.map(::row)))
+            })
+        })
     }
 
     private fun row(row: LinearRow) = buildJsonObject {
@@ -297,32 +237,17 @@ internal object AffineObjectiveProfile {
         put("strict", row.strict)
         put("activator", row.activator)
         val constants = row.constants
-        put(
-            "coefficients",
-            buildJsonArray {
-                for (term in 0 until row.size) {
-                    add(
-                        JsonPrimitive(
-                            when (constants) {
-                                is IntegralConstants -> constants.exactCoeff(term).toString()
-
-                                is RealConstants -> if (term < constants.intCoefficients.size) {
-                                    constants.intCoefficients.at(term).toString()
-                                } else {
-                                    constants.realCoefficients.at(term - constants.intCoefficients.size).toString()
-                                }
-                            },
-                        ),
-                    )
-                }
-            },
-        )
-        put(
-            "bound",
-            when (constants) {
-                is IntegralConstants -> constants.exactBound.toString()
-                is RealConstants -> constants.bound.toString()
-            },
-        )
+        put("coefficients", buildJsonArray {
+            for (term in 0 until row.size) add(JsonPrimitive(when (constants) {
+                is IntegralConstants -> constants.exactCoeff(term).toString()
+                is RealConstants -> if (term < constants.intCoefficients.size) {
+                    constants.intCoefficients.at(term).toString()
+                } else constants.realCoefficients.at(term - constants.intCoefficients.size).toString()
+            }))
+        })
+        put("bound", when (constants) {
+            is IntegralConstants -> constants.exactBound.toString()
+            is RealConstants -> constants.bound.toString()
+        })
     }
 }

@@ -6,16 +6,14 @@ import kotlin.test.assertEquals
 class CliProfileTest {
     @Test
     fun `polynomial checkpoint callers should retain the operation beneath cancellation adapters`() {
-        val callers = CliProfile.cliPolynomialCheckpointCallers(
-            listOf(
-                "com.eignex.klause.util.OrCancellation.isCancelled",
-                "com.eignex.klause.solver.pipeline.QuadraticNativeScope.getStopped",
-                "com.eignex.klause.theory.qfnra.QfNraWork.isCancelled",
-                "com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.step",
-                "com.eignex.klause.theory.qfnra.PolynomialSignPropagationKt.possibleSigns",
-                "com.eignex.klause.theory.qfnra.PolynomialBooleanSigns.prepare",
-            ),
-        )
+        val callers = CliProfile.cliPolynomialCheckpointCallers(listOf(
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.solver.pipeline.QuadraticNativeScope.getStopped",
+            "com.eignex.klause.theory.qfnra.QfNraWork.isCancelled",
+            "com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.step",
+            "com.eignex.klause.theory.qfnra.PolynomialSignPropagationKt.possibleSigns",
+            "com.eignex.klause.theory.qfnra.PolynomialBooleanSigns.prepare",
+        ))
 
         assertEquals(
             "com.eignex.klause.theory.qfnra.PolynomialSignPropagationKt.possibleSigns <- " +
@@ -42,14 +40,10 @@ class CliProfileTest {
 
     @Test
     fun `missing polynomial checkpoints should leave operation attribution unknown`() {
-        for (stack in listOf(
-            emptyList(),
-            listOf(
-                "com.eignex.klause.util.OrCancellation.isCancelled",
-                "com.eignex.klause.theory.qfnra.PolynomialBooleanSigns.prepare",
-            ),
-            listOf("com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.stepExtra"),
-        )) {
+        for (stack in listOf(emptyList(), listOf(
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.theory.qfnra.PolynomialBooleanSigns.prepare",
+        ), listOf("com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.stepExtra"))) {
             val callers = CliProfile.cliPolynomialCheckpointCallers(stack)
 
             assertEquals("unknown: no captured polynomial checkpoint", callers)
@@ -58,12 +52,10 @@ class CliProfileTest {
 
     @Test
     fun `truncated polynomial checkpoint ancestors should remain unknown`() {
-        val callers = CliProfile.cliPolynomialCheckpointCallers(
-            listOf(
-                "com.eignex.klause.theory.qfnra.QfNraWork.isCancelled",
-                "com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.step",
-            ),
-        )
+        val callers = CliProfile.cliPolynomialCheckpointCallers(listOf(
+            "com.eignex.klause.theory.qfnra.QfNraWork.isCancelled",
+            "com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic.step",
+        ))
 
         assertEquals("unknown: no captured caller below polynomial checkpoint", callers)
     }
@@ -91,14 +83,10 @@ class CliProfileTest {
 
     @Test
     fun `missing or truncated context ancestors should remain unknown`() {
-        for (stack in listOf(
-            emptyList(),
-            listOf("java.util.HashMap.getNode"),
-            listOf(
-                "com.eignex.klause.lp.LpPropagator.solve",
-                "com.eignex.klause.solver.search.ExactLiraSearchComponent.relax",
-            ),
-        )) {
+        for (stack in listOf(emptyList(), listOf("java.util.HashMap.getNode"), listOf(
+            "com.eignex.klause.lp.LpPropagator.solve",
+            "com.eignex.klause.solver.search.ExactLiraSearchComponent.relax",
+        ))) {
             val markers = CliProfile.cliContextMarkers(stack)
 
             assertEquals("unknown: no captured context marker", markers)
@@ -119,13 +107,11 @@ class CliProfileTest {
 
     @Test
     fun `repeated context frames should contribute one marker`() {
-        val markers = CliProfile.cliContextMarkers(
-            listOf(
-                "com.eignex.klause.solver.pipeline.RetainedLinearQueries.check",
-                "com.eignex.klause.solver.pipeline.RetainedLinearQueries.decide",
-                "com.eignex.klause.solver.pipeline.RetainedLinearQueries.check",
-            ),
-        )
+        val markers = CliProfile.cliContextMarkers(listOf(
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.check",
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.decide",
+            "com.eignex.klause.solver.pipeline.RetainedLinearQueries.check",
+        ))
 
         assertEquals("observed: retained-query entry", markers)
     }
@@ -163,19 +149,17 @@ class CliProfileTest {
 
     @Test
     fun `model caller paths should retain source ancestors beyond mechanism packages`() {
-        val callers = CliProfile.cliModelCallers(
-            listOf(
-                "java.util.HashMap.getNode",
-                "com.eignex.klause.util.OrCancellation.isCancelled",
-                "com.eignex.klause.bench.tools.CliProfile.summarizeCli",
-                "com.eignex.klause.lp.engine.LpExactState.<init>",
-                "com.eignex.klause.lp.lattice.IntegerEchelon.reduce",
-                "com.eignex.klause.simplex.exact.BigFraction.plus",
-                "com.eignex.klause.arithmetic.difference.DifferenceGraph.potentials",
-                "com.eignex.klause.theory.qflra.LiveQfLraSystem.assertComparison",
-                "com.eignex.klause.solver.search.SearchSession.propagate",
-            ),
-        )
+        val callers = CliProfile.cliModelCallers(listOf(
+            "java.util.HashMap.getNode",
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.bench.tools.CliProfile.summarizeCli",
+            "com.eignex.klause.lp.engine.LpExactState.<init>",
+            "com.eignex.klause.lp.lattice.IntegerEchelon.reduce",
+            "com.eignex.klause.simplex.exact.BigFraction.plus",
+            "com.eignex.klause.arithmetic.difference.DifferenceGraph.potentials",
+            "com.eignex.klause.theory.qflra.LiveQfLraSystem.assertComparison",
+            "com.eignex.klause.solver.search.SearchSession.propagate",
+        ))
 
         assertEquals(
             "com.eignex.klause.theory.qflra.LiveQfLraSystem.assertComparison <- " +
@@ -205,12 +189,10 @@ class CliProfileTest {
             "com.eignex.klause.lp.relaxation.CpToLpRelaxation.prepare",
             "com.eignex.klause.bound.KnapsackLagrangianBound.compute",
         )) {
-            val callers = CliProfile.cliModelCallers(
-                listOf(
-                    "com.eignex.klause.simplex.exact.BigFraction.plus",
-                    frame,
-                ),
-            )
+            val callers = CliProfile.cliModelCallers(listOf(
+                "com.eignex.klause.simplex.exact.BigFraction.plus",
+                frame,
+            ))
 
             assertEquals(frame, callers)
         }
@@ -218,17 +200,13 @@ class CliProfileTest {
 
     @Test
     fun `stacks without model callers should retain an explicit unknown label`() {
-        for (stack in listOf(
-            emptyList(),
-            listOf("java.util.HashMap.getNode"),
-            listOf(
-                "com.eignex.klause.util.OrCancellation.isCancelled",
-                "com.eignex.klause.lp.engine.LpExactState.<init>",
-                "com.eignex.klause.lp.lattice.IntegerEchelon.reduce",
-                "com.eignex.klause.simplex.exact.BigFraction.plus",
-                "com.eignex.klause.arithmetic.difference.DifferenceGraph.potentials",
-            ),
-        )) {
+        for (stack in listOf(emptyList(), listOf("java.util.HashMap.getNode"), listOf(
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.lp.engine.LpExactState.<init>",
+            "com.eignex.klause.lp.lattice.IntegerEchelon.reduce",
+            "com.eignex.klause.simplex.exact.BigFraction.plus",
+            "com.eignex.klause.arithmetic.difference.DifferenceGraph.potentials",
+        ))) {
             val callers = CliProfile.cliModelCallers(stack)
 
             assertEquals("no captured model-facing caller", callers)
@@ -237,14 +215,12 @@ class CliProfileTest {
 
     @Test
     fun `operation caller paths should preserve captured order beyond utilities`() {
-        val callers = CliProfile.cliOperationCallers(
-            listOf(
-                "java.util.HashMap.getNode",
-                "com.eignex.klause.util.OrCancellation.isCancelled",
-                "com.eignex.klause.theory.qflra.LiveQfLraSystem.install",
-                "com.eignex.klause.solver.search.SearchSession.initialize",
-            ),
-        )
+        val callers = CliProfile.cliOperationCallers(listOf(
+            "java.util.HashMap.getNode",
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.theory.qflra.LiveQfLraSystem.install",
+            "com.eignex.klause.solver.search.SearchSession.initialize",
+        ))
 
         assertEquals(
             "com.eignex.klause.theory.qflra.LiveQfLraSystem.install <- " +
@@ -268,14 +244,10 @@ class CliProfileTest {
 
     @Test
     fun `stacks without operation callers should keep an explicit unknown label`() {
-        for (stack in listOf(
-            emptyList(),
-            listOf("java.util.HashMap.getNode"),
-            listOf(
-                "com.eignex.klause.util.OrCancellation.isCancelled",
-                "com.eignex.klause.bench.tools.CliProfile.summarizeCli",
-            ),
-        )) {
+        for (stack in listOf(emptyList(), listOf("java.util.HashMap.getNode"), listOf(
+            "com.eignex.klause.util.OrCancellation.isCancelled",
+            "com.eignex.klause.bench.tools.CliProfile.summarizeCli",
+        ))) {
             val callers = CliProfile.cliOperationCallers(stack)
 
             assertEquals("no captured Klause operation", callers)
@@ -312,13 +284,11 @@ class CliProfileTest {
 
     @Test
     fun `greedy seeding should retain visible ALNS bootstrap attribution`() {
-        val phase = CliProfile.cliPhase(
-            listOf(
-                "LocalSearchState.apply",
-                "LocalSearchEngine\$greedyRepairPass\$1.invokeSuspend",
-                "com.eignex.klause.meta.alns.Alns.bootstrapIncumbent",
-            ),
-        )
+        val phase = CliProfile.cliPhase(listOf(
+            "LocalSearchState.apply",
+            "LocalSearchEngine\$greedyRepairPass\$1.invokeSuspend",
+            "com.eignex.klause.meta.alns.Alns.bootstrapIncumbent",
+        ))
 
         assertEquals("ALNS bootstrap: local-search seeding", phase)
     }
@@ -349,14 +319,12 @@ class CliProfileTest {
 
     @Test
     fun `shared root initialization should retain nested propagation cost`() {
-        val phase = CliProfile.cliPhase(
-            listOf(
-                "com.eignex.klause.propagation.MutatorsKt.excludeIntValueImpl",
-                "SearchSession.propagate",
-                "SearchSession.initialize",
-                "SearchRun.next",
-            ),
-        )
+        val phase = CliProfile.cliPhase(listOf(
+            "com.eignex.klause.propagation.MutatorsKt.excludeIntValueImpl",
+            "SearchSession.propagate",
+            "SearchSession.initialize",
+            "SearchRun.next",
+        ))
 
         assertEquals("shared root initialization", phase)
     }
@@ -375,13 +343,11 @@ class CliProfileTest {
 
     @Test
     fun `utility frames without a shared caller should remain unclassified`() {
-        val phase = CliProfile.cliPhase(
-            listOf(
-                "java.util.HashMap.getNode",
-                "OrCancellation.isCancelled",
-                "SearchSession.checkBudgetExhausted",
-            ),
-        )
+        val phase = CliProfile.cliPhase(listOf(
+            "java.util.HashMap.getNode",
+            "OrCancellation.isCancelled",
+            "SearchSession.checkBudgetExhausted",
+        ))
 
         assertEquals("other or unclassified", phase)
     }

@@ -9,7 +9,6 @@ class SourceAffineImage(
     val constant: BigFraction = BigFraction.ZERO,
 ) {
     private val captured = coefficients.filterValues { !it.isZero }.toMap()
-
     /** Original-source terms defining the target coordinate. */
     val coefficients: Map<SourceCoordinate, BigFraction> get() = captured.toMap()
 }
@@ -29,10 +28,8 @@ class SourceTransformation(
 ) {
     private val capturedImages = images.toMap()
     private val capturedDerivations = premiseDerivations.toMap()
-
     /** A total image for every target coordinate. */
     val images: Map<SourceCoordinate, SourceAffineImage> get() = capturedImages.toMap()
-
     /** Original-source justifications for each substituted target premise and invocation restriction. */
     val premiseDerivations: Map<String, SourceDerivation> get() = capturedDerivations.toMap()
 }

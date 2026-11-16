@@ -34,7 +34,8 @@ internal abstract class BufferedBestOutput : OutputProtocol {
      *  models can carry one needs this; the default never sees it. */
     protected open fun formatContinuousObjective(objective: Double): String = objective.toString()
 
-    protected open fun formatExactObjective(objective: BigFraction): String = objective.toString()
+    protected open fun formatExactObjective(objective: BigFraction): String =
+        objective.toString()
 
     /** The single status line this format prints for [verdict] at completion. */
     protected abstract fun statusLine(verdict: Verdict): String

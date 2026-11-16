@@ -23,9 +23,7 @@ class CorpusFetcherTest {
     fun `declared input discovery includes indexed members absent from a local subset`() {
         val root = Files.createTempDirectory("corpusfetcher").toFile()
         val properties = listOf(
-            "klause.bench.corpusCache",
-            "klause.bench.corpus.shared",
-            "klause.bench.declaredInputs",
+            "klause.bench.corpusCache", "klause.bench.corpus.shared", "klause.bench.declaredInputs",
         ).associateWith(System::getProperty)
         try {
             System.setProperty("klause.bench.corpusCache", root.path)
@@ -38,19 +36,12 @@ class CorpusFetcherTest {
             val subset = File(root, "fixture").apply { mkdirs() }
             File(pack, "present.mps").copyTo(File(subset, "present.mps"))
             val collection = ExternalCollection(
-                "fixture",
-                "https://example.invalid/fixture.zip",
-                "test",
-                "test",
-                FetchMethod.Zip,
+                "fixture", "https://example.invalid/fixture.zip", "test", "test", FetchMethod.Zip,
             )
 
             val selected = CorpusSelection.select(
-                collection,
-                CorpusSelection.Layout.Flat("", "mps"),
-                CorpusSelection.Selection(),
-                Category.OPTIMIZATION,
-                Format.MPS,
+                collection, CorpusSelection.Layout.Flat("", "mps"), CorpusSelection.Selection(),
+                Category.OPTIMIZATION, Format.MPS,
             )
 
             assertEquals(setOf("missing", "present"), selected.map { it.name }.toSet())

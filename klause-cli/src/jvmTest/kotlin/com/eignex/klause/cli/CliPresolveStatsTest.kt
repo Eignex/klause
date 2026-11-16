@@ -17,12 +17,8 @@ import kotlin.time.Duration
 class CliPresolveStatsTest {
     @Test
     fun `summary keys should stay bounded and ordered when the ledger repeats`() {
-        val problem = Problem.of(
-            0,
-            1,
-            arrayOf(IntDomain(0, 10)),
-            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
-        )
+        val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 10)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)))
         val budget = PresolveBudget(Long.MAX_VALUE)
         val config = PresolveConfig.parse("off,+strengthen,+bve")
         PresolvePipeline.run(problem, null, config, false, presolveBudget = budget)
@@ -36,25 +32,19 @@ class CliPresolveStatsTest {
 
         val once = presolveStatPairs(SolveStats(presolve = PresolveStats(effort = effort))).toMap()
         val many = presolveStatPairs(SolveStats(presolve = PresolveStats(effort = repeated))).toMap()
-        val reversed = presolveStatPairs(
-            SolveStats(
-                presolve = PresolveStats(
+        val reversed = presolveStatPairs(SolveStats(presolve = PresolveStats(
             effort = repeated.copy(
                 invocations = repeated.invocations.reversed(),
                 preparationStages = repeated.preparationStages.reversed(),
             ),
-        )
-            )
-        )
+        )))
 
         assertEquals(once.keys, many.keys)
         assertEquals(many.toList(), reversed)
         assertEquals("100", many["presolveInvocation_SOURCE_bve_ELIGIBILITY_SKIP_Calls"])
         assertEquals("0", many["presolveInvocation_SOURCE_bve_ELIGIBILITY_SKIP_InputOccurrenceCalls"])
         assertEquals(null, many["presolveInvocation_SOURCE_bve_ELIGIBILITY_SKIP_InputOccurrences"])
-        assertEquals(
-            100 * once.getValue("presolveInvocationWork").toLong(),
-            many.getValue("presolveInvocationWork").toLong(),
-        )
+        assertEquals(100 * once.getValue("presolveInvocationWork").toLong(),
+            many.getValue("presolveInvocationWork").toLong())
     }
 }

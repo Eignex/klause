@@ -54,10 +54,7 @@ internal enum class LpPointRejection {
 internal enum class ReconstructionPhase { INPUT, POINT, DUAL, RAY, SUPPORT, VIOLATION, VECTOR, BASIS, SCHEDULE }
 
 internal data class ReconstructionDualRejection(
-    val column: Int,
-    val upper: Boolean,
-    val reduced: BigFraction,
-    val basic: Boolean? = null,
+    val column: Int, val upper: Boolean, val reduced: BigFraction, val basic: Boolean? = null,
 )
 internal data class ReconstructionVectorRejection(val commonDenominator: BigInt, val limit: BigInt)
 internal data class ReconstructionEntryRejection(val row: Int, val value: BigFraction)
@@ -144,15 +141,17 @@ internal class ReconstructionMeter(
     @JvmField var admittedUntil = 0L
 
     @Suppress("NOTHING_TO_INLINE") // The admitted work total also schedules the cold stop path.
-    inline fun step(units: Long = 1L) {
+    inline
+
+    fun step(units: Long = 1L) {
         if (units > admittedUntil - work) admit(units)
         work += units
     }
 
-    private fun admit(units: Long) {
-        poll()
+    private fun admit(units: Long) { poll()
         if (units > workLimit - work) throw ReconstructionStop(ReconstructionDecline.WORK)
-        if (units > admittedUntil - work) admittedUntil = work + units
+        if (units > admittedUntil - work) admittedUntil =
+        work + units
     }
 
     fun require(condition: Boolean, reason: ReconstructionDecline) {
@@ -425,11 +424,8 @@ private class FixedReconstructionVerifier(
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
         if (!a.hasOpenStructuralBounds) {
             for (i in y.indices) {
-                if (y[i].isZero || a.rhs[i].isZero) {
-                    meter.step()
-                } else {
-                    value = plus(value, times(y[i], from(a.rhs[i])))
-                }
+                if (y[i].isZero || a.rhs[i].isZero) meter.step()
+                else value = plus(value, times(y[i], from(a.rhs[i])))
             }
         }
         val reduced = ArrayList<BigFraction>(a.size)
@@ -437,9 +433,7 @@ private class FixedReconstructionVerifier(
         val selectedReduced = if (a.hasOpenStructuralBounds) {
             meter.storage(64L + a.size.toLong() * 8L)
             ArrayList<Frac128>(a.size)
-        } else {
-            null
-        }
+        } else null
         var strict = false
         for (j in 0 until a.size) {
             var d = if (ray) from(BigFraction.ZERO) else from(a.costs[j])
@@ -454,14 +448,9 @@ private class FixedReconstructionVerifier(
                     return null
                 }
                 if (selectedReduced == null) {
-                    if (side.number.value.isZero) {
-                        meter.step()
-                    } else {
-                        value = plus(value, times(d, from(side.number.value)))
-                    }
-                } else {
-                    selectedReduced += d
-                }
+                    if (side.number.value.isZero) meter.step()
+                    else value = plus(value, times(d, from(side.number.value)))
+                } else selectedReduced += d
                 selected += ExactSimplexBound(j, upper)
                 strict = strict || side.strict
             }
@@ -469,11 +458,8 @@ private class FixedReconstructionVerifier(
         }
         if (selectedReduced != null) {
             for (i in y.indices) {
-                if (y[i].isZero || a.rhs[i].isZero) {
-                    meter.step()
-                } else {
-                    value = plus(value, times(y[i], from(a.rhs[i])))
-                }
+                if (y[i].isZero || a.rhs[i].isZero) meter.step()
+                else value = plus(value, times(y[i], from(a.rhs[i])))
             }
             for (index in selected.indices) {
                 meter.step()
@@ -481,11 +467,8 @@ private class FixedReconstructionVerifier(
                 val side = requireNotNull(
                     if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower,
                 )
-                if (side.number.value.isZero) {
-                    meter.step()
-                } else {
-                    value = plus(value, times(selectedReduced[index], from(side.number.value)))
-                }
+                if (side.number.value.isZero) meter.step()
+                else value = plus(value, times(selectedReduced[index], from(side.number.value)))
             }
         }
         if (!ray) value = plus(times(value, reciprocal(from(a.scale))), from(a.external))
@@ -550,11 +533,8 @@ private class BigReconstructionVerifier(
         var value = if (ray) from(BigFraction.ZERO) else from(a.constant)
         if (!a.hasOpenStructuralBounds) {
             for (i in y.indices) {
-                if (y[i].isZero || a.rhs[i].isZero) {
-                    meter.step()
-                } else {
-                    value = plus(value, times(y[i], from(a.rhs[i])))
-                }
+                if (y[i].isZero || a.rhs[i].isZero) meter.step()
+                else value = plus(value, times(y[i], from(a.rhs[i])))
             }
         }
         val reduced = ArrayList<BigFraction>(a.size)
@@ -573,11 +553,8 @@ private class BigReconstructionVerifier(
                     return null
                 }
                 if (!a.hasOpenStructuralBounds) {
-                    if (side.number.value.isZero) {
-                        meter.step()
-                    } else {
-                        value = plus(value, times(d, from(side.number.value)))
-                    }
+                    if (side.number.value.isZero) meter.step()
+                    else value = plus(value, times(d, from(side.number.value)))
                 }
                 selected += ExactSimplexBound(j, upper)
                 strict = strict || side.strict
@@ -586,22 +563,16 @@ private class BigReconstructionVerifier(
         }
         if (a.hasOpenStructuralBounds) {
             for (i in y.indices) {
-                if (y[i].isZero || a.rhs[i].isZero) {
-                    meter.step()
-                } else {
-                    value = plus(value, times(y[i], from(a.rhs[i])))
-                }
+                if (y[i].isZero || a.rhs[i].isZero) meter.step()
+                else value = plus(value, times(y[i], from(a.rhs[i])))
             }
             for (cited in selected) {
                 meter.step()
                 val side = requireNotNull(
                     if (cited.upper) a.bounds[cited.column].upper else a.bounds[cited.column].lower,
                 )
-                if (side.number.value.isZero) {
-                    meter.step()
-                } else {
-                    value = plus(value, times(reduced[cited.column], from(side.number.value)))
-                }
+                if (side.number.value.isZero) meter.step()
+                else value = plus(value, times(reduced[cited.column], from(side.number.value)))
             }
         }
         if (!ray) value = plus(times(value, reciprocal(from(a.scale))), from(a.external))
@@ -662,10 +633,8 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
             meter.verificationRestarts++
             BigReconstructionVerifier(a, meter).dual(candidate, ray)
         } ?: run {
-            if (usesBasis) {
-                meter.basisDualRejection = meter.dualRejection?.let {
-                    it.copy(basic = basis?.status?.get(it.column) == VarStatus.BASIC)
-                }
+            if (usesBasis) meter.basisDualRejection = meter.dualRejection?.let {
+                it.copy(basic = basis?.status?.get(it.column) == VarStatus.BASIC)
             }
             return
         }
@@ -735,17 +704,9 @@ private class ReconstructionRun(private val a: ReconstructionAuthority, private 
             if (!validHeadings(basis)) return null
             meter.phase = ReconstructionPhase.BASIS
             val layout = try {
-                LogicalBasisLayout.prepare(
-                    a.n,
-                    a.m,
-                    basis.basicVars,
-                    { a.matrix[it] },
-                    { work, bytes ->
-                        meter.step(work)
-                        if (bytes > 0L) meter.storage(bytes)
-                    },
-                    { reason -> throw ReconstructionLayoutStop(reason) },
-                )
+                LogicalBasisLayout.prepare(a.n, a.m, basis.basicVars, { a.matrix[it] },
+                    { work, bytes -> meter.step(work); if (bytes > 0L) meter.storage(bytes) },
+                    { reason -> throw ReconstructionLayoutStop(reason) })
             } catch (stop: ReconstructionLayoutStop) {
                 meter.basisRepair = ReconstructionBasisMetrics(decline = stop.reason.name)
                 return null
@@ -806,9 +767,7 @@ internal fun reconstructCertificate(
     basis, cancellation, limits,
     goal = if (claim == LpClaim.FEASIBLE_COMPLETION || claim == LpClaim.CONTRADICTION) {
         ReconstructionGoal.POINT
-    } else {
-        ReconstructionGoal.ATTAINMENT
-    },
+    } else ReconstructionGoal.ATTAINMENT,
     validate = { meter ->
         for (vector in listOfNotNull(primal, duals, ray)) {
             meter.step(vector.size.toLong())
@@ -918,11 +877,8 @@ private fun reconstructCandidates(
             (goal != ReconstructionGoal.POINT || current.point == null) &&
             (goal != ReconstructionGoal.BOUND || (current.bound == null && limits.maxAttempts > 0))
         ) {
-            var violation = if (goal == ReconstructionGoal.BOUND) {
-                null
-            } else {
+            var violation = if (goal == ReconstructionGoal.BOUND) null else
                 reconstructionViolation(authority, x, y ?: rho, ray = y == null && rho != null, meter)
-            }
             var correction = BigFraction.ofLong(2L)
             var previous: BigInt? = null
             var round = 0
@@ -935,13 +891,8 @@ private fun reconstructCandidates(
                     }
                     if (current.bound != null) break
                 }
-                val defect = violation ?: reconstructionViolation(
-                    authority,
-                    x,
-                    y ?: rho,
-                    ray = y == null && rho != null,
-                    meter,
-                ).also { violation = it }
+                val defect = violation ?: reconstructionViolation(authority, x, y ?: rho,
+                    ray = y == null && rho != null, meter).also { violation = it }
                 meter.phase = ReconstructionPhase.SCHEDULE
                 val denominator = if (defect.isZero) {
                     RECONSTRUCTION_FLOOR
@@ -964,15 +915,11 @@ private fun reconstructCandidates(
                         val vector = reconstructExactVector(y, denominator, meter)
                             ?: if (goal == ReconstructionGoal.BOUND) {
                                 reconstructRationalEntries(y, denominator, meter)
-                            } else {
-                                null
-                            }
+                            } else null
                         vector?.let {
                             val candidate = if (goal == ReconstructionGoal.BOUND) {
                                 repairBoundMultipliers(authority, it, meter)
-                            } else {
-                                it
-                            }
+                            } else it
                             current.dual(candidate, ray = false)
                         }
                     }
@@ -993,9 +940,7 @@ private fun reconstructCandidates(
                 if (current.attained() || current.conflict != null ||
                     (goal == ReconstructionGoal.BOUND && current.bound != null) ||
                     (goal == ReconstructionGoal.POINT && current.point != null)
-                ) {
-                    break
-                }
+                ) break
                 val next = nextReconstructionRound(round)
                 repeat(
                     next - round,
@@ -1043,12 +988,8 @@ private fun reconstructRationalEntries(
     return values.mapIndexed { row, value ->
         meter.step()
         val floating = value.toDouble()
-        val part = reconstructRational(
-            floating,
-            maxDenominator = limit,
-            tolerance = 1e-9 * maxOf(1.0, kotlin.math.abs(floating)),
-            onStep = { meter.step() },
-        )
+        val part = reconstructRational(floating, maxDenominator = limit,
+            tolerance = 1e-9 * maxOf(1.0, kotlin.math.abs(floating)), onStep = { meter.step() })
         if (part == null) {
             meter.entryRejection = ReconstructionEntryRejection(row, value)
             reconstructExactVector(listOf(value), denominator, meter)?.single() ?: return null
@@ -1184,18 +1125,8 @@ internal fun certifyLpConflictOnly(
         LpClaimObservation(LpClaim.CONTRADICTION, it)
     }
     val checked = certifyLpConflictOnlyWithin(model, ray, limits, cancellation, observation ?: observer, policy)
-    observation?.finish(
-        CertifiedLpResult(
-            null,
-            checked.bound,
-            null,
-            null,
-            checked.conflict,
-            false,
-            { null },
-            reconstruction = checked.metrics,
-        ),
-    )
+    observation?.finish(CertifiedLpResult(null, checked.bound, null, null, checked.conflict,
+        false, { null }, reconstruction = checked.metrics))
     return checked
 }
 
@@ -1215,15 +1146,8 @@ private fun certifyLpConflictOnlyWithin(
     if (conflict != null && accepted == null) (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
     observer?.observe(LpCertifier.RATIONAL, conflict != null, LpCertifierCost.Metered(metrics.work))
     timer.finish(metrics.decline?.name ?: if (accepted != null) "CONFLICT" else "REFUSED", metrics.work)
-    return ReconstructedCertificate(
-        null,
-        null,
-        accepted,
-        checked.conflictSupport.takeIf { accepted != null },
-        false,
-        false,
-        metrics,
-    )
+    return ReconstructedCertificate(null, null, accepted, checked.conflictSupport.takeIf { accepted != null },
+        false, false, metrics)
 }
 
 internal fun certifyLpIntegerBoundOnly(
@@ -1238,18 +1162,8 @@ internal fun certifyLpIntegerBoundOnly(
         LpClaimObservation(LpClaim.BOUND, it)
     }
     val checked = certifyLpIntegerBoundWithin(model, duals, limits, cancellation, observation ?: observer, policy)
-    observation?.finish(
-        CertifiedLpResult(
-            null,
-            checked.bound,
-            null,
-            null,
-            null,
-            false,
-            { null },
-            reconstruction = checked.metrics,
-        ),
-    )
+    observation?.finish(CertifiedLpResult(null, checked.bound, null, null, null,
+        false, { null }, reconstruction = checked.metrics))
     return checked
 }
 
@@ -1310,9 +1224,7 @@ private fun certifyLpIntegerBoundWithin(
         decline = ReconstructionDecline.CANCELLED
         (observer as? LpClaimObservation)?.refuse("CANCELLED")
         null
-    } else {
-        accepted
-    }
+    } else accepted
     val metrics = meter.snapshot(decline)
     observer?.observe(LpCertifier.INTEGER, bound != null, LpCertifierCost.Metered(metrics.work))
     timer.finish("INTEGER_${decline?.name ?: if (result != null) "BOUND" else "REFUSED"}", metrics.work)
@@ -1333,18 +1245,8 @@ internal fun certifyLpBoundOnly(
         LpClaimObservation(LpClaim.BOUND, it)
     }
     val checked = certifyLpBoundOnlyWithin(model, duals, limits, cancellation, observation ?: observer, policy, basis)
-    observation?.finish(
-        CertifiedLpResult(
-            null,
-            checked.bound,
-            null,
-            null,
-            checked.conflict,
-            false,
-            { null },
-            reconstruction = checked.metrics,
-        ),
-    )
+    observation?.finish(CertifiedLpResult(null, checked.bound, null, null, checked.conflict,
+        false, { null }, reconstruction = checked.metrics))
     return checked
 }
 
@@ -1376,21 +1278,10 @@ private fun certifyLpBoundOnlyWithin(
     if (bound != null && accepted == null) (observer as? LpClaimObservation)?.refuse("POLICY_REFUSED")
     observer?.observe(LpCertifier.RATIONAL, bound != null, LpCertifierCost.Metered(metrics.work - metrics.basisWork))
     if (metrics.basisWork > 0L) {
-        observer?.observe(
-            LpCertifier.EXACT_BASIS,
-            bound != null && checked.boundUsesBasis,
-            LpCertifierCost.Metered(metrics.basisWork),
-        )
+        observer?.observe(LpCertifier.EXACT_BASIS, bound != null && checked.boundUsesBasis,
+            LpCertifierCost.Metered(metrics.basisWork))
     }
     timer.finish(metrics.decline?.name ?: if (accepted != null) "BOUND" else "REFUSED", metrics.work)
-    return ReconstructedCertificate(
-        null,
-        accepted,
-        null,
-        null,
-        false,
-        false,
-        metrics,
-        boundUsesBasis = accepted != null && checked.boundUsesBasis,
-    )
+    return ReconstructedCertificate(null, accepted, null, null, false, false, metrics,
+        boundUsesBasis = accepted != null && checked.boundUsesBasis)
 }

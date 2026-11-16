@@ -13,20 +13,15 @@ internal fun polynomialSelectionEncoding(
     val result = PolynomialExpression.Variable(selection.result)
     val condition = selection.condition
     if (condition is PolynomialRealFormula.Constant) {
-        return PolynomialRealFormula.Atom(
-            result,
-            PolynomialRelation.EQ,
-            if (condition.value) selection.whenTrue else selection.whenFalse,
-        )
+        return PolynomialRealFormula.Atom(result, PolynomialRelation.EQ,
+            if (condition.value) selection.whenTrue else selection.whenFalse)
     }
     val whenTrue = PolynomialRealFormula.Atom(result, PolynomialRelation.EQ, selection.whenTrue)
     checkpoint()
     val whenFalse = PolynomialRealFormula.Atom(result, PolynomialRelation.EQ, selection.whenFalse)
     checkpoint()
-    return PolynomialRealFormula.And(
-        listOf(
-            PolynomialRealFormula.Or(listOf(PolynomialRealFormula.Not(selection.condition), whenTrue)),
-            PolynomialRealFormula.Or(listOf(selection.condition, whenFalse)),
-        ),
-    )
+    return PolynomialRealFormula.And(listOf(
+        PolynomialRealFormula.Or(listOf(PolynomialRealFormula.Not(selection.condition), whenTrue)),
+        PolynomialRealFormula.Or(listOf(selection.condition, whenFalse)),
+    ))
 }

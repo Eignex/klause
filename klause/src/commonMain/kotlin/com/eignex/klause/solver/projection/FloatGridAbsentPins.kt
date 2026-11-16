@@ -25,7 +25,11 @@ import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 
-internal class FloatGridAbsentPin(val present: SourceBoolId, val default: BigFraction, factors: List<Int>) {
+internal class FloatGridAbsentPin(
+    val present: SourceBoolId,
+    val default: BigFraction,
+    factors: List<Int>,
+) {
     private val capturedFactors = factors.toList()
     val factors: List<Int> get() = capturedFactors.toList()
 }
@@ -71,9 +75,7 @@ internal fun prepareFloatGridAbsentPins(
             val relation = presentChannel(selector, column) ?: return null
             factors += ReifiedLinear(booleans, relation.first, relation.second, LinearOp.EQ, relation.third)
             factors += Clause(intArrayOf(Lit.make(pin.present.index, false), Lit.make(booleans, true)))
-            val nearest = if (selector.step.isZero) {
-                0L
-            } else {
+            val nearest = if (selector.step.isZero) 0L else {
                 val position = (pin.default - selector.origin) * selector.step.reciprocal()
                 val rounded = -(position + BigFraction.ofLong(2).reciprocal()).negated().ceilInteger()
                 when {
@@ -82,13 +84,8 @@ internal fun prepareFloatGridAbsentPins(
                     else -> rounded.toLongExact()
                 }
             }
-            factors += ReifiedLinear(
-                booleans + 1,
-                longArrayOf(1),
-                intArrayOf(selector.coordinate.variable),
-                LinearOp.EQ,
-                nearest,
-            )
+            factors += ReifiedLinear(booleans + 1, longArrayOf(1),
+                intArrayOf(selector.coordinate.variable), LinearOp.EQ, nearest)
             factors += Clause(intArrayOf(Lit.make(pin.present.index, true), Lit.make(booleans + 1, true)))
             repeat(4) { origins.add(pin.factors.first()) }
             booleans += 2
@@ -97,9 +94,7 @@ internal fun prepareFloatGridAbsentPins(
             cancellation.charge(1)
             if (cancellation() || factor !in source.factors.indices || factor in rows ||
                 lowerGridPin(source.factors[factor], column, pin.default) == null
-            ) {
-                return null
-            }
+            ) return null
             rows[factor] = column to pin.default
         }
         columns += column
@@ -120,9 +115,7 @@ private fun absentValueColumn(primary: FloatGridColumn, default: BigFraction, va
         val position = (default - primary.origin) * primary.step.reciprocal()
         if (position.den == BIG_ONE && position.num >= BIG_ZERO &&
             position.num < bigIntOf(primary.coordinate.buckets)
-        ) {
-            return primary
-        }
+        ) return primary
         val lower = if (position.num < BIG_ZERO) position.num else BIG_ZERO
         val last = position.den * bigIntOf(primary.coordinate.buckets - 1)
         val upper = if (last > position.num) last else position.num
@@ -140,23 +133,21 @@ private fun absentValueColumn(primary: FloatGridColumn, default: BigFraction, va
     if (!lo.isFinite() || !hi.isFinite() || !(hi - lo).isFinite() ||
         !increment.isFinite() || increment <= 0.0 ||
         (!origin.isZero && lo == 0.0) || (!end.isZero && hi == 0.0)
-    ) {
-        return null
-    }
+    ) return null
     return FloatGridColumn(primary.source, GridCoordinate(variable.toInt(), lo, hi, buckets), origin, step, primary)
 }
 
-private fun presentChannel(primary: FloatGridColumn, value: FloatGridColumn): Triple<LongArray, IntArray, Long>? {
+private fun presentChannel(
+    primary: FloatGridColumn,
+    value: FloatGridColumn,
+): Triple<LongArray, IntArray, Long>? {
     val ratio = primary.step * value.step.reciprocal()
     val offset = (primary.origin - value.origin) * value.step.reciprocal()
     if (ratio.den != BIG_ONE || offset.den != BIG_ONE || !ratio.num.fitsLong() || !offset.num.fitsLong()) {
         return null
     }
-    return Triple(
-        longArrayOf(1, -ratio.num.toLongExact()),
-        intArrayOf(value.coordinate.variable, primary.coordinate.variable),
-        offset.num.toLongExact(),
-    )
+    return Triple(longArrayOf(1, -ratio.num.toLongExact()),
+        intArrayOf(value.coordinate.variable, primary.coordinate.variable), offset.num.toLongExact())
 }
 
 internal fun lowerGridPin(factor: Factor, column: FloatGridColumn, default: BigFraction): List<Factor>? {
@@ -168,25 +159,19 @@ internal fun lowerGridPin(factor: Factor, column: FloatGridColumn, default: BigF
                 !factor.realVars.contentEquals(intArrayOf(column.source.index)) ||
                 !factor.realCoeffs.contentEquals(doubleArrayOf(1.0)) ||
                 BigFraction.ofDouble(factor.bound) != default
-            ) {
-                return null
-            }
+            ) return null
             operation = factor.op
             reifier = factor.aux
         }
-
         is Linear -> {
             val row = factor.realConstants ?: return null
             if (row.strict || factor.vars.isNotEmpty() ||
                 !factor.realVars.contentEquals(intArrayOf(column.source.index)) ||
                 row.realCoefficients.at(0) != 1.0 || BigFraction.ofDouble(row.bound) != default
-            ) {
-                return null
-            }
+            ) return null
             operation = factor.op
             reifier = null
         }
-
         else -> return null
     }
     val coefficients: LongArray
@@ -203,11 +188,6 @@ internal fun lowerGridPin(factor: Factor, column: FloatGridColumn, default: BigF
         coefficients = longArrayOf(1)
     }
     val variables = intArrayOf(column.coordinate.variable)
-    return listOf(
-        if (reifier == null) {
-            Linear(coefficients, variables, operation, bound)
-        } else {
-            ReifiedLinear(reifier, coefficients, variables, operation, bound)
-        },
-    )
+    return listOf(if (reifier == null) Linear(coefficients, variables, operation, bound)
+        else ReifiedLinear(reifier, coefficients, variables, operation, bound))
 }

@@ -26,9 +26,7 @@ internal class AffineLineEvaluation(
     fun at(parameter: AlgebraicReal): Point = Point(parameter)
 
     inner class Point internal constructor(private val parameter: AlgebraicReal) {
-        init {
-            arithmetic.step()
-        }
+        init { arithmetic.step() }
 
         val coordinateCount: Int get() = coordinates.size
 

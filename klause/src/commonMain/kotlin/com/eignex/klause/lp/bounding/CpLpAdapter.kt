@@ -82,17 +82,12 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     // The source-root probe asserts no search restriction; live adoption checks every changed bound.
     fun retainRootProbe(probe: PropagationSession?): Boolean {
         val target = sharedNative ?: return false
-        val sameSource = if (probe == null) {
-            sourceRoot && native == null
-        } else {
-            native === probe && probe.problem === engine.problem && probe.decisionLevel == 0
-        }
+        val sameSource = if (probe == null) sourceRoot && native == null
+            else native === probe && probe.problem === engine.problem && probe.decisionLevel == 0
         if (!engine.retainedRootEnabled || !sameSource || !persistentState ||
             target.problem !== engine.problem || target.decisionLevel != 0 || shared?.decisionLevel != 0 ||
             engine.propagator.state?.depth != 0
-        ) {
-            return false
-        }
+        ) return false
         native = target
         sourceRoot = false
         return true
@@ -251,15 +246,11 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
                     SearchAtomPremise.Unavailable
                 }
             }
-
             CutSourceKind.BOOLEAN -> session.boolValue(source.id)?.let { value ->
-                if (context.boolValue(source.id) != value) {
-                    SearchAtomPremise.Unavailable
-                } else {
+                if (context.boolValue(source.id) != value) SearchAtomPremise.Unavailable else {
                     SearchAtomPremise.Asserted(SearchDecision.Bool((source.id shl 1) or if (value) 0 else 1))
                 }
             } ?: SearchAtomPremise.Unavailable
-
             else -> SearchAtomPremise.Unavailable
         }
     }
@@ -275,18 +266,11 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         }
         val core = engine.propagator
         if (!persistentState) core.reset()
-        if (core.state == null && !core.install(
-                base,
-                base.authoritativeWithTemplates(
-                    engine.params.cancellation,
-                    onWork = engine::noteNodeOverhead,
-                ) {
-                    engine.sink.lp.observeTemplateUse(exactBounds = it)
-                } ?: return null,
-            )
-        ) {
-            return null
-        }
+        if (core.state == null && !core.install(base, base.authoritativeWithTemplates(engine.params.cancellation,
+            onWork = engine::noteNodeOverhead) {
+                engine.sink.lp.observeTemplateUse(exactBounds = it)
+            } ?: return null)
+        ) return null
         val depth = if (session ===
             sharedNative
         ) {
@@ -308,18 +292,11 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         if (weakens) {
             if (!core.resetRoot()) {
                 cuts = newCuts()
-                if (!core.install(
-                        base,
-                        base.authoritativeWithTemplates(
-                            engine.params.cancellation,
-                            onWork = engine::noteNodeOverhead,
-                        ) {
-                            engine.sink.lp.observeTemplateUse(exactBounds = it)
-                        } ?: return null,
-                    )
-                ) {
-                    return null
-                }
+                if (!core.install(base, base.authoritativeWithTemplates(engine.params.cancellation,
+                    onWork = engine::noteNodeOverhead) {
+                        engine.sink.lp.observeTemplateUse(exactBounds = it)
+                    } ?: return null)
+                ) return null
             } else {
                 cuts.retract(0)
             }
@@ -344,7 +321,11 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
         return rebound
     }
 
-    fun cutRelaxation(base: LpRelaxation, session: PropagationSession, selected: List<Cut>? = null): LpRelaxation? {
+    fun cutRelaxation(
+        base: LpRelaxation,
+        session: PropagationSession,
+        selected: List<Cut>? = null,
+    ): LpRelaxation? {
         if (currentModel !== base.model || native !== session) return null
         val map = base.sourceMap?.withCpBounds(base.model, session) ?: return null
         return applyCuts(base, map, selected, session, engine.params.cancellation)
@@ -368,22 +349,12 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             core.editCuts(edit)
         } finally {
             core.metrics?.let { after ->
-                if (beforeMetrics != null) {
-                    engine.sink.lp.cutLifecycle.shared(
-                        "OWNER_EDIT",
-                        LpPhaseStats(
-                            calls = 1L,
-                            work = after.preparationWork - beforeMetrics.preparationWork,
-                            outcomes = mapOf(
-                                "CREATED" to after.createdOwners - beforeMetrics.createdOwners,
-                                "CLOSED" to after.closedOwners - beforeMetrics.closedOwners,
-                                "DECLINED" to after.editDeclines - beforeMetrics.editDeclines,
-                                "RETIRED_ROWS" to edit.retired.size.toLong(),
-                                "ADDED_ROWS" to edit.rows.size.toLong(),
-                            ),
-                        ),
-                    )
-                }
+                if (beforeMetrics != null) engine.sink.lp.cutLifecycle.shared("OWNER_EDIT", LpPhaseStats(calls = 1L,
+                    work = after.preparationWork - beforeMetrics.preparationWork,
+                    outcomes = mapOf("CREATED" to after.createdOwners - beforeMetrics.createdOwners,
+                        "CLOSED" to after.closedOwners - beforeMetrics.closedOwners,
+                        "DECLINED" to after.editDeclines - beforeMetrics.editDeclines,
+                        "RETIRED_ROWS" to edit.retired.size.toLong(), "ADDED_ROWS" to edit.rows.size.toLong())))
             }
         }
         if (!applied || cancellation()) return null
@@ -410,14 +381,8 @@ internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
             return base
         }
         val cutEdit = cuts.prepareCompaction(before, remap, engine.params.cancellation) ?: return base
-        engine.noteNodeOverhead(
-            (
-                edit?.extent ?: (
-                    before.model.layoutStorage.total +
-                        cuts.storageUnits + before.trailStorageUnits
-                    )
-                ) * LpNodeOverhead.BUILD,
-        )
+        engine.noteNodeOverhead((edit?.extent ?: (before.model.layoutStorage.total +
+            cuts.storageUnits + before.trailStorageUnits)) * LpNodeOverhead.BUILD)
         if (!core.compact(before, remap, cutEdit, edit)) return base
         val state = requireNotNull(core.state)
         val model = requireNotNull(state.ownerWorkingModel())

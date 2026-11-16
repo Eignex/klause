@@ -1,4 +1,5 @@
 package com.eignex.klause.formats.mps
+
 import com.eignex.klause.ir.IntegralConstants
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.SemanticOverrides
@@ -37,10 +38,8 @@ class MpsCompilerExactTest {
         val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
         val compiled = source.toProblem(semanticOverrides = exact)
 
-        val witness = assertNotNull(
-            assertNotNull(source.toLinearSourceProblem(exact))
-                .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ONE)),
-        )
+        val witness = assertNotNull(assertNotNull(source.toLinearSourceProblem(exact))
+            .checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ONE)))
 
         assertEquals(listOf(BigFraction.ONE, BigFraction.ONE), witness.values)
         assertTrue(compiled.sourceExact)
@@ -59,11 +58,9 @@ class MpsCompilerExactTest {
         )
         val value = BigFraction.of(bigIntOf(30000001), bigIntOf(10000000))
         val tolerance = assertNotNull(source.toLinearSourceProblem())
-        val exact = assertNotNull(
-            source.toLinearSourceProblem(
-                SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-            ),
-        )
+        val exact = assertNotNull(source.toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
 
         assertTrue(source.toProblem().sourceExact)
         assertFalse(assertNotNull(tolerance.checkMpsWitness(listOf(value))).exact)
@@ -138,10 +135,8 @@ class MpsCompilerExactTest {
             val exact = SemanticOverrides(feasibilityTolerance = SourceTolerance())
             val compiled = source.toProblem(semanticOverrides = exact)
 
-            val witness = assertNotNull(
-                assertNotNull(source.toLinearSourceProblem(exact))
-                    .checkMpsWitness(listOf(BigFraction.ONE)),
-            )
+            val witness = assertNotNull(assertNotNull(source.toLinearSourceProblem(exact))
+                .checkMpsWitness(listOf(BigFraction.ONE)))
             val retained = checkNotNull(compiled.objective)
             val workingValue = BigFraction.ofLong(retained.intCoefficients.single() + retained.constant)
             val originalValue = workingValue * BigFraction.ofLong(compiled.objectiveScale).reciprocal()
@@ -154,11 +149,9 @@ class MpsCompilerExactTest {
     @Test
     fun `exact source capture should survive mutations of parser arrays`() {
         val source = Mps.parse("ROWS\n N COST\n E ROW\nCOLUMNS\n X ROW 0.1\nRHS\n R ROW 0.3\nENDATA")
-        val linear = assertNotNull(
-            source.toLinearSourceProblem(
-                SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-            ),
-        )
+        val linear = assertNotNull(source.toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
         source.constraints.single().coeffs[0] = 1.0
 
         val witness = assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ofLong(3))))
@@ -183,14 +176,12 @@ class MpsCompilerExactTest {
         val sat = assertIs<OpenTheoryResult.Sat>(
             assertIs<OpenTheoryExecution.Satisfy>(execution).result,
         )
-        assertNotNull(
-            assertNotNull(source.toLinearSourceProblem(exact)).checkMpsWitness(
-                compiled.columns.map { column ->
-                    val parts = sat.assignment.realValue(column.id).split('/')
-                    BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
-                },
-            ),
-        )
+        assertNotNull(assertNotNull(source.toLinearSourceProblem(exact)).checkMpsWitness(
+            compiled.columns.map { column ->
+                val parts = sat.assignment.realValue(column.id).split('/')
+                BigFraction.of(parseBigInt(parts[0]), parts.getOrNull(1)?.let(::parseBigInt) ?: BIG_ONE)
+            },
+        ))
     }
 
     @Test
@@ -325,10 +316,8 @@ class MpsCompilerExactTest {
 
         val optimal = assertIs<OpenTheoryOptimum.Optimal>(assertIs<OpenTheoryExecution.Optimize>(execution).result)
         assertEquals(
-            assertNotNull(
-                assertNotNull(parsed.toLinearSourceProblem(exact))
-                    .checkMpsWitness(listOf(BigFraction.ofLong(3))),
-            ).objective,
+            assertNotNull(assertNotNull(parsed.toLinearSourceProblem(exact))
+                .checkMpsWitness(listOf(BigFraction.ofLong(3)))).objective,
             optimal.value,
         )
     }

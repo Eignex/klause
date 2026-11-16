@@ -4,9 +4,7 @@ import com.eignex.klause.util.SharingMemoryObservation
 
 internal class GeneralLearnedRows(state: PropagationState? = null) : AbstractList<LearnedPropagator>() {
     private val rows = LearnedPolicyRows(columns = 6, retiredFlag = 8, objectColumns = true)
-    init {
-        state?.let { it.preparationIndexWork += rows.preparationWork }
-    }
+    init { state?.let { it.preparationIndexWork += rows.preparationWork } }
     override val size: Int get() = rows.size
     val primitiveBytes: Long get() = rows.primitiveBytes
     val referenceCapacity: Long get() = rows.referenceCapacity + 1L
@@ -26,17 +24,9 @@ internal class GeneralLearnedRows(state: PropagationState? = null) : AbstractLis
 
     operator fun set(index: Int, propagator: LearnedPropagator) = rows.setPropagator(index, propagator)
     operator fun get(index: Int, column: Int): Int = rows[index, column]
-    operator fun set(index: Int, column: Int, value: Int) {
-        rows[index, column] = value
-    }
-    fun payload(index: Int): Any? {
-        checkIndex(index)
-        return rows.payload(index)
-    }
-    fun setPayload(index: Int, value: Any?): Any? {
-        checkIndex(index)
-        return rows.setPayload(index, value)
-    }
+    operator fun set(index: Int, column: Int, value: Int) { rows[index, column] = value }
+    fun payload(index: Int): Any? { checkIndex(index); return rows.payload(index) }
+    fun setPayload(index: Int, value: Any?): Any? { checkIndex(index); return rows.setPayload(index, value) }
     fun admission(index: Int): Long = rows.admission(index)
     fun add(propagator: LearnedPropagator, stage: Int, lbd: Int, permanent: Boolean, origin: Int, admission: Long) =
         rows.add(stage, lbd, permanent, origin, admission, propagator)

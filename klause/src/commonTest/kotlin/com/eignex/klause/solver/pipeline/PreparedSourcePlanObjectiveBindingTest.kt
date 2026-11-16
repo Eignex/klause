@@ -80,8 +80,8 @@ class PreparedSourcePlanObjectiveBindingTest {
     @Test
     fun `invalid objective coordinates should preserve polynomial satisfaction and allow a rebind`() {
         val source = SmtLibPolynomial.parse(
-            "(declare-const x Real) (assert (= (* x x) 2))",
-        ).realSource()
+                "(declare-const x Real) (assert (= (* x x) 2))",
+            ).realSource()
         val plan = source.prepareExecutionPlan()
         val invalid = plan.withObjective(LinearObjective(realCoefficients = doubleArrayOf(1.0, 1.0)))
         val objective = LinearObjective(realCoefficients = doubleArrayOf(0.5), constant = 7)
@@ -122,8 +122,8 @@ class PreparedSourcePlanObjectiveBindingTest {
     @Test
     fun `quadratic rebinding should keep exact source units but drop an earlier affine objective`() {
         val source = SmtLibPolynomial.parse(
-            "(declare-const x Real) (assert (= (* x x) 2))",
-        ).realSource()
+                "(declare-const x Real) (assert (= (* x x) 2))",
+            ).realSource()
         val affine = source.prepareExecutionPlan().withObjective(
             LinearObjective(realCoefficients = doubleArrayOf(0.5)),
             maximize = true,

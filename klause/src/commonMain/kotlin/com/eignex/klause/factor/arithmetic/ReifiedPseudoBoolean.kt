@@ -36,8 +36,7 @@ class ReifiedPseudoBoolean private constructor(
     literals: IntArray,
     /** Comparison of the weighted literal sum with its exact right-hand side. */
     val op: PbOp,
-) : ReifiedFactor,
-    LinearRow {
+) : ReifiedFactor, LinearRow {
 
     init {
         require(literals.none { com.eignex.klause.ir.Lit.variable(it) == auxBoolVar }) {
@@ -92,14 +91,12 @@ class ReifiedPseudoBoolean private constructor(
      *  disjoint from a bare pseudo-Boolean's key. */
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REIFIED_PSEUDO_BOOLEAN, ::buildKey)
 
-    override fun remapStructuralHash(mapping: VarRemap): Int = if (integerConstants != null) {
-        hashRemappedKey(FactorKind.REIFIED_PSEUDO_BOOLEAN, mapping, ::buildKey)
-    } else {
-        materializeKey(FactorKind.REIFIED_PSEUDO_BOOLEAN) { sink ->
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        if (integerConstants != null) hashRemappedKey(FactorKind.REIFIED_PSEUDO_BOOLEAN, mapping, ::buildKey)
+        else materializeKey(FactorKind.REIFIED_PSEUDO_BOOLEAN) { sink ->
             sink.boolVar(mapping.bool(auxBoolVar))
             pseudoBooleanKey(sink, constants, mapping.lits(literals), op)
         }.hashCode()
-    }
 
     private fun buildKey(sink: KeySink) {
         sink.boolVar(auxBoolVar)

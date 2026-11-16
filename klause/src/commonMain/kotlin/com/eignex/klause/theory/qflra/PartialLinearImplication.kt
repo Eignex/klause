@@ -8,7 +8,11 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.magnitudeBitLength
 
-internal data class ExplainedLinearBound(val value: BigFraction, val strict: Boolean, val premise: SearchAtomPremise)
+internal data class ExplainedLinearBound(
+    val value: BigFraction,
+    val strict: Boolean,
+    val premise: SearchAtomPremise,
+)
 
 internal data class PartialLinearImplication(val truth: Boolean, val premise: SearchAtomPremise)
 
@@ -62,11 +66,8 @@ internal fun partialLinearImplication(
 ): PartialLinearImplication? {
     val arithmetic = PartialImplicationArithmetic(stop)
     if (!arithmetic.admit(comparison.bound)) return null
-    return partialLinearActivityImplication(
-        comparison,
-        { upper -> arithmetic.activity(comparison, upper, bound) },
-        stop,
-    )
+    return partialLinearActivityImplication(comparison,
+        { upper -> arithmetic.activity(comparison, upper, bound) }, stop)
 }
 
 // Activity providers admit their arithmetic under the same operation allowance as the comparison bound.
@@ -81,48 +82,31 @@ internal fun partialLinearActivityImplication(
         if (stop()) null else PartialLinearImplication(truth, SearchAtomPremise.All(sides.map { it.premise }))
     return when (comparison.op) {
         LinearOp.LE -> when {
-            upper?.let {
-                it.value < comparison.bound ||
-                    (it.value == comparison.bound && (!comparison.strict || it.strict))
-            } == true ->
+            upper?.let { it.value < comparison.bound ||
+                (it.value == comparison.bound && (!comparison.strict || it.strict)) } == true ->
                 implied(true, requireNotNull(upper))
-
-            lower?.let {
-                it.value > comparison.bound ||
-                    (it.value == comparison.bound && (comparison.strict || it.strict))
-            } == true ->
+            lower?.let { it.value > comparison.bound ||
+                (it.value == comparison.bound && (comparison.strict || it.strict)) } == true ->
                 implied(false, requireNotNull(lower))
-
             else -> null
         }
-
         LinearOp.GE -> when {
-            lower?.let {
-                it.value > comparison.bound ||
-                    (it.value == comparison.bound && (!comparison.strict || it.strict))
-            } == true ->
+            lower?.let { it.value > comparison.bound ||
+                (it.value == comparison.bound && (!comparison.strict || it.strict)) } == true ->
                 implied(true, requireNotNull(lower))
-
-            upper?.let {
-                it.value < comparison.bound ||
-                    (it.value == comparison.bound && (comparison.strict || it.strict))
-            } == true ->
+            upper?.let { it.value < comparison.bound ||
+                (it.value == comparison.bound && (comparison.strict || it.strict)) } == true ->
                 implied(false, requireNotNull(upper))
-
             else -> null
         }
-
         LinearOp.EQ, LinearOp.NE -> when {
             upper?.let { it.value < comparison.bound || (it.value == comparison.bound && it.strict) } == true ->
                 implied(comparison.op == LinearOp.NE, requireNotNull(upper))
-
             lower?.let { it.value > comparison.bound || (it.value == comparison.bound && it.strict) } == true ->
                 implied(comparison.op == LinearOp.NE, requireNotNull(lower))
-
             lower?.let { it.value == comparison.bound && !it.strict } == true &&
                 upper?.let { it.value == comparison.bound && !it.strict } == true ->
                 implied(comparison.op == LinearOp.EQ, requireNotNull(lower), requireNotNull(upper))
-
             else -> null
         }
     }
@@ -130,11 +114,10 @@ internal fun partialLinearActivityImplication(
 
 internal class PartialImplicationArithmetic(private val stop: ExecutionControl) {
     private val stride = PollStride()
-
     fun admit(value: BigFraction): Boolean {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         stop.charge(1L + bits / Long.SIZE_BITS)
-        return bits <= MAX_BITS && !(stride.due() && stop())
+        return bits <= MAX_BITS && !(stride.due() &&stop())
     }
 
     fun affineValue(value: BigFraction, scale: BigFraction, offset: BigFraction): BigFraction? {

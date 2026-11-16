@@ -60,9 +60,7 @@ internal object MiniZincMode : CliMode {
             // when the objective var is not in the model's `output` section. Off by default — the
             // standard MiniZinc flow renders objectives through solns2out, not this binary.
             FlagSpec(listOf("--output-objective"), false) { outputObjective = true },
-            FlagSpec(
-                listOf("--output-complete-assignment"),
-                false,
+            FlagSpec(listOf("--output-complete-assignment"), false,
                 help = "Include bounded original integer and Boolean coordinates as diagnostic comments",
             ) { completeAssignment = true },
         )
@@ -89,13 +87,9 @@ internal object MiniZincMode : CliMode {
             val applier = oznPath?.let { OznApplier(readTextFile(it)) }
             val render: (Sample) -> String = { sample ->
                 val text = applier?.render(original, sample) ?: writeFlatZincSolution(original, sample, outputObjective)
-                if (completeAssignment) {
-                    withCompleteAssignment(original, text) {
-                        writeFlatZincSolution(original.copy(outputItems = null), sample, true)
-                    }
-                } else {
-                    text
-                }
+                if (completeAssignment) withCompleteAssignment(original, text) {
+                    writeFlatZincSolution(original.copy(outputItems = null), sample, true)
+                } else text
             }
 
             val objective = original.linearObjective()
@@ -145,13 +139,9 @@ internal object MiniZincMode : CliMode {
             return preparedSourceSolvable(invocation, render, { assignment ->
                 val text = applier?.render(original, assignment)
                     ?: writeFlatZincSolution(original, assignment, outputObjective)
-                if (completeAssignment) {
-                    withCompleteAssignment(original, text) {
-                        writeFlatZincSolution(original.copy(outputItems = null), assignment, true)
-                    }
-                } else {
-                    text
-                }
+                if (completeAssignment) withCompleteAssignment(original, text) {
+                    writeFlatZincSolution(original.copy(outputItems = null), assignment, true)
+                } else text
             }, lpStats, elapsed)
         }
 
@@ -164,28 +154,21 @@ internal object MiniZincMode : CliMode {
             val decline = when {
                 program.floatVarsByName.isNotEmpty() || program.setVarsByName.isNotEmpty() ->
                     "integer and Boolean coordinates required"
-
                 count > 65_536 -> "coordinate limit"
-
                 (program.boolVarsByName.keys.asSequence() + program.intVarsByName.keys.asSequence())
                     .sumOf { it.length.toLong() } > 4 * 1024 * 1024 -> "name limit"
-
                 else -> null
             }
             val point = if (decline == null) renderPoint().removeSuffix("----------\n") else null
             val encodedSize = point?.lineSequence()?.filter { it.isNotEmpty() }
                 ?.sumOf { it.length.toLong() + "% klause-assignment: ".length + 1 }?.plus(100) ?: 0
             val reason = decline ?: if (encodedSize > 8 * 1024 * 1024) "text limit" else null
-            val evidence = if (reason != null) {
-                "% klause-assignment-unavailable: $reason\n"
-            } else {
-                buildString {
-                    append("% klause-assignment-begin: flatzinc-integer-v1\n")
-                    for (line in checkNotNull(point).lineSequence().filter { it.isNotEmpty() }) {
-                        append("% klause-assignment: ").append(line).append('\n')
-                    }
-                    append("% klause-assignment-end\n")
+            val evidence = if (reason != null) "% klause-assignment-unavailable: $reason\n" else buildString {
+                append("% klause-assignment-begin: flatzinc-integer-v1\n")
+                for (line in checkNotNull(point).lineSequence().filter { it.isNotEmpty() }) {
+                    append("% klause-assignment: ").append(line).append('\n')
                 }
+                append("% klause-assignment-end\n")
             }
             return rendered.removeSuffix("----------\n") + evidence + "----------\n"
         }
@@ -281,11 +264,8 @@ internal class MiniZincOutput(
         if (realScopeChanged) {
             println("% klause-source-claim: caller real bounds; no default-source proof")
         }
-        val qualified = flatZincSourceVerdict(
-            verdict,
-            declarationScopeChanged ||
-                (floatApproximation && verdict == Verdict.UNBOUNDED),
-        )
+        val qualified = flatZincSourceVerdict(verdict, declarationScopeChanged ||
+            (floatApproximation && verdict == Verdict.UNBOUNDED))
         when (qualified) {
             Verdict.SATISFIABLE, Verdict.OPTIMAL -> println("==========")
 

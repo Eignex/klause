@@ -42,28 +42,19 @@ class RealDifferenceFragmentsTest {
     fun `finite real graph assembly should retain cost independently of elective passes`() {
         val budget = PresolveBudget(0L)
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 1)),
+            0, 1, arrayOf(IntDomain(0, 1)),
             arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.EQ,
-                    BigFraction.ONE,
-                ),
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.EQ, BigFraction.ONE),
                 RealElement(0, 0, doubleArrayOf(0.0, 1.0), indexOffset = 0),
             ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
             realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
         )
 
         val preparation = FinitePipeline.prepare(
             FinitePipelineRequest(
-                problem,
-                FiniteEngine.BACKTRACK,
-                presolveConfig = PresolveConfig.NONE,
+                problem, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.NONE,
                 presolveBudget = budget,
             ),
         )
@@ -79,30 +70,14 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `a strict real cycle should refute an open source guard`() {
-        val problem = Problem(
-            1,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ONE.negated()),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                ),
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(1), Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE, BigFraction.ONE.negated()),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                    strict = true,
-                    activator = 0,
-                ),
-            ),
-            numRealVars = 2,
-            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
-        ).bake()
+        val problem = Problem(1, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO,
+                strict = true, activator = 0),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY }).bake()
             .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
@@ -115,30 +90,13 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `a strict comparison complement should retain its equality boundary`() {
-        val problem = Problem(
-            1,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.EQ,
-                    BigFraction.ZERO,
-                ),
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                    strict = true,
-                    activator = 0,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
-        ).bake()
+        val problem = Problem(1, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ZERO),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO, strict = true, activator = 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
             .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
@@ -152,25 +110,13 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `a guarded real path should exclude its contradictory table selection`() {
-        val problem = Problem(
-            1,
-            1,
-            arrayOf(IntDomain(0, 1)),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ONE.negated()),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                    strict = true,
-                    activator = 0,
-                ),
-                RealElement(0, 0, intArrayOf(1, 2), indexOffset = 0),
-            ),
-            numRealVars = 3,
-            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
-        ).bake()
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO,
+                strict = true, activator = 0),
+            RealElement(0, 0, intArrayOf(1, 2), indexOffset = 0),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY }).bake()
             .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         assertTrue(state.pinLit(Lit.make(0, true)))
@@ -181,33 +127,19 @@ class RealDifferenceFragmentsTest {
         assertEquals(IntDomain(1, 1), state.intDomains[0])
         val excluded = Lit.make(state.atomVarEq(0, 0), false)
         assertEquals(true, state.litTruth(excluded))
-        assertEquals(
-            listOf(Lit.make(0, false)),
-            state.atoms.ant[Lit.variable(excluded) - problem.numBoolVars]?.toList(),
-        )
+        assertEquals(listOf(Lit.make(0, false)),
+            state.atoms.ant[Lit.variable(excluded) - problem.numBoolVars]?.toList())
     }
 
     @Test
     fun `a sibling should release a table exclusion and retract its selected edges`() {
-        val problem = Problem(
-            1,
-            1,
-            arrayOf(IntDomain(0, 1)),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ONE.negated()),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                    strict = true,
-                    activator = 0,
-                ),
-                RealElement(0, 0, intArrayOf(1, 2), indexOffset = 0),
-            ),
-            numRealVars = 3,
-            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
-        ).bake()
+        val problem = Problem(1, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO,
+                strict = true, activator = 0),
+            RealElement(0, 0, intArrayOf(1, 2), indexOffset = 0),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY }).bake()
             .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
@@ -230,23 +162,12 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `table atoms should belong to each receiving propagation state`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.EQ,
-                    BigFraction.ONE,
-                ),
-                RealElement(0, 0, doubleArrayOf(0.0, 1.0), indexOffset = 0),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
-        ).bake()
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ONE),
+            RealElement(0, 0, doubleArrayOf(0.0, 1.0), indexOffset = 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
             .withRealDifferenceSystem(ExecutionControl.Never)
         val first = PropagationState(problem, Assumptions.None)
         val second = PropagationState(problem, Assumptions.None)
@@ -264,23 +185,12 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `integer remapping should leave private real graph vertices independent`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(2)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.EQ,
-                    BigFraction.ONE,
-                ),
-                RealElement(1, 2, doubleArrayOf(0.0, 1.0), indexOffset = 0),
-            ),
-            numRealVars = 3,
-            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
-        ).bake()
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(2)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ONE),
+            RealElement(1, 2, doubleArrayOf(0.0, 1.0), indexOffset = 0),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY }).bake()
             .withRealDifferenceSystem(ExecutionControl.Never)
         val system = assertIs<DifferenceSystem>(problem.factors.last())
         val remapped = system.remap(VarRemap(intArrayOf(), intArrayOf(1, 0)))
@@ -296,28 +206,13 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `unsupported real rows should supply no graph contradiction`() {
-        val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ONE),
-                    LinearOp.LE,
-                    BigFraction.ONE.negated(),
-                ),
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ONE.negated()),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                ),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
-        ).bake()
+        val problem = Problem(0, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE.negated()),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO),
+        ), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY)).bake()
             .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
@@ -329,17 +224,10 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `stopped real graph preparation should discard its prefix and retain spent work`() {
-        val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 1)),
-            arrayOf(
-                RealElement(0, 0, doubleArrayOf(0.0, 1.0), indexOffset = 0),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
-        ).bake()
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            RealElement(0, 0, doubleArrayOf(0.0, 1.0), indexOffset = 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY)).bake()
         var work = 0L
         val stop = object : ExecutionControl() {
             override fun isCancelled(): Boolean = work >= 4L
@@ -356,29 +244,13 @@ class RealDifferenceFragmentsTest {
     @Test
     fun `a positive fractional cycle should retain feasible strict rows`() {
         val half = BigFraction.of(bigIntOf(1), bigIntOf(2))
-        val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ONE.negated()),
-                    LinearOp.LE,
-                    half,
-                    strict = true,
-                ),
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(1), Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE, BigFraction.ONE.negated()),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                ),
-            ),
-            numRealVars = 2,
-            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
-        ).bake()
+        val problem = Problem(0, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, half, strict = true),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY }).bake()
             .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
@@ -390,29 +262,13 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `an unconditional strict real cycle should explain a root contradiction`() {
-        val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ONE.negated()),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                    strict = true,
-                ),
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(1), Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE, BigFraction.ONE.negated()),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                ),
-            ),
-            numRealVars = 2,
-            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
-        ).bake()
+        val problem = Problem(0, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO, strict = true),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(1), Term.ofRealVar(0)),
+                listOf(BigFraction.ONE, BigFraction.ONE.negated()), LinearOp.LE, BigFraction.ZERO),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY }).bake()
             .withRealDifferenceSystem(ExecutionControl.Never)
         val state = PropagationState(problem, Assumptions.None)
         val id = problem.numFactors - 1
@@ -425,31 +281,15 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `finite preparation should retain source factors alongside real graph deductions`() {
-        val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 1)),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.EQ,
-                    BigFraction.ONE,
-                ),
-                RealElement(0, 0, doubleArrayOf(0.0, 1.0), indexOffset = 0),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
-        )
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 1)), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.EQ, BigFraction.ONE),
+            RealElement(0, 0, doubleArrayOf(0.0, 1.0), indexOffset = 0),
+        ), numRealVars = 1, realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
 
-        val preparation = FinitePipeline.prepare(
-            FinitePipelineRequest(
-                problem,
-                FiniteEngine.BACKTRACK,
-                presolveConfig = PresolveConfig.NONE,
-            ),
-        )
+        val preparation = FinitePipeline.prepare(FinitePipelineRequest(problem, FiniteEngine.BACKTRACK,
+            presolveConfig = PresolveConfig.NONE))
         val prepared = preparation.executableProblem()
 
         assertEquals(problem.numFactors + 1, prepared.numFactors)
@@ -463,27 +303,13 @@ class RealDifferenceFragmentsTest {
 
     @Test
     fun `approximate source semantics should retain their arithmetic owner without an exact graph`() {
-        val semantics = SourceSemantics(
-            SourceFormat.IR,
-            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE),
-        ).resolve()
-        val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.LE,
-                    BigFraction.ZERO,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(1.0),
-            realUpper = doubleArrayOf(2.0),
-            semantics = semantics,
-        ).bake()
+        val semantics = SourceSemantics(SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(absolute = SemanticRational.ONE)).resolve()
+        val problem = Problem(0, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.LE, BigFraction.ZERO),
+        ), numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(2.0),
+            semantics = semantics).bake()
 
         val prepared = problem.withRealDifferenceSystem(ExecutionControl.Never)
 

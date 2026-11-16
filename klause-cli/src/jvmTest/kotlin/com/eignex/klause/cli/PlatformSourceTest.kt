@@ -22,9 +22,7 @@ class PlatformSourceTest(private val failure: Boolean) {
         var closed = false
         val source = object : CharSource, AutoCloseable {
             override fun next(): String = "unread input"
-            override fun close() {
-                closed = true
-            }
+            override fun close() { closed = true }
         }
 
         if (failure) {

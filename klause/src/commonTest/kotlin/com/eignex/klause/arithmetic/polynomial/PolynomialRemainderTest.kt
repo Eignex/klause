@@ -16,14 +16,10 @@ class PolynomialRemainderTest {
     fun `ordered remainders retain exact rational divisor coefficients`() {
         val xSquared = arithmetic.power(x, 2)
         val ySquared = arithmetic.power(y, 2)
-        val divisors = listOf(
-            Polynomial.ZERO,
+        val divisors = listOf(Polynomial.ZERO,
             arithmetic.subtract(arithmetic.scale(xSquared, BigFraction.ofLong(2)), Polynomial.ONE),
-            arithmetic.subtract(
-                arithmetic.scale(ySquared, BigFraction.ofLong(3)),
-                Polynomial.constant(BigFraction.ofLong(2)),
-            ),
-        )
+            arithmetic.subtract(arithmetic.scale(ySquared, BigFraction.ofLong(3)),
+                Polynomial.constant(BigFraction.ofLong(2))))
         val product = arithmetic.multiply(x, y)
         val polynomial = arithmetic.add(arithmetic.add(xSquared, ySquared), product)
 
@@ -51,11 +47,8 @@ class PolynomialRemainderTest {
         val polynomial = arithmetic.add(y, arithmetic.power(x, 2))
         val divisor = arithmetic.subtract(arithmetic.power(x, 2), Polynomial.ONE)
         var stopped = false
-        val pending = preparePolynomialRemainder(
-            polynomial,
-            listOf(divisor),
-            PolynomialArithmetic(ExecutionControl { stopped }),
-        )
+        val pending = preparePolynomialRemainder(polynomial, listOf(divisor),
+            PolynomialArithmetic(ExecutionControl { stopped }))
         assertNull(pending.next())
 
         stopped = true
@@ -65,14 +58,8 @@ class PolynomialRemainderTest {
 
     @Test
     fun `unrepresentable remainder powers decline without a partial polynomial`() {
-        val large = Polynomial.of(
-            listOf(
-                PolynomialTerm(
-                    Monomial.of(mapOf(0 to Int.MAX_VALUE)),
-                    BigFraction.ONE,
-                ),
-            ),
-        )
+        val large = Polynomial.of(listOf(PolynomialTerm(Monomial.of(mapOf(0 to Int.MAX_VALUE)),
+            BigFraction.ONE)))
         val divisor = arithmetic.subtract(y, large)
         val polynomial = arithmetic.power(y, 2)
         val pending = preparePolynomialRemainder(polynomial, listOf(divisor), arithmetic)
@@ -139,13 +126,8 @@ class PolynomialRemainderTest {
     fun `shared divisors retain independent suspended dividend reductions`() {
         val squareX = arithmetic.power(x, 2)
         val squareY = arithmetic.power(y, 2)
-        val remainders = PolynomialRemainder(
-            listOf(
-                arithmetic.subtract(squareX, Polynomial.ONE),
-                arithmetic.subtract(squareY, Polynomial.constant(BigFraction.ofLong(2))),
-            ),
-            arithmetic,
-        )
+        val remainders = PolynomialRemainder(listOf(arithmetic.subtract(squareX, Polynomial.ONE),
+            arithmetic.subtract(squareY, Polynomial.constant(BigFraction.ofLong(2)))), arithmetic)
         val first = remainders.prepare(arithmetic.add(squareX, y))
         val second = remainders.prepare(arithmetic.add(x, squareY))
         assertNull(first.next())

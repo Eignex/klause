@@ -110,9 +110,8 @@ class NativeCapIndexTest {
         val rows = Rows()
         rows.add(9)
         rows.budget = ReclamationPreparation(64L, 512L, { false }, {})
-        try {
-            rows.index.advance(0, rows.configuration, rows.budget, rows.policy)
-        } catch (_: ReclamationPreparation.Deferred) { }
+        try { rows.index.advance(0, rows.configuration, rows.budget, rows.policy) }
+        catch (_: ReclamationPreparation.Deferred) { }
         rows.retirements = 7
 
         rows.finish(0)
@@ -199,12 +198,7 @@ class NativeCapIndexTest {
     fun `a new use after completed classification should protect eviction and survive suspension`() {
         val rows = Rows()
         repeat(4) { rows.add(9 - it) }
-        rows.keepHook = { id ->
-            if (id == 0) {
-                rows.use(0)
-                rows.cancelled = true
-            }
-        }
+        rows.keepHook = { id -> if (id == 0) { rows.use(0); rows.cancelled = true } }
         rows.attempt(1)
         assertEquals(1, rows.calls[0])
         rows.keepHook = {}
@@ -226,9 +220,8 @@ class NativeCapIndexTest {
             repeat(6) { rows.add(9 - it) }
             var charged = 0L
             rows.budget = ReclamationPreparation(100_000L, 1_048_576L, { charged >= stop }, { charged += it })
-            try {
-                rows.index.advance(2, rows.configuration, rows.budget, rows.policy)
-            } catch (_: ReclamationPreparation.Deferred) { }
+            try { rows.index.advance(2, rows.configuration, rows.budget, rows.policy) }
+            catch (_: ReclamationPreparation.Deferred) { }
 
             rows.finish(2)
 
@@ -341,9 +334,8 @@ class NativeCapIndexTest {
             repeat(6) { rows.add(9 - it) }
             var charged = 0L
             rows.budget = ReclamationPreparation(100_000L, 1_048_576L, { charged >= stop }, { charged += it })
-            try {
-                rows.index.advance(2, rows.configuration, rows.budget, rows.policy)
-            } catch (_: ReclamationPreparation.Deferred) { }
+            try { rows.index.advance(2, rows.configuration, rows.budget, rows.policy) }
+            catch (_: ReclamationPreparation.Deferred) { }
             rows.add(3)
             rows.budget = ReclamationPreparation(100_000L, 1_048_576L, { false }, {})
 
@@ -361,17 +353,12 @@ class NativeCapIndexTest {
         rows.finish(8)
         val populated = rows.index.modeledBytes
         val occupied = SharingMemoryObservation(10_000L, 1024, { false }, {})
-        val occupiedValues = assertNotNull(
-            occupied.snapshot {
-                rows.index.sharingMemory(occupied, false)
-            }.completeValues,
-        )
+        val occupiedValues = assertNotNull(occupied.snapshot {
+            rows.index.sharingMemory(occupied, false)
+        }.completeValues)
         assertEquals(rows.index.primitiveBytes, occupiedValues.getValue("ownedPrimitiveBytes"))
-        assertEquals(
-            populated,
-            occupiedValues.getValue("ownedPrimitiveBytes") +
-                occupiedValues.getValue("ownedReferenceSlots") * Long.SIZE_BYTES,
-        )
+        assertEquals(populated, occupiedValues.getValue("ownedPrimitiveBytes") +
+            occupiedValues.getValue("ownedReferenceSlots") * Long.SIZE_BYTES)
 
         rows.finish(0)
 
@@ -382,10 +369,8 @@ class NativeCapIndexTest {
         val snapshot = sample.snapshot { rows.index.sharingMemory(sample, false) }
         val values = assertNotNull(snapshot.completeValues)
         assertEquals(rows.index.primitiveBytes, values.getValue("ownedPrimitiveBytes"))
-        assertEquals(
-            rows.index.modeledBytes,
-            values.getValue("ownedPrimitiveBytes") + values.getValue("ownedReferenceSlots") * Long.SIZE_BYTES,
-        )
+        assertEquals(rows.index.modeledBytes,
+            values.getValue("ownedPrimitiveBytes") + values.getValue("ownedReferenceSlots") * Long.SIZE_BYTES)
     }
 
     @Test
@@ -446,7 +431,8 @@ class NativeCapIndexTest {
                 try {
                     completed = rows.index.advance(2, rows.configuration, rows.budget, rows.policy) !=
                         NativeCapIndex.Completion.None
-                } catch (_: ReclamationPreparation.Deferred) { }
+                }
+                catch (_: ReclamationPreparation.Deferred) { }
                 assertTrue(rows.budget.work <= work)
             }
         }
@@ -461,9 +447,8 @@ class NativeCapIndexTest {
         val rows = Rows()
         repeat(8) { rows.add(6, ClauseTier.MID) }
         rows.budget = ReclamationPreparation(1024L, 512L, { false }, {})
-        try {
-            rows.index.advance(0, rows.configuration, rows.budget, rows.policy)
-        } catch (_: ReclamationPreparation.Deferred) { }
+        try { rows.index.advance(0, rows.configuration, rows.budget, rows.policy) }
+        catch (_: ReclamationPreparation.Deferred) { }
         assertTrue(rows.index.bootstrapping)
         rows.alive.fill(false)
         rows.index.invalidateRetiredHandles()
@@ -480,9 +465,8 @@ class NativeCapIndexTest {
         val rows = Rows()
         repeat(4) { rows.add(6, ClauseTier.MID) }
         rows.budget = ReclamationPreparation(1024L, 512L, { false }, {})
-        try {
-            rows.index.advance(0, rows.configuration, rows.budget, rows.policy)
-        } catch (_: ReclamationPreparation.Deferred) { }
+        try { rows.index.advance(0, rows.configuration, rows.budget, rows.policy) }
+        catch (_: ReclamationPreparation.Deferred) { }
         rows.alive[1] = false
         rows.index.invalidateRetiredHandles()
         rows.finish(4)
@@ -549,10 +533,7 @@ class NativeCapIndexTest {
             override val retirementCount: Int get() = retirements
             override fun alive(index: Int): Boolean = alive[index]
             override fun lbd(index: Int): Int = keys[index]
-            override fun prepare(index: Int): Boolean {
-                budget.visit(36L)
-                return true
-            }
+            override fun prepare(index: Int): Boolean { budget.visit(36L); return true }
             override fun visited() = Unit
             override fun keep(index: Int): Boolean {
                 calls[index]++
@@ -572,13 +553,8 @@ class NativeCapIndexTest {
                 return before != ClauseTier.LOCAL || recent || protected[index]
             }
             override fun retire(index: Int): Boolean {
-                if (kept[index] || protected[index] || (
-                        configuration.tiered &&
-                            (used[index] || tiers[index] != ClauseTier.LOCAL)
-                        )
-                ) {
-                    return false
-                }
+                if (kept[index] || protected[index] || (configuration.tiered &&
+                    (used[index] || tiers[index] != ClauseTier.LOCAL))) return false
                 budget.visit(24L)
                 budget.visit(0L)
                 alive[index] = false
@@ -616,11 +592,8 @@ class NativeCapIndexTest {
 
         fun attempt(cap: Int): NativeCapIndex.Completion {
             budget = ReclamationPreparation(100_000L, 1_048_576L, { cancelled }, {})
-            return try {
-                index.advance(cap, configuration, budget, policy)
-            } catch (_: ReclamationPreparation.Deferred) {
-                NativeCapIndex.Completion.None
-            }
+            return try { index.advance(cap, configuration, budget, policy) }
+            catch (_: ReclamationPreparation.Deferred) { NativeCapIndex.Completion.None }
         }
 
         fun finish(cap: Int) {

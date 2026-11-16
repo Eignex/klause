@@ -14,23 +14,11 @@ import kotlin.test.assertFailsWith
 class CorpusStagingAdapterTest {
     @Test
     fun `frozen source planning preserves both byte identities without resolving a corpus`() {
-        val input = FrozenStagingInput(
-            "offline",
-            "tiny",
-            "DIMACS",
-            "offline/tiny.cnf.zst",
-            "1".repeat(64),
-            "2".repeat(64),
-        )
+        val input = FrozenStagingInput("offline", "tiny", "DIMACS", "offline/tiny.cnf.zst",
+            "1".repeat(64), "2".repeat(64))
 
-        val case = CorpusStagingSuite.plan(
-            BenchRequest(
-                mapOf(
-                    "inputs" to BenchProtocol.json.encodeToString(listOf(input)),
-                    "timeout-ms" to "10000",
-                ),
-            ),
-        ).single()
+        val case = CorpusStagingSuite.plan(BenchRequest(mapOf(
+            "inputs" to BenchProtocol.json.encodeToString(listOf(input)), "timeout-ms" to "10000"))).single()
 
         assertEquals(input.path, case.inputs.single().path)
         assertEquals(BenchInputRoot.CORPUS, case.inputs.single().root)
@@ -44,14 +32,8 @@ class CorpusStagingAdapterTest {
         val input = FrozenStagingInput("offline", "tiny", "DIMACS", "offline/tiny.cnf.zst", "1".repeat(64), hash)
 
         assertFailsWith<IllegalArgumentException> {
-            CorpusStagingSuite.plan(
-                BenchRequest(
-                    mapOf(
-                        "inputs" to BenchProtocol.json.encodeToString(listOf(input)),
-                        "timeout-ms" to "10000",
-                    ),
-                ),
-            )
+            CorpusStagingSuite.plan(BenchRequest(mapOf(
+                "inputs" to BenchProtocol.json.encodeToString(listOf(input)), "timeout-ms" to "10000")))
         }
     }
 
@@ -62,23 +44,13 @@ class CorpusStagingAdapterTest {
         target: String,
         bufferKiB: Int,
     ) {
-        val input = FrozenStagingInput(
-            "offline",
-            "tiny",
-            "DIMACS",
-            "offline/tiny.cnf.zst",
-            "1".repeat(64),
-            "2".repeat(64),
-        )
+        val input = FrozenStagingInput("offline", "tiny", "DIMACS", "offline/tiny.cnf.zst",
+            "1".repeat(64), "2".repeat(64))
         val parameters = mapOf("inputs" to BenchProtocol.json.encodeToString(listOf(input)), "timeout-ms" to "10000")
 
         val baseline = CorpusStagingSuite.plan(BenchRequest(parameters)).single()
-        val control = CorpusStagingSuite.plan(
-            BenchRequest(
-                parameters +
-                    mapOf("order" to order, "staging-target" to target, "staging-buffer-kib" to bufferKiB.toString()),
-            ),
-        ).single()
+        val control = CorpusStagingSuite.plan(BenchRequest(parameters +
+            mapOf("order" to order, "staging-target" to target, "staging-buffer-kib" to bufferKiB.toString()))).single()
 
         assertEquals(baseline.inputs, control.inputs)
         assertEquals(baseline.attributes["comparisonKey"], control.attributes["comparisonKey"])

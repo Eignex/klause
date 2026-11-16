@@ -215,31 +215,24 @@ internal object MakeSets {
             val c = text[i]
             when {
                 quoted && c == '"' && text.getOrNull(i + 1) == '"' -> {
-                    field.append('"')
+                    field.append('"');
                     i++
                 }
-
                 quoted && c == '"' -> quoted = false
-
                 quoted -> field.append(c)
-
                 c == '"' -> {
-                    quoted = true
+                    quoted = true;
                     started = true
                 }
-
                 c == ',' -> {
-                    fields += field.toString()
-                    field.clear()
+                    fields += field.toString();
+                    field.clear();
                     started = true
                 }
-
                 c == '\r' && text.getOrNull(i + 1) == '\n' -> {}
-
                 c == '\n' || c == '\r' -> endRecord()
-
                 else -> {
-                    field.append(c)
+                    field.append(c);
                     started = true
                 }
             }
@@ -289,7 +282,7 @@ internal class PythonRandom(seed: Long) {
             i++
             j++
             if (i >= N) {
-                mt[0] = mt[N - 1]
+                mt[0] = mt[N - 1];
                 i = 1
             }
             if (j >= key.size) j = 0
@@ -298,7 +291,7 @@ internal class PythonRandom(seed: Long) {
             mt[i] = (mt[i] xor ((mt[i - 1] xor (mt[i - 1] ushr 30)) * 1566083941)) - i
             i++
             if (i >= N) {
-                mt[0] = mt[N - 1]
+                mt[0] = mt[N - 1];
                 i = 1
             }
         }

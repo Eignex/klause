@@ -350,13 +350,8 @@ internal fun FlatZincCompiler.emitFloatTimes(c: FznConstraint) {
         emitFiniteFloatProduct(aRef, bRef, cRef)
         return
     }
-    factors.add(
-        GridProduct(
-            gridArithmeticCoordinate(aRef, "__grid_product"),
-            gridArithmeticCoordinate(bRef, "__grid_product"),
-            gridArithmeticCoordinate(cRef, "__grid_product"),
-        ),
-    )
+    factors.add(GridProduct(gridArithmeticCoordinate(aRef, "__grid_product"),
+        gridArithmeticCoordinate(bRef, "__grid_product"), gridArithmeticCoordinate(cRef, "__grid_product")))
 }
 
 /** Retain `float_abs(x, y)` under its component's exact or bucketed semantics. */
@@ -390,14 +385,7 @@ internal fun FlatZincCompiler.emitFloatAbs(c: FznConstraint) {
         return
     }
     val relation = com.eignex.klause.factor.arithmetic.GridAbs(
-        x.varId,
-        y.varId,
-        x.lo,
-        x.hi,
-        x.buckets,
-        y.lo,
-        y.hi,
-        y.buckets,
+        x.varId, y.varId, x.lo, x.hi, x.buckets, y.lo, y.hi, y.buckets,
     )
     if (!relation.hasImage) failHere("float_abs: not representable under the current float bucketing")
     factors.add(relation)

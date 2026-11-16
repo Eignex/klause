@@ -62,11 +62,7 @@ internal class WideReifiedLinearPropagator(
             wideSideReason(state, vars, coeffs, side, -1, if (includeExtraLit) extraLit else null)
         } else {
             collectLinearTightenAntecedents(
-                state,
-                vars,
-                excludeIdx = -1,
-                extraLit = extraLit,
-                includeExtraLit = includeExtraLit,
+                state, vars, excludeIdx = -1, extraLit = extraLit, includeExtraLit = includeExtraLit,
             )
         }
     }
@@ -130,9 +126,7 @@ internal class WideReifiedLinearPropagator(
             extraPin = {
                 if (singleEquality && eqTargetUnreachable(state)) {
                     state.pinBool(
-                        auxBoolVar,
-                        op == LinearOp.NE,
-                        unreachableEqualityReason(state, vars[0], equalityTarget),
+                        auxBoolVar, op == LinearOp.NE, unreachableEqualityReason(state, vars[0], equalityTarget),
                     )
                 } else {
                     null

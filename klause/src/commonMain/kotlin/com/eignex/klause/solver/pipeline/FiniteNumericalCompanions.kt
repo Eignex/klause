@@ -46,27 +46,20 @@ internal fun finiteNumericalCompanionEligibility(
     objective: LinearObjective?,
     params: TheoryParams,
 ): WorkerEligibility {
-    val cost = WorkerConstructionCost(
-        problem.numIntVars.toLong() + problem.numRealVars, problem.factors.size,
+    val cost = WorkerConstructionCost(problem.numIntVars.toLong() + problem.numRealVars, problem.factors.size,
         lpWorkLimit = params.sourceLpWorkLimit / 2, allocationLimit = params.sourceLpAllocationLimit / 2,
         activeMillis = scenario.companionActiveMillis, sliceMillis = 1_000, sliceWork = 5_000,
-        maxColumns = 4_096, maxFactors = 16_384,
-    )
+        maxColumns = 4_096, maxFactors = 16_384)
     val requirements = WorkerRequirements(
         if (scenario.companionIntegers) WorkerFragment.AFFINE_MIXED else WorkerFragment.AFFINE_BINARY_MIXED,
-        WorkerObjectiveView.CANONICAL,
-        WorkerProofAuthority.CHECKED_TERMINALS,
-        cost,
-    )
+        WorkerObjectiveView.CANONICAL, WorkerProofAuthority.CHECKED_TERMINALS, cost)
     val declines = buildList {
         if (scenario.cores != 1) add("single-lane-required")
         if (scenario.kind != Kind.COP || objective == null) add("canonical-objective-required")
         if (scenario.engine != EngineMix.MIXED) add("mixed-pool-required")
         if (scenario.explicitArms || scenario.arms != PortfolioScenario.DEFAULT_ARMS || scenario.btPool != null ||
             scenario.lsPool != null || scenario.btEdit != null || scenario.annotationArm != null
-        ) {
-            add("explicit-finite-recipe")
-        }
+        ) add("explicit-finite-recipe")
         if (problem.numIntVars == 0 || problem.numRealVars == 0 || problem.numBoolVars != 0) {
             add("integer-continuous-fragment-required")
         }
@@ -74,9 +67,8 @@ internal fun finiteNumericalCompanionEligibility(
             add("binary-integers-required")
         }
         if (cost.columns <= requireNotNull(cost.maxColumns) && (0 until problem.numIntVars).any {
-                !problem.intBounds.hasLower(it) || !problem.intBounds.hasUpper(it)
-            }
-        ) {
+            !problem.intBounds.hasLower(it) || !problem.intBounds.hasUpper(it)
+        }) {
             add("finite-integer-bounds-required")
         }
         if (cost.columns > requireNotNull(cost.maxColumns) || cost.factors > requireNotNull(cost.maxFactors)) {
@@ -108,33 +100,19 @@ internal class FiniteNumericalCompanions private constructor(
     val incumbents = PortfolioIncumbents.exact(objective)
     var objectiveBound: SourceEvidence? = null
         private set
-    private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null) {
-        LinearIncumbentSharing()
-    } else {
-        null
-    }
+    private val completionSharing = if (params.sourceIncumbentCompletion && incumbentCompletionCheck != null)
+        LinearIncumbentSharing() else null
     private val repairGuidance = if (completionSharing != null) LinearRepairGuidance() else null
 
     fun factories(plan: PreparedSourcePlan, firstArm: Int, sharePoints: Boolean = true): List<PortfolioArmFactory> {
         val identity = ModelIdentity.of(model, objective)
         val binding = EngineInvocation(plan, identity, objective)
         fun factory(arm: Int, family: ArmFamily, create: (PortfolioWorkerSlot) -> PortfolioWorker) =
-            PortfolioArmFactory(
-                plan,
-                arm,
-                family,
-                binding = {
-                    SourceWorkerBinding(
-                        binding,
-                        sharingInvocation = binding,
-                        provesResults = it.permitsSourceProofs,
-                    )
-                },
-                create = create,
-            )
+            PortfolioArmFactory(plan, arm, family,
+                binding = { SourceWorkerBinding(binding, sharingInvocation = binding,
+                    provesResults = it.permitsSourceProofs) }, create = create)
         fun local(slot: PortfolioWorkerSlot) = params.copy(
-            randomSeed = slot.seed,
-            nodeBudget = slot.nodeBudget,
+            randomSeed = slot.seed, nodeBudget = slot.nodeBudget,
             cancellation = cancellation or params.cancellation or slot.cancellation,
             sourceLpWorkLimit = requireNotNull(cost.lpWorkLimit),
             sourceLpAllocationLimit = requireNotNull(cost.allocationLimit),
@@ -144,21 +122,16 @@ internal class FiniteNumericalCompanions private constructor(
                 lateinit var worker: PortfolioWorker
                 worker = PortfolioWorker.ofMinimize(FiniteCompanionArms.NUMERICAL_TRAVERSAL, firstArm, resumable = {
                     val limits = local(slot)
-                    val search = if (admission == null) {
+                    val search = if (admission == null)
                         numericalSearch(limits, worker, requireNotNull(context), sharePoints)
-                    } else {
-                        DeferredCompanionSearch({ admission.declineReason }) { global, millis ->
-                            admission.contextForStart(global, millis)?.let {
-                                numericalSearch(limits, worker, it, sharePoints)
-                            }
+                    else DeferredCompanionSearch({ admission.declineReason }) { global, millis ->
+                        admission.contextForStart(global, millis)?.let {
+                            numericalSearch(limits, worker, it, sharePoints)
                         }
                     }
-                    BoundedCompanionSearch(
-                        search,
-                        "finiteNumericalCompanion",
+                    BoundedCompanionSearch(search, "finiteNumericalCompanion",
                         activeLimit = requireNotNull(cost.activeMillis).milliseconds,
-                        sliceLimit = requireNotNull(cost.sliceMillis).milliseconds,
-                    )
+                        sliceLimit = requireNotNull(cost.sliceMillis).milliseconds)
                 }) { _, _, _, _ -> error("numerical companion runs only by slice") }.bindEvidence(identity)
                 worker.also {
                     it.startAfterIncumbent = afterIncumbent
@@ -170,29 +143,19 @@ internal class FiniteNumericalCompanions private constructor(
                 lateinit var companion: PortfolioWorker
                 val limits = local(slot)
                 val worker = context?.let { repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion } }
-                companion = PortfolioWorker.ofMinimize(FiniteCompanionArms.JOINT_REPAIR,
-                    firstArm + 1,
+                companion = PortfolioWorker.ofMinimize(FiniteCompanionArms.JOINT_REPAIR, firstArm + 1,
                     countsInstructions = true,
                     resumable = {
-                        val search = if (worker != null) {
-                            requireNotNull(worker.newResumableSearch(incumbents::bound))
-                        } else {
-                            DeferredCompanionSearch({ requireNotNull(admission).declineReason }) { global, millis ->
-                                requireNotNull(admission).contextForStart(global, millis)?.let {
-                                    requireNotNull(
-                                        repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion }
-                                            .newResumableSearch(incumbents::bound),
-                                    )
-                                }
+                        val search = if (worker != null) requireNotNull(worker.newResumableSearch(incumbents::bound))
+                        else DeferredCompanionSearch({ requireNotNull(admission).declineReason }) { global, millis ->
+                            requireNotNull(admission).contextForStart(global, millis)?.let {
+                                requireNotNull(repairWorker(slot, firstArm + 1, limits, it, sharePoints) { companion }
+                                    .newResumableSearch(incumbents::bound))
                             }
                         }
-                        BoundedCompanionSearch(
-                            search,
-                            "finiteJointCompanion",
-                            activeLimit = requireNotNull(cost.activeMillis).milliseconds,
-                        )
-                    },
-                ) { _, _, _, _ -> error("joint companion runs only by slice") }
+                        BoundedCompanionSearch(search,
+                            "finiteJointCompanion", activeLimit = requireNotNull(cost.activeMillis).milliseconds)
+                    }) { _, _, _, _ -> error("joint companion runs only by slice") }
                     .bindEvidence(identity, provesResults = false)
                 companion.also {
                     it.startAfterIncumbent = afterIncumbent
@@ -202,69 +165,43 @@ internal class FiniteNumericalCompanions private constructor(
         )
     }
 
-    private fun repairWorker(
-        slot: PortfolioWorkerSlot,
-        arm: Int,
-        limits: TheoryParams,
-        context: SourceProofContext,
-        sharePoints: Boolean,
-        companion: () -> PortfolioWorker,
-    ): PortfolioWorker {
+    private fun repairWorker(slot: PortfolioWorkerSlot, arm: Int, limits: TheoryParams,
+        context: SourceProofContext, sharePoints: Boolean, companion: () -> PortfolioWorker): PortfolioWorker {
         var readVersion = 0L
         var importedVersion = 0L
-        val repair = slot.own(
-            JointLinearRepair(
-                model, context, objective, limits,
-                boundOrdered = true, external = {
-                    sharedIncumbent(companion(), sharePoints) { readVersion = it }
-                }, onIncumbentImport = {
-                    importedVersion = readVersion
-                    companion().observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
-                }, onIncumbentUse = {
-                    companion().observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
-                }, publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true,
-                sharedCompletions = completionSharing,
-                repairGuidance = repairGuidance,
-                incumbentCompletionCheck = incumbentCompletionCheck,
-                onObservation = onObservation?.let { report -> { observation -> report(slot.seed, observation) } },
-                onComparison = onComparison?.let { report ->
-                    { comparison ->
-                        val pool = incumbents.exchange.current()
-                        val candidate = comparison.candidateValue
-                        val standing = pool?.objective
-                        val disposition = if (comparison.phase != "discovery" || candidate == null) {
-                            comparison.disposition
-                        } else {
-                            when {
-                                standing == null -> "pool-empty"
-                                candidate < standing -> "improving"
-                                candidate == standing -> "tied"
-                                else -> "dominated"
-                            }
-                        }
-                        report(
-                            SearchEvent.CompanionComparison(
-                                comparison.condition, comparison.phase,
-                                if (comparison.phase == "external") readVersion else 0L, pool?.version ?: 0L,
-                                standing?.toString(),
-                                comparison.rawValue?.toString(),
-                                comparison.completedValue?.toString(),
-                                comparison.cutoff?.toString(), candidate?.toString(), disposition,
-                            ),
-                        )
-                    }
-                },
-            ),
-        )
-        return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR,
-            arm,
-            objective,
-            limits.cancellation,
-            limits.timeout,
-            { repair.exhausted },
+        val repair = slot.own(JointLinearRepair(model, context, objective, limits,
+            boundOrdered = true, external = {
+                sharedIncumbent(companion(), sharePoints) { readVersion = it }
+            }, onIncumbentImport = {
+                importedVersion = readVersion
+                companion().observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
+            }, onIncumbentUse = {
+                companion().observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
+            }, publicationLifetime = limits.cancellation or limits.timeout, observeExternalIncumbents = true,
+            sharedCompletions = completionSharing,
+            repairGuidance = repairGuidance,
+            incumbentCompletionCheck = incumbentCompletionCheck,
+            onObservation = onObservation?.let { report -> { observation -> report(slot.seed, observation) } },
+            onComparison = onComparison?.let { report -> { comparison ->
+                val pool = incumbents.exchange.current()
+                val candidate = comparison.candidateValue
+                val standing = pool?.objective
+                val disposition = if (comparison.phase != "discovery" || candidate == null)
+                    comparison.disposition else when {
+                    standing == null -> "pool-empty"
+                    candidate < standing -> "improving"
+                    candidate == standing -> "tied"
+                    else -> "dominated"
+                }
+                report(SearchEvent.CompanionComparison(comparison.condition, comparison.phase,
+                    if (comparison.phase == "external") readVersion else 0L, pool?.version ?: 0L,
+                    standing?.toString(), comparison.rawValue?.toString(), comparison.completedValue?.toString(),
+                    comparison.cutoff?.toString(), candidate?.toString(), disposition))
+            } }))
+        return exactNeighborhoodWorker(FiniteCompanionArms.JOINT_REPAIR, arm, objective,
+            limits.cancellation, limits.timeout, { repair.exhausted },
             pendingIncumbentTrial = { repair.incumbentTrialPending },
-            open = { repair.search(adaptive = adaptiveRepair, seed = slot.seed) },
-        )
+            open = { repair.search(adaptive = adaptiveRepair, seed = slot.seed) })
     }
 
     private fun sharedIncumbent(worker: PortfolioWorker, sharePoints: Boolean, onVersion: (Long) -> Unit): Sample? {
@@ -275,105 +212,63 @@ internal class FiniteNumericalCompanions private constructor(
         }?.assignment
     }
 
-    private fun numericalSearch(
-        limits: TheoryParams,
-        worker: PortfolioWorker,
-        context: SourceProofContext,
-        sharePoints: Boolean,
-    ): ResumableSearch = object : ResumableSearch {
-        private var readVersion = 0L
-        private var importedVersion = 0L
-        private val search = LinearAuthorityInvocation(
-            context, limits, boundOrdered = true,
-            external = { sharedIncumbent(worker, sharePoints) { readVersion = it } }, onIncumbentImport = {
-                importedVersion = readVersion
-                worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
-            }, onIncumbentUse = {
-                worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
-            }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
-            incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance,
-        )
-        private var result: MinimizeResult? = null
-        private var closed = false
-        override val isDone: Boolean get() = result != null
-        override val stats get() = search.stats
-        override val work: Long get() = search.work
+    private fun numericalSearch(limits: TheoryParams, worker: PortfolioWorker,
+        context: SourceProofContext, sharePoints: Boolean): ResumableSearch =
+        object : ResumableSearch {
+            private var readVersion = 0L
+            private var importedVersion = 0L
+            private val search = LinearAuthorityInvocation(context, limits, boundOrdered = true,
+                external = { sharedIncumbent(worker, sharePoints) { readVersion = it } }, onIncumbentImport = {
+                    importedVersion = readVersion
+                    worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_IMPORTED, importedVersion)
+                }, onIncumbentUse = {
+                    worker.observeLifecycle(PortfolioLifecycleKind.INCUMBENT_CONSUMED, importedVersion)
+                }, observeExternalIncumbents = true, sharedCompletions = completionSharing,
+                incumbentCompletionCheck = incumbentCompletionCheck, repairGuidance = repairGuidance)
+            private var result: MinimizeResult? = null
+            private var closed = false
+            override val isDone: Boolean get() = result != null
+            override val stats get() = search.stats
+            override val work: Long get() = search.work
 
-        override fun runSlice(
-            global: ExecutionControl,
-            sliceMillis: Long,
-            sliceNodes: Long,
-            onIncumbent: (MinimizeResult.WithSample) -> Unit,
-        ): MinimizeResult? {
-            result?.let { return it }
-            val finished = search.runSlice(global, sliceMillis, sliceNodes) { sample, value ->
-                onIncumbent(
-                    MinimizeResult.BestFound(
-                        sample,
-                        value.toDouble(),
-                        TerminationReason.BudgetExhausted,
-                        stats,
-                    ),
-                )
-            }.also { objectiveBound = search.objectiveBound } ?: return null
-            val original = LinearOptimizationResult(
-                context.scope,
-                finished.terminal,
-                finished.bound,
-                finished.incumbent,
-                finished.value,
-                finished.reason,
-                finished.stats,
-                context.semantics,
-            )
-            result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout)
-            return result
-        }
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
+                result?.let { return it }
+                val finished = search.runSlice(global, sliceMillis, sliceNodes) { sample, value ->
+                    onIncumbent(MinimizeResult.BestFound(sample, value.toDouble(),
+                        TerminationReason.BudgetExhausted, stats))
+                }.also { objectiveBound = search.objectiveBound } ?: return null
+                val original = LinearOptimizationResult(context.scope, finished.terminal, finished.bound,
+                    finished.incumbent, finished.value, finished.reason, finished.stats, context.semantics)
+                result = finiteNumericalCompletion(original, context, global or limits.cancellation or limits.timeout)
+                return result
+            }
 
-        override fun close() {
-            if (closed) return
-            closed = true
-            objectiveBound = search.objectiveBound
-            search.close()
+            override fun close() {
+                if (closed) return
+                closed = true
+                objectiveBound = search.objectiveBound
+                search.close()
+            }
         }
-    }
 
     companion object {
-        fun admission(
-            model: BakedProblem,
-            objective: LinearObjective,
-            cancellation: ExecutionControl,
-            cost: WorkerConstructionCost,
-        ): FiniteCompanionAdmission = FiniteCompanionAdmission(
-            cancellation,
-            requireNotNull(cost.activeMillis),
-            requireNotNull(cost.sliceMillis),
-            capture = { captureContext(model, objective, it) },
-        )
+        fun admission(model: BakedProblem, objective: LinearObjective, cancellation: ExecutionControl,
+            cost: WorkerConstructionCost): FiniteCompanionAdmission = FiniteCompanionAdmission(
+            cancellation, requireNotNull(cost.activeMillis), requireNotNull(cost.sliceMillis),
+            capture = { captureContext(model, objective, it) })
 
-        fun deferred(
-            model: BakedProblem,
-            objective: LinearObjective,
-            params: TheoryParams,
-            cancellation: ExecutionControl,
-            cost: WorkerConstructionCost,
-            admission: FiniteCompanionAdmission,
+        fun deferred(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
+            cancellation: ExecutionControl, cost: WorkerConstructionCost, admission: FiniteCompanionAdmission,
             incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)?,
-            afterImprovement: Boolean = false,
-            adaptiveRepair: Boolean = false,
+            afterImprovement: Boolean = false, adaptiveRepair: Boolean = false,
             onComparison: ((SearchEvent.CompanionComparison) -> Unit)? = null,
-            onObservation: ((Long, JointRepairObservation) -> Unit)? = null,
-        ): FiniteNumericalCompanions = FiniteNumericalCompanions(
-            model, objective, null, params, cancellation, cost, true,
-            incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, onComparison, onObservation,
-        )
+            onObservation: ((Long, JointRepairObservation) -> Unit)? = null): FiniteNumericalCompanions =
+            FiniteNumericalCompanions(model, objective, null, params, cancellation, cost, true,
+                incumbentCompletionCheck, admission, afterImprovement, adaptiveRepair, onComparison, onObservation)
 
-        fun prepare(
-            model: BakedProblem,
-            objective: LinearObjective,
-            params: TheoryParams,
-            cancellation: ExecutionControl,
-            cost: WorkerConstructionCost,
+        fun prepare(model: BakedProblem, objective: LinearObjective, params: TheoryParams,
+            cancellation: ExecutionControl, cost: WorkerConstructionCost,
             afterIncumbent: Boolean = false,
             incumbentCompletionCheck: ((Sample, BigFraction, ExecutionControl) -> Boolean)? = null,
             clock: TimeSource = TimeSource.Monotonic,
@@ -384,49 +279,32 @@ internal class FiniteNumericalCompanions private constructor(
             val started = clock.markNow()
             val context = captureContext(model, objective, cancellation)
             val companions = context?.let {
-                FiniteNumericalCompanions(
-                    model, objective, it, params, cancellation, cost, afterIncumbent,
+                FiniteNumericalCompanions(model, objective, it, params, cancellation, cost, afterIncumbent,
                     incumbentCompletionCheck, adaptiveRepair = adaptiveRepair, onComparison = onComparison,
-                    onObservation = onObservation,
-                )
+                    onObservation = onObservation)
             }
             return Preparation(companions, started.elapsedNow().inWholeNanoseconds)
         }
 
-        private fun captureContext(
-            model: BakedProblem,
-            objective: LinearObjective,
-            cancellation: ExecutionControl,
-        ): SourceProofContext? {
+        private fun captureContext(model: BakedProblem, objective: LinearObjective,
+            cancellation: ExecutionControl): SourceProofContext? {
             // The propagated difference graph duplicates affine rows and bounds in these coordinates.
             val affine = model.withFactors(model.factors.filterNot { it is DifferenceSystem }.toTypedArray())
-            return affine.linearAuthorityContext(
-                objective,
-                ObjectiveSense.MINIMIZE,
-                cancellation,
-                numericalIndicators = true,
-            )
+            return affine.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE, cancellation,
+                numericalIndicators = true)
         }
     }
 }
 
-internal fun finiteNumericalCompletion(
-    result: LinearOptimizationResult,
-    context: SourceProofContext,
-    cancellation: ExecutionControl,
-): MinimizeResult {
+internal fun finiteNumericalCompletion(result: LinearOptimizationResult, context: SourceProofContext,
+    cancellation: ExecutionControl): MinimizeResult {
     // A verified relaxation proof uses the finite working coordinates and objective.
     if (result.verifyTerminal(context, cancellation) is Verification.Accepted) {
         when (val claim = result.terminal?.claim) {
-            is SourceClaim.Optimal -> return MinimizeResult.Optimal(
-                claim.sample,
+            is SourceClaim.Optimal -> return MinimizeResult.Optimal(claim.sample,
                 requireNotNull((claim.value as? SourceValue.Rational)?.value)
-                    .toDouble(),
-                result.stats,
-            )
-
+                    .toDouble(), result.stats)
             SourceClaim.Refutation -> return MinimizeResult.Infeasible(stats = result.stats)
-
             else -> Unit
         }
     }
@@ -434,12 +312,7 @@ internal fun finiteNumericalCompletion(
     val value: BigFraction? = result.value
     val reason = if (result.reason == TerminationReason.SearchExhausted) {
         TerminationReason.Unsupported
-    } else {
-        result.reason
-    }
-    return if (point == null || value == null) {
-        MinimizeResult.Unknown(reason, result.stats)
-    } else {
-        MinimizeResult.BestFound(point, value.toDouble(), reason, result.stats)
-    }
+    } else result.reason
+    return if (point == null || value == null) MinimizeResult.Unknown(reason, result.stats)
+    else MinimizeResult.BestFound(point, value.toDouble(), reason, result.stats)
 }

@@ -46,19 +46,11 @@ class MiniZincModelWitnessTest {
         assertTrue(witness.endsWith("\n% klause-float-component: none"), witness)
         val objective = Regex("(?m)^_objective = (-?[0-9]+);").find(witness)?.groupValues?.get(1)
         val data = File(dir, "witness.dzn").apply {
-            writeText(
-                witness.lineSequence().filterNot { it.startsWith("%") || it.startsWith("_objective") }
-                    .joinToString("\n"),
-            )
+            writeText(witness.lineSequence().filterNot { it.startsWith("%") || it.startsWith("_objective") }
+                .joinToString("\n"))
         }
-        val checked = run(
-            "--solver",
-            "gecode",
-            "--allow-multiple-assignments",
-            "--output-objective",
-            File(dir, "m.mzn").path,
-            data.path,
-        )
+        val checked = run("--solver", "gecode", "--allow-multiple-assignments", "--output-objective",
+            File(dir, "m.mzn").path, data.path)
         assertTrue("----------" in checked && "_objective = $objective;" in checked, checked)
     }
 
@@ -78,13 +70,8 @@ class MiniZincModelWitnessTest {
     private fun model(): ProblemRef {
         dir.mkdirs()
         File(dir, "m.mzn").writeText(MODEL)
-        return ProblemRef(
-            "model-witness/m",
-            Format.MINIZINC,
-            ProblemSource.Vendored("$relative/m.mzn"),
-            Category.OPTIMIZATION,
-            Expected.Unknown,
-        )
+        return ProblemRef("model-witness/m", Format.MINIZINC, ProblemSource.Vendored("$relative/m.mzn"),
+            Category.OPTIMIZATION, Expected.Unknown)
     }
 
     /** A FlatZinc solver's own output for [ref]'s compiled FlatZinc, as Klause would print it. */
@@ -93,26 +80,12 @@ class MiniZincModelWitnessTest {
 
     private fun solve(ref: ProblemRef, raw: String, modelOutput: (ProblemRef, String) -> String): SolveRecord {
         val entry = ResolvedProblem(ref, lazy { error("source parsing must stay lazy") })
-        return SolveMetric.solve(
-            entry,
-            SolverInvocation.Settings(),
-            Budget(),
-            "now",
-            "fixture",
-            installedBuild = { null },
+        return SolveMetric.solve(entry, SolverInvocation.Settings(), Budget(),
+            "now", "fixture", installedBuild = { null },
             invoke = { _, _, _, _ ->
-                SolverInvocation.Result(
-                    true,
-                    null,
-                    null,
-                    proven = false,
-                    stats = emptyMap(),
-                    rawOutput = raw,
-                    command = "cli",
-                )
-            },
-            modelOutput = modelOutput,
-        ).first
+                SolverInvocation.Result(true, null, null, proven = false, stats = emptyMap(), rawOutput = raw,
+                    command = "cli")
+            }, modelOutput = modelOutput).first
     }
 
     private fun run(vararg args: String): String {

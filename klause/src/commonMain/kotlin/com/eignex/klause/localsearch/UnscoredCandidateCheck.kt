@@ -21,16 +21,11 @@ internal class UnscoredCandidateCheck(
 ) {
     private val factorIds = problem.factors.indices.filter {
         it !in enforcingPeers &&
-            (
-                (selection?.capabilities(it) ?: problem.factors[it].executionCapabilities()).assignmentCheck ==
-                    AssignmentCheckCapability.UNSUPPORTED || selection?.requiresOriginalScoringCheck(it) == true
-                )
+            ((selection?.capabilities(it) ?: problem.factors[it].executionCapabilities()).assignmentCheck ==
+                AssignmentCheckCapability.UNSUPPORTED || selection?.requiresOriginalScoringCheck(it) == true)
     }.toIntArray()
-    private val unchecked = if (factorIds.isEmpty()) {
-        null
-    } else {
+    private val unchecked = if (factorIds.isEmpty()) null else
         problem.withFactors(Array(factorIds.size) { problem.factors[factorIds[it]] })
-    }
     private val uncheckedSelection = unchecked?.let { selection?.projected(it, factorIds) }
     val required: Boolean get() = unchecked != null
     val requiresReals: Boolean = factorIds.any { problem.factors[it].variables.reals.isNotEmpty() }
@@ -58,16 +53,12 @@ internal class UnscoredCandidateCheck(
     fun check(candidate: Sample, assumptions: Assumptions, cancellation: ExecutionControl): Completion {
         val source = unchecked ?: return Completion.Witness(candidate)
         if (cancellation()) return Completion.Undecided()
-        val points = if (reusable && withinDeclared(source, candidate)) {
-            retainedCheck(source, cancellation)
-        } else {
+        val points = if (reusable && withinDeclared(source, candidate)) retainedCheck(source, cancellation) else {
             // Singleton integer declarations avoid materializing an open source domain, and leave a value outside
             // the declared domains to the factors alone.
-            val point = source.withIntDomains(
-                Array(source.numIntVars) {
-                    IntDomain(candidate.intValue(it), candidate.intValue(it))
-                },
-            )
+            val point = source.withIntDomains(Array(source.numIntVars) {
+                IntDomain(candidate.intValue(it), candidate.intValue(it))
+            })
             FinitePointCheck(uncheckedSelection?.let { point.bake(it.forEngineView(point), cancellation) } ?: point)
         }
         val checked = points.check(Candidate(candidate, Unit), cancellation, assumptions)

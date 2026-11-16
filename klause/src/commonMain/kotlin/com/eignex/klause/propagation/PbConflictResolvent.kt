@@ -184,10 +184,11 @@ internal class PbConflictResolvent(private val state: PropagationState, private 
         }
     }
 
-    private fun booleanLiterals(literals: IntArray): Boolean = literals.all {
-        state.checkFiniteWork()
-        Lit.variable(it) in 0 until state.problem.numBoolVars
-    }
+    private fun booleanLiterals(literals: IntArray): Boolean =
+        literals.all {
+            state.checkFiniteWork()
+            Lit.variable(it) in 0 until state.problem.numBoolVars
+        }
 
     private fun admitSource(literals: IntArray): Boolean = booleanLiterals(literals).also {
         if (!it) decline("non-boolean-source")

@@ -47,38 +47,23 @@ class AllDifferentSeparatorTest {
 
     @Test
     fun `optional and excepted globals should not imply unconditional Hall cuts`() {
-        val problem = Problem(
-            1,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            arrayOf(
-                AllDifferent(intArrayOf(0, 1, 2), presents = IntArray(3) { Lit.make(0, true) }),
-                AllDifferent(intArrayOf(0, 1, 2), exceptSet = longArrayOf(0)),
-            ),
-        )
+        val problem = Problem(1, 3, Array(3) { IntDomain(0, 2) }, arrayOf(
+            AllDifferent(intArrayOf(0, 1, 2), presents = IntArray(3) { Lit.make(0, true) }),
+            AllDifferent(intArrayOf(0, 1, 2), exceptSet = longArrayOf(0)),
+        ))
 
         assertTrue(allDifferentGroups(problem).isEmpty())
     }
 
     @Test
     fun `unrepresentable distinct sums should leave the relaxation without Hall cuts`() {
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) },
-            arrayOf(AllDifferent(intArrayOf(0, 1, 2))),
-        )
+        val problem = Problem(0, 3, Array(3) { IntDomain(Long.MIN_VALUE, Long.MAX_VALUE) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2))))
         val session = PropagationSession(problem)
         val relaxation = CpToLpRelaxation(problem, null).build(session)
 
-        val cuts = AllDifferentSeparator().separate(
-            CutContext(
-                problem,
-                relaxation,
-                DoubleArray(relaxation.model.n),
-                session,
-            ),
-        )
+        val cuts = AllDifferentSeparator().separate(CutContext(
+            problem, relaxation, DoubleArray(relaxation.model.n), session))
 
         assertTrue(cuts.isEmpty())
     }

@@ -9,10 +9,17 @@ internal class MutableIntObjectIndex<V : Any> {
     }
 
     internal sealed class Node<V : Any>(var parent: Branch<V>? = null)
-    internal class Leaf<V : Any>(override val key: Int, override var value: V, val owner: MutableIntObjectIndex<V>) :
-        Node<V>(),
-        Slot<V>
-    internal class Branch<V : Any>(val mask: Int, val prefix: Int, var zero: Node<V>, var one: Node<V>) : Node<V>()
+    internal class Leaf<V : Any>(
+        override val key: Int,
+        override var value: V,
+        val owner: MutableIntObjectIndex<V>,
+    ) : Node<V>(), Slot<V>
+    internal class Branch<V : Any>(
+        val mask: Int,
+        val prefix: Int,
+        var zero: Node<V>,
+        var one: Node<V>,
+    ) : Node<V>()
 
     private var root: Node<V>? = null
     var size = 0
@@ -39,9 +46,7 @@ internal class MutableIntObjectIndex<V : Any> {
         if (found?.key == key) {
             found.value = value
             lastWork++
-        } else {
-            insert(key, value, found)
-        }
+        } else insert(key, value, found)
         return lastWork
     }
 
@@ -72,11 +77,8 @@ internal class MutableIntObjectIndex<V : Any> {
             parent = parent.parent
         }
         val prefix = key and (mask or (mask - 1)).inv()
-        val branch = if (key and mask == 0) {
-            Branch(mask, prefix, leaf, node)
-        } else {
-            Branch(mask, prefix, node, leaf)
-        }
+        val branch = if (key and mask == 0) Branch(mask, prefix, leaf, node)
+            else Branch(mask, prefix, node, leaf)
         branch.parent = parent
         node.parent = branch
         leaf.parent = branch
@@ -97,9 +99,8 @@ internal class MutableIntObjectIndex<V : Any> {
         fund(12L)
         ready()
         val parent = leaf.parent
-        if (parent == null) {
-            root = null
-        } else {
+        if (parent == null) root = null
+        else {
             val sibling = if (parent.zero === leaf) parent.one else parent.zero
             val grandparent = parent.parent
             replace(grandparent, parent, sibling)
@@ -124,7 +125,6 @@ internal class MutableIntObjectIndex<V : Any> {
             visit(1L)
             val retained = when (node) {
                 is Leaf -> protected(node.key, node.value)
-
                 is Branch -> {
                     val zero = covered(node.zero)
                     val one = covered(node.one)
@@ -161,17 +161,13 @@ internal class MutableIntObjectIndex<V : Any> {
     private fun replace(parent: Branch<V>?, previous: Node<V>, next: Node<V>) {
         when {
             parent == null -> root = next
-
             parent.zero === previous -> parent.zero = next
-
-            else -> {
-                check(parent.one === previous)
-                parent.one = next
-            }
+            else -> { check(parent.one === previous); parent.one = next }
         }
     }
 
-    private fun child(branch: Branch<V>, key: Int): Node<V> = if (key and branch.mask == 0) branch.zero else branch.one
+    private fun child(branch: Branch<V>, key: Int): Node<V> =
+        if (key and branch.mask == 0) branch.zero else branch.one
 
     private fun minimum(start: Node<V>, visit: (Long) -> Unit): Leaf<V> {
         var node = start
@@ -188,7 +184,6 @@ internal class MutableIntObjectIndex<V : Any> {
         visit(1L)
         return when (node) {
             is Leaf -> node.takeIf { it.key >= key }
-
             is Branch -> when {
                 key > (node.prefix or node.mask or (node.mask - 1)) -> null
                 key <= node.prefix -> minimum(node, visit)
@@ -203,11 +198,7 @@ internal class MutableIntObjectIndex<V : Any> {
         visit(1L)
         when (node) {
             is Leaf -> action(node.key, node.value)
-
-            is Branch -> {
-                walk(node.zero, visit, action)
-                walk(node.one, visit, action)
-            }
+            is Branch -> { walk(node.zero, visit, action); walk(node.one, visit, action) }
         }
     }
 }

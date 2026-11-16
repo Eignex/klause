@@ -28,12 +28,8 @@ internal fun solveCapturedSource(
         val result = SourceSetup.execute(controls) as SourceExecutionResult.Prepared
         val prepared = result.result
         SolveCore.printPresolved(
-            result.originalProblem,
-            prepared.model,
-            prepared.stats,
-            result.elapsed,
-            loadElapsedMs = null,
-            constructionBakeElapsed = Duration.ZERO,
+            result.originalProblem, prepared.model, prepared.stats, result.elapsed,
+            loadElapsedMs = null, constructionBakeElapsed = Duration.ZERO,
         )
         printErrorLine("  open sides closed: ${prepared.closedSides}")
         controls.presolveBudget?.let { printErrorLine("  work: ${it.spent()} of ${it.allowance}") }
@@ -79,29 +75,22 @@ internal fun solveCapturedSource(
                 is OpenTheoryExecution.Satisfy -> {
                     val outcome = execution.result
                     val stats = outcome.stats.copy(lp = outcome.stats.lp.mergedWith(solvable.routingLpStats))
-                    reporting.onVerdictContext(
-                        VerdictContext(
-                            budgetExhausted = budgetSpent(stats.run.timedOut),
-                            terminationReason = (outcome as? OpenTheoryResult.Unknown)?.reason,
-                        ),
-                    )
+                    reporting.onVerdictContext(VerdictContext(
+                        budgetExhausted = budgetSpent(stats.run.timedOut),
+                        terminationReason = (outcome as? OpenTheoryResult.Unknown)?.reason,
+                    ))
                     when (outcome) {
                         is OpenTheoryResult.Sat -> {
                             reporting.onSolution(rendering.render(outcome.assignment), null)
                             reporting.onComplete(Verdict.SATISFIABLE)
                         }
-
                         is OpenTheoryResult.Unsat -> reporting.onComplete(Verdict.UNSATISFIABLE)
-
                         is OpenTheoryResult.Unknown -> reporting.onComplete(Verdict.UNKNOWN)
                     }
-                    if (common.statistics) {
-                        reporting.onStatistics(
-                            stats,
-                            stats.run.wallMs + solvable.routingElapsedMs,
-                            if (outcome is OpenTheoryResult.Sat) 1L else 0L,
-                        )
-                    }
+                    if (common.statistics) reporting.onStatistics(
+                        stats, stats.run.wallMs + solvable.routingElapsedMs,
+                        if (outcome is OpenTheoryResult.Sat) 1L else 0L,
+                    )
                 }
             }
             controls.presolveBudget?.let { budget ->
@@ -111,13 +100,10 @@ internal fun solveCapturedSource(
 
         is SourceExecutionResult.Refuted -> {
             reporting.onComplete(Verdict.UNSATISFIABLE)
-            if (common.statistics) {
-                reporting.onStatistics(
-                    SolveStats(lp = solvable.routingLpStats, presolve = result.preparationStats),
-                    solvable.routingElapsedMs + (result.preparationStats?.effort?.elapsed?.inWholeMilliseconds ?: 0L),
-                    0L,
-                )
-            }
+            if (common.statistics) reporting.onStatistics(
+                SolveStats(lp = solvable.routingLpStats, presolve = result.preparationStats),
+                solvable.routingElapsedMs + (result.preparationStats?.effort?.elapsed?.inWholeMilliseconds ?: 0L), 0L,
+            )
         }
 
         is SourceExecutionResult.Quadratic -> reportQuadraticOptimization(
@@ -156,17 +142,12 @@ internal fun solveCapturedSource(
         is SourceExecutionResult.Declined -> {
             reporting.onVerdictContext(VerdictContext(terminationReason = result.reason, completePool = complete))
             reporting.onComplete(Verdict.UNKNOWN)
-            if (common.statistics) {
-                reporting.onStatistics(
-                    SolveStats(presolve = result.preparationStats),
-                    solvable.routingElapsedMs,
-                    0L,
-                )
-            }
+            if (common.statistics) reporting.onStatistics(
+                SolveStats(presolve = result.preparationStats), solvable.routingElapsedMs, 0L,
+            )
         }
 
         is SourceExecutionResult.Finite -> error("finite source execution requires its finite renderer")
-
         is SourceExecutionResult.Prepared -> error("preparation diagnostics require their diagnostic renderer")
     }
 }
@@ -220,46 +201,40 @@ internal fun reportNativeSatisfaction(
     }
     output.onAllowanceStatistics(pairs)
     execution.integerCells?.let { cells ->
-        output.onAllowanceStatistics(
-            listOf(
-                "niaCellProducer" to cells.producerEnabled.toString(),
-                "niaCellReuse" to cells.reuseEnabled.toString(),
-                "niaCellObserved" to cells.observed.toString(),
-                "niaCellRetained" to cells.retained.toString(),
-                "niaCellDeclined" to cells.declined.toString(),
-                "niaExcludedTuples" to cells.excludedTuples.toString(),
-                "niaRepeatedSupports" to cells.repeatedSupports.toString(),
-                "niaCompletionChecks" to cells.completionChecks.toString(),
-                "niaCellSteering" to cells.steeringEnabled.toString(),
-                "niaCellSelections" to cells.selections.toString(),
-                "niaSteeredTuples" to cells.steeredTuples.toString(),
-                "niaAllowedTuples" to cells.allowedTuples.toString(),
-                "niaDuplicateTuples" to cells.duplicateTuples.toString(),
-            ),
-        )
+        output.onAllowanceStatistics(listOf(
+            "niaCellProducer" to cells.producerEnabled.toString(),
+            "niaCellReuse" to cells.reuseEnabled.toString(),
+            "niaCellObserved" to cells.observed.toString(),
+            "niaCellRetained" to cells.retained.toString(),
+            "niaCellDeclined" to cells.declined.toString(),
+            "niaExcludedTuples" to cells.excludedTuples.toString(),
+            "niaRepeatedSupports" to cells.repeatedSupports.toString(),
+            "niaCompletionChecks" to cells.completionChecks.toString(),
+            "niaCellSteering" to cells.steeringEnabled.toString(),
+            "niaCellSelections" to cells.selections.toString(),
+            "niaSteeredTuples" to cells.steeredTuples.toString(),
+            "niaAllowedTuples" to cells.allowedTuples.toString(),
+            "niaDuplicateTuples" to cells.duplicateTuples.toString(),
+        ))
     }
     execution.integerRoots?.let { roots ->
-        output.onAllowanceStatistics(
-            listOf(
-                "niaRootEquations" to roots.admittedEquations.toString(),
-                "niaRootDeclines" to roots.declinedEquations.toString(),
-                "niaRootReuses" to roots.reusedAdmissions.toString(),
-                "niaRootRefutedScopes" to roots.refutedScopes.toString(),
-                "niaRootExcludedTuples" to roots.excludedTuples.toString(),
-                "niaRootCompletionChecks" to roots.completionChecks.toString(),
-            ),
-        )
+        output.onAllowanceStatistics(listOf(
+            "niaRootEquations" to roots.admittedEquations.toString(),
+            "niaRootDeclines" to roots.declinedEquations.toString(),
+            "niaRootReuses" to roots.reusedAdmissions.toString(),
+            "niaRootRefutedScopes" to roots.refutedScopes.toString(),
+            "niaRootExcludedTuples" to roots.excludedTuples.toString(),
+            "niaRootCompletionChecks" to roots.completionChecks.toString(),
+        ))
     }
     execution.integerResidues?.let { residues ->
-        output.onAllowanceStatistics(
-            listOf(
-                "niaResidueRings" to residues.completedRings.toString(),
-                "niaResidueTuples" to residues.tuples.toString(),
-                "niaResidueWork" to residues.workSpent.toString(),
-                "niaResidueRefutedScopes" to residues.refutedScopes.toString(),
-                "niaResidueDeclines" to residues.declinedChecks.toString(),
-                "niaResidueExcludedAtoms" to residues.excludedAtoms.toString(),
-            ),
-        )
+        output.onAllowanceStatistics(listOf(
+            "niaResidueRings" to residues.completedRings.toString(),
+            "niaResidueTuples" to residues.tuples.toString(),
+            "niaResidueWork" to residues.workSpent.toString(),
+            "niaResidueRefutedScopes" to residues.refutedScopes.toString(),
+            "niaResidueDeclines" to residues.declinedChecks.toString(),
+            "niaResidueExcludedAtoms" to residues.excludedAtoms.toString(),
+        ))
     }
 }

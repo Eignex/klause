@@ -5,8 +5,7 @@ import java.io.File
 internal enum class SourceStaging(val key: String) {
     CACHE("cache"),
     TEMPORARY("temporary"),
-    CLI("cli"),
-    ;
+    CLI("cli"),;
 
     val directory: File
         get() = when (this) {

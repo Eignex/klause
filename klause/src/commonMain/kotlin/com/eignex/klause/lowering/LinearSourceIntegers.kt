@@ -7,7 +7,9 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.fitsLong
 
-internal fun LinearSourceProblem.integralRealBounds(stop: ExecutionControl): Array<Pair<BigFraction, BigFraction>?>? {
+internal fun LinearSourceProblem.integralRealBounds(
+    stop: ExecutionControl,
+): Array<Pair<BigFraction, BigFraction>?>? {
     if (stop()) return null
     val integral = BooleanArray(variableValues.size)
     val lower = arrayOfNulls<BigFraction>(variableValues.size)

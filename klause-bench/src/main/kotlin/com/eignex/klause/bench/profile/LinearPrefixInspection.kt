@@ -35,41 +35,26 @@ import kotlin.time.Duration.Companion.seconds
 
 internal object LinearPrefixInspection {
     fun inspect(
-        compiled: SmtLibProblem,
-        out: File,
-        sourceSha256: String,
-        probe: Boolean = false,
-        integrated: Boolean = false,
-        cached: Boolean = false,
-        reuse: Boolean = false,
-        batching: Boolean = false,
-        incremental: Boolean = false,
-        incrementalControl: Boolean = false,
+        compiled: SmtLibProblem, out: File, sourceSha256: String, probe: Boolean = false,
+        integrated: Boolean = false, cached: Boolean = false, reuse: Boolean = false, batching: Boolean = false,
+        incremental: Boolean = false, incrementalControl: Boolean = false,
     ) {
         val emergencySeconds = if (incremental) 40 else 10
         val captures = (0..1).map { replay ->
             val incrementalRows = incremental && !incrementalControl && replay == 1
             val stop = ExecutionControl.after(emergencySeconds.seconds)
             val started = System.nanoTime()
-            val invocation = SourceSetup.prepare(
-                SourceSetupRequest(
-                    compiled.source,
-                    ExecutionOperation.SATISFY,
-                    FiniteEngine.BACKTRACK,
-                    cancellation = stop,
-                ),
-            )
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                compiled.source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = stop,
+            ))
             val request = (invocation.route as? SourceProblemRoute.OpenTheory)?.request
                 ?: error("prefix capture requires an open theory route")
             val factory = OpenTheoryPipeline.javaClass.declaredMethods.single {
                 it.name.startsWith("engineFor") && it.parameterCount == 1
             }
             val engine = requireNotNull(factory.invoke(OpenTheoryPipeline, request))
-            val params = TheoryParams(
-                timeout = stop,
-                randomSeed = 1L,
-                openWorkLimit = if (incremental) 100_000_000L else Long.MAX_VALUE,
-            )
+            val params = TheoryParams(timeout = stop, randomSeed = 1L,
+                openWorkLimit = if (incremental) 100_000_000L else Long.MAX_VALUE)
             val stateType = Class.forName("com.eignex.klause.solver.pipeline.OpenTheorySolveState")
             val state = stateType.getDeclaredConstructor(TheoryParams::class.java).newInstance(params)
             val boundary = PrefixBoundary()
@@ -119,11 +104,8 @@ internal object LinearPrefixInspection {
                     put("openingAndTraversalNs", elapsed)
                     if (run != null) {
                         val theory = (field(run, "planned") as PlannedSearch).theory
-                        put(
-                            "partialPropagation",
-                            LinearPrefixSnapshot(ExecutionControl.after(10.seconds))
-                                .record(theory?.let { member(it, "getPartialLinearPropagationStats") }),
-                        )
+                        put("partialPropagation", LinearPrefixSnapshot(ExecutionControl.after(10.seconds))
+                            .record(theory?.let { member(it, "getPartialLinearPropagationStats") }))
                     }
                 }
                 out.resolve("prefix-$replay-status.json").writeText("$status\n")
@@ -138,23 +120,15 @@ internal object LinearPrefixInspection {
                     val probeStarted = System.nanoTime()
                     val work = member(state, "getWork") as OpenTheoryWorkSink
                     val before = work.snapshot()
-                    val deductions = if (probe && replay == 1) {
-                        call(
-                            requireNotNull(planned.theory),
-                            "probePartialLinearImplications",
-                        )
-                    } else {
-                        null
-                    }
+                    val deductions = if (probe && replay == 1) call(requireNotNull(planned.theory),
+                        "probePartialLinearImplications") else null
                     val propagation = if (probe) planned.session.propagate() else ComponentResult.Consistent
                     val probeElapsed = System.nanoTime() - probeStarted
                     boundary.resume()
                     val continuationStarted = System.nanoTime()
                     val continuation = if (propagation is ComponentResult.Consistent && !stop()) {
                         call(run, "advance")
-                    } else {
-                        null
-                    }
+                    } else null
                     val continuationElapsed = System.nanoTime() - continuationStarted
                     val after = work.snapshot()
                     val observation = buildJsonObject {
@@ -177,19 +151,11 @@ internal object LinearPrefixInspection {
                         put("workAfter", after.openWork)
                         put("booleanDecisionsBefore", before.openBoolDecisions)
                         put("booleanDecisionsAfter", after.openBoolDecisions)
-                        put(
-                            "assignedBooleans",
-                            (
-                                0 until (field(requireNotNull(planned.theory), "model") as Problem)
-                                    .numBoolVars
-                                ).count { planned.session.boolValue(it) != null },
-                        )
+                        put("assignedBooleans", (0 until (field(requireNotNull(planned.theory), "model") as Problem)
+                            .numBoolVars).count { planned.session.boolValue(it) != null })
                         put("stopCause", planned.session.executionControls.stopCause?.name)
-                        put(
-                            "partialPropagation",
-                            LinearPrefixSnapshot(ExecutionControl.after(10.seconds))
-                                .record(member(requireNotNull(planned.theory), "getPartialLinearPropagationStats")),
-                        )
+                        put("partialPropagation", LinearPrefixSnapshot(ExecutionControl.after(10.seconds))
+                            .record(member(requireNotNull(planned.theory), "getPartialLinearPropagationStats")))
                     }
                     out.resolve("probe-$replay.json").writeText("$observation\n")
                     println(observation)
@@ -197,10 +163,7 @@ internal object LinearPrefixInspection {
                         planned.session.executionControls.stopCause == null
                     ) {
                         val afterCapture = LinearPrefixSnapshot(ExecutionControl.after(10.seconds)).capture(
-                            planned,
-                            run,
-                            compiled,
-                            out.resolve("after-$replay.exact"),
+                            planned, run, compiled, out.resolve("after-$replay.exact"),
                         )
                         out.resolve("after-$replay.json").writeText("$afterCapture\n")
                         if ((cached || batching || incremental) && replay == 1) {
@@ -221,26 +184,17 @@ internal object LinearPrefixInspection {
             put("sourceSha256", sourceSha256)
             put("snapshotSha256", sha256(captures[0]))
             put("replaySha256", sha256(captures[1]))
-            put(
-                "experiment",
-                when {
-                    incrementalControl -> "cached-producer-self-replay"
-                    incremental -> "cached-producer-versus-incremental-source-rows"
-                    batching -> "individual-versus-batched-source-bounds"
-                    cached -> "integrated-versus-cached"
-                    reuse -> "plain-versus-integrated-cache"
-                    integrated -> "plain-versus-integrated"
-                    else -> "exact-prefix-replay"
-                },
-            )
-            put(
-                "exactReplay",
-                if (integrated && !cached && !batching && !incremental) {
-                    JsonNull
-                } else {
-                    JsonPrimitive(captures[0].contentEquals(captures[1]))
-                },
-            )
+            put("experiment", when {
+                incrementalControl -> "cached-producer-self-replay"
+                incremental -> "cached-producer-versus-incremental-source-rows"
+                batching -> "individual-versus-batched-source-bounds"
+                cached -> "integrated-versus-cached"
+                reuse -> "plain-versus-integrated-cache"
+                integrated -> "plain-versus-integrated"
+                else -> "exact-prefix-replay"
+            })
+            put("exactReplay", if (integrated && !cached && !batching && !incremental) JsonNull
+                else JsonPrimitive(captures[0].contentEquals(captures[1])))
             put("sourceVerdictClaim", false)
         }
         out.resolve("replay.json").writeText("$report\n")
@@ -300,14 +254,11 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
             put("decisionLevel", session.decisionLevel)
             put("exactStateSha256", sha256(exactBytes))
             put("sourceSlotContract", "presolve retains slots; ordered rebuild stages reconstruct eliminated columns")
-            put(
-                "sourceNames",
-                buildJsonObject {
-                    put("integers", scalar(compiled.intVarNames))
-                    put("booleans", scalar(compiled.boolVarNames))
-                    put("reals", scalar(compiled.realVarNames))
-                },
-            )
+            put("sourceNames", buildJsonObject {
+                put("integers", scalar(compiled.intVarNames))
+                put("booleans", scalar(compiled.boolVarNames))
+                put("reals", scalar(compiled.realVarNames))
+            })
             put("sourceModel", dimensions(member(mapping, "getSource") as Problem))
             put("preparedModel", dimensions(member(mapping, "getTarget") as Problem))
             put("arithmeticModel", dimensions(model))
@@ -315,87 +266,67 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
             put("privateBooleans", scalar((0 until model.numBoolVars).filter { it !in compiled.boolVarNames.values }))
             put("reconstruction", reconstruction(mapping))
             put("decisions", scalar(field(trail, "decisions")))
-            put(
-                "booleanPins",
-                buildJsonArray {
-                    for (variable in pins.indices) {
-                        tick()
-                        val shared = session.boolValue(variable)
-                        val received = when (pins[variable]) {
-                            -1 -> null
-                            0 -> false
-                            1 -> true
-                            else -> error("invalid arithmetic Boolean pin")
-                        }
-                        require(shared == received) { "undelivered Boolean pin" }
-                        add(
-                            buildJsonObject {
-                                put("value", scalar(shared))
-                                put("reason", scalar(session.reasonFor(variable)?.literals))
-                                put("level", scalar(shared?.let { session.levelOf(variable shl 1) }))
-                            },
-                        )
+            put("booleanPins", buildJsonArray {
+                for (variable in pins.indices) {
+                    tick()
+                    val shared = session.boolValue(variable)
+                    val received = when (pins[variable]) {
+                        -1 -> null
+                        0 -> false
+                        1 -> true
+                        else -> error("invalid arithmetic Boolean pin")
                     }
-                },
-            )
+                    require(shared == received) { "undelivered Boolean pin" }
+                    add(buildJsonObject {
+                        put("value", scalar(shared))
+                        put("reason", scalar(session.reasonFor(variable)?.literals))
+                        put("level", scalar(shared?.let { session.levelOf(variable shl 1) }))
+                    })
+                }
+            })
             put("registeredAtoms", scalar(atoms?.let { field(it, "assertions") }))
-            put(
-                "registeredPins",
-                buildJsonArray {
-                    val assertions = (atoms?.let { field(it, "assertions") } as? List<*>).orEmpty()
-                    for (assertion in assertions) {
-                        val literal = member(requireNotNull(assertion), "getLiteral") as Int
-                        if (literal and 1 != 0) continue
-                        add(
-                            buildJsonObject {
-                                put("literal", literal)
-                                val value = session.boolValue(literal ushr 1)
-                                put("value", scalar(value))
-                                put("level", scalar(value?.let { session.levelOf(literal) }))
-                                put("reason", scalar(session.reasonFor(literal ushr 1)?.literals))
-                            },
-                        )
-                    }
-                },
-            )
-            put(
-                "integerBounds",
-                buildJsonArray {
-                    for (variable in 0 until model.numIntVars) {
+            put("registeredPins", buildJsonArray {
+                val assertions = (atoms?.let { field(it, "assertions") } as? List<*>).orEmpty()
+                for (assertion in assertions) {
+                    val literal = member(requireNotNull(assertion), "getLiteral") as Int
+                    if (literal and 1 != 0) continue
+                    add(buildJsonObject {
+                        put("literal", literal)
+                        val value = session.boolValue(literal ushr 1)
+                        put("value", scalar(value))
+                        put("level", scalar(value?.let { session.levelOf(literal) }))
+                        put("reason", scalar(session.reasonFor(literal ushr 1)?.literals))
+                    })
+                }
+            })
+            put("integerBounds", buildJsonArray {
+                for (variable in 0 until model.numIntVars) {
+                    tick()
+                    add(buildJsonObject {
+                        put("variable", variable)
+                        put("declaredLower", model.intBounds.lowerAsBigInteger(variable)?.toString())
+                        put("declaredUpper", model.intBounds.upperAsBigInteger(variable)?.toString())
+                        put("finite", model.intDomainOrNull(variable) != null)
+                        put("publishedLower", scalar(session.intLowerBound(variable)))
+                        put("publishedUpper", scalar(session.intUpperBound(variable)))
+                        put("lowerPremise", scalar(session.intLowerBoundPremise(variable)))
+                        put("upperPremise", scalar(session.intUpperBoundPremise(variable)))
+                    })
+                }
+            })
+            put("rows", buildJsonArray {
+                for ((factorIndex, factor) in model.factors.withIndex()) {
+                    for ((rowIndex, row) in factor.linearRows.withIndex()) {
                         tick()
-                        add(
-                            buildJsonObject {
-                                put("variable", variable)
-                                put("declaredLower", model.intBounds.lowerAsBigInteger(variable)?.toString())
-                                put("declaredUpper", model.intBounds.upperAsBigInteger(variable)?.toString())
-                                put("finite", model.intDomainOrNull(variable) != null)
-                                put("publishedLower", scalar(session.intLowerBound(variable)))
-                                put("publishedUpper", scalar(session.intUpperBound(variable)))
-                                put("lowerPremise", scalar(session.intLowerBoundPremise(variable)))
-                                put("upperPremise", scalar(session.intUpperBoundPremise(variable)))
-                            },
-                        )
+                        add(buildJsonObject {
+                            put("factor", factorIndex)
+                            put("row", rowIndex)
+                            put("form", factor.linearForm?.javaClass?.simpleName)
+                            put("data", LinearDisjunctionInspection.rowRecord(row))
+                        })
                     }
-                },
-            )
-            put(
-                "rows",
-                buildJsonArray {
-                    for ((factorIndex, factor) in model.factors.withIndex()) {
-                        for ((rowIndex, row) in factor.linearRows.withIndex()) {
-                            tick()
-                            add(
-                                buildJsonObject {
-                                    put("factor", factorIndex)
-                                    put("row", rowIndex)
-                                    put("form", factor.linearForm?.javaClass?.simpleName)
-                                    put("data", LinearDisjunctionInspection.rowRecord(row))
-                                },
-                            )
-                        }
-                    }
-                },
-            )
+                }
+            })
             put("assertionLevels", scalar(field(theory, "sourceAssertionLevels")))
             put("lpWitnessPremises", scalar(field(lp, "witnesses")))
             put("rowAssertions", scalar(field(node, "rowAssertions")))
@@ -417,14 +348,12 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
             val current = requireNotNull(stage)
             require(field(current, "opaqueReconstruction") == false) { "opaque reconstruction cannot be replayed" }
             val rebuild = requireNotNull(member(current, "getRebuild"))
-            add(
-                buildJsonObject {
-                    put("source", dimensions(member(current, "getSource") as Problem))
-                    put("target", dimensions(member(current, "getTarget") as Problem))
-                    put("sourceBooleanCount", scalar(member(rebuild, "getSourceBoolVars")))
-                    put("steps", scalar(field(rebuild, "steps")))
-                },
-            )
+            add(buildJsonObject {
+                put("source", dimensions(member(current, "getSource") as Problem))
+                put("target", dimensions(member(current, "getTarget") as Problem))
+                put("sourceBooleanCount", scalar(member(rebuild, "getSourceBoolVars")))
+                put("steps", scalar(field(rebuild, "steps")))
+            })
         }
     }
 
@@ -459,36 +388,22 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
         require(depth <= 128) { "premise snapshot exceeds depth allowance" }
         return when (value) {
             null -> JsonNull
-
             is Boolean -> JsonPrimitive(value)
-
             is Number -> JsonPrimitive(value)
-
             is String -> JsonPrimitive(value)
-
             is Enum<*> -> JsonPrimitive(value.name)
-
             is BigFraction -> JsonPrimitive(value.toString())
-
             is IntArray -> JsonArray(value.map { scalar(it, depth + 1) })
-
             is LongArray -> JsonArray(value.map { scalar(it, depth + 1) })
-
             is Array<*> -> JsonArray(value.map { scalar(it, depth + 1) })
-
             is List<*> -> JsonArray(value.map { scalar(it, depth + 1) })
-
-            is Map<*, *> -> JsonArray(
-                value.entries.map {
-                    buildJsonObject {
-                        put("key", scalar(it.key, depth + 1))
-                        put("value", scalar(it.value, depth + 1))
-                    }
-                },
-            )
-
+            is Map<*, *> -> JsonArray(value.entries.map {
+                buildJsonObject {
+                    put("key", scalar(it.key, depth + 1))
+                    put("value", scalar(it.value, depth + 1))
+                }
+            })
             is SearchAtomPremise -> premiseReference(value)
-
             else -> fields(value, depth)
         }
     }
@@ -505,33 +420,27 @@ internal class LinearPrefixSnapshot(private val stop: ExecutionControl) {
         while (index < premises.size) {
             tick()
             val premise = premises[index++]
-            add(
-                buildJsonObject {
-                    when (premise) {
-                        is SearchAtomPremise.Asserted -> {
-                            put("type", "asserted")
-                            put("decision", scalar(premise.decision))
-                        }
-
-                        is SearchAtomPremise.All -> {
-                            put("type", "all")
-                            put("children", scalar(field(premise, "premises")))
-                        }
-
-                        SearchAtomPremise.Unavailable -> put("type", "unavailable")
+            add(buildJsonObject {
+                when (premise) {
+                    is SearchAtomPremise.Asserted -> {
+                        put("type", "asserted")
+                        put("decision", scalar(premise.decision))
                     }
-                },
-            )
+                    is SearchAtomPremise.All -> {
+                        put("type", "all")
+                        put("children", scalar(field(premise, "premises")))
+                    }
+                    SearchAtomPremise.Unavailable -> put("type", "unavailable")
+                }
+            })
         }
     }
 
     private fun fields(value: Any, depth: Int): JsonObject {
         val type = value.javaClass
-        require(
-            type.name.startsWith("com.eignex.klause.solver.search.") ||
-                type.name.startsWith("com.eignex.klause.theory.qflra.") ||
-                type.name.startsWith("com.eignex.klause.presolve.RebuildStep"),
-        ) {
+        require(type.name.startsWith("com.eignex.klause.solver.search.") ||
+            type.name.startsWith("com.eignex.klause.theory.qflra.") ||
+            type.name.startsWith("com.eignex.klause.presolve.RebuildStep")) {
             "unsupported capture value ${type.name}"
         }
         return buildJsonObject {

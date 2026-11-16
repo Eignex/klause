@@ -67,15 +67,8 @@ internal class LpPassiveVariableChoice(
         clear()
         if (!accepted) return
         observe(if (applyAdvice) "PASSIVE_VARIABLE_COMMITTED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD")
-        if (wasChanged) {
-            observe(
-                if (applyAdvice) {
-                    "PASSIVE_VARIABLE_COMMIT_CHANGED"
-                } else {
-                    "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED"
-                },
-            )
-        }
+        if (wasChanged) observe(if (applyAdvice) "PASSIVE_VARIABLE_COMMIT_CHANGED"
+            else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED")
     }
 
     private fun Candidate.fractional(): Boolean {
@@ -86,15 +79,10 @@ internal class LpPassiveVariableChoice(
 
     private fun Candidate.matches(decision: SearchDecision): Boolean = when (decision) {
         is SearchDecision.Bool -> variable is VarRef.Bool && variable.varId == (decision.literal ushr 1)
-
-        is SearchDecision.IntAtMost ->
-            variable is VarRef.IntVar && variable.varId == decision.variable &&
-                decision.upper == floor(point).toLong()
-
-        is SearchDecision.IntAtLeast ->
-            variable is VarRef.IntVar && variable.varId == decision.variable &&
-                decision.lower == floor(point).toLong() + 1L
-
+        is SearchDecision.IntAtMost -> variable is VarRef.IntVar && variable.varId == decision.variable &&
+            decision.upper == floor(point).toLong()
+        is SearchDecision.IntAtLeast -> variable is VarRef.IntVar && variable.varId == decision.variable &&
+            decision.lower == floor(point).toLong() + 1L
         else -> false
     }
 

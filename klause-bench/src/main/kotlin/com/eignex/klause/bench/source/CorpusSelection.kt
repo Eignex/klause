@@ -231,18 +231,19 @@ internal object CorpusSelection {
         category: Category,
         format: Format,
         expected: ((File) -> Expected)?,
-    ): List<ProblemRef> = discovered.map { d ->
-        ProblemRef(
-            name = d.name,
-            format = format,
-            source = ProblemSource.External(collection, d.mznRelPath),
-            category = category,
-            expected = expected?.invoke(File(root, d.mznRelPath)) ?: Expected.Unknown,
-            data = d.dznRelPath?.let { ProblemSource.External(collection, it) },
-            license = collection.license,
-            family = d.family,
-        )
-    }
+    ): List<ProblemRef> =
+        discovered.map { d ->
+            ProblemRef(
+                name = d.name,
+                format = format,
+                source = ProblemSource.External(collection, d.mznRelPath),
+                category = category,
+                expected = expected?.invoke(File(root, d.mznRelPath)) ?: Expected.Unknown,
+                data = d.dznRelPath?.let { ProblemSource.External(collection, it) },
+                license = collection.license,
+                family = d.family,
+            )
+        }
 
     /** Apply per-family cap (head or seeded sample), interleave, then overall cap. */
     fun applySelection(all: List<Discovered>, sel: Selection): List<Discovered> =

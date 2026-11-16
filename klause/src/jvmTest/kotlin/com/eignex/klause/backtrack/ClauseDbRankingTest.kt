@@ -16,25 +16,16 @@ class ClauseDbRankingTest(private val cap: Int, private val nativeSat: Boolean) 
         @JvmStatic
         @Parameterized.Parameters(name = "cap={0}, nativeSat={1}")
         fun parameters(): List<Array<Any>> = listOf(
-            arrayOf<Any>(4_000, false),
-            arrayOf<Any>(4_000, true),
-            arrayOf<Any>(20_000, false),
-            arrayOf<Any>(20_000, true),
+            arrayOf<Any>(4_000, false), arrayOf<Any>(4_000, true),
+            arrayOf<Any>(20_000, false), arrayOf<Any>(20_000, true),
         )
     }
 
     @Test
     fun `production caps should rank locals without a permanent floor`() {
-        val session = PropagationSession(
-            Problem(
-                3, 0, emptyArray(),
-                arrayOf(
-            Clause(intArrayOf(1, 2)),
-            Clause(intArrayOf(3, 4)),
-        )
-            ),
-            nativeSat = nativeSat
-        )
+        val session = PropagationSession(Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)),
+        )), nativeSat = nativeSat)
         val clause = Clause(intArrayOf(1, 3, 4))
         repeat(cap) { session.addLearnedClause(clause, 9) }
         session.addLearnedClause(clause, 8)

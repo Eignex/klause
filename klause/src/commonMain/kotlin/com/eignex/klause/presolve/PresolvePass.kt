@@ -192,9 +192,7 @@ enum class PresolvePass(
     REMOVE_REDUNDANT("subsume", Stage.PROBLEM, Capability.SOURCE, PresolveTiming.FAST, true, autoEligible = true) {
         override fun applySource(problem: Problem, ctx: PresolveContext) =
             RedundantConstraints.removeRedundantSourceConstraints(
-                problem,
-                ctx.cancellation,
-                ctx.subsumeIncremental as? RedundantConstraints.SubsumeMemo,
+                problem, ctx.cancellation, ctx.subsumeIncremental as? RedundantConstraints.SubsumeMemo,
             )
 
         // The finite lane charges the same phases over root-propagated domains, which are narrower than
@@ -277,21 +275,13 @@ enum class PresolvePass(
         autoEligible = true,
     ) {
         override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.foldSourceComparisonClauses(
-            problem,
-            ctx.objectiveBoolVars,
-            ctx.cancellation,
-            ctx.keepBinaryComparisons,
-            ctx.objectiveIntVars,
+            problem, ctx.objectiveBoolVars, ctx.cancellation, ctx.keepBinaryComparisons, ctx.objectiveIntVars,
         )
 
         // Root propagation fixes columns the declarations leave free, and a fixed column is what lets a
         // multi-term row reduce to a single-variable comparison.
         override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.foldComparisonClauses(
-            problem,
-            ctx.objectiveBoolVars,
-            ctx.cancellation,
-            ctx.keepBinaryComparisons,
-            ctx.objectiveIntVars,
+            problem, ctx.objectiveBoolVars, ctx.cancellation, ctx.keepBinaryComparisons, ctx.objectiveIntVars,
         )
     },
 
@@ -312,13 +302,10 @@ enum class PresolvePass(
             Presolve.mergeSourceDuplicateColumns(problem, ctx.objectiveIntVars, ctx.cancellation)
 
         // A finite delta can widen the representative to the Minkowski sum, which a source range cannot.
-        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) = Presolve.mergeDuplicateColumns(
-            problem,
-            ctx.objectiveIntVars,
-            ctx.sharedIntOcc,
-            ctx.dupColumnsTouchedVars,
-            ctx.cancellation,
-        )
+        override fun applyFinite(problem: BakedProblem, ctx: PresolveContext) =
+            Presolve.mergeDuplicateColumns(
+                problem, ctx.objectiveIntVars, ctx.sharedIntOcc, ctx.dupColumnsTouchedVars, ctx.cancellation,
+            )
     },
 
     /** Fourier-Motzkin projection of a variable occurring in exactly one linear inequality (and not the
@@ -418,12 +405,10 @@ enum class PresolvePass(
         preservesSolutionSet = false,
         autoEligible = true,
     ) {
-        override fun applySource(problem: Problem, ctx: PresolveContext) = Presolve.fixDominatedSourceVariables(
-            problem,
-            ctx.objectiveIntCoeffs,
-            ctx.objectiveBoolCoeffs,
-            ctx.cancellation,
-        )
+        override fun applySource(problem: Problem, ctx: PresolveContext) =
+            Presolve.fixDominatedSourceVariables(
+                problem, ctx.objectiveIntCoeffs, ctx.objectiveBoolCoeffs, ctx.cancellation,
+            )
 
         // The finite lane pins into root-propagated domains, which are narrower than the model states,
         // so it fixes columns the declaration alone leaves too wide.
@@ -656,28 +641,17 @@ enum class PresolvePass(
 
     internal fun namespaceEligible(problem: Problem, factorCount: Int = problem.factors.size): Boolean = when (this) {
         SUBSUME_CLAUSES -> OriginalClauseSubsumption.eligible(problem.numBoolVars, factorCount)
-
         PROBE_OPEN_RANGES -> problem.numRealVars > 0 || problem.intBounds.hasOpenSides
-
         AGGREGATE_SUB_SUMS -> problem.numIntVars >= 3
-
         SPARSIFY_LINEAR_ROWS -> problem.numIntVars > 0 && LinearSubSumAggregation.sparsificationEligible(factorCount)
-
         FOLD_COMPARISON_CLAUSES -> problem.numBoolVars > 0 && problem.numIntVars > 0
-
         DROP_DEPENDENT_EQUALITIES -> problem.numIntVars > 0 || problem.numRealVars > 0
-
         ELIMINATE_BOOL_VARS, ELIMINATE_BLOCKED_CLAUSES, IMPLICATION_GRAPH,
-        PROBE_FAILED_LITERALS,
-        -> problem.numBoolVars > 0
-
+        PROBE_FAILED_LITERALS, -> problem.numBoolVars > 0
         ELIMINATE_AFFINE_SINGLETONS, REDUCE_DIOPHANTINE, PROJECT_SINGLETON_INEQUALITIES,
         FUSE_LINEAR_BOUNDS,
-        VALUE_PRECEDENCE, PROBE_INT_BOUNDS, PROBE_INT_HOLES, SUBSTITUTE_BINARY_COLUMNS,
-        -> problem.numIntVars > 0
-
+        VALUE_PRECEDENCE, PROBE_INT_BOUNDS, PROBE_INT_HOLES, SUBSTITUTE_BINARY_COLUMNS, -> problem.numIntVars > 0
         MERGE_DUPLICATE_COLUMNS -> problem.numIntVars >= 2
-
         else -> true
     }
 
@@ -685,10 +659,8 @@ enum class PresolvePass(
     val guarantees: TransformationGuarantees
         get() = when {
             preservesSolutionSet -> TransformationGuarantees.IDENTITY
-
             this == ELIMINATE_AFFINE_SINGLETONS || this == IMPLICATION_GRAPH || this == FOLD_COMPARISON_CLAUSES ->
                 TransformationGuarantees(true, true, true, false, true)
-
             else -> TransformationGuarantees(true, true, true, false, false)
         }
 

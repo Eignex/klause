@@ -13,7 +13,6 @@ class SourceInequality(
 ) {
     private val captured = coefficients.filterValues { !it.isZero }.toMap()
     internal val supportSize: Int get() = captured.size
-
     /** Nonzero coefficients in original source coordinates. */
     val coefficients: Map<SourceCoordinate, BigFraction> get() = captured.toMap()
 
@@ -47,7 +46,6 @@ sealed interface SourceClaim {
         /** Complete original-source coordinates. */
         val sample: Sample,
     ) : SourceClaim
-
     /** Global objective bound in source units. */
     data class Bound(
         /** Exact original-source objective bound. */
@@ -58,7 +56,6 @@ sealed interface SourceClaim {
         /** Construct a rational objective bound without converting to floating point. */
         constructor(value: BigFraction, strict: Boolean = false) : this(SourceValue.Rational(value), strict)
     }
-
     /** A feasible point attaining a proved global bound in source objective units. */
     data class Optimal(
         /** Complete original-source witness. */
@@ -66,7 +63,6 @@ sealed interface SourceClaim {
         /** Exact objective value attaining the global bound. */
         val value: SourceValue,
     ) : SourceClaim
-
     /** An exact unattained infimum or supremum, with a feasible source point. */
     data class Limit(
         /** Complete feasible original-source point. */
@@ -74,34 +70,26 @@ sealed interface SourceClaim {
         /** Exact unattained objective limit. */
         val value: SourceValue,
     ) : SourceClaim
-
     /** Unlimited objective improvement, requiring a source-specific trajectory derivation. */
     data class Unbounded(
         /** A complete feasible original-source point. */
         val sample: Sample,
     ) : SourceClaim
-
     /** A disjunction of original-source Boolean literals. */
     class Clause(literals: Map<Int, Boolean>) : SourceClaim {
         private val captured = literals.toMap()
-
         /** Boolean coordinates and the values satisfying their literals. */
         val literals: Map<Int, Boolean> get() = captured.toMap()
 
-        init {
-            require(captured.keys.all { it >= 0 })
-        }
+        init { require(captured.keys.all { it >= 0 }) }
 
         override fun equals(other: Any?): Boolean = other is Clause && captured == other.captured
         override fun hashCode(): Int = captured.hashCode()
     }
-
     /** Typed source-specific claims whose semantics belong to the source checker. */
     interface Extension : SourceClaim
-
     /** No assignment exists in this invocation. */
     data object Refutation : SourceClaim
-
     /** Unlimited improvement from a feasible source point. */
     class Ray(
         /** Complete feasible original-source base point. */
@@ -109,11 +97,9 @@ sealed interface SourceClaim {
         direction: Map<SourceCoordinate, BigFraction>,
     ) : SourceClaim {
         private val captured = direction.toMap()
-
         /** Exact direction in original source coordinates. */
         val direction: Map<SourceCoordinate, BigFraction> get() = captured.toMap()
     }
-
     /** A justified source inequality, suitable for bound or clause import. */
     data class Consequence(
         /** Exact inequality established in this source invocation. */
@@ -125,16 +111,13 @@ sealed interface SourceClaim {
 sealed interface SourceDerivation {
     /** Check complete coordinates against original declared semantics. */
     data object SourceWitness : SourceDerivation
-
     /** Check a point and direction against original declared semantics. */
     data object SourceRay : SourceDerivation
-
     /** A cited original row or declaration. */
     data class Premise(
         /** Original-source premise identifier resolved by the consumer. */
         val id: String,
     ) : SourceDerivation
-
     /** A witness and an equal global bound establishing an attained optimum. */
     data class Optimum(
         /** Complete source witness check. */
@@ -142,16 +125,13 @@ sealed interface SourceDerivation {
         /** Global bound equal to the witness objective. */
         val bound: SourceDerivation,
     ) : SourceDerivation
-
     /** Discharge exactly the negations of a Boolean clause using a checked conditional refutation. */
     data class Discharge(
         /** Original-source refutation under precisely the negated clause literals. */
         val refutation: SourceEvidence,
     ) : SourceDerivation
-
     /** Source-specific derivation data; an unsupported semantics checker must decline it. */
     interface Extension : SourceDerivation
-
     /** An inclusive numeric invocation restriction. */
     data class Assumption(
         /** Original-source numeric coordinate. */
@@ -159,13 +139,11 @@ sealed interface SourceDerivation {
         /** Whether to cite its upper or lower invocation bound. */
         val upper: Boolean,
     ) : SourceDerivation
-
     /** Round the right side of an inequality whose activity is integral. */
     data class IntegerRounding(
         /** Exact inequality with integral coefficients over declared integer coordinates. */
         val inequality: SourceDerivation,
     ) : SourceDerivation
-
     /** Round integral integer activity with bounded continuous residuals. */
     class MixedIntegerRounding(
         /** Exact row with integral coefficients on its declared integer coordinates. */
@@ -173,18 +151,14 @@ sealed interface SourceDerivation {
         bounds: List<SourceDerivation>,
     ) : SourceDerivation {
         private val captured = bounds.toList()
-
         /** One proved single-coordinate bound for each continuous coordinate in the row. */
         val bounds: List<SourceDerivation> get() = captured.toList()
     }
-
     /** A nonnegative exact combination of inequalities. */
     class Combination(terms: List<Term>) : SourceDerivation {
         private val captured = terms.toList()
-
         /** Derivations and their nonnegative weights. */
         val terms: List<Term> get() = captured.toList()
-
         /** One weighted premise. */
         data class Term(
             /** Exact nonnegative multiplier. */
@@ -193,7 +167,6 @@ sealed interface SourceDerivation {
             val derivation: SourceDerivation,
         )
     }
-
     /** Exhaustive Boolean alternatives under the current invocation. */
     data class BooleanSplit(
         /** Original-source Boolean coordinate. */
@@ -203,7 +176,6 @@ sealed interface SourceDerivation {
         /** Coverage when the Boolean is true. */
         val whenTrue: SourceDerivation,
     ) : SourceDerivation
-
     /** Exhaustive integer alternatives `x <= threshold` and `x >= threshold + 1`. */
     data class IntegerSplit(
         /** Original-source integer coordinate. */
@@ -215,21 +187,17 @@ sealed interface SourceDerivation {
         /** Coverage for values at or above the threshold plus one. */
         val above: SourceDerivation,
     ) : SourceDerivation
-
     /** Recheck a compatible imported claim; a refutation can discharge an objective bound. */
     data class Import(
         /** Imported claim and complete cited derivation. */
         val evidence: SourceEvidence,
     ) : SourceDerivation
-
     /** The engine decided the claim without retaining a checkable derivation. */
     data class Unavailable(
         /** Missing derivation or unsupported capture mechanism. */
         val reason: String,
     ) : SourceDerivation {
-        init {
-            require(reason.isNotBlank())
-        }
+        init { require(reason.isNotBlank()) }
     }
 }
 
@@ -247,13 +215,11 @@ data class SourceEvidence(
 sealed interface SourceEvidenceCheck {
     /** Every required derivation and source check succeeded. */
     data object Checked : SourceEvidenceCheck
-
     /** Evidence disagrees with the claim or original source. */
     data class Rejected(
         /** Disagreement with the claim or original source. */
         val reason: String,
     ) : SourceEvidenceCheck
-
     /** Required evidence or a supported source checker is unavailable. */
     data class Unavailable(
         /** Missing evidence, unsupported checking or exhausted allowance. */

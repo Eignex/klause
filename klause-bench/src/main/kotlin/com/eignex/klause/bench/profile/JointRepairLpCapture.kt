@@ -44,35 +44,15 @@ internal object JointRepairLpCapture {
         val stop = ExecutionControl.after(timeout.milliseconds)
         val source = requireNotNull(Mps.parse(bytes.decodeToString()).toLinearSourceProblem(cancellation = stop))
         val seed = options.getValue("seed").toLong()
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.MIXED,
-                maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE,
-                cancellation = stop,
-            ),
-        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+            maximize = source.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop))
         val executionPolicy = SourceExecutionPolicy()
-        val prepared = SourceSetup.execute(
-            SourceExecutionRequest(
-                invocation,
-                executionPolicy,
-                ExecutionOptions.parse(FinitePortfolioLpCapture.parameters(options)),
-                finiteRequest = { shape ->
-                    executionPolicy.finiteRequest(
-                        shape,
-                        FiniteEngine.MIXED,
-                        cancellation = stop,
-                        randomSeed = seed,
-                        prepareOnly = true,
-                    )
-                },
-                randomSeed = seed,
-                timeout = stop,
-                cancellation = stop,
-            ),
-        )
+        val prepared = SourceSetup.execute(SourceExecutionRequest(invocation, executionPolicy,
+            ExecutionOptions.parse(FinitePortfolioLpCapture.parameters(options)),
+            finiteRequest = { shape -> executionPolicy.finiteRequest(shape, FiniteEngine.MIXED,
+                cancellation = stop, randomSeed = seed, prepareOnly = true) },
+            randomSeed = seed, timeout = stop, cancellation = stop))
         val preparation = (prepared as? SourceExecutionResult.Finite)?.result?.preparation
             ?: error("joint capture requires finite preparation")
         val model = preparation.problem
@@ -89,19 +69,13 @@ internal object JointRepairLpCapture {
             it.name == "incumbentCompletionCheck" && it.parameterTypes.first().simpleName == "PreparedLinearSource"
         }.invoke(null, original, field(preparation, "sourceMapping"))
         val active = stop or ExecutionControl.after(4_000.milliseconds)
-        val params = TheoryParams(
-            timeout = active,
-            randomSeed = seed + 9,
-            sourceLpWorkLimit = 500_000_000L,
-            sourceLpAllocationLimit = 256L * 1024 * 1024,
-            sourceIncumbentCompletion = true,
-        )
+        val params = TheoryParams(timeout = active, randomSeed = seed + 9,
+            sourceLpWorkLimit = 500_000_000L, sourceLpAllocationLimit = 256L * 1024 * 1024,
+            sourceIncumbentCompletion = true)
         val policy = Class.forName("com.eignex.klause.lp.SparseSourceLpPolicy").getConstructor().newInstance()
         val owner = Class.forName(PIPELINE + "JointLinearRepair").constructors.single { it.parameterCount == 16 }
-            .newInstance(
-                model, context, objective, params, policy, true, { null }, active, null,
-                null, null, true, null, checker, null, null,
-            )
+            .newInstance(model, context, objective, params, policy, true, { null }, active, null,
+                null, null, true, null, checker, null, null)
         val window = ConditionWindow(limit)
         val authority = requireNotNull(field(owner, "authority"))
         val budget = requireNotNull(field(owner, "budget"))
@@ -123,37 +97,28 @@ internal object JointRepairLpCapture {
                 states[id] = requireNotNull(state).toString()
                 val payload = FinitePortfolioLpCapture.capture(query, stop)
                 payload?.let { out.resolve("conditional-$id.klexact").writeBytes(it) }
-                val basis = FinitePortfolioLpCapture.writeBasis(
-                    query,
-                    out.resolve("conditional-$id-basis.json"),
-                )
-                out.resolve("conditional-$id.json").writeText(
-                    buildJsonObject {
-                        put("condition", NumericalResidualProfile.json(field(owner, "pending")))
-                        put("scope", NumericalFrontierSnapshot.scope(requireNotNull(currentScope)))
-                        put("conditionScope", NumericalFrontierSnapshot.scope(invocationContext.scope))
-                        put("stateIdentity", state)
-                        put("route", call(query, "getRoute").toString())
-                        put("sourceSha256", sha256(bytes))
-                        put("captureSha256", payload?.let(::sha256))
-                        put("basisSha256", basis)
-                        put("captureDeclined", payload == null)
-                        put("sourceVerdictClaim", false)
-                    }.toString(),
-                )
+                val basis = FinitePortfolioLpCapture.writeBasis(query,
+                    out.resolve("conditional-$id-basis.json"))
+                out.resolve("conditional-$id.json").writeText(buildJsonObject {
+                    put("condition", NumericalResidualProfile.json(field(owner, "pending")))
+                    put("scope", NumericalFrontierSnapshot.scope(requireNotNull(currentScope)))
+                    put("conditionScope", NumericalFrontierSnapshot.scope(invocationContext.scope))
+                    put("stateIdentity", state)
+                    put("route", call(query, "getRoute").toString())
+                    put("sourceSha256", sha256(bytes))
+                    put("captureSha256", payload?.let(::sha256))
+                    put("basisSha256", basis)
+                    put("captureDeclined", payload == null)
+                    put("sourceVerdictClaim", false)
+                }.toString())
                 observerNs += System.nanoTime() - started
             }
         }
         val contextType = Class.forName(ENGINE + "LpSolveContext")
         val observing = contextType.constructors.single { it.parameterCount == 7 }.newInstance(
-            call(defaults, "getEngineFactory"),
-            call(defaults, "getCertificationPolicy"),
-            call(defaults, "getOnRefinementBasisVerification"),
-            call(defaults, "getSparsePointRecovery"),
-            call(defaults, "getStartArbitraryPrecision"),
-            call(defaults, "getPreserveOverflowCheckpoint"),
-            observe,
-        )
+            call(defaults, "getEngineFactory"), call(defaults, "getCertificationPolicy"),
+            call(defaults, "getOnRefinementBasisVerification"), call(defaults, "getSparsePointRecovery"),
+            call(defaults, "getStartArbitraryPrecision"), call(defaults, "getPreserveOverflowCheckpoint"), observe)
         budget.javaClass.getDeclaredField("solveContext").apply { isAccessible = true }.set(budget, { observing })
         val snapshots = NumericalSelectionSnapshot(stop)
         val journal = snapshots.journal()
@@ -186,39 +151,31 @@ internal object JointRepairLpCapture {
                         val matched = states[id] == state.toString()
                         val started = System.nanoTime()
                         val rayCapture = if (matched && !active() &&
-                            call(guide, "getTermination").toString() == "INFEASIBLE_CANDIDATE"
-                        ) {
+                            call(guide, "getTermination").toString() == "INFEASIBLE_CANDIDATE") {
                             captureRay(session, id, requireNotNull(scope), state, out)
-                        } else {
-                            null
-                        }
+                        } else null
                         observerNs += System.nanoTime() - started
-                        out.resolve("guidance.jsonl").appendText(
-                            buildJsonObject {
-                                put("phase", phase)
-                                put("termination", termination)
-                                put("guidanceClaim", guidanceClaim)
-                                put("primalSize", (call(guide, "getPrimal") as DoubleArray?)?.size)
-                                put("certificateMetrics", NumericalResidualProfile.json(metrics))
-                                put("scope", NumericalFrontierSnapshot.scope(requireNotNull(scope)))
-                                put("conditionId", id)
-                                put("stateIdentity", state)
-                                put("captureStateMatched", matched)
-                                put("rayCaptureSha256", rayCapture)
-                                rejection?.let { missing ->
-                                    put(
-                                        "dualRejection",
-                                        buildJsonObject {
-                                            put("column", call(missing, "getColumn") as Int)
-                                            put("upper", call(missing, "getUpper") as Boolean)
-                                            put("reduced", call(missing, "getReduced").toString())
-                                        },
-                                    )
-                                }
-                                put("missingBoundSide", rejection != null)
-                                put("checkedKernelRayAvailable", checkedRay)
-                            }.toString() + "\n",
-                        )
+                        out.resolve("guidance.jsonl").appendText(buildJsonObject {
+                            put("phase", phase)
+                            put("termination", termination)
+                            put("guidanceClaim", guidanceClaim)
+                            put("primalSize", (call(guide, "getPrimal") as DoubleArray?)?.size)
+                            put("certificateMetrics", NumericalResidualProfile.json(metrics))
+                            put("scope", NumericalFrontierSnapshot.scope(requireNotNull(scope)))
+                            put("conditionId", id)
+                            put("stateIdentity", state)
+                            put("captureStateMatched", matched)
+                            put("rayCaptureSha256", rayCapture)
+                            rejection?.let { missing ->
+                                put("dualRejection", buildJsonObject {
+                                    put("column", call(missing, "getColumn") as Int)
+                                    put("upper", call(missing, "getUpper") as Boolean)
+                                    put("reduced", call(missing, "getReduced").toString())
+                                })
+                            }
+                            put("missingBoundSide", rejection != null)
+                            put("checkedKernelRayAvailable", checkedRay)
+                        }.toString() + "\n")
                         val matchedRejection = rejection != null && matched
                         unresolvedMissingSide = matchedRejection && !checkedRay
                         if (matchedRejection) {
@@ -230,40 +187,35 @@ internal object JointRepairLpCapture {
                 }
             }
             out.resolve("source-queries.json").writeText(snapshots.capture(journal).toString())
-            out.resolve("result.json").writeText(
-                buildJsonObject {
-                    put("captureMode", "standalone-joint-before")
-                    put("sourceSha256", sha256(bytes))
-                    put("sourceSeed", seed)
-                    put("workerSeed", seed + 9)
-                    put("workerSeedBasis", "ordinary eight finite workers plus leading numerical companion")
-                    put("preparedIntegers", model.numIntVars)
-                    put("preparedReals", model.numRealVars)
-                    put("preparedFactors", model.numFactors)
-                    put("presolve", NumericalResidualProfile.json(preparation.presolve))
-                    put("activeLimitMs", 4000)
-                    put("sourceLpWorkLimit", params.sourceLpWorkLimit)
-                    put("sourceLpAllocationLimit", params.sourceLpAllocationLimit)
-                    put("capturedSnapshots", window.size)
-                    put("captureObserverNs", observerNs)
-                    put("observerTimeInsideActiveLimit", true)
-                    put("missingBoundSideObserved", missingSide)
-                    put("stoppedOnUnresolvedMissingSide", unresolvedMissingSide)
-                    put("resultRequiresMatchingCaptureState", true)
-                    put("rejectionCondition", rejectionCondition)
-                    put(
-                        "rejectionCaptureAvailable",
-                        rejectionCondition?.let {
-                            out.resolve("conditional-$it.klexact").isFile
-                        } == true,
-                    )
-                    put("rejectionRayCaptureAvailable", rejectionRayCapture != null)
-                    put("stats", NumericalResidualProfile.json(call(owner, "getStats")))
-                    put("sourceVerdictClaim", false)
-                    put("fullPortfolioReplayQualified", false)
-                    put("performanceQualified", false)
-                }.toString(),
-            )
+            out.resolve("result.json").writeText(buildJsonObject {
+                put("captureMode", "standalone-joint-before")
+                put("sourceSha256", sha256(bytes))
+                put("sourceSeed", seed)
+                put("workerSeed", seed + 9)
+                put("workerSeedBasis", "ordinary eight finite workers plus leading numerical companion")
+                put("preparedIntegers", model.numIntVars)
+                put("preparedReals", model.numRealVars)
+                put("preparedFactors", model.numFactors)
+                put("presolve", NumericalResidualProfile.json(preparation.presolve))
+                put("activeLimitMs", 4000)
+                put("sourceLpWorkLimit", params.sourceLpWorkLimit)
+                put("sourceLpAllocationLimit", params.sourceLpAllocationLimit)
+                put("capturedSnapshots", window.size)
+                put("captureObserverNs", observerNs)
+                put("observerTimeInsideActiveLimit", true)
+                put("missingBoundSideObserved", missingSide)
+                put("stoppedOnUnresolvedMissingSide", unresolvedMissingSide)
+                put("resultRequiresMatchingCaptureState", true)
+                put("rejectionCondition", rejectionCondition)
+                put("rejectionCaptureAvailable", rejectionCondition?.let {
+                    out.resolve("conditional-$it.klexact").isFile
+                } == true)
+                put("rejectionRayCaptureAvailable", rejectionRayCapture != null)
+                put("stats", NumericalResidualProfile.json(call(owner, "getStats")))
+                put("sourceVerdictClaim", false)
+                put("fullPortfolioReplayQualified", false)
+                put("performanceQualified", false)
+            }.toString())
         } finally {
             (search as AutoCloseable).close()
             (owner as AutoCloseable).close()
@@ -313,9 +265,7 @@ internal object JointRepairLpCapture {
     }
 
     internal class ConditionWindow(private val limit: Int) {
-        init {
-            require(limit in 1..4)
-        }
+        init { require(limit in 1..4) }
         private val conditions = IdentityHashMap<Any, String>()
         var size: Int = 0
             private set

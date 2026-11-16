@@ -18,37 +18,22 @@ import com.eignex.klause.simplex.exact.BigFraction
 fun LinearObjective.toQuadraticObjectiveSpec(): QuadraticObjectiveSpec {
     val terms = buildList {
         boolWeightValues.forEachIndexed { id, weight ->
-            if (weight != 0L) {
-                add(
-                    QuadraticObjectiveTerm(
-                        QuadraticCoefficient.ofLong(weight),
-                        QuadraticVariable.Bool(SourceBoolId(id)),
-                    ),
-                )
-            }
+            if (weight != 0L) add(QuadraticObjectiveTerm(
+                QuadraticCoefficient.ofLong(weight), QuadraticVariable.Bool(SourceBoolId(id)),
+            ))
         }
         intCoefficientValues.forEachIndexed { id, coefficient ->
-            if (coefficient != 0L) {
-                add(
-                    QuadraticObjectiveTerm(
-                        QuadraticCoefficient.ofLong(coefficient),
-                        QuadraticVariable.Int(SourceIntId(id)),
-                    ),
-                )
-            }
+            if (coefficient != 0L) add(QuadraticObjectiveTerm(
+                QuadraticCoefficient.ofLong(coefficient), QuadraticVariable.Int(SourceIntId(id)),
+            ))
         }
         realCoefficientValues.forEachIndexed { id, coefficient ->
             val exact = requireNotNull(BigFraction.ofDouble(coefficient)) {
                 "affine objective requires finite real coefficients"
             }
-            if (exact != BigFraction.ZERO) {
-                add(
-                    QuadraticObjectiveTerm(
-                        QuadraticCoefficient.of(exact.num, exact.den),
-                        QuadraticVariable.Real(SourceRealId(id)),
-                    ),
-                )
-            }
+            if (exact != BigFraction.ZERO) add(QuadraticObjectiveTerm(
+                QuadraticCoefficient.of(exact.num, exact.den), QuadraticVariable.Real(SourceRealId(id)),
+            ))
         }
     }
     val native = QuadraticObjectiveSpec(terms, QuadraticCoefficient.ofLong(constant))

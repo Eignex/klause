@@ -105,9 +105,7 @@ class FlatZincSemanticsTest {
     @Test
     fun `legacy integer arguments should use the same replacement contract`() {
         val program = parseFlatZinc(
-            "var int: x; solve satisfy;",
-            unboundedIntLo = -2_000_000,
-            unboundedIntHi = 3_000_000,
+            "var int: x; solve satisfy;", unboundedIntLo = -2_000_000, unboundedIntHi = 3_000_000,
         )
 
         assertEquals(-2_000_000L, program.problem.intBounds.lower(0))
@@ -145,8 +143,7 @@ class FlatZincSemanticsTest {
         )
         for (range in listOf("-2..5", "{-2, 5}")) {
             val program = parseFlatZinc(
-                "var int: x; var $range: y = x; solve satisfy;",
-                semanticOverrides = overrides,
+                "var int: x; var $range: y = x; solve satisfy;", semanticOverrides = overrides,
             )
 
             val id = program.intVarsByName.getValue("x")
@@ -232,13 +229,9 @@ class FlatZincSemanticsTest {
             BoundOverride.Value(SemanticRational.ofLong(3_000_000)),
         )
         for (declaration in listOf("var float: x;", "array[1..2] of var float: x;")) {
-            val program = parseFlatZinc(
-                "$declaration solve satisfy;",
-                semanticOverrides = SemanticOverrides(
-                    floats = FloatSemantics.Continuous,
-                    undeclaredReals = bounds,
-                ),
-            )
+            val program = parseFlatZinc("$declaration solve satisfy;", semanticOverrides = SemanticOverrides(
+                floats = FloatSemantics.Continuous, undeclaredReals = bounds,
+            ))
 
             for (id in 0 until program.problem.numRealVars) {
                 assertEquals(-2_000_000.0, program.problem.realLower[id])
@@ -252,13 +245,10 @@ class FlatZincSemanticsTest {
 
     @Test
     fun `an omitted continuous real endpoint should remain open`() {
-        val program = parseFlatZinc(
-            "var float: x; solve satisfy;",
-            semanticOverrides = SemanticOverrides(
-                floats = FloatSemantics.Continuous,
-                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
-            ),
-        )
+        val program = parseFlatZinc("var float: x; solve satisfy;", semanticOverrides = SemanticOverrides(
+            floats = FloatSemantics.Continuous,
+            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+        ))
 
         assertEquals(2_000_000.0, program.problem.realLower[0])
         assertEquals(Double.POSITIVE_INFINITY, program.problem.realUpper[0])
@@ -266,12 +256,9 @@ class FlatZincSemanticsTest {
 
     @Test
     fun `continuous real defaults outside the grid window should survive float planning`() {
-        val program = parseFlatZinc(
-            "var float: x; solve satisfy;",
-            semanticOverrides = SemanticOverrides(
-                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
-            ),
-        )
+        val program = parseFlatZinc("var float: x; solve satisfy;", semanticOverrides = SemanticOverrides(
+            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+        ))
 
         assertTrue(program.floatVarsByName.getValue("x").lpOnly)
         assertEquals(2_000_000.0, program.problem.realLower[0])
@@ -280,16 +267,13 @@ class FlatZincSemanticsTest {
 
     @Test
     fun `finite caller real defaults should define the unranged objective grid`() {
-        val program = parseFlatZinc(
-            "var float: x; solve minimize x;",
-            semanticOverrides = SemanticOverrides(
-                floats = FloatSemantics.Grid(4, 1_000_000),
-                undeclaredReals = BoundsOverride(
-                    BoundOverride.Value(SemanticRational.ofLong(2_000_000)),
-                    BoundOverride.Value(SemanticRational.ofLong(3_000_000)),
-                ),
+        val program = parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = SemanticOverrides(
+            floats = FloatSemantics.Grid(4, 1_000_000),
+            undeclaredReals = BoundsOverride(
+                BoundOverride.Value(SemanticRational.ofLong(2_000_000)),
+                BoundOverride.Value(SemanticRational.ofLong(3_000_000)),
             ),
-        )
+        ))
 
         val variable = program.floatVarsByName.getValue("x")
         assertFalse(variable.lpOnly)
@@ -321,13 +305,10 @@ class FlatZincSemanticsTest {
         val bound = SemanticRational.of(bigIntOf(1), bigIntOf(10))
 
         val error = assertFailsWith<IllegalArgumentException> {
-            parseFlatZinc(
-                "var float: x; solve satisfy;",
-                semanticOverrides = SemanticOverrides(
-                    floats = FloatSemantics.Continuous,
-                    undeclaredReals = BoundsOverride(lower = BoundOverride.Value(bound)),
-                ),
-            )
+            parseFlatZinc("var float: x; solve satisfy;", semanticOverrides = SemanticOverrides(
+                floats = FloatSemantics.Continuous,
+                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(bound)),
+            ))
         }
 
         assertTrue("undeclared real bound cannot be represented exactly" in error.message.orEmpty())
@@ -335,13 +316,10 @@ class FlatZincSemanticsTest {
 
     @Test
     fun `a disjoint grid window should preserve the original real default and native route`() {
-        val program = parseFlatZinc(
-            "var float: x; solve minimize x;",
-            semanticOverrides = SemanticOverrides(
-                floats = FloatSemantics.Grid(4, 1_000_000),
-                undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
-            ),
-        )
+        val program = parseFlatZinc("var float: x; solve minimize x;", semanticOverrides = SemanticOverrides(
+            floats = FloatSemantics.Grid(4, 1_000_000),
+            undeclaredReals = BoundsOverride(lower = BoundOverride.Value(SemanticRational.ofLong(2_000_000))),
+        ))
 
         assertEquals(2_000_000.0, program.sourceProgram.problem.realLower[0])
         assertEquals(Double.POSITIVE_INFINITY, program.sourceProgram.problem.realUpper[0])
@@ -352,10 +330,8 @@ class FlatZincSemanticsTest {
     @Test
     fun `an unrepresentable private linear scale should preserve the original source`() {
         val policy = FloatSemantics.Grid(4, 9_007_199_254_740_993L)
-        val program = parseFlatZinc(
-            "var float: x; solve minimize x;",
-            semanticOverrides = SemanticOverrides(floats = policy),
-        )
+        val program = parseFlatZinc("var float: x; solve minimize x;",
+            semanticOverrides = SemanticOverrides(floats = policy))
 
         assertEquals(policy, program.semantics.effective.floats)
         assertSame(program.sourceProgram.problem, program.problem)

@@ -12,19 +12,18 @@ internal sealed interface LpSolveStep<out T> {
     class Completed<T>(val value: T) : LpSolveStep<T>
 }
 
-internal class LpSolveCursor<T>(private val completed: () -> Unit = {}, operation: suspend LpSolveCursor<T>.() -> T) :
-    AutoCloseable {
+internal class LpSolveCursor<T>(
+    private val completed: () -> Unit = {},
+    operation: suspend LpSolveCursor<T>.() -> T,
+) : AutoCloseable {
     private var outcome: Result<T>? = null
-    private var continuation: Continuation<Unit>? = operation.createCoroutine(
-        this,
-        object : Continuation<T> {
-            override val context = EmptyCoroutineContext
-            override fun resumeWith(result: Result<T>) {
-                outcome = result
-                completed()
-            }
-        },
-    )
+    private var continuation: Continuation<Unit>? = operation.createCoroutine(this, object : Continuation<T> {
+        override val context = EmptyCoroutineContext
+        override fun resumeWith(result: Result<T>) {
+            outcome = result
+            completed()
+        }
+    })
     private var closed = false
     private var advancing = false
     private var allowance = 0L
@@ -87,9 +86,10 @@ internal class LpSolveCursor<T>(private val completed: () -> Unit = {}, operatio
     private class CursorClosed : RuntimeException()
 }
 
-internal fun <T> immediateLpSolve(operation: suspend () -> T): T = LpSolveCursor<T> { operation() }.use { cursor ->
-    when (val step = cursor.advance()) {
-        is LpSolveStep.Completed -> step.value
-        LpSolveStep.Paused -> error("synchronous LP solve suspended")
+internal fun <T> immediateLpSolve(operation: suspend () -> T): T =
+    LpSolveCursor<T> { operation() }.use { cursor ->
+        when (val step = cursor.advance()) {
+            is LpSolveStep.Completed -> step.value
+            LpSolveStep.Paused -> error("synchronous LP solve suspended")
+        }
     }
-}

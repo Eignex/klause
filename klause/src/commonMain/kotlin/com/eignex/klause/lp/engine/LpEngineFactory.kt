@@ -91,12 +91,8 @@ private class ScalingLpEngineFactory(private val scalingOptions: LpScalingOption
         isolated: IntArray,
     ): ComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
 
-    override fun newRetainedComponentSolver(
-        model: LpModel,
-        parts: List<LpNeighborhood>,
-        solvers: List<LpSolver>,
-        isolated: IntArray,
-    ): RetainedComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
+    override fun newRetainedComponentSolver(model: LpModel, parts: List<LpNeighborhood>, solvers: List<LpSolver>,
+        isolated: IntArray): RetainedComponentLpSolverCapability = ComponentLpSolver(model, parts, solvers, isolated)
 
     override fun newTableauSolver(
         model: LpModel,

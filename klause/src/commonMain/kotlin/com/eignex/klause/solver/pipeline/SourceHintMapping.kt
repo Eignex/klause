@@ -64,11 +64,7 @@ internal fun SearchHints.remapped(mapping: SourceMapping, cancellation: Executio
         val coordinates = if (group.varSelector != VariableSelection.SmallestLowerBound &&
             group.varSelector != VariableSelection.LargestUpperBound &&
             group.valueSelector in setOf(ValueSelection.Minimum, ValueSelection.Maximum)
-        ) {
-            translated
-        } else {
-            direct
-        }
+        ) translated else direct
         val mapped = copy(tiers = listOf(group)).remapped(coordinates, cancellation) ?: return null
         groups += mapped.tiers
     }
@@ -91,8 +87,7 @@ private fun SourceMapping.translatedCoordinates(cancellation: ExecutionControl):
             }
         }
         translated = translated.followedBy(
-            VarRemap(IntArray(retained.boolCount) { retained.bool(it) }, ints),
-            cancellation,
+            VarRemap(IntArray(retained.boolCount) { retained.bool(it) }, ints), cancellation,
         ) ?: return null
     }
     return if (cancellation()) null else translated
@@ -216,10 +211,8 @@ internal fun DefinitionHint.Linear.reconstructed(
         null
     } else {
         DefinitionHint.Linear(
-            target,
-            kept.values.toLongArray(),
-            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(),
-            rhs,
+            target, kept.values.toLongArray(),
+            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(), rhs,
         )
     }
 } catch (_: CheckedLongOverflowException) {
@@ -240,7 +233,6 @@ internal fun DefinitionHint.Comparison.reconstructed(
             val coefficient = coefficients[k]
             when (val operand = inputs[k]) {
                 is DefinitionHint.Operand.Constant -> rhs = subExact(rhs, mulExact(coefficient, operand.value))
-
                 is DefinitionHint.Operand.Variable -> {
                     val reconstruction = reconstructions[operand.id]
                     if (reconstruction == null) {
@@ -262,14 +254,8 @@ internal fun DefinitionHint.Comparison.reconstructed(
         cancellation.charge(3L * terms.size)
         if (cancellation()) return null
         val kept = terms.filterValues { it != 0L }
-        DefinitionHint.Comparison(
-            output,
-            kept.values.toLongArray(),
-            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(),
-            rhs,
-            relation,
-            strict,
-        )
+        DefinitionHint.Comparison(output, kept.values.toLongArray(),
+            kept.keys.map { DefinitionHint.Operand.Variable(it) }.toTypedArray(), rhs, relation, strict)
     } catch (_: CheckedLongOverflowException) {
         null
     }

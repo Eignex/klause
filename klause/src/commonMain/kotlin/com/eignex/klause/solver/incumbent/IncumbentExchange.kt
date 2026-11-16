@@ -72,11 +72,8 @@ class IncumbentExchange<A, V>(
 
     internal fun offerFromWorker(assignment: A, objective: V, measure: (() -> Unit) -> Unit) {
         val buffered = bufferedOffers
-        if (buffered == null) {
-            measure { offer(assignment, objective) }
-        } else {
-            buffered.add(assignment, objective, measure)
-        }
+        if (buffered == null) measure { offer(assignment, objective) }
+        else buffered.add(assignment, objective, measure)
     }
 
     internal fun <T> withBufferedOffers(

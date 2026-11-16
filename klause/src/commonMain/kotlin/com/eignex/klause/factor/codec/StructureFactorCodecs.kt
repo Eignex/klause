@@ -123,10 +123,7 @@ internal fun structureFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         "cumulative",
         {
             CumulativePayload(
-                it.starts,
-                it.durations,
-                it.resources,
-                it.capacity,
+                it.starts, it.durations, it.resources, it.capacity,
                 it.presents.takeIf(IntArray::isNotEmpty),
                 it.durationVars.takeIf(IntArray::isNotEmpty),
                 it.resourceVars.takeIf(IntArray::isNotEmpty),
@@ -135,10 +132,7 @@ internal fun structureFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         },
         {
             Cumulative(
-                it.starts,
-                it.durations,
-                it.resources,
-                it.capacity,
+                it.starts, it.durations, it.resources, it.capacity,
                 it.presents ?: IntArray(0),
                 it.durationVars ?: IntArray(0),
                 it.resourceVars ?: IntArray(0),
@@ -188,26 +182,14 @@ internal fun structureFactorCodecs(): List<FactorCodec<*, *>> = listOf(
         "mdd",
         {
             MddPayload(
-                it.seq,
-                it.numStatesPerLayer,
-                it.layerStarts,
-                it.transitions,
-                it.initial,
-                it.accepting,
-                it.recordStride,
-                it.cost.takeIf { cost -> cost >= 0 },
+                it.seq, it.numStatesPerLayer, it.layerStarts, it.transitions, it.initial, it.accepting,
+                it.recordStride, it.cost.takeIf { cost -> cost >= 0 },
             )
         },
         {
             Mdd(
-                it.seq,
-                it.statesPerLayer,
-                it.layerStarts,
-                it.transitions,
-                it.initial,
-                it.accepting,
-                it.recordStride,
-                it.cost ?: -1,
+                it.seq, it.statesPerLayer, it.layerStarts, it.transitions, it.initial, it.accepting,
+                it.recordStride, it.cost ?: -1,
             )
         },
     ),

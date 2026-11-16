@@ -70,18 +70,19 @@ internal object PortfolioReduction {
         dirty: Boolean,
         reason: TerminationReason,
         stats: SolveStats,
-    ): MinimizeResult = when {
-        incumbent != null && dirty -> MinimizeResult.BestFound(
-            incumbent.assignment,
-            incumbent.objective,
-            reason,
-            stats,
-        )
+    ): MinimizeResult =
+        when {
+            incumbent != null && dirty -> MinimizeResult.BestFound(
+                incumbent.assignment,
+                incumbent.objective,
+                reason,
+                stats,
+            )
 
-        incumbent != null -> MinimizeResult.Optimal(incumbent.assignment, incumbent.objective, stats)
+            incumbent != null -> MinimizeResult.Optimal(incumbent.assignment, incumbent.objective, stats)
 
-        dirty -> MinimizeResult.Unknown(reason, stats)
+            dirty -> MinimizeResult.Unknown(reason, stats)
 
-        else -> MinimizeResult.Infeasible(stats = stats)
-    }
+            else -> MinimizeResult.Infeasible(stats = stats)
+        }
 }

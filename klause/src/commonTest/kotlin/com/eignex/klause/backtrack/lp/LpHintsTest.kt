@@ -34,28 +34,16 @@ class LpHintsTest {
         val builder = LpBuilder()
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        val relaxation = LpRelaxation(
-            assertNotNull(trail.state.ownerWorkingModel()),
-            intArrayOf(0, 1),
-            booleanArrayOf(false, false),
-            0L,
-            intArrayOf(0, 1),
-            IntArray(0),
-        )
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0, 1),
+            booleanArrayOf(false, false), 0L, intArrayOf(0, 1), IntArray(0))
         val baseline = VarRef.IntVar(0)
         val proposal = VarRef.IntVar(1)
         val costs = ArrayList<Long>()
         for (apply in listOf(false, true)) {
             var work = 0L
             val events = ArrayList<String>()
-            val hints = LpHints(
-                2,
-                0,
-                directionalGains = true,
-                applyAdvice = apply,
-                observe = events::add,
-                charge = { work += it },
-            )
+            val hints = LpHints(2, 0, directionalGains = true, applyAdvice = apply,
+                observe = events::add, charge = { work += it })
             repeat(2) {
                 hints.beginNode(0, 100.0)
                 hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
@@ -96,14 +84,8 @@ class LpHintsTest {
         repeat(2) { builder.addVar(0, 10, cost = 1L) }
         val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val model = assertNotNull(trail.state.ownerWorkingModel())
-        val relaxation = LpRelaxation(
-            model,
-            intArrayOf(0, 1),
-            booleanArrayOf(false, false),
-            0L,
-            intArrayOf(0, 1),
-            IntArray(0),
-        )
+        val relaxation = LpRelaxation(model, intArrayOf(0, 1), booleanArrayOf(false, false),
+            0L, intArrayOf(0, 1), IntArray(0))
         val events = ArrayList<String>()
         val hints = LpHints(2, 0, directionalGains = true, observe = events::add)
         val proposal = VarRef.IntVar(1)
@@ -121,17 +103,8 @@ class LpHintsTest {
         }
         hints.beginNode(0, 100.0)
         hints.record(relaxation, doubleArrayOf(2.25, 3.25), DoubleArray(0))
-        hints.recordObjective(
-            LpRelaxation(
-                model,
-                intArrayOf(0, 1),
-                booleanArrayOf(false, false),
-                0L,
-                intArrayOf(0, 1),
-                IntArray(0),
-            ),
-            10.0,
-        )
+        hints.recordObjective(LpRelaxation(model, intArrayOf(0, 1), booleanArrayOf(false, false),
+            0L, intArrayOf(0, 1), IntArray(0)), 10.0)
 
         val selected = hints.selectVariable(proposal, VarRef.IntVar(0))
         hints.branch(VarRef.IntVar(0))
@@ -149,14 +122,8 @@ class LpHintsTest {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-            val relaxation = LpRelaxation(
-                assertNotNull(trail.state.ownerWorkingModel()),
-                intArrayOf(0),
-                booleanArrayOf(false),
-                0L,
-                intArrayOf(0),
-                IntArray(0),
-            )
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
             var work = 0L
             val hints = LpHints(1, 0, directionalGains = true, charge = { work += it })
             val variable = VarRef.IntVar(0)
@@ -188,6 +155,7 @@ class LpHintsTest {
             }
         }
     }
+
 
     private fun recordedHints(lpValue: Double): LpHints {
         val p = Problem(
@@ -259,14 +227,8 @@ class LpHintsTest {
         val b = LpBuilder()
         b.addVar(0, 10, cost = 1)
         val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
-        val relaxation = LpRelaxation(
-            assertNotNull(trail.state.ownerWorkingModel()),
-            intArrayOf(0),
-            booleanArrayOf(false),
-            0L,
-            intArrayOf(0),
-            IntArray(0),
-        )
+        val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
         val observations = ArrayList<String>()
         var work = 0L
         val hints = LpHints(1, 0, directionalGains = false, observe = observations::add, charge = { work += it })
@@ -296,14 +258,10 @@ class LpHintsTest {
             val trail = LpBoundTrail(assertNotNull(base.authoritativeModel()))
             val observations = ArrayList<String>()
             val hints = LpHints(1, 1, directionalGains = true, observe = observations::add)
-            fun relaxation() = LpRelaxation(
-                assertNotNull(trail.state.ownerWorkingModel()),
-                intArrayOf(0),
+            fun relaxation() = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
                 booleanArrayOf(change == "mapping" && trail.state.depth > 0),
                 if (change == "constant" && trail.state.depth > 0) 1L else 0L,
-                intArrayOf(0),
-                IntArray(0),
-            )
+                intArrayOf(0), IntArray(0))
             hints.beginNode(0, 100.0)
             val parent = relaxation()
             hints.record(parent, doubleArrayOf(2.25), DoubleArray(parent.model.m))
@@ -312,29 +270,18 @@ class LpHintsTest {
             hints.commit(SearchDecision.IntAtMost(0, 2), 1)
             assertTrue(trail.push())
             when (change) {
-                "cut" -> assertTrue(
-                    trail.append(
-                        LpScopedRow(
-                            1L,
-                            listOf(0 to ExactLpNumber.of(1L)),
-                            ExactLpNumber.of(2L),
-                            ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L)))),
-                        ),
-                        scoped = true,
-                    ),
-                )
-
+                "cut" -> assertTrue(trail.append(
+                    LpScopedRow(1L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(2L),
+                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))),
+                    scoped = true,
+                ))
                 "scale", "objective" -> {
                     val old = trail.state.model.objective
-                    assertTrue(
-                        trail.replaceObjective(
-                            ExactLpObjective(
-                                List(old.size) { old.cost(it) },
-                                scale = ExactLpNumber.of(if (change == "scale") 2L else 1L),
-                                externalConstant = ExactLpNumber.of(if (change == "objective") 1L else 0L),
-                            ),
-                        ),
-                    )
+                    assertTrue(trail.replaceObjective(ExactLpObjective(
+                        List(old.size) { old.cost(it) },
+                        scale = ExactLpNumber.of(if (change == "scale") 2L else 1L),
+                        externalConstant = ExactLpNumber.of(if (change == "objective") 1L else 0L),
+                    )))
                 }
             }
             hints.beginNode(1, if (change == "cutoff") 99.0 else 100.0)
@@ -354,14 +301,8 @@ class LpHintsTest {
         val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
         val observations = ArrayList<String>()
         val hints = LpHints(1, 0, directionalGains = true, observe = observations::add)
-        fun relaxation() = LpRelaxation(
-            assertNotNull(trail.state.ownerWorkingModel()),
-            intArrayOf(0),
-            booleanArrayOf(false),
-            0L,
-            intArrayOf(0),
-            IntArray(0),
-        )
+        fun relaxation() = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+            booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
         hints.beginNode(0, 100.0)
         hints.record(relaxation(), doubleArrayOf(2.25), DoubleArray(0))
         hints.recordObjective(relaxation(), 10.0)
@@ -386,14 +327,8 @@ class LpHintsTest {
             val b = LpBuilder()
             b.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(b.build(Sense.MINIMIZE).authoritativeModel()))
-            val relaxation = LpRelaxation(
-                assertNotNull(trail.state.ownerWorkingModel()),
-                intArrayOf(0),
-                booleanArrayOf(false),
-                0L,
-                intArrayOf(0),
-                IntArray(0),
-            )
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), 0L, intArrayOf(0), IntArray(0))
             val hints = LpHints(1, 0, directionalGains = true)
             repeat(2) {
                 hints.beginNode(0, 100.0)
@@ -414,21 +349,13 @@ class LpHintsTest {
 
             if (change == "cut") {
                 hints.recordObjective(relaxation, 10.0)
-                assertTrue(
-                    trail.append(
-                        LpScopedRow(
-                            0L,
-                            listOf(0 to ExactLpNumber.of(1L)),
-                            ExactLpNumber.of(8L),
-                            ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L)))),
-                        ),
-                        scoped = false,
-                    ),
-                )
+                assertTrue(trail.append(
+                    LpScopedRow(0L, listOf(0 to ExactLpNumber.of(1L)), ExactLpNumber.of(8L),
+                        ExactLpColumn(ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(0L))))),
+                    scoped = false,
+                ))
                 hints.finishNode(trail.state)
-            } else {
-                hints.finishNode()
-            }
+            } else hints.finishNode()
 
             assertTrue(hints.directionalScore(VarRef.IntVar(0)).isNaN())
             assertTrue(hints.branchScore(VarRef.IntVar(0)).isFinite())
@@ -441,14 +368,8 @@ class LpHintsTest {
             val builder = LpBuilder()
             builder.addVar(0, 10, cost = 1)
             val trail = LpBoundTrail(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-            val relaxation = LpRelaxation(
-                assertNotNull(trail.state.ownerWorkingModel()),
-                intArrayOf(0),
-                booleanArrayOf(false),
-                constant,
-                intArrayOf(0),
-                IntArray(0),
-            )
+            val relaxation = LpRelaxation(assertNotNull(trail.state.ownerWorkingModel()), intArrayOf(0),
+                booleanArrayOf(false), constant, intArrayOf(0), IntArray(0))
             val hints = LpHints(1, 0, directionalGains = true)
             val variable = VarRef.IntVar(0)
             repeat(2) {

@@ -14,7 +14,8 @@ internal class RootPrimalTargets(
     var components: RootComponentOrder? = null
 }
 
-internal fun rootComponentValueBytes(variables: Int): Long = 128L + variables.toLong() * (Long.SIZE_BYTES + 1L)
+internal fun rootComponentValueBytes(variables: Int): Long =
+    128L + variables.toLong() * (Long.SIZE_BYTES + 1L)
 
 internal class RootComponentValues(variables: Int) {
     val values = LongArray(variables)

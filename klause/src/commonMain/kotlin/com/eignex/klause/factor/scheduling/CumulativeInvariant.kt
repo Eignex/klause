@@ -129,7 +129,6 @@ internal class CumulativeInvariant(
                 applyAliasedIntSet(state, simulated, intVar, oldVal, newValue, aliasPositions[alias])
                 simulated.overage - ls.overage
             }
-
             intVar == capacityVar -> cumulativeCapacityDelta(ls, newValue)
 
             else -> {
@@ -192,7 +191,6 @@ internal class CumulativeInvariant(
         val alias = aliasIndex[intVar]
         when {
             alias >= 0 -> applyAliasedIntSet(state, ls, intVar, oldValue, newValue, aliasPositions[alias])
-
             intVar == capacityVar -> applyCumulativeCapacityDelta(ls, newValue)
 
             else -> {
@@ -410,10 +408,7 @@ internal class CumulativeInvariant(
             val i = peakTasks[(first + offset) % peakTasks.size]
             ls.durationRepairCursor = if (i + 1 == n) 0 else i + 1
             added += ConditionalProductRepair(
-                state,
-                sink,
-                durationVars[i],
-                CUMULATIVE_MAX_DURATION_REPAIRS - added,
+                state, sink, durationVars[i], CUMULATIVE_MAX_DURATION_REPAIRS - added,
             ).propose()
         }
     }
@@ -543,9 +538,7 @@ internal class CumulativeInvariant(
             if (ls.choicePartnerCursor == 0) ls.choiceRepairCursor = if (i + 1 == n) 0 else i + 1
             if (i == j || curDur(state, j) != 0L || curRes(state, j) <= 0L ||
                 !OptionalPresence.isPresentInAssignment(presents, j, state)
-            ) {
-                return@repeat
-            }
+            ) return@repeat
             val iChannel = conditionalDurationChannel(state, i, sink) ?: return@repeat
             val jChannel = conditionalDurationChannel(state, j, sink) ?: return@repeat
             if (Lit.isPositive(iChannel.literal) != Lit.isPositive(jChannel.literal)) return@repeat
@@ -553,16 +546,12 @@ internal class CumulativeInvariant(
             val jChoice = net.equalityPredicate(Lit.variable(jChannel.literal)) ?: return@repeat
             if (iChoice.value != jChoice.value || iChoice.input == jChoice.input ||
                 !sink.allowsInt(iChoice.input) || !sink.allowsInt(jChoice.input)
-            ) {
-                return@repeat
-            }
+            ) return@repeat
             val iValue = state.assignment.intValue(iChoice.input)
             val jValue = state.assignment.intValue(jChoice.input)
             if (iValue == jValue || jValue !in state.rootDomains[iChoice.input] ||
                 iValue !in state.rootDomains[jChoice.input]
-            ) {
-                return@repeat
-            }
+            ) return@repeat
             val coordinated = ChannelingSink(iChoice.input, jValue)
             coordinated.pin(jChoice.input)
             coordinated.add(IntSet(jChoice.input, iValue))
@@ -593,9 +582,7 @@ internal class CumulativeInvariant(
                 if (a < 0 || b < 0 || a == b) return null
                 listOf(a to state.assignment.intValue(b), b to state.assignment.intValue(a))
             }
-
             is FunctionalObjective.Lin -> listOf(positiveScaledBinaryDefinition(state, output) ?: return null)
-
             else -> return null
         }
         for ((flag, duration) in candidates) {
@@ -603,9 +590,7 @@ internal class CumulativeInvariant(
             val domain = state.rootDomains[flag]
             if (domain.min < 0L || domain.max > 1L || 0L !in domain || 1L !in domain ||
                 !sink.allowsDefinedInt(flag)
-            ) {
-                continue
-            }
+            ) continue
             val channel = net.literalChannel(flag) ?: continue
             if (state.assumptions.isFrozenBool(Lit.variable(channel.literal))) continue
             return channel

@@ -134,15 +134,11 @@ internal class CutPool(
             val mapped = remapEntry(entry, map, columns)
             entry.cut = mapped?.orNull()
             val family = entry.source?.family ?: CutFamily.UNSPECIFIED
-            observe(
-                family,
-                "REMAP",
-                when (mapped) {
-                    null -> "CANCELLED"
-                    is CutMapping.Declined -> mapped.reason.name
-                    is CutMapping.Mapped -> "MAPPED"
-                },
-            )
+            observe(family, "REMAP", when (mapped) {
+                null -> "CANCELLED"
+                is CutMapping.Declined -> mapped.reason.name
+                is CutMapping.Mapped -> "MAPPED"
+            })
             if (wasActive && entry.cut == null) observe(family, "RETRACTION", "UNAVAILABLE")
             if (!wasActive && entry.cut != null) observe(family, "RETRACTION", "REACTIVATED")
             if (mapped is CutMapping.Declined) declines[mapped.reason] = (declines[mapped.reason] ?: 0) + 1
@@ -167,12 +163,8 @@ internal class CutPool(
             releaseColumnLayout()
             return null
         }
-        val bound = CutColumnLayout.capture(
-            map,
-            MAX_PREPARATION_UNITS - preparationStorageUnits,
-            cancellation,
-            onPreparationWork,
-        ) ?: return null
+        val bound = CutColumnLayout.capture(map, MAX_PREPARATION_UNITS - preparationStorageUnits,
+            cancellation, onPreparationWork) ?: return null
         val layout = requireNotNull(bound.layoutFor(map))
         if (layout.storageUnits > MAX_PREPARATION_UNITS - preparationStorageUnits || cancellation()) return null
         columnLayout = layout
@@ -195,9 +187,7 @@ internal class CutPool(
         val room = units <= MAX_PREPARATION_UNITS - preparationStorageUnits + (prepared?.storageUnits ?: 0L)
         val capture: ((SourceCutPreparation) -> Unit)? = if (eligible && room && source.preparationExtent >= units) {
             { next -> retainPreparation(entry, prepared, next) }
-        } else {
-            null
-        }
+        } else null
         val binding = if (prepared?.projection == true || upgrade) columns else null
         val result = source.toCut(map, preparation = prepared, onPrepared = capture, columnBinding = binding)
         if (prepareSources && cancellation()) return null
@@ -236,11 +226,8 @@ internal class CutPool(
         preparationStorageUnits -= prepared.storageUnits
         entry.preparation = null
         if (prepared.supportsProjection) projectionCandidates--
-        observe(
-            entry.source?.family ?: CutFamily.UNSPECIFIED,
-            if (prepared.projection) "PROJECTION" else "PREPARATION",
-            "RETIRED",
-        )
+        observe(entry.source?.family ?: CutFamily.UNSPECIFIED,
+            if (prepared.projection) "PROJECTION" else "PREPARATION", "RETIRED")
         if (projectionCandidates == 0) releaseColumnLayout()
     }
 
@@ -288,11 +275,8 @@ internal class CutPool(
             (it.inactiveCount >= maxConsecutiveInactive).also { retired ->
                 if (retired) {
                     releasePreparation(it)
-                    observe(
-                        it.source?.family ?: it.cut?.family ?: CutFamily.UNSPECIFIED,
-                        "RETIREMENT",
-                        "INACTIVE",
-                    )
+                    observe(it.source?.family ?: it.cut?.family ?: CutFamily.UNSPECIFIED,
+                        "RETIREMENT", "INACTIVE")
                 }
             }
         }
@@ -398,7 +382,9 @@ internal class CutPool(
         }
         val violation = when (cut.rel) {
             Relation.GE -> cut.rhs - lhs
+
             Relation.LE -> lhs - cut.rhs
+
             Relation.EQ -> abs(lhs - cut.rhs)
         }
         if (violation <= 0.0) return 0.0

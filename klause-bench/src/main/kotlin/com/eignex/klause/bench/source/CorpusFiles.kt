@@ -83,12 +83,8 @@ internal object CorpusFiles {
         if (!isCompressed(file)) return block(file)
         stagingDirectory.mkdirs()
         checkStaging()
-        val directory = StagedDirectory(
-            Files.createTempDirectory(stagingDirectory.toPath(), "plain-").toFile(),
-            nanoTime,
-            onCleanup,
-            onCleanupStart,
-        )
+        val directory = StagedDirectory(Files.createTempDirectory(stagingDirectory.toPath(), "plain-").toFile(),
+            nanoTime, onCleanup, onCleanupStart)
         directory.use {
             checkStaging()
             val plain = File(it.file, plainPath(file.name))

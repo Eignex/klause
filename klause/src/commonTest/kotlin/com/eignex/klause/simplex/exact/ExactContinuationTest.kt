@@ -66,23 +66,15 @@ class ExactContinuationTest {
     @Test
     fun `a rebound wide endpoint should restart from current exact bounds`() {
         val initial = ExactContinuationInput(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(BigFraction.ZERO),
-            listOf(null),
-            emptyList(),
-            listOf(ContinuationStatus.LOWER),
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
+            emptyList(), listOf(ContinuationStatus.LOWER),
         )
         val session = ExactContinuation(initial)
         assertNotNull(session.resume().values)
         val huge = BigFraction.of(BIG_ONE shl 140, BIG_ONE)
         val changed = ExactContinuationInput(
-            initial.columns,
-            initial.rhs,
-            listOf(huge),
-            initial.upper,
-            initial.headings,
-            initial.statuses,
+            initial.columns, initial.rhs, listOf(huge), initial.upper,
+            initial.headings, initial.statuses,
         )
 
         val result = session.resume(replacement = changed)
@@ -94,34 +86,21 @@ class ExactContinuationTest {
     @Test
     fun `cancelled overflow promotion should keep a complete checkpoint and cumulative spending`() {
         val initial = ExactContinuationInput(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(BigFraction.ZERO),
-            listOf(null),
-            emptyList(),
-            listOf(ContinuationStatus.LOWER),
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
+            emptyList(), listOf(ContinuationStatus.LOWER),
         )
         val huge = BigFraction.of(BIG_ONE shl 140, BIG_ONE)
         val changed = ExactContinuationInput(
-            initial.columns,
-            initial.rhs,
-            listOf(huge),
-            initial.upper,
-            initial.headings,
-            initial.statuses,
+            initial.columns, initial.rhs, listOf(huge), initial.upper,
+            initial.headings, initial.statuses,
         )
         val probe = ExactContinuation(initial)
         assertNotNull(probe.resume().values)
         var checks = 0
-        assertNotNull(
-            probe.resume(
-                replacement = changed,
-                cancellation = ExecutionControl {
-                    checks++
-                    false
-                },
-            ).values,
-        )
+        assertNotNull(probe.resume(replacement = changed, cancellation = ExecutionControl {
+            checks++
+            false
+        }).values)
         var promotionInterruptions = 0
         var previousCheckpoints = 0
 
@@ -160,23 +139,14 @@ class ExactContinuationTest {
     @Test
     fun `rebound open sides should reseat nonbasic coordinates`() {
         val initial = ExactContinuationInput(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(BigFraction.ZERO),
-            listOf(null),
-            emptyList(),
-            listOf(ContinuationStatus.LOWER),
+            listOf(emptyList()), emptyList(), listOf(BigFraction.ZERO), listOf(null),
+            emptyList(), listOf(ContinuationStatus.LOWER),
         )
         val session = ExactContinuation(initial)
         assertNotNull(session.resume().values)
         val upperOnly = ExactContinuationInput(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(null),
-            listOf(BigFraction.MINUS_ONE),
-            emptyList(),
-            listOf(ContinuationStatus.UPPER),
-            upperStrict = listOf(true),
+            listOf(emptyList()), emptyList(), listOf(null), listOf(BigFraction.MINUS_ONE),
+            emptyList(), listOf(ContinuationStatus.UPPER), upperStrict = listOf(true),
         )
 
         val result = session.resume(replacement = upperOnly)
@@ -188,22 +158,15 @@ class ExactContinuationTest {
     @Test
     fun `a changed exact matrix should decline retained feasibility`() {
         val initial = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ONE)),
-            listOf(BigFraction.ONE),
-            listOf(null, BigFraction.ZERO),
-            listOf(null, BigFraction.ZERO),
-            listOf(0),
-            listOf(ContinuationStatus.BASIC, ContinuationStatus.FIXED),
+            listOf(listOf(0 to BigFraction.ONE)), listOf(BigFraction.ONE),
+            listOf(null, BigFraction.ZERO), listOf(null, BigFraction.ZERO),
+            listOf(0), listOf(ContinuationStatus.BASIC, ContinuationStatus.FIXED),
         )
         val session = ExactContinuation(initial)
         assertNotNull(session.resume().values)
         val changed = ExactContinuationInput(
-            listOf(listOf(0 to BigFraction.ofLong(2))),
-            initial.rhs,
-            initial.lower,
-            initial.upper,
-            initial.headings,
-            initial.statuses,
+            listOf(listOf(0 to BigFraction.ofLong(2))), initial.rhs, initial.lower, initial.upper,
+            initial.headings, initial.statuses,
         )
 
         val result = session.resume(replacement = changed)

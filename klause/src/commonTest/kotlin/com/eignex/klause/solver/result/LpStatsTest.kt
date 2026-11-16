@@ -37,17 +37,8 @@ class LpStatsTest {
 
             val phase = sink.snapshot().phases.getValue("DIRECTIONAL_BRANCH_NODE")
 
-            assertEquals(
-                LpPhaseStats(
-                    calls = 4L,
-                    outcomes = mapOf(
-                        "UP" to 2L,
-                        "DOWN" to 1L,
-                        "RESET" to 1L,
-                    ),
-                ),
-                phase,
-            )
+            assertEquals(LpPhaseStats(calls = 4L, outcomes = mapOf("UP" to 2L, "DOWN" to 1L,
+                "RESET" to 1L)), phase)
             for ((outcome, count) in phase.outcomes) assertEquals(count, sink.directionalBranchCount(outcome))
             assertEquals(0L, sink.directionalBranchCount("MISSING"))
         }
@@ -64,41 +55,27 @@ class LpStatsTest {
         sink.observeDirectionalBranch("UP")
         val after = sink.snapshot()
 
-        assertEquals(
-            LpPhaseStats(calls = 2L, outcomes = mapOf("UP" to 2L)),
-            before.phases.getValue("DIRECTIONAL_BRANCH_NODE"),
-        )
-        assertEquals(
-            LpPhaseStats(calls = 4L, outcomes = mapOf("UP" to 3L, "DOWN" to 1L)),
-            after.phases.getValue("DIRECTIONAL_BRANCH_NODE"),
-        )
+        assertEquals(LpPhaseStats(calls = 2L, outcomes = mapOf("UP" to 2L)),
+            before.phases.getValue("DIRECTIONAL_BRANCH_NODE"))
+        assertEquals(LpPhaseStats(calls = 4L, outcomes = mapOf("UP" to 3L, "DOWN" to 1L)),
+            after.phases.getValue("DIRECTIONAL_BRANCH_NODE"))
     }
 
     @Test
     fun `template preparation should retain declined work on its owning route`() {
         val sink = LpStatsSink(LpRoute.ROOT)
-        sink.observeTemplatePreparation(
-            7L, 11L, prepared = true, factorsReused = 2,
+        sink.observeTemplatePreparation(7L, 11L, prepared = true, factorsReused = 2,
             sourceRebound = true, indexesReused = true, boundsReused = 3,
-            componentsReused = 1, componentsDirty = 1, retainedUnits = 17L,
-        )
+            componentsReused = 1, componentsDirty = 1, retainedUnits = 17L)
         sink.observeTemplatePreparation(13L, 19L, prepared = false)
 
         val phase = sink.snapshot().phases.getValue("TEMPLATE_PREPARATION_ROOT")
 
-        assertEquals(
-            LpPhaseStats(
-                calls = 2L,
-                nanos = 20L,
-                work = 30L,
-                outcomes = mapOf(
-                    "DECLINED" to 1L, "PREPARED" to 1L, "FACTORS_REUSED" to 2L, "SOURCE_REBOUND" to 1L,
-                    "INDEXES_REUSED" to 1L, "BOUNDS_REUSED" to 3L, "COMPONENTS_REUSED" to 1L,
-                    "COMPONENTS_DIRTY" to 1L, "RETAINED_UNITS_SUM" to 17L,
-                ),
-            ),
-            phase,
-        )
+        assertEquals(LpPhaseStats(calls = 2L, nanos = 20L, work = 30L, outcomes = mapOf(
+            "DECLINED" to 1L, "PREPARED" to 1L, "FACTORS_REUSED" to 2L, "SOURCE_REBOUND" to 1L,
+            "INDEXES_REUSED" to 1L, "BOUNDS_REUSED" to 3L, "COMPONENTS_REUSED" to 1L,
+            "COMPONENTS_DIRTY" to 1L, "RETAINED_UNITS_SUM" to 17L,
+        )), phase)
     }
 
     @Test
@@ -110,14 +87,10 @@ class LpStatsTest {
         sink.observeTemplateUse(rows = 5, exactBounds = 7)
         val after = sink.snapshot()
 
-        assertEquals(
-            mapOf("ROWS" to 2L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 1L),
-            before.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes,
-        )
-        assertEquals(
-            mapOf("ROWS" to 7L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 8L),
-            after.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes,
-        )
+        assertEquals(mapOf("ROWS" to 2L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 1L),
+            before.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes)
+        assertEquals(mapOf("ROWS" to 7L, "BOUNDS" to 3L, "EXACT_BOUND_OBJECTS" to 8L),
+            after.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes)
     }
 
     @Test
@@ -129,10 +102,8 @@ class LpStatsTest {
         val after = sink.snapshot()
 
         assertFalse(before.phases.containsKey("TEMPLATE_ASSEMBLY_NODE"))
-        assertEquals(
-            mapOf("ROWS" to 0L, "BOUNDS" to 0L, "EXACT_BOUND_OBJECTS" to 0L),
-            after.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes,
-        )
+        assertEquals(mapOf("ROWS" to 0L, "BOUNDS" to 0L, "EXACT_BOUND_OBJECTS" to 0L),
+            after.phases.getValue("TEMPLATE_ASSEMBLY_NODE").outcomes)
     }
 
     @Test

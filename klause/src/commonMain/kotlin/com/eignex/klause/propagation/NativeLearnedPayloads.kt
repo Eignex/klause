@@ -13,11 +13,8 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         var next: Page? = null
         var allocationIdentity = Any()
 
-        fun growthWork(required: Int): Long = if (required <= rows.size) {
-            0L
-        } else {
+        fun growthWork(required: Int): Long = if (required <= rows.size) 0L else
             capacityFor(required) * 2L + rows.size + 4L
-        }
 
         fun growTo(required: Int) {
             if (required > rows.size) rows = rows.copyOf(capacityFor(required))
@@ -45,16 +42,10 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
                     }
                 }
             }
-            sample.ownedPool(
-                allocationIdentity,
-                16L + words * Int.SIZE_BYTES,
-                if (required) 16L + protectedWords * Int.SIZE_BYTES else 0L,
-            )
-            sample.ownedReferencesPool(
-                allocationIdentity,
-                rows.size + 4L,
-                if (required) rows.size + 4L else 0L,
-            )
+            sample.ownedPool(allocationIdentity, 16L + words * Int.SIZE_BYTES,
+                if (required) 16L + protectedWords * Int.SIZE_BYTES else 0L)
+            sample.ownedReferencesPool(allocationIdentity, rows.size + 4L,
+                if (required) rows.size + 4L else 0L)
             return required
         }
     }
@@ -75,7 +66,6 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     val preparationWork: Long get() = 46L + cachedIndices.size * 2L + cachedPages.size * 2L
     val capacityBytes: Long get() = words * Int.SIZE_BYTES
     val referenceCapacity: Long get() = referenceSlots
-
     // The index-array owner reference accompanies the cache's reference slots.
     val cacheReferenceCapacity: Long get() = cachedPages.size + 1L
     val directoryCapacity: Long get() = directory.referenceCapacity
@@ -85,11 +75,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     fun <T> usingBudget(active: ReclamationPreparation, operation: () -> T): T {
         val previous = budget
         budget = active
-        return try {
-            operation()
-        } finally {
-            budget = previous
-        }
+        return try { operation() } finally { budget = previous }
     }
 
     private inline fun locate(index: Int, visit: (Long) -> Unit): Page? {
@@ -117,13 +103,8 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         val required = (size and PAGE_MASK) + 1
         var lookup = 0L
         val page = locate(index) { lookup += it }
-        val insertion = if (page != null || index == 0) {
-            0L
-        } else if (directory.size == 0) {
-            8L
-        } else {
+        val insertion = if (page != null || index == 0) 0L else if (directory.size == 0) 8L else
             (Int.SIZE_BITS - index.countLeadingZeroBits()) * 2L + 18L
-        }
         val allocation = page?.growthWork(required) ?: (capacityFor(required) * 2L + 8L)
         return (if (ownedLiterals) 0L else literals * 2L) + (if (index == 0) 12L else 14L) +
             lookup + insertion + allocation
@@ -145,9 +126,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     }
 
     private fun install(index: Int, page: Page, insertionWork: (Long) -> Unit) {
-        if (index == 0) {
-            primary = page
-        } else {
+        if (index == 0) primary = page else {
             page.slot = directory.getOrPutSlot(index) { page }
             insertionWork(directory.lastWork)
             directoryIdentity = Any()
@@ -159,10 +138,8 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         referenceSlots += page.rows.size
     }
 
-    operator fun get(index: Int): IntArray = checkNotNull(
-        checkNotNull(pageAt(index ushr PAGE_SHIFT))
-            .rows[index and PAGE_MASK],
-    )
+    operator fun get(index: Int): IntArray = checkNotNull(checkNotNull(pageAt(index ushr PAGE_SHIFT))
+        .rows[index and PAGE_MASK])
 
     fun length(index: Int): Int = pageAt(index ushr PAGE_SHIFT)?.rows?.getOrNull(index and PAGE_MASK)?.size ?: 0
 
@@ -211,10 +188,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         if (page.live != 0) return
         val slot = page.slot
         val cacheSlot = slot?.let { it.key and CACHE_MASK } ?: -1
-        if (slot == null) {
-            check(primary === page)
-            primary = null
-        } else {
+        if (slot == null) { check(primary === page); primary = null } else {
             check(directory.remove(slot, {}, {}))
             directoryIdentity = Any()
         }
@@ -279,10 +253,8 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
 
     fun prepareRemap(budget: ReclamationPreparation) {
         val pages = ((size.toLong() + PAGE_MASK) ushr PAGE_SHIFT).coerceAtLeast(1L)
-        budget.atomic(
-            size * 8L + directory.size * 8L + pages * PAGE_SIZE * 2L,
-            pages * (PAGE_SIZE * Long.SIZE_BYTES * 2L + 128L),
-        )
+        budget.atomic(size * 8L + directory.size * 8L + pages * PAGE_SIZE * 2L,
+            pages * (PAGE_SIZE * Long.SIZE_BYTES * 2L + 128L))
     }
 
     fun sharingMemory(
@@ -293,25 +265,16 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     ) {
         primary?.sharingMemory(sample, 0, protectedRows, allPermanent, protected)
         val retained = directory.protectedCapacity({ units -> repeat(units.toInt()) { sample.step() } }) {
-                index,
-                page,
-            ->
-            page.sharingMemory(sample, index shl PAGE_SHIFT, protectedRows, allPermanent, protected)
+            index, page, -> page.sharingMemory(sample, index shl PAGE_SHIFT, protectedRows, allPermanent, protected)
         }
         sample.owned(this, 24L, protectedRows)
         sample.owned(cachedIndices, cachedIndices.size.toLong() * Int.SIZE_BYTES, protectedRows)
         sample.ownedReferences(this, 9L, protectedRows)
         sample.ownedReferences(cachedPages, cachedPages.size.toLong(), protectedRows)
-        sample.ownedPool(
-            directoryIdentity,
-            directory.primitiveCapacityBytes,
-            retained.first + if (protectedRows) 12L else 0L,
-        )
-        sample.ownedReferencesPool(
-            directoryIdentity,
-            directory.referenceCapacity,
-            retained.second + if (protectedRows) 1L else 0L,
-        )
+        sample.ownedPool(directoryIdentity, directory.primitiveCapacityBytes,
+            retained.first + if (protectedRows) 12L else 0L)
+        sample.ownedReferencesPool(directoryIdentity, directory.referenceCapacity,
+            retained.second + if (protectedRows) 1L else 0L)
     }
 
     private companion object {

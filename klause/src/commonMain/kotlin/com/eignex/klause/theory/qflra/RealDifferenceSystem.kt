@@ -35,16 +35,10 @@ internal class RealDifferenceSystem private constructor(
             guard == ALWAYS || bools[Lit.variable(guard)] == if (Lit.isPositive(guard)) 1 else 0
         }
         var cycle: IntArray? = null
-        val result = graph.potentials(
-            active,
-            stop::invoke,
-            potentials,
-            onNegativeCycle = { cycle = it },
-            onWork = onWork,
-        )
+        val result = graph.potentials(active, stop::invoke, potentials,
+            onNegativeCycle = { cycle = it }, onWork = onWork)
         return when (result) {
             Potentials.Abandoned -> Result.Interrupted
-
             Potentials.Infeasible -> {
                 // ALWAYS edges are immutable source rows and declared bounds, not scoped LP assertions.
                 val clause = cycle?.takeIf { edges -> edges.all { active[it] } }?.asSequence()
@@ -52,7 +46,6 @@ internal class RealDifferenceSystem private constructor(
                     ?.distinct()?.sorted()?.toList()?.toIntArray()
                 if (stop()) Result.Interrupted else Result.Infeasible(clause)
             }
-
             is Potentials.Found -> {
                 if (stop()) return Result.Interrupted
                 val zero = result.values.last()
@@ -60,11 +53,9 @@ internal class RealDifferenceSystem private constructor(
                 potentials = normalized.takeIf { values ->
                     values.all { it in -Long.MAX_VALUE / 8L..Long.MAX_VALUE / 8L }
                 }
-                Result.Feasible {
-                    List(graph.numVars - 1) { column ->
-                        BigFraction.of(bigIntOf(result.values[column] - zero), bigIntOf(scale))
-                    }
-                }
+                Result.Feasible { List(graph.numVars - 1) { column ->
+                    BigFraction.of(bigIntOf(result.values[column] - zero), bigIntOf(scale))
+                } }
             }
         }
     }
@@ -93,14 +84,10 @@ internal class RealDifferenceSystem private constructor(
                 if (stop()) return null
                 if (model.realLower[real].isFinite() &&
                     !append(exactBound(real, model.realLower[real], false), ALWAYS, zero, edges, stop)
-                ) {
-                    return null
-                }
+                ) return null
                 if (model.realUpper[real].isFinite() &&
                     !append(exactBound(real, model.realUpper[real], true), ALWAYS, zero, edges, stop)
-                ) {
-                    return null
-                }
+                ) return null
             }
             for ((factorIndex, factor) in model.factors.withIndex()) {
                 val source = (factor as? EncodedTheoryFactor)?.takeIf {
@@ -135,9 +122,7 @@ internal class RealDifferenceSystem private constructor(
             for (row in rows) {
                 if (row.columns.any { it !in 0 until realColumns } ||
                     !append(row, ALWAYS, realColumns, edges, stop)
-                ) {
-                    return null
-                }
+                ) return null
             }
             return build(realColumns, edges, stop)
         }
@@ -198,39 +183,24 @@ internal class RealDifferenceSystem private constructor(
             if (stop()) return false
             if (row.columns.size > 2) return false
             if (row.columns.isEmpty()) {
-                edges += Edge(
-                    zero,
-                    zero,
-                    if (row.rhs.signum() < 0) -1L else 0L,
-                    row.strict && row.rhs.isZero,
-                    guard,
-                )
+                edges += Edge(zero, zero, if (row.rhs.signum() < 0) -1L else 0L,
+                    row.strict && row.rhs.isZero, guard)
                 return true
             }
             val coefficient = row.coefficients[0]
             if (coefficient.isZero ||
                 (row.columns.size == 2 && coefficient != row.coefficients[1].negated())
-            ) {
-                return false
-            }
+            ) return false
             val positive = coefficient.signum() > 0
             val magnitude = if (positive) coefficient else coefficient.negated()
             val bound = row.rhs * magnitude.reciprocal()
             if (bound.den > bigIntOf(Long.MAX_VALUE) || bound.num < bigIntOf(Long.MIN_VALUE) ||
                 bound.num > bigIntOf(Long.MAX_VALUE)
-            ) {
-                return false
-            }
+            ) return false
             val first = row.columns[0]
             val second = row.columns.getOrNull(1) ?: zero
-            edges += Edge(
-                if (positive) second else first,
-                if (positive) first else second,
-                bound.num.toLong(),
-                row.strict,
-                guard,
-                bound.den.toLong(),
-            )
+            edges += Edge(if (positive) second else first, if (positive) first else second,
+                bound.num.toLong(), row.strict, guard, bound.den.toLong())
             return true
         }
     }

@@ -19,32 +19,17 @@ internal fun ContinuousProduct.emitLpRelaxation(builder: RelaxationBuilder) {
         val otherColumn = builder.realColumn(other)
         if (operandColumn < 0 || resultColumn < 0 || otherColumn < 0) continue
         val value = choices.valueAt(index)
-        builder.realRow(
-            intArrayOf(operandColumn),
-            doubleArrayOf(1.0),
-            LinearOp.EQ,
-            value,
-            premiseLits = intArrayOf(literal),
-        )
+        builder.realRow(intArrayOf(operandColumn), doubleArrayOf(1.0), LinearOp.EQ, value,
+            premiseLits = intArrayOf(literal))
         if (resultColumn == otherColumn) {
             val exact = BigFraction.ONE - requireNotNull(BigFraction.ofDouble(value))
             val coefficient = exact.toDouble()
             if (BigFraction.ofDouble(coefficient) != exact) continue
-            builder.realRow(
-                intArrayOf(resultColumn),
-                doubleArrayOf(coefficient),
-                LinearOp.EQ,
-                0.0,
-                premiseLits = intArrayOf(literal),
-            )
+            builder.realRow(intArrayOf(resultColumn), doubleArrayOf(coefficient), LinearOp.EQ, 0.0,
+                premiseLits = intArrayOf(literal))
         } else {
-            builder.realRow(
-                intArrayOf(resultColumn, otherColumn),
-                doubleArrayOf(1.0, -value),
-                LinearOp.EQ,
-                0.0,
-                premiseLits = intArrayOf(literal),
-            )
+            builder.realRow(intArrayOf(resultColumn, otherColumn), doubleArrayOf(1.0, -value), LinearOp.EQ, 0.0,
+                premiseLits = intArrayOf(literal))
         }
     }
 }

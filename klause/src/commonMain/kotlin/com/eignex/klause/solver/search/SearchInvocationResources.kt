@@ -28,11 +28,8 @@ internal class SearchInvocationResources : AutoCloseable {
                 resource.close()
             } catch (cleanup: Throwable) {
                 val previous = failure
-                if (previous == null) {
-                    failure = cleanup
-                } else if (previous !== cleanup) {
-                    previous.addSuppressed(cleanup)
-                }
+                if (previous == null) failure = cleanup
+                else if (previous !== cleanup) previous.addSuppressed(cleanup)
             }
         }
         if (primary == null) failure?.let { throw it }

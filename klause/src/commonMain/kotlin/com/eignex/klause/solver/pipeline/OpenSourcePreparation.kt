@@ -84,62 +84,37 @@ internal fun PreparedSource.planned(
     cancellation: ExecutionControl = ExecutionControl.Never,
     capturedPlan: ComponentPlan? = null,
 ): OpenSourcePreparation.Planned = budget.observePreparation(
-    PresolvePreparationStage.SOURCE_ENCODER,
-    PresolveLane.SOURCE,
-    model,
-    cancellation,
+    PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, model, cancellation,
 ) { token, observation ->
     val selected = capturedPlan?.takeIf { it.reusableFor(model, projections) }
-        ?.takeUnless {
-            token.charge(1L)
-            token()
-        }
+        ?.takeUnless { token.charge(1L); token() }
         ?: run {
             var retained: RetainedLinearEncoding? = null
             val selection = budget.observePreparation(
-                PresolvePreparationStage.SOURCE_SELECTION,
-                PresolveLane.SOURCE,
-                model,
-                token,
+                PresolvePreparationStage.SOURCE_SELECTION, PresolveLane.SOURCE, model, token,
             ) { selectionToken, _ ->
                 val mapping = if (model === problem && projections?.providers === FactorProjectionProviders.Default) {
                     retainedFactors(selectionToken)
-                } else {
-                    null
-                }
+                } else null
                 retained = mapping?.let { capturedPlan?.retainedEncoding(it, projections) }
-                if (retained != null) {
-                    requireNotNull(projections).retained(requireNotNull(mapping))
-                } else {
-                    projections?.forEngineView(model) ?: FactorProjectionProviders.Default.prepare(model)
-                }
+                if (retained != null) requireNotNull(projections).retained(requireNotNull(mapping))
+                else projections?.forEngineView(model) ?: FactorProjectionProviders.Default.prepare(model)
             }
             budget.observePreparation(
-                PresolvePreparationStage.SOURCE_OWNERSHIP,
-                PresolveLane.SOURCE,
-                model,
-                token,
+                PresolvePreparationStage.SOURCE_OWNERSHIP, PresolveLane.SOURCE, model, token,
             ) { ownershipToken, _ ->
-                model.buildComponentPlan(
-                    selection,
-                    cancellation = ownershipToken,
-                    retained = retained,
-                    preparationBudget = budget,
-                )
+                model.buildComponentPlan(selection, cancellation = ownershipToken, retained = retained,
+                    preparationBudget = budget)
             }
         }
     val plan = if (!token() && selected.theoryPipeline == ProblemPipeline.FINITE_CP) {
         requireNotNull(selected.forLinearConditions(model, retainEmptyTheory = true, cancellation = token)) {
             "source preparation lost the selected arithmetic completion"
         }
-    } else {
-        selected
-    }
+    } else selected
     require(
-        (
-            plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
-                plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN
-            ) || token() ||
+        (plan.theoryPipeline != ProblemPipeline.FINITE_CP &&
+            plan.theoryPipeline != ProblemPipeline.UNSUPPORTED_OPEN) || token() ||
             plan.encodingDecline == EncoderDecline.RESOURCE,
     ) {
         "source preparation left the model without an open-theory route"

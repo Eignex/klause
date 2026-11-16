@@ -59,24 +59,18 @@ class LocalSearchEngineCompletionTest {
                 }
             }
             var calls = 0
-            val search = LocalSearchEngine(
-                LocalSearchModel.open(problem),
-                strategy = SourceDrivenStrategy(
-                    listOf(ConfiguredSource(source)),
-                    feasibleDescent = FeasibleDescent.SelfOwned,
-                ),
-                greedyRepairOnRestart = false,
-                completion = { candidate, _ ->
+            val search = LocalSearchEngine(LocalSearchModel.open(problem),
+                strategy = SourceDrivenStrategy(listOf(ConfiguredSource(source)),
+                    feasibleDescent = FeasibleDescent.SelfOwned),
+                greedyRepairOnRestart = false, completion = { candidate, _ ->
                     calls++
                     Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 4)
-                },
-            )
+                })
             val initial = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))
 
             val result = search.improvements(
                 LinearObjective(intCoefficients = longArrayOf(1), realCoefficients = doubleArrayOf(realCoefficient)),
-                LocalSearchParams(maxInstructions = 5, initialAssignment = initial),
-                null,
+                LocalSearchParams(maxInstructions = 5, initialAssignment = initial), null,
             ).last()
 
             val best = assertIs<MinimizeResult.BestFound>(result)
@@ -99,24 +93,17 @@ class LocalSearchEngineCompletionTest {
             }
         }
         var calls = 0
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(problem),
+        val search = LocalSearchEngine(LocalSearchModel.open(problem),
             strategy = SourceDrivenStrategy(emptyList(), feasibleDescent = FeasibleDescent.SelfOwned),
-            restartPolicy = restart,
-            greedyRepairOnRestart = false,
-            completion = { candidate, _ ->
+            restartPolicy = restart, greedyRepairOnRestart = false, completion = { candidate, _ ->
                 calls++
                 Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 4)
-            },
-        )
+            })
 
         val result = search.improvements(
             LinearObjective(realCoefficients = doubleArrayOf(1.0)),
-            LocalSearchParams(
-                maxInstructions = 5,
-                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0)),
-            ),
-            null,
+            LocalSearchParams(maxInstructions = 5,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))), null,
         ).last()
 
         val best = assertIs<MinimizeResult.BestFound>(result)
@@ -137,24 +124,17 @@ class LocalSearchEngineCompletionTest {
                 }
             }
             var calls = 0
-            val search = LocalSearchEngine(
-                LocalSearchModel.open(mixedProblem()),
+            val search = LocalSearchEngine(LocalSearchModel.open(mixedProblem()),
                 strategy = SourceDrivenStrategy(emptyList(), feasibleDescent = FeasibleDescent.SelfOwned),
-                restartPolicy = restart,
-                greedyRepairOnRestart = false,
-                completion = { _, _ ->
+                restartPolicy = restart, greedyRepairOnRestart = false, completion = { _, _ ->
                     calls++
                     decision
-                },
-            )
+                })
 
             val result = search.improvements(
                 LinearObjective(realCoefficients = doubleArrayOf(1.0)),
-                LocalSearchParams(
-                    maxInstructions = 10,
-                    initialAssignment = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0)),
-                ),
-                null,
+                LocalSearchParams(maxInstructions = 10,
+                    initialAssignment = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0))), null,
             ).last()
 
             assertIs<MinimizeResult.Unknown>(result)
@@ -174,38 +154,27 @@ class LocalSearchEngineCompletionTest {
         }
         val attempted = mutableListOf<Long>()
         var expired = false
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(mixedProblem(finiteMinimum = 2)),
-            strategy = SourceDrivenStrategy(
-                listOf(ConfiguredSource(source)),
-                feasibleDescent = FeasibleDescent.SelfOwned,
-            ),
-            greedyRepairOnRestart = false,
-            completion = { candidate, _ ->
+        val search = LocalSearchEngine(LocalSearchModel.open(mixedProblem(finiteMinimum = 2)),
+            strategy = SourceDrivenStrategy(listOf(ConfiguredSource(source)),
+                feasibleDescent = FeasibleDescent.SelfOwned),
+            greedyRepairOnRestart = false, completion = { candidate, _ ->
                 attempted += candidate.intValue(0)
                 if (attempted.size == 1) {
                     expired = true
                     Completion.Undecided(work = 2)
-                } else {
-                    Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 2)
-                }
-            },
-        )
+                } else Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 2)
+            })
 
-        search.resumable(
-            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
-            LocalSearchParams(
-                maxInstructions = 5,
-                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0)),
-            ),
+        search.resumable(LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            LocalSearchParams(maxInstructions = 5,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))),
         ).use { handle ->
             assertNull(handle.runSlice(ExecutionControl { expired }, Long.MAX_VALUE, -1L) {})
             assertFalse(handle.isDone)
             expired = false
 
             val best = assertIs<MinimizeResult.BestFound>(
-                handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {},
-            )
+                handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {})
 
             assertEquals(listOf(2L, 2L), attempted)
             assertEquals(2L, best.sample.intValue(0))
@@ -220,27 +189,17 @@ class LocalSearchEngineCompletionTest {
             override val id = MoveSourceId("exhausted-finite-start-repair")
             override val phase = Phase.Infeasible
             override val pool = Pool.NoiseEligible
-            override fun generate(state: LocalSearchState, sink: MoveSink) {
-                sink.addIntSet(0, 2)
-            }
+            override fun generate(state: LocalSearchState, sink: MoveSink) { sink.addIntSet(0, 2) }
         }
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(mixedProblem(finiteMinimum = 2)),
-            strategy = SourceDrivenStrategy(
-                listOf(ConfiguredSource(source)),
-                feasibleDescent = FeasibleDescent.SelfOwned,
-            ),
+        val search = LocalSearchEngine(LocalSearchModel.open(mixedProblem(finiteMinimum = 2)),
+            strategy = SourceDrivenStrategy(listOf(ConfiguredSource(source)),
+                feasibleDescent = FeasibleDescent.SelfOwned),
             greedyRepairOnRestart = false,
-            completion = { _, _ -> error("completion must not start after the allowance is exhausted") },
-        )
+            completion = { _, _ -> error("completion must not start after the allowance is exhausted") })
 
-        val result = search.improvements(
-            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
-            LocalSearchParams(
-                maxInstructions = 1,
-                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0)),
-            ),
-            null,
+        val result = search.improvements(LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            LocalSearchParams(maxInstructions = 1,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(0), doubleArrayOf(0.0))), null,
         ).last()
 
         assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
@@ -260,10 +219,8 @@ class LocalSearchEngineCompletionTest {
         val candidate = state.completionCandidate(work)
 
         assertNotNull(candidate)
-        assertTrue(
-            visits >= 2L * state.problem.numIntVars + state.problem.numBoolVars +
-                state.problem.numRealVars + state.violated.size,
-        )
+        assertTrue(visits >= 2L * state.problem.numIntVars + state.problem.numBoolVars +
+            state.problem.numRealVars + state.violated.size)
     }
 
     @Test
@@ -276,8 +233,7 @@ class LocalSearchEngineCompletionTest {
         val initial = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0))
 
         for (assumptions in listOf(Assumptions.None, Assumptions.None.withInt(0, 1))) {
-            search.improvements(
-                LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            search.improvements(LinearObjective(realCoefficients = doubleArrayOf(1.0)),
                 LocalSearchParams(maxInstructions = 2, initialAssignment = initial, assumptions = assumptions),
                 null,
             ).last()
@@ -299,31 +255,18 @@ class LocalSearchEngineCompletionTest {
             }
         }
         val attemptedAt = mutableListOf<Int>()
-        val search = LocalSearchEngine(
-            LocalSearchModel.open(mixedProblem()),
-            strategy = SourceDrivenStrategy(
-                listOf(ConfiguredSource(source)),
-                acceptance = AcceptanceRule.WalkSatNoise(1.0),
-                feasibleDescent = FeasibleDescent.SelfOwned,
-            ),
-            greedyRepairOnRestart = false,
-            completion = { candidate, _ ->
+        val search = LocalSearchEngine(LocalSearchModel.open(mixedProblem()),
+            strategy = SourceDrivenStrategy(listOf(ConfiguredSource(source)),
+                acceptance = AcceptanceRule.WalkSatNoise(1.0), feasibleDescent = FeasibleDescent.SelfOwned),
+            greedyRepairOnRestart = false, completion = { candidate, _ ->
                 attemptedAt += steps
-                if (attemptedAt.size == 1) {
-                    Completion.Refuted(work = 4)
-                } else {
-                    Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 1)
-                }
-            },
-        )
+                if (attemptedAt.size == 1) Completion.Refuted(work = 4)
+                else Completion.Witness(candidate.copy(reals = doubleArrayOf(0.5)), work = 1)
+            })
 
-        val result = search.improvements(
-            LinearObjective(realCoefficients = doubleArrayOf(1.0)),
-            LocalSearchParams(
-                maxInstructions = 10,
-                initialAssignment = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0)),
-            ),
-            null,
+        val result = search.improvements(LinearObjective(realCoefficients = doubleArrayOf(1.0)),
+            LocalSearchParams(maxInstructions = 10,
+                initialAssignment = Sample(BooleanArray(0), longArrayOf(1), doubleArrayOf(0.0))), null,
         ).last()
 
         assertIs<MinimizeResult.BestFound>(result)
@@ -335,26 +278,13 @@ class LocalSearchEngineCompletionTest {
     @Test
     fun `continuous satisfaction should complete before requiring zero heuristic violation`() {
         val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ofLong(3)),
-                    LinearOp.EQ,
-                    BigFraction.ONE,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
+            0, 0, emptyArray(),
+            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3)),
+                LinearOp.EQ, BigFraction.ONE)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
         )
-        val search = LocalSearchEngine(
-            LocalSearchModel.of(problem.bake()),
-            greedyRepairOnRestart = false,
-            completion = LeafRealCompletion(problem, null),
-        )
+        val search = LocalSearchEngine(LocalSearchModel.of(problem.bake()),
+            greedyRepairOnRestart = false, completion = LeafRealCompletion(problem, null))
         val initial = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.0))
 
         val result = search.solve(LocalSearchParams(maxFlips = 1, initialAssignment = initial), null)
@@ -367,35 +297,19 @@ class LocalSearchEngineCompletionTest {
     @Test
     fun `continuous optimization should publish a charged completion beyond its move slice`() {
         val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ofLong(3)),
-                    LinearOp.GE,
-                    BigFraction.ONE,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
+            0, 0, emptyArray(),
+            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3)),
+                LinearOp.GE, BigFraction.ONE)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
         )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-        val search = LocalSearchEngine(
-            LocalSearchModel.of(problem.bake()),
-            greedyRepairOnRestart = false,
-            completion = LeafRealCompletion(problem, objective),
-        )
+        val search = LocalSearchEngine(LocalSearchModel.of(problem.bake()),
+            greedyRepairOnRestart = false, completion = LeafRealCompletion(problem, objective))
         val initial = Sample(BooleanArray(0), LongArray(0), doubleArrayOf(0.0))
         val budget = NodeBudget(100)
 
-        val result = search.improvements(
-            objective,
-            LocalSearchParams(maxFlips = 1, initialAssignment = initial, nodeBudget = budget),
-            null,
-        ).last()
+        val result = search.improvements(objective,
+            LocalSearchParams(maxFlips = 1, initialAssignment = initial, nodeBudget = budget), null).last()
 
         val best = assertIs<MinimizeResult.BestFound>(result)
         assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), best.sample.exactReals)
@@ -406,34 +320,18 @@ class LocalSearchEngineCompletionTest {
     @Test
     fun `generated mixed optimization starts should receive charged real completion`() {
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(1, 1)),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
-                    listOf(BigFraction.ofLong(3), BigFraction.MINUS_ONE),
-                    LinearOp.EQ,
-                    BigFraction.ZERO,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
+            0, 1, arrayOf(IntDomain(1, 1)),
+            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofIntVar(0)),
+                listOf(BigFraction.ofLong(3), BigFraction.MINUS_ONE), LinearOp.EQ, BigFraction.ZERO)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
         )
         val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0))
-        val search = LocalSearchEngine(
-            LocalSearchModel.of(problem.bake()),
-            greedyRepairOnRestart = false,
-            completion = LeafRealCompletion(problem, objective),
-        )
+        val search = LocalSearchEngine(LocalSearchModel.of(problem.bake()),
+            greedyRepairOnRestart = false, completion = LeafRealCompletion(problem, objective))
         val budget = NodeBudget(100)
 
-        val result = search.improvements(
-            objective,
-            LocalSearchParams(maxFlips = 1, nodeBudget = budget, randomSeed = 17),
-            null,
-        ).last()
+        val result = search.improvements(objective,
+            LocalSearchParams(maxFlips = 1, nodeBudget = budget, randomSeed = 17), null).last()
 
         val point = assertIs<MinimizeResult.BestFound>(result).sample
         assertEquals(listOf(BigFraction.ofLong(3).reciprocal()), point.exactReals)
@@ -444,25 +342,13 @@ class LocalSearchEngineCompletionTest {
     @Test
     fun `an exhausted allowance should not begin continuous completion`() {
         val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ofLong(3)),
-                    LinearOp.EQ,
-                    BigFraction.ONE,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
+            0, 0, emptyArray(),
+            arrayOf(ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ofLong(3)),
+                LinearOp.EQ, BigFraction.ONE)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
         )
-        val search = LocalSearchEngine(
-            LocalSearchModel.of(problem.bake()),
-            completion = { _, _ -> error("an exhausted allowance cannot begin completion") },
-        )
+        val search = LocalSearchEngine(LocalSearchModel.of(problem.bake()),
+            completion = { _, _ -> error("an exhausted allowance cannot begin completion") })
         val params = LocalSearchParams(nodeBudget = NodeBudget(0))
 
         val solve = search.solve(params, null)
@@ -481,13 +367,9 @@ class LocalSearchEngineCompletionTest {
         factors = arrayOf<Factor>(
             Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 2.5),
             Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
-        ) + if (finiteMinimum == null) {
-            emptyArray()
-        } else {
-            arrayOf<Factor>(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, finiteMinimum),
-            )
-        },
+        ) + if (finiteMinimum == null) emptyArray() else arrayOf<Factor>(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, finiteMinimum),
+        ),
         numRealVars = 1,
         realLower = doubleArrayOf(0.0),
         realUpper = doubleArrayOf(10.0),
@@ -647,17 +529,11 @@ class LocalSearchEngineCompletionTest {
 
             val best = assertIs<MinimizeResult.BestFound>(result)
             val reals = assertNotNull(best.sample.exactReals)
-            val checked = assertNotNull(
-                linear.checkMpsWitness(
-                    source.columns.map {
-                        if (it.real) reals[it.id] else BigFraction.ofLong(best.sample.ints[it.id])
-                    },
-                ),
-            )
-            assertEquals(
-                BigFraction.ofLong(10),
-                assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE))).objective,
-            )
+            val checked = assertNotNull(linear.checkMpsWitness(source.columns.map {
+                if (it.real) reals[it.id] else BigFraction.ofLong(best.sample.ints[it.id])
+            }))
+            assertEquals(BigFraction.ofLong(10),
+                assertNotNull(linear.checkMpsWitness(listOf(BigFraction.ZERO, BigFraction.ONE))).objective)
             assertEquals(BigFraction.ONE, checked.objective)
             assertEquals(listOf(BigFraction.ONE, BigFraction.ZERO), checked.values)
         }

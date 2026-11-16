@@ -34,10 +34,7 @@ internal fun BakedProblem.withDifferenceSystem(): BakedProblem {
     if (fragment.edges.none { edge ->
             !edge.domainBound && edge.source != DifferenceFragment.ZERO && edge.target != DifferenceFragment.ZERO &&
                 !rootIntDomain(edge.source).isFixed && !rootIntDomain(edge.target).isFixed
-        }
-    ) {
-        return this
-    }
+        }) return this
     // The system is redundant with the rows it reads, so it changes nothing the base fold derived:
     // [withAppendedFactor] reuses that fold and carries the proven root deductions forward.
     return withAppendedFactor(DifferenceSystem(fragment.edges))

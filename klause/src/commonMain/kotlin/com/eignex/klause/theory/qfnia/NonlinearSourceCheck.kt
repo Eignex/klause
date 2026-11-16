@@ -38,17 +38,13 @@ internal fun checkNonlinearSource(
             }
             expressions[node] = when (node) {
                 is PolynomialExpression.Constant -> algebraic.rational(BigFraction.of(node.numerator, node.denominator))
-
                 is PolynomialExpression.Variable -> assignment.realValue(node.id.index)
-
                 is PolynomialExpression.Sum -> children.fold(algebraic.rational(BigFraction.ZERO)) { value, child ->
                     algebraic.add(value, expressions.getValue(child))
                 }
-
                 is PolynomialExpression.Product -> children.fold(algebraic.rational(BigFraction.ONE)) { value, child ->
                     algebraic.multiply(value, expressions.getValue(child))
                 }
-
                 is PolynomialExpression.Power -> algebraic.power(expressions.getValue(node.base), node.exponent)
             }
         }
@@ -75,15 +71,10 @@ internal fun checkNonlinearSource(
         }
         truth[node] = when (node) {
             is PolynomialRealFormula.Constant -> node.value
-
             is PolynomialRealFormula.BooleanVariable -> assignment.boolValue(node.id.index)
-
             is PolynomialRealFormula.Not -> !truth.getValue(node.operand)
-
             is PolynomialRealFormula.And -> children.all { truth.getValue(it) }
-
             is PolynomialRealFormula.Or -> children.any { truth.getValue(it) }
-
             is PolynomialDistinct -> {
                 val values = node.operands.map(::evaluate)
                 var distinct = true
@@ -95,12 +86,8 @@ internal fun checkNonlinearSource(
                 }
                 distinct
             }
-
-            is PolynomialSelection -> algebraic.compare(
-                assignment.realValue(node.result.index),
-                evaluate(if (truth.getValue(node.condition)) node.whenTrue else node.whenFalse),
-            ) == 0
-
+            is PolynomialSelection -> algebraic.compare(assignment.realValue(node.result.index),
+                evaluate(if (truth.getValue(node.condition)) node.whenTrue else node.whenFalse)) == 0
             is PolynomialRealFormula.Atom -> {
                 val comparison = algebraic.compare(evaluate(node.left), evaluate(node.right))
                 when (node.relation) {

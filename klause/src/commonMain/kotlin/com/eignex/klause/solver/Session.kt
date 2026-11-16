@@ -61,11 +61,8 @@ interface Session<P : SolverParams> : AutoCloseable {
     /** Draw one sample under the captured scope and close the draw's state. */
     fun sample(params: P): SampleResult {
         val sample = openSamples(params).use { it.firstOrNull() }
-        val result = if (sample != null) {
-            SampleResult.Found(sample)
-        } else {
-            SampleResult.Unknown(TerminationReason.BudgetExhausted)
-        }
+        val result = if (sample != null) SampleResult.Found(sample)
+        else SampleResult.Unknown(TerminationReason.BudgetExhausted)
         return result.withSourceSemantics(problem.semantics)
     }
 
@@ -96,7 +93,6 @@ interface Session<P : SolverParams> : AutoCloseable {
     /** Quality-tiered sampling under a scope captured at invocation. */
     fun samples(config: SamplingConfig, params: P): Sequence<Sample> = when (config.quality) {
         SampleQuality.CHEAP -> samples(params)
-
         SampleQuality.ACCURATE -> {
             requireUnscoped()
             solver.samples(config, params)
@@ -197,13 +193,7 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     private fun <T : Any> own(source: SearchStream<T>, transform: (T) -> T = { it }): SearchStream<T> {
         val owned = PullSearchStream(
             pull = { if (source.hasNext()) transform(source.next()) else null },
-            release = {
-                try {
-                    source.close()
-                } finally {
-                    active = null
-                }
-            },
+            release = { try { source.close() } finally { active = null } },
             terminal = { source.isDone },
         )
         active = owned
@@ -240,27 +230,20 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
 
     private fun qualitySamples(config: SamplingConfig, params: P): Sequence<Sample> = when (config.quality) {
         SampleQuality.CHEAP -> samplesScoped(params)
-
         SampleQuality.ACCURATE -> solver.problem.countingScope(params.assumptions)
             .accurateSamples(config) { samplesScoped(params) }
     }
 
     override fun approximateCount(config: ApproxCountConfig): Count {
         ensureAvailable()
-        return if (stack.isEmpty()) {
-            solver.approximateCount(config)
-        } else {
-            solver.problem.countingScope(mergedStack()).scopedApproximateCount(config)
-        }
+        return if (stack.isEmpty()) solver.approximateCount(config)
+        else solver.problem.countingScope(mergedStack()).scopedApproximateCount(config)
     }
 
     override fun exactCount(config: ExactCountConfig): Sequence<Count> {
         ensureAvailable()
-        val sequence = if (stack.isEmpty()) {
-            solver.exactCount(config)
-        } else {
-            solver.problem.countingScope(mergedStack()).scopedExactCount(config)
-        }
+        val sequence = if (stack.isEmpty()) solver.exactCount(config)
+        else solver.problem.countingScope(mergedStack()).scopedExactCount(config)
         return guarded(sequence)
     }
 
@@ -276,11 +259,10 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
     override fun minimize(objective: LinearObjective, params: P): MinimizeResult =
         minimizeScoped(objective, applyStack(params)).withSourceSemantics(solver.problem.semantics)
 
-    override fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> = guarded(
-        improvementsScoped(objective, applyStack(params)).map {
+    override fun improvements(objective: LinearObjective, params: P): Sequence<MinimizeResult> =
+        guarded(improvementsScoped(objective, applyStack(params)).map {
             it.withSourceSemantics(solver.problem.semantics)
-        },
-    )
+        })
 
     override fun openSamples(params: P): SearchStream<Sample> = own(openSamplesScoped(applyStack(params))) {
         it.withSourceSemantics(solver.problem.semantics)
@@ -297,11 +279,8 @@ open class StatelessSession<P : SolverParams>(override val solver: Solver<P>) : 
 
     override fun openExactCount(config: ExactCountConfig): SearchStream<Count> {
         ensureAvailable()
-        val sequence = if (stack.isEmpty()) {
-            solver.exactCount(config)
-        } else {
-            solver.problem.countingScope(mergedStack()).scopedExactCount(config)
-        }
+        val sequence = if (stack.isEmpty()) solver.exactCount(config)
+        else solver.problem.countingScope(mergedStack()).scopedExactCount(config)
         return own(sequence.asSearchStream())
     }
 

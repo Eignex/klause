@@ -29,16 +29,9 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
         val source = Dimacs.parseWcnf((1..512).joinToString("\n") { "$it $it 0" }).toProblem()
         val problem = source.problem
         val sweep = assertNotNull(DefinitionalSweep.infer(problem, boolFolds = source.boolFolds))
-        val functional = assertIs<FunctionalObjective>(
-            sweep.functionalObjective(
-            intArrayOf(),
-            longArrayOf(),
-            0L,
-            minimize,
-            IntArray(512) { 512 + it },
-            LongArray(512) { (it + 1L) },
-        )
-        )
+        val functional = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            intArrayOf(), longArrayOf(), 0L, minimize, IntArray(512) { 512 + it }, LongArray(512) { (it + 1L) },
+        ))
         val state = LocalSearchState(problem.bake(), Random(0))
         state.invariants = sweep.network(0, 1024)
         val observations = LocalSearchPhaseTimer { 0L }
@@ -57,16 +50,9 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
     fun `indexed primitive scores should report preparation and completed candidate calls`() {
         val source = Dimacs.parseWcnf("7 1 2 0\n11 -1 2 0\n").toProblem()
         val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
-        val functional = assertIs<FunctionalObjective>(
-            sweep.functionalObjective(
-            intArrayOf(),
-            longArrayOf(),
-            0L,
-            minimize,
-            intArrayOf(2, 3),
-            longArrayOf(7L, 11L),
-        )
-        )
+        val functional = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            intArrayOf(), longArrayOf(), 0L, minimize, intArrayOf(2, 3), longArrayOf(7L, 11L),
+        ))
         val state = LocalSearchState(source.problem.bake(), Random(0))
         val observations = LocalSearchPhaseTimer { 0L }
         state.phaseTimer = observations
@@ -85,25 +71,13 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
     fun `propagated indexed scores should report completed candidate calls`() {
         val source = Dimacs.parseWcnf("h 1 3 0\nh -1 -3 0\n7 3 2 0\n11 -3 2 0\n").toProblem()
         val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
-        val functional = assertIs<FunctionalObjective>(
-            sweep.functionalObjective(
-            intArrayOf(),
-            longArrayOf(),
-            0L,
-            minimize,
-            intArrayOf(3, 4),
-            longArrayOf(7L, 11L),
-        )
-        )
+        val functional = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            intArrayOf(), longArrayOf(), 0L, minimize, intArrayOf(3, 4), longArrayOf(7L, 11L),
+        ))
         val state = LocalSearchState(source.problem.bake(), Random(0))
-        state.invariants = assertNotNull(
-            DefinitionalSweep.infer(
-                source.problem,
-                boolFolds = listOf(
+        state.invariants = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = listOf(
             BoolFoldDefinition(2, intArrayOf(Lit.make(0, false)), true),
-        )
-            )
-        ).network(0, 5)
+        ))).network(0, 5)
         state.assignment.setBool(2, true)
         state.assignment.setBool(4, true)
         state.recompute()
@@ -122,25 +96,13 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
     fun `a maintained probe should restore its coordinates after scoring soft clauses`() {
         val source = Dimacs.parseWcnf("h 1 3 0\nh -1 -3 0\n7 3 2 0\n11 -3 2 0\n").toProblem()
         val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
-        val functional = assertIs<FunctionalObjective>(
-            sweep.functionalObjective(
-            intArrayOf(),
-            longArrayOf(),
-            0L,
-            minimize,
-            intArrayOf(3, 4),
-            longArrayOf(7L, 11L),
-        )
-        )
+        val functional = assertIs<FunctionalObjective>(sweep.functionalObjective(
+            intArrayOf(), longArrayOf(), 0L, minimize, intArrayOf(3, 4), longArrayOf(7L, 11L),
+        ))
         val state = LocalSearchState(source.problem.bake(), Random(0))
-        state.invariants = assertNotNull(
-            DefinitionalSweep.infer(
-                source.problem,
-                boolFolds = listOf(
+        state.invariants = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = listOf(
             BoolFoldDefinition(2, intArrayOf(Lit.make(0, false)), true),
-        )
-            )
-        ).network(0, 5)
+        ))).network(0, 5)
         state.assignment.setBool(2, true)
         state.assignment.setBool(4, true)
         state.recompute()
@@ -160,13 +122,8 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
         val sweep = assertNotNull(DefinitionalSweep.infer(source.problem, boolFolds = source.boolFolds))
         val functional = assertIs<FunctionalObjective>(
             sweep.functionalObjective(
-                intArrayOf(),
-                longArrayOf(),
-                0L,
-                minimize,
-                intArrayOf(2, 3),
-                longArrayOf(7L, 11L),
-            ),
+                intArrayOf(), longArrayOf(), 0L, minimize, intArrayOf(2, 3), longArrayOf(7L, 11L),
+            )
         )
         val state = LocalSearchState(source.problem.bake(), Random(0))
         state.prepareObjectiveDelta(functional).forEach { }
@@ -185,11 +142,7 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
         }
         val evaluator = assertNotNull(
             BooleanObjectiveDelta.preparation(
-                definitions,
-                IntArray(128) { 128 + it },
-                LongArray(128) { 7L },
-                minimize,
-                256,
+                definitions, IntArray(128) { 128 + it }, LongArray(128) { 7L }, minimize, 256,
             ).filterNotNull().last().evaluator,
         )
         val assignment = Assignment(256, 0)
@@ -207,11 +160,7 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
     fun `compound scoring should honor cancellation while collecting repeated flips`() {
         val evaluator = assertNotNull(
             BooleanObjectiveDelta.preparation(
-                emptyList(),
-                intArrayOf(0),
-                longArrayOf(1L),
-                minimize,
-                1,
+                emptyList(), intArrayOf(0), longArrayOf(1L), minimize, 1,
             ).filterNotNull().last().evaluator,
         )
         val assignment = Assignment(1, 0)
@@ -237,21 +186,14 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
         }
         val evaluator = assertNotNull(
             BooleanObjectiveDelta.preparation(
-                listOf(definition),
-                intArrayOf(3, 0, 2),
-                longArrayOf(Long.MAX_VALUE, Long.MIN_VALUE, 7L),
-                minimize,
-                4,
+                listOf(definition), intArrayOf(3, 0, 2), longArrayOf(Long.MAX_VALUE, Long.MIN_VALUE, 7L), minimize, 4,
             ).filterNotNull().last().evaluator,
         )
         val assignment = Assignment(4, 0)
         val move = Move.Compound(
             listOf(
-                Move.BoolFlip(0),
-                Move.BoolFlip(1),
-                Move.BoolFlip(2),
-                Move.BoolFlip(1),
-            ),
+                Move.BoolFlip(0), Move.BoolFlip(1), Move.BoolFlip(2), Move.BoolFlip(1),
+            )
         )
 
         val delta = evaluator.delta(assignment, move) {}
@@ -270,11 +212,7 @@ class BooleanObjectiveDeltaTest(private val minimize: Boolean) {
         }
         val evaluator = assertNotNull(
             BooleanObjectiveDelta.preparation(
-                listOf(definition),
-                intArrayOf(2),
-                longArrayOf(9L),
-                minimize,
-                3,
+                listOf(definition), intArrayOf(2), longArrayOf(9L), minimize, 3,
             ).filterNotNull().last().evaluator,
         )
         val assignment = Assignment(3, 0)

@@ -44,38 +44,18 @@ internal class NonlinearIntegerResidueReduction(
                 is PolynomialRealFormula.Atom -> if (formula.relation == PolynomialRelation.EQ && excludes(formula)) {
                     excluded++
                     PolynomialRealFormula.Constant(false)
-                } else {
-                    formula
-                }
-
+                } else formula
                 is PolynomialRealFormula.Not -> {
                     val child = reduced.getValue(FormulaIdentity(formula.operand))
-                    if (child is PolynomialRealFormula.Constant) {
-                        PolynomialRealFormula.Constant(!child.value)
-                    } else if (child === formula.operand) {
-                        formula
-                    } else {
-                        PolynomialRealFormula.Not(child)
-                    }
+                    if (child is PolynomialRealFormula.Constant) PolynomialRealFormula.Constant(!child.value)
+                    else if (child === formula.operand) formula else PolynomialRealFormula.Not(child)
                 }
-
                 is PolynomialRealFormula.And, is PolynomialRealFormula.Or -> {
                     val conjunction = formula is PolynomialRealFormula.And
-                    val operands = children.map {
-                        step()
-                        reduced.getValue(FormulaIdentity(it))
-                    }
-                    if (operands.indices.all {
-                            step()
-                            operands[it] === children[it]
-                        }
-                    ) {
-                        formula
-                    } else {
-                        junction(operands, conjunction)
-                    }
+                    val operands = children.map { step(); reduced.getValue(FormulaIdentity(it)) }
+                    if (operands.indices.all { step(); operands[it] === children[it] }) formula
+                    else junction(operands, conjunction)
                 }
-
                 else -> formula
             }
         }
@@ -89,9 +69,7 @@ internal class NonlinearIntegerResidueReduction(
             step()
             if (operand is PolynomialRealFormula.Constant) {
                 if (operand.value != conjunction) return operand
-            } else {
-                retained.add(operand)
-            }
+            } else retained.add(operand)
         }
         return when (retained.size) {
             0 -> PolynomialRealFormula.Constant(conjunction)

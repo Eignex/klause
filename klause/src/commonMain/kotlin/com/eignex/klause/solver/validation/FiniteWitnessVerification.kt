@@ -18,11 +18,7 @@ internal fun finiteWitnessVerifier(
     cancellation: ExecutionControl = ExecutionControl.Never,
     toleranceCheck: ((Sample) -> Boolean)? = null,
 ): CandidateVerifier<Sample, Double?> = finiteWitnessVerifier(
-    problem,
-    objective,
-    Assumptions.None,
-    cancellation,
-    toleranceCheck,
+    problem, objective, Assumptions.None, cancellation, toleranceCheck,
 )
 
 internal fun finiteWitnessVerifier(
@@ -59,10 +55,8 @@ private fun verifyFiniteWitness(
         return Verification.Rejected("assignment does not cover the model's discrete variables")
     }
     if (sample.numRealVars != problem.numRealVars ||
-        (
-            sample.exactReals == null &&
-                (0 until sample.numRealVars).any { !sample.approximateRealValue(it).isFinite() }
-            )
+        (sample.exactReals == null &&
+            (0 until sample.numRealVars).any { !sample.approximateRealValue(it).isFinite() })
     ) {
         return Verification.Rejected("assignment does not cover finite real coordinates")
     }

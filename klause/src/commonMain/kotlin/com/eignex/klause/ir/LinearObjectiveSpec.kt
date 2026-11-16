@@ -3,6 +3,7 @@ package com.eignex.klause.ir
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.arrays.emptyLongArray
 
+
 /** Immutable linear objective coefficients produced by lowering. */
 class LinearObjectiveSpec(
     /** Weight of each Boolean variable when true, indexed by Boolean variable id. */

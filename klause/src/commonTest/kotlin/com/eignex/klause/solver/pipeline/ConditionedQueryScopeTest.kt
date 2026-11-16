@@ -90,10 +90,8 @@ class ConditionedQueryScopeTest {
 
         assertTrue(scope.stop())
         assertFailsWith<IllegalStateException> {
-            scope.withCondition(
-                ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
-                ExecutionControl.Never,
-            ) {}
+            scope.withCondition(ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
+                ExecutionControl.Never) {}
         }
     }
 }

@@ -16,9 +16,7 @@ fun PreparedSourcePlan.sourceResultCapture(
     val original = originalSource as? Problem ?: return null
     if (!assumptions.deductions.isEmpty || assumptions.bools.keys.any { it !in 0 until sourceBoolCount } ||
         assumptions.ints.keys.any { it !in 0 until sourceIntCount }
-    ) {
-        return null
-    }
+    ) return null
     if ((objective == null) != (objectiveIdentity == null)) return null
     val descriptor = objectiveIdentity?.let {
         SourceObjective(it, if (maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE)

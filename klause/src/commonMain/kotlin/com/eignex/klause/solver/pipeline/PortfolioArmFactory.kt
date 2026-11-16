@@ -11,9 +11,7 @@ internal class PortfolioArmFactory(
     private val binding: ((PortfolioWorker) -> SourceWorkerBinding)? = null,
     private val create: (PortfolioWorkerSlot) -> PortfolioWorker,
 ) {
-    init {
-        require(armId >= 0)
-    }
+    init { require(armId >= 0) }
 
     @Suppress("TooGenericExceptionCaught")
     fun materialize(plan: PreparedSourcePlan, slot: PortfolioWorkerSlot): PortfolioWorker {

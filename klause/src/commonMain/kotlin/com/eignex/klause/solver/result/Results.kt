@@ -71,8 +71,10 @@ sealed interface SampleResult {
     }
 
     /** Proven infeasible. See [com.eignex.klause.solver.SolveResult.Unsat.core] for [core] semantics. */
-    data class Infeasible(val core: UnsatCore? = null, override val semantics: EffectiveSourceSemantics? = null) :
-        SampleResult {
+    data class Infeasible(
+        val core: UnsatCore? = null,
+        override val semantics: EffectiveSourceSemantics? = null,
+    ) : SampleResult {
         override val assignment: Sample? = null
     }
 

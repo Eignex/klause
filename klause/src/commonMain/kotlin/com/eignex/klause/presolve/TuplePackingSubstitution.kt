@@ -133,13 +133,8 @@ internal object TuplePackingSubstitution {
             val exactCover = capacity.size == packing.scope.size
             for (literals in capacity.values) {
                 if (!meter.visit()) return null
-                local.add(
-                    if (exactCover) {
-                        Cardinality.exactlyOne(literals.toIntArray())
-                    } else {
-                        Cardinality.atMostOne(literals.toIntArray())
-                    },
-                )
+                local.add(if (exactCover) Cardinality.exactlyOne(literals.toIntArray())
+                else Cardinality.atMostOne(literals.toIntArray()))
             }
             if (cancellation()) return null
             dropped.add(packing.distinctId)
@@ -155,13 +150,8 @@ internal object TuplePackingSubstitution {
         val domains = sourceDomains.copyOf()
         for (variable in pinned) domains[variable] = IntDomain(domains[variable].min, domains[variable].min)
         val factors = problem.factors.filterIndexed { id, _ -> id !in dropped } + additions
-        val rebuilt = PresolveShared.rebuildProblem(
-            problem,
-            factors,
-            domains,
-            numBoolVars = nextBool,
-            cancellation = cancellation,
-        )
+        val rebuilt = PresolveShared.rebuildProblem(problem, factors, domains, numBoolVars = nextBool,
+            cancellation = cancellation)
         return Substitution(rebuilt, SourceRebuilds(rebuilds, problem.numBoolVars), nextBool - problem.numBoolVars)
     }
 

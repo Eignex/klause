@@ -23,8 +23,7 @@ class CliModePresolveTest {
     @Test
     fun `comparison folding should publish a complete FlatZinc assignment satisfying both reifications`() {
         val fzn = File.createTempFile("comparison-indicators", ".fzn").apply {
-            writeText(
-                """
+            writeText("""
                 var 0..1: x :: output_var;
                 var 0..1: y :: output_var;
                 var bool: b :: output_var;
@@ -33,8 +32,7 @@ class CliModePresolveTest {
                 constraint int_eq_reif(y, 1, c);
                 constraint bool_clause([b, c], []);
                 solve satisfy;
-                """.trimIndent(),
-            )
+                """.trimIndent())
         }
 
         val output = try {
@@ -83,18 +81,8 @@ class CliModePresolveTest {
 
         val text = captureStderr {
             output = captureStdout {
-                assertEquals(
-                    0,
-                    runCli(
-                        arrayOf(
-                    "--presolve",
-                    "none",
-                    "--param",
-                    "dry-run-presolve=true",
-                    mps.absolutePath,
-                )
-                    )
-                )
+                assertEquals(0, runCli(arrayOf("--presolve", "none", "--param", "dry-run-presolve=true",
+                    mps.absolutePath)))
             }
         }
 
@@ -137,7 +125,9 @@ class CliModePresolveTest {
         }
 
         var out = ""
-        val err = captureStderr { out = captureStdout { runCli(arrayOf("--param", "dry-run-presolve=true", smt.absolutePath)) } }
+        val err = captureStderr {
+            out = captureStdout { runCli(arrayOf("--param", "dry-run-presolve=true", smt.absolutePath)) }
+        }
 
         assertTrue("presolve dry-run:" in err, err)
         assertTrue("open columns: 2 of 2" in err, err)
@@ -382,10 +372,8 @@ class CliModePresolveTest {
     @Test
     fun `exhausted optional routing allowance should retain SMT complete admission`() {
         val source = File.createTempFile("routing-admission", ".smt2").apply {
-            writeText(
-                "(declare-const x Int) (declare-const y Int) " +
-                    "(assert (<= (+ (* 2 x) (* 3 y)) 1)) (check-sat)",
-            )
+            writeText("(declare-const x Int) (declare-const y Int) " +
+                "(assert (<= (+ (* 2 x) (* 3 y)) 1)) (check-sat)")
             deleteOnExit()
         }
         val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }

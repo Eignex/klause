@@ -11,22 +11,11 @@ internal class SourceIntegerBounds(
     private val upper: Map<SourceCoordinate, BigFraction>,
 ) {
     fun status(pins: Map<SourceCoordinate, BigFraction>): IntegerPinStatus {
-        if (pins.any { (id, value) ->
-                lower[id]?.let { it > value } == true ||
-                    upper[id]?.let { it < value } == true
-            }
-        ) {
-            return IntegerPinStatus.Inactive
-        }
-        return if (pins.all { (id, value) ->
-                lower[id]?.let { it >= value } == true &&
-                    upper[id]?.let { it <= value } == true
-            }
-        ) {
-            IntegerPinStatus.Established
-        } else {
-            IntegerPinStatus.Unresolved
-        }
+        if (pins.any { (id, value) -> lower[id]?.let { it > value } == true ||
+                upper[id]?.let { it < value } == true }) return IntegerPinStatus.Inactive
+        return if (pins.all { (id, value) -> lower[id]?.let { it >= value } == true &&
+                upper[id]?.let { it <= value } == true }) IntegerPinStatus.Established
+            else IntegerPinStatus.Unresolved
     }
 
     fun split(pins: Map<SourceCoordinate, BigFraction>): Pair<SourceCoordinate, BigFraction>? {
@@ -39,8 +28,7 @@ internal class SourceIntegerBounds(
 }
 
 internal fun SourceProofContext.integerPinBounds(
-    condition: SourceCondition,
-    cancellation: ExecutionControl,
+    condition: SourceCondition, cancellation: ExecutionControl,
 ): SourceIntegerBounds? {
     val lower = linkedMapOf<SourceCoordinate, BigFraction>()
     val upper = linkedMapOf<SourceCoordinate, BigFraction>()
@@ -50,11 +38,7 @@ internal fun SourceProofContext.integerPinBounds(
         val floor = BigFraction.of(value.negated().ceilInteger(), BIG_ONE).negated()
         val rounded = if (isUpper) {
             if (strict) ceiling - BigFraction.ONE else floor
-        } else if (strict) {
-            floor + BigFraction.ONE
-        } else {
-            ceiling
-        }
+        } else if (strict) floor + BigFraction.ONE else ceiling
         val bounds = if (isUpper) upper else lower
         val previous = bounds[id]
         if (previous == null || if (isUpper) rounded < previous else rounded > previous) bounds[id] = rounded
@@ -69,10 +53,7 @@ internal fun SourceProofContext.integerPinBounds(
     for (premise in premises.values) {
         if (cancellation()) return null
         if (premise.integerPins.isNotEmpty() ||
-            premise.guards.any { (id, value) -> condition.bools[id] != value }
-        ) {
-            continue
-        }
+            premise.guards.any { (id, value) -> condition.bools[id] != value }) continue
         val row = premise.inequality
         if (row.coefficients.size != 1) continue
         val (id, coefficient) = row.coefficients.entries.single()

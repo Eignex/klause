@@ -126,11 +126,8 @@ internal class RootHoleHistory {
                 for (position in index until runs.size - 2) runs[position] = runs[position + 2]
                 runs.truncateTo(runs.size - 2)
             }
-
             joinsBefore -> runs[before + 1] = value
-
             joinsAfter -> runs[index] = value
-
             else -> {
                 runs.insertAt(index, value)
                 runs.insertAt(index + 1, value)

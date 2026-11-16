@@ -521,16 +521,12 @@ private class RationalContinuationLane<F>(
         val nextLower = input.lower.map { it?.let { value -> fromBig(value, budget) } }
         val nextUpper = input.upper.map { it?.let { value -> fromBig(value, budget) } }
         val nextStatuses = statuses.mapIndexed { j, status ->
-            if (status == ContinuationStatus.BASIC) {
-                status
-            } else {
-                when {
-                    input.lower[j] != null && input.lower[j] == input.upper[j] -> ContinuationStatus.FIXED
-                    status == ContinuationStatus.UPPER && input.upper[j] != null -> ContinuationStatus.UPPER
-                    input.lower[j] != null -> ContinuationStatus.LOWER
-                    input.upper[j] != null -> ContinuationStatus.UPPER
-                    else -> ContinuationStatus.FREE
-                }
+            if (status == ContinuationStatus.BASIC) status else when {
+                input.lower[j] != null && input.lower[j] == input.upper[j] -> ContinuationStatus.FIXED
+                status == ContinuationStatus.UPPER && input.upper[j] != null -> ContinuationStatus.UPPER
+                input.lower[j] != null -> ContinuationStatus.LOWER
+                input.upper[j] != null -> ContinuationStatus.UPPER
+                else -> ContinuationStatus.FREE
             }
         }.toMutableList()
         val nextSeats = nextStatuses.mapIndexed { j, status ->
@@ -548,9 +544,7 @@ private class RationalContinuationLane<F>(
                     else -> ops.zero
                 }
             }.toMutableList()
-        } else {
-            null
-        }
+        } else null
         budget.step()
         this.input = input
         lower = nextLower
@@ -643,15 +637,11 @@ private class RationalContinuationLane<F>(
         if (lower[column]?.let {
                 compareValue(value, epsilon?.get(column), it, lowerEpsilon(column), budget) < 0
             } == true
-        ) {
-            return 1
-        }
+        ) return 1
         if (upper[column]?.let {
                 compareValue(value, epsilon?.get(column), it, upperEpsilon(column), budget) > 0
             } == true
-        ) {
-            return -1
-        }
+        ) return -1
         return 0
     }
 
@@ -727,11 +717,8 @@ private class RationalContinuationLane<F>(
             }
             upper[j]?.let {
                 step = finiteStep(
-                    step,
-                    subtract(it, values[j], budget),
-                    multiply(ops.minusOne, epsilon[j], budget),
-                    input.upperIsStrict(j),
-                    budget,
+                    step, subtract(it, values[j], budget), multiply(ops.minusOne, epsilon[j], budget),
+                    input.upperIsStrict(j), budget,
                 )
             }
         }

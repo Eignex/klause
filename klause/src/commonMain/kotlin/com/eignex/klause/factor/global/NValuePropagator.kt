@@ -159,9 +159,7 @@ internal class NValuePropagator(
         val nonAbsent = xs.indices.filter { !definitelyAbsentNvFn(it, state) }
         if (nonAbsent.any { state.intDomains[xs[it]].spanOrNull(DEFAULT_DOMAIN_WALK_CAP) == null }) {
             val boundsAnt = OptionalPresence.withPresencePremises(
-                presents,
-                state,
-                collectHoleAndBoundAntecedents(state, xs),
+                presents, state, collectHoleAndBoundAntecedents(state, xs),
             )
             val fixedValues = LongHashSet()
             for (i in xs.indices) {

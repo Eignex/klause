@@ -145,9 +145,7 @@ object FixedWorkSatMeasurement {
         try {
             if (model != null && !deadline()) {
                 val base = BacktrackCatalog.byLabel(request.recipe).build(request.seed, null)
-                val stop = if (request.unit == FixedWorkUnit.WORK) {
-                    deadline
-                } else {
+                val stop = if (request.unit == FixedWorkUnit.WORK) deadline else {
                     deadline or ExecutionControl { trajectory.limitReached }
                 }
                 val params = base.copy(
@@ -204,17 +202,14 @@ object FixedWorkSatMeasurement {
             put("unit", request.unit.label)
             put("limit", request.limit)
             put("deadlineMillis", request.deadlineMillis)
-            put(
-                "engine",
-                buildJsonObject {
-                    put("kind", "resumable-backtrack")
-                    put("nativeSatRequested", true)
-                    put("sliceMillis", Long.MAX_VALUE)
-                    put("presolve", false)
-                    put("localSearch", false)
-                    put("portfolio", false)
-                },
-            )
+            put("engine", buildJsonObject {
+                put("kind", "resumable-backtrack")
+                put("nativeSatRequested", true)
+                put("sliceMillis", Long.MAX_VALUE)
+                put("presolve", false)
+                put("localSearch", false)
+                put("portfolio", false)
+            })
             put("sourceSha256", request.sourceSha256)
             put("sourceBooleanVariables", model?.numBoolVars)
             put("sourceIntegerVariables", model?.numIntVars)
@@ -228,18 +223,15 @@ object FixedWorkSatMeasurement {
             put("comparable", stopReason != "deadline")
             put("result", result?.let { it::class.simpleName } ?: "Paused")
             put("unknownReason", (result as? SolveResult.Unknown)?.reason?.name)
-            put(
-                "counters",
-                buildJsonObject {
-                    put("work", work)
-                    put("initialWork", initialWork)
-                    put("decisions", counters.nodes.sum.toLong())
-                    put("failures", counters.fails.sum.toLong())
-                    put("restarts", counters.restarts.sum.toLong())
-                    put("propagationWork", counters.propagationWork.sum.toLong())
-                    put("rootPropagationWork", counters.rootPropagationWork.sum.toLong())
-                },
-            )
+            put("counters", buildJsonObject {
+                put("work", work)
+                put("initialWork", initialWork)
+                put("decisions", counters.nodes.sum.toLong())
+                put("failures", counters.fails.sum.toLong())
+                put("restarts", counters.restarts.sum.toLong())
+                put("propagationWork", counters.propagationWork.sum.toLong())
+                put("rootPropagationWork", counters.rootPropagationWork.sum.toLong())
+            })
             put("trajectory", trajectory.json())
             put("nativeSatClaim", result is SolveResult.Sat)
             put("nativeUnsatClaim", result is SolveResult.Unsat)
@@ -337,22 +329,15 @@ object FixedWorkSatMeasurement {
 
             fun threadCpu(): Long? = if (threads.isCurrentThreadCpuTimeSupported && threads.isThreadCpuTimeEnabled) {
                 threads.currentThreadCpuTime.takeIf { it >= 0L }
-            } else {
-                null
-            }
+            } else null
 
             fun processCpu(): Long? = os?.processCpuTime?.takeIf { it >= 0L }
 
-            fun allocated(): Long? = sunThreads?.takeIf {
-                it.isThreadAllocatedMemorySupported &&
-                    it.isThreadAllocatedMemoryEnabled
-            }?.currentThreadAllocatedBytes?.takeIf { it >= 0L }
+            fun allocated(): Long? = sunThreads?.takeIf { it.isThreadAllocatedMemorySupported &&
+                it.isThreadAllocatedMemoryEnabled }?.currentThreadAllocatedBytes?.takeIf { it >= 0L }
 
             fun collections(): Pair<Long, Long> = ManagementFactory.getGarbageCollectorMXBeans().fold(0L to 0L) {
-                    (count, millis),
-                    bean,
-                ->
-                (count + bean.collectionCount.coerceAtLeast(0L)) to
+                    (count, millis), bean, -> (count + bean.collectionCount.coerceAtLeast(0L)) to
                     (millis + bean.collectionTime.coerceAtLeast(0L))
             }
 
@@ -389,9 +374,7 @@ object FixedWorkSatMeasurement {
         var limitReached = false
             private set
 
-        fun start(meter: Meter) {
-            this.meter = meter
-        }
+        fun start(meter: Meter) { this.meter = meter }
 
         fun picked(variable: VarRef?, session: PropagationSession) {
             picks++
@@ -417,12 +400,10 @@ object FixedWorkSatMeasurement {
                     restarts++
                     row('R', event.index, event.steps)
                 }
-
                 is SearchEvent.LearnedDbSweep -> {
                     sweeps++
                     row('S', event.kept.toLong(), event.dropped.toLong())
                 }
-
                 else -> Unit
             }
         }

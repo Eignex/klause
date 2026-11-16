@@ -22,15 +22,10 @@ import kotlin.test.assertNotNull
 class LocalSearchMoveInspectionTest {
     @Test
     fun `inspection preserves violated factor sampling order`() {
-        val problem = Problem(
-            2,
-            0,
-            emptyArray(),
-            arrayOf(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(1, true))),
-            ),
-        )
+        val problem = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true))),
+            Clause(intArrayOf(Lit.make(1, true))),
+        ))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
         state.recompute()
         val before = state.violated.toIntArray()
@@ -42,14 +37,9 @@ class LocalSearchMoveInspectionTest {
 
     @Test
     fun `inspection restores grades and search activity without random draws`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 4) },
-            arrayOf(
-                Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
-            ),
-        )
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 4) }, arrayOf(
+            Linear(longArrayOf(1, -1), intArrayOf(0, 1), LinearOp.EQ, 0),
+        ))
         val random = object : Random() {
             override fun nextBits(bitCount: Int): Int = error("inspection consumed a random draw")
         }
@@ -83,10 +73,7 @@ class LocalSearchMoveInspectionTest {
     @Test
     fun `inspection includes maintained compound outputs and restores them`() {
         val problem = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 16)),
-            arrayOf(Product(0, 1, 2)),
+            0, 3, arrayOf(IntDomain(0, 4), IntDomain(0, 4), IntDomain(0, 16)), arrayOf(Product(0, 1, 2)),
         )
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(1))
         state.invariants = assertNotNull(DefinitionalSweep.infer(problem)).network(3, 0)
@@ -106,14 +93,9 @@ class LocalSearchMoveInspectionTest {
 
     @Test
     fun `inspection preserves the walk across instruction slices`() {
-        val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 4)),
-            arrayOf(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
-            ),
-        )
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 4)), arrayOf(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 10),
+        ))
         fun trace(inspect: Boolean, slice: Long): List<Long> {
             val values = ArrayList<Long>()
             val strategy = SourceDrivenStrategy(
@@ -128,9 +110,7 @@ class LocalSearchMoveInspectionTest {
                 },
             )
             val engine = LocalSearchEngine(
-                LocalSearchModel.open(problem),
-                strategy = strategy,
-                greedyRepairOnRestart = false,
+                LocalSearchModel.open(problem), strategy = strategy, greedyRepairOnRestart = false,
             )
             val params = LocalSearchParams(maxFlips = 4, randomSeed = 7)
             engine.resumable(LinearObjective(intCoefficients = longArrayOf(1)), params).use { run ->

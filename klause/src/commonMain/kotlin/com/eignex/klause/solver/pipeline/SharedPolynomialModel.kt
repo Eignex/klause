@@ -32,7 +32,7 @@ internal class SharedPolynomialModel private constructor(
     val service: PolynomialTheoryService,
     val integerColumns: Map<Int, Int>,
     val finiteFactorIndices: List<Int>,
-    val encodingAttributions: List<EncodingAttribution>
+    val encodingAttributions: List<EncodingAttribution>,
 ) {
     val finiteEnforcingFactors: Set<Int> = finiteFactorIndices.indices.filter { local ->
         encodingAttributions.any { it.sourceFactorIndex == finiteFactorIndices[local] }
@@ -53,18 +53,20 @@ internal class SharedPolynomialModel private constructor(
     fun capture(assignment: QfNraAssignment, bools: BooleanArray, ints: LongArray): Sample {
         val reals = List(source.numRealVars) { assignment.realValue(it) }
         return Sample(
-            bools,
-            ints,
+            bools, ints,
             DoubleArray(reals.size) { index ->
                 val value = reals[index]
                 value.rational?.toDouble() ?: (value.lowerBound.toDouble() / 2 + value.upperBound.toDouble() / 2)
             },
-            algebraicReals = reals
+            algebraicReals = reals,
         )
     }
 
     companion object {
-        fun assemble(source: Problem, sourceFormula: PolynomialRealFormula? = null): SharedPolynomialModel? =
+        fun assemble(
+            source: Problem,
+            sourceFormula: PolynomialRealFormula? = null,
+        ): SharedPolynomialModel? =
             source.preparePolynomialExecutionPlan(sourceFormula).execution.polynomial?.completion
 
         internal fun lower(
@@ -72,7 +74,7 @@ internal class SharedPolynomialModel private constructor(
             sourceFormula: PolynomialRealFormula?,
             projections: PreparedFactorProjections,
             cancellation: ExecutionControl,
-            onDecline: (EncoderDecline) -> Unit
+            onDecline: (EncoderDecline) -> Unit,
         ): SharedPolynomialModel? {
             projections.requireSource(source)
             val stop = cancellation.encodingPreparationScope()
@@ -103,36 +105,26 @@ internal class SharedPolynomialModel private constructor(
                 for ((index, factor) in source.factors.withIndex()) {
                     if (stopped()) return null
                     if (!participating[index] && projections.encoder(index, EncodingTarget.POLYNOMIAL).enforcesSource &&
-                        (
-                            factor.intVars.any { relevantIntegers[it] } ||
-                                factor.boolVars.any { relevantBooleans[it] }
-                            )
+                        (factor.intVars.any { relevantIntegers[it] } ||
+                            factor.boolVars.any { relevantBooleans[it] })
                     ) {
                         participating[index] = true
                         changed = true
                     }
                     if (participating[index]) {
-                        for (id in factor.intVars) {
-                            if (!relevantIntegers[id]) {
-                                relevantIntegers[id] = true
-                                changed = true
-                            }
+                        for (id in factor.intVars) if (!relevantIntegers[id]) {
+                            relevantIntegers[id] = true
+                            changed = true
                         }
-                        for (id in factor.boolVars) {
-                            if (!relevantBooleans[id]) {
-                                relevantBooleans[id] = true
-                                changed = true
-                            }
+                        for (id in factor.boolVars) if (!relevantBooleans[id]) {
+                            relevantBooleans[id] = true
+                            changed = true
                         }
                     }
                 }
             }
-            val request = projections.requestEncoders(
-                EncodingTarget.POLYNOMIAL,
-                participating.indices.filter { participating[it] },
-                cancellation = stop,
-                onDecline = onDecline
-            )
+            val request = projections.requestEncoders(EncodingTarget.POLYNOMIAL,
+                participating.indices.filter { participating[it] }, cancellation = stop, onDecline = onDecline)
                 ?: return null
             val lowering = PolynomialRealLowering(source.numRealVars)
             val integerIds = LinkedHashMap<Int, Int>()
@@ -152,10 +144,8 @@ internal class SharedPolynomialModel private constructor(
                 if (!participating[index]) continue
                 val selected = request.encoders[selectedIndex++]
                 val encoding = PolynomialEncodingContext(index, factor, lowering, installationStop,
-                    integerCoordinate = {integerIds.getOrPut(it) { lowering.opaqueReal().id.index
-                    } },
-                    realCoordinate = { it
-                })
+                    integerCoordinate = { integerIds.getOrPut(it) { lowering.opaqueReal().id.index } },
+                    realCoordinate = { it })
                 val decline = try {
                     selected.install(factor, encoding)
                 } catch (_: PolynomialSourceInterrupted) {
@@ -166,8 +156,7 @@ internal class SharedPolynomialModel private constructor(
                     return null
                 }
                 formulas += encoding.formulas
-                attributions += encoding.attribution(
-                )
+                attributions += encoding.attribution()
             }
             for (id in 0 until source.numRealVars) {
                 val lower = source.realLower[id]
@@ -189,19 +178,15 @@ internal class SharedPolynomialModel private constructor(
             return SharedPolynomialModel(
                 source,
                 Problem.of(
-                    source.numBoolVars,
-                    source.numIntVars,
-                    source.declaredIntDomains,
+                    source.numBoolVars, source.numIntVars, source.declaredIntDomains,
                     Array(kept.size) { source.factors[kept[it]] },
                     source.impliedFactorMask?.let { mask -> BooleanArray(kept.size) { mask[kept[it]] } },
-                    source.hasSymmetryBreaking,
-                    settings = source.settings,
-                    semantics = source.semantics
+                    source.hasSymmetryBreaking, settings = source.settings, semantics = source.semantics,
                 ),
                 PolynomialTheoryService(formula, source.numBoolVars, lowering.realCount, fixedReals),
                 integerIds.toMap(),
                 kept.toList(),
-                attributions.toList()
+                attributions.toList(),
             )
         }
 

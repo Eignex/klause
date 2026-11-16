@@ -21,25 +21,16 @@ class SessionOwnershipTest {
                 override val incumbentTrialPending: Boolean get() = pending
                 override val isDone: Boolean get() = false
                 override val stats: SolveStats get() = SolveStats.EMPTY
-                override fun runSlice(
-                    global: ExecutionControl,
-                    sliceMillis: Long,
-                    sliceNodes: Long,
-                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
-                ): MinimizeResult? = null
+                override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = null
             }
             val child = if (counted) {
                 object : ResumableSearch by source, InstructionSlicedSearch, ReseedGuard by source {
-                    override fun runInstructionSlice(
-                        global: ExecutionControl,
-                        sliceMillis: Long,
-                        sliceInstructions: Long,
-                        onIncumbent: (MinimizeResult.WithSample) -> Unit,
-                    ): MinimizeResult? = source.runSlice(global, sliceMillis, sliceInstructions, onIncumbent)
+                    override fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long,
+                        sliceInstructions: Long, onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+                        source.runSlice(global, sliceMillis, sliceInstructions, onIncumbent)
                 }
-            } else {
-                source
-            }
+            } else source
 
             ownSearch(child) {}.use { owned ->
                 val guard = assertIs<ReseedGuard>(owned)
@@ -65,12 +56,9 @@ class SessionOwnershipTest {
         }
         val owned = ownSolve(source) { releases++ }
 
-        assertSame(
-            failure,
-            assertFailsWith<IllegalArgumentException> {
-                owned.runSlice(ExecutionControl.Never, 1L, 1L)
-            },
-        )
+        assertSame(failure, assertFailsWith<IllegalArgumentException> {
+            owned.runSlice(ExecutionControl.Never, 1L, 1L)
+        })
 
         assertTrue(failure.suppressedExceptions.isEmpty())
         assertEquals(1, releases)

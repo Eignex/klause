@@ -39,7 +39,7 @@ internal class LpScanCount(private val model: LpModel) {
     fun cost(): LpCertifierCost.Metered {
         val entries = (model.doubleView?.colPtr ?: model.csc.colPtr)[model.n].toLong() + model.numVars + model.m
         return LpCertifierCost.Metered(
-            if (units > 0 && entries > Long.MAX_VALUE / units) Long.MAX_VALUE else entries * units
+            if (units > 0 && entries > Long.MAX_VALUE / units) Long.MAX_VALUE else entries * units,
         )
     }
 }
@@ -58,7 +58,7 @@ internal enum class LpRefactorReason {
     BACKEND_REQUESTED,
     RECONCILE_RECOVERY,
     NUMERICAL_RECOVERY,
-    PRIMAL
+    PRIMAL,
 }
 
 /** Outcome of one float invocation; candidates still require independent exact certification. */
@@ -70,7 +70,7 @@ internal enum class LpFloatTermination {
     PIVOTS,
     CANCELLED,
     NUMERICAL,
-    OTHER
+    OTHER,
 }
 
 /** Optional, solve-scoped observer for certification and exact-input eligibility. */
@@ -117,7 +117,7 @@ internal data class LpSolveMetrics(
     val basisBuildWork: Long = 0L,
     val basisBuildDeclines: Long = 0L,
     val basisBuildUnmeasured: Long = 0L,
-    val factorEntriesBuilt: Long = 0L
+    val factorEntriesBuilt: Long = 0L,
 ) {
     operator fun minus(previous: LpSolveMetrics) = LpSolveMetrics(
         pivots = pivots - previous.pivots,
@@ -132,9 +132,9 @@ internal data class LpSolveMetrics(
         updateLimitRefactorizations = updateLimitRefactorizations - previous.updateLimitRefactorizations,
         backendRequestedRefactorizations = backendRequestedRefactorizations - previous.backendRequestedRefactorizations,
         reconcileRecoveryRefactorizations =
-        reconcileRecoveryRefactorizations - previous.reconcileRecoveryRefactorizations,
+            reconcileRecoveryRefactorizations - previous.reconcileRecoveryRefactorizations,
         numericalRecoveryRefactorizations =
-        numericalRecoveryRefactorizations - previous.numericalRecoveryRefactorizations,
+            numericalRecoveryRefactorizations - previous.numericalRecoveryRefactorizations,
         primalRefactorizations = primalRefactorizations - previous.primalRefactorizations,
         objectiveWarmAttempts = objectiveWarmAttempts - previous.objectiveWarmAttempts,
         objectiveWarmHits = objectiveWarmHits - previous.objectiveWarmHits,
@@ -148,7 +148,7 @@ internal data class LpSolveMetrics(
         basisBuildWork = basisBuildWork - previous.basisBuildWork,
         basisBuildDeclines = basisBuildDeclines - previous.basisBuildDeclines,
         basisBuildUnmeasured = basisBuildUnmeasured - previous.basisBuildUnmeasured,
-        factorEntriesBuilt = factorEntriesBuilt - previous.factorEntriesBuilt
+        factorEntriesBuilt = factorEntriesBuilt - previous.factorEntriesBuilt,
     )
 
     operator fun plus(other: LpSolveMetrics) = LpSolveMetrics(
@@ -174,7 +174,7 @@ internal data class LpSolveMetrics(
         basisBuildWork + other.basisBuildWork,
         basisBuildDeclines + other.basisBuildDeclines,
         basisBuildUnmeasured + other.basisBuildUnmeasured,
-        factorEntriesBuilt + other.factorEntriesBuilt
+        factorEntriesBuilt + other.factorEntriesBuilt,
     )
 }
 
@@ -293,7 +293,7 @@ internal interface LpSolver : AutoCloseable {
         pivots = lastPivots,
         workOps = lastWorkOps,
         singularRefactorizations = lastSingularRefactorizations,
-        smallPivotBails = lastSmallPivotBails
+        smallPivotBails = lastSmallPivotBails,
     )
 
     /** Nonbasic columns with zero reduced cost at the last termination — dual degeneracy. 0 on an engine
@@ -331,18 +331,18 @@ internal interface ComponentLpSolverCapability : LpSolver {
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
         cancellation: ExecutionControl = ExecutionControl.Never,
         withAlternatives: Boolean = false,
-        sharedMeter: MixedCertificateMeter? = null
+        sharedMeter: MixedCertificateMeter? = null,
     ): ComponentLpDeductions? = null
 
     fun exactBound(
         observer: LpCertificationObserver? = null,
-        policy: LpCertificationPolicy = ProductionLpCertificationPolicy
+        policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
     ): CertifiedLpBound?
 
     fun exactWitness(
         observer: LpCertificationObserver? = null,
         policy: LpCertificationPolicy = ProductionLpCertificationPolicy,
-        cancellation: ExecutionControl = ExecutionControl.Never
+        cancellation: ExecutionControl = ExecutionControl.Never,
     ): ExactLpWitness?
 }
 
@@ -377,7 +377,7 @@ internal interface ResumableLpSolver : RetainedLpSolver {
     val currentWork: Long
     fun openSolve(
         allowance: LpFloatAllowance? = null,
-        retainFundingStop: Boolean = false
+        retainFundingStop: Boolean = false,
     ): LpSolveCursor<FloatLpResult?>
     fun promoteSolve(allowance: LpFloatAllowance): Boolean = false
 }
@@ -430,22 +430,17 @@ internal fun newLpSolver(
     componentSplit: Boolean = true,
     factory: LpEngineFactory = ProductionLpEngineFactory,
     pricing: LpPricingOptions = LpPricingOptions(),
-    workLimit: Long = 0L
+    workLimit: Long = 0L,
 ): LpSolver {
     if (componentSplit) {
         componentLpSolverOrNull(
             model,
             cancellation,
             null,
-            { part, token, rowOnlyRows ->
-                factory.newGeneralSolver(
-                    part,
-                    token,
-                    workLimit,
-                    pricing.componentShare(part.n, model.n, rowOnlyRows)
-                )
-            },
-            factory::newComponentSolver
+            { part, token, rowOnlyRows -> factory.newGeneralSolver(
+                part, token, workLimit, pricing.componentShare(part.n, model.n, rowOnlyRows),
+            ) },
+            factory::newComponentSolver,
         )?.let { return it }
     }
     return factory.newGeneralSolver(model, cancellation, workLimit, pricing)
@@ -466,7 +461,7 @@ internal fun newTableauCutSolver(
     workLimit: Long = 0L,
     trackDegeneracy: Boolean = false,
     factory: LpEngineFactory = ProductionLpEngineFactory,
-    pricing: LpPricingOptions = LpPricingOptions()
+    pricing: LpPricingOptions = LpPricingOptions(),
 ): TableauCutSolver = factory.newTableauSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy, pricing)
 
 internal fun newComponentTableauCutSolver(
@@ -476,26 +471,17 @@ internal fun newComponentTableauCutSolver(
     workLimit: Long = 0L,
     trackDegeneracy: Boolean = false,
     factory: LpEngineFactory = ProductionLpEngineFactory,
-    pricing: LpPricingOptions = LpPricingOptions()
+    pricing: LpPricingOptions = LpPricingOptions(),
 ): TableauCutSolver = componentLpSolverOrNull(
-    model,
-    cancellation,
-    null,
-    { part, token, rowOnlyRows ->
-        factory.newTableauSolver(
-            part,
-            token,
-            iterationLimit,
-            workLimit,
-            trackDegeneracy,
-            pricing.componentShare(part.n, model.n, rowOnlyRows)
-        )
-    },
+    model, cancellation, null,
+    { part, token, rowOnlyRows -> factory.newTableauSolver(
+        part, token, iterationLimit, workLimit, trackDegeneracy, pricing.componentShare(part.n, model.n, rowOnlyRows),
+    ) },
     { parent, parts, children, isolated ->
         ComponentLpSolver(parent, parts, children, isolated).apply {
             queryAllowance = LpFloatAllowance(workLimit, iterationLimit)
         }
-    }
+    },
 ) ?: newTableauCutSolver(model, cancellation, iterationLimit, workLimit, trackDegeneracy, factory, pricing)
 
 internal fun LpPricingOptions.componentShare(columns: Int, totalColumns: Int, rowOnlyRows: Int = 0): LpPricingOptions {
@@ -527,7 +513,7 @@ internal fun newPersistentLpSolver(
     workLimit: Long = 0L,
     trackDegeneracy: Boolean = false,
     factory: LpEngineFactory = ProductionLpEngineFactory,
-    pricing: LpPricingOptions = LpPricingOptions()
+    pricing: LpPricingOptions = LpPricingOptions(),
 ): PersistentLpSolver = factory.newPersistentSolver(
     model,
     cancellation,
@@ -535,7 +521,7 @@ internal fun newPersistentLpSolver(
     iterationLimit,
     workLimit,
     trackDegeneracy,
-    pricing
+    pricing,
 )
 
 internal fun newRetainedLpSolver(
@@ -544,7 +530,7 @@ internal fun newRetainedLpSolver(
     componentSplit: Boolean = true,
     factory: LpEngineFactory = ProductionLpEngineFactory,
     pricing: LpPricingOptions = LpPricingOptions(),
-    workLimit: Long = 0L
+    workLimit: Long = 0L,
 ): RetainedLpSolver {
     require(model.exactState != null)
     if (componentSplit) {
@@ -558,10 +544,10 @@ internal fun newRetainedLpSolver(
                     token,
                     factory = factory,
                     pricing = pricing.componentShare(part.n, model.n, rowOnlyRows),
-                    workLimit = workLimit
+                    workLimit = workLimit,
                 )
             },
-            factory::newRetainedComponentSolver
+            factory::newRetainedComponentSolver,
         )?.let { return it }
     }
     return newPersistentLpSolver(model, cancellation, factory = factory, pricing = pricing, workLimit = workLimit)

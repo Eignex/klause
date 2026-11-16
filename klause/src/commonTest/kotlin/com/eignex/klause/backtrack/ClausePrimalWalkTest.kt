@@ -18,14 +18,8 @@ class ClausePrimalWalkTest {
             Clause(intArrayOf(Lit.make(64, false), Lit.make(65, false))),
             Clause(intArrayOf(Lit.make(63, true), Lit.make(64, true), Lit.make(65, true))),
         )
-        val walk = ClausePrimalWalk(
-            Sample(BooleanArray(66) { it == 0 || it == 63 }, longArrayOf()),
-            clauses,
-            listOf(0, 63),
-            Assumptions.None,
-            3L,
-            null,
-        )
+        val walk = ClausePrimalWalk(Sample(BooleanArray(66) { it == 0 || it == 63 }, longArrayOf()),
+            clauses, listOf(0, 63), Assumptions.None, 3L, null)
 
         walk.begin(0, ExecutionControl.Never)
         assertEquals(false, walk.advance(ExecutionControl.Never, -1L))

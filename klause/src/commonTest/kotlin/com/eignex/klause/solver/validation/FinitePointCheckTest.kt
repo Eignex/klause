@@ -28,9 +28,7 @@ class FinitePointCheckTest {
     @Test
     fun `a complete point satisfying the relation should be accepted`() {
         val model = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 10) },
+            0, 2, Array(2) { IntDomain(0, 10) },
             arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10)),
         ).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(3, 7)), Unit)
@@ -43,9 +41,7 @@ class FinitePointCheckTest {
     @Test
     fun `a complete point violating the relation should be rejected`() {
         val model = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 10) },
+            0, 2, Array(2) { IntDomain(0, 10) },
             arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10)),
         ).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(3, 6)), Unit)
@@ -58,9 +54,7 @@ class FinitePointCheckTest {
     @Test
     fun `a complete point should retain caller integer pins`() {
         val model = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 10) },
+            0, 2, Array(2) { IntDomain(0, 10) },
             arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10)),
         ).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), longArrayOf(3, 7)), Unit)
@@ -95,9 +89,7 @@ class FinitePointCheckTest {
     @Test
     fun `checking one point should not condition the next check`() {
         val model = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 10) },
+            0, 2, Array(2) { IntDomain(0, 10) },
             arrayOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 10)),
         ).bake()
         val points = listOf(longArrayOf(3, 7), longArrayOf(8, 2))
@@ -182,9 +174,7 @@ class FinitePointCheckTest {
     fun `checking a complete wide row should use linear propagation work`() {
         val columns = 512
         val source = Problem(
-            0,
-            columns,
-            Array(columns) { IntDomain(0, 1) },
+            0, columns, Array(columns) { IntDomain(0, 1) },
             arrayOf(Linear(IntArray(columns) { 1 }, IntArray(columns) { it }, LinearOp.EQ, columns / 2)),
         ).bake()
         val candidate = Candidate(Sample(booleanArrayOf(), LongArray(columns) { (it % 2).toLong() }), Unit)

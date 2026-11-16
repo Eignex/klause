@@ -22,42 +22,27 @@ internal fun continuousProductEncoder(factor: ContinuousProduct, target: Encodin
 
 private val polynomialProduct = Encoder(EncoderSupport.DIRECT) { view, encoding ->
     view as ContinuousProduct
-    encoding.polynomial(
-        PolynomialRealFormula.Atom(
-            PolynomialExpression.Product(
-                listOf(
-                    encoding.real(SourceRealId(view.a)),
-                    encoding.real(SourceRealId(view.b)),
-                ),
-            ),
-            PolynomialRelation.EQ,
-            encoding.real(SourceRealId(view.result)),
-        ),
-    )
+    encoding.polynomial(PolynomialRealFormula.Atom(
+        PolynomialExpression.Product(listOf(encoding.real(SourceRealId(view.a)),
+            encoding.real(SourceRealId(view.b)))), PolynomialRelation.EQ,
+        encoding.real(SourceRealId(view.result))))
     view.finiteChoices?.let { choices ->
         val alternatives = ArrayList<PolynomialRealFormula>()
         for (index in 0 until choices.size) {
             if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
             encoding.cancellation.charge(1)
             val value = requireNotNull(BigFraction.ofDouble(choices.valueAt(index)))
-            val member = PolynomialRealFormula.Atom(
-                encoding.real(SourceRealId(choices.operand)),
-                PolynomialRelation.EQ,
-                PolynomialExpression.Constant.of(value.num, value.den),
-            )
+            val member = PolynomialRealFormula.Atom(encoding.real(SourceRealId(choices.operand)),
+                PolynomialRelation.EQ, PolynomialExpression.Constant.of(value.num, value.den))
             alternatives += member
             if (choices.hasGuards) {
                 val literal = choices.literalAt(index)
                 val variable = PolynomialRealFormula.BooleanVariable(SourceBoolId(Lit.variable(literal)))
                 val guard = if (Lit.isPositive(literal)) variable else PolynomialRealFormula.Not(variable)
-                encoding.polynomial(
-                    PolynomialRealFormula.And(
-                        listOf(
-                            PolynomialRealFormula.Or(listOf(PolynomialRealFormula.Not(guard), member)),
-                            PolynomialRealFormula.Or(listOf(guard, PolynomialRealFormula.Not(member))),
-                        ),
-                    ),
-                )
+                encoding.polynomial(PolynomialRealFormula.And(listOf(
+                    PolynomialRealFormula.Or(listOf(PolynomialRealFormula.Not(guard), member)),
+                    PolynomialRealFormula.Or(listOf(guard, PolynomialRealFormula.Not(member))),
+                )))
             }
         }
         encoding.polynomial(PolynomialRealFormula.Or(alternatives))
@@ -74,33 +59,18 @@ private val finiteLinearProduct = Encoder(EncoderSupport.EQUIVALENT) { view, enc
         if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
         encoding.cancellation.charge(2)
         val value = requireNotNull(BigFraction.ofDouble(choices.valueAt(index)))
-        val selected = ExactSearchRow.of(
-            intArrayOf(Term.ofRealVar(choices.operand)),
-            listOf(BigFraction.ONE),
-            LinearOp.EQ,
-            value,
-        )
-        val absent = ExactSearchRow.of(
-            intArrayOf(Term.ofRealVar(choices.operand)),
-            listOf(BigFraction.ONE),
-            LinearOp.NE,
-            value,
-        )
-        val product = ExactSearchRow.of(
-            intArrayOf(Term.ofRealVar(view.result), Term.ofRealVar(other)),
-            listOf(BigFraction.ONE, value.negated()),
-            LinearOp.EQ,
-            BigFraction.ZERO,
-        )
+        val selected = ExactSearchRow.of(intArrayOf(Term.ofRealVar(choices.operand)), listOf(BigFraction.ONE),
+            LinearOp.EQ, value)
+        val absent = ExactSearchRow.of(intArrayOf(Term.ofRealVar(choices.operand)), listOf(BigFraction.ONE),
+            LinearOp.NE, value)
+        val product = ExactSearchRow.of(intArrayOf(Term.ofRealVar(view.result), Term.ofRealVar(other)),
+            listOf(BigFraction.ONE, value.negated()), LinearOp.EQ, BigFraction.ZERO)
         cover += selected
         encoding.linear(LinearForm.Disjunction(listOf(absent, product)))
         if (choices.hasGuards) {
             fun guard(truth: Boolean): LinearRow = ExactSearchRow.of(
-                intArrayOf(Term.ofLit(choices.literalAt(index))),
-                listOf(BigFraction.ONE),
-                LinearOp.EQ,
-                if (truth) BigFraction.ONE else BigFraction.ZERO,
-            )
+                intArrayOf(Term.ofLit(choices.literalAt(index))), listOf(BigFraction.ONE), LinearOp.EQ,
+                if (truth) BigFraction.ONE else BigFraction.ZERO)
             encoding.linear(LinearForm.Disjunction(listOf(guard(false), selected)))
             encoding.linear(LinearForm.Disjunction(listOf(guard(true), absent)))
         }

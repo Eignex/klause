@@ -38,9 +38,7 @@ internal class RealAbsInvariant(private val operand: Int, private val result: In
             if (value.isFinite() && value != state.assignment.realValue(variable) &&
                 value >= state.problem.realLower[variable] && value <= state.problem.realUpper[variable] &&
                 score(state, variable, value) <= score(state)
-            ) {
-                sink.addRealSet(variable, value)
-            }
+            ) sink.addRealSet(variable, value)
         }
         propose(result, abs(input))
         if (output >= 0.0) {

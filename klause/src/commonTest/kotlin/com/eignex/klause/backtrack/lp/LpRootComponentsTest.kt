@@ -31,34 +31,18 @@ import kotlin.test.assertTrue
 class LpRootComponentsTest {
     @Test
     fun `completed component values survive a restart without another numerical query`() {
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-            ),
-        ).bake()
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        )).bake()
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         val factory = RecordingLpEngineFactory()
         val offered = 1_000_000L
         val sink = SolveStatsSink("completed-component-restart")
-        LpEngine(
-            problem,
-            objective,
-            LpParams(
-                lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                ),
-            ),
-            sink,
-            LpSolveContext(factory),
-            nodeWorkAllowance = { offered },
-        ).use { engine ->
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), sink,
+            LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
             assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
@@ -70,52 +54,31 @@ class LpRootComponentsTest {
 
             engine.pickRootComponent(session, ExecutionControl.Never)
             engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).first()
-            assertNull(
-                sink.snapshot().lp.phases["PRIMAL_COMPONENT_VALUES_ROOT"]
-                    ?.outcomes?.get("RESTART_VALUE_ORDER_OFFERED"),
-            )
+            assertNull(sink.snapshot().lp.phases["PRIMAL_COMPONENT_VALUES_ROOT"]
+                ?.outcomes?.get("RESTART_VALUE_ORDER_OFFERED"))
             engine.restartRootPrimalTargets()
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
             assertEquals(listOf(1L, 0L), ordered)
             assertEquals(queries, factory.floatAllowances.size)
-            assertEquals(
-                1L,
-                sink.snapshot().lp.phases["PRIMAL_COMPONENT_VALUES_ROOT"]
-                    ?.outcomes?.get("RESTART_VALUE_ORDER_OFFERED"),
-            )
+            assertEquals(1L, sink.snapshot().lp.phases["PRIMAL_COMPONENT_VALUES_ROOT"]
+                ?.outcomes?.get("RESTART_VALUE_ORDER_OFFERED"))
         }
     }
 
     @Test
     fun `unfinished component pins supply no restart values`() {
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-            ),
-        ).bake()
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        )).bake()
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         val factory = RecordingLpEngineFactory()
         val offered = 1_000_000L
-        LpEngine(
-            problem,
-            objective,
-            LpParams(
-                lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                ),
-            ),
-            SolveStatsSink("completed-component-values"),
-            LpSolveContext(factory),
-            nodeWorkAllowance = { offered },
-        ).use { engine ->
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("completed-component-values"),
+            LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
             assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
@@ -135,33 +98,17 @@ class LpRootComponentsTest {
 
     @Test
     fun `discarding root targets releases completed component preferences`() {
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-            ),
-        ).bake()
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        )).bake()
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         val factory = RecordingLpEngineFactory()
         val offered = 1_000_000L
-        LpEngine(
-            problem,
-            objective,
-            LpParams(
-                lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                ),
-            ),
-            SolveStatsSink("completed-component-values"),
-            LpSolveContext(factory),
-            nodeWorkAllowance = { offered },
-        ).use { engine ->
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("completed-component-values"),
+            LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
             assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
@@ -182,34 +129,18 @@ class LpRootComponentsTest {
 
     @Test
     fun `replacing numerical guidance preserves completed component preferences`() {
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-            ),
-        ).bake()
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        )).bake()
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         val factory = RecordingLpEngineFactory()
         val offered = 1_000_000L
         val sink = SolveStatsSink("replaced-component-guide")
-        LpEngine(
-            problem,
-            objective,
-            LpParams(
-                lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                ),
-            ),
-            sink,
-            LpSolveContext(factory),
-            nodeWorkAllowance = { offered },
-        ).use { engine ->
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), sink,
+            LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
             assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
@@ -221,51 +152,30 @@ class LpRootComponentsTest {
             val queries = factory.floatAllowances.size
 
             val relaxation = assertNotNull(engine.lpRelaxer).build(PropagationSession(problem))
-            engine.rootRoundingWarmStart = RootRoundingWarmStart(
-                objective,
-                relaxation,
-                primal = DoubleArray(relaxation.model.n),
-            )
+            engine.rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation,
+                primal = DoubleArray(relaxation.model.n))
             val ordered = engine.orderRootValues(VarRef.IntVar(0), sequenceOf(0L, 1L)).toList()
 
             assertEquals(listOf(1L, 0L), ordered)
             assertEquals(queries, factory.floatAllowances.size)
-            assertNull(
-                sink.snapshot().lp.phases["PRIMAL_COMPONENT_VALUES_ROOT"]
-                    ?.outcomes?.get("RESTART_VALUE_ORDER_OFFERED"),
-            )
+            assertNull(sink.snapshot().lp.phases["PRIMAL_COMPONENT_VALUES_ROOT"]
+                ?.outcomes?.get("RESTART_VALUE_ORDER_OFFERED"))
         }
     }
 
     @Test
     fun `spent component allowance withholds restart values`() {
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-            ),
-        ).bake()
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        )).bake()
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         val factory = RecordingLpEngineFactory()
         var offered = 1_000_000L
-        LpEngine(
-            problem,
-            objective,
-            LpParams(
-                lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                ),
-            ),
-            SolveStatsSink("completed-component-values"),
-            LpSolveContext(factory),
-            nodeWorkAllowance = { offered },
-        ).use { engine ->
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("completed-component-values"),
+            LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
             assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
@@ -287,33 +197,17 @@ class LpRootComponentsTest {
 
     @Test
     fun `cancelled completed component reads supply no restart values`() {
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-            ),
-        ).bake()
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        )).bake()
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         val factory = RecordingLpEngineFactory()
         val offered = 1_000_000L
-        LpEngine(
-            problem,
-            objective,
-            LpParams(
-                lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                ),
-            ),
-            SolveStatsSink("completed-component-values"),
-            LpSolveContext(factory),
-            nodeWorkAllowance = { offered },
-        ).use { engine ->
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("completed-component-values"),
+            LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
             assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
@@ -334,21 +228,13 @@ class LpRootComponentsTest {
 
     @Test
     fun `known component targets precede unknown components`() {
-        val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 5), LinearOp.LE, 4),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 2),
-            ),
-        )
-        val targets = RootPrimalTargets(
-            IntArray(6) { it },
-            intArrayOf(),
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 5), LinearOp.LE, 4),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 2),
+        ))
+        val targets = RootPrimalTargets(IntArray(6) { it }, intArrayOf(),
             doubleArrayOf(0.0, 0.9, 0.0, 0.25, 0.0, 0.0),
-            booleanArrayOf(false, true, false, true, false, false),
-        )
+            booleanArrayOf(false, true, false, true, false, false))
 
         val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter(), targets = targets))
 
@@ -358,23 +244,15 @@ class LpRootComponentsTest {
 
     @Test
     fun `nonfinite and unavailable component targets preserve source ordering`() {
-        val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 5), LinearOp.LE, 4),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 2),
-            ),
-        )
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 5), LinearOp.LE, 4),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.LE, 2),
+        ))
         for (coordinate in listOf(Double.NaN, Double.POSITIVE_INFINITY, 0.5)) {
             val available = !coordinate.isFinite()
-            val targets = RootPrimalTargets(
-                IntArray(6) { it },
-                intArrayOf(),
+            val targets = RootPrimalTargets(IntArray(6) { it }, intArrayOf(),
                 doubleArrayOf(0.0, coordinate, 0.0, coordinate, 0.0, 0.0),
-                booleanArrayOf(false, available, false, available, false, false),
-            )
+                booleanArrayOf(false, available, false, available, false, false))
 
             val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter(), targets = targets))
 
@@ -385,15 +263,10 @@ class LpRootComponentsTest {
 
     @Test
     fun `fractional coordinates precede integral coordinates within each component`() {
-        val problem = Problem(
-            0,
-            8,
-            Array(8) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 6), LinearOp.LE, 4),
-                Linear(intArrayOf(1, 1, 1, 1), intArrayOf(1, 3, 5, 7), LinearOp.LE, 4),
-            ),
-        )
+        val problem = Problem(0, 8, Array(8) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, 2, 4, 6), LinearOp.LE, 4),
+            Linear(intArrayOf(1, 1, 1, 1), intArrayOf(1, 3, 5, 7), LinearOp.LE, 4),
+        ))
         val columns = intArrayOf(6, 1, 4, 3, 2, 5, 0, 7)
         val coordinates = DoubleArray(8)
         for ((variable, value) in listOf(1.0, 0.9, -0.5, -0.5, 0.25, 0.5, 0.5, 0.0).withIndex()) {
@@ -408,22 +281,14 @@ class LpRootComponentsTest {
 
     @Test
     fun `unknown and nonfinite coordinates follow known component targets in source order`() {
-        val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
-            ),
-        )
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
+        ))
         for (unknown in listOf(0.5, Double.NaN, Double.POSITIVE_INFINITY)) {
-            val targets = RootPrimalTargets(
-                IntArray(6) { it },
-                intArrayOf(),
+            val targets = RootPrimalTargets(IntArray(6) { it }, intArrayOf(),
                 doubleArrayOf(1.0, Double.NaN, 0.25, unknown, 0.5, 0.0),
-                booleanArrayOf(true, true, true, false, false, true),
-            )
+                booleanArrayOf(true, true, true, false, false, true))
 
             val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter(), targets = targets))
 
@@ -433,15 +298,10 @@ class LpRootComponentsTest {
 
     @Test
     fun `target ordering cannot publish a component order beyond its preparation allowance`() {
-        val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
-            ),
-        )
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
+        ))
         val graph = LpProjectionMeter()
         assertNotNull(rootComponentOrder(problem, graph))
         val meter = LpProjectionMeter(graph.work + 1L, rootComponentPreparationBytes(6))
@@ -455,34 +315,18 @@ class LpRootComponentsTest {
 
     @Test
     fun `a fresh slice can fund preparation after an unstarted component attempt`() {
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
-            ),
-        ).bake()
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1), intArrayOf(0, 2), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1), intArrayOf(1, 3), LinearOp.GE, 1),
+        )).bake()
         val objective = LinearObjective(intCoefficients = LongArray(4) { 1L })
         for (boundary in listOf("work", "clock", "initial-poll")) {
             var offered = 1_000_000L
             val factory = RecordingLpEngineFactory()
-            LpEngine(
-                problem,
-                objective,
-                LpParams(
-                    lpPlan = LpPlan(
-                        bounding = true,
-                        probe = true,
-                        componentOwnership = true,
-                        rootCutHarvest = false,
-                    ),
-                ),
-                SolveStatsSink("pending-component-preparation"),
-                LpSolveContext(factory),
-                nodeWorkAllowance = { offered },
-            ).use { engine ->
+            LpEngine(problem, objective,
+                LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                    rootCutHarvest = false)), SolveStatsSink("pending-component-preparation"),
+                LpSolveContext(factory), nodeWorkAllowance = { offered }).use { engine ->
                 assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
                 engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
                 assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
@@ -508,15 +352,10 @@ class LpRootComponentsTest {
 
     @Test
     fun `fixed endpoints do not join otherwise independent live components`() {
-        val problem = Problem(
-            0,
-            5,
-            Array(5) { IntDomain(0, if (it == 4) 0 else 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 4), LinearOp.GE, 1),
-            ),
-        )
+        val problem = Problem(0, 5, Array(5) { IntDomain(0, if (it == 4) 0 else 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 4), LinearOp.GE, 1),
+        ))
         val session = PropagationSession(problem)
 
         val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter(), session))
@@ -526,29 +365,14 @@ class LpRootComponentsTest {
 
     @Test
     fun `paid lp work withholds a fresh component preparation grant`() {
-        val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.GE, 1),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.GE, 1),
-            ),
-        ).bake()
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.GE, 1),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.GE, 1),
+        )).bake()
         val objective = LinearObjective(intCoefficients = LongArray(6) { 1L })
-        LpEngine(
-            problem,
-            objective,
-            LpParams(
-                lpPlan = LpPlan(
-                    bounding = true,
-                    probe = true,
-                    componentOwnership = true,
-                    rootCutHarvest = false,
-                ),
-            ),
-            SolveStatsSink("charged-component-admission"),
-        ).use { engine ->
+        LpEngine(problem, objective,
+            LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true,
+                rootCutHarvest = false)), SolveStatsSink("charged-component-admission")).use { engine ->
             assertTrue(engine.prepareRootLayout(ExecutionControl.Never, ExecutionControl.Never))
             engine.rootLpRelaxationBound(assertNotNull(engine.lpRelaxer), emptyList())
             assertNotNull(engine.lpRoundingProbe(objective, ExecutionControl.Never))
@@ -565,15 +389,10 @@ class LpRootComponentsTest {
 
     @Test
     fun `declared integer components stay contiguous in source coordinates`() {
-        val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
-            ),
-        )
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
+        ))
 
         val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter()))
 
@@ -584,16 +403,11 @@ class LpRootComponentsTest {
 
     @Test
     fun `a factor joining components preserves the connected fallback`() {
-        val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
-            ),
-        )
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 2),
+        ))
 
         val order = rootComponentOrder(problem, LpProjectionMeter())
 
@@ -615,15 +429,10 @@ class LpRootComponentsTest {
 
     @Test
     fun `interrupted component preparation preserves its completed charge`() {
-        val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
-            ),
-        )
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
+        ))
         var polls = 0
         val meter = LpProjectionMeter(1_000L, rootComponentPreparationBytes(6), ExecutionControl { ++polls >= 2 })
 
@@ -635,15 +444,10 @@ class LpRootComponentsTest {
 
     @Test
     fun `component choice revisits retracted variables and charges membership visits`() {
-        val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
-                Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
-            ),
-        )
+        val problem = Problem(0, 6, Array(6) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1, 1, 1), intArrayOf(0, 2, 4), LinearOp.LE, 3),
+            Linear(intArrayOf(1, 1, 1), intArrayOf(1, 3, 5), LinearOp.LE, 3),
+        ))
         val order = assertNotNull(rootComponentOrder(problem, LpProjectionMeter()))
         val session = PropagationSession(problem)
         assertEquals(0, firstRootComponentVariable(order, session, ExecutionControl.Never))

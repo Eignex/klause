@@ -22,10 +22,8 @@ import kotlin.test.assertTrue
 class ExecutionOptionsTest {
     @Test
     fun `typed weighted search controls should match their parsed scenario`() {
-        val typed = ExecutionOptions(
-            ExecutionOption.coreEarly(true),
-            ExecutionOption.coreRefinement(CoreRefinementMode.REASONS),
-        )
+        val typed = ExecutionOptions(ExecutionOption.coreEarly(true),
+            ExecutionOption.coreRefinement(CoreRefinementMode.REASONS))
         val parsed = ExecutionOptions.parse(listOf("core-early=true", "core-refinement=reasons"))
 
         val expected = buildPortfolioScenario(typed.reader(), 3L, 1, Kind.COP, EngineMix.MIXED, 6)

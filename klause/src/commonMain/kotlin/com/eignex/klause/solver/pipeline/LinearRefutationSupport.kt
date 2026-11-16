@@ -11,9 +11,7 @@ import com.eignex.klause.solver.search.SourceBoundPredicate
 
 internal fun linearRefutationSupport(
     opening: SourceCondition,
-    assertions: List<SearchDecision>,
-    support: SourceCondition,
-    conclusion: RegisteredTheoryDecision,
+    assertions: List<SearchDecision>, support: SourceCondition, conclusion: RegisteredTheoryDecision,
     visit: () -> Boolean = { true },
 ): List<SearchDecision>? {
     if (!visit()) return null
@@ -40,10 +38,7 @@ internal fun linearRefutationSupport(
         for ((coordinate, value) in bounds) {
             if (!visit()) return null
             if (coordinate.kind == SourceCoordinate.Kind.Integer && coordinate.id == excludedCoordinate &&
-                isUpper != excluded.upper
-            ) {
-                continue
-            }
+                isUpper != excluded.upper) continue
             val rootBound = (if (isUpper) upper else lower)[coordinate]
             if (rootBound != null && if (isUpper) rootBound <= value else rootBound >= value) continue
             var found: SearchDecision? = null

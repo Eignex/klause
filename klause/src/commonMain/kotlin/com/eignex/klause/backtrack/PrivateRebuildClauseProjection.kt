@@ -9,12 +9,8 @@ internal class PrivateRebuildClauseProjection private constructor(
     private val eliminated: BooleanArray,
     private val stages: List<Stage>,
 ) {
-    private class Stage(
-        val variable: Int,
-        val positive: IntArray?,
-        val negative: IntArray?,
-        val replacement: Int = Lit.NONE,
-    ) {
+    private class Stage(val variable: Int, val positive: IntArray?, val negative: IntArray?,
+        val replacement: Int = Lit.NONE) {
         val pureValue: Boolean? get() = when {
             positive == null -> false
             negative == null -> true
@@ -45,17 +41,10 @@ internal class PrivateRebuildClauseProjection private constructor(
             if (pivot == Lit.NONE) continue
             if (stage.replacement != Lit.NONE) {
                 if (!visit(current.size * 4L + 1L)) return Result.Stopped
-                val replaced = Clause(
-                    IntArray(current.size) { index ->
-                        if (Lit.variable(current[index]) != stage.variable) {
-                            current[index]
-                        } else if (Lit.isPositive(current[index])) {
-                            stage.replacement
-                        } else {
-                            Lit.negate(stage.replacement)
-                        }
-                    },
-                )
+                val replaced = Clause(IntArray(current.size) { index ->
+                    if (Lit.variable(current[index]) != stage.variable) current[index]
+                    else if (Lit.isPositive(current[index])) stage.replacement else Lit.negate(stage.replacement)
+                })
                 if (replaced.tautological) return Result.Skipped
                 current = replaced.literals
                 continue
@@ -74,10 +63,8 @@ internal class PrivateRebuildClauseProjection private constructor(
             if (!visit((current.size + parent.size) * 4L + 4L)) return Result.Stopped
             val merged = IntArray(current.size + parent.size - 2)
             var used = 0
-            for (row in listOf(current, parent)) {
-                for (literal in row) {
-                    if (Lit.variable(literal) != stage.variable) merged[used++] = literal
-                }
+            for (row in listOf(current, parent)) for (literal in row) {
+                if (Lit.variable(literal) != stage.variable) merged[used++] = literal
             }
             if (merged.isEmpty()) return Result.Refuted
             // One source resolvent remains entailed after projection without expanding the learned database.
@@ -94,7 +81,11 @@ internal class PrivateRebuildClauseProjection private constructor(
         const val SCRATCH_BYTES: Long = 16_384L
         private const val MAX_WIDTH = 64
 
-        fun prepare(rebuild: SourceRebuilds, columns: Int, visit: (Long) -> Boolean): PrivateRebuildClauseProjection? {
+        fun prepare(
+            rebuild: SourceRebuilds,
+            columns: Int,
+            visit: (Long) -> Boolean,
+        ): PrivateRebuildClauseProjection? {
             if (!visit(columns * 2L + rebuild.steps.size)) return null
             val eliminated = BooleanArray(columns)
             val stages = ArrayList<Stage>(rebuild.steps.size)
@@ -109,10 +100,7 @@ internal class PrivateRebuildClauseProjection private constructor(
                 eliminated[variable] = true
                 if (step is RebuildStep.CopyLiteral) {
                     if (Lit.variable(step.source) !in 0 until columns ||
-                        Lit.variable(step.source) == variable
-                    ) {
-                        return null
-                    }
+                        Lit.variable(step.source) == variable) return null
                     stages.add(Stage(variable, null, null, step.source))
                     continue
                 }
@@ -131,9 +119,7 @@ internal class PrivateRebuildClauseProjection private constructor(
                     if (pivot == Lit.NONE) return null
                     if (Lit.isPositive(pivot)) {
                         if (parent.size < (positive?.size ?: Int.MAX_VALUE)) positive = parent
-                    } else if (parent.size < (negative?.size ?: Int.MAX_VALUE)) {
-                        negative = parent
-                    }
+                    } else if (parent.size < (negative?.size ?: Int.MAX_VALUE)) negative = parent
                 }
                 if (positive == null && negative == null) return null
                 stages.add(Stage(variable, positive, negative))

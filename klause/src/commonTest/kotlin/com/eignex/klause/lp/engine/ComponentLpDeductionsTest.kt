@@ -45,13 +45,8 @@ class ComponentLpDeductionsTest {
         owner.use {
             val result = assertNotNull(it.solve())
             val wholeAlternatives = ArrayList<LpDeductionCertificate>()
-            val whole = assertNotNull(
-                nodeDualCertificate(
-                    model,
-                    result.duals,
-                    onAdditionalCertificate = { wholeAlternatives.add(it) },
-                ),
-            )
+            val whole = assertNotNull(nodeDualCertificate(model, result.duals,
+                onAdditionalCertificate = { wholeAlternatives.add(it) }))
 
             val deductions = assertNotNull(it.nodeDeductions(result.duals, withAlternatives = true))
 
@@ -68,17 +63,13 @@ class ComponentLpDeductionsTest {
                     assertEquals(reduced, candidate.exactReducedCost(column))
                 }
             }
-            for (candidate in listOf(whole) + wholeAlternatives) {
-                for (column in 0 until model.n) {
-                    val steps = candidate.fixSteps(column, 10L, 0L) ?: continue
-                    assertTrue(
-                        candidates.any { assembled ->
-                            (assembled.fixingColumns()?.contains(column) != false) &&
-                                assembled.reducedCostSign(column) == candidate.reducedCostSign(column) &&
-                                assembled.fixSteps(column, 10L, 0L)?.let { it <= steps } == true
-                        },
-                    )
-                }
+            for (candidate in listOf(whole) + wholeAlternatives) for (column in 0 until model.n) {
+                val steps = candidate.fixSteps(column, 10L, 0L) ?: continue
+                assertTrue(candidates.any { assembled ->
+                    (assembled.fixingColumns()?.contains(column) != false) &&
+                        assembled.reducedCostSign(column) == candidate.reducedCostSign(column) &&
+                        assembled.fixSteps(column, 10L, 0L)?.let { it <= steps } == true
+                })
             }
         }
     }

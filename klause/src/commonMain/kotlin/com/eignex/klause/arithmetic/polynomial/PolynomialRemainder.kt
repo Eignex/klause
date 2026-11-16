@@ -19,51 +19,43 @@ internal class PolynomialRemainder(divisors: List<Polynomial>, private val arith
         }
     }
 
-    fun prepare(polynomial: Polynomial): Iterator<Polynomial?> = arithmetic.execution.iterator(
-        sequence {
-            if (generators.isEmpty()) {
-                arithmetic.step()
-                yield(polynomial)
-                return@sequence
-            }
-            var pending = polynomial
-            val remainder = ArrayList<PolynomialTerm>()
-            while (!pending.isZero) {
-                arithmetic.step()
-                val term = pending.terms.last()
-                var cancelled = false
-                for (divisor in candidates(term.monomial)) {
-                    arithmetic.step()
-                    val leading = divisor.leading
-                    val quotient = term.monomial.quotient(leading.monomial) ?: continue
-                    val factor = Polynomial.of(
-                        listOf(
-                            PolynomialTerm(
-                                quotient,
-                                term.coefficient * leading.coefficient.reciprocal(),
-                            ),
-                        ),
-                    )
-                    val multiplying = arithmetic.prepareMultiply(factor, divisor.polynomial)
-                    var product: Polynomial? = null
-                    while (product == null) {
-                        product = multiplying.next()
-                        if (product == null) yield(null)
-                    }
-                    pending = arithmetic.subtract(pending, product)
-                    cancelled = true
-                    break
-                }
-                if (!cancelled) {
-                    remainder.add(term)
-                    pending = arithmetic.subtract(pending, Polynomial.of(listOf(term)))
-                }
-                yield(null)
-            }
+    fun prepare(polynomial: Polynomial): Iterator<Polynomial?> = arithmetic.execution.iterator(sequence {
+        if (generators.isEmpty()) {
             arithmetic.step()
-            yield(Polynomial.of(remainder))
-        }.iterator(),
-    )
+            yield(polynomial)
+            return@sequence
+        }
+        var pending = polynomial
+        val remainder = ArrayList<PolynomialTerm>()
+        while (!pending.isZero) {
+            arithmetic.step()
+            val term = pending.terms.last()
+            var cancelled = false
+            for (divisor in candidates(term.monomial)) {
+                arithmetic.step()
+                val leading = divisor.leading
+                val quotient = term.monomial.quotient(leading.monomial) ?: continue
+                val factor = Polynomial.of(listOf(PolynomialTerm(quotient,
+                    term.coefficient * leading.coefficient.reciprocal())))
+                val multiplying = arithmetic.prepareMultiply(factor, divisor.polynomial)
+                var product: Polynomial? = null
+                while (product == null) {
+                    product = multiplying.next()
+                    if (product == null) yield(null)
+                }
+                pending = arithmetic.subtract(pending, product)
+                cancelled = true
+                break
+            }
+            if (!cancelled) {
+                remainder.add(term)
+                pending = arithmetic.subtract(pending, Polynomial.of(listOf(term)))
+            }
+            yield(null)
+        }
+        arithmetic.step()
+        yield(Polynomial.of(remainder))
+    }.iterator())
 
     private fun candidates(monomial: Monomial): Sequence<RemainderDivisor> = sequence {
         val buckets = ArrayList<List<RemainderDivisor>>()

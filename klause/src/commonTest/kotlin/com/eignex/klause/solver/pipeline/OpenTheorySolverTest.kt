@@ -49,37 +49,14 @@ import kotlin.test.assertTrue
 class OpenTheorySolverTest {
     @Test
     fun `default ordinary traversal should consume a shared affine bound`() {
-        val model = Problem(
-            3,
-            0,
-            emptyArray(),
-            arrayOf(
-                Clause(intArrayOf(Lit.make(0, true))),
-                ReifiedRealLinear(
-                    0,
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    intArrayOf(0, 1),
-                    doubleArrayOf(2.0, -3.0),
-                    LinearOp.LE,
-                    1.0,
-                    strict = true,
-                ),
-                ReifiedRealLinear(
-                    1,
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    intArrayOf(0, 1),
-                    doubleArrayOf(-4.0, 6.0),
-                    LinearOp.GE,
-                    -2.0,
-                    strict = true,
-                ),
-            ),
-            numRealVars = 2,
-            realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY },
-        )
+        val model = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true))),
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(2.0, -3.0),
+                LinearOp.LE, 1.0, strict = true),
+            ReifiedRealLinear(1, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(-4.0, 6.0),
+                LinearOp.GE, -2.0, strict = true),
+        ), numRealVars = 2, realLower = DoubleArray(2) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(2) { Double.POSITIVE_INFINITY })
         val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
 
         val result = assertIs<OpenTheoryResult.Sat>(engine.solve())
@@ -90,32 +67,12 @@ class OpenTheorySolverTest {
 
     @Test
     fun `default ordinary linear traversal should publish a strict guard consequence`() {
-        val model = Problem(
-            2,
-            0,
-            emptyArray(),
-            arrayOf(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
-                    listOf(BigFraction.ofLong(2), BigFraction.ofLong(3)),
-                    LinearOp.LE,
-                    BigFraction.ONE,
-                ),
-                ReifiedRealLinear(
-                    0,
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    intArrayOf(0, 1),
-                    doubleArrayOf(2.0, -3.0),
-                    LinearOp.LE,
-                    0.0,
-                    strict = true,
-                ),
-            ),
-            numRealVars = 2,
-            realLower = DoubleArray(2),
-            realUpper = DoubleArray(2),
-        )
+        val model = Problem(2, 0, emptyArray(), arrayOf(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0), Term.ofRealVar(1)),
+                listOf(BigFraction.ofLong(2), BigFraction.ofLong(3)), LinearOp.LE, BigFraction.ONE),
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(2.0, -3.0), LinearOp.LE, 0.0, strict = true),
+        ), numRealVars = 2, realLower = DoubleArray(2), realUpper = DoubleArray(2))
         val engine = OpenTheoryPipeline.engineFor(OpenTheoryRequest(model).withPresolve(PresolveConfig.NONE))
 
         val result = assertIs<OpenTheoryResult.Sat>(engine.solve())
@@ -171,11 +128,8 @@ class OpenTheorySolverTest {
     @Test
     fun `a spent node allowance should stop open traversal before a decision`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val model = Problem(
-            1,
-            IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
-            emptyArray(),
-        )
+        val model = Problem(1, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            emptyArray())
         val budget = NodeBudget(0)
 
         val result = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
@@ -189,11 +143,8 @@ class OpenTheorySolverTest {
     @Test
     fun `the same node allowance should span separate open feasibility rounds`() {
         val openUpper = Bits(1).also { it.set(0) }
-        val model = Problem(
-            1,
-            IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
-            emptyArray(),
-        )
+        val model = Problem(1, IntBounds.fromModelBounds(longArrayOf(0), longArrayOf(0), null, openUpper),
+            emptyArray())
         val budget = NodeBudget(1)
         val params = TheoryParams(nodeBudget = budget)
         val engine = OpenTheoryEngine(model, ProblemPipeline.DIFFERENCE_THEORY)
@@ -207,15 +158,8 @@ class OpenTheorySolverTest {
 
     @Test
     fun `an exhausted node allowance should retain a root open witness`() {
-        val model = Problem(
-            0,
-            0,
-            emptyArray(),
-            emptyArray(),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
-        )
+        val model = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
         val budget = NodeBudget(0)
 
         val result = OpenTheoryEngine(model, ProblemPipeline.EXACT_LRA).solve(TheoryParams(nodeBudget = budget))

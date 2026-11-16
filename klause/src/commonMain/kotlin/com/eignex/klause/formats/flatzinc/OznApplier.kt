@@ -11,8 +11,8 @@ class OznApplier(oznSource: String) {
     private val evaluator: OznEvaluator = OznEvaluator(items)
 
     /** Render one solution block ending with `----------\n`. */
-    fun render(program: FlatZincProgram, sample: Sample): String =
-        renderValues(program.forSample(sample), FlatZincValues(sample))
+    fun render(program: FlatZincProgram, sample: Sample): String = renderValues(program.forSample(sample),
+        FlatZincValues(sample))
 
     /** Render an open-theory witness through the output model. */
     fun render(program: FlatZincProgram, assignment: OpenTheoryAssignment): String =

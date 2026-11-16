@@ -26,15 +26,8 @@ internal fun wideDivModRows(factor: WideDivMod): List<Linear> {
         return Linear(terms.keys.toIntArray(), terms.values.toTypedArray(), op, bound - constant)
     }
     return listOf(
-        row(
-            listOf(
-                factor.dividend to BIG_ONE,
-                factor.quotient to factor.divisor.negate(),
-                factor.remainder to BIG_ONE.negate(),
-            ),
-            LinearOp.EQ,
-            BIG_ZERO,
-        ),
+        row(listOf(factor.dividend to BIG_ONE, factor.quotient to factor.divisor.negate(),
+            factor.remainder to BIG_ONE.negate()), LinearOp.EQ, BIG_ZERO),
         row(listOf(factor.remainder to BIG_ONE), LinearOp.GE, BIG_ZERO),
         row(listOf(factor.remainder to BIG_ONE), LinearOp.LE, factor.divisor.abs() - BIG_ONE),
     )

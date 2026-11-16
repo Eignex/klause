@@ -68,13 +68,8 @@ class CpLpAdapterTest {
             shared.push(SearchDecision.IntAtLeast(0, 5))
 
             val child = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
-            val childValue = assertNotNull(
-                engine.solveNode(
-                    child.model,
-                    null,
-                    ExecutionControl.Never,
-                )?.second,
-            ).objective
+            val childValue = assertNotNull(engine.solveNode(child.model, null,
+                ExecutionControl.Never)?.second).objective
             shared.popTo(1)
             val ancestor = assertNotNull(engine.nodeRelaxation(relaxer, cp.session))
             val ancestorValue = assertNotNull(

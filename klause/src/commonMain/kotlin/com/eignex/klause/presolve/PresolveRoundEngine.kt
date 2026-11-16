@@ -130,7 +130,6 @@ internal object PresolveRoundEngine {
                     }
 
                     PassOutcome.UNCHANGED -> if (pass.skipAfterEmpty) exhausted[pass] = host.inputRevision(pass)
-
                     PassOutcome.SKIPPED, PassOutcome.INTERRUPTED -> Unit
                 }
                 if (infeasible) break
@@ -172,11 +171,8 @@ private fun PresolveInvocationStats.changeForCost(pass: PresolvePass): Long {
     // Added factors and replaced rows alone do not establish useful yield. Tightening and net
     // representation reductions are proxies; neither promises better propagation or learning.
     val yield = maxOf(
-        1L,
-        removedOccurrences,
-        (input.factors - output.factors).toLong(),
-        narrowedColumns.toLong(),
-        fixedColumns.toLong(),
+        1L, removedOccurrences, (input.factors - output.factors).toLong(),
+        narrowedColumns.toLong(), fixedColumns.toLong(),
     )
     // Self-metered passes charge visits directly; other passes normalize by their entry weight.
     // Ceiling divisions avoid overflow and make a costly empty or interrupted call require more change.

@@ -27,20 +27,18 @@ class PortfolioPlanTest {
         for (requested in listOf(null, false, true)) {
             val settings = requested?.let { listOf("root-maintenance=$it") }.orEmpty()
 
-            val plan = FinitePipeline.planPortfolio(
-                PortfolioPlanRequest(
-                    engine = FiniteEngine.BACKTRACK,
-                    optimize = false,
-                    cores = 1,
-                    executionOptions = ExecutionOptions.parse(settings),
-                    randomSeed = 17L,
-                    defaultArms = 6,
-                    lpCeiling = LpConfig.AGGRESSIVE,
-                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
-                    nodeBudget = null,
-                    annotationArm = null,
-                ),
-            )
+            val plan = FinitePipeline.planPortfolio(PortfolioPlanRequest(
+                engine = FiniteEngine.BACKTRACK,
+                optimize = false,
+                cores = 1,
+                executionOptions = ExecutionOptions.parse(settings),
+                randomSeed = 17L,
+                defaultArms = 6,
+                lpCeiling = LpConfig.AGGRESSIVE,
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+                nodeBudget = null,
+                annotationArm = null,
+            ))
             val scenario = assertIs<PortfolioPlan.Execute>(plan).scenario
 
             assertEquals(requested != false, scenario.rootMaintenance)
@@ -61,16 +59,11 @@ class PortfolioPlanTest {
         }
     }
 
+
     @Test
     fun `sharing memory controls work without diagnostic scheduling`() {
-        val params = EngineParams(
-            listOf(
-                "sharing-memory=true",
-                "sharing-memory-work=7",
-                "sharing-memory-scratch=1",
-                "sharing-memory-bytes=500",
-            ),
-        )
+        val params = EngineParams(listOf("sharing-memory=true", "sharing-memory-work=7", "sharing-memory-scratch=1",
+            "sharing-memory-bytes=500"))
 
         val scenario = buildPortfolioScenario(params, 17L, 1, Kind.COP, EngineMix.MIXED, 6)
 
@@ -144,22 +137,13 @@ class PortfolioPlanTest {
             Triple(listOf("learned-memory-scratch-bytes=4194304", "luby=8"), 6, emptyList()),
         )) {
             val options = ExecutionOptions.parse(settings)
-            val scenario = assertIs<PortfolioPlan.Execute>(
-                FinitePipeline.planPortfolio(
-                    PortfolioPlanRequest(
-                        FiniteEngine.MIXED, false, 1, options, 17L, autoArms(1), LpConfig.OFF,
-                        LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null,
-                    ),
-                ),
-            ).scenario
+            val scenario = assertIs<PortfolioPlan.Execute>(FinitePipeline.planPortfolio(PortfolioPlanRequest(
+                FiniteEngine.MIXED, false, 1, options, 17L, autoArms(1), LpConfig.OFF,
+                LpZeroObjectivePricing.MIN_BOUND_SUPPORT, null, null,
+            ))).scenario
 
-            val resolved = clausalDefaultScenario(
-                scenario,
-                profile,
-                autoArms(1),
-                options.explicitArms,
-                options.privateRebuildBudgetOnly,
-            )
+            val resolved = clausalDefaultScenario(scenario, profile, autoArms(1), options.explicitArms,
+                options.privateRebuildBudgetOnly)
             val shares = clausalProofShares(resolved, profile, labels, options.privateRebuildBudgetOnly)
 
             assertEquals(expectedArms, resolved.arms)

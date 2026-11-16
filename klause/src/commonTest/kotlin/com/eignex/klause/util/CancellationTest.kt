@@ -12,32 +12,33 @@ import kotlin.time.TestTimeSource
 class CancellationTest {
     @Test
     fun `an infinite monotonic deadline should remain open`() {
-        val stop = Cancellation.after(Duration.INFINITE)
+            val stop = Cancellation.after(Duration.INFINITE)
 
-        assertFalse(stop())
-    }
+            assertFalse(stop())
+        }
 
     @Test
     fun `an expired monotonic deadline should request a stop`() {
-        val stop = Cancellation.until(TimeSource.Monotonic.markNow() - 1.seconds)
+            val stop = Cancellation.until( TimeSource.Monotonic.markNow()
+            - 1.seconds)
 
-        assertTrue(stop())
-    }
+            assertTrue(stop())
+        }
 
     @Test
     fun `predicate composition should preserve ordered short circuiting`() {
         val calls = ArrayList<Int>()
         val stop = Cancellation {
-            calls += 1
-            false
-        } or Cancellation {
+                    calls += 1
+                    false
+                } or
+                Cancellation{
             calls += 2
             true
-        } or
-            Cancellation {
-                calls += 3
-                false
-            }
+        } or Cancellation {
+            calls += 3
+            false
+        }
 
         assertTrue(stop())
 
@@ -46,12 +47,10 @@ class CancellationTest {
 
     @Test
     fun `a deadline should observe its supplied time source`() {
-        val clock = TestTimeSource()
-        val stop = Cancellation.until(clock.markNow() + 2.seconds)
-        assertFalse(stop())
-
-        clock += 2.seconds
-
-        assertTrue(stop())
+            val clock = TestTimeSource()
+            val stop = Cancellation.until( clock.markNow() + 2.seconds)
+            assertFalse(stop())
+            clock += 2.seconds
+            assertTrue(stop())
     }
 }

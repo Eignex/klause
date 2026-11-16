@@ -25,14 +25,10 @@ internal class PortfolioExitObservations(size: Int) {
             is MinimizeResult.Unbounded -> "unbounded"
             null -> "paused"
         }
-        reasons[arm] = if (failure != null) {
-            null
-        } else {
-            when (result) {
-                is MinimizeResult.BestFound -> result.reason
-                is MinimizeResult.Unknown -> result.reason
-                else -> null
-            }
+        reasons[arm] = if (failure != null) null else when (result) {
+            is MinimizeResult.BestFound -> result.reason
+            is MinimizeResult.Unknown -> result.reason
+            else -> null
         }
     }
 
@@ -48,15 +44,8 @@ internal class PortfolioExitObservations(size: Int) {
 
     fun event(arm: Int, worker: String, cause: String): PortfolioEvent.WorkerExit {
         val version = versions[arm].takeIf { it >= 0L }
-        return PortfolioEvent.WorkerExit(
-            arm,
-            worker,
-            cause,
-            outcomes[arm],
-            reasons[arm],
-            if (version == null) null else cutoffBits[arm],
-            version,
-        )
+        return PortfolioEvent.WorkerExit(arm, worker, cause, outcomes[arm], reasons[arm],
+            if (version == null) null else cutoffBits[arm], version)
     }
 
     private fun failed(failure: Throwable?): String? = when (failure) {

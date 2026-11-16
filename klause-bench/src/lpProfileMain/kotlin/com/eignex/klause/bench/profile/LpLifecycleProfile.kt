@@ -162,10 +162,7 @@ fun main(args: Array<String>) {
         for (preserve in listOf(false, true)) {
             if (profileExpired(stop)) return
             sourceWorker(
-                compiled.model,
-                requireNotNull(objective),
-                stop,
-                timeoutSeconds = 5,
+                compiled.model, requireNotNull(objective), stop, timeoutSeconds = 5,
                 preserveOverflowCheckpoint = preserve,
             )
         }
@@ -173,29 +170,21 @@ fun main(args: Array<String>) {
         for (arbitrary in listOf(false, true)) {
             if (profileExpired(stop)) return
             sourceWorker(
-                compiled.model,
-                requireNotNull(objective),
-                stop,
-                arbitrary,
-                5,
+                compiled.model, requireNotNull(objective), stop, arbitrary, 5,
                 preserveOverflowCheckpoint = false,
             )
         }
-    } else if (!profileExpired(stop)) {
-        sourceWorker(compiled.model, requireNotNull(objective), stop)
-    }
+    } else if (!profileExpired(stop)) sourceWorker(compiled.model, requireNotNull(objective), stop)
 }
 
 private fun profileExpired(cancellation: ExecutionControl): Boolean {
     if (!cancellation()) return false
-    println(
-        buildJsonObject {
-            put("kind", "profile-stop")
-            put("complete", false)
-            put("reason", "containing-allowance")
-            put("cancelled", true)
-        },
-    )
+    println(buildJsonObject {
+        put("kind", "profile-stop")
+        put("complete", false)
+        put("reason", "containing-allowance")
+        put("cancelled", true)
+    })
     return true
 }
 
@@ -224,13 +213,9 @@ private fun lifecycle(
     var previousHeadings: List<Int>? = null
     var previousStatuses: List<String>? = null
     val stages = if (claims) {
-        listOf(
-            "cold", "unchanged", "authority", "authority-repeat", "bound", "bound-repeat", "bound-pop",
-            "row", "row-repeat", "row-pop", "objective", "objective-repeat", "activation", "activation-repeat",
-        )
-    } else {
-        listOf("cold", "bound", "bound-pop", "row", "row-pop")
-    }
+        listOf("cold", "unchanged", "authority", "authority-repeat", "bound", "bound-repeat", "bound-pop",
+            "row", "row-repeat", "row-pop", "objective", "objective-repeat", "activation", "activation-repeat")
+    } else listOf("cold", "bound", "bound-pop", "row", "row-pop")
     try {
         for (stage in stages) {
             if (cancellation()) return
@@ -257,13 +242,9 @@ private fun lifecycle(
 
                 "objective" -> {
                     val objective = current.state.model.objective
-                    check(
-                        current.replaceObjective(
-                            objective.withConstant(
-                                ExactLpNumber.of(objective.constant.value + BigFraction.ONE),
-                            ),
-                        ) || cancellation(),
-                    )
+                    check(current.replaceObjective(objective.withConstant(
+                        ExactLpNumber.of(objective.constant.value + BigFraction.ONE),
+                    )) || cancellation())
                 }
 
                 "activation" -> check(current.deactivate(initial.rows.row(0).id) || cancellation())
@@ -309,18 +290,14 @@ private fun lifecycle(
             val queryStart = Monotonic.markNow()
             factory.queryActive = true
             val result = try {
-                if (prepared) {
-                    current.solve(
-                        observer = observer.takeIf { observed },
-                        claim = claim,
-                        continuationLimits = ExactContinuationLimits(
-                            startArbitraryPrecision = arbitraryPrecision,
-                            preserveOverflowCheckpoint = preserveOverflowCheckpoint,
-                        ),
-                    )
-                } else {
-                    null
-                }
+                if (prepared) current.solve(
+                    observer = observer.takeIf { observed },
+                    claim = claim,
+                    continuationLimits = ExactContinuationLimits(
+                        startArbitraryPrecision = arbitraryPrecision,
+                        preserveOverflowCheckpoint = preserveOverflowCheckpoint,
+                    ),
+                ) else null
             } finally {
                 factory.queryActive = false
             }
@@ -348,26 +325,17 @@ private fun lifecycle(
                     put("objectiveRevision", current.state.objectiveRevision)
                     put("rowRevision", current.state.rowRevision)
                     put("depth", current.state.depth)
-                    put(
-                        "sameBasisHeadings",
-                        result?.float?.basis?.basicVars?.toList()?.let {
-                            previousHeadings?.let { previous -> JsonPrimitive(previous == it) }
-                        } ?: JsonNull,
-                    )
-                    put(
-                        "sameBasisStatuses",
-                        result?.float?.basis?.status?.map { it.name }?.let {
-                            previousStatuses?.let { previous -> JsonPrimitive(previous == it) }
-                        } ?: JsonNull,
-                    )
+                    put("sameBasisHeadings", result?.float?.basis?.basicVars?.toList()?.let {
+                        previousHeadings?.let { previous -> JsonPrimitive(previous == it) }
+                    } ?: JsonNull)
+                    put("sameBasisStatuses", result?.float?.basis?.status?.map { it.name }?.let {
+                        previousStatuses?.let { previous -> JsonPrimitive(previous == it) }
+                    } ?: JsonNull)
                     put("certificationReused", result?.certificationReused)
                     put("checkedResultStorageDeclined", current.checkedResultStorageDeclined)
-                    put(
-                        "structuralBasisColumns",
-                        result?.float?.basis?.basicVars?.count {
-                            it < current.state.model.n
-                        },
-                    )
+                    put("structuralBasisColumns", result?.float?.basis?.basicVars?.count {
+                        it < current.state.model.n
+                    })
                     put("stageNs", stageNs)
                     put("constructionNs", constructionNs)
                     put("editNs", editNs)
@@ -378,10 +346,8 @@ private fun lifecycle(
                     put("floatingNs", if (observed) JsonPrimitive(factory.floatingNanos - before) else JsonNull)
                     put("numericalInvocations", JsonArray(factory.invocations.drop(firstInvocation)))
                     put("droppedInvocations", factory.droppedInvocations)
-                    put(
-                        "queryNonFloatNs",
-                        if (observed) JsonPrimitive(queryNs - (factory.floatingNanos - before)) else JsonNull,
-                    )
+                    put("queryNonFloatNs",
+                        if (observed) JsonPrimitive(queryNs - (factory.floatingNanos - before)) else JsonNull)
                     put("allocatedBytes", stageBytes?.let(::JsonPrimitive) ?: JsonNull)
                     put("cancelled", cancellation())
                     put("verdict", result?.verdict?.name)
@@ -411,25 +377,20 @@ private fun lifecycle(
                     put("reconstructionEntryRejection", result?.reconstruction?.entryRejection?.toString())
                     put("basisDecline", result?.basisVerification?.decline?.name)
                     put("continuationDecline", result?.continuation?.decline?.name)
-                    put(
-                        "continuation",
-                        result?.continuation?.let { metrics ->
-                            buildJsonObject {
-                                put("phase", metrics.phase.name)
-                                put("work", metrics.work)
-                                put("allocation", metrics.allocation)
-                                put("elapsedNs", metrics.elapsedNs)
-                                put("builds", metrics.builds)
-                                put("imports", metrics.imports)
-                                put("importPosition", metrics.importPosition)
-                                put("maxImportPivots", ExactContinuationLimits().maxImportPivots)
-                                put("restarts", metrics.restarts)
-                                put("resumed", metrics.resumed)
-                                put("invalidated", metrics.invalidated)
-                                put("workByPhase", numbers(metrics.workByPhase))
-                            }
-                        } ?: JsonNull,
-                    )
+                    put("continuation", result?.continuation?.let { metrics -> buildJsonObject {
+                        put("phase", metrics.phase.name)
+                        put("work", metrics.work)
+                        put("allocation", metrics.allocation)
+                        put("elapsedNs", metrics.elapsedNs)
+                        put("builds", metrics.builds)
+                        put("imports", metrics.imports)
+                        put("importPosition", metrics.importPosition)
+                        put("maxImportPivots", ExactContinuationLimits().maxImportPivots)
+                        put("restarts", metrics.restarts)
+                        put("resumed", metrics.resumed)
+                        put("invalidated", metrics.invalidated)
+                        put("workByPhase", numbers(metrics.workByPhase))
+                    } } ?: JsonNull)
                     put("refinementDecline", result?.refinement?.decline?.name)
                     put("refinementWork", result?.refinement?.work)
                     put("refinementAllocation", result?.refinement?.allocation)
@@ -560,8 +521,10 @@ private class LifecycleCertificates : LpCertificationObserver {
     }
 }
 
-private class LifecycleFactory(private val observed: Boolean, private val classifyOwners: Boolean = true) :
-    LpEngineFactory by ProductionLpEngineFactory {
+private class LifecycleFactory(
+    private val observed: Boolean,
+    private val classifyOwners: Boolean = true,
+) : LpEngineFactory by ProductionLpEngineFactory {
     var lastEngine: RevisedSimplex? = null
     var queryActive = false
     var floatingNanos = 0L
@@ -585,17 +548,8 @@ private class LifecycleFactory(private val observed: Boolean, private val classi
         workLimit: Long,
         trackDegeneracy: Boolean,
         pricing: LpPricingOptions,
-    ): TableauCutSolver = observe(
-        RevisedSimplex(
-            model,
-            cancellation,
-            iterationLimit = iterationLimit,
-            workLimit = workLimit,
-            trackDegeneracy = trackDegeneracy,
-            pricing = pricing,
-        ),
-        true,
-    )
+    ): TableauCutSolver = observe(RevisedSimplex(model, cancellation, iterationLimit = iterationLimit,
+        workLimit = workLimit, trackDegeneracy = trackDegeneracy, pricing = pricing), true)
 
     override fun newPersistentSolver(
         model: LpModel,
@@ -605,43 +559,26 @@ private class LifecycleFactory(private val observed: Boolean, private val classi
         workLimit: Long,
         trackDegeneracy: Boolean,
         pricing: LpPricingOptions,
-    ): PersistentLpSolver = observe(
-        RevisedSimplex(
-            model,
-            cancellation,
-            refactorUpdateLimit = refactorUpdateLimit,
-            iterationLimit = iterationLimit,
-            workLimit = workLimit,
-            trackDegeneracy = trackDegeneracy,
-            pricing = pricing,
-        ),
-        true,
-    )
+    ): PersistentLpSolver = observe(RevisedSimplex(model, cancellation, refactorUpdateLimit = refactorUpdateLimit,
+        iterationLimit = iterationLimit, workLimit = workLimit, trackDegeneracy = trackDegeneracy,
+        pricing = pricing), true)
 
     private fun observe(solver: RevisedSimplex, primary: Boolean): RevisedSimplex {
         if (primary && !queryActive) lastEngine = solver
-        if (observed) {
-            solver.profileTo { metrics, trace ->
-                val elapsed = trace.phaseNanos.getValue(SimplexProfilePhase.SOLVE)
-                floatingNanos += elapsed
-                completedInvocations++
-                modeledWork += metrics.workOps
-                pivots += metrics.pivots
-                if (invocations.size < 256) {
-                    invocations.add(
-                        buildJsonObject {
-                            put("elapsedNs", elapsed)
-                            put("primary", if (classifyOwners) JsonPrimitive(solver === lastEngine) else JsonNull)
-                            put("work", metrics.workOps)
-                            put("pivots", metrics.pivots)
-                            put("termination", solver.lastTermination?.name)
-                            put("trace", traceJson(trace))
-                        },
-                    )
-                } else {
-                    droppedInvocations++
-                }
-            }
+        if (observed) solver.profileTo { metrics, trace ->
+            val elapsed = trace.phaseNanos.getValue(SimplexProfilePhase.SOLVE)
+            floatingNanos += elapsed
+            completedInvocations++
+            modeledWork += metrics.workOps
+            pivots += metrics.pivots
+            if (invocations.size < 256) invocations.add(buildJsonObject {
+                put("elapsedNs", elapsed)
+                put("primary", if (classifyOwners) JsonPrimitive(solver === lastEngine) else JsonNull)
+                put("work", metrics.workOps)
+                put("pivots", metrics.pivots)
+                put("termination", solver.lastTermination?.name)
+                put("trace", traceJson(trace))
+            }) else droppedInvocations++
         }
         return solver
     }
@@ -660,87 +597,60 @@ private fun sourceWorker(
     val factory = LifecycleFactory(observed = true, classifyOwners = false)
     val started = Monotonic.markNow()
     val allocated = profileAllocatedBytes()
-    val solver = BacktrackSolver(
-        problem.bake(stop),
-        LpSolveContext(
-            engineFactory = factory,
-            startArbitraryPrecision = arbitraryPrecision,
-            preserveOverflowCheckpoint = preserveOverflowCheckpoint,
-        ),
-    )
+    val solver = BacktrackSolver(problem.bake(stop), LpSolveContext(
+        engineFactory = factory, startArbitraryPrecision = arbitraryPrecision,
+        preserveOverflowCheckpoint = preserveOverflowCheckpoint,
+    ))
     val controls = BacktrackPresets.satOptimized(randomSeed = 3L, cancellation = stop)
         .copy(maxInstructions = 1000L)
     val result = solver.minimize(objective, controls)
     val elapsed = started.elapsedNow().inWholeNanoseconds
     val bytes = allocated?.let { start -> profileAllocatedBytes()?.minus(start) }
     val lp = result.stats.lp
-    println(
-        buildJsonObject {
-            put("kind", "source-worker")
-            put("entry", "direct satOptimized BacktrackSolver; worker-native coordinates")
-            put("sourceVerdictClaim", false)
-            put("cliRoutingEquivalence", false)
-            put("seed", 3)
-            put("instructionLimit", 1000)
-            put("containingMillis", timeoutSeconds * 1000)
-            put("startArbitraryPrecision", arbitraryPrecision)
-            put("preserveOverflowCheckpoint", preserveOverflowCheckpoint)
-            put("elapsedNs", elapsed)
-            put("allocatedBytes", bytes?.let(::JsonPrimitive) ?: JsonNull)
-            put("result", result::class.simpleName)
-            put("objective", result.objectiveValue?.let(::profileNumber) ?: JsonNull)
-            put("cancelled", stop())
-            put("numericalNs", factory.floatingNanos)
-            put("numericalInvocations", factory.completedInvocations)
-            put("numericalWork", factory.modeledWork)
-            put("numericalPivots", factory.pivots)
-            put("droppedInvocations", factory.droppedInvocations)
-            put("invocations", JsonArray(factory.invocations))
-            put("lpRootBound", lp.rootBound.takeIf { it.isFinite() }?.let(::JsonPrimitive) ?: JsonNull)
-            put("lpPrunes", lp.pruned.sum)
-            put("lpFixings", lp.fixed.sum)
-            put("basisVerificationWork", numbers(lp.basisVerification.work))
-            put("basisVerificationAllocation", numbers(lp.basisVerification.allocation))
-            put("continuationWork", numbers(lp.continuation.work))
-            put("continuationAllocation", numbers(lp.continuation.allocation))
-            put(
-                "certificatePhases",
-                buildJsonObject {
-                    lp.phases.forEach { (name, phase) ->
-                        put(
-                            name,
-                            buildJsonObject {
-                                put("calls", phase.calls)
-                                put("nanos", phase.nanos)
-                                put("work", phase.work)
-                                put("outcomes", numbers(phase.outcomes))
-                            },
-                        )
-                    }
-                },
-            )
-            put(
-                "witness",
-                result.assignment?.let { sample ->
-                    buildJsonObject {
-                        put("bools", JsonArray(sample.bools.map(::JsonPrimitive)))
-                        put(
-                            "ints",
-                            JsonArray(
-                                sample.exactInts?.map { JsonPrimitive(it.toString()) }
-                                    ?: sample.ints.map(::JsonPrimitive),
-                            ),
-                        )
-                        put("reals", JsonArray(sample.reals.map(::profileNumber)))
-                        put(
-                            "exactReals",
-                            sample.exactReals?.let { values ->
-                                JsonArray(values.map { JsonPrimitive(it.toString()) })
-                            } ?: JsonNull,
-                        )
-                    }
-                } ?: JsonNull,
-            )
-        },
-    )
+    println(buildJsonObject {
+        put("kind", "source-worker")
+        put("entry", "direct satOptimized BacktrackSolver; worker-native coordinates")
+        put("sourceVerdictClaim", false)
+        put("cliRoutingEquivalence", false)
+        put("seed", 3)
+        put("instructionLimit", 1000)
+        put("containingMillis", timeoutSeconds * 1000)
+        put("startArbitraryPrecision", arbitraryPrecision)
+        put("preserveOverflowCheckpoint", preserveOverflowCheckpoint)
+        put("elapsedNs", elapsed)
+        put("allocatedBytes", bytes?.let(::JsonPrimitive) ?: JsonNull)
+        put("result", result::class.simpleName)
+        put("objective", result.objectiveValue?.let(::profileNumber) ?: JsonNull)
+        put("cancelled", stop())
+        put("numericalNs", factory.floatingNanos)
+        put("numericalInvocations", factory.completedInvocations)
+        put("numericalWork", factory.modeledWork)
+        put("numericalPivots", factory.pivots)
+        put("droppedInvocations", factory.droppedInvocations)
+        put("invocations", JsonArray(factory.invocations))
+        put("lpRootBound", lp.rootBound.takeIf { it.isFinite() }?.let(::JsonPrimitive) ?: JsonNull)
+        put("lpPrunes", lp.pruned.sum)
+        put("lpFixings", lp.fixed.sum)
+        put("basisVerificationWork", numbers(lp.basisVerification.work))
+        put("basisVerificationAllocation", numbers(lp.basisVerification.allocation))
+        put("continuationWork", numbers(lp.continuation.work))
+        put("continuationAllocation", numbers(lp.continuation.allocation))
+        put("certificatePhases", buildJsonObject {
+            lp.phases.forEach { (name, phase) -> put(name, buildJsonObject {
+                put("calls", phase.calls)
+                put("nanos", phase.nanos)
+                put("work", phase.work)
+                put("outcomes", numbers(phase.outcomes))
+            }) }
+        })
+        put("witness", result.assignment?.let { sample -> buildJsonObject {
+            put("bools", JsonArray(sample.bools.map(::JsonPrimitive)))
+            put("ints", JsonArray(sample.exactInts?.map { JsonPrimitive(it.toString()) }
+                ?: sample.ints.map(::JsonPrimitive)))
+            put("reals", JsonArray(sample.reals.map(::profileNumber)))
+            put("exactReals", sample.exactReals?.let { values ->
+                JsonArray(values.map { JsonPrimitive(it.toString()) })
+            } ?: JsonNull)
+        } } ?: JsonNull)
+    })
 }

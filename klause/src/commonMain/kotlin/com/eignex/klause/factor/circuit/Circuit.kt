@@ -58,4 +58,5 @@ class Circuit(
         sink.bool(subcircuit)
         sink.intVars(succ)
     }
+
 }

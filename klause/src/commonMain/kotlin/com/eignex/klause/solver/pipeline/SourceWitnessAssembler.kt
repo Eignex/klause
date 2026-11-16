@@ -15,15 +15,16 @@ import com.eignex.klause.solver.search.SearchExactRealExpressionValue
 import com.eignex.klause.solver.search.SearchExactRealValue
 import com.eignex.util.numbers.BigInt
 
-internal class SourceWitnessAssembler(private val source: Problem, private val originalSource: Problem = source) {
+internal class SourceWitnessAssembler(
+    private val source: Problem,
+    private val originalSource: Problem = source,
+) {
     fun assemble(model: AssembledSearchModel, mapping: SourceMapping): OpenTheoryAssignment? {
         if (mapping.target !== source || mapping.source !== originalSource ||
             mapping.source.numBoolVars != source.numBoolVars ||
             mapping.source.numIntVars != source.numIntVars || mapping.source.numRealVars != source.numRealVars ||
             !model.numericCoordinatesFit(source.numIntVars, source.numRealVars)
-        ) {
-            return null
-        }
+        ) return null
         val bools = BooleanArray(source.numBoolVars) { model.valueOf(SearchBoolValue(it)) ?: return null }
         val ints = Array(source.numIntVars) {
             model.valueOf(SearchExactIntValue(SourceIntId(it))) ?: return null
@@ -63,8 +64,11 @@ internal sealed interface SourceRealCoordinate {
     }
 }
 
-internal class SourceCoordinateWitness(bools: BooleanArray, ints: Array<BigInt>, reals: List<SourceRealCoordinate>) :
-    OpenTheoryAssignment {
+internal class SourceCoordinateWitness(
+    bools: BooleanArray,
+    ints: Array<BigInt>,
+    reals: List<SourceRealCoordinate>,
+) : OpenTheoryAssignment {
     private val bools = bools.copyOf()
     private val ints = ints.copyOf()
     private val reals = reals.toList()
@@ -73,10 +77,8 @@ internal class SourceCoordinateWitness(bools: BooleanArray, ints: Array<BigInt>,
     override fun intValue(id: Int): String = ints[id].toString()
     override fun realValue(id: Int): String = when (val value = reals[id]) {
         is SourceRealCoordinate.Rational -> value.rational.toString()
-
         is SourceRealCoordinate.Algebraic -> value.algebraic.rational?.toString()
             ?: "root(${value.algebraic.rootIndex};[${value.algebraic.definingCoefficients.joinToString(",")}])"
-
         is SourceRealCoordinate.Expression -> value.value.expression.exactRealText()
     }
 

@@ -35,9 +35,7 @@ internal class ArithmeticPublication(private val output: OutputProtocol) {
     ): Boolean {
         if (rendered != null && point != null &&
             !publish(rendered, SourceValue.Algebraic(point.value), acceptedVersion)
-        ) {
-            return false
-        }
+        ) return false
         output.onQuadraticResult(null, result)
         return true
     }
@@ -45,10 +43,8 @@ internal class ArithmeticPublication(private val output: OutputProtocol) {
 
 internal fun arithmeticObjectiveText(objective: SourceValue): String = when (objective) {
     is SourceValue.Rational -> objective.value.toString()
-
     is SourceValue.Algebraic -> objective.value.rational?.toString()
         ?: "root(${objective.value.rootIndex};[${objective.value.definingCoefficients.joinToString(",")}])"
-
     is SourceValue.Extension -> error("arithmetic objective requires its source renderer")
 }
 

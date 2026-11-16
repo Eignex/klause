@@ -388,11 +388,8 @@ class PropagationState private constructor(
     internal var workLimit: Long = Long.MAX_VALUE
     internal var preparationIndexWork: Long = 0L
 
-    internal fun preparationStatistics(): Map<String, Long> = if (preparationIndexWork == 0L) {
-        emptyMap()
-    } else {
-        mapOf("propagationPreparationIndexWork" to preparationIndexWork)
-    }
+    internal fun preparationStatistics(): Map<String, Long> = if (preparationIndexWork == 0L) emptyMap()
+        else mapOf("propagationPreparationIndexWork" to preparationIndexWork)
     internal val finiteWork = FinitePropagationWork()
     internal var finiteMutationInterruptible = false
     internal var finiteMaintenanceActive = false
@@ -460,17 +457,13 @@ class PropagationState private constructor(
     /** Base and incremental factor payload references; General learned rows own their payload slots. */
     private class PayloadOwner(var values: ArrayList<Any?>)
     private val payloadOwner: PayloadOwner by lazy(LazyThreadSafetyMode.NONE) {
-        PayloadOwner(
-            prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
-                repeat(problem.numFactors) { add(null) }
-            },
-        )
+        PayloadOwner(prepared?.refPayloadStore ?: ArrayList<Any?>(problem.numFactors).apply {
+            repeat(problem.numFactors) { add(null) }
+        })
     }
     internal var refPayloadStore: ArrayList<Any?>
         get() = payloadOwner.values
-        set(value) {
-            payloadOwner.values = value
-        }
+        set(value) { payloadOwner.values = value }
 
     /** Indices in [refPayloadStore] currently holding a [SnapshottablePayload]. Maintained on every
      *  write through [refPayload] so [mark] visits only these slots instead of scanning the whole
@@ -486,19 +479,13 @@ class PropagationState private constructor(
     val refPayload: MutableList<Any?> by lazy(LazyThreadSafetyMode.NONE) {
         object : AbstractMutableList<Any?>() {
             override val size: Int
-                get() = if (!incremental && nativeEngine == null) {
-                    baseFactorCount + learned.size
-                } else {
-                    refPayloadStore.size
-                }
-            override fun get(index: Int): Any? = if (!incremental && index >= baseFactorCount && nativeEngine == null) {
-                learned.store.payload(index - baseFactorCount)
-            } else {
-                refPayloadStore[index]
-            }
-            override fun add(index: Int, element: Any?) {
-                refPayloadStore.add(index, element)
-            }
+                get() = if (!incremental && nativeEngine == null) baseFactorCount + learned.size
+                else refPayloadStore.size
+            override fun get(index: Int): Any? =
+                if (!incremental && index >= baseFactorCount && nativeEngine == null) {
+                    learned.store.payload(index - baseFactorCount)
+                } else refPayloadStore[index]
+            override fun add(index: Int, element: Any?) { refPayloadStore.add(index, element) }
             override fun removeAt(index: Int): Any? = refPayloadStore.removeAt(index)
             override fun set(index: Int, element: Any?): Any? {
                 if (index !in 0 until size) throw IndexOutOfBoundsException("factor payload $index outside $size")
@@ -511,9 +498,7 @@ class PropagationState private constructor(
                 }
                 return if (!incremental && index >= baseFactorCount && nativeEngine == null) {
                     learned.store.setPayload(index - baseFactorCount, element)
-                } else {
-                    refPayloadStore.set(index, element)
-                }
+                } else refPayloadStore.set(index, element)
             }
         }
     }
@@ -883,12 +868,8 @@ class PropagationState private constructor(
                 if (watchers != null) {
                     val blockers = propagator.initialBoolWatcherBlockers
                     for (i in watchers.indices) {
-                        state.installLitWatch(
-                            watchers[i],
-                            fid,
-                            blockers?.getOrNull(i) ?: NO_BLOCKER,
-                            preparation = true,
-                        )
+                        state.installLitWatch(watchers[i], fid, blockers?.getOrNull(i) ?: NO_BLOCKER,
+                            preparation = true)
                         if (++visits % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
                     }
                 }
@@ -948,10 +929,8 @@ class PropagationState private constructor(
      */
     internal fun addMidlifeFactor(factor: Factor): Int {
         require(incremental) { "mid-life factors require an incremental PropagationState" }
-        val prop = factor.propagatorProjection(
-            provider =
-            projection.selection?.providers?.propagation ?: BuiltInPropagationProjectionProvider,
-        )
+        val prop = factor.propagatorProjection(provider =
+            projection.selection?.providers?.propagation ?: BuiltInPropagationProjectionProvider)
         val fid = totalFactorCount
         midlife.store.add(prop)
         midlife.factors.add(factor)
@@ -1241,12 +1220,8 @@ class PropagationState private constructor(
         finiteWork.cancellation = cancellation
         try {
             return fireQueue(
-                cancellation !== ExecutionControl.Never,
-                0,
-                cancellation,
-                false,
-                maxFires = PROPAGATION_PREPARATION_BATCH_SIZE,
-                cancelIsPause = true,
+                cancellation !== ExecutionControl.Never, 0, cancellation, false,
+                maxFires = PROPAGATION_PREPARATION_BATCH_SIZE, cancelIsPause = true,
             )
         } finally {
             propagationNanos += start.elapsedNow().inWholeNanoseconds
@@ -1362,9 +1337,7 @@ class PropagationState private constructor(
             }
             fireCount++
             val schedule = propagationSchedule
-            val fid = if (schedule == null) {
-                propQueue.removeFirst()
-            } else {
+            val fid = if (schedule == null) propQueue.removeFirst() else {
                 val selected = schedule.remove(propQueue) { factorAt(it).propagationFamily() }
                 work += schedule.selectionWork
                 selected
@@ -1396,11 +1369,8 @@ class PropagationState private constructor(
                 attribution?.note(family, FactorAttribution.Metric.Interrupted)
                 (f as? InterruptiblePropagator)?.interrupted(this, fid)
                 propEnq(fid)
-                if (pendingFiniteMutation != null) {
-                    runCancelled = !cancelIsPause
-                } else if (!cancelIsPause) {
-                    runCancelled = true
-                }
+                if (pendingFiniteMutation != null) runCancelled = !cancelIsPause
+                else if (!cancelIsPause) runCancelled = true
                 conflictLevels = null
                 return null
             } finally {
@@ -1410,11 +1380,8 @@ class PropagationState private constructor(
                     it.note(family, FactorAttribution.Metric.Fires)
                     it.note(family, FactorAttribution.Metric.Work, work - before)
                     it.note(family, FactorAttribution.Metric.Deductions, propagations - pins)
-                    it.note(
-                        family,
-                        FactorAttribution.Metric.Nanos,
-                        requireNotNull(start).elapsedNow().inWholeNanoseconds,
-                    )
+                    it.note(family, FactorAttribution.Metric.Nanos,
+                        requireNotNull(start).elapsedNow().inWholeNanoseconds)
                 }
             }
             if (runCancelled) {

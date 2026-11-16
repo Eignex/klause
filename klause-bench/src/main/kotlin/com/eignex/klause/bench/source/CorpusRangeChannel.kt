@@ -11,9 +11,7 @@ internal class CorpusRangeChannel(
     private val downloads: CorpusDownload,
     private val limit: Long = 32L * 1024 * 1024,
 ) : SeekableByteChannel {
-    init {
-        require(limit >= 1)
-    }
+    init { require(limit >= 1) }
 
     private val identity = downloads.range(uri, 0, 1).identity
     private var offset = 0L

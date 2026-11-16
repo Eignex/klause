@@ -38,59 +38,18 @@ class LinearBooleanCutsTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val y = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
     private val quarter = BigFraction.ofLong(4).reciprocal()
-    private val scope = SourceScope(
-        SourceRevision("coupled-real", "klause-ir-exact-v1"),
-        objective = SourceObjective("difference", ObjectiveSense.MINIMIZE),
-    )
+    private val scope = SourceScope(SourceRevision("coupled-real", "klause-ir-exact-v1"),
+        objective = SourceObjective("difference", ObjectiveSense.MINIMIZE))
     private val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0, 1.0))
 
-    private fun model(refutation: Boolean = false): Problem = Problem(
-        1,
-        0,
-        emptyArray(),
-        buildList {
-            for (id in 0..1) {
-                add(
-                    ReifiedRealLinear(
-                        0,
-                        intArrayOf(),
-                        doubleArrayOf(),
-                        intArrayOf(id),
-                        doubleArrayOf(1.0),
-                        LinearOp.LE,
-                        0.0,
-                    ),
-                )
-            }
-            for (sign in listOf(-1.0, 1.0)) {
-                add(
-                    Linear(
-                        intArrayOf(),
-                        doubleArrayOf(),
-                        intArrayOf(0, 1),
-                        doubleArrayOf(sign, sign),
-                        LinearOp.LE,
-                        0.25,
-                    ),
-                )
-            }
-            if (refutation) {
-                add(
-                    Linear(
-                        intArrayOf(),
-                        doubleArrayOf(),
-                        intArrayOf(0, 1),
-                        doubleArrayOf(-1.0, 1.0),
-                        LinearOp.LE,
-                        -0.5,
-                    ),
-                )
-            }
-        },
-        numRealVars = 2,
-        realLower = doubleArrayOf(-1.0, -1.0),
-        realUpper = doubleArrayOf(1.0, 1.0),
-    )
+    private fun model(refutation: Boolean = false): Problem = Problem(1, 0, emptyArray(), buildList {
+        for (id in 0..1) add(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(id),
+            doubleArrayOf(1.0), LinearOp.LE, 0.0))
+        for (sign in listOf(-1.0, 1.0)) add(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(sign, sign), LinearOp.LE, 0.25))
+        if (refutation) add(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(-1.0, 1.0), LinearOp.LE, -0.5))
+    }, numRealVars = 2, realLower = doubleArrayOf(-1.0, -1.0), realUpper = doubleArrayOf(1.0, 1.0))
 
     @Test
     fun `prepared real reifications should supply checked common rows in both directions`() {
@@ -135,11 +94,8 @@ class LinearBooleanCutsTest {
             }
         }
 
-        val evidence = SourceEvidence(
-            scope,
-            SourceClaim.Refutation,
-            SourceDerivation.BooleanSplit(0, proofs[0], proofs[1]),
-        )
+        val evidence = SourceEvidence(scope, SourceClaim.Refutation,
+            SourceDerivation.BooleanSplit(0, proofs[0], proofs[1]))
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
     }
@@ -147,29 +103,15 @@ class LinearBooleanCutsTest {
     @Test
     fun `composition should preserve feasible original points in both alternatives`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
-        val values = listOf(
-            true to listOf(BigFraction.ZERO, quarter.negated()),
-            false to listOf(quarter * BigFraction.ofLong(2).reciprocal(), quarter * BigFraction.ofLong(2).reciprocal()),
-        )
+        val values = listOf(true to listOf(BigFraction.ZERO, quarter.negated()),
+            false to listOf(quarter * BigFraction.ofLong(2).reciprocal(), quarter * BigFraction.ofLong(2).reciprocal()))
         val verifier = SourceEvidenceVerifier(source)
 
         for ((bool, reals) in values) {
-            val witness = Sample(
-                booleanArrayOf(bool),
-                longArrayOf(),
-                reals.map { it.toDouble() }.toDoubleArray(),
-                exactReals = reals,
-            )
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                verifier.verify(
-                    SourceEvidence(
-                        scope,
-                        SourceClaim.Witness(witness),
-                        SourceDerivation.SourceWitness,
-                    ),
-                ),
-            )
+            val witness = Sample(booleanArrayOf(bool), longArrayOf(), reals.map { it.toDouble() }.toDoubleArray(),
+                exactReals = reals)
+            assertEquals(SourceEvidenceCheck.Checked, verifier.verify(SourceEvidence(scope,
+                SourceClaim.Witness(witness), SourceDerivation.SourceWitness)))
         }
         val result = LinearActiveRows(source, SourceLpBudget(), composeBranches = true).use {
             it.check(SourceCondition(), ExecutionControl.Never)
@@ -182,21 +124,12 @@ class LinearBooleanCutsTest {
     fun `a common consequence should preserve strictness only when both alternatives establish it`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         for ((leftStrict, rightStrict) in listOf(false to false, true to false, false to true, true to true)) {
-            val source = SourceProofContext(
-                scope,
-                setOf(x, bool),
-                mapOf(
-                    "false" to SourcePremise(
-                        SourceInequality(mapOf(x to BigFraction.ONE), quarter, leftStrict),
-                        mapOf(0 to false),
-                    ),
-                    "true" to SourcePremise(
-                        SourceInequality(mapOf(x to BigFraction.ONE), quarter, rightStrict),
-                        mapOf(0 to true),
-                    ),
-                ),
-                mapOf(x to BigFraction.ONE),
-            )
+            val source = SourceProofContext(scope, setOf(x, bool), mapOf(
+                "false" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), quarter, leftStrict),
+                    mapOf(0 to false)),
+                "true" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE), quarter, rightStrict),
+                    mapOf(0 to true)),
+            ), mapOf(x to BigFraction.ONE))
 
             val evidence = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never).consequences.single()
 
@@ -225,11 +158,9 @@ class LinearBooleanCutsTest {
         for (kind in listOf("integer activity", "integer pin", "other guard")) {
             val activity = if (kind == "integer activity") integer else x
             val rows = listOf(false, true).associate { value ->
-                value.toString() to SourcePremise(
-                    SourceInequality(mapOf(activity to BigFraction.ONE), quarter),
+                value.toString() to SourcePremise(SourceInequality(mapOf(activity to BigFraction.ONE), quarter),
                     mapOf(0 to value) + if (kind == "other guard") mapOf(1 to true) else emptyMap(),
-                    if (kind == "integer pin") mapOf(integer to BigFraction.ONE) else emptyMap(),
-                )
+                    if (kind == "integer pin") mapOf(integer to BigFraction.ONE) else emptyMap())
             }
             val source = SourceProofContext(scope, setOf(x, bool, other, integer), rows, mapOf(x to BigFraction.ONE))
 
@@ -247,15 +178,8 @@ class LinearBooleanCutsTest {
             it.claim == SourceClaim.Consequence(row)
         }
 
-        val bound = SourceEvidence(
-            scope,
-            SourceClaim.Bound(quarter.negated()),
-            SourceDerivation.Combination(
-                listOf(
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Import(common)),
-                ),
-            ),
-        )
+        val bound = SourceEvidence(scope, SourceClaim.Bound(quarter.negated()), SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Import(common)))))
 
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(bound))
     }
@@ -264,17 +188,10 @@ class LinearBooleanCutsTest {
     fun `imported common rows should reject foreign revisions and changed source premises`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
         val common = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never).consequences.first()
-        val imported = SourceEvidence(
-            scope.copy(revision = SourceRevision("other", scope.revision.semantics)),
-            common.claim,
-            SourceDerivation.Import(common),
-        )
-        val missing = SourceProofContext(
-            scope,
-            source.coordinates,
-            source.premises.filterValues { it.guards[0] != false },
-            source.objective,
-        )
+        val imported = SourceEvidence(scope.copy(revision = SourceRevision("other", scope.revision.semantics)),
+            common.claim, SourceDerivation.Import(common))
+        val missing = SourceProofContext(scope, source.coordinates,
+            source.premises.filterValues { it.guards[0] != false }, source.objective)
 
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source.atScope(imported.scope)).verify(imported))
         assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(missing).verify(common))
@@ -303,18 +220,9 @@ class LinearBooleanCutsTest {
         val original = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never).consequences.first()
         val foreign = scope.copy(objective = SourceObjective("other", ObjectiveSense.MAXIMIZE))
 
-        for ((context, evidence) in listOf(
-            source to SourceEvidence(
-                scope,
-                conditioned.claim,
-                SourceDerivation.Import(conditioned),
-            ),
-            source.atScope(foreign) to SourceEvidence(
-                foreign,
-                original.claim,
-                SourceDerivation.Import(original),
-            ),
-        )) {
+        for ((context, evidence) in listOf(source to SourceEvidence(scope, conditioned.claim,
+            SourceDerivation.Import(conditioned)), source.atScope(foreign) to SourceEvidence(foreign,
+            original.claim, SourceDerivation.Import(original)))) {
             assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(context).verify(evidence))
         }
     }
@@ -323,34 +231,14 @@ class LinearBooleanCutsTest {
     fun `a stale common row should not survive a real coordinate remap`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
         val common = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never).consequences.single {
-            it.claim == SourceClaim.Consequence(
-                SourceInequality(
-                    mapOf(
-                        x to BigFraction.ONE,
-                        y to BigFraction.MINUS_ONE,
-                    ),
-                    quarter,
-                ),
-            )
+            it.claim == SourceClaim.Consequence(SourceInequality(mapOf(x to BigFraction.ONE,
+                y to BigFraction.MINUS_ONE), quarter))
         }
         val remap: (SourceCoordinate) -> SourceCoordinate = { if (it == y) it.copy(id = 2) else it }
-        val mapped =
-            SourceProofContext(
-                scope,
-                source.coordinates.map(remap).toSet(),
-                source.premises.mapValues { (_, premise) ->
-                    SourcePremise(
-                        SourceInequality(
-                            premise.inequality.coefficients.mapKeys { remap(it.key) },
-                            premise.inequality.rhs,
-                            premise.inequality.strict,
-                        ),
-                        premise.guards,
-                        premise.integerPins,
-                    )
-                },
-                source.objective.mapKeys { remap(it.key) },
-            )
+        val mapped = SourceProofContext(scope, source.coordinates.map(remap).toSet(), source.premises.mapValues {
+            (_, premise) -> SourcePremise(SourceInequality(premise.inequality.coefficients.mapKeys { remap(it.key) },
+                premise.inequality.rhs, premise.inequality.strict), premise.guards, premise.integerPins)
+        }, source.objective.mapKeys { remap(it.key) })
 
         val verdict = SourceEvidenceVerifier(mapped).verify(common)
 
@@ -360,44 +248,21 @@ class LinearBooleanCutsTest {
     @Test
     fun `an import should not erase a Boolean substitution from its source scope`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val source = SourceProofContext(
-            scope,
-            setOf(x, bool),
-            mapOf(
-                "boolean" to SourcePremise(
-                    SourceInequality(
-                        mapOf(x to BigFraction.ONE, bool to BigFraction.ONE),
-                        BigFraction.ZERO,
-                    ),
-                ),
-                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), quarter)),
-            ),
-            mapOf(x to BigFraction.ONE),
-        )
+        val source = SourceProofContext(scope, setOf(x, bool), mapOf(
+            "boolean" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, bool to BigFraction.ONE),
+                BigFraction.ZERO)),
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), quarter)),
+        ), mapOf(x to BigFraction.ONE))
         val branch = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
-        val falseGlobal = SourceEvidence(
-            scope,
-            SourceClaim.Consequence(
-                SourceInequality(
-                    mapOf(x to BigFraction.ONE),
-                    BigFraction.MINUS_ONE,
-                ),
-            ),
-            SourceDerivation.Premise("boolean"),
-        )
-        val proof = LinearActiveRefutation(
-            SourceDerivation.Combination(
-                listOf(
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Import(falseGlobal)),
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-                ),
-            ),
-            alternatives = true,
-        )
+        val falseGlobal = SourceEvidence(scope, SourceClaim.Consequence(SourceInequality(
+            mapOf(x to BigFraction.ONE), BigFraction.MINUS_ONE)), SourceDerivation.Premise("boolean"))
+        val proof = LinearActiveRefutation(SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Import(falseGlobal)),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+        )), alternatives = true)
 
         val verdict = SourceEvidenceVerifier(source.withLinearAuthority().atScope(branch)).verify(
-            SourceEvidence(branch, SourceClaim.Refutation, proof),
-        )
+            SourceEvidence(branch, SourceClaim.Refutation, proof))
 
         assertIs<SourceEvidenceCheck.Rejected>(verdict)
     }
@@ -405,25 +270,14 @@ class LinearBooleanCutsTest {
     @Test
     fun `bounded failed preparation should retain its charged work and no authority`() {
         val source = assertNotNull(model().sourceProofContext(scope, objective))
-        for (limits in listOf(
-            LinearBooleanCutLimits(work = 1L),
-            LinearBooleanCutLimits(allocation = 1L),
-            LinearBooleanCutLimits(scalarBits = 1),
-            LinearBooleanCutLimits(rows = 1),
-            LinearBooleanCutLimits(branchRows = 1),
-        )) {
+        for (limits in listOf(LinearBooleanCutLimits(work = 1L), LinearBooleanCutLimits(allocation = 1L),
+            LinearBooleanCutLimits(scalarBits = 1), LinearBooleanCutLimits(rows = 1),
+            LinearBooleanCutLimits(branchRows = 1))) {
             var work = 0L
             var allocation = 0L
 
-            val result = LinearBooleanCutPreparation.prepare(
-                source,
-                ExecutionControl.Never,
-                { steps, bytes ->
-                    work += steps
-                    allocation += bytes
-                },
-                limits,
-            )
+            val result = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never,
+                { steps, bytes -> work += steps; allocation += bytes }, limits)
 
             assertFalse(result.complete)
             assertTrue(result.consequences.isEmpty())

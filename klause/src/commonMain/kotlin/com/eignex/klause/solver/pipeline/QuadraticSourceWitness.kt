@@ -28,25 +28,17 @@ internal fun checkQuadraticSourceWitness(
     arithmetic.step()
     if (point.numBoolVars != plan.sourceBoolCount || point.numIntVars != plan.sourceIntCount ||
         point.numRealVars != plan.sourceRealCount
-    ) {
-        SourceEvidenceCheck.Rejected("quadratic witness has different source coordinates")
-    } else {
-        when (val source = plan.originalSource) {
-            is PolynomialRealProblem -> checkProjectedPolynomialWitness(source, point, cancellation, limits)
-
-            is NonlinearIntegerProblem -> checkQuadraticIntegerWitness(source, point, cancellation, arithmetic, limits)
-
-            is Problem -> {
-                val projection = (plan.execution as? PreparedExecution.NonlinearInteger)?.projection
-                if (projection != null) {
-                    checkQuadraticIntegerWitness(projection.formula, point, cancellation, arithmetic, limits)
-                } else {
-                    checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
-                }
-            }
-
-            else -> SourceEvidenceCheck.Unavailable("quadratic source has no installed witness checker")
+    ) SourceEvidenceCheck.Rejected("quadratic witness has different source coordinates")
+    else when (val source = plan.originalSource) {
+        is PolynomialRealProblem -> checkProjectedPolynomialWitness(source, point, cancellation, limits)
+        is NonlinearIntegerProblem -> checkQuadraticIntegerWitness(source, point, cancellation, arithmetic, limits)
+        is Problem -> {
+            val projection = (plan.execution as? PreparedExecution.NonlinearInteger)?.projection
+            if (projection != null) {
+                checkQuadraticIntegerWitness(projection.formula, point, cancellation, arithmetic, limits)
+            } else checkQuadraticIrWitness(plan, point, cancellation, arithmetic, limits)
         }
+        else -> SourceEvidenceCheck.Unavailable("quadratic source has no installed witness checker")
     }
 } catch (_: PolynomialInterrupted) {
     SourceEvidenceCheck.Unavailable("quadratic source witness checking interrupted")
@@ -69,16 +61,8 @@ private fun checkQuadraticIntegerWitness(
         arithmetic.step()
         values[column] = algebraic.rational(BigFraction.of(point.exactIntValue(id), BIG_ONE))
     }
-    return checkProjectedPolynomialFormula(
-        source.formula,
-        source.boolCount,
-        source.numericCount,
-        point.bools,
-        values,
-        cancellation,
-        arithmetic,
-        limits,
-    )
+    return checkProjectedPolynomialFormula(source.formula, source.boolCount, source.numericCount,
+        point.bools, values, cancellation, arithmetic, limits)
 }
 
 private fun checkQuadraticIrWitness(
@@ -94,10 +78,8 @@ private fun checkQuadraticIrWitness(
         return SourceEvidenceCheck.Rejected("quadratic finite source integer is outside its declared range")
     }
     val discrete = Sample(point.bools, point.ints)
-    when (
-        val checked = model.finitePointCheck(plan.finiteFactorProjections, cancellation)
-            .check(Candidate(discrete, Unit), cancellation)
-    ) {
+    when (val checked = model.finitePointCheck(plan.finiteFactorProjections, cancellation)
+        .check(Candidate(discrete, Unit), cancellation)) {
         is Verification.Rejected -> return SourceEvidenceCheck.Rejected(checked.reason)
         is Verification.Indeterminate -> return SourceEvidenceCheck.Unavailable(checked.reason)
         is Verification.Accepted -> Unit
@@ -110,16 +92,8 @@ private fun checkQuadraticIrWitness(
         arithmetic.step()
         values[column] = algebraic.rational(BigFraction.of(point.exactIntValue(id), BIG_ONE))
     }
-    return checkProjectedPolynomialFormula(
-        model.service.formula,
-        model.service.boolCount,
-        model.service.realCount,
-        point.bools,
-        values,
-        cancellation,
-        arithmetic,
-        limits,
-    )
+    return checkProjectedPolynomialFormula(model.service.formula, model.service.boolCount, model.service.realCount,
+        point.bools, values, cancellation, arithmetic, limits)
 }
 
 private fun exactQuadraticReals(point: Sample, arithmetic: AlgebraicArithmetic): List<AlgebraicReal>? =

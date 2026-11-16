@@ -10,9 +10,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 
-internal class PolynomialAlnsSolve(private val search: ResumableSearch) :
-    InstructionSlicedSolve,
-    ReseedGuard {
+internal class PolynomialAlnsSolve(private val search: ResumableSearch) : InstructionSlicedSolve, ReseedGuard {
     private var result: SolveResult? = null
     private var witness: Sample? = null
     override val canReseed: Boolean get() = false
@@ -24,18 +22,13 @@ internal class PolynomialAlnsSolve(private val search: ResumableSearch) :
     override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long): SolveResult? =
         advance { callback -> search.runSlice(global, sliceMillis, sliceNodes, callback) }
 
-    override fun runInstructionSlice(
-        global: ExecutionControl,
-        sliceMillis: Long,
-        sliceInstructions: Long,
-    ): SolveResult? = advance { callback ->
-        val counted = search as? InstructionSlicedSearch
-        if (counted != null) {
-            counted.runInstructionSlice(global, sliceMillis, sliceInstructions, callback)
-        } else {
-            search.runSlice(global, sliceMillis, sliceInstructions, callback)
+    override fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long,
+        sliceInstructions: Long): SolveResult? =
+        advance { callback ->
+            val counted = search as? InstructionSlicedSearch
+            if (counted != null) counted.runInstructionSlice(global, sliceMillis, sliceInstructions, callback)
+            else search.runSlice(global, sliceMillis, sliceInstructions, callback)
         }
-    }
 
     private fun advance(run: ((MinimizeResult.WithSample) -> Unit) -> MinimizeResult?): SolveResult? {
         result?.let { return it }

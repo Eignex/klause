@@ -78,19 +78,10 @@ internal fun FlatZincCompiler.emitGridMinMax(c: FznConstraint, max: Boolean): Bo
         if (value.buckets > 1) (value.hi - value.lo) / (value.buckets - 1) else 0.0
     }
     val origins = DoubleArray(coordinates.size) { coordinates[it].lo }
-    val constants = booleanArrayOf(
-        references[2] is FloatRef.Const,
-        references[0] is FloatRef.Const,
-        references[1] is FloatRef.Const,
-    )
-    val relation = GridArrayMinMax(
-        coordinates.map { it.varId }.toIntArray(),
-        steps,
-        origins,
-        constants,
-        floatScale,
-        max,
-    )
+    val constants = booleanArrayOf(references[2] is FloatRef.Const, references[0] is FloatRef.Const,
+        references[1] is FloatRef.Const)
+    val relation = GridArrayMinMax(coordinates.map { it.varId }.toIntArray(), steps, origins, constants,
+        floatScale, max)
     try {
         for (position in 1 until coordinates.size) {
             relation.comparison(position, equality = false)

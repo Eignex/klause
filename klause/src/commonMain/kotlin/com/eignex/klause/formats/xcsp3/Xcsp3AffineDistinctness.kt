@@ -132,10 +132,8 @@ private fun subtractExact(left: Long, right: Long): Long? {
     return if (((left xor right) and (left xor difference)) < 0L) null else difference
 }
 
-internal fun Compiler.Builder.recoverAffineDistinctness(
-    index: Xcsp3AffineDistinctness,
-    cancellation: ExecutionControl,
-) {
+internal fun Compiler.Builder.recoverAffineDistinctness(index: Xcsp3AffineDistinctness,
+    cancellation: ExecutionControl) {
     val removed = HashSet<Int>()
     for (group in index.groups(cancellation)) {
         if (cancellation()) break

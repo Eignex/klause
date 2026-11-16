@@ -401,12 +401,10 @@ private fun Compiler.Builder.combineInt(head: String, args: List<Res>): Res = wh
         }
     }
 
-    "^" -> Res.I(
-        integerPower(
-            args[0].asIntComb(),
-            (args[1] as? Res.I)?.term ?: smtUnsupported("power requires an integer exponent"),
-        ),
-    )
+    "^" -> Res.I(integerPower(
+        args[0].asIntComb(),
+        (args[1] as? Res.I)?.term ?: smtUnsupported("power requires an integer exponent"),
+    ))
 
     "to_real" -> Res.I(args[0].asIntComb())
 
@@ -459,17 +457,10 @@ private fun Compiler.Builder.iteRes(cond: Int, a: IntComb, b: IntComb): Res {
         val hiU = if (aHi == null || bHi == null) null else maxOf(aHi, bHi)
         val self = LinComb(mapOf(newInt(loU, hiU) to 1), 0)
         val parts = exclusiveIntegerSelection(
-            checkNotNull(self.asSimpleVar()),
-            listOf(cond),
-            listOf(thenTerm),
-            elseTerm,
+            checkNotNull(self.asSimpleVar()), listOf(cond), listOf(thenTerm), elseTerm,
         )
         conditionalEqualities.define(
-            checkNotNull(self.asSimpleVar()),
-            listOf(cond),
-            listOf(thenTerm),
-            elseTerm,
-            parts,
+            checkNotNull(self.asSimpleVar()), listOf(cond), listOf(thenTerm), elseTerm, parts,
             listOf(iteChains.guardEquality(cond)),
         )
         return narrowRes(self)

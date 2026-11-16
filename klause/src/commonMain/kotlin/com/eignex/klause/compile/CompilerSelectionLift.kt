@@ -14,9 +14,7 @@ internal fun Lowering.liftElement(index: IntExpr, items: List<IntExpr>): IntExpr
     val idx = intVarOf(materializeIntVar(lift(index)).name)
     val entries = items.map { intVarOf(materializeIntVar(lift(it)).name) }.toIntArray()
     val result = problemBuilder.newIntSelection(idx, LongArray(entries.size) { entries[it].toLong() },
-        selectionBounds( entries, intDomains), freshInt = {
-        intVarOf(newAuxIntVar(it)) }
-    )
+        selectionBounds(entries, intDomains), freshInt = { intVarOf(newAuxIntVar(it)) })
     return IntRef(idToIntName.getValue(result))
 }
 
@@ -24,24 +22,17 @@ internal fun Lowering.liftIfThenElse(cond: BoolExpr, thenE: IntExpr, elseE: IntE
     val thenId = intVarOf(materializeIntVar(lift(thenE)).name)
     val elseId = intVarOf(materializeIntVar(lift(elseE)).name)
     val literal = lowerToLit(cond)
-    val index = problemBuilder.newBooleanInt(literal) { intVarOf (newAuxIntVar(it)
-    ) }
-    val domain =
-        IntDomain(
-            minOf(intDomains[thenId].min, intDomains[elseId].min),
-            maxOf(intDomains[thenId].max, intDomains[elseId].max)
-        )
-    val result = problemBuilder.newIntSelection(
-        index,
-        longArrayOf(elseId.toLong(), thenId.toLong()),
-        domain, freshInt = { intVarOf(newAuxIntVar(it)) }
-    )
+    val index = problemBuilder.newBooleanInt(literal) { intVarOf(newAuxIntVar(it)) }
+    val domain = IntDomain(minOf(intDomains[thenId].min, intDomains[elseId].min),
+        maxOf(intDomains[thenId].max, intDomains[elseId].max))
+    val result = problemBuilder.newIntSelection(index, longArrayOf(elseId.toLong(), thenId.toLong()),
+        domain, freshInt = { intVarOf(newAuxIntVar(it)) })
     return IntRef(idToIntName.getValue(result))
 }
 
 internal fun Lowering.liftMinMax(children: List<IntExpr>, isMin: Boolean): IntExpr {
     val entries = children.map { intVarOf(materializeIntVar(lift(it)).name) }.toIntArray()
-    val result = problemBuilder.newIntExtreme(entries,max = !isMin,
-        domain = extremeBounds(entries, intDomains,max = !isMin), freshInt = { intVarOf( newAuxIntVar(it)) })
+    val result = problemBuilder.newIntExtreme(entries, max = !isMin,
+        domain = extremeBounds(entries, intDomains, max = !isMin), freshInt = { intVarOf(newAuxIntVar(it)) })
     return IntRef(idToIntName.getValue(result))
 }

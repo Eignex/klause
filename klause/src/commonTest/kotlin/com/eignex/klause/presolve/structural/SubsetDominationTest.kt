@@ -22,20 +22,13 @@ class SubsetDominationTest {
     @Test
     fun `uniform support widths should skip comparisons on either side of the old row cap`() {
         for (count in listOf(1_500, 1_501)) {
-            val problem = Problem(
-                0,
-                count * 2,
-                Array(count * 2) { IntDomain(0, 1) },
-                List(count) { Linear(intArrayOf(1, 1), intArrayOf(it * 2, it * 2 + 1), LinearOp.LE, 1) },
-            )
+            val problem = Problem(0, count * 2, Array(count * 2) { IntDomain(0, 1) },
+                List(count) { Linear(intArrayOf(1, 1), intArrayOf(it * 2, it * 2 + 1), LinearOp.LE, 1) })
             val budget = PresolveBudget(Long.MAX_VALUE)
             val factors = problem.factors.asList()
 
             val reduced = SubsetDomination().removeDominated(
-                problem,
-                ColumnRanges.of(problem.intBounds),
-                factors,
-                budget.orSpent(ExecutionControl.Never),
+                problem, ColumnRanges.of(problem.intBounds), factors, budget.orSpent(ExecutionControl.Never),
             )
 
             val call = budget.invocations.single()
@@ -51,19 +44,13 @@ class SubsetDominationTest {
         val count = 1_600
         val small = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)
         val large = Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 1)
-        val problem = Problem(
-            0,
-            count + 2,
-            Array(count + 2) { IntDomain(0, 1) },
-            listOf(small, large) + List(count) { Linear(intArrayOf(1), intArrayOf(it + 2), LinearOp.LE, 0) },
-        )
+        val problem = Problem(0, count + 2, Array(count + 2) { IntDomain(0, 1) },
+            listOf(small, large) + List(count) { Linear(intArrayOf(1), intArrayOf(it + 2), LinearOp.LE, 0) })
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val reduced = SubsetDomination().removeDominated(
-            problem,
-            ColumnRanges.of(problem.intBounds),
-            problem.factors.asList(),
-            budget.orSpent(ExecutionControl.Never),
+            problem, ColumnRanges.of(problem.intBounds), problem.factors.asList(),
+                budget.orSpent(ExecutionControl.Never),
         )
 
         val call = budget.invocations.single()
@@ -79,30 +66,21 @@ class SubsetDominationTest {
         val small = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)
         val large = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 0)
         val problem = Problem(0, 3, Array(3) { IntDomain(0, 1) }, listOf(small, large))
-        val unrelated = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 1) },
-            listOf(small, large, Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 0)),
-        )
+        val unrelated = Problem(0, 3, Array(3) { IntDomain(0, 1) },
+            listOf(small, large, Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 0)))
         val state = SubsetDomination()
         val budget = PresolveBudget(Long.MAX_VALUE)
         val token = budget.orSpent(ExecutionControl.Never)
 
         val first = state.removeDominated(problem, ColumnRanges.of(problem.intBounds), problem.factors.asList(), token)
         val second = state.removeDominated(
-            unrelated,
-            ColumnRanges.of(unrelated.intBounds),
-            unrelated.factors.asList(),
-            token,
+            unrelated, ColumnRanges.of(unrelated.intBounds), unrelated.factors.asList(), token,
         )
 
         assertEquals(problem.factors.toList(), first)
         assertEquals(unrelated.factors.toList(), second)
-        assertEquals(
-            listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.ELIGIBILITY_SKIP),
-            budget.invocations.map { it.outcome },
-        )
+        assertEquals(listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.ELIGIBILITY_SKIP),
+            budget.invocations.map { it.outcome })
         assertEquals(budget.spent(), budget.invocations.sumOf { it.work })
     }
 
@@ -113,18 +91,10 @@ class SubsetDominationTest {
         val source = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(small, large))
         val changes = listOf(
             Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 0)), listOf(small, large)),
-            Problem(
-                0,
-                2,
-                Array(2) { IntDomain(0, 1) },
-                listOf(small, Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
-            ),
-            Problem(
-                0,
-                2,
-                Array(2) { IntDomain(0, 1) },
-                listOf(Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 0), large),
-            ),
+            Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(small, Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1))),
+            Problem(0, 2, Array(2) { IntDomain(0, 1) },
+                listOf(Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 0), large)),
         )
         for ((index, changed) in changes.withIndex()) {
             val state = SubsetDomination()
@@ -133,17 +103,12 @@ class SubsetDominationTest {
             state.removeDominated(source, ColumnRanges.of(source.intBounds), source.factors.asList(), token)
 
             val reduced = state.removeDominated(
-                changed,
-                ColumnRanges.of(changed.intBounds),
-                changed.factors.asList(),
-                token,
+                changed, ColumnRanges.of(changed.intBounds), changed.factors.asList(), token,
             )
 
             assertEquals(if (index == 2) changed.factors.toList() else listOf(small), reduced)
-            assertEquals(
-                if (index == 2) PresolveInvocationOutcome.COMPLETE_MISS else PresolveInvocationOutcome.CHANGED,
-                budget.invocations.last().outcome,
-            )
+            assertEquals(if (index == 2) PresolveInvocationOutcome.COMPLETE_MISS else PresolveInvocationOutcome.CHANGED,
+                budget.invocations.last().outcome)
         }
     }
 
@@ -176,26 +141,12 @@ class SubsetDominationTest {
     @Test
     fun `bounded scans should resume untested pairs and skip after completion`() {
         val count = 128
-        val problem = Problem(
-            0,
-            count * 3 + 4,
-            Array(count * 3 + 4) { IntDomain(0, 1) },
+        val problem = Problem(0, count * 3 + 4, Array(count * 3 + 4) { IntDomain(0, 1) },
             List(count) { Linear(intArrayOf(1, 1), intArrayOf(0, it + 1), LinearOp.LE, 0) } +
-                List(count) {
-                    Linear(
-                        intArrayOf(1, 1, 1),
-                        intArrayOf(0, count + it + 1, 2 * count + it + 1),
-                        LinearOp.LE,
-                        0,
-                    )
-                } +
-                Linear(
-                    intArrayOf(1, 1, 1, 1),
-                    intArrayOf(0, count * 3 + 1, count * 3 + 2, count * 3 + 3),
-                    LinearOp.LE,
-                    0,
-                ),
-        )
+                List(count) { Linear(intArrayOf(1, 1, 1), intArrayOf(0, count + it + 1, 2 * count + it + 1),
+                    LinearOp.LE, 0) } +
+                Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, count * 3 + 1, count * 3 + 2, count * 3 + 3),
+                    LinearOp.LE, 0))
         val state = SubsetDomination()
         val budget = PresolveBudget(Long.MAX_VALUE)
         val token = budget.orSpent(ExecutionControl.Never)
@@ -206,14 +157,8 @@ class SubsetDominationTest {
         }
 
         val calls = budget.invocations
-        assertEquals(
-            listOf(
-                PresolveInvocationOutcome.INTERRUPTED,
-                PresolveInvocationOutcome.COMPLETE_MISS,
-                PresolveInvocationOutcome.ELIGIBILITY_SKIP,
-            ),
-            calls.map { it.outcome },
-        )
+        assertEquals(listOf(PresolveInvocationOutcome.INTERRUPTED, PresolveInvocationOutcome.COMPLETE_MISS,
+            PresolveInvocationOutcome.ELIGIBILITY_SKIP), calls.map { it.outcome })
         assertTrue(calls.all { it.work <= 700_000L })
         assertTrue(calls[1].work < calls[0].work)
         assertTrue(calls[2].work < calls[1].work)
@@ -224,20 +169,10 @@ class SubsetDominationTest {
     fun `removing a wider row should not rescan unchanged smaller pairs`() {
         val count = 64
         val rows = List(count) { Linear(intArrayOf(1, 1), intArrayOf(0, it + 1), LinearOp.LE, 0) } +
-            List(count) {
-                Linear(
-                    intArrayOf(1, 1, 1),
-                    intArrayOf(0, count + it + 1, 2 * count + it + 1),
-                    LinearOp.LE,
-                    0,
-                )
-            }
-        val wide = Linear(
-            intArrayOf(1, 1, 1, 1),
-            intArrayOf(0, count * 3 + 1, count * 3 + 2, count * 3 + 3),
-            LinearOp.LE,
-            0,
-        )
+            List(count) { Linear(intArrayOf(1, 1, 1), intArrayOf(0, count + it + 1, 2 * count + it + 1),
+                LinearOp.LE, 0) }
+        val wide = Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, count * 3 + 1, count * 3 + 2, count * 3 + 3),
+            LinearOp.LE, 0)
         val domains = Array(count * 3 + 4) { IntDomain(0, 1) }
         val source = Problem(0, domains.size, domains, rows + wide)
         val changed = Problem(0, domains.size, domains, rows)
@@ -247,10 +182,7 @@ class SubsetDominationTest {
         state.removeDominated(source, ColumnRanges.of(source.intBounds), source.factors.asList(), token)
 
         val reduced = state.removeDominated(
-            changed,
-            ColumnRanges.of(changed.intBounds),
-            changed.factors.asList(),
-            token,
+            changed, ColumnRanges.of(changed.intBounds), changed.factors.asList(), token,
         )
 
         assertEquals(rows, reduced)
@@ -263,12 +195,8 @@ class SubsetDominationTest {
         val count = 14_000
         val small = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)
         val large = Linear(intArrayOf(2, 1), intArrayOf(0, 1), LinearOp.LE, 1)
-        val problem = Problem(
-            0,
-            count + 2,
-            Array(count + 2) { IntDomain(0, 1) },
-            listOf(small, large) + List(count) { Linear(intArrayOf(1), intArrayOf(it + 2), LinearOp.LE, 0) },
-        )
+        val problem = Problem(0, count + 2, Array(count + 2) { IntDomain(0, 1) },
+            listOf(small, large) + List(count) { Linear(intArrayOf(1), intArrayOf(it + 2), LinearOp.LE, 0) })
         val state = SubsetDomination()
         val budget = PresolveBudget(Long.MAX_VALUE)
         val token = budget.orSpent(ExecutionControl.Never)
@@ -280,10 +208,8 @@ class SubsetDominationTest {
         val calls = budget.invocations
         assertSame(factors, first)
         assertEquals(factors.filter { it !== large }, second)
-        assertEquals(
-            listOf(PresolveInvocationOutcome.INTERRUPTED, PresolveInvocationOutcome.CHANGED),
-            calls.map { it.outcome },
-        )
+        assertEquals(listOf(PresolveInvocationOutcome.INTERRUPTED, PresolveInvocationOutcome.CHANGED),
+            calls.map { it.outcome })
         assertTrue(calls[1].work < calls[0].work)
         assertEquals(budget.spent(), calls.sumOf { it.work })
     }
@@ -304,29 +230,20 @@ class SubsetDominationTest {
         state.removeDominated(source, ColumnRanges.of(source.intBounds), source.factors.asList(), token)
 
         val reduced = state.removeDominated(
-            replaced,
-            ColumnRanges.of(replaced.intBounds),
-            replaced.factors.asList(),
-            token,
+            replaced, ColumnRanges.of(replaced.intBounds), replaced.factors.asList(), token,
         )
 
         assertEquals(replaced.factors.toList(), reduced)
-        assertEquals(
-            listOf(PresolveInvocationOutcome.INTERRUPTED, PresolveInvocationOutcome.COMPLETE_MISS),
-            budget.invocations.map { it.outcome },
-        )
+        assertEquals(listOf(PresolveInvocationOutcome.INTERRUPTED, PresolveInvocationOutcome.COMPLETE_MISS),
+            budget.invocations.map { it.outcome })
     }
 
     @Test
     fun `cancellation should retain completed drops and report interruption`() {
         val count = 200
         val small = Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0)
-        val problem = Problem(
-            0,
-            count + 1,
-            Array(count + 1) { IntDomain(0, 1) },
-            listOf(small) + List(count) { Linear(intArrayOf(1, 1), intArrayOf(0, it + 1), LinearOp.LE, 1) },
-        )
+        val problem = Problem(0, count + 1, Array(count + 1) { IntDomain(0, 1) },
+            listOf(small) + List(count) { Linear(intArrayOf(1, 1), intArrayOf(0, it + 1), LinearOp.LE, 1) })
         var stop = false
         var reads = 0
         val ranges = object : ColumnRanges by ColumnRanges.of(problem.intBounds) {
@@ -338,10 +255,7 @@ class SubsetDominationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val reduced = SubsetDomination().removeDominated(
-            problem,
-            ranges,
-            problem.factors.asList(),
-            budget.orSpent(ExecutionControl { stop }),
+            problem, ranges, problem.factors.asList(), budget.orSpent(ExecutionControl { stop }),
         )
 
         val call = budget.invocations.single()
@@ -353,23 +267,15 @@ class SubsetDominationTest {
 
     @Test
     fun `a cancelled scan should publish no unfinished analysis`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
-            listOf(
-                Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
-                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
-            ),
-        )
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, listOf(
+            Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 0),
+            Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1),
+        ))
         val factors = problem.factors.asList()
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val reduced = SubsetDomination().removeDominated(
-            problem,
-            ColumnRanges.of(problem.intBounds),
-            factors,
-            budget.orSpent(ExecutionControl { true }),
+            problem, ColumnRanges.of(problem.intBounds), factors, budget.orSpent(ExecutionControl { true }),
         )
 
         assertSame(factors, reduced)
@@ -395,15 +301,11 @@ class SubsetDominationTest {
 
             val calls = budget.invocations.filter { it.pass == "subsume-subset" }
             assertEquals(PresolveInvocationOutcome.CHANGED, budget.invocations.first { it.pass == "subsume" }.outcome)
-            assertEquals(
-                listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.ELIGIBILITY_SKIP),
-                calls.map { it.outcome },
-            )
+            assertEquals(listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.ELIGIBILITY_SKIP),
+                calls.map { it.outcome })
             assertTrue(calls.all { it.lane == lane && it.input.factors == it.output.factors })
-            assertEquals(
-                budget.spent(),
-                budget.invocations.sumOf { it.work } + budget.preparationStages.sumOf { it.work },
-            )
+            assertEquals(budget.spent(),
+                budget.invocations.sumOf { it.work } + budget.preparationStages.sumOf { it.work })
         }
     }
 }

@@ -10,7 +10,6 @@ import com.eignex.koblas.SparseMatrix
 internal class SimplexBasisLifecycle(m: Int, numVars: Int) {
     val basicVar = IntArray(m)
     val status = Array(numVars) { VarStatus.BASIC }
-
     // Factors are acquired lazily because an unsolved engine can be discarded by its consumer.
     var current: BasisSolver? = null
         private set
@@ -27,13 +26,10 @@ internal class SimplexBasisLifecycle(m: Int, numVars: Int) {
         workLimit: Long,
         initialOrder: SymbolicLu? = null,
         cancelled: () -> Boolean,
-    ): BasisSolver = current ?: (
-        factory?.invoke(matrix) ?: KotlinBasisSolver(
-            matrix,
-            policy = LuPivotPolicy(maxEntries = entryLimit, maxWork = workLimit, cancelled = cancelled),
-            initialOrder = initialOrder,
-        )
-        ).also { current = it }
+    ): BasisSolver = current ?: (factory?.invoke(matrix) ?: KotlinBasisSolver(
+        matrix, policy = LuPivotPolicy(maxEntries = entryLimit, maxWork = workLimit, cancelled = cancelled),
+        initialOrder = initialOrder,
+    )).also { current = it }
 
     fun installCopy(solver: BasisSolver, columns: IntArray, unitRows: IntArray) {
         check(current == null)

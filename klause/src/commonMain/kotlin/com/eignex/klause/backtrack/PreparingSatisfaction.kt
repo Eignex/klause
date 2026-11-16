@@ -88,12 +88,9 @@ internal class PreparingSatisfaction(
                 continue
             }
             val handle = ResumableSatisfaction(
-                solver,
-                params.copy(cancellation = propagationToken.withLifetime(lifetime)),
-                ownsWorkDebt = false,
-                projectAssumptionCore = projectAssumptionCore,
-                preparedSession = live,
-                preparedSeed = seed,
+                solver, params.copy(cancellation = propagationToken.withLifetime(lifetime)),
+                ownsWorkDebt = false, projectAssumptionCore = projectAssumptionCore,
+                preparedSession = live, preparedSeed = seed,
             )
             query = handle
             preparation = null

@@ -25,15 +25,13 @@ internal class QuadraticIntegerTraversalCursor(
     private var global = lifetime
     private val slice = SliceBudget(work, { 0L }, { 0L })
     private val session = SearchSession(
-        listOf(component),
-        cancellation = object : ExecutionControl() {
+        listOf(component), cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = global()
             override fun deadline() = global.deadline()
             override val accounting get() = global.accounting
             override val admission get() = admissionFrom(global)
         },
-        branchers = listOf(component),
-        atoms = SearchAtomRegistry(boolCount),
+        branchers = listOf(component), atoms = SearchAtomRegistry(boolCount),
     )
     private var run: SearchRun? = null
     private var initialized = false
@@ -60,14 +58,9 @@ internal class QuadraticIntegerTraversalCursor(
         val paused = { slice.expired() }
         if (!initialized) {
             when (session.initialize()) {
-                is ComponentResult.Conflict -> terminal = if (global()) {
-                    SearchRunEvent.Indeterminate.Cancelled
-                } else {
-                    SearchRunEvent.Exhausted
-                }
-
+                is ComponentResult.Conflict -> terminal = if (global()) SearchRunEvent.Indeterminate.Cancelled
+                    else SearchRunEvent.Exhausted
                 ComponentResult.Indeterminate -> terminal = SearchRunEvent.Indeterminate.Component
-
                 ComponentResult.Consistent -> Unit
             }
             initialized = true
@@ -80,13 +73,11 @@ internal class QuadraticIntegerTraversalCursor(
         while (!global() && !paused()) {
             when (val event = cursor.next()) {
                 is SearchRunEvent.Satisfied -> onModel(requireNotNull(event.model.valueOf(component.modelKey)))
-
                 SearchRunEvent.Paused -> {
                     if (component.outcome is QuadraticIntegerNode.Unbounded) terminal = event
                     slice.noteOverspend()
                     return terminal
                 }
-
                 SearchRunEvent.Exhausted, is SearchRunEvent.Indeterminate -> {
                     terminal = event
                     return event

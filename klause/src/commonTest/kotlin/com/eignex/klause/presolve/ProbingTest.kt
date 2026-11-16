@@ -219,13 +219,10 @@ class ProbingTest {
 
         assertTrue(Presolve.probeSource(problem, cap, ExecutionControl.Never).isEmpty)
     }
-
     @Test
     fun `root fixed columns should not consume the candidate cap or emit redundant units`() {
         val problem = Problem(
-            4,
-            0,
-            emptyArray(),
+            4, 0, emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
@@ -254,9 +251,7 @@ class ProbingTest {
     @Test
     fun `the candidate cap should stop before a later live failed literal`() {
         val problem = Problem(
-            4,
-            0,
-            emptyArray(),
+            4, 0, emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(2, true), Lit.make(3, true))),
@@ -270,9 +265,7 @@ class ProbingTest {
     @Test
     fun `source preparation and root rows should stop within one metered stride`() {
         val problem = Problem(
-            0,
-            8,
-            Array(8) { IntDomain(0, 1) },
+            0, 8, Array(8) { IntDomain(0, 1) },
             List(8) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
         )
         for (allowance in listOf(1L, 81L, 331L, 481L, 561L, 721L, 801L)) {
@@ -289,9 +282,7 @@ class ProbingTest {
     @Test
     fun `source root interruption should retain a proved bound`() {
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 10) },
+            0, 2, Array(2) { IntDomain(0, 10) },
             listOf(
                 Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5),
                 Linear(intArrayOf(1), intArrayOf(1), LinearOp.LE, 5),
@@ -310,9 +301,7 @@ class ProbingTest {
     @Test
     fun `interrupted hypothetical propagation should never publish its assumption`() {
         val problem = Problem(
-            4,
-            0,
-            emptyArray(),
+            4, 0, emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(2, true))),
@@ -333,9 +322,7 @@ class ProbingTest {
     @Test
     fun `metered source scans without deadlines should batch polls and retain exact charges`() {
         val problem = Problem(
-            0,
-            128,
-            Array(128) { IntDomain(0, 1) },
+            0, 128, Array(128) { IntDomain(0, 1) },
             List(128) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
         )
         var work = 0L
@@ -343,14 +330,8 @@ class ProbingTest {
         var meterReads = 0
         val meter = WorkMeter { work += it }
         val token = object : ExecutionControl() {
-            override fun isCancelled(): Boolean {
-                polls++
-                return false
-            }
-            override val accounting: WorkMeter get() {
-                meterReads++
-                return meter
-            }
+            override fun isCancelled(): Boolean { polls++; return false }
+            override val accounting: WorkMeter get() { meterReads++; return meter }
         }
 
         val delta = Presolve.probeSource(problem, cap, token)
@@ -364,9 +345,7 @@ class ProbingTest {
     @Test
     fun `metered and unmetered complete source probes should retain the same deductions`() {
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 10)),
+            0, 1, arrayOf(IntDomain(0, 10)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 5)),
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
@@ -383,19 +362,14 @@ class ProbingTest {
     @Test
     fun `metered external cancellation should stop compilation within one stride`() {
         val problem = Problem(
-            0,
-            128,
-            Array(128) { IntDomain(0, 1) },
+            0, 128, Array(128) { IntDomain(0, 1) },
             List(128) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
         )
         var work = 0L
         var polls = 0
         val meter = WorkMeter { work += it }
         val token = object : ExecutionControl() {
-            override fun isCancelled(): Boolean {
-                polls++
-                return work >= 451L
-            }
+            override fun isCancelled(): Boolean { polls++; return work >= 451L }
             override val accounting: WorkMeter get() = meter
         }
 
@@ -410,9 +384,7 @@ class ProbingTest {
     @Test
     fun `external cancellation should stop source compilation without deductions`() {
         val problem = Problem(
-            0,
-            128,
-            Array(128) { IntDomain(0, 1) },
+            0, 128, Array(128) { IntDomain(0, 1) },
             List(128) { Linear(intArrayOf(1), intArrayOf(it), LinearOp.LE, 1) },
         )
         var polls = 0
@@ -428,9 +400,7 @@ class ProbingTest {
     @Test
     fun `wide row compilation and propagation should poll individual terms`() {
         val problem = Problem(
-            0,
-            16,
-            Array(16) { IntDomain(0, 1) },
+            0, 16, Array(16) { IntDomain(0, 1) },
             listOf(Linear(IntArray(16) { 1 }, IntArray(16) { it }, LinearOp.LE, 16)),
         )
         for (allowance in listOf(181L, 851L, 1011L)) {
@@ -447,9 +417,7 @@ class ProbingTest {
     @Test
     fun `high degree incidence should stop inside a hypothetical column scan`() {
         val problem = Problem(
-            129,
-            0,
-            emptyArray(),
+            129, 0, emptyArray(),
             List(128) { Clause(intArrayOf(Lit.make(0, false), Lit.make(it + 1, true))) },
         )
         for (allowance in listOf(21801L, 22441L, 23081L)) {

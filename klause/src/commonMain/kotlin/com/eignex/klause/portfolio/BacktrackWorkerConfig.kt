@@ -52,40 +52,20 @@ internal class BacktrackWorkerConfig(
     fun withNumericalLp(): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, onGuidance, true)
 
-    override fun withNodeBudget(budget: NodeBudget): WorkerConfig = BacktrackWorkerConfig(
-        recipe.spending(budget),
-        zeroObjectivePricing,
-        toleranceCheck,
-        coreRefinement,
-        onLpQuery,
-        onGuidance,
-        numericalLp,
-    )
+    override fun withNodeBudget(budget: NodeBudget): WorkerConfig =
+        BacktrackWorkerConfig(recipe.spending(budget), zeroObjectivePricing, toleranceCheck, coreRefinement,
+            onLpQuery, onGuidance, numericalLp)
 
     override fun withCoreRefinement(mode: CoreRefinementMode): BacktrackWorkerConfig =
         BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, mode, onLpQuery, onGuidance, numericalLp)
 
     fun withLpQueryObserver(observer: (String, Double?, LpQueryObservation) -> Unit): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(
-            recipe,
-            zeroObjectivePricing,
-            toleranceCheck,
-            coreRefinement,
-            observer,
-            onGuidance,
-            numericalLp,
-        )
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, observer, onGuidance,
+            numericalLp)
 
     fun withGuidanceObserver(observer: (String, PooledGuidanceObservation) -> Unit): BacktrackWorkerConfig =
-        BacktrackWorkerConfig(
-            recipe,
-            zeroObjectivePricing,
-            toleranceCheck,
-            coreRefinement,
-            onLpQuery,
-            observer,
-            numericalLp,
-        )
+        BacktrackWorkerConfig(recipe, zeroObjectivePricing, toleranceCheck, coreRefinement, onLpQuery, observer,
+            numericalLp)
 
     override val label: String get() = recipe.label
 
@@ -117,32 +97,28 @@ internal class BacktrackWorkerConfig(
         params = params.copy(zeroObjectivePricing = zeroObjectivePricing, toleranceCheck = toleranceCheck)
         onGuidance?.let { observe ->
             val previous = params.branchObserver
-            params = params.copy(
-                branchObserver = object : PooledGuidanceObserver {
-                    private val counts = IntArray(PooledGuidanceKind.entries.size)
-                    private val windowCounts = IntArray(PooledGuidanceKind.entries.size)
-                    override fun accepts(kind: PooledGuidanceKind): Boolean = when (kind) {
-                        PooledGuidanceKind.IMPORT, PooledGuidanceKind.LOCAL -> counts[kind.ordinal] < 16
-                        else -> counts[kind.ordinal] < 128 && windowCounts[kind.ordinal] < 8
+            params = params.copy(branchObserver = object : PooledGuidanceObserver {
+                private val counts = IntArray(PooledGuidanceKind.entries.size)
+                private val windowCounts = IntArray(PooledGuidanceKind.entries.size)
+                override fun accepts(kind: PooledGuidanceKind): Boolean = when (kind) {
+                    PooledGuidanceKind.IMPORT, PooledGuidanceKind.LOCAL -> counts[kind.ordinal] < 16
+                    else -> counts[kind.ordinal] < 128 && windowCounts[kind.ordinal] < 8
+                }
+                override fun onGuidance(observation: PooledGuidanceObservation) {
+                    counts[observation.kind.ordinal]++
+                    windowCounts[observation.kind.ordinal]++
+                    if (observation.kind == PooledGuidanceKind.IMPORT || observation.kind == PooledGuidanceKind.LOCAL) {
+                        windowCounts.fill(0)
                     }
-                    override fun onGuidance(observation: PooledGuidanceObservation) {
-                        counts[observation.kind.ordinal]++
-                        windowCounts[observation.kind.ordinal]++
-                        if (observation.kind == PooledGuidanceKind.IMPORT || observation.kind ==
-                            PooledGuidanceKind.LOCAL
-                        ) {
-                            windowCounts.fill(0)
-                        }
-                        observe(workerLabel, observation)
-                    }
-                    override fun onAttempt(decision: SearchDecision, context: SearchContext) {
-                        previous?.onAttempt(decision, context)
-                    }
-                    override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
-                        previous?.onCommit(decision, decisionLevel)
-                    }
-                },
-            )
+                    observe(workerLabel, observation)
+                }
+                override fun onAttempt(decision: SearchDecision, context: SearchContext) {
+                    previous?.onAttempt(decision, context)
+                }
+                override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
+                    previous?.onCommit(decision, decisionLevel)
+                }
+            })
         }
         if (recipe.label == BacktrackArm.CoreGuided.label) {
             val coreParams = params
@@ -157,10 +133,7 @@ internal class BacktrackWorkerConfig(
         matchedPools?.clauses?.let {
             params = params.copy(
                 clauseExchange = PoolClauseExchange(
-                    it,
-                    origin = index,
-                    tally = matchedPools.contributions,
-                    meter = meter,
+                    it, origin = index, tally = matchedPools.contributions, meter = meter,
                 ),
             )
             sharing += Contribution.Clause
@@ -180,14 +153,9 @@ internal class BacktrackWorkerConfig(
                         meter.exported(SharingChannel.Floor, 1)
                         val invocation = worker.evidenceInvocation?.takeIf { worker.sharingInvocation != null }
                         val raise = if (invocation != null) {
-                            if (v.isFinite()) {
-                                bounds.publish(CompletedEnginePublication.ObjectiveBound(invocation, v))
-                            } else {
-                                0.0
-                            }
-                        } else {
-                            0.0
-                        }
+                            if (v.isFinite()) bounds.publish(CompletedEnginePublication.ObjectiveBound(invocation, v))
+                            else 0.0
+                        } else 0.0
                         matchedPools.contributions.note(Contribution.Floor, index, raise)
                     },
                     objectiveLowerBoundSupplier = {
@@ -202,12 +170,8 @@ internal class BacktrackWorkerConfig(
                     globalVarBoundSink = { v, lo, hi ->
                         meter.exported(SharingChannel.Bounds, 1)
                         val invocation = worker.evidenceInvocation?.takeIf { worker.sharingInvocation != null }
-                        if (invocation != null) {
-                            vb.publish(
-                                CompletedEnginePublication.IntegerWindow(invocation, v, lo, hi),
-                                origin = index,
-                            )
-                        }
+                        if (invocation != null) vb.publish(
+                            CompletedEnginePublication.IntegerWindow(invocation, v, lo, hi), origin = index)
                     },
                     globalVarLowerSupplier = vb::lowerOf,
                     globalVarUpperSupplier = vb::upperOf,
@@ -228,18 +192,10 @@ internal class BacktrackWorkerConfig(
                             val consumer = worker.sharingInvocation
                             val certificate = if (producer != null && consumer != null) {
                                 EvidenceCertificate.published(
-                                    CompletedEnginePublication.Witness(producer, sample, value),
-                                )
-                            } else {
-                                null
-                            }
+                                    CompletedEnginePublication.Witness(producer, sample, value))
+                            } else null
                             matchedPools.offerSolution(
-                                evidenceModel,
-                                sample,
-                                value,
-                                certificate,
-                                consumer,
-                                params.cancellation,
+                                evidenceModel, sample, value, certificate, consumer, params.cancellation,
                             )
                         }
                     },
@@ -252,19 +208,11 @@ internal class BacktrackWorkerConfig(
         }
         // A pure CSP has no bound to prune on, so withBound is wired only when optimising.
         val withBound: ((BacktrackParams, () -> Double) -> BacktrackParams)? =
-            if (objective != null) {
-                { p, supplier ->
-                    p.copy(
-                        objectiveBoundSupplier = if (onLpQuery == null) {
-                            supplier
-                        } else {
-                            { supplier().also { observedCutoff = it } }
-                        },
-                    )
-                }
-            } else {
-                null
-            }
+            if (objective != null) { p, supplier ->
+                p.copy(objectiveBoundSupplier = if (onLpQuery == null) supplier else {
+                    { supplier().also { observedCutoff = it } }
+                })
+            } else null
         val finite = LpSolveContext.finite(numericalLp)
         val context = onLpQuery?.let { observer ->
             finite.copy(onQuery = { observer(workerLabel, observedCutoff, it) })
@@ -279,15 +227,11 @@ internal class BacktrackWorkerConfig(
             objective = objective,
             withBound = withBound,
         ).bindEvidence(evidenceModel).also {
-            if (objective == null) {
-                it.booleanProofRecipe = BooleanProofRecipe(solver, params) { cancellation, open ->
-                    session.openOwnedSolve(params.withCancellation(cancellation)) { scoped ->
-                        check(
-                            scoped.assumptions.numInts == 0 && scoped.assumptions.deductions.isEmpty &&
-                                scoped.assumptions.bools == params.assumptions.bools,
-                        ) { "worker source condition changed" }
-                        open()
-                    }
+            if (objective == null) it.booleanProofRecipe = BooleanProofRecipe(solver, params) { cancellation, open ->
+                session.openOwnedSolve(params.withCancellation(cancellation)) { scoped ->
+                    check(scoped.assumptions.numInts == 0 && scoped.assumptions.deductions.isEmpty &&
+                        scoped.assumptions.bools == params.assumptions.bools) { "worker source condition changed" }
+                    open()
                 }
             }
             it.controlsObjectiveCutoff = objective != null
@@ -359,13 +303,9 @@ internal fun BacktrackRecipe.editing(edit: ((BacktrackParams) -> BacktrackParams
 internal fun BacktrackRecipe.capLp(ceiling: LpConfig): BacktrackRecipe = BacktrackRecipe(label) { seed, onEvent ->
     val p = build(seed, onEvent)
     val intended = p.lpConfig
-    if (intended != null) {
-        p.copy(lpConfig = intended.cappedUnder(ceiling))
-    } else if (ceiling.sourcePreparation == null || p.lpPlan.hasDefaultNumericalSettings()) {
-        p
-    } else {
-        p.copy(lpPlan = p.lpPlan.copy(sourcePreparation = ceiling.sourcePreparation))
-    }
+    if (intended != null) p.copy(lpConfig = intended.cappedUnder(ceiling))
+    else if (ceiling.sourcePreparation == null || p.lpPlan.hasDefaultNumericalSettings()) p
+    else p.copy(lpPlan = p.lpPlan.copy(sourcePreparation = ceiling.sourcePreparation))
 }
 
 /** This recipe with every arm it builds spending [budget], the solve-spanning node allowance. A null

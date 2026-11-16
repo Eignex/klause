@@ -200,12 +200,7 @@ internal class BooleanObjectiveDelta private constructor(
                 if ((term + 1) % 256 == 0) yield(null)
             }
             val evaluator = BooleanObjectiveDelta(
-                terms,
-                coefficients,
-                folds,
-                offsets,
-                readers,
-                minimize,
+                terms, coefficients, folds, offsets, readers, minimize,
             )
             yield(PreparedBooleanObjectiveDelta(evaluator))
         }

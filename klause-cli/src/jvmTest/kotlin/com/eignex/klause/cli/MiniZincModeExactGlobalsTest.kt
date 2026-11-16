@@ -54,24 +54,15 @@ class MiniZincModeExactGlobalsTest(
     @Test
     fun `exact execution should enforce the advertised global through source completion`() {
         val bridge = if (coupling == "algebraic") "v" else "x"
-        val realConstraints = if (coupling == "finite") {
-            ""
-        } else {
-            "constraint int2float($bridge,r); " + when (coupling) {
+        val realConstraints = if (coupling == "finite") "" else "constraint int2float($bridge,r); " + when (coupling) {
             "linear" -> "constraint float_lin_eq([3.0,-1.0],[y,r],0.0);"
             "polynomial", "algebraic" -> "constraint float_times(y,y,r);"
             else -> ""
         }
-        }
         val realUpper = if (verdict == "real-refutation") "0.25" else "2.0"
-        val realDeclarations = if (coupling == "finite") {
-            ""
-        } else {
+        val realDeclarations = if (coupling == "finite") "" else
             "var 0.0..3.0: r :: output_var; var 0.0..$realUpper: y :: output_var; "
-        }
-        val pin = if (verdict == "optimum") {
-            ""
-        } else {
+        val pin = if (verdict == "optimum") "" else {
             val value = (if (verdict == "refutation") 0 else 1) + if (coupling == "algebraic") 1 else 0
             if (coupling == "finite") "constraint int_eq(x,$value);" else "constraint float_eq(r,$value.0);"
         }
@@ -94,10 +85,8 @@ class MiniZincModeExactGlobalsTest(
             }
             val definitions = (if ("v" in roles) "constraint int_plus(x,1,v); " else "") +
                 if ("d" in roles) "constraint int_eq(d,1); " else ""
-            writeText(
-                "var 0..2: x :: output_var; $declarations $realDeclarations $definitions " +
-                    "constraint ${global.second}; $realConstraints $pin solve $solve;",
-            )
+            writeText("var 0..2: x :: output_var; $declarations $realDeclarations $definitions " +
+                "constraint ${global.second}; $realConstraints $pin solve $solve;")
         }
         val common = CommonOptions().apply {
             engine = "cp"
@@ -137,11 +126,8 @@ class MiniZincModeExactGlobalsTest(
                 if (coupling == "algebraic" || (coupling == "polynomial" && exact != "% klause-exact: y = 1;")) {
                     assertTrue(assertNotNull(exact, output).startsWith("% klause-exact: y = root("), output)
                     val image = if (coupling == "algebraic") 2 else 1
-                    assertEquals(
-                        "% klause-exact: r = $image;",
-                        output.lineSequence().lastOrNull { it.startsWith("% klause-exact: r = ") },
-                        output,
-                    )
+                    assertEquals("% klause-exact: r = $image;",
+                        output.lineSequence().lastOrNull { it.startsWith("% klause-exact: r = ") }, output)
                 } else {
                     val value = if (coupling == "linear") "1/3" else "1"
                     assertEquals("% klause-exact: y = $value;", exact, output)

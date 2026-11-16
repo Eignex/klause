@@ -27,10 +27,8 @@ class TableValueSubstitutionTest {
     fun `strict support inclusion should remove an interior value`() {
         val table = Table(intArrayOf(0, 1, 2), longArrayOf(0, 1, 0, 0, 1, 1, 1, 1, 1, 2, 0, 1))
         val problem = Problem(0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1)), listOf(table)).bake()
-        val context = PresolveContext.of(
-            LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
-            transformObjective = true,
-        )
+        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
+            transformObjective = true)
 
         val delta = TableValueSubstitution.reduce(problem, context)
 
@@ -49,10 +47,8 @@ class TableValueSubstitutionTest {
             ReifiedLinear(0, longArrayOf(1), intArrayOf(0), LinearOp.EQ, 1),
             Linear(longArrayOf(1, -1), intArrayOf(0, 2), LinearOp.GE, 0),
         )
-        val context = PresolveContext.of(
-            LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
-            transformObjective = true,
-        )
+        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0, 0)),
+            transformObjective = true)
         for (blocker in blockers) {
             val problem = Problem(1, 3, Array(3) { IntDomain(0, 2) }, listOf(base, blocker)).bake()
 
@@ -65,10 +61,8 @@ class TableValueSubstitutionTest {
     @Test
     fun `declared holes and root pins should exclude unavailable replacements`() {
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0, 0, 1, 1, 1, 2, 0))
-        val context = PresolveContext.of(
-            LinearObjective(intCoefficients = longArrayOf(1, 0)),
-            transformObjective = true,
-        )
+        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)),
+            transformObjective = true)
         for (domain in listOf(IntDomain(0, 2).excludeValue(0), IntDomain(1, 1))) {
             val problem = Problem(0, 2, arrayOf(domain, IntDomain(0, 1)), listOf(table)).bake()
 
@@ -81,17 +75,11 @@ class TableValueSubstitutionTest {
     @Test
     fun `strict exact descent should retain a replacement after batched chains`() {
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 0, 2, 0))
-        for ((coefficient, expected) in listOf(
-            1L to 0L,
-            -1L to 2L,
-            Long.MAX_VALUE to 0L,
-            Long.MIN_VALUE to 2L,
-        )) {
+        for ((coefficient, expected) in listOf(1L to 0L, -1L to 2L, Long.MAX_VALUE to 0L,
+            Long.MIN_VALUE to 2L)) {
             val problem = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 0)), listOf(table)).bake()
-            val context = PresolveContext.of(
-                LinearObjective(intCoefficients = longArrayOf(coefficient, 0)),
-                transformObjective = true,
-            )
+            val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(coefficient, 0)),
+                transformObjective = true)
 
             val delta = TableValueSubstitution.reduce(problem, context)
 
@@ -123,17 +111,13 @@ class TableValueSubstitutionTest {
     fun `interrupted verification should publish no partial exclusion`() {
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 0, 2, 0))
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 0)), listOf(table)).bake()
-        val context = PresolveContext.of(
-            LinearObjective(intCoefficients = longArrayOf(1, 0)),
-            transformObjective = true,
-        )
+        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)),
+            transformObjective = true)
         for (limit in listOf(0L, 5L, 20L, 40L)) {
             val budget = PresolveBudget(limit)
 
-            val delta = TableValueSubstitution.reduce(
-                problem,
-                context.withCancellation(budget.orSpent(ExecutionControl.Never)),
-            )
+            val delta = TableValueSubstitution.reduce(problem,
+                context.withCancellation(budget.orSpent(ExecutionControl.Never)))
 
             assertTrue(delta.isEmpty)
             assertTrue(budget.spent() <= limit)
@@ -154,12 +138,8 @@ class TableValueSubstitutionTest {
 
         assertFalse(1L in reduced.rootIntDomain(0))
         assertEquals(17L, objective.evaluateLong(witness))
-        assertFalse(
-            source.propagate(
-                Assumptions.None.withInt(0, witness.intValue(0))
-                    .withInt(1, witness.intValue(1)),
-            ) is PropagationResult.Unsat,
-        )
+        assertFalse(source.propagate(Assumptions.None.withInt(0, witness.intValue(0))
+            .withInt(1, witness.intValue(1))) is PropagationResult.Unsat)
     }
 
     @Test
@@ -173,12 +153,8 @@ class TableValueSubstitutionTest {
         assertFalse(config.resolved(PresolvePass.SUBSTITUTE_TABLE_VALUES, sensitive))
         assertTrue(TableValueSubstitution.reduce(source, sensitive).isEmpty)
         assertTrue(TableValueSubstitution.reduce(source, PresolveContext.EMPTY).isEmpty)
-        assertFalse(
-            PresolveConfig.DEFAULT.resolved(
-                PresolvePass.SUBSTITUTE_TABLE_VALUES,
-                PresolveContext.of(objective),
-            ),
-        )
+        assertFalse(PresolveConfig.DEFAULT.resolved(PresolvePass.SUBSTITUTE_TABLE_VALUES,
+            PresolveContext.of(objective)))
     }
 
     @Test
@@ -223,10 +199,8 @@ class TableValueSubstitutionTest {
         val table = Table(intArrayOf(0, 1), tuples)
         val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 1023)), listOf(table)).bake()
         val budget = PresolveBudget(Long.MAX_VALUE)
-        val context = PresolveContext.of(
-            LinearObjective(intCoefficients = longArrayOf(1, 0)),
-            transformObjective = true,
-        ).withCancellation(budget.orSpent(ExecutionControl.Never))
+        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)),
+            transformObjective = true).withCancellation(budget.orSpent(ExecutionControl.Never))
 
         val delta = TableValueSubstitution.reduce(problem, context)
 
@@ -239,10 +213,8 @@ class TableValueSubstitutionTest {
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 0, 2, 0))
         val source = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 0)), listOf(table)).bake()
         val conditioned = source.conditionedRoot(Assumptions.None.withInt(0, 1), ExecutionControl.Never)
-        val context = PresolveContext.of(
-            LinearObjective(intCoefficients = longArrayOf(1, 0)),
-            transformObjective = true,
-        )
+        val context = PresolveContext.of(LinearObjective(intCoefficients = longArrayOf(1, 0)),
+            transformObjective = true)
 
         val delta = TableValueSubstitution.reduce(conditioned, context)
 

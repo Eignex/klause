@@ -22,16 +22,8 @@ class FiniteCompanionAdmissionTest {
     fun `cancelled queries should avoid funded construction`() {
         val clock = TestTimeSource()
         var calls = 0
-        val admission = FiniteCompanionAdmission(
-            ExecutionControl.until(clock.markNow() + 30.seconds),
-            4_000,
-            1_000,
-            capture = {
-                calls++
-                null
-            },
-            clock = clock,
-        )
+        val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 30.seconds), 4_000, 1_000,
+            capture = { calls++; null }, clock = clock)
 
         assertNull(admission.contextForStart(ExecutionControl { true }, 1_000))
 
@@ -44,16 +36,8 @@ class FiniteCompanionAdmissionTest {
         for (grant in listOf(0L, -1L)) {
             val clock = TestTimeSource()
             var calls = 0
-            val admission = FiniteCompanionAdmission(
-                ExecutionControl.until(clock.markNow() + 30.seconds),
-                4_000,
-                1_000,
-                capture = {
-                    calls++
-                    null
-                },
-                clock = clock,
-            )
+            val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 30.seconds), 4_000, 1_000,
+                capture = { calls++; null }, clock = clock)
 
             assertNull(admission.contextForStart(ExecutionControl.Never, grant))
 
@@ -66,16 +50,8 @@ class FiniteCompanionAdmissionTest {
     fun `late first starts should decline before constructing a context`() {
         val clock = TestTimeSource()
         var captured = false
-        val admission = FiniteCompanionAdmission(
-            ExecutionControl.until(clock.markNow() + 30.seconds),
-            4_000,
-            1_000,
-            capture = {
-                captured = true
-                null
-            },
-            clock = clock,
-        )
+        val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 30.seconds), 4_000, 1_000,
+            capture = { captured = true; null }, clock = clock)
 
         assertTrue(admission.initiallyFunded)
         clock += 23.seconds
@@ -91,16 +67,8 @@ class FiniteCompanionAdmissionTest {
         for (remaining in listOf(1, 7, 8)) {
             val clock = TestTimeSource()
             var captured = false
-            val admission = FiniteCompanionAdmission(
-                ExecutionControl.until(clock.markNow() + remaining.seconds),
-                4_000,
-                1_000,
-                capture = {
-                    captured = true
-                    null
-                },
-                clock = clock,
-            )
+            val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + remaining.seconds),
+                4_000, 1_000, capture = { captured = true; null }, clock = clock)
 
             assertFalse(admission.initiallyFunded)
             assertNull(admission.contextForStart(ExecutionControl.Never, 1_000))
@@ -114,26 +82,12 @@ class FiniteCompanionAdmissionTest {
     @Test
     fun `admitted workers should share one paid capture and recheck their remaining lifetime`() {
         val model = Problem(0, 1, arrayOf(IntDomain(0, 1)), emptyArray())
-        val context = assertNotNull(
-            model.linearAuthorityContext(
-                LinearObjective(intCoefficients = longArrayOf(1)),
-                ObjectiveSense.MINIMIZE,
-                ExecutionControl.Never,
-            ),
-        )
+        val context = assertNotNull(model.linearAuthorityContext(LinearObjective(intCoefficients = longArrayOf(1)),
+            ObjectiveSense.MINIMIZE, ExecutionControl.Never))
         val clock = TestTimeSource()
         var calls = 0
-        val admission = FiniteCompanionAdmission(
-            ExecutionControl.until(clock.markNow() + 10.seconds),
-            4_000,
-            1_000,
-            capture = {
-                calls++
-                clock += 100.milliseconds
-                context
-            },
-            clock = clock,
-        )
+        val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 10.seconds), 4_000, 1_000,
+            capture = { calls++; clock += 100.milliseconds; context }, clock = clock)
 
         assertSame(context, admission.contextForStart(ExecutionControl.Never, 1_000))
         clock += 4.seconds
@@ -152,18 +106,13 @@ class FiniteCompanionAdmissionTest {
         for (grant in listOf(50L, 1_000L)) {
             val clock = TestTimeSource()
             var calls = 0
-            val admission = FiniteCompanionAdmission(
-                ExecutionControl.until(clock.markNow() + 8_100.milliseconds),
-                4_000,
-                1_000,
-                capture = {
+            val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 8_100.milliseconds),
+                4_000, 1_000, capture = {
                     calls++
                     clock += minOf(grant, 100L).milliseconds
                     assertTrue(it.isCancelled())
                     null
-                },
-                clock = clock,
-            )
+                }, clock = clock)
 
             assertTrue(admission.initiallyFunded)
             assertNull(admission.contextForStart(ExecutionControl.Never, grant))
@@ -179,16 +128,8 @@ class FiniteCompanionAdmissionTest {
     fun `unavailable complete affine capture should not repeat in sibling workers`() {
         val clock = TestTimeSource()
         var calls = 0
-        val admission = FiniteCompanionAdmission(
-            ExecutionControl.until(clock.markNow() + 30.seconds),
-            4_000,
-            1_000,
-            capture = {
-                calls++
-                null
-            },
-            clock = clock,
-        )
+        val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 30.seconds), 4_000, 1_000,
+            capture = { calls++; null }, clock = clock)
 
         assertNull(admission.contextForStart(ExecutionControl.Never, 1_000))
         assertNull(admission.contextForStart(ExecutionControl.Never, 1_000))

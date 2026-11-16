@@ -46,17 +46,11 @@ class LinearTerminalAcceptanceTest {
         }
 
         for (steps in listOf(1, sufficient)) {
-            val checked = result.verifyTerminal(
-                source,
-                ExecutionControl.Never,
-                SourceEvidenceVerifier(captured, maximumSteps = steps),
-            )
+            val checked = result.verifyTerminal(source, ExecutionControl.Never,
+                SourceEvidenceVerifier(captured, maximumSteps = steps))
 
-            if (steps == sufficient) {
-                assertIs<Verification.Accepted<Unit, Unit>>(checked)
-            } else {
-                assertIs<Verification.Indeterminate>(checked)
-            }
+            if (steps == sufficient) assertIs<Verification.Accepted<Unit, Unit>>(checked)
+            else assertIs<Verification.Indeterminate>(checked)
         }
     }
 

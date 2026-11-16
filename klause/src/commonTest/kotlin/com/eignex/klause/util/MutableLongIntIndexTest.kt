@@ -33,10 +33,8 @@ class MutableLongIntIndexTest {
 
             assertEquals(49, index.size)
             assertEquals(-1, index.getOrDefault(removed, -1))
-            for (key in 0L until 50L) {
-                if (key != removed) {
-                    assertEquals(if (key == updated) 123 else key.toInt(), index.getOrDefault(key, -1))
-                }
+            for (key in 0L until 50L) if (key != removed) {
+                assertEquals(if (key == updated) 123 else key.toInt(), index.getOrDefault(key, -1))
             }
         }
     }

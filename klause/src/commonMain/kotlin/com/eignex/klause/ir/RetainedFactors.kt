@@ -20,9 +20,7 @@ internal class RetainedFactors private constructor(
                 !source.realLower.contentEquals(target.realLower) ||
                 !source.realUpper.contentEquals(target.realUpper) || source.settings !== target.settings ||
                 source.semantics !== target.semantics || source.hasSymmetryBreaking != target.hasSymmetryBreaking
-            ) {
-                return null
-            }
+            ) return null
             val indices = IntArray(target.numFactors)
             val stop = if (cancellation.stopPolling == null) cancellation.bindStopControl() else cancellation
             val meter = stop.accounting
@@ -38,9 +36,7 @@ internal class RetainedFactors private constructor(
                 if (next < target.numFactors && source.factors[index] === target.factors[next]) {
                     if ((source.impliedFactorMask?.get(index) == true) !=
                         (target.impliedFactorMask?.get(next) == true)
-                    ) {
-                        return null
-                    }
+                    ) return null
                     indices[next++] = index
                 }
             }

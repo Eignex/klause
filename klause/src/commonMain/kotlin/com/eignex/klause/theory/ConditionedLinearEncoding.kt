@@ -36,9 +36,7 @@ private fun PreparedFactorProjections.conditionedLinearDomains(
         if (cancellation()) return null
         if (id.index !in 0 until problem.numIntVars || !problem.intBounds.hasLower(id.index) ||
             !problem.intBounds.hasUpper(id.index)
-        ) {
-            return null
-        }
+        ) return null
         val domain = problem.declaredIntDomains.finiteDomain(id.index)
             .spanOrNull(MAX_CONDITIONED_LINEAR_CASES.toLong()) ?: return null
         cases *= domain.size.toLong()
@@ -84,34 +82,19 @@ internal fun PreparedFactorProjections.installConditionedLinearFactor(
             if (fixed == null) pins.remove(id) else pins[id] = fixed
             return true
         }
-        val relations = installLinearFactor(
-            index,
-            EncodingTarget.LINEAR,
-            pins,
-            booleanPins,
-            cancellation,
-            allocator,
-            onDecline,
-        ) ?: return false
-        val guards = domains.map { (id, _) ->
-            ExactSearchRow.of(
-                intArrayOf(Term.ofIntVar(id.index)),
-                listOf(BigFraction.ONE),
-                LinearOp.NE,
-                BigFraction.of(checkNotNull(pins[id]), BIG_ONE),
-            )
-        }
+        val relations = installLinearFactor(index, EncodingTarget.LINEAR, pins, booleanPins,
+            cancellation, allocator, onDecline) ?: return false
+        val guards = domains.map { (id, _) -> ExactSearchRow.of(intArrayOf(Term.ofIntVar(id.index)),
+            listOf(BigFraction.ONE), LinearOp.NE, BigFraction.of(checkNotNull(pins[id]), BIG_ONE)) }
         for (relation in relations) {
             lowering.checkpoint()
             val clauses = lowering.or(listOf(listOf(guards), lowering.relation(relation.linearForm)))
             val previous = relation.attribution
-            val attribution = EncodingAttribution(
-                previous.sourceFactorIndex,
+            val attribution = EncodingAttribution(previous.sourceFactorIndex,
                 previous.booleans, (previous.integers + domains.map { it.first }).distinct(), previous.reals,
                 auxiliaries = previous.auxiliaries, integerConditions = integerPins,
                 booleanConditions = booleanPins, affineAuxiliaries = previous.affineAuxiliaries,
-                linearGuards = previous.linearGuards,
-            )
+                linearGuards = previous.linearGuards)
             for (form in lowering.forms(clauses)) result += EncodedTheoryFactor(source, form, attribution)
         }
         return true
@@ -120,9 +103,7 @@ internal fun PreparedFactorProjections.installConditionedLinearFactor(
         if (!install(0) || cancellation()) {
             if (cancellation()) onDecline(EncoderDecline.RESOURCE)
             null
-        } else {
-            result
-        }
+        } else result
     } catch (_: LinearEncodingInterrupted) {
         onDecline(EncoderDecline.RESOURCE)
         null

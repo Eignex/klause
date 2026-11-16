@@ -10,22 +10,15 @@ class SharingMeterTest {
     @Test
     fun `incumbent exports should count installations separately from queued offers`() {
         val meter = SharingMeter()
-        for (event in listOf(
-            IncumbentOfferEvent.Offered,
-            IncumbentOfferEvent.Offered,
-            IncumbentOfferEvent.Coalesced,
-            IncumbentOfferEvent.Checked,
-            IncumbentOfferEvent.Installed,
-        )) {
+        for (event in listOf(IncumbentOfferEvent.Offered, IncumbentOfferEvent.Offered,
+            IncumbentOfferEvent.Coalesced, IncumbentOfferEvent.Checked, IncumbentOfferEvent.Installed)) {
             meter.incumbentEvent(event)
         }
 
         val snapshot = meter.snapshot()
 
-        assertEquals(
-            mapOf("offered" to 2L, "coalesced" to 1L, "checked" to 1L, "installed" to 1L),
-            snapshot.incumbents.filterValues { it > 0L },
-        )
+        assertEquals(mapOf("offered" to 2L, "coalesced" to 1L, "checked" to 1L, "installed" to 1L),
+            snapshot.incumbents.filterValues { it > 0L })
         assertEquals(0L, snapshot.incumbents.getValue("dropped"))
         assertEquals(0L, snapshot.incumbents.getValue("expired"))
         assertEquals(1L, snapshot.channels.getValue(SharingChannel.Incumbents).exported)

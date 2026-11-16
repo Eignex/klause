@@ -50,21 +50,11 @@ private fun projectedPolynomialPoint(
 ): SourceEvidenceCheck {
     val algebraic = AlgebraicArithmetic(arithmetic)
     val values = point.algebraicReals ?: point.exactReals?.map(algebraic::rational)
-        ?: if (source.sourceRealCount == 0) {
-            emptyList()
-        } else {
+        ?: if (source.sourceRealCount == 0) emptyList() else {
             return SourceEvidenceCheck.Unavailable("polynomial witness has no exact source coordinates")
         }
-    return checkProjectedPolynomialFormula(
-        source.formula,
-        source.totalBoolCount,
-        source.totalRealCount,
-        point.bools,
-        values.withIndex().associate { it.index to it.value },
-        cancellation,
-        arithmetic,
-        limits,
-    )
+    return checkProjectedPolynomialFormula(source.formula, source.totalBoolCount, source.totalRealCount,
+        point.bools, values.withIndex().associate { it.index to it.value }, cancellation, arithmetic, limits)
 }
 
 internal fun checkProjectedPolynomialFormula(
@@ -83,20 +73,15 @@ internal fun checkProjectedPolynomialFormula(
     for ((id, value) in values) {
         arithmetic.step()
         val rational = value.rational
-        if (rational != null) {
-            fixed[id] = rational
-        } else {
-            terms.addAll(polynomialRootCondition(id, value, arithmetic))
-        }
+        if (rational != null) fixed[id] = rational
+        else terms.addAll(polynomialRootCondition(id, value, arithmetic))
     }
     val bools = booleans.indices.associateWith {
         arithmetic.step()
         booleans[it]
     }
     val checked = solveQfNra(
-        PolynomialRealFormula.And(terms),
-        boolCount,
-        realCount,
+        PolynomialRealFormula.And(terms), boolCount, realCount,
         QfNraParams(cancellation = cancellation, polynomialLimits = limits),
         PolynomialCondition(bools, fixed, fixed),
     )
@@ -104,10 +89,8 @@ internal fun checkProjectedPolynomialFormula(
     return when (checked) {
         is QfNraResult.Unsatisfiable ->
             SourceEvidenceCheck.Rejected("polynomial source point has no feasible lowering extension")
-
         is QfNraResult.Unknown ->
             SourceEvidenceCheck.Unavailable("projected polynomial witness checking incomplete: ${checked.reason}")
-
         is QfNraResult.Satisfiable -> {
             for ((id, value) in values) {
                 if (algebraic.compare(value, checked.assignment.realValue(id)) != 0) {
@@ -130,12 +113,9 @@ private fun polynomialRootCondition(
     var polynomial: PolynomialExpression = polynomialConstant(coefficients.last())
     for (index in coefficients.lastIndex - 1 downTo 0) {
         arithmetic.step()
-        polynomial = PolynomialExpression.Sum(
-            listOf(
-                PolynomialExpression.Product(listOf(polynomial, variable)),
-                polynomialConstant(coefficients[index]),
-            ),
-        )
+        polynomial = PolynomialExpression.Sum(listOf(
+            PolynomialExpression.Product(listOf(polynomial, variable)), polynomialConstant(coefficients[index]),
+        ))
     }
     return listOf(
         PolynomialRealFormula.Atom(polynomial, PolynomialRelation.EQ, polynomialConstant(BigFraction.ZERO)),

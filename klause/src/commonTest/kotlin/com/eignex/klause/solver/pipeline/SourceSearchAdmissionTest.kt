@@ -36,47 +36,33 @@ class SourceSearchAdmissionTest {
                 "solve :: int_search([a,b,c], first_fail, indomain_min, complete) minimize a;",
         )
         val objective = assertNotNull(program.linearObjective())
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-                SourceAttachment(
-                    program.problem,
-                    program.definitionHints,
-                    assertNotNull(program.searchHints).toSearchHints(),
-                ),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.MIXED,
-                objective,
-            ),
-        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(program.problem, program.definitionHints,
+                assertNotNull(program.searchHints).toSearchHints()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, objective,
+        ))
         val points = ArrayList<Sample>()
 
-        val result = assertIs<SourceExecutionResult.Finite>(
-            SourceSetup.execute(
-                SourceExecutionRequest(invocation, finiteRequest = { shape ->
-                    FiniteSolveRequest(
-                        shape, FiniteEngine.MIXED, PresolveConfig.parse("affine"), true, false, ExecutionControl.Never,
-                        presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
-                        randomSeed = 1, defaultArms = PortfolioScenario.DEFAULT_ARMS, lpConfig = LpConfig.OFF,
-                        zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
-                        solveBudgetMillis = null, allSolutions = false, solutionCap = null,
-                        deadlineExceeded =
-                        { false },
-                        onEvent = null, onPortfolioEvent = null,
-                    )
-                }),
-                SourceExecutionCallbacks(FiniteSolveCallbacks(points::add, { points += it.sample })),
-            ),
-        )
+        val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(
+            SourceExecutionRequest(invocation, finiteRequest = { shape ->
+                FiniteSolveRequest(
+                    shape, FiniteEngine.MIXED, PresolveConfig.parse("affine"), true, false, ExecutionControl.Never,
+                    presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
+                    randomSeed = 1, defaultArms = PortfolioScenario.DEFAULT_ARMS, lpConfig = LpConfig.OFF,
+                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT, nodeBudget = null,
+                    solveBudgetMillis = null, allSolutions = false, solutionCap = null, deadlineExceeded = { false },
+                    onEvent = null, onPortfolioEvent = null,
+                )
+            }),
+            SourceExecutionCallbacks(FiniteSolveCallbacks(points::add, { points += it.sample })),
+        ))
 
         val outcome = assertIs<FiniteSolveOutcome.Completed>(result.result.outcome)
         val best = assertNotNull(outcome.bestSample)
         assertEquals(2L, objective.evaluateLong(best))
-        assertEquals(
-            listOf(2L, 3L, 1L),
-            listOf("a", "b", "c").map {
-                best.intValue(program.intVarsByName.getValue(it))
-            },
-        )
+        assertEquals(listOf(2L, 3L, 1L), listOf("a", "b", "c").map {
+            best.intValue(program.intVarsByName.getValue(it))
+        })
         assertTrue(points.isNotEmpty())
         val verifier = finiteWitnessVerifier(program.problem.bake(), objective)
         for (point in points + best) {
@@ -93,40 +79,23 @@ class SourceSearchAdmissionTest {
                     "solve :: seq_search([int_search(p, first_fail, indomain_min, complete), " +
                     "int_search([cost], input_order, indomain_min, complete)]) minimize cost;",
             )
-            val invocation = SourceSetup.prepare(
-                SourceSetupRequest(
-                    SourceAttachment(
-                        program.problem,
-                        program.definitionHints,
-                        assertNotNull(program.searchHints).toSearchHints(),
-                    ),
-                    ExecutionOperation.OPTIMIZE,
-                    FiniteEngine.MIXED,
-                    assertNotNull(program.linearObjective()),
-                ),
-            )
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SourceAttachment(program.problem, program.definitionHints,
+                    assertNotNull(program.searchHints).toSearchHints()),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, assertNotNull(program.linearObjective()),
+            ))
             val shape = invocation.finiteShape()
-            val preparation = FinitePipeline.prepare(
-                FinitePipelineRequest(
-                    shape.problem,
-                    FiniteEngine.MIXED,
-                    shape.linearObjective,
-                    PresolveConfig.parse("affine"),
-                    explicitPresolveConfig = true,
-                    preparedPlan = shape.preparedPlan,
-                ),
-            )
-            val hints = assertNotNull(
-                assertNotNull(shape.searchHints)
-                    .remapped(assertNotNull(preparation.sourceMapping), ExecutionControl.Never),
-            )
+            val preparation = FinitePipeline.prepare(FinitePipelineRequest(
+                shape.problem, FiniteEngine.MIXED, shape.linearObjective, PresolveConfig.parse("affine"),
+                explicitPresolveConfig = true, preparedPlan = shape.preparedPlan,
+            ))
+            val hints = assertNotNull(assertNotNull(shape.searchHints)
+                .remapped(assertNotNull(preparation.sourceMapping), ExecutionControl.Never))
             val annotation = hints.toBacktrackParams(preparation.problem.numBoolVars, preparation.problem.numIntVars)
 
-            val workers = PortfolioBuilder.build(
-                preparation.executableProblem(),
+            val workers = PortfolioBuilder.build(preparation.executableProblem(),
                 PortfolioScenario.sequential(Kind.COP).copy(annotationArm = annotation, lpCeiling = LpConfig.OFF),
-                preparation.objective,
-            )
+                preparation.objective)
 
             try {
                 val successors = preparation.problem.factors.filterIsInstance<Circuit>().single().succ.toList()

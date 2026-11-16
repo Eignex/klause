@@ -19,9 +19,7 @@ internal fun rowLatticeBounds(
     val upper = logical.upper ?: return emptyList()
     if (lower.strict || upper.strict || lower.premises != null || upper.premises != null ||
         lower.number.value != upper.number.value || logical != state.baseModel.column(state.model.n + row).bounds
-    ) {
-        return emptyList()
-    }
+    ) return emptyList()
     for (term in terms) {
         meter.step()
         val bounds = state.model.column(term.column).bounds
@@ -76,22 +74,14 @@ internal fun rowLatticeBounds(
         val gcd = rowGcd(prefix[index], suffix[index + 1], meter)
         if (gcd == 0L || (gcd == 1L && rangeLower <= rangeUpper)) continue
         if (rangeLower <= rangeUpper &&
-            !meter.less(
-                meter.add(BigFraction.ofLong(rangeUpper), BigFraction.ofLong(rangeLower).negated()),
-                BigFraction.ofLong(gcd - 1L),
-            )
-        ) {
-            continue
-        }
+            !meter.less(meter.add(BigFraction.ofLong(rangeUpper), BigFraction.ofLong(rangeLower).negated()),
+                BigFraction.ofLong(gcd - 1L))
+        ) continue
         val interval = targetInterval(state, term.column, ordinary, meter) ?: continue
         if (interval.first > interval.last ||
-            meter.less(
-                BigFraction.ofLong(15L),
-                meter.add(BigFraction.ofLong(interval.last), BigFraction.ofLong(interval.first).negated()),
-            )
-        ) {
-            continue
-        }
+            meter.less(BigFraction.ofLong(15L),
+                meter.add(BigFraction.ofLong(interval.last), BigFraction.ofLong(interval.first).negated()))
+        ) continue
         meter.step()
         val allowedLower = positiveRemainder(rangeLower, gcd)
         meter.step()
@@ -118,21 +108,13 @@ internal fun rowLatticeBounds(
         val hi = last ?: interval.first.takeIf { it != Long.MIN_VALUE }?.minus(1L)
         if (lo != null && lo > interval.first) {
             meter.reserve(160L)
-            completed.add(
-                LpRowBound(
-                    state, row, term.column, false, BigFraction.ofLong(lo),
-                    false, true, terms, lattice = true,
-                ),
-            )
+            completed.add(LpRowBound(state, row, term.column, false, BigFraction.ofLong(lo),
+                false, true, terms, lattice = true))
         }
         if (hi != null && hi < interval.last) {
             meter.reserve(160L)
-            completed.add(
-                LpRowBound(
-                    state, row, term.column, true, BigFraction.ofLong(hi),
-                    false, false, terms, lattice = true,
-                ),
-            )
+            completed.add(LpRowBound(state, row, term.column, true, BigFraction.ofLong(hi),
+                false, false, terms, lattice = true))
         }
     }
     return completed

@@ -6,7 +6,9 @@ import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import kotlin.math.sqrt
 
-internal class ContinuousProductInvariant(private val factor: ContinuousProduct) : Invariant {
+internal class ContinuousProductInvariant(
+    private val factor: ContinuousProduct,
+) : Invariant {
     private val a = factor.a
     private val b = factor.b
     private val result = factor.result
@@ -19,14 +21,12 @@ internal class ContinuousProductInvariant(private val factor: ContinuousProduct)
         val selectedValue = choices.nearest(operand)
         val membership = numericalEqualityDegree(selectedValue, operand, state.violationSoftCap)
         var degree = product.toLong() + membership
-        if (choices.hasGuards) {
-            for (index in 0 until choices.size) {
-                val literal = choices.literalAt(index)
-                val variable = Lit.variable(literal)
-                val boolean = state.assignment.boolValue(variable) xor (variable == flipped)
-                val selected = choices.valueAt(index) == selectedValue
-                if (Lit.evaluate(literal, boolean) != selected) degree++
-            }
+        if (choices.hasGuards) for (index in 0 until choices.size) {
+            val literal = choices.literalAt(index)
+            val variable = Lit.variable(literal)
+            val boolean = state.assignment.boolValue(variable) xor (variable == flipped)
+            val selected = choices.valueAt(index) == selectedValue
+            if (Lit.evaluate(literal, boolean) != selected) degree++
         }
         return degree.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
@@ -56,9 +56,7 @@ internal class ContinuousProductInvariant(private val factor: ContinuousProduct)
             if (value.isFinite() && value != state.assignment.realValue(variable) &&
                 value >= state.problem.realLower[variable] && value <= state.problem.realUpper[variable] &&
                 score(state, variable, value) < before
-            ) {
-                sink.addRealSet(variable, value)
-            }
+            ) sink.addRealSet(variable, value)
         }
         factor.finiteChoices?.let { choices ->
             propose(choices.operand, choices.nearest(state.assignment.realValue(choices.operand)))

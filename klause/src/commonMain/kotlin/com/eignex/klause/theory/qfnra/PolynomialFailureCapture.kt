@@ -79,10 +79,8 @@ internal class PolynomialFailureCapture {
             atoms("signedPremises", premises)
         }
         firstSignConflict = copied + context.mapKeys { "context.${it.key}" } +
-            operation.mapKeys { "operation.${it.key}" } + (
-                "complete" to
-                    listOf(scope, context, operation, copied).all { it["complete"] == "true" }.toString()
-                )
+            operation.mapKeys { "operation.${it.key}" } + ("complete" to
+            listOf(scope, context, operation, copied).all { it["complete"] == "true" }.toString())
     }
 
     fun refused(resource: String, arithmetic: PolynomialArithmetic) {
@@ -98,10 +96,8 @@ internal class PolynomialFailureCapture {
                     put("context.$key", value)
                 }
             }
-            firstRefusal = copied + (
-                "complete" to
-                    listOf(scope, context, operation, copied).all { it["complete"] == "true" }.toString()
-                )
+            firstRefusal = copied + ("complete" to
+                listOf(scope, context, operation, copied).all { it["complete"] == "true" }.toString())
         }
     }
 
@@ -144,7 +140,11 @@ internal class PolynomialFailureCapture {
         }
     }
 
-    fun scope(formula: PolynomialFormula, condition: PolynomialCondition, arithmetic: PolynomialArithmetic) {
+    fun scope(
+        formula: PolynomialFormula,
+        condition: PolynomialCondition,
+        arithmetic: PolynomialArithmetic,
+    ) {
         scope = capture(arithmetic) {
             for ((id, truth) in condition.bools) {
                 if (exhausted) break
@@ -276,7 +276,10 @@ internal class PolynomialFailureCapture {
     }
 }
 
-internal class FailureWriter(private val arithmetic: PolynomialArithmetic, private val copied: () -> Unit = {}) {
+internal class FailureWriter(
+    private val arithmetic: PolynomialArithmetic,
+    private val copied: () -> Unit = {},
+) {
     private fun step() {
         arithmetic.step()
         copied()
@@ -300,9 +303,7 @@ internal class FailureWriter(private val arithmetic: PolynomialArithmetic, priva
         step()
         if (value.num.magnitudeBitLength() > 4096 || value.den.magnitudeBitLength() > 4096) {
             complete = false
-        } else {
-            put(key, value.toString())
-        }
+        } else put(key, value.toString())
     }
 
     fun polynomial(key: String, value: Polynomial) {

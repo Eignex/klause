@@ -22,10 +22,8 @@ internal fun integerResidueStats(
 ): NonlinearIntegerResidueStats? {
     if (!params.residueRefutation) return null
     return NonlinearIntegerResidueStats(
-        workers.sumOf { it.residueCounts.rings },
-        workers.sumOf { it.residueCounts.tuples },
-        workers.sumOf { it.residueCounts.work },
-        workers.sumOf { it.residueCounts.refuted },
+        workers.sumOf { it.residueCounts.rings }, workers.sumOf { it.residueCounts.tuples },
+        workers.sumOf { it.residueCounts.work }, workers.sumOf { it.residueCounts.refuted },
         workers.sumOf { it.residueCounts.declined },
         workers.sumOf { it.residueCounts.excluded },
     )

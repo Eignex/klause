@@ -143,9 +143,8 @@ internal fun certifyBoundConflict(
     val conflict = state.conflict ?: return null
     val observation = observer as? LpClaimObservation ?: observer?.let { LpClaimObservation(claim, it) }
     fun stopped(): Boolean = cancellation().also { if (it) observation?.refuse("CANCELLED") }
-    val accepted = if (stopped()) {
-        null
-    } else {
+    val accepted = if (stopped())
+        null else {
         observation?.observe(LpCertifier.EXACT_FARKAS, true, LpCertifierCost.Reported)
         policy.acceptNullable(LpCertifier.EXACT_FARKAS, conflict)?.takeUnless { stopped() }.also {
             if (it == null && !stopped()) observation?.refuse("POLICY_REFUSED")
@@ -364,10 +363,8 @@ internal class LpCertificationSession(private val context: LpSolveContext, priva
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
     ): CertifiedLpResult {
         val observation = observer?.let { LpClaimObservation(claim, it) }
-        return certifyWithin(
-            model, solver, result, cancellation, observation, counterResults,
-            refinementLimits, floatAccept, floatOffset, claim,
-        ).also {
+        return certifyWithin(model, solver, result, cancellation, observation, counterResults,
+            refinementLimits, floatAccept, floatOffset, claim).also {
             observation?.finish(it, it.certificationReused)
         }
     }
@@ -545,43 +542,19 @@ private fun certifyLpResultWithin(
         }
         val remembered = counterResults?.read(model, policy)
         if (remembered != null && claim.satisfiedBy(remembered) && !stopped()) {
-            return CertifiedLpResult(
-                result,
-                remembered.bound,
-                remembered.witness,
-                null,
-                null,
-                model.hasIntegralObjective(),
-                { null },
-                certificationReused = true,
-            )
+            return CertifiedLpResult(result, remembered.bound, remembered.witness, null, null,
+                model.hasIntegralObjective(), { null }, certificationReused = true)
         }
         if (result != null && claim == LpClaim.BOUND) {
             val direct = certifyLpBound(model, result.duals, observer, policy)
                 ?: (solver as? ComponentLpSolverCapability)?.exactBound(observer, policy)
             val checked = if (direct == null && !stopped()) {
-                certifyLpBoundOnly(
-                    model,
-                    result.duals,
-                    ReconstructionLimits(),
-                    cancellation,
-                    observer,
-                    policy,
-                    result.basis,
-                )
-            } else {
+                certifyLpBoundOnly(model, result.duals, ReconstructionLimits(), cancellation,
+                    observer, policy, result.basis)
+            } else
                 null
-            }
-            val certified = CertifiedLpResult(
-                result,
-                direct ?: checked?.bound,
-                null,
-                null,
-                null,
-                model.hasIntegralObjective(),
-                { null },
-                reconstruction = checked?.metrics,
-            )
+            val certified = CertifiedLpResult(result, direct ?: checked?.bound, null, null, null,
+                model.hasIntegralObjective(), { null }, reconstruction = checked?.metrics)
             if (!stopped()) counterResults?.remember(model, certified, policy)
             return if (stopped()) CertifiedLpResult(null, null, null, null, null, false, { null }) else certified
         }
@@ -785,15 +758,10 @@ private fun certifyLpResultWithin(
                 cancellation,
                 observer,
             )
-            observer?.observePhase(
-                LpPhaseMetrics(
-                    LpSolvePhase.EXACT_POINT_RECOVERY,
-                    recovered.decline?.name ?: "WITNESS",
-                    recovered.elapsed.inWholeNanoseconds,
-                    work = recovered.work,
-                    steps = recovered.repairs,
-                ),
-            )
+            observer?.observePhase(LpPhaseMetrics(
+                LpSolvePhase.EXACT_POINT_RECOVERY, recovered.decline?.name ?: "WITNESS",
+                recovered.elapsed.inWholeNanoseconds, work = recovered.work, steps = recovered.repairs,
+            ))
             pointRecovery = recovered
             recovered.witness
         }
@@ -894,13 +862,10 @@ private fun certifyLpResultWithin(
         }
     }
     if (result == null &&
-        (
-            if (claim == LpClaim.ATTAINED_OPTIMUM) {
+        (if (claim == LpClaim.ATTAINED_OPTIMUM)
                 numericalWitness == null || numericalBound == null
-            } else {
-                claim.needsMore(numericalBound, numericalWitness)
-            }
-            ) &&
+        else
+                claim.needsMore(numericalBound, numericalWitness)) &&
         ray == null && numericalConflict == null && conflict == null && !stopped()
     ) {
         refine()
@@ -929,9 +894,8 @@ private fun certifyLpResultWithin(
         // refinement that can prove the optimum.
         if (claim == LpClaim.ATTAINED_OPTIMUM && witness != null && bound?.value != witness.objective &&
             !stopped()
-        ) {
+        )
             refine()
-        }
     }
     if (continued == null) {
         capturedTarget?.let {
@@ -1111,7 +1075,7 @@ internal fun exactLagrangian(
     multipliers: List<BigFraction>,
     cancellation: ExecutionControl = ExecutionControl.Never,
 ): BigFraction? {
-    if (cancellation() || multipliers.size != model.m || !model.finiteExactInput()) return null
+    if (cancellation() ||multipliers.size != model.m || !model.finiteExactInput()) return null
     val stride = PollStride()
     val y = model.objectiveMultipliers(multipliers)
     var value = model.exactConstant()
@@ -1120,13 +1084,12 @@ internal fun exactLagrangian(
         value += y[i] * model.exactRhs(i)
     }
     for (j in 0 until model.numVars) {
-        if (stride.due() && cancellation()) return null
+        if (stride.due() &&cancellation()) return null
         var reduced = model.exactCost(j)
         var stopped = false
         model.forEachRationalColumn(j) { row, a ->
             if (stride.due() && cancellation()) stopped = true
-            if (!stopped) reduced -= y[row] * a
-        }
+            if (!stopped) reduced -= y[row] * a }
         if (stopped) return null
         if (reduced.signum() > 0) {
             val side = model.exactBounds(j).lower ?: return null
@@ -1542,9 +1505,8 @@ internal class LpCounterResults {
         val exact = model.exactState
         if (exact != null && state === exact && acceptedBy === policy &&
             policy === ProductionLpCertificationPolicy
-        ) {
+        )
             return evidence
-        }
         val current = if (exact == null) keyOf(model) else null
         if (policy !== ProductionLpCertificationPolicy || current == null ||
             key?.contentEquals(current) != true || acceptedBy !== policy || state !== model.exactState

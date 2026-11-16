@@ -134,10 +134,7 @@ class CorpusDownloadTest {
 
         assertFailsWith<IllegalArgumentException> {
             downloader.range(
-                URI("https://corpus.invalid/archive"),
-                0,
-                1,
-                CorpusDownload.RangeIdentity(12, "\"archive\""),
+                URI("https://corpus.invalid/archive"), 0, 1, CorpusDownload.RangeIdentity(12, "\"archive\""),
             )
         }
     }

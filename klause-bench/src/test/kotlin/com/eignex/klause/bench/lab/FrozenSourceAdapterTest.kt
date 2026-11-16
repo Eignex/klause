@@ -32,30 +32,13 @@ class FrozenSourceAdapterTest {
             else -> "${format.lowercase()}.zst"
         }
         val input = BenchInput("offline/tiny.$extension", BenchInputRoot.CORPUS, "model", "1".repeat(64))
-        val template = BenchCase(
-            "original",
-            inputs = listOf(input),
-            attributes = mapOf(
-                "suite" to "offline",
-                "problem" to "tiny",
-                "format" to format,
-                "category" to "UNSAT",
-                "sourcePlainSha256" to "2".repeat(64),
-                "labInputDigest" to "stale",
-            ),
-        )
+        val template = BenchCase("original", inputs = listOf(input), attributes = mapOf(
+            "suite" to "offline", "problem" to "tiny", "format" to format, "category" to "UNSAT",
+            "sourcePlainSha256" to "2".repeat(64), "labInputDigest" to "stale"))
 
-        val cases = FrozenSourceSuite.plan(
-            BenchRequest(
-                mapOf(
-                    "cases" to BenchProtocol.json.encodeToString(listOf(template)),
-                    "source-staging" to target,
-                    "solver-seeds" to "1,3",
-                    "repeats" to "2",
-                    "timeout-ms" to "10000",
-                ),
-            ),
-        )
+        val cases = FrozenSourceSuite.plan(BenchRequest(mapOf(
+            "cases" to BenchProtocol.json.encodeToString(listOf(template)), "source-staging" to target,
+            "solver-seeds" to "1,3", "repeats" to "2", "timeout-ms" to "10000")))
 
         assertEquals(4, cases.map { it.attributes["comparisonKey"] }.distinct().size)
         assertEquals(listOf(listOf(input)), cases.map { it.inputs }.distinct())
@@ -72,21 +55,11 @@ class FrozenSourceAdapterTest {
             BenchInput("offline/model.mzn", BenchInputRoot.CORPUS, "model", "1".repeat(64)),
             BenchInput("offline/data.dzn", BenchInputRoot.CORPUS, "data", "2".repeat(64)),
         )
-        val attributes = mapOf(
-            "suite" to "offline",
-            "problem" to "tiny",
-            "format" to "MINIZINC",
-            "category" to "OPTIMIZATION",
-            "sourcePlainSha256" to "1".repeat(64),
-        ) +
+        val attributes = mapOf("suite" to "offline", "problem" to "tiny", "format" to "MINIZINC",
+            "category" to "OPTIMIZATION", "sourcePlainSha256" to "1".repeat(64)) +
             if (withIdentity) mapOf("sourceDataPlainSha256" to "2".repeat(64)) else emptyMap()
-        val request = BenchRequest(
-            mapOf(
-                "cases" to BenchProtocol.json.encodeToString(
-                    listOf(BenchCase("original", inputs = inputs, attributes = attributes)),
-                ),
-            ),
-        )
+        val request = BenchRequest(mapOf("cases" to BenchProtocol.json.encodeToString(
+            listOf(BenchCase("original", inputs = inputs, attributes = attributes)))))
 
         if (withIdentity) {
             val cases = FrozenSourceSuite.plan(request)
@@ -101,16 +74,8 @@ class FrozenSourceAdapterTest {
     @Test
     fun `planning names the missing decoded identity of each rejected case`() {
         val input = BenchInput("miplib2017/timtab1CUTS.mps.zst", BenchInputRoot.CORPUS, "model", "1".repeat(64))
-        val template = BenchCase(
-            "timtab1CUTS",
-            inputs = listOf(input),
-            attributes = mapOf(
-                "suite" to "miplib2017",
-                "problem" to "timtab1CUTS",
-                "format" to "MPS",
-                "category" to "OPTIMIZATION",
-            ),
-        )
+        val template = BenchCase("timtab1CUTS", inputs = listOf(input), attributes = mapOf("suite" to "miplib2017",
+            "problem" to "timtab1CUTS", "format" to "MPS", "category" to "OPTIMIZATION"))
         val request = BenchRequest(mapOf("cases" to BenchProtocol.json.encodeToString(listOf(template))))
 
         val failure = assertFailsWith<IllegalArgumentException> { FrozenSourceSuite.plan(request) }

@@ -10,9 +10,10 @@ import com.eignex.klause.solver.search.SearchLearnedConflictResult
 import com.eignex.klause.solver.search.SearchPendingLearnedPropagation
 import com.eignex.klause.solver.search.SearchSession
 
-internal class LpLearnedConflict(private val learned: LearnedConstraint, private val cp: CpSearchComponent) :
-    SearchLearnedConflict,
-    SearchPendingLearnedPropagation {
+internal class LpLearnedConflict(
+    private val learned: LearnedConstraint,
+    private val cp: CpSearchComponent,
+) : SearchLearnedConflict, SearchPendingLearnedPropagation {
     override var propagationPending = false
         private set
     override val decisionLevel: Int get() = cp.sharedLevelForNative(learned.backjumpLevel)

@@ -131,9 +131,7 @@ object RootBaker {
                     invocation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
                     base
                 }
-
                 token() -> base
-
                 else -> action(base as PropagationResult.Implied, token).also { result ->
                     if (result is PropagationResult.Implied && result !== base) {
                         invocation?.recordTierYield(problem, base, result)

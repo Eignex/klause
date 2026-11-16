@@ -25,12 +25,8 @@ class PolynomialMagnitudePropagationTest {
                 "(assert (> (* x0 x1 x2) 1))",
         )
 
-        val result = solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(maximumWork = 50_000),
-        )
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 50_000))
 
         val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(0L, refuted.stats.dyadicAttempts)

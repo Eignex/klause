@@ -97,7 +97,13 @@ internal class DifferenceRelativeBranches private constructor(
 
     private data class Bound(val from: Int, val to: Int, val bound: Long) : SearchTheoryDecision
     private class Split(val threshold: Long, val atom: SearchTheoryAtom)
-    private class Interval(val from: Int, val to: Int, val lower: Long, val upper: Long, val preferred: Long = lower)
+    private class Interval(
+        val from: Int,
+        val to: Int,
+        val lower: Long,
+        val upper: Long,
+        val preferred: Long = lower,
+    )
 
     companion object {
         private const val MAX_EDGES = 65_536
@@ -112,9 +118,7 @@ internal class DifferenceRelativeBranches private constructor(
                 if (stop()) return null
                 if (edge.guard != DifferenceEdge.ALWAYS || edge.source == DifferenceFragment.ZERO ||
                     edge.target == DifferenceFragment.ZERO || edge.source == edge.target
-                ) {
-                    continue
-                }
+                ) continue
                 val key = edge.source to edge.target
                 bounds[key] = minOf(bounds[key] ?: edge.bound, edge.bound)
             }

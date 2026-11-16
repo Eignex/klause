@@ -12,18 +12,9 @@ import kotlin.math.sqrt
 internal class GridArithmeticInvariant(private val relation: GridArithmetic) : Invariant {
     private fun score(state: LocalSearchState, value: (Int) -> Long): Int {
         if (relation.inputs.any { !it.contains(value(it.variable)) } ||
-            !relation.output.contains(value(relation.output.variable))
-        ) {
-            return state.violationSoftCap
-        }
-        val image = relation.image(value) ?: return maxOf(
-            1,
-            numericalEqualityDegree(
-                relation.evaluate(value),
-                relation.output.value(value(relation.output.variable)),
-                state.violationSoftCap,
-            ),
-        )
+            !relation.output.contains(value(relation.output.variable))) return state.violationSoftCap
+        val image = relation.image(value) ?: return maxOf(1, numericalEqualityDegree(relation.evaluate(value),
+            relation.output.value(value(relation.output.variable)), state.violationSoftCap))
         return compressViolation(distance(image, value(relation.output.variable)), state.violationSoftCap)
     }
 
@@ -46,9 +37,7 @@ internal class GridArithmeticInvariant(private val relation: GridArithmetic) : I
         fun propose(variable: Int, value: Long) {
             if (value in state.rootDomains[variable] && value != state.assignment.intValue(variable) &&
                 score(state) { if (it == variable) value else state.assignment.intValue(it) } < before
-            ) {
-                sink.addChannelingIntSet(state, variable, value)
-            }
+            ) sink.addChannelingIntSet(state, variable, value)
         }
         fun propose(coordinate: GridCoordinate, value: Double) {
             coordinate.index(value)?.let { propose(coordinate.variable, it) }
@@ -67,7 +56,6 @@ internal class GridArithmeticInvariant(private val relation: GridArithmetic) : I
                     if (a != 0.0) propose(relation.b, output / a)
                 }
             }
-
             is GridPower -> if (relation.exponent > 0 && (output >= 0.0 || relation.exponent and 1 != 0)) {
                 val magnitude = abs(output).pow(1.0 / relation.exponent)
                 propose(relation.base, if (output < 0.0) -magnitude else magnitude)

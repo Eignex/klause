@@ -35,18 +35,9 @@ class RealFiniteDomainEncoderTest {
         val domain = RealFiniteDomain(1, doubleArrayOf(-2.5, 0.125, 7.0))
             .remap(VarRemap(intArrayOf(), intArrayOf(), intArrayOf(1, 0)))
         for ((value, valid) in listOf(0.125 to true, 0.25 to false)) {
-            val source = Problem(
-                0,
-                0,
-                emptyArray(),
-                arrayOf(
-                    domain,
-                    Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, value),
-                ),
-                numRealVars = 1,
-                realLower = doubleArrayOf(-3.0),
-                realUpper = doubleArrayOf(8.0),
-            )
+            val source = Problem(0, 0, emptyArray(), arrayOf(domain,
+                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, value)),
+                numRealVars = 1, realLower = doubleArrayOf(-3.0), realUpper = doubleArrayOf(8.0))
 
             val result = BacktrackSolver.source(source).solve()
 
@@ -58,50 +49,23 @@ class RealFiniteDomainEncoderTest {
 
     @Test
     fun `polynomial membership should retain disconnected coordinates across Boolean queries`() {
-        val source = Problem(
-            1,
-            0,
-            emptyArray(),
-            arrayOf(
-                RealFiniteDomain(0, doubleArrayOf(-1.0, 2.0)),
-                RealFiniteDomain(1, doubleArrayOf(0.125)),
-                ReifiedRealLinear(
-                    0,
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.GE,
-                    2.0,
-                ),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(-1.0, 0.0),
-            realUpper = doubleArrayOf(2.0, 1.0),
-        )
+        val source = Problem(1, 0, emptyArray(), arrayOf(
+            RealFiniteDomain(0, doubleArrayOf(-1.0, 2.0)),
+            RealFiniteDomain(1, doubleArrayOf(0.125)),
+            ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 2.0),
+        ), numRealVars = 2, realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(2.0, 1.0))
         val model = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
         val arithmetic = AlgebraicArithmetic()
 
         model.service.invocation().use { owner ->
             for (truth in listOf(false, true, false)) {
                 val result = assertIs<QfNraResult.Satisfiable>(
-                    owner.check(PolynomialCondition(bools = mapOf(0 to truth))),
-                )
+                    owner.check(PolynomialCondition(bools = mapOf(0 to truth))))
 
-                assertEquals(
-                    0,
-                    arithmetic.compare(
-                        result.assignment.realValue(0),
-                        arithmetic.rational(BigFraction.ofLong(if (truth) 2 else -1)),
-                    ),
-                )
-                assertEquals(
-                    0,
-                    arithmetic.compare(
-                        result.assignment.realValue(1),
-                        arithmetic.rational(BigFraction.ofLong(8).reciprocal()),
-                    ),
-                )
+                assertEquals(0, arithmetic.compare(result.assignment.realValue(0),
+                    arithmetic.rational(BigFraction.ofLong(if (truth) 2 else -1))))
+                assertEquals(0, arithmetic.compare(result.assignment.realValue(1),
+                    arithmetic.rational(BigFraction.ofLong(8).reciprocal())))
             }
         }
         assertEquals(2, source.numRealVars)
@@ -110,15 +74,8 @@ class RealFiniteDomainEncoderTest {
 
     @Test
     fun `cancelled membership installation should not poison a later selected cover`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(RealFiniteDomain(0, doubleArrayOf(-2.5, 0.125, 7.0))),
-            numRealVars = 1,
-            realLower = doubleArrayOf(-3.0),
-            realUpper = doubleArrayOf(8.0),
-        )
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf(-2.5, 0.125, 7.0))),
+            numRealVars = 1, realLower = doubleArrayOf(-3.0), realUpper = doubleArrayOf(8.0))
         val selected = FactorProjectionProviders.Default.prepare(source)
         var work = 0L
         val stopped = object : ExecutionControl() {
@@ -138,18 +95,10 @@ class RealFiniteDomainEncoderTest {
 
     @Test
     fun `the finite facade should complete every disconnected real membership`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(
-                RealFiniteDomain(0, doubleArrayOf(0.125)),
-                RealFiniteDomain(1, doubleArrayOf(-2.5, 7.0)),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(0.0, -3.0),
-            realUpper = doubleArrayOf(1.0, 8.0),
-        )
+        val source = Problem(0, 0, emptyArray(), arrayOf(
+            RealFiniteDomain(0, doubleArrayOf(0.125)),
+            RealFiniteDomain(1, doubleArrayOf(-2.5, 7.0)),
+        ), numRealVars = 2, realLower = doubleArrayOf(0.0, -3.0), realUpper = doubleArrayOf(1.0, 8.0))
 
         val result = assertIs<SolveResult.Sat>(BacktrackSolver(source.bake()).solve())
 
@@ -161,15 +110,8 @@ class RealFiniteDomainEncoderTest {
 
     @Test
     fun `an empty source membership should refute finite preparation`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(RealFiniteDomain(0, doubleArrayOf())),
-            numRealVars = 1,
-            realLower = doubleArrayOf(-1.0),
-            realUpper = doubleArrayOf(1.0),
-        )
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf())),
+            numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
 
         val result = source.baked
 

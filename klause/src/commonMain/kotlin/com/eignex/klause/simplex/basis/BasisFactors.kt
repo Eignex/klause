@@ -56,12 +56,7 @@ internal data class LuBuildReport(
 
 // These are floating-point declines, including exhausted numerical pivots, never exact rank claims.
 internal enum class LuBuildRejection {
-    NO_USABLE_PIVOT,
-    NONFINITE_INPUT,
-    ARITHMETIC_BREAKDOWN,
-    STORAGE,
-    WORK,
-    CANCELLED,
+    NO_USABLE_PIVOT, NONFINITE_INPUT, ARITHMETIC_BREAKDOWN, STORAGE, WORK, CANCELLED
 }
 
 internal sealed interface LuBuildResult {

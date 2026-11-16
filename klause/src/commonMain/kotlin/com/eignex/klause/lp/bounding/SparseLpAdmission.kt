@@ -57,12 +57,8 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     var inspected = 0L
     var assemblyWork = 0L
     val preparationAllowance = minOf(SPARSE_LP_MAX_PREPARATION_WORK, workAllowance.coerceAtLeast(0L))
-    fun decline(reason: String) = SparseLpAdmission(
-        mapOf(
-            "Decline$reason" to 1L,
-            "PreparationWork" to maxOf(inspected, assemblyWork),
-        ),
-    )
+    fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
+        "PreparationWork" to maxOf(inspected, assemblyWork)))
     if ((problem as? BakedProblem)?.factorProjections?.builtInRelaxation == false) return decline("Projection")
     if (columns + rows > MAX_DIMENSION) {
         return decline("Shape")
@@ -74,22 +70,11 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         inspected++
         if (factor is ExactLinear && factor.strict) return decline("StrictRow")
         entries += when (factor) {
-            is Linear -> if (factor.integerConstants != null && factor.op != LinearOp.NE) {
-                factor.vars.size
-            } else {
-                return decline("Source")
-            }
-
+            is Linear -> if (factor.integerConstants != null && factor.op != LinearOp.NE) factor.vars.size
+                else return decline("Source")
             is ExactLinear -> if (factor.constants is IntegerConstants && factor.activator == LinearRow.ALWAYS &&
-                factor.relation != LinearOp.NE
-            ) {
-                factor.size
-            } else {
-                return decline("Source")
-            }
-
+                factor.relation != LinearOp.NE) factor.size else return decline("Source")
             is SymmetryHandling -> 0
-
             else -> return decline("Source")
         }
         if (entries > MAX_ENTRIES || 32L * (entries + columns + rows) > preparationAllowance) {
@@ -101,15 +86,11 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
     if (reservation > SPARSE_LP_MAX_ALLOCATION) return decline("Storage")
     assemblyWork = 32L * (entries + rows + columns)
     val relaxation = try {
-        val relaxer = CpToLpRelaxation(
-            problem,
-            objective,
-            deferred = true,
+        val relaxer = CpToLpRelaxation(problem, objective, deferred = true,
             reuseSourceTemplates = sourcePreparation != LpSourcePreparation.DISABLED,
             reuseTemplateIndexes = sourcePreparation != LpSourcePreparation.OBJECT,
             reuseTemplateMetadata = sourcePreparation == LpSourcePreparation.ADMITTED,
-            earnTemplatePreparation = sourcePreparation == LpSourcePreparation.ADMITTED,
-        )
+            earnTemplatePreparation = sourcePreparation == LpSourcePreparation.ADMITTED)
         relaxer.preparation().forEach {
             if (cancellation()) return decline("Cancelled")
             yield(Unit)
@@ -142,12 +123,8 @@ internal fun estimateSparseLpAdmission(
     preparationWork: Long = 0L,
     cancellation: ExecutionControl = ExecutionControl.Never,
 ): SparseLpAdmission {
-    fun decline(reason: String) = SparseLpAdmission(
-        mapOf(
-            "Decline$reason" to 1L,
-            "PreparationWork" to preparationWork,
-        ),
-    )
+    fun decline(reason: String) = SparseLpAdmission(mapOf("Decline$reason" to 1L,
+        "PreparationWork" to preparationWork))
     val dimensions = model.n.toLong() + model.m
     if (dimensions > MAX_DIMENSION) return decline("Shape")
     val parent = IntArray(dimensions.toInt()) { it }
@@ -165,11 +142,7 @@ internal fun estimateSparseLpAdmission(
         var a = root(left)
         var b = root(right)
         if (a == b) return
-        if (rank[a] < rank[b]) {
-            val swap = a
-            a = b
-            b = swap
-        }
+        if (rank[a] < rank[b]) { val swap = a; a = b; b = swap }
         parent[b] = a
         if (rank[a] == rank[b]) rank[a]++
     }
@@ -224,25 +197,23 @@ internal fun estimateSparseLpAdmission(
         preparationWork > SPARSE_LP_MAX_PREPARATION_WORK -> "PreparationWork"
         else -> null
     }
-    return SparseLpAdmission(
-        buildMap {
-            put("Rows", model.m.toLong())
-            put("Columns", model.n.toLong())
-            put("Nonzeros", entries)
-            put("Components", components)
-            put("LargestComponentRows", largestRows)
-            put("LargestComponentColumns", largestColumns)
-            put("ScalarBits", scalarBits.toLong())
-            put("RowIntersectionRisk", fillRisk)
-            put("FactorEntryLimit", SPARSE_LP_MAX_FACTOR_ENTRIES)
-            put("FactorWorkLimit", SPARSE_LP_MAX_FACTOR_WORK)
-            put("ReservedBytes", storage)
-            put("CheckingReservedBytes", SPARSE_LP_CHECKING_ALLOCATION)
-            put("PreparationWork", preparationWork)
-            put("WorkLimit", SPARSE_LP_MAX_WORK)
-            put("StorageLimit", SPARSE_LP_MAX_ALLOCATION)
-            put("Admitted", if (decline == null) 1L else 0L)
-            decline?.let { put("Decline$it", 1L) }
-        },
-    )
+    return SparseLpAdmission(buildMap {
+        put("Rows", model.m.toLong())
+        put("Columns", model.n.toLong())
+        put("Nonzeros", entries)
+        put("Components", components)
+        put("LargestComponentRows", largestRows)
+        put("LargestComponentColumns", largestColumns)
+        put("ScalarBits", scalarBits.toLong())
+        put("RowIntersectionRisk", fillRisk)
+        put("FactorEntryLimit", SPARSE_LP_MAX_FACTOR_ENTRIES)
+        put("FactorWorkLimit", SPARSE_LP_MAX_FACTOR_WORK)
+        put("ReservedBytes", storage)
+        put("CheckingReservedBytes", SPARSE_LP_CHECKING_ALLOCATION)
+        put("PreparationWork", preparationWork)
+        put("WorkLimit", SPARSE_LP_MAX_WORK)
+        put("StorageLimit", SPARSE_LP_MAX_ALLOCATION)
+        put("Admitted", if (decline == null) 1L else 0L)
+        decline?.let { put("Decline$it", 1L) }
+    })
 }

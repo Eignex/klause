@@ -27,8 +27,7 @@ class CorpusRangeChannelTest {
                 }
                 override fun getContentLengthLong() = -1L
                 override fun getInputStream() = source.copyOfRange(
-                    interval[0].toInt(),
-                    interval[1].toInt() + 1,
+                    interval[0].toInt(), interval[1].toInt() + 1,
                 ).also { transferred += it.size }.inputStream()
             }
         })

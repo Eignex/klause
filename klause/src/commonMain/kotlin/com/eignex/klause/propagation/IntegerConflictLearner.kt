@@ -35,15 +35,9 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         fallback: ConflictAnalyzer.AnalysisResult.Learned,
     ): ConflictAnalyzer.AnalysisResult.LearnedIntegerRow? {
         if (currentLevel !in 1..INTEGER_LEARNING_LEVELS) {
-            state.arithmeticLearningTrace?.record(
-                "integer.level-limit",
-                currentLevel.toLong(),
-                factorId.toLong(),
-                state.baseFactorCount.toLong(),
-                fallback.backjumpLevel.toLong(),
-                if (fallback.asserting) 1L else 0L,
-                fallback.literals.size.toLong(),
-            )
+            state.arithmeticLearningTrace?.record("integer.level-limit", currentLevel.toLong(), factorId.toLong(),
+                state.baseFactorCount.toLong(), fallback.backjumpLevel.toLong(),
+                if (fallback.asserting) 1L else 0L, fallback.literals.size.toLong())
             val originalSeed = factorId in 0 until state.baseFactorCount
             return decline(if (originalSeed) "level-limit-original" else "level-limit-learned")
         }
@@ -57,14 +51,11 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
         val source = sourceFactor(factorId) ?: return decline("seed-source")
         var row = when (source.linear.op) {
             LinearOp.LE -> normalizedSource(source, useLo = true)
-
             LinearOp.GE -> normalizedSource(source, useLo = false)
-
             LinearOp.EQ -> {
                 val lower = normalizedSource(source, useLo = true) ?: return decline("seed-normalization")
                 if (lower.minimum(state) > lower.bound) lower else normalizedSource(source, useLo = false)
             }
-
             LinearOp.NE -> null
         } ?: return decline("seed-normalization")
         state.arithmeticLearningTrace?.row("integer.seed-row", row, state)
@@ -79,12 +70,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             if (row.minimum(state) <= row.bound) return decline("combination-lost-conflict")
             if (state.learned.integerRows?.any { it.row.subsumes(row) } == true) return decline("duplicate")
             val asserts = row.assertsAt(state, trail)
-            state.arithmeticLearningTrace?.record(
-                "integer.assertion",
-                target.toLong(),
-                trail.toLong(),
-                if (asserts) 1 else 0,
-            )
+            state.arithmeticLearningTrace?.record("integer.assertion", target.toLong(), trail.toLong(),
+                if (asserts) 1 else 0)
             if (!asserts) return@repeat
             val levels = row.variables.indices.map { index ->
                 val variable = row.variables[index]
@@ -100,8 +87,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
     private fun normalizedSource(source: IntegerSourceRow, useLo: Boolean): IntegerConflictRow? {
         val previous = previousSource
         if (previous != null && previous.linear === source.linear && previous.guard == source.guard &&
-            previousUseLo == useLo
-        ) {
+            previousUseLo == useLo) {
             return previousRow
         }
         val row = source.row(useLo)
@@ -144,8 +130,7 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             val extra = marker[LAZY_PAYLOAD + 5] != 0
             if (extra != (source.guard != Lit.NONE) ||
-                (extra && marker[LAZY_PAYLOAD + 4] != (source.guard xor 1))
-            ) {
+                (extra && marker[LAZY_PAYLOAD + 4] != (source.guard xor 1))) {
                 state.arithmeticLearningTrace?.record("integer.endpoint-decline.guard-marker", source.guard.toLong())
                 continue
             }
@@ -166,13 +151,8 @@ internal class IntegerConflictLearner(private val state: PropagationState) {
             }
             if (!state.rawIntegerEndpointSupported(variable, lower, proposed, marker[2])) {
                 val domain = state.intDomains[variable]
-                state.arithmeticLearningTrace?.record(
-                    "integer.endpoint-decline.raw-endpoint-provenance",
-                    proposed,
-                    domain.min,
-                    domain.max,
-                    marker[2].toLong(),
-                )
+                state.arithmeticLearningTrace?.record("integer.endpoint-decline.raw-endpoint-provenance", proposed,
+                    domain.min, domain.max, marker[2].toLong())
                 continue
             }
             latest = BoundEvent(sourceRow, variable, marker[2], key)

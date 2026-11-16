@@ -34,27 +34,20 @@ class SmtLibScopeTest {
     @Test
     fun `nonlinear helper applications should preserve original finite source values`() {
         for (body in listOf("(* v v)", "(^ v 2)")) {
-            val source = SmtLib.parse(
-                "(set-logic QF_NIA) (declare-const n Int) " +
-                    "(define-fun square ((v Int)) Int $body) (assert (<= 1 n 2)) (assert (= (square n) 4))",
-            )
+            val source = SmtLib.parse("(set-logic QF_NIA) (declare-const n Int) " +
+                "(define-fun square ((v Int)) Int $body) (assert (<= 1 n 2)) (assert (= (square n) 4))")
 
             val result = BacktrackSolver.source(source.model).solve()
 
-            assertEquals(
-                "2",
-                assertIs<OpenTheoryResult.Sat>(result).assignment
-                    .intValue(source.intVarNames.getValue("n")),
-            )
+            assertEquals("2", assertIs<OpenTheoryResult.Sat>(result).assignment
+                .intValue(source.intVarNames.getValue("n")))
         }
     }
 
     @Test
     fun `unused helper declarations should retain unrelated native products`() {
-        val source = SmtLib.parse(
-            "(declare-const n Int) (define-fun identity ((v Int)) Int v) " +
-                "(assert (<= 1 n 2)) (assert (= (* n n) 4))",
-        )
+        val source = SmtLib.parse("(declare-const n Int) (define-fun identity ((v Int)) Int v) " +
+            "(assert (<= 1 n 2)) (assert (= (* n n) 4))")
 
         val result = BacktrackSolver.source(source.model).solve()
 
@@ -63,26 +56,16 @@ class SmtLibScopeTest {
 
     @Test
     fun `unrestricted integer declarations beside retained real products should reach shared setup`() {
-        val source = SmtLib.parse(
-            "(declare-const unused Int) (declare-const x Real) " +
-                "(assert (= x 1)) (assert (= (* x x) 1))",
-        )
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-                source.source,
-                ExecutionOperation.SATISFY,
-                FiniteEngine.BACKTRACK,
-            ),
-        )
+        val source = SmtLib.parse("(declare-const unused Int) (declare-const x Real) " +
+            "(assert (= x 1)) (assert (= (* x x) 1))")
+        val invocation = SourceSetup.prepare(SourceSetupRequest(source.source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
 
         val result = BacktrackSolver.source(source.model).solve()
 
         assertEquals(SourceExecutionKind.NONLINEAR_INTEGER, SourceSetup.executionKind(invocation))
-        assertEquals(
-            "1",
-            assertIs<OpenTheoryResult.Sat>(result).assignment
-                .realValue(source.realVarNames.getValue("x")),
-        )
+        assertEquals("1", assertIs<OpenTheoryResult.Sat>(result).assignment
+            .realValue(source.realVarNames.getValue("x")))
     }
 
     @Test
@@ -96,18 +79,13 @@ class SmtLibScopeTest {
 
     @Test
     fun `declared signed decimal symbols should retain their integer sorts in helper arguments`() {
-        val source = SmtLib.parse(
-            "(declare-const -1.5 Int) (define-fun accepts ((n Int)) Bool (= n 3)) " +
-                "(assert (accepts -1.5))",
-        )
+        val source = SmtLib.parse("(declare-const -1.5 Int) (define-fun accepts ((n Int)) Bool (= n 3)) " +
+            "(assert (accepts -1.5))")
 
         val result = BacktrackSolver.source(source.model).solve()
 
-        assertEquals(
-            "3",
-            assertIs<OpenTheoryResult.Sat>(result).assignment
-                .intValue(source.intVarNames.getValue("-1.5")),
-        )
+        assertEquals("3", assertIs<OpenTheoryResult.Sat>(result).assignment
+            .intValue(source.intVarNames.getValue("-1.5")))
     }
 
     @Test

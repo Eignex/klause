@@ -92,8 +92,7 @@ internal fun PropagationState.addLearnedClause(
     val watchers = clause.initialBoolWatchers
     val blockers = clause.initialBoolWatcherBlockers
     if (watchers.size == 2 && watchers[0] != watchers[1] &&
-        watchers.all { Lit.variable(it) < problem.numBoolVars }
-    ) {
+        watchers.all { Lit.variable(it) < problem.numBoolVars }) {
         val first = watches.byLit[watchers[0]]
         val second = watches.byLit[watchers[1]]
         work += watches.pos.putPair(newFid, watchers[0], first.size, watchers[1], second.size)
@@ -155,10 +154,7 @@ internal fun PropagationState.addLearnedIntegerRow(row: IntegerConflictRow, lbd:
     learned.nonClauseCount++
     work++
     work += learned.trackCapObject(learned.size - 1, false, LearnedKind.Integer)
-    val rows = learned.integerRows ?: LearnedIntegerRows().also {
-        learned.integerRows = it
-        work++
-    }
+    val rows = learned.integerRows ?: LearnedIntegerRows().also { learned.integerRows = it; work++ }
     work += rows.admissionWork
     rows.admit(propagator)
     arithmeticLearningTrace?.stored(factor, "integer")
@@ -285,21 +281,16 @@ internal fun PropagationState.forgetLearnedClauses(
     work += selectedRetirements.remapWork
     selectedRetirements.remap(remap)
     arithmeticLearningTrace?.remap(baseFactorCount, remap)
-    for (i in 0 until n) {
-        if (remap[i] < 0) {
-            work++
-            if (!learned.retiredOf(i)) {
-                learned.lifecycle.note(learnedKind(i), LearnedStage.Retired)
-                factorAttribution?.retire(learned.store[i])
-            }
+    for (i in 0 until n) if (remap[i] < 0) {
+        work++
+        if (!learned.retiredOf(i)) {
+            learned.lifecycle.note(learnedKind(i), LearnedStage.Retired)
+            factorAttribution?.retire(learned.store[i])
         }
     }
 
     learned.units.clear()
-    learned.integerRows?.let { rows ->
-        work += rows.size.toLong() + 2L
-        rows.reset()
-    }
+    learned.integerRows?.let { rows -> work += rows.size.toLong() + 2L; rows.reset() }
     work += learned.resetCapIndex()
     var w = 0
     for (i in 0 until n) {
@@ -316,7 +307,8 @@ internal fun PropagationState.forgetLearnedClauses(
             if (learned.retiredOf(w)) {
                 learned.retiredCount++
                 learned.enqueueRetiredMetadata(w)
-            } else {
+            }
+            else {
                 work += learned.trackCapObject(w, learned.store[w, GeneralLearnedRows.PERMANENT] == 1, learnedKind(w))
                 if (propagator !is ClausePropagator) {
                     learned.nonClauseCount++
@@ -419,12 +411,10 @@ internal fun PropagationState.forgetLearnedClauses(
     remapReasons(boolReason, remap, refBase)
     remapReasons(intMinReason, remap, refBase)
     remapReasons(intMaxReason, remap, refBase)
-    for (i in 0 until undo.size) {
-        if (undo.tag[i] == 1) {
-            work++
-            undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
-            undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
-        }
+    for (i in 0 until undo.size) if (undo.tag[i] == 1) {
+        work++
+        undo.minReason[i] = remappedReason(undo.minReason[i], remap, refBase)
+        undo.maxReason[i] = remappedReason(undo.maxReason[i], remap, refBase)
     }
     for (column in listOf(learned.units, learned.pendingAttach, learned.capCandidates)) {
         work += column.learnedTrimmingWork

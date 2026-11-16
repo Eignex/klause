@@ -50,33 +50,19 @@ internal class OpenLinearPortfolioResults(
             accepted.store(Accepted(it, rayValue))
         }.check(worker, native) ?: return null
         if (mathematical.verification !is Verification.Accepted) return mathematical
-        if (claim is SourceClaim.Ray && rayValue == null) {
-            return PortfolioTerminalPublication(
-                Verification.Indeterminate("linear ray lacks its exact source base value"),
-            ) {}
-        }
+        if (claim is SourceClaim.Ray && rayValue == null) return PortfolioTerminalPublication(
+            Verification.Indeterminate("linear ray lacks its exact source base value")) {}
         val standing = incumbents.exchange.current()?.objective?.source
         val boundary = when (claim) {
             is SourceClaim.Optimal -> (claim.value as? SourceValue.Rational)?.value
             is SourceClaim.Limit -> (claim.value as? SourceValue.Rational)?.value
             else -> null
         }
-        val contradicts = standing != null && (
-            claim == SourceClaim.Refutation ||
-                (
-                    boundary != null && (
-                        values.improves(standing, boundary) ||
-                            (claim is SourceClaim.Limit && standing == boundary)
-                        )
-                    )
-            )
-        return if (contradicts) {
-            PortfolioTerminalPublication(
-                Verification.Rejected("linear terminal contradicts an accepted source incumbent"),
-            ) {}
-        } else {
-            mathematical
-        }
+        val contradicts = standing != null && (claim == SourceClaim.Refutation ||
+            (boundary != null && (values.improves(standing, boundary) ||
+                (claim is SourceClaim.Limit && standing == boundary))))
+        return if (contradicts) PortfolioTerminalPublication(
+            Verification.Rejected("linear terminal contradicts an accepted source incumbent")) {} else mathematical
     }
 
     fun fold(result: MinimizeResult): OpenTheoryOptimum {
@@ -90,35 +76,16 @@ internal class OpenLinearPortfolioResults(
             result is MinimizeResult.Unknown -> result.reason
             else -> TerminationReason.BudgetExhausted
         }
-        val authority = LinearOptimizationResult(
-            original.scope,
-            terminal?.result?.terminal,
-            bound,
-            pooled?.assignment,
-            pooled?.objective?.source,
-            reason,
-            result.stats,
-            original.semantics,
-        )
+        val authority = LinearOptimizationResult(original.scope, terminal?.result?.terminal, bound,
+            pooled?.assignment, pooled?.objective?.source, reason, result.stats, original.semantics)
         val point = pooled?.assignment?.let { OpenTheoryAssignment.Sampled(it) }
         val score = pooled?.objective?.source?.let(::minimized)
         return when (val claim = authority.terminal?.claim) {
-            is SourceClaim.Optimal -> OpenTheoryOptimum.Optimal(
-                checkNotNull(point),
-                checkNotNull(score),
-                result.stats,
-                authority,
-            )
-
+            is SourceClaim.Optimal -> OpenTheoryOptimum.Optimal(checkNotNull(point), checkNotNull(score),
+                result.stats, authority)
             SourceClaim.Refutation -> OpenTheoryOptimum.Infeasible(result.stats, authority)
-
-            is SourceClaim.Ray -> OpenTheoryOptimum.Unbounded(
-                OpenTheoryAssignment.Sampled(claim.sample),
-                minimized(checkNotNull(terminal?.rayValue)),
-                result.stats,
-                authority,
-            )
-
+            is SourceClaim.Ray -> OpenTheoryOptimum.Unbounded(OpenTheoryAssignment.Sampled(claim.sample),
+                minimized(checkNotNull(terminal?.rayValue)), result.stats, authority)
             else -> OpenTheoryOptimum.Bounded(point, score, reason, result.stats, authority)
         }
     }
@@ -138,9 +105,7 @@ internal class OpenLinearPortfolioResults(
             val oldValue = (old?.value as? SourceValue.Rational)?.value
             if (oldValue == null || values.improves(oldValue, value) ||
                 (oldValue == value && claim.strict && old.strict != true)
-            ) {
-                standing = candidate
-            }
+            ) standing = candidate
         }
         return standing
     }

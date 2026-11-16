@@ -29,13 +29,11 @@ class LabAdapterTest {
         try {
             System.setProperty("klause.workspace.root", root.toString())
             val directory = Files.createDirectory(root.resolve("models"))
-            val request = BenchRequest(
-                parameters = mapOf(
-                    "selections" to """[{"suite":"mzn-smoke","name":"argmax"},
+            val request = BenchRequest(parameters = mapOf(
+                "selections" to """[{"suite":"mzn-smoke","name":"argmax"},
                     {"suite":"mzn-smoke","name":"queens"}]""",
-                    "input-only" to "true",
-                ),
-            )
+                "input-only" to "true",
+            ))
 
             val cases = KlauseLabSuite.plan(request) { ref, inputOnly ->
                 val model = Files.writeString(directory.resolve("${ref.name}.mzn"), "solve satisfy;\n")
@@ -75,14 +73,12 @@ class LabAdapterTest {
     @Test
     fun `matched selections should retain every source seed and repeat block`() {
         val cases = KlauseLabSuite.plan(
-            BenchRequest(
-                parameters = mapOf(
-                    "selections" to """[{"suite":"dimacs-core","name":"php4"},
+            BenchRequest(parameters = mapOf(
+                "selections" to """[{"suite":"dimacs-core","name":"php4"},
                     {"suite":"mps-core","name":"blend-tiny"}]""",
-                    "solver-seeds" to "1,3",
-                    "repeats" to "2",
-                ),
-            ),
+                "solver-seeds" to "1,3",
+                "repeats" to "2",
+            )),
         )
 
         assertEquals(listOf("php4", "blend-tiny"), cases.map { it.attributes.getValue("problem") }.distinct())
@@ -94,12 +90,12 @@ class LabAdapterTest {
         val cases = KlauseLabSuite.plan(
             BenchRequest(
                 parameters = mapOf(
-                    "suite" to "dimacs-core",
-                    "name" to "php4",
-                    "engines" to "cp",
-                    "propagation-controls" to "true",
-                ),
-            ),
+            "suite" to "dimacs-core",
+            "name" to "php4",
+            "engines" to "cp",
+            "propagation-controls" to "true",
+        )
+            )
         )
 
         assertEquals(3, cases.map { it.id }.distinct().size)
@@ -114,10 +110,10 @@ class LabAdapterTest {
         assertFailsWith<IllegalArgumentException> {
             LabSettings(
                 mapOf(
-                    "engines" to "cp",
-                    "propagation-controls" to "true",
-                    "param.historical-table-reasons" to "false",
-                ),
+                "engines" to "cp",
+                "propagation-controls" to "true",
+                "param.historical-table-reasons" to "false",
+            )
             )
         }
     }
@@ -154,13 +150,13 @@ class LabAdapterTest {
         val cases = KlauseLabSuite.plan(
             BenchRequest(
                 parameters = mapOf(
-                    "suite" to "dimacs-core",
-                    "name" to "php4",
-                    "compiler-seed" to "1",
-                    "solver-seeds" to "1,3",
-                    "repeats" to "2",
-                ),
-            ),
+            "suite" to "dimacs-core",
+            "name" to "php4",
+            "compiler-seed" to "1",
+            "solver-seeds" to "1,3",
+            "repeats" to "2",
+        )
+            )
         )
 
         assertEquals(4, cases.size)
@@ -317,10 +313,8 @@ class LabAdapterTest {
 
             val environment = LabRuntime.environment(case, BenchContext(output, worktree = root))
 
-            assertEquals(
-                if (recordsJfr) output.resolve("report").toString() else null,
-                environment["KLAUSE_LAB_PROFILE_DIR"],
-            )
+            assertEquals(if (recordsJfr) output.resolve("report").toString() else null,
+                environment["KLAUSE_LAB_PROFILE_DIR"])
         } finally {
             root.toFile().deleteRecursively()
         }

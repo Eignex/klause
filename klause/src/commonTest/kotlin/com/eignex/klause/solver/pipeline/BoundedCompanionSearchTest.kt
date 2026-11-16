@@ -28,12 +28,8 @@ class BoundedCompanionSearchTest {
                 override val incumbentTrialPending: Boolean get() = true
                 override val isDone: Boolean get() = false
                 override val stats: SolveStats get() = SolveStats.EMPTY
-                override fun runSlice(
-                    global: ExecutionControl,
-                    sliceMillis: Long,
-                    sliceNodes: Long,
-                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
-                ): MinimizeResult? {
+                override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                     assertEquals(ceiling, sliceMillis)
                     assertEquals(5_000L, sliceNodes)
                     calls++
@@ -63,12 +59,8 @@ class BoundedCompanionSearchTest {
         val native = object : ResumableSearch {
             override val isDone: Boolean get() = true
             override val stats: SolveStats get() = SolveStats.EMPTY
-            override fun runSlice(
-                global: ExecutionControl,
-                sliceMillis: Long,
-                sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit,
-            ): MinimizeResult {
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult {
                 assertEquals(10L, sliceMillis)
                 assertEquals(7L, sliceNodes)
                 clock += 20.milliseconds

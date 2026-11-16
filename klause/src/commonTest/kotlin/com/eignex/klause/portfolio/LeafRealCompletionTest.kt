@@ -77,10 +77,8 @@ class LeafRealCompletionTest {
     @Test
     fun `a refutation should name the rows its proof combines`() {
         // k = 0 forces x = 2.5 through the first row, which the second row's x ≤ 1 forbids.
-        val completion = LeafRealCompletion(problem, objective = null).complete(
-            candidate(0, 1.0),
-            ExecutionControl.Never,
-        )
+        val completion = LeafRealCompletion(problem, objective = null).complete(candidate(0, 1.0),
+            ExecutionControl.Never)
 
         val refuted = assertIs<Completion.Refuted>(completion)
         assertEquals(setOf(0, 1), refuted.factors.toSet())
@@ -129,15 +127,9 @@ class LeafRealCompletionTest {
 
     @Test
     fun `conditioned completion should install the current integer operand`() {
-        val source = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 1)),
-            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)),
-            numRealVars = 2,
-            realLower = doubleArrayOf(1.0, 0.0),
-            realUpper = doubleArrayOf(1.0, 1.0),
-        )
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 1)),
+            arrayOf(RealProduct(0, 0, 1, 1.0, 1.0)), numRealVars = 2,
+            realLower = doubleArrayOf(1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
         val completion = LeafRealCompletion(source, objective = null)
 
         for (pin in listOf(0L, 1L, 0L)) {
@@ -150,22 +142,15 @@ class LeafRealCompletionTest {
 
     @Test
     fun `custom linear encoders should retain candidate-specific declines`() {
-        val projections = FactorProjectionProviders(
-            encoder = EncoderProvider { factor, target ->
-                val selected = BuiltInEncoderProvider.select(factor, target)
-                if (target != EncodingTarget.LINEAR) {
-                    selected
-                } else {
-                    Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0))) { view, encoding ->
-                        if (encoding.fixedInteger(SourceIntId(0)) == bigIntOf(0)) {
-                            EncoderDecline.UNSUPPORTED
-                        } else {
-                            selected.install(view, encoding)
-                        }
-                    }
+        val projections = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
+            val selected = BuiltInEncoderProvider.select(factor, target)
+            if (target != EncodingTarget.LINEAR) selected else {
+                Encoder(EncoderSupport.CONDITIONED, listOf(SourceIntId(0))) { view, encoding ->
+                    if (encoding.fixedInteger(SourceIntId(0)) == bigIntOf(0)) EncoderDecline.UNSUPPORTED
+                    else selected.install(view, encoding)
                 }
-            },
-        ).prepare(problem)
+            }
+        }).prepare(problem)
         val encoding = LinearCompletionEncoding(projections)
 
         val accepted = encoding.modelFor(candidate(2, 0.5), ExecutionControl.Never)
@@ -271,11 +256,9 @@ class LeafRealCompletionTest {
         val linear = assertNotNull(parsed.toLinearSourceProblem())
         val objective = source.objective!!.toLinearObjective().negated()
         val check: (Sample) -> Boolean = { sample ->
-            linear.checkMpsWitness(
-                source.columns.mapNotNull {
-                    if (it.real) BigFraction.ofDouble(sample.reals[it.id]) else BigFraction.ofLong(sample.ints[it.id])
-                },
-            ) != null
+            linear.checkMpsWitness(source.columns.mapNotNull {
+                if (it.real) BigFraction.ofDouble(sample.reals[it.id]) else BigFraction.ofLong(sample.ints[it.id])
+            }) != null
         }
 
         for (tolerance in listOf(false, true)) {

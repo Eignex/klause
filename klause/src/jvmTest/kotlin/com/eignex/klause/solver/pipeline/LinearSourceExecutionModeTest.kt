@@ -34,24 +34,15 @@ class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
     fun `a numerical heuristic should publish an exact rational point within the same node allowance`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ZERO, SemanticRational.ONE)),
-            listOf(
-                LinearSourceRow(
-                listOf(LinearSourceTerm(0, SemanticRational.ofLong(3))),
-                lower = SemanticRational.ONE,
-            )
-            ),
+            listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ofLong(3))),
+                lower = SemanticRational.ONE)),
             LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            engine,
-        )
-        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, engine,
+        ))
 
-        val result = SourceSetup.execute(
-            SourceExecutionRequest(invocation, finiteRequest = { shape ->
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
                 shape, engine, PresolveConfig.NONE, false, false, ExecutionControl.Never,
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
@@ -60,8 +51,7 @@ class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
                 solveBudgetMillis = null, allSolutions = false, solutionCap = null,
                 deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
             )
-        })
-        )
+        }))
 
         val outcome = assertNotNull(result.linearSource)
         val point = assertNotNull(outcome.incumbent)
@@ -79,20 +69,14 @@ class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
     fun `a numerical real source should retain heuristic execution with fixed discrete coordinates`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false, SemanticRational.ONE, SemanticRational.ONE)),
-            emptyList(),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-            SourceAttachment(source, ProblemSettings()),
-            ExecutionOperation.OPTIMIZE,
-            engine,
-        )
-        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, engine,
+        ))
         val budget = NodeBudget(32)
 
-        val result = SourceSetup.execute(
-            SourceExecutionRequest(invocation, finiteRequest = { shape ->
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
             FiniteSolveRequest(
                 shape, engine, PresolveConfig.NONE, false, false, ExecutionControl.after(50.milliseconds),
                 presolveBudget = null, cores = 1, executionOptions = ExecutionOptions(),
@@ -101,8 +85,7 @@ class LinearSourceExecutionModeTest(private val engine: FiniteEngine) {
                 solveBudgetMillis = null, allSolutions = false, solutionCap = null,
                 deadlineExceeded = { false }, onEvent = null, onPortfolioEvent = null,
             )
-        })
-        )
+        }))
 
         val finite = assertIs<SourceExecutionResult.Finite>(result)
         val outcome = assertIs<FiniteSolveOutcome.Completed>(finite.result.outcome)

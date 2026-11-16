@@ -41,11 +41,8 @@ internal fun repairTranscendentalCandidate(
                 if (references(expression, variable.id.index, arithmetic)) continue
                 val proposal = try {
                     val desired = TranscendentalSourceCheck(arithmetic, values, bools).evaluate(expression)
-                    if (target is TranscendentalExpression.Variable) {
-                        desired
-                    } else {
-                        inverse((target as TranscendentalExpression.Function).function, desired, arithmetic)
-                    }
+                    if (target is TranscendentalExpression.Variable) desired
+                    else inverse((target as TranscendentalExpression.Function).function, desired, arithmetic)
                 } catch (_: RealDomainInvalid) {
                     null
                 } catch (_: RealCertificationUnavailable) {
@@ -65,18 +62,12 @@ private fun references(expression: TranscendentalExpression, id: Int, arithmetic
         arithmetic.transcendental.step()
         when (val node = pending.removeLast()) {
             is TranscendentalExpression.Variable -> if (node.id.index == id) return true
-
             is TranscendentalExpression.Function -> pending.addLast(node.argument)
-
             is TranscendentalExpression.Sum -> pending.addAll(node.operands)
-
             is TranscendentalExpression.Product -> pending.addAll(node.operands)
-
             is TranscendentalExpression.Power -> pending.addLast(node.base)
-
             // Conditional dependencies can include their Boolean condition's arithmetic atoms.
             is TranscendentalExpression.Conditional -> return true
-
             else -> Unit
         }
     }
@@ -89,9 +80,7 @@ private fun inverse(
     arithmetic: ExactRealArithmetic,
 ): ExactRealValue? = when (function) {
     TranscendentalFunction.EXP -> arithmetic.function(ExactRealFunction.LOG, desired)
-
     TranscendentalFunction.LOG -> arithmetic.function(ExactRealFunction.EXP, desired)
-
     TranscendentalFunction.SIN, TranscendentalFunction.COS -> {
         val rational = desired.rational
         val zero = BigFraction.ZERO
@@ -104,13 +93,11 @@ private fun inverse(
                 minusOne -> minusOne * BigFraction.ofLong(2).reciprocal()
                 else -> null
             }
-        } else {
-            when (rational) {
-                zero -> one * BigFraction.ofLong(2).reciprocal()
-                one -> zero
-                minusOne -> one
-                else -> null
-            }
+        } else when (rational) {
+            zero -> one * BigFraction.ofLong(2).reciprocal()
+            one -> zero
+            minusOne -> one
+            else -> null
         }
         multiple?.let { arithmetic.multiply(listOf(arithmetic.rational(it), arithmetic.pi())) }
     }

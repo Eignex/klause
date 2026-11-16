@@ -24,8 +24,7 @@ internal class PortfolioEvidence(
     private var invocation: EngineInvocation? = null
 
     fun bindInvocation(
-        binding: EngineInvocation,
-        cancellation: ExecutionControl = ExecutionControl.Never,
+        binding: EngineInvocation, cancellation: ExecutionControl = ExecutionControl.Never,
     ): PortfolioEvidence = also {
         require(model.matches(binding.model)) { "runtime invocation differs from the portfolio model" }
         require(invocation?.matches(binding) != false) { "portfolio cannot change its runtime invocation" }
@@ -38,8 +37,7 @@ internal class PortfolioEvidence(
     }
 
     fun bindSourceScope(
-        scope: SourceScope,
-        cancellation: ExecutionControl = ExecutionControl.Never,
+        scope: SourceScope, cancellation: ExecutionControl = ExecutionControl.Never,
     ): PortfolioEvidence = also {
         require(sourceScope == null || sourceScope == scope) { "portfolio cannot change its source invocation" }
         require(invocation == null || invocation?.scope == scope) { "portfolio has another runtime capture scope" }
@@ -81,9 +79,7 @@ internal class PortfolioEvidence(
         val expected = sourceScope
         if (completion.scope != expected || worker.evidenceScope != expected ||
             completion.evidence?.scope?.let { it != expected } == true
-        ) {
-            return Verification.Rejected("completion belongs to a different original-source invocation")
-        }
+        ) return Verification.Rejected("completion belongs to a different original-source invocation")
         val identity = worker.evidenceModel ?: return Verification.Indeterminate("worker has no model identity")
         val sample = when (completion) {
             is CompletedEngineResult.Solve -> (completion.result as? SolveResult.Sat)?.assignment
@@ -111,15 +107,10 @@ internal class PortfolioEvidence(
     ): Verification<Unit, Unit> {
         val evidence: ModelEvidence<Sample, Double?> = when (kind) {
             EvidenceKind.Bound -> ModelEvidence.Bound(identity, value, certificate)
-
             EvidenceKind.Infeasible -> ModelEvidence.Infeasible(identity, certificate)
-
             EvidenceKind.Unbounded -> ModelEvidence.Unbounded(
-                identity,
-                Candidate(checkNotNull(sample), value),
-                certificate,
+                identity, Candidate(checkNotNull(sample), value), certificate,
             )
-
             EvidenceKind.Witness -> error("a witness is checked separately")
         }
         val verdict = verifier.verify(evidence, sourceScope, invocation, scopeCancellation)

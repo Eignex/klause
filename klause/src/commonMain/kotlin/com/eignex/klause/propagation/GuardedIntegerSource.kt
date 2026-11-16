@@ -41,13 +41,11 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                 if (source.boolVars.isNotEmpty() || source.op == LinearOp.NE || source.op != original.relation ||
                     source.bound != constants.bound || source.vars.size != original.size ||
                     source.vars.indices.any { source.vars[it] != Term.intVar(original.ref(it)) } ||
-                    !source.coeffs.contentEquals(constants.coeffs)
-                ) {
+                    !source.coeffs.contentEquals(constants.coeffs)) {
                     return decline("projection-identity-or-operation", factorId)
                 }
                 IntegerSourceRow(source)
             }
-
             is Linear -> {
                 if (original.vars.size > INTEGER_LEARNING_TERMS) return decline("term-limit", factorId)
                 if (original.realVars.isNotEmpty()) return decline("real-coordinates", factorId)
@@ -56,13 +54,11 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                     ?: return decline("projection-kind", factorId)
                 if (source.boolVars.isNotEmpty() || source.op == LinearOp.NE || source.op != original.op ||
                     source.bound != constants.bound || !source.vars.contentEquals(original.vars) ||
-                    !source.coeffs.contentEquals(constants.coeffs)
-                ) {
+                    !source.coeffs.contentEquals(constants.coeffs)) {
                     return decline("projection-identity-or-operation", factorId)
                 }
                 IntegerSourceRow(source)
             }
-
             is ReifiedLinear -> {
                 if (original.vars.size > INTEGER_LEARNING_TERMS) return decline("term-limit", factorId)
                 val constants = original.integerConstants ?: return decline("wide-constants", factorId)
@@ -70,39 +66,25 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                     ?: return decline("projection-kind", factorId)
                 if (source.auxBoolVar != original.auxBoolVar || source.op != original.op ||
                     source.bound != constants.bound || !source.vars.contentEquals(original.vars) ||
-                    !source.coeffs.contentEquals(constants.coeffs)
-                ) {
-                    return decline("projection-identity", factorId)
-                }
+                    !source.coeffs.contentEquals(constants.coeffs)) return decline("projection-identity", factorId)
                 val truth = state.boolValues[original.auxBoolVar] ?: return decline("guard-unassigned", factorId)
                 val guard = Lit.make(original.auxBoolVar, truth)
                 if (!state.integerGuardTrueAt(guard, trail)) return decline("guard-history", factorId)
-                val op = if (truth) {
-                    original.op
-                } else {
-                    when (original.op) {
-                        LinearOp.LE -> LinearOp.GE
-                        LinearOp.GE -> LinearOp.LE
-                        LinearOp.EQ -> LinearOp.NE
-                        LinearOp.NE -> LinearOp.EQ
-                    }
+                val op = if (truth) original.op else when (original.op) {
+                    LinearOp.LE -> LinearOp.GE
+                    LinearOp.GE -> LinearOp.LE
+                    LinearOp.EQ -> LinearOp.NE
+                    LinearOp.NE -> LinearOp.EQ
                 }
                 if (op == LinearOp.NE) return decline("disequality", factorId)
-                val bound = if (truth) {
-                    constants.bound
-                } else {
-                    when (original.op) {
-                        LinearOp.LE -> addExact(constants.bound, 1L)
-                        LinearOp.GE -> subExact(constants.bound, 1L)
-                        else -> constants.bound
-                    }
+                val bound = if (truth) constants.bound else when (original.op) {
+                    LinearOp.LE -> addExact(constants.bound, 1L)
+                    LinearOp.GE -> subExact(constants.bound, 1L)
+                    else -> constants.bound
                 }
-                IntegerSourceRow(
-                    LinearPropagator(intArrayOf(), source.intVars, source.coeffs, source.vars, op, bound),
-                    guard,
-                )
+                IntegerSourceRow(LinearPropagator(intArrayOf(), source.intVars, source.coeffs, source.vars, op, bound),
+                    guard)
             }
-
             is Element -> {
                 if (forBoundReason) return decline("element-support-reason", factorId)
                 if (!original.arrIsVars) return decline("element-constant-array", factorId)
@@ -110,10 +92,7 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                     ?: return decline("projection-kind", factorId)
                 if (source.idx != original.idx || source.result != original.result ||
                     source.arrIsVars != original.arrIsVars || source.indexOffset != original.indexOffset ||
-                    source.arr !== original.arr
-                ) {
-                    return decline("projection-identity", factorId)
-                }
+                    source.arr !== original.arr) return decline("projection-identity", factorId)
                 val selected = state.domainAt(original.idx, trail)
                 if (selected.min != selected.max) return decline("element-unfixed-selection", factorId)
                 val first = original.indexOffset.toLong()
@@ -127,19 +106,9 @@ internal class GuardedIntegerSource(private val state: PropagationState) {
                 val variables = intArrayOf(original.result, cell.toInt())
                 val guard = Lit.make(state.atomVarEq(original.idx, selected.min), true)
                 if (!state.integerGuardTrueAt(guard, trail)) return decline("guard-history", factorId)
-                IntegerSourceRow(
-                    LinearPropagator(
-                        intArrayOf(),
-                        variables,
-                        longArrayOf(1, -1),
-                        variables,
-                        LinearOp.EQ,
-                        0,
-                    ),
-                    guard,
-                )
+                IntegerSourceRow(LinearPropagator(intArrayOf(), variables, longArrayOf(1, -1), variables,
+                    LinearOp.EQ, 0), guard)
             }
-
             else -> decline("source-kind", factorId)
         }
     }
@@ -153,27 +122,10 @@ internal fun PropagationState.integerGuardTrueAt(guard: Int, trail: Int = undo.s
     val domain = domainAt(atoms.intVar[atom], trail)
     val threshold = atoms.threshold[atom]
     val truth = when (atoms.kind[atom]) {
-        AtomKind.GE -> if (domain.min >= threshold) {
-            true
-        } else if (domain.max < threshold) {
-            false
-        } else {
-            null
-        }
-
-        AtomKind.LE -> if (domain.max <= threshold) {
-            true
-        } else if (domain.min > threshold) {
-            false
-        } else {
-            null
-        }
-
-        AtomKind.EQ -> if (domain.min == threshold && domain.max == threshold) {
-            true
-        } else {
+        AtomKind.GE -> if (domain.min >= threshold) true else if (domain.max < threshold) false else null
+        AtomKind.LE -> if (domain.max <= threshold) true else if (domain.min > threshold) false else null
+        AtomKind.EQ -> if (domain.min == threshold && domain.max == threshold) true else
             if (!inDomainAt(atoms.intVar[atom], threshold, trail, domain)) false else null
-        }
     }
     return truth != null && Lit.evaluate(guard, truth)
 }

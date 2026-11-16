@@ -68,8 +68,7 @@ internal fun recoverLinearPrimal(
             if (!row.strict && row.columns.size == 1) {
                 val column = row.columns.single()
                 if (coordinates[column].kind == SourceCoordinate.Kind.Real &&
-                    meter.subtractProduct(row.rhs, row.coefficients.single(), point[column]).isZero
-                ) {
+                    meter.subtractProduct(row.rhs, row.coefficients.single(), point[column]).isZero) {
                     endpoints[column] = true
                 }
             }
@@ -77,14 +76,10 @@ internal fun recoverLinearPrimal(
         }
         val reconstructed = point.mapIndexed { id, value ->
             meter.reserve(1L, 32L)
-            if (coordinates[id].kind != SourceCoordinate.Kind.Real || endpoints[id]) {
-                value
-            } else {
+            if (coordinates[id].kind != SourceCoordinate.Kind.Real || endpoints[id]) value else {
                 val floating = value.toDouble()
                 val exactFloating = BigFraction.ofDouble(floating)?.let(meter::number)
-                if (exactFloating != value) {
-                    value
-                } else {
+                if (exactFloating != value) value else {
                     val part = reconstructRational(floating, onStep = { meter.reserve(1L) })
                     part?.let { meter.number(BigFraction.of(bigIntOf(it.numerator), bigIntOf(it.denominator))) }
                         ?: value
@@ -162,14 +157,8 @@ internal fun recoverLinearPrimal(
             componentRows.forEach { id ->
                 val row = residual[id]
                 meter.reserve(row.columns.size.toLong() + 1L, 64L + 32L * row.columns.size)
-                localRows.add(
-                    ExactRationalInequality(
-                        IntArray(row.columns.size) { local[row.columns[it]] },
-                        row.coefficients,
-                        row.rhs,
-                        row.strict,
-                    ),
-                )
+                localRows.add(ExactRationalInequality(IntArray(row.columns.size) { local[row.columns[it]] },
+                    row.coefficients, row.rhs, row.strict))
             }
             if (meter.satisfies(List(members.size) { recovered[members[it]] }, localRows)) continue
             observe("PrimalRecoveryComponents", 1L)
@@ -189,9 +178,7 @@ internal fun recoverLinearPrimal(
         if (meter.satisfies(recovered, active)) {
             observe("PrimalRecoveryResidual", 1L)
             recovered
-        } else {
-            null
-        }
+        } else null
     } catch (stop: LinearPrimalStop) {
         progress.pending = false
         observe("PrimalRecovery${stop.reason}", 1L)
@@ -253,9 +240,7 @@ internal fun refineLinearPrimal(
             }
             if (columns.isEmpty()) {
                 if (if (row.strict) rhs <= BigFraction.ZERO else rhs < BigFraction.ZERO) return null
-            } else {
-                residual += ExactRationalInequality(columns.toIntArray(), coefficients, rhs, row.strict)
-            }
+            } else residual += ExactRationalInequality(columns.toIntArray(), coefficients, rhs, row.strict)
         }
         val refined = complete(residual, objective, cancellation) ?: return null
         if (refined.size != members.size) return null

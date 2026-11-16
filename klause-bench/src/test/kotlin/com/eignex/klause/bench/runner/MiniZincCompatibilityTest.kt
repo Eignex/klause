@@ -92,8 +92,8 @@ class MiniZincCompatibilityTest {
         assertEquals(
             "index-set-mismatch",
             MiniZincCompileFailure.classify(
-                "Error: evaluation error: Index set mismatch. Declared index sets of argument DSR are different",
-            ),
+            "Error: evaluation error: Index set mismatch. Declared index sets of argument DSR are different",
+        )
         )
     }
 

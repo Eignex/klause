@@ -25,12 +25,8 @@ class LocalSearchProblem private constructor(
     val realOccurrences: Array<IntArray>,
 ) {
     private constructor(compiled: LocalSearchProblem) : this(
-        compiled.problem,
-        compiled.invariants,
-        compiled.selection,
-        compiled.boolOccurrences,
-        compiled.intOccurrences,
-        compiled.realOccurrences,
+        compiled.problem, compiled.invariants, compiled.selection, compiled.boolOccurrences,
+        compiled.intOccurrences, compiled.realOccurrences,
     )
 
     /** Compile [problem], retaining exact linear rows when sums over [domains] can leave the 64-bit range. */
@@ -46,78 +42,73 @@ class LocalSearchProblem private constructor(
             problem: Problem,
             domains: Array<IntDomain>?,
             selection: PreparedFactorProjections? = (problem as? BakedProblem)?.factorProjections,
-        ): Iterator<LocalSearchProblem?> = sequence<LocalSearchProblem?> {
-            selection?.requireSource(problem)
-            val invariants = arrayOfNulls<Invariant>(problem.numFactors)
-            val tableCaches = HashMap<Int, MutableMap<LongArray, TableGroupCache>>()
-            yield(null)
-            val boolCounts = IntArray(problem.numBoolVars)
-            yield(null)
-            val intCounts = IntArray(problem.numIntVars)
-            yield(null)
-            val realCounts = IntArray(problem.numRealVars)
-            yield(null)
-            val boolSeen = IntArray(problem.numBoolVars)
-            yield(null)
-            val intSeen = IntArray(problem.numIntVars)
-            yield(null)
-            val realSeen = IntArray(problem.numRealVars)
-            yield(null)
-            for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
-                for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
-                    val factor = problem.factors[fid]
-                    invariants[fid] = if (factor is Table && factor.hi == null &&
-                        (selection == null || selection.usesBuiltInScoring(fid))
-                    ) {
-                        val cache = tableCaches.getOrPut(factor.arity) { HashMap() }.getOrPut(factor.tuples) {
-                            TableGroupCache(factor.arity, factor.tuples, null)
-                        }
-                        factor.tableInvariantProjection(cache)
-                    } else {
-                        selection?.invariant(fid, domains) ?: factor.invariantProjection(domains)
-                    }
-                    if (invariants[fid] === NoInvariant) continue
-                    factor.boolVars.forEachVariableOnce(boolSeen, fid) { boolCounts[it]++ }
-                    factor.intVars.forEachVariableOnce(intSeen, fid) { intCounts[it]++ }
-                    factor.variables.reals.forEachVariableOnce(realSeen, fid) { realCounts[it]++ }
-                }
+        ): Iterator<LocalSearchProblem?> =
+            sequence<LocalSearchProblem?> {
+                selection?.requireSource(problem)
+                val invariants = arrayOfNulls<Invariant>(problem.numFactors)
+                val tableCaches = HashMap<Int, MutableMap<LongArray, TableGroupCache>>()
                 yield(null)
-            }
-            val boolOccurrences = allocateOccurrences(boolCounts)
-            val intOccurrences = allocateOccurrences(intCounts)
-            val realOccurrences = allocateOccurrences(realCounts)
-            for (counts in listOf(boolCounts, intCounts, realCounts, boolSeen, intSeen, realSeen)) {
-                for (from in counts.indices step PROJECTION_BATCH) {
-                    counts.fill(0, from, minOf(from + PROJECTION_BATCH, counts.size))
+                val boolCounts = IntArray(problem.numBoolVars)
+                yield(null)
+                val intCounts = IntArray(problem.numIntVars)
+                yield(null)
+                val realCounts = IntArray(problem.numRealVars)
+                yield(null)
+                val boolSeen = IntArray(problem.numBoolVars)
+                yield(null)
+                val intSeen = IntArray(problem.numIntVars)
+                yield(null)
+                val realSeen = IntArray(problem.numRealVars)
+                yield(null)
+                for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
+                    for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
+                        val factor = problem.factors[fid]
+                        invariants[fid] = if (factor is Table && factor.hi == null &&
+                            (selection == null || selection.usesBuiltInScoring(fid))
+                        ) {
+                            val cache = tableCaches.getOrPut(factor.arity) { HashMap() }.getOrPut(factor.tuples) {
+                                TableGroupCache(factor.arity, factor.tuples, null)
+                            }
+                            factor.tableInvariantProjection(cache)
+                        } else {
+                            selection?.invariant(fid, domains) ?: factor.invariantProjection(domains)
+                        }
+                        if (invariants[fid] === NoInvariant) continue
+                        factor.boolVars.forEachVariableOnce(boolSeen, fid) { boolCounts[it]++ }
+                        factor.intVars.forEachVariableOnce(intSeen, fid) { intCounts[it]++ }
+                        factor.variables.reals.forEachVariableOnce(realSeen, fid) { realCounts[it]++ }
+                    }
                     yield(null)
                 }
-            }
-            for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
-                for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
-                    if (invariants[fid] === NoInvariant) continue
-                    val factor = problem.factors[fid]
-                    factor.boolVars.forEachVariableOnce(boolSeen, fid) {
-                        boolOccurrences[it][boolCounts[it]++] = fid
-                    }
-                    factor.intVars.forEachVariableOnce(intSeen, fid) { intOccurrences[it][intCounts[it]++] = fid }
-                    factor.variables.reals.forEachVariableOnce(realSeen, fid) {
-                        realOccurrences[it][realCounts[it]++] = fid
+                val boolOccurrences = allocateOccurrences(boolCounts)
+                val intOccurrences = allocateOccurrences(intCounts)
+                val realOccurrences = allocateOccurrences(realCounts)
+                for (counts in listOf(boolCounts, intCounts, realCounts, boolSeen, intSeen, realSeen)) {
+                    for (from in counts.indices step PROJECTION_BATCH) {
+                        counts.fill(0, from, minOf(from + PROJECTION_BATCH, counts.size))
+                        yield(null)
                     }
                 }
-                yield(null)
-            }
-            @Suppress("UNCHECKED_CAST")
-            yield(
-                LocalSearchProblem(
-                    problem,
-                    invariants as Array<Invariant>,
-                    selection,
-                    boolOccurrences,
-                    intOccurrences,
-                    realOccurrences,
-                ),
-            )
-        }.iterator()
+                for (from in 0 until problem.numFactors step PROJECTION_BATCH) {
+                    for (fid in from until minOf(from + PROJECTION_BATCH, problem.numFactors)) {
+                        if (invariants[fid] === NoInvariant) continue
+                        val factor = problem.factors[fid]
+                        factor.boolVars.forEachVariableOnce(boolSeen, fid) {
+                            boolOccurrences[it][boolCounts[it]++] = fid
+                        }
+                        factor.intVars.forEachVariableOnce(intSeen, fid) { intOccurrences[it][intCounts[it]++] = fid }
+                        factor.variables.reals.forEachVariableOnce(realSeen, fid) {
+                            realOccurrences[it][realCounts[it]++] = fid
+                        }
+                    }
+                    yield(null)
+                }
+                @Suppress("UNCHECKED_CAST")
+                yield(LocalSearchProblem(
+                    problem, invariants as Array<Invariant>, selection,
+                    boolOccurrences, intOccurrences, realOccurrences,
+                ))
+            }.iterator()
 
         private inline fun IntArray.forEachVariableOnce(seen: IntArray, factorId: Int, action: (Int) -> Unit) {
             // The invariant updates all repeated positions itself; a move dispatches to it once.

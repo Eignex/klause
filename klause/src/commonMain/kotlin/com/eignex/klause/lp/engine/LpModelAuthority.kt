@@ -5,7 +5,9 @@ import com.eignex.util.numbers.BIG_ONE
 // Stored normalized Long/IEEE data is authoritative; probe sides are absent, origins stay finite.
 internal fun LpModel.authoritativeModel(): ExactLpModel? = authoritativeModel(null)
 
-internal fun LpModel.authoritativeModel(structuralColumn: ((Int) -> ExactLpColumn?)?): ExactLpModel? {
+internal fun LpModel.authoritativeModel(
+    structuralColumn: ((Int) -> ExactLpColumn?)?,
+): ExactLpModel? {
     exactState?.let { return it.model }
     if (!finiteExactInput()) return null
     val dv = doubleView

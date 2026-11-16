@@ -45,11 +45,9 @@ class SourceFloatProjection internal constructor(binding: SelectedFloatGridBindi
 
     private val capturedCoordinates = binding.projection.mapping.columns().map {
         val selector = it.selector()
-        SourceFloatGridCoordinate(
-            it.source, selector.coordinate.variable, selector.origin.semantic(),
+        SourceFloatGridCoordinate(it.source, selector.coordinate.variable, selector.origin.semantic(),
             selector.step.semantic(), selector.coordinate.buckets, it.coordinate.variable,
-            it.origin.semantic(), it.step.semantic(), it.coordinate.buckets,
-        )
+            it.origin.semantic(), it.step.semantic(), it.coordinate.buckets)
     }
     private val origins = binding.projection.mapping.factorOrigins()
 

@@ -25,12 +25,8 @@ import kotlin.test.assertNull
 class AllDifferentEncoderTest {
     @Test
     fun `cancelled all different installation should publish no enforcing fragment`() {
-        val source = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            arrayOf(AllDifferent(intArrayOf(0, 1, 2))),
-        )
+        val source = Problem(0, 3, Array(3) { IntDomain(0, 2) },
+            arrayOf(AllDifferent(intArrayOf(0, 1, 2))))
         var charged = 0L
         val cancellation = object : ExecutionControl() {
             override fun isCancelled(): Boolean = charged > 1
@@ -38,12 +34,8 @@ class AllDifferentEncoderTest {
         }
         val declines = mutableListOf<EncoderDecline>()
 
-        val installed = FactorProjectionProviders.Default.prepare(source).installLinearFactor(
-            0,
-            EncodingTarget.LINEAR,
-            cancellation = cancellation,
-            onDecline = declines::add,
-        )
+        val installed = FactorProjectionProviders.Default.prepare(source).installLinearFactor(0,
+            EncodingTarget.LINEAR, cancellation = cancellation, onDecline = declines::add)
 
         assertNull(installed)
         assertEquals(listOf(EncoderDecline.RESOURCE), declines)
@@ -51,30 +43,14 @@ class AllDifferentEncoderTest {
 
     @Test
     fun `linear all different encoding should retain optional polarity and exempt collisions`() {
-        for ((value, present, expectedSat) in listOf(
-            Triple(1L, true, false),
-            Triple(1L, false, true),
-            Triple(7L, true, true),
-        )) {
-            val relation = AllDifferent(
-                intArrayOf(0, 1),
-                presents = intArrayOf(Lit.make(0, true), Lit.make(1, false)),
-                exceptSet = longArrayOf(7),
-            )
-            val source = Problem(
-                2,
-                2,
-                Array(2) { IntDomain(value, value) },
-                arrayOf<Factor>(
-                    relation,
-                    Clause(intArrayOf(Lit.make(0, present))),
-                    Clause(intArrayOf(Lit.make(1, false))),
-                ),
-            )
-            val installed = assertNotNull(
-                FactorProjectionProviders.Default.prepare(source)
-                    .linearTheoryModel(EncodingTarget.LINEAR),
-            )
+        for ((value, present, expectedSat) in listOf(Triple(1L, true, false),
+            Triple(1L, false, true), Triple(7L, true, true))) {
+            val relation = AllDifferent(intArrayOf(0, 1),
+                presents = intArrayOf(Lit.make(0, true), Lit.make(1, false)), exceptSet = longArrayOf(7))
+            val source = Problem(2, 2, Array(2) { IntDomain(value, value) }, arrayOf<Factor>(relation,
+                Clause(intArrayOf(Lit.make(0, present))), Clause(intArrayOf(Lit.make(1, false)))))
+            val installed = assertNotNull(FactorProjectionProviders.Default.prepare(source)
+                .linearTheoryModel(EncodingTarget.LINEAR))
 
             val result = BacktrackSolver.source(installed).solve()
 
@@ -84,30 +60,14 @@ class AllDifferentEncoderTest {
 
     @Test
     fun `polynomial all different encoding should retain optional polarity and exempt collisions`() {
-        for ((value, present, expectedSat) in listOf(
-            Triple(1L, true, false),
-            Triple(1L, false, true),
-            Triple(7L, true, true),
-        )) {
-            val relation = AllDifferent(
-                intArrayOf(0, 1),
-                presents = intArrayOf(Lit.make(0, true), Lit.make(1, false)),
-                exceptSet = longArrayOf(7),
-            )
-            val source = Problem(
-                2,
-                2,
-                Array(2) { IntDomain(value, value) },
-                arrayOf<Factor>(
-                    relation,
-                    Clause(intArrayOf(Lit.make(0, present))),
-                    Clause(intArrayOf(Lit.make(1, false))),
-                    RealProduct(0, 0, 0, 0.0, 0.0),
-                ),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0),
-                realUpper = doubleArrayOf(0.0),
-            )
+        for ((value, present, expectedSat) in listOf(Triple(1L, true, false),
+            Triple(1L, false, true), Triple(7L, true, true))) {
+            val relation = AllDifferent(intArrayOf(0, 1),
+                presents = intArrayOf(Lit.make(0, true), Lit.make(1, false)), exceptSet = longArrayOf(7))
+            val source = Problem(2, 2, Array(2) { IntDomain(value, value) }, arrayOf<Factor>(relation,
+                Clause(intArrayOf(Lit.make(0, present))), Clause(intArrayOf(Lit.make(1, false))),
+                RealProduct(0, 0, 0, 0.0, 0.0)), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(0.0))
             val shared = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
 
             val pins = (0..1).associate { shared.integerColumns.getValue(it) to BigFraction.ofLong(value) }

@@ -549,9 +549,7 @@ internal object AffineSingletons {
         val fallback = if (minimizeRewrite) {
             cancellation.charge(AFFINE_WORK_WEIGHT)
             candidateInFactor(ws, di, eliminated, objectiveIntVars, capWide, pivotable, cancellation) ?: return null
-        } else {
-            null
-        }
+        } else null
         cancellation.charge(AFFINE_WORK_WEIGHT * f.vars.size)
         if (row.bound == Long.MIN_VALUE) return null
         var preferred = 0
@@ -563,9 +561,7 @@ internal object AffineSingletons {
                 val variable = f.vars[index]
                 if (eliminated[variable] || variable in objectiveIntVars ||
                     (row.coeff(index) != 1L && row.coeff(index) != -1L)
-                ) {
-                    continue
-                }
+                ) continue
                 if (pivotable != null && !pivotable(f, index)) continue
                 val weight = ws.rewriteWeight(di, variable, cancellation)
                 if (cancellation()) return null
@@ -645,14 +641,8 @@ internal object AffineSingletons {
             // Int space, so a scale or offset beyond Int range takes the Linear-fold path instead.
             val singlePartnerSubstitutable = !isAlias && termVars.size == 1 &&
                 termCoeffs[0] in INT_RANGE && constTerm in INT_RANGE &&
-                ws.otherOccurrencesAffineSubstitutable(
-                    di,
-                    x,
-                    termCoeffs[0].toInt(),
-                    constTerm.toInt(),
-                    termVars[0],
-                    cancellation,
-                )
+                ws.otherOccurrencesAffineSubstitutable(di, x, termCoeffs[0].toInt(), constTerm.toInt(),
+                    termVars[0], cancellation)
             if (isAlias || ws.otherOccurrencesAllLinear(di, x) || singlePartnerSubstitutable) {
                 return AffineCandidate(di, x, constTerm, termVars, termCoeffs, isAlias)
             }
@@ -1278,11 +1268,8 @@ internal object AffineSingletons {
             w++
         }
         val bound = row.bound - cX * c.constTerm
-        return if (l.activator == LinearRow.ALWAYS) {
-            Linear(newCoeffs, newVars, l.relation, bound)
-        } else {
-            ReifiedLinear(l.activator, newCoeffs, newVars, l.relation, bound)
-        }
+        return if (l.activator == LinearRow.ALWAYS) Linear(newCoeffs, newVars, l.relation, bound)
+        else ReifiedLinear(l.activator, newCoeffs, newVars, l.relation, bound)
     }
 
     private fun domainBoundsOverflow(ranges: ColumnRanges, c: AffineCandidate): Boolean = try {

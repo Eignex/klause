@@ -35,9 +35,7 @@ internal fun Compiler.Builder.retainedEuclideanDivMod(a: IntComb, b: IntComb, qu
                 return DivModExpression(wide.coeffs, wide.constant)
             }
             WideDivMod(expression(a), divisor, expression(q), expression(r))
-        } else {
-            DivMod(divModColumn(a), divisor, divModColumn(q), divModColumn(r), DivisionConvention.EUCLIDEAN)
-        }
+        } else DivMod(divModColumn(a), divisor, divModColumn(q), divModColumn(r), DivisionConvention.EUCLIDEAN)
         q to r
     }
     return if (quotient) outputs.first else outputs.second
@@ -50,7 +48,6 @@ private fun Compiler.Builder.divModColumn(expression: IntComb): Int {
     }
     val range = when (expression) {
         is IntComb.Narrow -> linCombRange(expression.lin)
-
         is IntComb.Wide -> wideRange(wide)?.let { (lo, hi) ->
             lo.takeIf { it.fitsLong() }?.toLongExact() to hi.takeIf { it.fitsLong() }?.toLongExact()
         } ?: (null to null)

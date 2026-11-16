@@ -33,15 +33,10 @@ internal fun NonlinearIntegerProblem.integerSeeds(
                 seed(node.left, node.right)
                 seed(node.right, node.left)
             }
-
             is PolynomialRealFormula.And -> work.addAll(node.operands)
-
             is PolynomialRealFormula.Or -> work.addAll(node.operands)
-
             is PolynomialRealFormula.Not -> work.addLast(node.operand)
-
             is PolynomialSelection -> work.addLast(polynomialSelectionEncoding(node, step))
-
             else -> Unit
         }
     }

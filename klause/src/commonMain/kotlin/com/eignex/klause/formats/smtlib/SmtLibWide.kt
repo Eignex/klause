@@ -83,12 +83,8 @@ internal fun Compiler.Builder.freshWideInt(magnitude: BigInt?): IntComb {
 internal fun Compiler.Builder.wideAbsTerm(x: WideLinComb): IntComb {
     val y = freshWideInt(intCombMagnitude(IntComb.Wide(x)))
     val output = y.toWide()
-    factors.add(
-        AffineAbs(
-            AbsAffineValue(x.coeffs, x.constant),
-            AbsAffineValue(output.coeffs, output.constant),
-        ),
-    )
+    factors.add(AffineAbs(AbsAffineValue(x.coeffs, x.constant),
+        AbsAffineValue(output.coeffs, output.constant)))
     return y
 }
 

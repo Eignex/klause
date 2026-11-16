@@ -5,10 +5,7 @@ package com.eignex.klause.solver
  * Completion, failure and idempotent [close] release its retained search and resources.
  * A buffered terminal value remains readable after completion; explicit close discards it.
  */
-interface SearchStream<out T : Any> :
-    Sequence<T>,
-    Iterator<T>,
-    AutoCloseable {
+interface SearchStream<out T : Any> : Sequence<T>, Iterator<T>, AutoCloseable {
     /** True when the search has completed, failed or been closed. */
     val isDone: Boolean
 

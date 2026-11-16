@@ -103,11 +103,7 @@ class StripEnergyMakespanBoundTest {
             numBoolVars = 0,
             numIntVars = 5,
             intDomains = arrayOf(
-                IntDomain(0L, 100L),
-                IntDomain(0L, 100L),
-                IntDomain(0L, 0L),
-                IntDomain(0L, 0L),
-                IntDomain(0L, 100L),
+                IntDomain(0L, 100L), IntDomain(0L, 100L), IntDomain(0L, 0L), IntDomain(0L, 0L), IntDomain(0L, 100L),
             ),
             factors = arrayOf(
                 Diffn(intArrayOf(0, 1), intArrayOf(2, 3), longArrayOf(2, 2), longArrayOf(1, 1)),

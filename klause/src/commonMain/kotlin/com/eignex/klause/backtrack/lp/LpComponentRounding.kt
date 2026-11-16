@@ -15,23 +15,21 @@ import com.eignex.klause.util.ExecutionControl
 import kotlin.math.round
 import kotlin.time.TimeSource
 
-internal fun LpEngine.prepareRootComponentTrial(objective: LinearObjective, cancellation: ExecutionControl): Boolean {
+internal fun LpEngine.prepareRootComponentTrial(
+    objective: LinearObjective,
+    cancellation: ExecutionControl,
+): Boolean {
     val guide = rootRoundingWarmStart ?: return false
     val targets = rootPrimalTargets ?: return false
     if (guide.primal == null || targets.coordinates !== guide.primal ||
         guide.objective !== objective || guide.roundingComplete || problem.numBoolVars != 0 ||
         problem.numRealVars != 0 || problem.numIntVars < 4 || cancellation()
-    ) {
-        return false
-    }
+    ) return false
     if (guide.componentRounding != null && guide.pinning?.fixpointCancelled == false) return true
     if (guide.pinning != null) return false
     if (guide.componentRounding == null && !fractionalComponentTargets(targets, cancellation)) return false
-    val bytes = if (guide.componentRounding != null) {
-        0L
-    } else {
+    val bytes = if (guide.componentRounding != null) 0L else
         128L + if (targets.components == null) rootComponentPreparationBytes(problem.numIntVars) else 0L
-    }
     if (!rootComponentPreparationAllowed(targets, bytes, 8L) ||
         rootComponentPreparationWork(targets, bytes) < 8L
     ) {
@@ -55,25 +53,22 @@ internal fun LpEngine.prepareRootComponentTrial(objective: LinearObjective, canc
         return true
     } finally {
         if (!retained) session.releaseRetainedState()
-        sink.lp.observePrimalPhase(
-            "PRIMAL_COMPONENT_ROUNDING",
-            outcome,
-            started.elapsedNow().inWholeNanoseconds,
-        )
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", outcome,
+            started.elapsedNow().inWholeNanoseconds)
     }
 }
 
-private fun LpEngine.fractionalComponentTargets(targets: RootPrimalTargets, cancellation: ExecutionControl): Boolean {
+private fun LpEngine.fractionalComponentTargets(
+    targets: RootPrimalTargets,
+    cancellation: ExecutionControl,
+): Boolean {
     val maximumWork = 8L * targets.intColumns.size
     if (!rootComponentPreparationAllowed(targets, 0L, maximumWork) ||
         rootComponentPreparationWork(targets, 0L) < maximumWork
     ) {
         sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", "TARGET_SCAN_DECLINED", 0L)
-        sink.lp.observePrimalPhase(
-            "PRIMAL_COMPONENT_ADMISSION",
-            rootComponentPreparationDecline(targets, 0L, maximumWork) ?: "SLICE_WORK",
-            0L,
-        )
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ADMISSION",
+            rootComponentPreparationDecline(targets, 0L, maximumWork) ?: "SLICE_WORK", 0L)
         return false
     }
     val meter = LpProjectionMeter(maximumWork, 0L, cancellation)
@@ -95,12 +90,8 @@ private fun LpEngine.fractionalComponentTargets(targets: RootPrimalTargets, canc
         return false
     } finally {
         noteNodeOverhead(meter.work)
-        sink.lp.observePrimalPhase(
-            "PRIMAL_COMPONENT_ROUNDING",
-            outcome,
-            started.elapsedNow().inWholeNanoseconds,
-            meter.work,
-        )
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", outcome,
+            started.elapsedNow().inWholeNanoseconds, meter.work)
     }
 }
 
@@ -138,12 +129,10 @@ internal fun LpEngine.pinRootComponents(
         if (pending.repair?.active == true) {
             when (repairRootComponent(session, pending, cancellation, ::target, charge)) {
                 null -> return null
-
                 false -> {
                     retainCompletedRoundingComponents(pending, session, cancellation, charge)
                     return null
                 }
-
                 true -> {
                     pending.group++
                     pending.level = session.decisionLevel
@@ -207,13 +196,11 @@ private fun LpEngine.retainCompletedRoundingComponents(
     charge: () -> Unit,
 ) {
     val targets = rootPrimalTargets?.takeIf { it.components === pending.order }
-    if (targets != null) {
-        for (group in 0 until pending.group) {
-            session.chargeInprocessingWork(1L)
-            charge()
-            if (cancellation()) break
-            retainRootComponentValues(targets, pending.order, group, session, cancellation)
-        }
+    if (targets != null) for (group in 0 until pending.group) {
+        session.chargeInprocessingWork(1L)
+        charge()
+        if (cancellation()) break
+        retainRootComponentValues(targets, pending.order, group, session, cancellation)
     }
     sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ROUNDING", "GROUP_DECLINED", 0L)
 }

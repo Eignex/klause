@@ -35,10 +35,8 @@ class ArithmeticLearningTraceTest {
         state.arithmeticLearningTrace?.record("integer.decline.seed-source")
         state.arithmeticLearningTrace?.record("integer.source-decline.term-limit")
 
-        assertEquals(
-            mapOf("integer.decline.seed-source" to 2L, "integer.source-decline.term-limit" to 1L),
-            trace.declineCensus,
-        )
+        assertEquals(mapOf("integer.decline.seed-source" to 2L, "integer.source-decline.term-limit" to 1L),
+            trace.declineCensus)
         assertEquals(1L, trace.discardedWindows)
         assertEquals(1, trace.events.size)
         assertTrue(trace.truncated)
@@ -68,11 +66,8 @@ class ArithmeticLearningTraceTest {
             trace.record(kind, 3)
 
             assertEquals(4, trace.events.size)
-            assertContentEquals(
-                longArrayOf(1, 3),
-                trace.events.filter { it.kind == kind }
-                    .map { it.data[0] }.toLongArray(),
-            )
+            assertContentEquals(longArrayOf(1, 3), trace.events.filter { it.kind == kind }
+                .map { it.data[0] }.toLongArray())
             assertEquals(8L, trace.omittedObservations)
             assertFalse(trace.truncated)
         }
@@ -83,20 +78,8 @@ class ArithmeticLearningTraceTest {
         val state = PropagationState(Problem(1, 1, arrayOf(IntDomain(0, 6)), emptyArray()), Assumptions.None)
         val selected = Lit.make(state.atomVarEq(0, 2), true)
         for (guard in intArrayOf(Lit.make(0, false), selected)) {
-            val row = requireNotNull(
-                IntegerConflictRow.source(
-                    LinearPropagator(
-                        intArrayOf(),
-                        intArrayOf(0),
-                        longArrayOf(1),
-                        intArrayOf(0),
-                        LinearOp.LE,
-                        6,
-                    ),
-                    useLo = true,
-                    guard = guard,
-                ),
-            )
+            val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+                longArrayOf(1), intArrayOf(0), LinearOp.LE, 6), useLo = true, guard = guard))
             val trace = ArithmeticLearningTrace()
 
             trace.row("candidate", row, state)
@@ -133,29 +116,11 @@ class ArithmeticLearningTraceTest {
 
     @Test
     fun `historical capture should exclude a later journalled hole`() {
-        val state = PropagationState(
-            Problem(
-                0,
-                1,
-                arrayOf(IntDomain(0, 6).excludeValue(1)),
-                emptyArray(),
-            ),
-            Assumptions.None,
-        )
+        val state = PropagationState(Problem(0, 1,
+            arrayOf(IntDomain(0, 6).excludeValue(1)), emptyArray()), Assumptions.None)
         state.undoLogging = true
-        val row = requireNotNull(
-            IntegerConflictRow.source(
-                LinearPropagator(
-                    intArrayOf(),
-                    intArrayOf(0),
-                    longArrayOf(1),
-                    intArrayOf(0),
-                    LinearOp.LE,
-                    6,
-                ),
-                useLo = true,
-            ),
-        )
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 6), useLo = true))
         assertTrue(state.excludeIntValueImpl(0, 3, null))
         val trace = ArithmeticLearningTrace()
 
@@ -171,18 +136,13 @@ class ArithmeticLearningTraceTest {
         for (marker in listOf(false, true)) {
             val trace = ArithmeticLearningTrace()
             trace.stored(4, "integer")
-            if (marker) {
-                trace.marker(0, true, IntArray(33))
-            } else {
-                trace.clause("analysis.seed-clause", IntArray(65), state)
-            }
+            if (marker) trace.marker(0, true, IntArray(33))
+            else trace.clause("analysis.seed-clause", IntArray(65), state)
 
             trace.pin(4, 0, 2, "upper", 1)
 
-            assertContentEquals(
-                longArrayOf(if (marker) 33L else 65L),
-                trace.events.single { it.kind.endsWith(".omitted") }.data,
-            )
+            assertContentEquals(longArrayOf(if (marker) 33L else 65L),
+                trace.events.single { it.kind.endsWith(".omitted") }.data)
             assertTrue(trace.events.any { it.kind == "consumer.upper" })
             assertEquals(1, trace.omittedPayloads)
             assertFalse(trace.truncated)
@@ -192,19 +152,8 @@ class ArithmeticLearningTraceTest {
     @Test
     fun `focused capture should retain a derivation and later consumers within its allowance`() {
         val state = PropagationState(Problem(0, 1, arrayOf(IntDomain(0, 6)), emptyArray()), Assumptions.None)
-        val row = requireNotNull(
-            IntegerConflictRow.source(
-                LinearPropagator(
-                    intArrayOf(),
-                    intArrayOf(0),
-                    longArrayOf(1),
-                    intArrayOf(0),
-                    LinearOp.LE,
-                    6,
-                ),
-                useLo = true,
-            ),
-        )
+        val row = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 6), useLo = true))
         val trace = ArithmeticLearningTrace().apply { captureFirstInteger = true }
         trace.record("prefix", 1)
         trace.beginConflict(0, 1, 0)
@@ -221,11 +170,8 @@ class ArithmeticLearningTraceTest {
         trace.remap(3, intArrayOf(-1, -1))
 
         assertTrue(trace.events.any { it.kind == "integer.derived.endpoint" })
-        assertContentEquals(
-            longArrayOf(1, 2),
-            trace.events.filter { it.kind == "consumer.upper" }
-                .map { it.data[3] }.toLongArray(),
-        )
+        assertContentEquals(longArrayOf(1, 2), trace.events.filter { it.kind == "consumer.upper" }
+            .map { it.data[3] }.toLongArray())
         assertEquals(1, trace.events.count { it.kind == "traversal.pick" })
         assertEquals(-1L, trace.events.last().data[2])
         assertEquals(1L, trace.discardedWindows)
@@ -279,18 +225,11 @@ class ArithmeticLearningTraceTest {
     fun `bounded capture should preserve conflict fallback and later row deduction`() {
         val work = mutableListOf<Long>()
         for (capture in 0..2) {
-            val native = PropagationSession(
-                Problem(
-                    0,
-                    3,
-                    arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)),
-                    arrayOf(
-                        Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
-                        Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
-                    ),
-                ),
-                pbLearning = false,
-            ).apply { enableIntegerRowLearning() }
+            val native = PropagationSession(Problem(0, 3,
+                arrayOf(IntDomain(0, 6), IntDomain(0, 12), IntDomain(0, 24)), arrayOf(
+                    Linear(intArrayOf(2, 1, -1), intArrayOf(0, 1, 2), LinearOp.LE, 0),
+                    Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 0),
+                )), pbLearning = false).apply { enableIntegerRowLearning() }
             val trace = ArithmeticLearningTrace().apply { captureFirstInteger = capture == 2 }
             if (capture != 0) native.explanationState.arithmeticLearningTrace = trace
             val cp = CpSearchComponent(native)

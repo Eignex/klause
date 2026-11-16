@@ -14,7 +14,8 @@ internal class RunsDomain(
     override val max: Long,
     private val runs: LongArray,
     storage: DomainStorageSettings = defaultDomainStorageSettings,
-) : AbstractIntDomain(storage),
+) :
+    AbstractIntDomain(storage),
     IntSpan {
     override fun withStorage(settings: DomainStorageSettings): IntDomain =
         if (storage == settings) this else RunsDomain(min, max, runs, settings)

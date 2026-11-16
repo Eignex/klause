@@ -163,27 +163,16 @@ class LpExactContinuationTest {
                 Basis(intArrayOf(0), arrayOf(VarStatus.BASIC, VarStatus.FIXED))
         }
         val cases = listOf(
-            Triple(
-                ExactContinuationLimits(maxRows = 0, maxWork = 0L),
-                ExecutionControl.Never,
-                ContinuationDecline.WORK,
-            ),
-            Triple(
-                ExactContinuationLimits(maxRows = 0, maxTimeNs = 0L),
-                ExecutionControl.Never,
-                ContinuationDecline.TIME,
-            ),
+            Triple(ExactContinuationLimits(maxRows = 0, maxWork = 0L), ExecutionControl.Never,
+                ContinuationDecline.WORK),
+            Triple(ExactContinuationLimits(maxRows = 0, maxTimeNs = 0L), ExecutionControl.Never,
+                ContinuationDecline.TIME),
             Triple(ExactContinuationLimits(maxRows = 0), ExecutionControl { true }, ContinuationDecline.CANCELLED),
         )
         for ((limit, cancellation, reason) in cases) {
             val stopped = captureContinuationTarget(model, solver, null, limit, cancellation)
-            val target = captureContinuationTarget(
-                model,
-                solver,
-                null,
-                ExactContinuationLimits(),
-                ExecutionControl.Never,
-            )
+            val target = captureContinuationTarget(model, solver, null, ExactContinuationLimits(),
+                ExecutionControl.Never)
             val retried = continueExactLp(model, target.basis, targetMetrics = target.metrics)
 
             assertEquals(reason, stopped.metrics.decline)
@@ -239,8 +228,7 @@ class LpExactContinuationTest {
                 }
             }.build(Sense.MINIMIZE)
             val basis = Basis(
-                intArrayOf(0, 1),
-                arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
+                intArrayOf(0, 1), arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED),
             )
             val cache = LpExactContinuationCache()
             val limits = ExactContinuationLimits(maxImportPivots = 1, startArbitraryPrecision = arbitrary)
@@ -275,10 +263,8 @@ class LpExactContinuationTest {
             val statuses = arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.FIXED, VarStatus.FIXED)
             val cache = LpExactContinuationCache()
             val limits = ExactContinuationLimits(maxImportPivots = 1, startArbitraryPrecision = arbitrary)
-            assertEquals(
-                ContinuationDecline.IMPORT_LIMIT,
-                continueExactLp(model, Basis(intArrayOf(0, 1), statuses), cache, limits = limits).metrics.decline,
-            )
+            assertEquals(ContinuationDecline.IMPORT_LIMIT,
+                continueExactLp(model, Basis(intArrayOf(0, 1), statuses), cache, limits = limits).metrics.decline)
 
             val changed = continueExactLp(model, Basis(intArrayOf(1, 0), statuses), cache, limits = limits)
 
@@ -447,13 +433,11 @@ class LpExactContinuationTest {
 
     @Test
     fun `retracting conflicting bounds should restore a coupled source witness`() {
-        val source = assertNotNull(
-            LpBuilder().apply {
-                addVar(0L, 10L)
-                addVar(0L, 10L)
-                addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.EQ, 1L)
-            }.build(Sense.MINIMIZE).authoritativeModel(),
-        )
+        val source = assertNotNull(LpBuilder().apply {
+            addVar(0L, 10L)
+            addVar(0L, 10L)
+            addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.EQ, 1L)
+        }.build(Sense.MINIMIZE).authoritativeModel())
         val trail = LpBoundTrail(source)
         val basis = Basis(intArrayOf(2), arrayOf(VarStatus.AT_LOWER, VarStatus.AT_LOWER, VarStatus.BASIC))
         val cache = LpExactContinuationCache()
@@ -474,10 +458,8 @@ class LpExactContinuationTest {
 
     @Test
     fun `bound edits should retain the exhausted continuation allowance`() {
-        val source = assertNotNull(
-            LpBuilder().apply { addVar(0L, 10L) }
-                .build(Sense.MINIMIZE).authoritativeModel(),
-        )
+        val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
+            .build(Sense.MINIMIZE).authoritativeModel())
         val trail = LpBoundTrail(source)
         val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
         val cache = LpExactContinuationCache()
@@ -486,9 +468,7 @@ class LpExactContinuationTest {
         assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
 
         val limited = continueExactLp(
-            assertNotNull(trail.state.toWorkingModel()),
-            basis,
-            cache,
+            assertNotNull(trail.state.toWorkingModel()), basis, cache,
             limits = ExactContinuationLimits(maxWork = spent),
         )
 
@@ -500,10 +480,8 @@ class LpExactContinuationTest {
     @Test
     fun `a cancelled bound update should allow a current source retry`() {
         for (arbitrary in listOf(false, true)) {
-            val source = assertNotNull(
-                LpBuilder().apply { addVar(0L, 10L) }
-                    .build(Sense.MINIMIZE).authoritativeModel(),
-            )
+            val source = assertNotNull(LpBuilder().apply { addVar(0L, 10L) }
+                .build(Sense.MINIMIZE).authoritativeModel())
             val trail = LpBoundTrail(source)
             val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_LOWER))
             val cache = LpExactContinuationCache()
@@ -512,13 +490,8 @@ class LpExactContinuationTest {
             assertNotNull(continueExactLp(initial, basis, cache, limits = limits).witness)
             assertTrue(trail.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 11L))
             val model = assertNotNull(trail.state.toWorkingModel())
-            val stopped = continueExactLp(
-                model,
-                basis,
-                cache,
-                limits = limits,
-                cancellation = ExecutionControl { true },
-            )
+            val stopped = continueExactLp(model, basis, cache, limits = limits, cancellation =
+                ExecutionControl { true })
             assertNull(stopped.witness)
 
             val retried = continueExactLp(model, basis, cache, limits = limits)

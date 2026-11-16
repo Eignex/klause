@@ -13,7 +13,6 @@ internal object ProblemKind {
     /** True iff [ref] is a constraint *optimization* problem (carries an objective). */
     fun isCop(ref: ProblemRef): Boolean = when (ref.format) {
         Format.DIMACS, Format.JSON_SCHEMA, Format.IN_CODE -> false
-
         Format.WCNF -> true
 
         else -> {

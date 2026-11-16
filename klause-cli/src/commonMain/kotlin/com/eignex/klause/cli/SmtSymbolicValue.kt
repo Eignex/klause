@@ -24,16 +24,11 @@ internal fun smtSymbolicValue(value: ExactRealValue): String {
         }
         expressions[node] = when (node) {
             is ExactRealExpression.Algebraic -> smtAlgebraicValue(node.value)
-
             ExactRealExpression.Pi -> "((_ klause-real pi))"
-
             is ExactRealExpression.Function ->
                 "((_ klause-real ${node.function.name.lowercase()}) ${expressions.getValue(node.argument)})"
-
             is ExactRealExpression.Sum -> "(+ ${children.joinToString(" ") { expressions.getValue(it) }})"
-
             is ExactRealExpression.Product -> "(* ${children.joinToString(" ") { expressions.getValue(it) }})"
-
             is ExactRealExpression.Power -> "(^ ${expressions.getValue(node.base)} ${node.exponent})"
         }
     }

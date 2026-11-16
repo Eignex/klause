@@ -100,9 +100,7 @@ internal class CutSourceMap(
     fun parent(row: Int): CutProvenance? = parentSnapshot[row]
     fun parentFamilies(): Map<Int, CutFamily> = parentSnapshot.mapValues { it.value.family }
     fun auxiliarySource(source: CutSource, definition: CutAuxiliaryDefinition): CutSource? =
-        if (source.kind != CutSourceKind.AUXILIARY) {
-            null
-        } else if (auxiliarySnapshot[source] == definition) {
+        if (source.kind != CutSourceKind.AUXILIARY) null else if (auxiliarySnapshot[source] == definition) {
             source
         } else {
             auxiliaryByDefinition[definition]

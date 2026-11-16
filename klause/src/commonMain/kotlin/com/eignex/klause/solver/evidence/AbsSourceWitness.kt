@@ -30,10 +30,8 @@ internal fun Problem.absSourceWitnessContext(
 ): SourceProofContext? {
     if (cancellation() || !hasCompleteAbsSource()) return null
     val identity = Uuid.random().toString()
-    val scope = SourceScope(
-        SourceRevision(identity, "klause-ir-exact-v1"),
-        objective = SourceObjective("$identity/objective", ObjectiveSense.MINIMIZE),
-    )
+    val scope = SourceScope(SourceRevision(identity, "klause-ir-exact-v1"),
+        objective = SourceObjective("$identity/objective", ObjectiveSense.MINIMIZE))
     return sourceProofContext(scope, objective, cancellation)
 }
 
@@ -45,9 +43,7 @@ internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: Executi
         override fun truth(boolVar: Int): Boolean = sample.boolValue(boolVar)
         override fun at(column: Int): BigFraction = if (column < numRealVars) {
             checkNotNull(sample.exactReals)[column]
-        } else {
-            BigFraction.of(sample.exactIntValue(column - numRealVars), BIG_ONE)
-        }
+        } else BigFraction.of(sample.exactIntValue(column - numRealVars), BIG_ONE)
     }
     var interrupted = false
     fun holds(row: LinearRow): Boolean {
@@ -56,26 +52,19 @@ internal fun Problem.checkAbsSourceWitness(sample: Sample, cancellation: Executi
             return false
         }
         return row.exactComparison(
-            numRealVars,
-            row.activator == LinearRow.ALWAYS || witness.truth(row.activator),
-            witness::truth,
+            numRealVars, row.activator == LinearRow.ALWAYS || witness.truth(row.activator), witness::truth,
         ).holdsAt(witness)
     }
     for ((id, factor) in factors.withIndex()) {
         if (cancellation()) return SourceEvidenceCheck.Unavailable("original-source check cancelled")
         val valid = when (factor) {
             is Abs -> sample.exactIntValue(factor.operand).abs() == sample.exactIntValue(factor.result)
-
             is AffineAbs -> factor.isSatisfied(sample::exactIntValue)
-
             else -> when (val form = factor.linearForm) {
                 is LinearForm.Conjunction -> form.rows.all(::holds)
-
                 is LinearForm.Disjunction -> form.rows.any(::holds)
-
                 is LinearForm.Relaxation, null -> return SourceEvidenceCheck.Unavailable(
-                    "original factor has no complete absolute value source checker",
-                )
+                    "original factor has no complete absolute value source checker")
             }
         }
         if (interrupted || cancellation()) return SourceEvidenceCheck.Unavailable("original-source check cancelled")

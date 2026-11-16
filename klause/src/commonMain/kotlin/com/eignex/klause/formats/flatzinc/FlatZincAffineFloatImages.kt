@@ -78,13 +78,11 @@ private fun FlatZincCompiler.affineDefinition(c: FznConstraint): AffineDefinitio
         floatReferences(c.args[1]),
         evalFloatConst(c.args[2]),
     )
-
     c.name == "float_eq" && c.args.size == 2 -> AffineDefinition(
         doubleArrayOf(1.0, -1.0),
         c.args.map(::resolveFloatVarOrConst),
         0.0,
     )
-
     c.name == "float_times" && c.args.size == 3 -> {
         val a = resolveFloatVarOrConst(c.args[0])
         val b = resolveFloatVarOrConst(c.args[1])
@@ -96,7 +94,6 @@ private fun FlatZincCompiler.affineDefinition(c: FznConstraint): AffineDefinitio
             AffineDefinition(doubleArrayOf(constant, -1.0), listOf(variable, resolveFloatVarOrConst(c.args[2])), 0.0)
         }
     }
-
     else -> null
 }
 

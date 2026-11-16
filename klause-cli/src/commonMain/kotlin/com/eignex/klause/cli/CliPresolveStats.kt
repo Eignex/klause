@@ -61,11 +61,8 @@ private fun presolveLedgerStatPairs(effort: PresolveEffortStats): List<Pair<Stri
         add(prefix + "FixedColumns" to "${calls.sumOf { it.fixedColumns.toLong() }}")
         for (key in calls.flatMap { it.structuralImpact.keys }.distinct().sorted()) {
             val values = calls.mapNotNull { it.structuralImpact[key] }
-            val value = if (key.endsWith("MaxSupport") || key.endsWith("MaxDepth")) {
-                values.maxOrNull() ?: 0L
-            } else {
-                values.sum()
-            }
+            val value = if (key.endsWith("MaxSupport") || key.endsWith("MaxDepth")) values.maxOrNull() ?: 0L
+            else values.sum()
             add(prefix + "Impact" + key to "$value")
         }
         addAll(presolveSizeStatPairs(prefix + "Input", calls.map { it.input }))
@@ -83,16 +80,18 @@ private fun presolveLedgerStatPairs(effort: PresolveEffortStats): List<Pair<Stri
     }
 }
 
-private fun presolveSizeStatPairs(prefix: String, sizes: List<PresolveSizeStats>): List<Pair<String, String>> =
-    buildList {
-        add(prefix + "Factors" to "${sizes.sumOf { it.factors.toLong() }}")
-        add(prefix + "Booleans" to "${sizes.sumOf { it.booleans.toLong() }}")
-        add(prefix + "Integers" to "${sizes.sumOf { it.integers.toLong() }}")
-        add(prefix + "Reals" to "${sizes.sumOf { it.reals.toLong() }}")
-        val observed = sizes.mapNotNull { it.occurrences }
-        add(prefix + "OccurrenceCalls" to "${observed.size}")
-        if (observed.isNotEmpty()) add(prefix + "Occurrences" to "${observed.sum()}")
-    }
+private fun presolveSizeStatPairs(
+    prefix: String,
+    sizes: List<PresolveSizeStats>,
+): List<Pair<String, String>> = buildList {
+    add(prefix + "Factors" to "${sizes.sumOf { it.factors.toLong() }}")
+    add(prefix + "Booleans" to "${sizes.sumOf { it.booleans.toLong() }}")
+    add(prefix + "Integers" to "${sizes.sumOf { it.integers.toLong() }}")
+    add(prefix + "Reals" to "${sizes.sumOf { it.reals.toLong() }}")
+    val observed = sizes.mapNotNull { it.occurrences }
+    add(prefix + "OccurrenceCalls" to "${observed.size}")
+    if (observed.isNotEmpty()) add(prefix + "Occurrences" to "${observed.sum()}")
+}
 
 internal fun printPresolveDiagnostics(stats: PresolveStats?) {
     for ((key, value) in presolveStatPairs(SolveStats(presolve = stats))) printErrorLine("  $key=$value")

@@ -6,8 +6,11 @@ import com.eignex.klause.localsearch.MoveSink
 import kotlin.math.abs
 import kotlin.math.pow
 
-internal class RealPowerInvariant(private val base: Int, private val exponent: Int, private val result: Int) :
-    Invariant {
+internal class RealPowerInvariant(
+    private val base: Int,
+    private val exponent: Int,
+    private val result: Int,
+) : Invariant {
     private fun score(state: LocalSearchState, changed: Int = -1, value: Double = 0.0): Int {
         val input = if (changed == base) value else state.assignment.realValue(base)
         val output = if (changed == result) value else state.assignment.realValue(result)
@@ -33,9 +36,7 @@ internal class RealPowerInvariant(private val base: Int, private val exponent: I
             if (value.isFinite() && value != state.assignment.realValue(variable) &&
                 value >= state.problem.realLower[variable] && value <= state.problem.realUpper[variable] &&
                 score(state, variable, value) < before
-            ) {
-                sink.addRealSet(variable, value)
-            }
+            ) sink.addRealSet(variable, value)
         }
         propose(result, input.pow(exponent))
         if (exponent > 0 && (output >= 0.0 || exponent and 1 != 0)) {

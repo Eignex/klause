@@ -51,63 +51,35 @@ internal fun parseSmtLibSource(
         }
         val result = try {
             parseLinearAdmission(commands, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics).let {
-                it.copy(
-                    intVarNames = sourceNames(it.intVarNames),
-                    boolVarNames = sourceNames(it.boolVarNames),
-                    realVarNames = sourceNames(it.realVarNames),
-                )
+                it.copy(intVarNames = sourceNames(it.intVarNames), boolVarNames = sourceNames(it.boolVarNames),
+                    realVarNames = sourceNames(it.realVarNames))
             }
         } catch (factorFailure: UnsupportedSmtException) {
             if (cancellation()) throw PolynomialSourceInterrupted()
             try {
-                val compiler = SmtLibPolynomialCompiler(
-                    cancellation,
-                    allowIntegers = true,
-                    allowFunctions = true,
-                    semantics = semantics,
-                )
+                val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
+                    allowFunctions = true, semantics = semantics)
                 for (command in commands) compiler.command(command)
                 val captured = compiler.build()
                 val functions = captured.transcendental
                 if (functions != null) {
-                    SmtLibProblem(
-                        SourceAttachment(functions, settings),
-                        null,
-                        sourceNames(functions.intVarNames),
-                        sourceNames(functions.boolVarNames),
-                        sourceNames(functions.realVarNames),
-                        functions.objectiveSense,
-                    )
+                    SmtLibProblem(SourceAttachment(functions, settings), null,
+                        sourceNames(functions.intVarNames), sourceNames(functions.boolVarNames),
+                        sourceNames(functions.realVarNames), functions.objectiveSense)
                 } else if (captured.intVarNames.isNotEmpty()) {
                     val source = NonlinearIntegerProblem(
-                        captured.formula,
-                        captured.realCount,
-                        captured.boolCount,
-                        captured.intVarNames,
-                        captured.realVarNames,
-                        captured.boolVarNames,
-                        semantics,
+                        captured.formula, captured.realCount, captured.boolCount,
+                        captured.intVarNames, captured.realVarNames, captured.boolVarNames, semantics,
                     )
-                    SmtLibProblem(
-                        SourceAttachment(source, settings),
-                        null,
-                        sourceNames(source.intVarNames),
-                        sourceNames(source.boolVarNames),
+                    SmtLibProblem(SourceAttachment(source, settings), null,
+                        sourceNames(source.intVarNames), sourceNames(source.boolVarNames),
                         sourceNames(source.realVarNames),
-                        captured.objectiveSense,
-                        captured.objective,
-                    )
+                        captured.objectiveSense, captured.objective)
                 } else {
                     val source = captured.realSource(semantics)
-                    SmtLibProblem(
-                        SourceAttachment(source, settings),
-                        null,
-                        emptyMap(),
-                        sourceNames(source.boolVarNames),
-                        sourceNames(source.realVarNames),
-                        captured.objectiveSense,
-                        captured.objective,
-                    )
+                    SmtLibProblem(SourceAttachment(source, settings), null,
+                        emptyMap(), sourceNames(source.boolVarNames), sourceNames(source.realVarNames),
+                        captured.objectiveSense, captured.objective)
                 }
             } catch (_: UnsupportedSmtException) {
                 throw factorFailure
@@ -134,14 +106,8 @@ private fun parseLinearAdmission(
     cancellation: ExecutionControl,
     semantics: EffectiveSourceSemantics,
 ): SmtLibProblem {
-    val builder = Compiler.Builder(
-        unboundedIntLo,
-        unboundedIntHi,
-        strictBounds = false,
-        settings = settings,
-        sourceCancellation = cancellation,
-        semantics = semantics,
-    )
+    val builder = Compiler.Builder(unboundedIntLo, unboundedIntHi, strictBounds = false, settings = settings,
+        sourceCancellation = cancellation, semantics = semantics)
     val scope = SmtLibScope(cancellation)
     for (command in commands) {
         builder.command(command.factorSourceSymbols(cancellation))
@@ -151,12 +117,8 @@ private fun parseLinearAdmission(
         buildLinearAdmission(builder, commands, cancellation, semantics)
     } catch (refuted: SmtLibRefutedPremises) {
         // Refutation does not excuse unsupported syntax elsewhere in the source.
-        val compiler = SmtLibPolynomialCompiler(
-            cancellation,
-            allowIntegers = true,
-            allowFunctions = true,
-            semantics = semantics,
-        )
+        val compiler = SmtLibPolynomialCompiler(cancellation, allowIntegers = true,
+            allowFunctions = true, semantics = semantics)
         for (command in commands) compiler.command(command)
         val captured = compiler.build()
         if (captured.transcendental?.hasObjective == true) {
@@ -189,28 +151,27 @@ private fun buildLinearAdmission(
     return objective.bindObjective(builder.buildSource(), cancellation)
 }
 
-private fun <T> withSource(openSource: () -> CharSource, cancellation: ExecutionControl, read: (CharSource) -> T): T {
+private fun <T> withSource(
+    openSource: () -> CharSource,
+    cancellation: ExecutionControl,
+    read: (CharSource) -> T,
+): T {
     val source = openSource()
     var interrupted = false
     val outcome = try {
         runCatching { read(source) }.also {
             if (it.exceptionOrNull() is PolynomialSourceInterrupted ||
                 it.exceptionOrNull() is CancellationException
-            ) {
-                interrupted = true
-            }
+            ) interrupted = true
         }
     } finally {
-        if (source is AutoCloseable) {
-            source.close()
-        } else {
-            while (!interrupted) {
-                if (cancellation()) {
-                    interrupted = true
-                    break
-                }
-                if (source.next() == null) break
+        if (source is AutoCloseable) source.close()
+        else while (!interrupted) {
+            if (cancellation()) {
+                interrupted = true
+                break
             }
+            if (source.next() == null) break
         }
     }
     if (interrupted) throw PolynomialSourceInterrupted()

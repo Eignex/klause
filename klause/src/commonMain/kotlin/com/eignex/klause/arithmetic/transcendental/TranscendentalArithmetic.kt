@@ -17,9 +17,7 @@ internal class TranscendentalArithmetic(
     var work: Long = 0
         private set
 
-    init {
-        require(maximumBits > 0 && (maximumWork == null || maximumWork >= 0))
-    }
+    init { require(maximumBits > 0 && (maximumWork == null || maximumWork >= 0)) }
 
     fun step() {
         execution.step {
@@ -38,9 +36,7 @@ internal class TranscendentalArithmetic(
         // Cross products are bounded before allocation, even when later cancellation would reduce them.
         val productBits = bits(left) + bits(right) + 1
         if (productBits > maximumBits) throw TranscendentalResourceLimit()
-        if (productBits > 4096) {
-            execution.boundary()
-        } else {
+        if (productBits > 4096) execution.boundary() else {
             execution.pollingCost((productBits / Long.SIZE_BITS).toInt())
         }
     }
@@ -62,8 +58,7 @@ internal class TranscendentalArithmetic(
 
     fun add(left: RationalEnclosure, right: RationalEnclosure): RationalEnclosure = execution.operation {
         RationalEnclosure(
-            add(left.lower, right.lower),
-            add(left.upper, right.upper),
+        add(left.lower, right.lower), add(left.upper, right.upper),
         )
     }
 
@@ -74,14 +69,11 @@ internal class TranscendentalArithmetic(
 
     fun multiply(left: RationalEnclosure, right: RationalEnclosure): RationalEnclosure = execution.operation {
         val products = listOf(
-            multiply(left.lower, right.lower),
-            multiply(left.lower, right.upper),
-            multiply(left.upper, right.lower),
-            multiply(left.upper, right.upper),
+            multiply(left.lower, right.lower), multiply(left.lower, right.upper),
+            multiply(left.upper, right.lower), multiply(left.upper, right.upper),
         )
         return@operation RationalEnclosure(
-            products.reduce { a, b -> minimum(a, b) },
-            products.reduce { a, b -> maximum(a, b) },
+            products.reduce { a, b -> minimum(a, b) }, products.reduce { a, b -> maximum(a, b) },
         )
     }
 
@@ -169,10 +161,8 @@ internal class TranscendentalArithmetic(
             sum = add(sum, divide(power, q(2L * index + 1)))
             power = multiply(power, square)
         }
-        val tail = divide(
-            multiply(q(2), power),
-            multiply(q(2L * terms + 1), add(BigFraction.ONE, square.negated())),
-        )
+        val tail = divide(multiply(q(2), power),
+            multiply(q(2L * terms + 1), add(BigFraction.ONE, square.negated())))
         val lower = multiply(q(2), sum)
         return RationalEnclosure(lower, add(lower, tail))
     }
@@ -180,13 +170,8 @@ internal class TranscendentalArithmetic(
     fun pi(terms: Int): RationalEnclosure = execution.operation {
         validateTerms(terms)
         // atan(1/2) + atan(1/3) = pi/4: tangent addition gives 1 and both angles lie in (0, pi/4).
-        return@operation multiply(
-            add(
-                atanUnit(divide(BigFraction.ONE, q(2)), terms),
-                atanUnit(divide(BigFraction.ONE, q(3)), terms),
-            ),
-            RationalEnclosure.point(q(4)),
-        )
+        return@operation multiply(add(atanUnit(divide(BigFraction.ONE, q(2)), terms),
+            atanUnit(divide(BigFraction.ONE, q(3)), terms)), RationalEnclosure.point(q(4)))
     }
 
     private fun atanUnit(value: BigFraction, terms: Int): RationalEnclosure {
@@ -199,11 +184,8 @@ internal class TranscendentalArithmetic(
             power = multiply(power, square)
         }
         val next = divide(power, q(2L * terms + 1))
-        return if (terms and 1 == 0) {
-            RationalEnclosure(sum, add(sum, next))
-        } else {
-            RationalEnclosure(add(sum, next.negated()), sum)
-        }
+        return if (terms and 1 == 0) RationalEnclosure(sum, add(sum, next))
+        else RationalEnclosure(add(sum, next.negated()), sum)
     }
 
     fun sin(value: RationalEnclosure, terms: Int): RationalEnclosure = execution.operation {

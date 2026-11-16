@@ -20,10 +20,7 @@ class CompilerInputReceiptsTest {
         val cache = root.resolve("receipts")
         var reads = 0
         repeat(2) {
-            val receipts = CompilerInputReceipts(cache, hash = { path ->
-                reads++
-                LabInputs.treeHash(path)
-            })
+            val receipts = CompilerInputReceipts(cache, hash = { path -> reads++; LabInputs.treeHash(path) })
             assertTrue(receipts.matches(compiler, expected))
         }
         assertEquals(1, reads)
@@ -48,25 +45,18 @@ class CompilerInputReceiptsTest {
                 Files.writeString(file, "modified")
                 Files.setLastModifiedTime(file, modified)
             }
-
             "replace" -> {
                 val replacement = root.resolve("replacement")
                 Files.writeString(replacement, "original")
                 Files.setLastModifiedTime(replacement, modified)
                 Files.move(replacement, file, REPLACE_EXISTING)
             }
-
             "add" -> Files.writeString(Files.createDirectories(compiler.resolve("nested")).resolve("added"), "new")
-
             "delete" -> Files.delete(file)
-
             else -> error(change)
         }
         var reads = 0
-        val receipts = CompilerInputReceipts(cache, hash = { path ->
-            reads++
-            LabInputs.treeHash(path)
-        })
+        val receipts = CompilerInputReceipts(cache, hash = { path -> reads++; LabInputs.treeHash(path) })
         assertEquals(matches, receipts.matches(compiler, expected))
         assertEquals(1, reads)
     }
@@ -81,10 +71,7 @@ class CompilerInputReceiptsTest {
         val receipt = Files.list(cache).use { it.findFirst().orElseThrow() }
         Files.writeString(receipt, "broken")
         var reads = 0
-        val receipts = CompilerInputReceipts(cache, hash = { path ->
-            reads++
-            LabInputs.treeHash(path)
-        })
+        val receipts = CompilerInputReceipts(cache, hash = { path -> reads++; LabInputs.treeHash(path) })
         assertTrue(receipts.matches(compiler, expected))
         assertEquals(1, reads)
     }
@@ -107,12 +94,7 @@ class CompilerInputReceiptsTest {
         var reads = 0
         repeat(2) {
             val receipts = CompilerInputReceipts(
-                cache,
-                hash = { path ->
-                    reads++
-                    LabInputs.treeHash(path)
-                },
-                reliable = { false },
+                cache, hash = { path -> reads++; LabInputs.treeHash(path) }, reliable = { false },
             )
             assertTrue(receipts.matches(compiler, expected))
         }
@@ -127,15 +109,13 @@ class CompilerInputReceiptsTest {
         Files.writeString(file, "original")
         val expected = LabInputs.treeHash(compiler)
         val cache = root.resolve("receipts")
-        assertFalse(
-            CompilerInputReceipts(cache, hash = { path ->
-                LabInputs.treeHash(path).also {
-                    val modified = Files.getLastModifiedTime(file)
-                    Files.writeString(file, "modified")
-                    Files.setLastModifiedTime(file, modified)
-                }
-            }).matches(compiler, expected),
-        )
+        assertFalse(CompilerInputReceipts(cache, hash = { path ->
+            LabInputs.treeHash(path).also {
+                val modified = Files.getLastModifiedTime(file)
+                Files.writeString(file, "modified")
+                Files.setLastModifiedTime(file, modified)
+            }
+        }).matches(compiler, expected))
         assertFalse(Files.exists(cache))
     }
 }

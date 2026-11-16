@@ -25,9 +25,7 @@ class CountTypesTest {
         val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray(), semantics = semantics).bake())
 
         val counts = listOf(
-            solver.exactCount().last(),
-            solver.approximateCount(),
-            solver.count(CountConfig(exactBudget = 1)),
+            solver.exactCount().last(), solver.approximateCount(), solver.count(CountConfig(exactBudget = 1)),
         )
 
         for (count in counts) {
@@ -40,12 +38,9 @@ class CountTypesTest {
     @Test
     fun `exact counts should describe the replaced caller range`() {
         for (upper in listOf(2L, 3L)) {
-            val source = parseFlatZinc(
-                "var int: x; solve satisfy;",
-                semanticOverrides = SemanticOverrides(
-                    undeclaredIntegers = BoundsOverride(BoundOverride.Value(1L), BoundOverride.Value(upper)),
-                ),
-            )
+            val source = parseFlatZinc("var int: x; solve satisfy;", semanticOverrides = SemanticOverrides(
+                undeclaredIntegers = BoundsOverride(BoundOverride.Value(1L), BoundOverride.Value(upper)),
+            ))
 
             val count = BacktrackSolver(source.problem.bake()).exactCount().last()
 
@@ -59,13 +54,8 @@ class CountTypesTest {
     @Test
     fun `conditioned zero counts should retain policy after closing their session`() {
         val semantics = SourceSemantics(SourceFormat.DIMACS).resolve()
-        val model = Problem(
-            1,
-            0,
-            emptyArray(),
-            arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
-            semantics = semantics,
-        ).bake()
+        val model = Problem(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
+            semantics = semantics).bake()
         val solver = BacktrackSolver(model)
 
         val counts = solver.session().use { session ->

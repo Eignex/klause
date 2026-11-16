@@ -66,11 +66,9 @@ internal object NumericalResidualProfile {
         val supplied = input["mps64"]?.jsonPrimitive?.content
         val catalogKeys = setOf("suite", "problem", "sha256")
         val suppliedKeys = setOf("mps64", "problem", "sha256", "root")
-        require(
-            input.keys == catalogKeys || input.keys == catalogKeys + "root" ||
-                input.keys == catalogKeys + setOf("root", "unbaked") ||
-                input.keys == suppliedKeys || input.keys == suppliedKeys + "exact",
-        )
+        require(input.keys == catalogKeys || input.keys == catalogKeys + "root" ||
+            input.keys == catalogKeys + setOf("root", "unbaked") ||
+            input.keys == suppliedKeys || input.keys == suppliedKeys + "exact")
         val unbaked = input["unbaked"]?.jsonPrimitive?.content?.toBooleanStrict() == true
         require(!unbaked || input["root"]?.jsonPrimitive?.content?.toBooleanStrict() == true)
         val suite = input["suite"]?.jsonPrimitive?.content ?: "self-authored"
@@ -89,14 +87,10 @@ internal object NumericalResidualProfile {
         val entry = reference?.takeUnless { unbaked }?.let { Runners.resolve(it) }
         val overrides = if (input["exact"]?.jsonPrimitive?.content?.toBooleanStrict() == true) {
             SemanticOverrides(feasibilityTolerance = SourceTolerance())
-        } else {
-            SemanticOverrides()
-        }
+        } else SemanticOverrides()
         val compiled = if (entry == null) {
             Mps.parse(bytes.decodeToString()).toProblem(semanticOverrides = overrides)
-        } else {
-            null
-        }
+        } else null
         val problem = entry?.problem ?: requireNotNull(compiled).model
         val sourceObjective = entry?.objective ?: compiled?.objective?.toLinearObjective()?.let {
             if (compiled.maximize) it.negated() else it
@@ -169,10 +163,7 @@ internal object NumericalResidualProfile {
         val relaxation = requireNotNull(build.invoke(builder, domains, emptyList<Any>(), stop))
         val model = requireNotNull(call(relaxation, "getModel"))
         captureModel(
-            model,
-            source,
-            out,
-            "diagnostic root relaxation after propagation; no traversal or optional presolve",
+            model, source, out, "diagnostic root relaxation after propagation; no traversal or optional presolve",
         )
     }
 
@@ -183,24 +174,12 @@ internal object NumericalResidualProfile {
             val x = call(builder, "addRealVar", 0.0, 2.0, 1.0, -1) as Int
             val y = call(builder, "addRealVar", 0.0, 2.0, 1.0, -1) as Int
             call(
-                builder,
-                "addRow",
-                intArrayOf(x, y),
-                longArrayOf(1_000_000L, 1_000_000L),
-                equal,
-                2_000_000L,
-                true,
-                null,
+                builder, "addRow", intArrayOf(x, y), longArrayOf(1_000_000L, 1_000_000L), equal,
+                2_000_000L, true, null,
             )
             call(
-                builder,
-                "addRow",
-                intArrayOf(x, y),
-                longArrayOf(1_000_000L, 1_000_001L),
-                equal,
-                2_000_001L,
-                true,
-                null,
+                builder, "addRow", intArrayOf(x, y), longArrayOf(1_000_000L, 1_000_001L), equal,
+                2_000_001L, true, null,
             )
         }
         val sense = Class.forName(ENGINE + "Sense").enumConstants.single { it.toString() == "MINIMIZE" }
@@ -300,9 +279,7 @@ internal object NumericalResidualProfile {
                     val inputSupport = if (transform) call(requireNotNull(arguments[0]), "getCount") as Int else 0
                     val rhs = if (transform && auditBasis && basisResiduals.size < 128) {
                         call(requireNotNull(arguments[0]), "toDoubleArray") as DoubleArray
-                    } else {
-                        null
-                    }
+                    } else null
                     val observation = if (phase == "refactorize" && builds.size < 4096) {
                         buildJsonObject {
                             put("owner", id)
@@ -324,13 +301,7 @@ internal object NumericalResidualProfile {
                         null
                     }
                     val timed = setOf(
-                        "refactorize",
-                        "ftran",
-                        "btran",
-                        "update",
-                        "close",
-                        "refactorizeRepairing",
-                        "solveQuality",
+                        "refactorize", "ftran", "btran", "update", "close", "refactorizeRepairing", "solveQuality",
                     )
                     val result = if (phase in timed) {
                         measured(phase) { invoke(backend, method, arguments) }
@@ -350,13 +321,8 @@ internal object NumericalResidualProfile {
                             }
                         }
                     }
-                    if (auditBasis && (
-                            (phase == "refactorize" && result == true) ||
-                                (phase == "update" && result.toString() != "SINGULAR")
-                            )
-                    ) {
-                        recordBasisSlices(backend, phase)
-                    }
+                    if (auditBasis && ((phase == "refactorize" && result == true) ||
+                        (phase == "update" && result.toString() != "SINGULAR"))) recordBasisSlices(backend, phase)
                     if (phase == "update" && result.toString() != "SINGULAR") {
                         val spread = call(backend, "getRcond") as Double
                         if (spread.isFinite() && spread >= 0.0) {

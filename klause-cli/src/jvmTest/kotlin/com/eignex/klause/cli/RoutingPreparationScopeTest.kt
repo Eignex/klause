@@ -37,7 +37,8 @@ class RoutingPreparationScopeTest {
     fun `a completed routing scope should retain the live containing deadline`() {
         val common = CommonOptions()
         val scope = common.routingPreparationCancellation()
-        val stop = scope.control
+        val
+        stop = scope.control
         scope.close()
         assertFalse(stop())
 

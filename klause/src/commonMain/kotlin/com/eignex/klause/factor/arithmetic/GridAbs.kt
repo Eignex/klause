@@ -39,7 +39,8 @@ internal class GridAbs(
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.GRID_ABS, ::buildKey)
 
-    override fun remapStructuralHash(mapping: VarRemap): Int = hashRemappedKey(FactorKind.GRID_ABS, mapping, ::buildKey)
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        hashRemappedKey(FactorKind.GRID_ABS, mapping, ::buildKey)
 
     private fun buildKey(sink: KeySink) {
         sink.intVar(operand)
@@ -61,12 +62,8 @@ internal class GridAbs(
             val magnitude = abs(operandLower + index * inputStep)
             if (magnitude < resultLower - outputStep * ROUNDING_TOLERANCE ||
                 magnitude > resultUpper + outputStep * ROUNDING_TOLERANCE
-            ) {
-                return@IntArray -1
-            }
-            val output = if (outputStep == 0.0) {
-                0
-            } else {
+            ) return@IntArray -1
+            val output = if (outputStep == 0.0) 0 else {
                 val position = (magnitude - resultLower) / outputStep
                 val rounded = round(position).toInt()
                 if (abs(position - rounded) > ROUNDING_TOLERANCE) -1 else rounded

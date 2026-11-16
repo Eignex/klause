@@ -47,14 +47,8 @@ internal object MpsLpQuery {
         bean: ThreadMXBean,
         emit: (JsonObject) -> Unit,
     ) {
-        val plan = LpPlan(
-            bounding = true,
-            boundMaxDepth = 0,
-            probe = false,
-            cuts = false,
-            objectiveCone = mode == "cone-cold",
-            rootBudgetFraction = 0.0,
-        )
+        val plan = LpPlan(bounding = true, boundMaxDepth = 0, probe = false, cuts = false,
+            objectiveCone = mode == "cone-cold", rootBudgetFraction = 0.0)
         val containing = ExecutionControl.after(30.seconds)
         var callStop: ExecutionControl = containing
         val token = object : ExecutionControl() {
@@ -104,11 +98,7 @@ internal object MpsLpQuery {
                     }
                 }
                 val prune = active.first.javaClass.methods.single { it.name == "pruneNode" }.invoke(
-                    active.first,
-                    session,
-                    Double.POSITIVE_INFINITY,
-                    -1,
-                    true,
+                    active.first, session, Double.POSITIVE_INFINITY, -1, true,
                 ) as Boolean
                 val pruneElapsed = System.nanoTime() - pruneNs
                 val pruneAllocated = bean.getThreadAllocatedBytes(thread) - pruneBytes
@@ -119,8 +109,7 @@ internal object MpsLpQuery {
                 }
                 val rootUnchanged = !sameRoot || (
                     rootDomains.indices.all { session.intDomain(it) === rootDomains[it] } &&
-                        rootBooleans.indices.all { session.boolValue(it) == rootBooleans[it] }
-                    )
+                        rootBooleans.indices.all { session.boolValue(it) == rootBooleans[it] })
                 val floatTermination = (afterPrune["scopedPreparation"] as? JsonObject)
                     ?.get("floatTermination")?.jsonPrimitive?.content
                 val completedRoot = nodeOnly && lower.isFinite() && floatTermination == "OPTIMAL_CANDIDATE"
@@ -142,45 +131,41 @@ internal object MpsLpQuery {
                 }
                 val closeElapsed = System.nanoTime() - closeNs
                 val closeAllocated = bean.getThreadAllocatedBytes(thread) - closeBytes
-                emit(
-                    buildJsonObject {
-                        put("scope", "native-prepared-root-queries")
-                        put("sourceVerdictClaim", false)
-                        put("threadAllocationOnly", true)
-                        put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
-                        put("mode", mode)
-                        put("repeat", repeat)
-                        put("ownerReused", reused)
-                        put("freshRootSession", !sameRoot || repeat == 0)
-                        put("rootUnchanged", rootUnchanged)
-                        put("stopReason", stopReason)
-                        put("rootQueryPolicy", rootPolicy)
-                        put("checkedBoundOrigin", if (nodeOnly) "node-query" else "fresh-root")
-                        put("checkedRootBoundExecuted", !nodeOnly)
-                        put("plan", plan.toString())
-                        put("containingSeconds", 30)
-                        put("querySeconds", 10)
-                        put("cutoff", "positive-infinity")
-                        if (lower.isFinite()) {
-                            put("checkedNativeLowerBound", lower)
-                        } else {
-                            put("checkedNativeLowerBound", JsonNull)
-                        }
-                        put("certifiedNodePrune", prune)
-                        put("cancelled", token())
-                        put("setupNs", setupNs)
-                        put("setupThreadBytes", setupBytes)
-                        put("checkedRootBoundNs", boundElapsed)
-                        put("checkedRootBoundThreadBytes", boundAllocated)
-                        put("nodeSessionAndPruneNs", pruneElapsed)
-                        put("nodeSessionAndPruneThreadBytes", pruneAllocated)
-                        put("closeNs", closeElapsed)
-                        put("closeThreadBytes", closeAllocated)
-                        put("before", before)
-                        put("afterCheckedRootBound", afterBound)
-                        put("afterNodePrune", afterPrune)
-                    },
-                )
+                emit(buildJsonObject {
+                    put("scope", "native-prepared-root-queries")
+                    put("sourceVerdictClaim", false)
+                    put("threadAllocationOnly", true)
+                    put("jvmMaxHeapBytes", Runtime.getRuntime().maxMemory())
+                    put("mode", mode)
+                    put("repeat", repeat)
+                    put("ownerReused", reused)
+                    put("freshRootSession", !sameRoot || repeat == 0)
+                    put("rootUnchanged", rootUnchanged)
+                    put("stopReason", stopReason)
+                    put("rootQueryPolicy", rootPolicy)
+                    put("checkedBoundOrigin", if (nodeOnly) "node-query" else "fresh-root")
+                    put("checkedRootBoundExecuted", !nodeOnly)
+                    put("plan", plan.toString())
+                    put("containingSeconds", 30)
+                    put("querySeconds", 10)
+                    put("cutoff", "positive-infinity")
+                    if (lower.isFinite()) put("checkedNativeLowerBound", lower) else {
+                        put("checkedNativeLowerBound", JsonNull)
+                    }
+                    put("certifiedNodePrune", prune)
+                    put("cancelled", token())
+                    put("setupNs", setupNs)
+                    put("setupThreadBytes", setupBytes)
+                    put("checkedRootBoundNs", boundElapsed)
+                    put("checkedRootBoundThreadBytes", boundAllocated)
+                    put("nodeSessionAndPruneNs", pruneElapsed)
+                    put("nodeSessionAndPruneThreadBytes", pruneAllocated)
+                    put("closeNs", closeElapsed)
+                    put("closeThreadBytes", closeAllocated)
+                    put("before", before)
+                    put("afterCheckedRootBound", afterBound)
+                    put("afterNodePrune", afterPrune)
+                })
                 if (stopReason != null) break
                 repeat++
             }
@@ -227,18 +212,12 @@ internal object MpsLpQuery {
     private fun stats(owner: AutoCloseable, sink: Any): JsonObject {
         val lp = (sink.javaClass.getMethod("snapshot").invoke(sink) as SolveStats).lp
         return buildJsonObject {
-            put(
-                "offeredNodeWork",
-                owner.javaClass.methods.single {
-                    it.name.startsWith("nodeWorkBudget") && it.parameterCount == 0
-                }.invoke(owner) as Long,
-            )
-            put(
-                "offeredPreparationWork",
-                owner.javaClass.methods.single {
-                    it.name.startsWith("nodePreparationWorkBudget") && it.parameterCount == 0
-                }.invoke(owner) as Long,
-            )
+            put("offeredNodeWork", owner.javaClass.methods.single {
+                it.name.startsWith("nodeWorkBudget") && it.parameterCount == 0
+            }.invoke(owner) as Long)
+            put("offeredPreparationWork", owner.javaClass.methods.single {
+                it.name.startsWith("nodePreparationWorkBudget") && it.parameterCount == 0
+            }.invoke(owner) as Long)
             put("scopedPreparation", scopedPreparation(owner))
             put("nodePasses", lp.nodePasses.sum)
             put("nodeSolves", lp.solves.sum)
@@ -256,19 +235,14 @@ internal object MpsLpQuery {
             put("refactorizations", lp.refactorizations.sum)
             put("workAllowanceSpent", lp.workAllowanceSpent)
             put("demoted", lp.demoted)
-            put(
-                "certifiers",
-                buildJsonObject {
-                    for ((name, value) in listOf(
-                        "integer" to lp.integerCertify,
-                        "safeBound" to lp.safeObjectiveLowerBound,
-                        "farkas" to lp.exactFarkasRay,
-                        "rational" to lp.rationalOutcome,
-                    )) {
-                        put(name, certifier(value))
-                    }
-                },
-            )
+            put("certifiers", buildJsonObject {
+                for ((name, value) in listOf(
+                    "integer" to lp.integerCertify,
+                    "safeBound" to lp.safeObjectiveLowerBound,
+                    "farkas" to lp.exactFarkasRay,
+                    "rational" to lp.rationalOutcome,
+                )) put(name, certifier(value))
+            })
         }
     }
 
@@ -276,11 +250,8 @@ internal object MpsLpQuery {
         val propagator = owner.javaClass.methods.single { it.name.startsWith("getPropagator") }.invoke(owner)
         val metrics = propagator.javaClass.getMethod("getMetrics").invoke(propagator) ?: return JsonNull
         return buildJsonObject {
-            put(
-                "floatTermination",
-                propagator.javaClass.getMethod("getFloatTermination")
-                    .invoke(propagator)?.toString(),
-            )
+            put("floatTermination", propagator.javaClass.getMethod("getFloatTermination")
+                .invoke(propagator)?.toString())
             put("floatPaused", propagator.javaClass.getMethod("getFloatPaused").invoke(propagator) as Boolean)
             for (name in listOf(
                 "EditAttempts", "EditDeclines", "PreparationAttempts", "PreparationDeclines", "PreparationWork",

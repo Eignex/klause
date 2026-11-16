@@ -68,16 +68,8 @@ internal class ProductPropagator(
             domain.max <= 0L -> last
             else -> 0L
         }
-        if (!tightenLong(
-                state,
-                result,
-                lower,
-                maxOf(first, last),
-                state.composeIntVarAtomAntecedents(intArrayOf(a)),
-            )
-        ) {
-            return false
-        }
+        if (!tightenLong(state, result, lower, maxOf(first, last),
+                state.composeIntVarAtomAntecedents(intArrayOf(a)))) return false
         val output = state.intDomains[result]
         val upperRoot = floorSquareRoot(output.max)
         val floorLower = floorSquareRoot(output.min)

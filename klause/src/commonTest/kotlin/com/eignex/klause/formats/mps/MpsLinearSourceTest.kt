@@ -57,10 +57,8 @@ class MpsLinearSourceTest {
         )
         val third = SemanticRational.of(BIG_ONE, bigIntOf(3))
         val overrides = SemanticOverrides(
-            undeclaredIntegers = BoundsOverride(
-                BoundOverride.Value(Long.MIN_VALUE),
-                BoundOverride.Value(Long.MAX_VALUE),
-            ),
+            undeclaredIntegers = BoundsOverride(BoundOverride.Value(Long.MIN_VALUE),
+                BoundOverride.Value(Long.MAX_VALUE)),
             undeclaredReals = BoundsOverride(BoundOverride.Value(third), BoundOverride.Open),
         )
 
@@ -100,10 +98,8 @@ class MpsLinearSourceTest {
         parsed.objective.coeffs[0] = 7.0
         parsed.constraints[0].coeffs[0] = 9.0
 
-        assertEquals(
-            SemanticRational.of(BIG_ONE, bigIntOf(10)),
-            assertNotNull(source.objective).terms.single().coefficient,
-        )
+        assertEquals(SemanticRational.of(BIG_ONE, bigIntOf(10)),
+            assertNotNull(source.objective).terms.single().coefficient)
         assertEquals(SemanticRational.of(BIG_ONE, bigIntOf(5)), source.rows.single().terms.single().coefficient)
         val edited = assertNotNull(parsed.toLinearSourceProblem())
         assertEquals(SemanticRational.ofLong(7), assertNotNull(edited.objective).terms.single().coefficient)
@@ -112,22 +108,11 @@ class MpsLinearSourceTest {
 
     @Test
     fun `guarded duplicate terms should retain their independent tolerance magnitudes`() {
-        val parsed = MpsModel(
-            "duplicates",
-            ObjectiveSense.MINIMIZE,
+        val parsed = MpsModel("duplicates", ObjectiveSense.MINIMIZE,
             MpsObjective("", intArrayOf(), doubleArrayOf(), 0.0),
             listOf(MpsVar("B", true, 0.0, 2.0), MpsVar("X", false, null, null)),
-            listOf(
-                MpsConstraint(
-                    "R",
-                    intArrayOf(1, 1),
-                    doubleArrayOf(1.0, -1.0),
-                    null,
-                    1.0,
-                    MpsIndicator(0, false),
-                ),
-            ),
-        )
+            listOf(MpsConstraint("R", intArrayOf(1, 1), doubleArrayOf(1.0, -1.0), null, 1.0,
+                MpsIndicator(0, false))))
 
         val source = assertNotNull(parsed.toLinearSourceProblem())
 
@@ -157,13 +142,9 @@ class MpsLinearSourceTest {
 
     @Test
     fun `programmatic coefficients should retain their exact binary64 authority`() {
-        val source = MpsModel(
-            "binary",
-            ObjectiveSense.MINIMIZE,
+        val source = MpsModel("binary", ObjectiveSense.MINIMIZE,
             MpsObjective("COST", intArrayOf(0), doubleArrayOf(0.1), 0.0),
-            listOf(MpsVar("X", false, null, null)),
-            emptyList(),
-        )
+            listOf(MpsVar("X", false, null, null)), emptyList())
 
         val captured = assertNotNull(source.toLinearSourceProblem())
 
@@ -184,11 +165,9 @@ class MpsLinearSourceTest {
 
         assertFalse(witness.exact)
         assertEquals(BigFraction.of(bigIntOf(-2), bigIntOf(5)), witness.objective)
-        val exact = assertNotNull(
-            parsed.toLinearSourceProblem(
-                SemanticOverrides(feasibilityTolerance = SourceTolerance()),
-            ),
-        )
+        val exact = assertNotNull(parsed.toLinearSourceProblem(
+            SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+        ))
         assertNull(exact.checkMpsWitness(listOf(BigFraction.ofLong(3))))
     }
 
@@ -200,13 +179,9 @@ class MpsLinearSourceTest {
         for (policy in policies) {
             val source = assertNotNull(parsed.toLinearSourceProblem(policy))
             for (engine in listOf(FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH)) {
-                val invocation = SourceSetup.prepare(
-                    SourceSetupRequest(
-                        SourceAttachment(source, ProblemSettings()),
-                        ExecutionOperation.OPTIMIZE,
-                        engine,
-                    ),
-                )
+                val invocation = SourceSetup.prepare(SourceSetupRequest(
+                    SourceAttachment(source, ProblemSettings()), ExecutionOperation.OPTIMIZE, engine,
+                ))
 
                 assertEquals(SourceExecutionKind.FINITE, SourceSetup.executionKind(invocation))
             }

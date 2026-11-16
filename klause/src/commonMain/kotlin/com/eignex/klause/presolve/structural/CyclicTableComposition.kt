@@ -10,7 +10,10 @@ internal object CyclicTableComposition {
         override fun equals(other: Any?): Boolean = other is Tuple && values.contentEquals(other.values)
     }
 
-    private class Projection(val targetColumns: IntArray, val supports: Map<Tuple, Set<Tuple>>)
+    private class Projection(
+        val targetColumns: IntArray,
+        val supports: Map<Tuple, Set<Tuple>>,
+    )
 
     fun intersect(
         target: Table,
@@ -48,11 +51,8 @@ internal object CyclicTableComposition {
             }
         }
         if (kept.size == target.tuples.size) return null
-        return if (kept.isEmpty()) {
-            ExtensionalIntersection.Refuted
-        } else {
-            ExtensionalIntersection.Restricted(Table(target.xs, kept.toLongArray()))
-        }
+        return if (kept.isEmpty()) ExtensionalIntersection.Refuted
+        else ExtensionalIntersection.Restricted(Table(target.xs, kept.toLongArray()))
     }
 
     fun sharedOutsideTarget(target: Table, left: Table, right: Table, visit: () -> Boolean): IntArray? {

@@ -32,9 +32,8 @@ internal class PrivateRebuildAffine(
         val point = BooleanArray(coordinates.size)
         for (column in coordinates.indices) {
             val coordinate = coordinates[column]
-            if (coordinate == Int.MIN_VALUE) {
-                point[column] = checkNotNull(fixed[column])
-            } else if (coordinate < 0) {
+            if (coordinate == Int.MIN_VALUE) point[column] = checkNotNull(fixed[column])
+            else if (coordinate < 0) {
                 val index = -coordinate - 1
                 val value = sample.boolValue(column)
                 point[column] = value
@@ -64,7 +63,11 @@ internal class PrivateRebuildAffine(
         return result
     }
 
-    internal class RowPlan(private val forward: BooleanArray, val literals: Long, val triangularRows: Int) {
+    internal class RowPlan(
+        private val forward: BooleanArray,
+        val literals: Long,
+        val triangularRows: Int,
+    ) {
         fun usesTriangular(row: Int): Boolean = forward[row]
     }
 
@@ -82,9 +85,7 @@ internal class PrivateRebuildAffine(
             cancellation.charge(words * 2L + 4L)
             if (cancellation()) return null
             val expandedWidth = 1 + dependencies[row].sumOf { it.countOneBits() }
-            val forwardWidth = if (triangular == null) {
-                null
-            } else {
+            val forwardWidth = if (triangular == null) null else {
                 triangular.rowWidth(row, cancellation) ?: return null
             }
             cancellation.charge(8L)
@@ -92,10 +93,7 @@ internal class PrivateRebuildAffine(
             val useForward = forwardWidth != null && forwardWidth <= 64 &&
                 (expandedWidth > 64 || forwardWidth < expandedWidth)
             val width = if (useForward) checkNotNull(forwardWidth) else expandedWidth
-            if (width > 64) {
-                onDecline("ParityRowWidth")
-                return null
-            }
+            if (width > 64) { onDecline("ParityRowWidth"); return null }
             forward[row] = useForward
             if (useForward) triangularRows++
             literals += width
@@ -105,11 +103,7 @@ internal class PrivateRebuildAffine(
 
     fun jointModeledBytes(): Long = if (rank == 0 ||
         AffineXorSeed.initializationWork(coordinates.size, freeColumns) > Int.MAX_VALUE
-    ) {
-        0L
-    } else {
-        AffineXorSeed.modeledBytes(coordinates.size, rank, freeColumns)
-    }
+    ) 0L else AffineXorSeed.modeledBytes(coordinates.size, rank, freeColumns)
 
     fun jointRows(cancellation: ExecutionControl, rows: Array<Factor>): GaussianXor? {
         cancellation.charge(coordinates.size * 8L + rank * (words * 2L + 10L) + 32L)
@@ -126,13 +120,8 @@ internal class PrivateRebuildAffine(
         val variables = IntArray(used.count { it })
         var next = 0
         for (variable in used.indices) if (used[variable]) variables[next++] = variable
-        val seed = AffineXorSeed(
-            coordinates.copyOf(),
-            rhs.copyOf(rank),
-            Array(rank) { dependencies[it].copyOf() },
-            freeColumns,
-            variables,
-        )
+        val seed = AffineXorSeed(coordinates.copyOf(), rhs.copyOf(rank),
+            Array(rank) { dependencies[it].copyOf() }, freeColumns, variables)
         val result = GaussianXor(constraints, seed)
         return result.takeUnless { cancellation() }
     }

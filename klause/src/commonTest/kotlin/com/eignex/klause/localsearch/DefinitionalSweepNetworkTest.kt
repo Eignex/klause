@@ -29,19 +29,11 @@ class DefinitionalSweepNetworkTest {
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.invariants = InvariantNetwork(
             List(129) { i ->
-                if (i == 128) {
-                    DefinitionalSweep.SweepNode.IntDef(
-                        FunctionalObjective.Plus(
-                            128,
-                            FunctionalObjective.Operand.v(0),
-                            FunctionalObjective
-                                .Operand.c(1),
-                        ),
-                        intArrayOf(0),
-                    )
-                } else {
-                    DefinitionalSweep.SweepNode.Bool2Int(i, if (i == 0) 0 else 1)
-                }
+                if (i == 128) DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(128, FunctionalObjective.Operand.v(0), FunctionalObjective.Operand.c(1)),
+                    intArrayOf(0),
+                )
+                else DefinitionalSweep.SweepNode.Bool2Int(i, if (i == 0) 0 else 1)
             },
             129,
             2,
@@ -59,19 +51,11 @@ class DefinitionalSweepNetworkTest {
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(3))
         state.invariants = InvariantNetwork(
             List(71) { i ->
-                if (i == 0) {
-                    DefinitionalSweep.SweepNode.Bool2Int(0, 0)
-                } else {
-                    DefinitionalSweep.SweepNode.IntDef(
-                        FunctionalObjective.Plus(
-                            i,
-                            FunctionalObjective.Operand.v(i - 1),
-                            FunctionalObjective
-                                .Operand.c(1),
-                        ),
-                        intArrayOf(i - 1),
-                    )
-                }
+                if (i == 0) DefinitionalSweep.SweepNode.Bool2Int(0, 0)
+                else DefinitionalSweep.SweepNode.IntDef(
+                    FunctionalObjective.Plus(i, FunctionalObjective.Operand.v(i - 1), FunctionalObjective.Operand.c(1)),
+                    intArrayOf(i - 1),
+                )
             },
             71,
             1,
@@ -146,11 +130,8 @@ class DefinitionalSweepNetworkTest {
                 0,
             )
             state.apply(Move.IntSet(0, 2))
-            if (block == "pin") {
-                state.moveSink.setAssumptions(Assumptions(ints = mapOf(1 to 3L)))
-            } else {
-                state.moveSink.setOwners(intArrayOf(-1, 7, -1))
-            }
+            if (block == "pin") state.moveSink.setAssumptions(Assumptions(ints = mapOf(1 to 3L)))
+            else state.moveSink.setOwners(intArrayOf(-1, 7, -1))
             state.apply(Move.IntSet(0, 5))
             assertEquals(3L, state.assignment.intValue(1))
             assertEquals(4L, state.assignment.intValue(2))

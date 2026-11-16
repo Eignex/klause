@@ -338,11 +338,8 @@ class InprocessingTest {
             val cheap = CountingPass(work = 50L)
             val stats = SearchStatsSink()
             val loop = Inprocessing(listOf(RootProbingPass(), cheap), cadence = 1, stats = stats)
-            val params = BacktrackParams(
-                rootProbeBatch = 1,
-                rootProbeImplications = false,
-                inprocessingProbeInterval = 100L,
-            )
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+                inprocessingProbeInterval = 100L)
             loop.onRestart(session, params)
 
             repeat(3) { loop.onRestart(session, params) }
@@ -363,11 +360,8 @@ class InprocessingTest {
             val session = PropagationSession(problem().bake(), nativeSat = native)
             val stats = SearchStatsSink()
             val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1, stats = stats)
-            val params = BacktrackParams(
-                rootProbeBatch = 1,
-                rootProbeImplications = false,
-                inprocessingProbeInterval = 100L,
-            )
+            val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+                inprocessingProbeInterval = 100L)
             loop.onRestart(session, params)
 
             assertTrue(loop.releaseRetainedBuffers())
@@ -385,11 +379,8 @@ class InprocessingTest {
         val session = session()
         val stats = SearchStatsSink()
         val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1, stats = stats)
-        val params = BacktrackParams(
-            rootProbeBatch = 1,
-            rootProbeImplications = false,
-            inprocessingProbeInterval = 100L,
-        )
+        val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
+            inprocessingProbeInterval = 100L)
         loop.onRestart(session, params)
 
         loop.reset()
@@ -401,25 +392,15 @@ class InprocessingTest {
     @Test
     fun `deferred implications should resume before the next optional probe interval`() {
         for (native in listOf(false, true)) {
-            val source = Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf<Factor>(
-                    Clause(intArrayOf(1, 2)),
-                    Clause(intArrayOf(3, 4)),
-                ),
-            )
+            val source = Problem(4, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)),
+            ))
             val session = PropagationSession(source.bake(), nativeSat = native)
             val pass = RootProbingPass()
             val stats = SearchStatsSink()
             val loop = Inprocessing(listOf(CountingPass(work = 193L), pass), cadence = 1, stats = stats)
-            val params = BacktrackParams(
-                rootProbeBatch = 1,
-                inprocessingWork = 256L,
-                inprocessingProbeWork = 256L,
-                inprocessingProbeInterval = 10000L,
-            )
+            val params = BacktrackParams(rootProbeBatch = 1, inprocessingWork = 256L,
+                inprocessingProbeWork = 256L, inprocessingProbeInterval = 10000L)
             loop.onRestart(session, params)
             assertTrue(pass.hasContinuation(session))
             assertEquals(0, session.learnedClauseCount)
@@ -457,23 +438,14 @@ class InprocessingTest {
     @Test
     fun `memory pressure should protect an interrupted root attachment`() {
         for (native in listOf(false, true)) {
-            val source = Problem(
-                3,
-                0,
-                emptyArray(),
-                arrayOf<Factor>(
-                    Clause(intArrayOf(0, 2)),
-                    Clause(intArrayOf(0, 3)),
-                ),
-            )
+            val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+            ))
             val session = PropagationSession(source, nativeSat = native)
             repeat(2) { session.addLearnedClause(Clause(intArrayOf(4, 5)), 4) }
             val loop = Inprocessing(listOf(Subsumption(), RootProbingPass()), cadence = 1)
-            val params = BacktrackParams(
-                rootProbeBatch = 2,
-                inprocessingSubsumeWork = 1L,
-                cancellation = ExecutionControl { session.learnedClauseCount > 2 },
-            )
+            val params = BacktrackParams(rootProbeBatch = 2, inprocessingSubsumeWork = 1L,
+                cancellation = ExecutionControl { session.learnedClauseCount > 2 })
             assertNull(session.boolValue(0))
             assertNull(session.boolValue(1))
             assertNull(session.boolValue(2))
@@ -496,15 +468,9 @@ class InprocessingTest {
     @Test
     fun `memory pressure should preserve completed root facts awaiting publication`() {
         for (native in listOf(false, true)) {
-            val source = Problem(
-                2,
-                0,
-                emptyArray(),
-                arrayOf<Factor>(
-                    Clause(intArrayOf(0, 2)),
-                    Clause(intArrayOf(0, 3)),
-                ),
-            )
+            val source = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+                Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+            ))
             val session = PropagationSession(source, nativeSat = native)
             val loop = Inprocessing(listOf(RootProbingPass()), cadence = 1)
             assertNull(session.boolValue(0))
@@ -514,11 +480,8 @@ class InprocessingTest {
             val revision = session.learnedClauseRevision
 
             val released = loop.releaseRetainedBuffers()
-            val reclamation = session.reclaimLearnedMemory(
-                0L,
-                maxWork = 1_000_000L,
-                publicationPending = loop.retainsPublication,
-            )
+            val reclamation = session.reclaimLearnedMemory(0L, maxWork = 1_000_000L,
+                publicationPending = loop.retainsPublication)
 
             assertTrue(publicationNeeded)
             assertFalse(session.fixpointCancelled)

@@ -27,21 +27,14 @@ class SourceRateRewardTest {
                     .also { it.constructionNanos = 10_000_000 },
             )
 
-            val result = Portfolio(
-                workers,
-                fixedBandit(2, 1),
-                baseSliceWork = 1,
-                maxSliceWork = 1,
-                reseedStaleThreshold = 0,
-                diagnostics = PortfolioDiagnostics(32),
+            val result = Portfolio(workers, fixedBandit(2, 1), baseSliceWork = 1, maxSliceWork = 1,
+                reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(32),
                 onProgress = { event ->
                     if (event is PortfolioEvent.Progressed && !event.progress.idleCredit) {
                         observed += event.progress
                         if (event.progress.arm == 1) stop = true
                     }
-                },
-                rewardPolicy = SourceRateReward(priceFamilies),
-            ).use { it.minimize(ExecutionControl { stop }) }
+                }, rewardPolicy = SourceRateReward(priceFamilies)).use { it.minimize(ExecutionControl { stop }) }
 
             val first = observed.single { it.arm == 0 }
             val peer = observed.single { it.arm == 1 }
@@ -58,26 +51,17 @@ class SourceRateRewardTest {
     fun `published batches should price family gains without overflowing objective units`() {
         for (scale in listOf(1e-200, 1.0, 1e308)) {
             val reward = SourceRateReward(priceFamilies = true).fresh(
-                listOf(ArmFamily.LocalSearch, ArmFamily.Backtrack),
-            )
-            val first = PortfolioProgress(
-                0, PortfolioPhase.FEASIBILITY, 1, 10, 0, true, false,
-                mapOf("FirstSolution" to 1.0), 0.5, acceptedIncumbents = 4, constructionNanos = 90,
-            )
+                listOf(ArmFamily.LocalSearch, ArmFamily.Backtrack))
+            val first = PortfolioProgress(0, PortfolioPhase.FEASIBILITY, 1, 10, 0, true, false,
+                mapOf("FirstSolution" to 1.0), 0.5, acceptedIncumbents = 4, constructionNanos = 90)
             reward.recordAcceptedGain(0, scale / 2)
             reward.recordAcceptedGain(0, scale)
             reward.recordAcceptedGain(0, scale)
 
             assertEquals(1.0, reward.reward(first))
             reward.recordAcceptedGain(1, scale)
-            val peer = first.copy(
-                arm = 1,
-                phase = PortfolioPhase.IMPROVEMENT,
-                nanos = 100,
-                credit = mapOf("Improvement" to scale),
-                acceptedIncumbents = 1,
-                constructionNanos = 0,
-            )
+            val peer = first.copy(arm = 1, phase = PortfolioPhase.IMPROVEMENT, nanos = 100,
+                credit = mapOf("Improvement" to scale), acceptedIncumbents = 1, constructionNanos = 0)
 
             assertEquals(2.0 / 7, reward.reward(peer), 1e-12)
             assertEquals(2.0 / 7, assertNotNull(reward.familyReward), 1e-12)
@@ -87,15 +71,12 @@ class SourceRateRewardTest {
     @Test
     fun `family gain rates should pay unproductive sibling costs`() {
         for (scale in listOf(1e-200, 1.0, 1e200, 1e308)) {
-            val gain = PortfolioProgress(
-                2, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
-                mapOf("Improvement" to scale), 0.0,
-            )
+            val gain = PortfolioProgress(2, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
+                mapOf("Improvement" to scale), 0.0)
             val sibling = gain.copy(arm = 1, nanos = 90, acceptedIncumbent = false)
             for (unproductive in listOf(sibling, sibling.copy(failed = true), sibling.copy(refuted = true))) {
                 val reward = SourceRateReward(priceFamilies = true).fresh(
-                    listOf(ArmFamily.LocalSearch, ArmFamily.LocalSearch, ArmFamily.Backtrack),
-                )
+                    listOf(ArmFamily.LocalSearch, ArmFamily.LocalSearch, ArmFamily.Backtrack))
                 reward.reward(gain.copy(arm = 0, acceptedIncumbent = false))
                 reward.reward(unproductive)
                 reward.reward(gain)
@@ -109,17 +90,10 @@ class SourceRateRewardTest {
     @Test
     fun `family feasibility rewards should retain feedback while pricing setup`() {
         val reward = SourceRateReward(priceFamilies = true).fresh(listOf(ArmFamily.LocalSearch, ArmFamily.Backtrack))
-        val progress = PortfolioProgress(
-            0, PortfolioPhase.FEASIBILITY, 1, 10, 0, false, false,
-            mapOf("Violation" to 0.5), 0.75, constructionNanos = 20,
-        )
-        val improving = progress.copy(
-            phase = PortfolioPhase.IMPROVEMENT,
-            nanos = 10,
-            acceptedIncumbent = true,
-            credit = mapOf("Improvement" to 10.0),
-            constructionNanos = 0,
-        )
+        val progress = PortfolioProgress(0, PortfolioPhase.FEASIBILITY, 1, 10, 0, false, false,
+            mapOf("Violation" to 0.5), 0.75, constructionNanos = 20)
+        val improving = progress.copy(phase = PortfolioPhase.IMPROVEMENT, nanos = 10,
+            acceptedIncumbent = true, credit = mapOf("Improvement" to 10.0), constructionNanos = 0)
 
         assertEquals(0.75, reward.reward(progress))
         assertNull(reward.familyReward)
@@ -135,21 +109,16 @@ class SourceRateRewardTest {
             val observed = mutableListOf<PortfolioProgress>()
             var stop = false
             val workers = listOf(
-                trackingWorker(
-                    "failed",
-                    0,
-                    ScriptedSearch({ refuted }, start = 2_000.0) {
-                        if (!refuted) error("fixture failure")
-                    },
-                ).also { it.constructionNanos = 30_000_000 },
+                trackingWorker("failed", 0, ScriptedSearch({ refuted }, start = 2_000.0) {
+                    if (!refuted) error("fixture failure")
+                }).also { it.constructionNanos = 30_000_000 },
                 trackingWorker("finder", 1, ScriptedSearch({ true }, perSlice = 10) {})
                     .also { it.restartingSearch = true },
                 trackingWorker("peer", 2, ScriptedSearch({ true }, start = 990.0) {})
                     .also { it.restartingSearch = true },
             )
 
-            val result = Portfolio(
-                workers, fixedBandit(3, 1), baseSliceWork = 1, maxSliceWork = 1,
+            val result = Portfolio(workers, fixedBandit(3, 1), baseSliceWork = 1, maxSliceWork = 1,
                 reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(100),
                 witnessCheck = WitnessCheck { _, objective -> if (objective == 1_999.0) "refuted fixture" else null },
                 onProgress = { event ->
@@ -157,8 +126,7 @@ class SourceRateRewardTest {
                         observed += event.progress
                         if (event.progress.arm == 1 && event.progress.phase == PortfolioPhase.IMPROVEMENT) stop = true
                     }
-                }, rewardPolicy = SourceRateReward(),
-            ).use { it.minimize(ExecutionControl { stop }) }
+                }, rewardPolicy = SourceRateReward()).use { it.minimize(ExecutionControl { stop }) }
 
             val failed = observed.single { it.arm == 0 }
             val own = observed.filter { it.arm == 1 }
@@ -171,11 +139,8 @@ class SourceRateRewardTest {
             assertTrue(failed.failed || failed.refuted)
             assertEquals(0.0, result.stats.portfolio.arms[0].meanReward)
             assertEquals(2, own.size)
-            assertEquals(
-                (1.0 + expected) / 2,
-                result.stats.portfolio.arms[1].meanReward,
-                1e-12,
-            )
+            assertEquals((1.0 + expected) / 2,
+                result.stats.portfolio.arms[1].meanReward, 1e-12)
         }
     }
 
@@ -183,25 +148,15 @@ class SourceRateRewardTest {
     fun `each invocation should price its own observations when a configured policy is reused`() {
         for (priceFamilies in listOf(false, true)) {
             val configured = SourceRateReward(priceFamilies)
-            configured.reward(
-                PortfolioProgress(
-                    1, PortfolioPhase.IMPROVEMENT, 1, 1, 0, true, false,
-                    mapOf("Improvement" to 1_000_000.0), 0.0,
-                ),
-            )
+            configured.reward(PortfolioProgress(1, PortfolioPhase.IMPROVEMENT, 1, 1, 0, true, false,
+                mapOf("Improvement" to 1_000_000.0), 0.0))
             configured.recordAcceptedGain(0, 1.0)
 
             repeat(2) {
                 val worker = trackingWorker("finder", 0, ScriptedSearch({ true }) {})
-                val result = Portfolio(
-                    listOf(worker),
-                    fixedBandit(1, 0),
-                    baseSliceWork = 1,
-                    maxSliceWork = 1,
-                    reseedStaleThreshold = 0,
-                    diagnostics = PortfolioDiagnostics(8),
-                    rewardPolicy = configured,
-                ).use { it.minimize(ExecutionControl.Never) }
+                val result = Portfolio(listOf(worker), fixedBandit(1, 0), baseSliceWork = 1, maxSliceWork = 1,
+                    reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(8),
+                    rewardPolicy = configured).use { it.minimize(ExecutionControl.Never) }
 
                 assertEquals(1.0, result.stats.portfolio.arms.single().meanReward, 1e-12)
             }
@@ -212,26 +167,16 @@ class SourceRateRewardTest {
     fun `silent complete workers should retain coverage under gain rate rewards`() {
         for (retention in listOf(0.0, 0.25, 1.0)) {
             for ((priceFamilies, restarting) in listOf(
-                false to false,
-                false to true,
-                true to false,
-                true to true,
+                false to false, false to true, true to false, true to true,
             )) {
                 var slices = 0
                 val base = ScriptedSearch({ false }) {}
                 val proof = object : ResumableSearch by base {
-                    override fun runSlice(
-                        global: ExecutionControl,
-                        sliceMillis: Long,
-                        sliceNodes: Long,
-                        onIncumbent: (MinimizeResult.WithSample) -> Unit,
-                    ): MinimizeResult? {
+                    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                         base.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
-                        return if (++slices == 3) {
-                            MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
-                        } else {
-                            null
-                        }
+                        return if (++slices == 3) MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
+                        else null
                     }
                 }
                 val workers = listOf(
@@ -242,16 +187,9 @@ class SourceRateRewardTest {
                     trackingWorker("proof", 1, proof).also { it.restartingSearch = restarting },
                 )
 
-                val result = Portfolio(
-                    workers,
-                    fixedBandit(2, 0),
-                    baseSliceWork = 2,
-                    maxSliceWork = 2,
-                    reseedStaleThreshold = 0,
-                    phaseRetention = retention,
-                    diagnostics = PortfolioDiagnostics(32),
-                    rewardPolicy = SourceRateReward(priceFamilies),
-                ).also {
+                val result = Portfolio(workers, fixedBandit(2, 0), baseSliceWork = 2, maxSliceWork = 2,
+                    reseedStaleThreshold = 0, phaseRetention = retention, diagnostics = PortfolioDiagnostics(32),
+                    rewardPolicy = SourceRateReward(priceFamilies)).also {
                     it.includeRestartingProof = restarting
                 }.use { it.minimize(ExecutionControl.Never) }
 
@@ -263,17 +201,10 @@ class SourceRateRewardTest {
     @Test
     fun `feasibility should retain ordinary rewards while paying its setup cost`() {
         val reward = SourceRateReward()
-        val progress = PortfolioProgress(
-            0, PortfolioPhase.FEASIBILITY, 1, 10, 0, false, false,
-            mapOf("Violation" to 0.5), 0.75, constructionNanos = 20,
-        )
-        val improving = progress.copy(
-            phase = PortfolioPhase.IMPROVEMENT,
-            nanos = 10,
-            acceptedIncumbent = true,
-            credit = mapOf("Improvement" to 10.0),
-            constructionNanos = 0,
-        )
+        val progress = PortfolioProgress(0, PortfolioPhase.FEASIBILITY, 1, 10, 0, false, false,
+            mapOf("Violation" to 0.5), 0.75, constructionNanos = 20)
+        val improving = progress.copy(phase = PortfolioPhase.IMPROVEMENT, nanos = 10,
+            acceptedIncumbent = true, credit = mapOf("Improvement" to 10.0), constructionNanos = 0)
 
         assertEquals(0.75, reward.reward(progress))
         reward.reward(improving.copy(arm = 1))
@@ -283,14 +214,10 @@ class SourceRateRewardTest {
 
     @Test
     fun `gain rates should include factory cost and count nested initialization only once`() {
-        val progress = PortfolioProgress(
-            1, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
-            mapOf("Improvement" to 10.0), 0.0,
-        )
-        for (costly in listOf(
-            progress.copy(arm = 0, constructionNanos = 30),
-            progress.copy(arm = 0, nanos = 40, initializationNanos = 30, checkingNanos = 5),
-        )) {
+        val progress = PortfolioProgress(1, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
+            mapOf("Improvement" to 10.0), 0.0)
+        for (costly in listOf(progress.copy(arm = 0, constructionNanos = 30),
+            progress.copy(arm = 0, nanos = 40, initializationNanos = 30, checkingNanos = 5))) {
             val reward = SourceRateReward()
             reward.reward(progress)
 
@@ -301,10 +228,8 @@ class SourceRateRewardTest {
     @Test
     fun `unproductive work should be paid by the next gain without charging it twice`() {
         val reward = SourceRateReward()
-        val progress = PortfolioProgress(
-            1, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
-            mapOf("Improvement" to 10.0), 0.0,
-        )
+        val progress = PortfolioProgress(1, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
+            mapOf("Improvement" to 10.0), 0.0)
         reward.reward(progress)
         val improving = progress.copy(arm = 0)
 
@@ -317,22 +242,12 @@ class SourceRateRewardTest {
     fun `reward should price gain magnitude independently of objective units`() {
         for (scale in listOf(1e-200, 1.0, 1e200, 1e308)) {
             val reward = SourceRateReward()
-            val progress = PortfolioProgress(
-                1, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
-                mapOf("Improvement" to scale), 0.0,
-            )
+            val progress = PortfolioProgress(1, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
+                mapOf("Improvement" to scale), 0.0)
             reward.reward(progress)
 
-            assertEquals(
-                1.0 / 11,
-                reward.reward(
-                    progress.copy(
-                        arm = 0,
-                        credit = mapOf("Improvement" to scale / 10),
-                    ),
-                ),
-                1e-12,
-            )
+            assertEquals(1.0 / 11, reward.reward(progress.copy(arm = 0,
+                credit = mapOf("Improvement" to scale / 10))), 1e-12)
         }
     }
 
@@ -340,38 +255,22 @@ class SourceRateRewardTest {
     fun `larger gains should preserve the relative rate of earlier peer progress`() {
         for (priceFamilies in listOf(false, true)) {
             val reward = SourceRateReward(priceFamilies).fresh(listOf(ArmFamily.LocalSearch, ArmFamily.Backtrack))
-            val progress = PortfolioProgress(
-                1, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
-                mapOf("Improvement" to 1e307), 0.0,
-            )
+            val progress = PortfolioProgress(1, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
+                mapOf("Improvement" to 1e307), 0.0)
             reward.reward(progress)
 
-            assertEquals(
-                10.0 / 11,
-                reward.reward(
-                    progress.copy(
-                        arm = 0,
-                        credit = mapOf("Improvement" to 1e308),
-                    ),
-                ),
-                1e-12,
-            )
+            assertEquals(10.0 / 11, reward.reward(progress.copy(arm = 0,
+                credit = mapOf("Improvement" to 1e308))), 1e-12)
             if (priceFamilies) assertEquals(10.0 / 11, assertNotNull(reward.familyReward), 1e-12)
         }
     }
 
     @Test
     fun `unaccepted failed refuted idle or unpriced gains should earn no improvement reward`() {
-        val progress = PortfolioProgress(
-            0, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
-            mapOf("Improvement" to 10.0), 1.0,
-        )
-        for (unearned in listOf(
-            progress.copy(acceptedIncumbent = false),
-            progress.copy(failed = true),
-            progress.copy(refuted = true),
-            progress.copy(idleCredit = true),
-        ) +
+        val progress = PortfolioProgress(0, PortfolioPhase.IMPROVEMENT, 1, 10, 0, true, false,
+            mapOf("Improvement" to 10.0), 1.0)
+        for (unearned in listOf(progress.copy(acceptedIncumbent = false), progress.copy(failed = true),
+            progress.copy(refuted = true), progress.copy(idleCredit = true)) +
             listOf(0.0, -1.0, Double.NaN, Double.POSITIVE_INFINITY).map {
                 progress.copy(credit = mapOf("Improvement" to it))
             }) {
@@ -387,10 +286,8 @@ class SourceRateRewardTest {
 
     @Test
     fun `accepted proof closure should receive terminal reward`() {
-        val progress = PortfolioProgress(
-            0, PortfolioPhase.PROOF_CLOSURE, 0, 0, 1, false, false,
-            emptyMap(), 0.0,
-        )
+        val progress = PortfolioProgress(0, PortfolioPhase.PROOF_CLOSURE, 0, 0, 1, false, false,
+            emptyMap(), 0.0)
 
         assertEquals(1.0, SourceRateReward().reward(progress))
         assertEquals(0.0, SourceRateReward().reward(progress.copy(refuted = true)))

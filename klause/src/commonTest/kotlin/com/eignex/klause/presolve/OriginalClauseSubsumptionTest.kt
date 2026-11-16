@@ -60,9 +60,9 @@ class OriginalClauseSubsumptionTest {
         val clauses = clauses(3)
         for (first in clauses) {
             for (second in clauses) {
-                val problem = problem(first, second)
-                checkModels(problem, OriginalClauseSubsumption.simplify(problem))
-            }
+            val problem = problem(first, second)
+            checkModels(problem, OriginalClauseSubsumption.simplify(problem))
+        }
         }
     }
 
@@ -72,9 +72,9 @@ class OriginalClauseSubsumptionTest {
         for (first in clauses) {
             for (second in clauses) {
                 for (third in clauses) {
-                    val problem = Problem(2, 0, emptyArray(), listOf(first, second, third))
-                    checkModels(problem, OriginalClauseSubsumption.simplify(problem))
-                }
+            val problem = Problem(2, 0, emptyArray(), listOf(first, second, third))
+            checkModels(problem, OriginalClauseSubsumption.simplify(problem))
+        }
             }
         }
     }

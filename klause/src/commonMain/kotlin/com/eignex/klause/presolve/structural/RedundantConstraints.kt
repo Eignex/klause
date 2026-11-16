@@ -41,6 +41,7 @@ internal object RedundantConstraints {
     private class Interrupted : RuntimeException()
 
     @Suppress("NOTHING_TO_INLINE") // Scalar scans use the bound cursor without default-argument forwarding.
+
     private inline fun visit(scan: ScanMeter?, units: Long = SUBSUME_WORK_WEIGHT) {
         if (scan != null && !scan.visit(units)) throw Interrupted()
     }
@@ -86,10 +87,7 @@ internal object RedundantConstraints {
         cancellation: ExecutionControl,
         memo: SubsumeMemo? = null,
     ): SourceDelta = computeFull(
-        problem,
-        ColumnRanges.of(problem.intBounds),
-        cancellation,
-        memo?.subsets,
+        problem, ColumnRanges.of(problem.intBounds), cancellation, memo?.subsets,
     ).asSourceDelta()
 
     // Debug switch: every incremental firing also recomputes the full delta and asserts the two agree, so a
@@ -170,10 +168,9 @@ internal object RedundantConstraints {
         }
         // Unit-coefficient clause rows have the same bound; their duplicates were removed by keys.
         if (deduped.all {
-                visit(scan)
-                it is Clause
-            }
-        ) {
+            visit(scan)
+            it is Clause
+        }) {
             return deduped
         }
         // Phase 2: bucket the ≤-normalised Linear inequalities by coefficient vector; the bucket's
@@ -276,7 +273,6 @@ internal object RedundantConstraints {
      */
     internal class SubsumeMemo : SubsumeState {
         val subsets = SubsetDomination()
-
         // Long-keyed to avoid boxing the shallow key on every factor: a clause-heavy model registers
         // hundreds of thousands of factors, and a `HashMap<Long, …>` would box the key on each lookup.
         private val shallowSingle = MutableLongObjectMap<SubsumeFactor>()
@@ -365,11 +361,8 @@ internal object RedundantConstraints {
                     process(f, drops)
                 }
             }
-            return if (drops.isEmpty()) {
-                problem.factors.asList()
-            } else {
+            return if (drops.isEmpty()) problem.factors.asList() else
                 problem.factors.filterIndexed { i, _ -> inc.liveIds[i] !in drops }
-            }
         }
 
         // Later phases also remove indexed occurrences; duplicates have no entry and retract as a no-op.
@@ -427,7 +420,6 @@ internal object RedundantConstraints {
             }
             indexed.put(entry.id, entry)
             val f = entry.factor
-
             // Most factors (every Clause, Xor, plain global) offer nothing to the phase-2 buckets, so the
             // touched-key set and the row form are derived only once a factor actually offers.
             @Suppress("DoubleMutabilityForCollection") // deliberately lazily created on the first offer
@@ -593,19 +585,21 @@ internal object RedundantConstraints {
 
     /** Every exact [LinearRow] of [f] as `≤`-normalised [IneqForm]s (each `=` row carries its opposite
      *  direction), for offering into the dominator buckets. Clause-shaped rows are skipped (see [rowForm]). */
-    private fun offerForms(f: Factor, scan: ScanMeter? = null): List<IneqForm> = f.impliedLinearRows.mapNotNull {
-        visit(scan)
-        rowForm(it, scan)
-    }
+    private fun offerForms(f: Factor, scan: ScanMeter? = null): List<IneqForm> =
+        f.impliedLinearRows.mapNotNull {
+            visit(scan)
+            rowForm(it, scan)
+        }
 
     /** The `≤`-normalised [IneqForm] of [f] when it is a single-row inequality (the only shape this pass
      *  drops as dominated), else `null` — a multi-row factor (cardinality, increasing chain) offers its
      *  rows but is never itself dropped here. */
-    private fun dropForm(f: Factor, scan: ScanMeter? = null): IneqForm? = if (f.linearForm is LinearForm.Conjunction) {
-        f.impliedLinearRows.singleOrNull()?.let { rowForm(it, scan) }
-    } else {
-        null
-    }
+    private fun dropForm(f: Factor, scan: ScanMeter? = null): IneqForm? =
+        if (f.linearForm is LinearForm.Conjunction) {
+            f.impliedLinearRows.singleOrNull()?.let { rowForm(it, scan) }
+        } else {
+            null
+        }
 
     /**
      * A single exact [LinearRow] as its `≤`-normalised [IneqForm], keyed uniformly over the row's tagged
@@ -663,10 +657,11 @@ internal object RedundantConstraints {
         return true
     }
 
-    private fun negated(xs: LongArray, scan: ScanMeter? = null): LongArray = LongArray(xs.size) {
-        visit(scan)
-        -xs[it]
-    }
+    private fun negated(xs: LongArray, scan: ScanMeter? = null): LongArray =
+        LongArray(xs.size) {
+            visit(scan)
+            -xs[it]
+        }
 
     /** A `≤`-form `Σ coeffs·refs ≤ bound`, GCD-reduced so proportional rows (`x+y ≤ 2` and `2x+2y ≤ 4`)
      *  share a bucket even when coefficient strengthening hasn't normalised them

@@ -32,21 +32,19 @@ internal object JointRayInspection {
                 add(inspectRay(file, stop))
             }
         }
-        out.resolve("ray-inspection.json").writeText(
-            buildJsonObject {
-                put("maximumCapturedRays", 4)
-                put("maximumCandidates", 8)
-                put("maximumProjectionWorkPerRay", WORK)
-                put("maximumProjectionAllocationPerRay", BYTES)
-                put("maximumVerificationWorkPerCandidate", WORK)
-                put("maximumVerificationAllocationPerCandidate", BYTES)
-                put("separateFromProducerGrant", true)
-                put("inspectionStopped", stop())
-                put("rays", rays)
-                put("sourceVerdictClaim", false)
-                put("independentProofClaim", false)
-            }.toString(),
-        )
+        out.resolve("ray-inspection.json").writeText(buildJsonObject {
+            put("maximumCapturedRays", 4)
+            put("maximumCandidates", 8)
+            put("maximumProjectionWorkPerRay", WORK)
+            put("maximumProjectionAllocationPerRay", BYTES)
+            put("maximumVerificationWorkPerCandidate", WORK)
+            put("maximumVerificationAllocationPerCandidate", BYTES)
+            put("separateFromProducerGrant", true)
+            put("inspectionStopped", stop())
+            put("rays", rays)
+            put("sourceVerdictClaim", false)
+            put("independentProofClaim", false)
+        }.toString())
     }
 
     private fun inspectRay(file: File, stop: ExecutionControl): JsonObject {
@@ -67,24 +65,15 @@ internal object JointRayInspection {
         val columns = call(exact, "getN") as Int
         require(rows in 1..4096 && columns >= 0 && columns.toLong() + rows <= 8192)
         val identity = input.getValue("stateIdentity").jsonObject
-        require(
-            identity.getValue("rows").jsonPrimitive.int == rows &&
-                identity.getValue("columns").jsonPrimitive.int == columns,
-        )
+        require(identity.getValue("rows").jsonPrimitive.int == rows &&
+            identity.getValue("columns").jsonPrimitive.int == columns)
         for (part in listOf("Matrix", "Bound", "Objective", "Pop", "Row")) {
-            require(
-                call(state, "get${part}Revision") ==
-                    identity.getValue(part.lowercase() + "Revision").jsonPrimitive.long,
-            )
+            require(call(state, "get${part}Revision") ==
+                identity.getValue(part.lowercase() + "Revision").jsonPrimitive.long)
         }
-        val ray = requireNotNull(
-            decodeRay(
-                input.getValue("rayBits").jsonArray.map {
-                    it.jsonPrimitive.content
-                },
-                rows,
-            ),
-        )
+        val ray = requireNotNull(decodeRay(input.getValue("rayBits").jsonArray.map {
+            it.jsonPrimitive.content
+        }, rows))
         val projection = create("LpProjectionMeter", WORK, BYTES, stop)
         val model = call(state, "ownerWorkingModel", projection)
         val candidates = buildJsonArray {
@@ -134,27 +123,21 @@ internal object JointRayInspection {
         val rejection = call(metrics, "getDualRejection")
         return buildJsonObject {
             put("orientation", if (negated) "negated-engine-original" else "engine-original")
-            put(
-                "outcome",
-                when {
-                    decline != null -> "DECLINED"
-                    conflict -> "KERNEL_CONFLICT"
-                    rejection != null -> "MISSING_BOUND_SIDE"
-                    else -> "NON_CONTRADICTORY"
-                },
-            )
+            put("outcome", when {
+                decline != null -> "DECLINED"
+                conflict -> "KERNEL_CONFLICT"
+                rejection != null -> "MISSING_BOUND_SIDE"
+                else -> "NON_CONTRADICTORY"
+            })
             put("kernelConflictAvailable", conflict)
             put("decline", decline?.toString())
             put("metrics", NumericalResidualProfile.json(metrics))
             rejection?.let {
-                put(
-                    "dualRejection",
-                    buildJsonObject {
-                        put("column", call(it, "getColumn") as Int)
-                        put("upper", call(it, "getUpper") as Boolean)
-                        put("reduced", call(it, "getReduced").toString())
-                    },
-                )
+                put("dualRejection", buildJsonObject {
+                    put("column", call(it, "getColumn") as Int)
+                    put("upper", call(it, "getUpper") as Boolean)
+                    put("reduced", call(it, "getReduced").toString())
+                })
             }
             put("elapsedNs", System.nanoTime() - started)
         }
@@ -173,7 +156,8 @@ internal object JointRayInspection {
             .apply { isAccessible = true }.newInstance(*args)
 
     @Suppress("SpreadOperator")
-    private fun call(owner: Any, name: String, vararg args: Any?): Any? = owner.javaClass.methods.single {
-        it.name.substringBefore('$') == name && it.parameterCount == args.size
-    }.apply { isAccessible = true }.invoke(owner, *args)
+    private fun call(owner: Any, name: String, vararg args: Any?): Any? =
+        owner.javaClass.methods.single {
+            it.name.substringBefore('$') == name && it.parameterCount == args.size
+        }.apply { isAccessible = true }.invoke(owner, *args)
 }

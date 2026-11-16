@@ -28,9 +28,7 @@ class LpAutoConfigTest {
     @Test
     fun `element admission selects complete index groups alongside competing hulls`() {
         val problem = Problem(
-            0,
-            6,
-            Array(6) { IntDomain(0, 2) },
+            0, 6, Array(6) { IntDomain(0, 2) },
             arrayOf(
                 Element(0, 2, longArrayOf(0, 1, 0), false, 0),
                 Element(0, 3, longArrayOf(1, 0, 1), false, 0),
@@ -60,9 +58,7 @@ class LpAutoConfigTest {
     @Test
     fun `element admission declines a group when one property cannot be built`() {
         val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
+            0, 3, Array(3) { IntDomain(0, 2) },
             arrayOf(
                 Element(0, 1, longArrayOf(0, 1, 2), false, 0),
                 Element(0, 2, longArrayOf(0, 1, 2), false, 10),
@@ -78,9 +74,7 @@ class LpAutoConfigTest {
     @Test
     fun `explicit element plans retain all groups above the automatic budget`() {
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 2) },
+            0, 2, Array(2) { IntDomain(0, 2) },
             arrayOf(Element(0, 1, longArrayOf(0, 1, 2), false, 0)),
             settings = ProblemSettings(lpMaxTableauCells = 1L),
         )
@@ -97,9 +91,7 @@ class LpAutoConfigTest {
     @Test
     fun `element admission charges shared index choices once`() {
         val problem = Problem(
-            0,
-            5,
-            Array(5) { IntDomain(0, 39) },
+            0, 5, Array(5) { IntDomain(0, 39) },
             Array(4) { Element(0, it + 1, LongArray(40) { value -> value.toLong() }, false, 0) },
         )
 
@@ -125,13 +117,9 @@ class LpAutoConfigTest {
             Triple(64L, "off", true to false),
             Triple(64L, "default", true to true),
         )) {
-            val p = Problem(
-                0,
-                2,
-                Array(2) { IntDomain(0, 5) },
+            val p = Problem(0, 2, Array(2) { IntDomain(0, 5) },
                 listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2)),
-                settings = ProblemSettings(lpCeilingTableauCells = ceiling),
-            )
+                settings = ProblemSettings(lpCeilingTableauCells = ceiling))
             val config = LpConfig.parse(spec)
 
             val admission = LpAutoConfig.admission(p, config, LpPlan())
@@ -145,13 +133,9 @@ class LpAutoConfigTest {
 
     @Test
     fun `admission should retain explicit bounding above the ceiling`() {
-        val p = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 5) },
+        val p = Problem(0, 2, Array(2) { IntDomain(0, 5) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 2)),
-            settings = ProblemSettings(lpCeilingTableauCells = 1L),
-        )
+            settings = ProblemSettings(lpCeilingTableauCells = 1L))
 
         val admission = LpAutoConfig.admission(p, LpConfig.parse("off"), LpPlan(bounding = true))
 

@@ -30,15 +30,9 @@ class NValueInvariantTest {
                 numBoolVars = 1,
                 numIntVars = 2,
                 intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 2)),
-                factors = arrayOf(
-                    NValue(
-                        0,
-                        intArrayOf(0, 1, 1),
-                        mode,
-                        presents = intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(0, false)),
-                        exceptSet = longArrayOf(0, 2),
-                    ),
-                ),
+                factors = arrayOf(NValue(0, intArrayOf(0, 1, 1), mode,
+                    presents = intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(0, false)),
+                    exceptSet = longArrayOf(0, 2))),
             )
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
             state.assignment.setBool(0, false)
@@ -50,11 +44,8 @@ class NValueInvariantTest {
                 val before = factor.violationDegree(state, 0)
                 val delta = state.netDelta(move)
                 state.apply(move)
-                val active = if (state.assignment.boolValue(0)) {
-                    listOf(state.assignment.intValue(0))
-                } else {
-                    listOf(state.assignment.intValue(1))
-                }
+                val active = if (state.assignment.boolValue(0)) listOf(state.assignment.intValue(0))
+                    else listOf(state.assignment.intValue(1))
                 val count = active.count { it == 1L }.toLong()
                 val n = state.assignment.intValue(0)
                 val expected = when (mode) {
@@ -71,12 +62,8 @@ class NValueInvariantTest {
 
     @Test
     fun `excepted seeds should recheck a target that is also a counted position`() {
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 2), IntDomain(2, 2)),
-            arrayOf(NValue(0, intArrayOf(0, 1), exceptSet = longArrayOf(0))),
-        )
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(2, 2)),
+            arrayOf(NValue(0, intArrayOf(0, 1), exceptSet = longArrayOf(0))))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
 
         assertFalse(state.factors[0].seedFeasible(state, 0))
@@ -85,12 +72,8 @@ class NValueInvariantTest {
     @Test
     fun `excepted repair moves should introduce and remove counted values`() {
         for ((target, initial, repaired) in listOf(Triple(1L, 0L, 1L), Triple(0L, 1L, 0L))) {
-            val problem = Problem(
-                0,
-                2,
-                arrayOf(IntDomain(target, target), IntDomain(0, 1)),
-                arrayOf(NValue(0, intArrayOf(1), exceptSet = longArrayOf(0))),
-            )
+            val problem = Problem(0, 2, arrayOf(IntDomain(target, target), IntDomain(0, 1)),
+                arrayOf(NValue(0, intArrayOf(1), exceptSet = longArrayOf(0))))
             val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
             state.assignment.setInt(0, target)
             state.assignment.setInt(1, initial)

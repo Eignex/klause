@@ -86,9 +86,8 @@ class PortfolioProofTest {
         }
 
         Portfolio.thompson(workers, seed = 0, reseedStaleThreshold = 0).use {
-            it.minimize(
-                ExecutionControl.after(1.seconds) or ExecutionControl { offers.size >= 2 || ordinaryVisits >= 16 },
-            )
+            it.minimize(ExecutionControl.after(1.seconds) or ExecutionControl { offers.size >= 2 ||
+                ordinaryVisits >= 16 })
         }
 
         assertEquals(2, offers.size)

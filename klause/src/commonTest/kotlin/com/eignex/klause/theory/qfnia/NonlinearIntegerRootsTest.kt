@@ -43,11 +43,9 @@ class NonlinearIntegerRootsTest {
 
     @Test
     fun `equalities on one coordinate should intersect their integer roots`() {
-        val store = NonlinearIntegerRootStore(
-            problem(
-                "(declare-const n Int) (assert (= (* n n) 4)) (assert (= (* n n n) (- 8)))",
-            ),
-        )
+        val store = NonlinearIntegerRootStore(problem(
+            "(declare-const n Int) (assert (= (* n n) 4)) (assert (= (* n n n) (- 8)))",
+        ))
 
         val admission = store.admit(ExecutionControl.Never, PolynomialLimits()) {}
 
@@ -57,11 +55,9 @@ class NonlinearIntegerRootsTest {
 
     @Test
     fun `wide integer roots should be admitted well within the equation allowance`() {
-        val store = NonlinearIntegerRootStore(
-            problem(
-                "(declare-const n Int) (assert (= (* n n) 10000000000000000000000000000000000000000))",
-            ),
-        )
+        val store = NonlinearIntegerRootStore(problem(
+            "(declare-const n Int) (assert (= (* n n) 10000000000000000000000000000000000000000))",
+        ))
         var charged = 0L
         val parent = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
@@ -116,11 +112,9 @@ class NonlinearIntegerRootsTest {
 
     @Test
     fun `a completed admission should be reused without isolating roots again`() {
-        val store = NonlinearIntegerRootStore(
-            problem(
-                "(declare-const n Int) (assert (= (* (- (* n n) 2) (- n 2)) 0))",
-            ),
-        )
+        val store = NonlinearIntegerRootStore(problem(
+            "(declare-const n Int) (assert (= (* (- (* n n) 2) (- n 2)) 0))",
+        ))
         var charged = 0L
         val parent = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false

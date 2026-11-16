@@ -44,16 +44,10 @@ class ConflictAnalyzerTest {
             state.currentFactor = 0
             val marker = state.lazyReason(intArrayOf())
             val variable = if (integer) state.atomVarGe(0, 5) else 0
-            if (integer) {
-                check(state.tightenIntMin(0, 5, marker))
-            } else {
-                check(state.pinBool(0, true, marker))
-            }
-            val recorded = if (integer) {
-                state.atoms.ant[variable - problem.numBoolVars]
-            } else {
-                state.boolAntecedents[variable]
-            }
+            if (integer) check(state.tightenIntMin(0, 5, marker))
+            else check(state.pinBool(0, true, marker))
+            val recorded = if (integer) state.atoms.ant[variable - problem.numBoolVars]
+            else state.boolAntecedents[variable]
             val analyzer = ConflictAnalyzer(state)
             val work = state.work
             assertTrue(analyzer.deferredReason(variable))
@@ -85,12 +79,8 @@ class ConflictAnalyzerTest {
     fun `historical table replay should improve the minimized asserting backjump`() {
         val tuples = (0 until 8).flatMap { listOf(0L, (it / 4).toLong(), (it / 2 % 2).toLong(), (it % 2).toLong()) }
             .toLongArray() + longArrayOf(1, 0, 0, 1, 1, 1, 1, 0)
-        val problem = Problem(
-            1,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)),
-        )
+        val problem = Problem(1, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)))
         for (enabled in listOf(false, true)) {
             val state = PropagationState(problem, Assumptions.None)
             state.undoLogging = true
@@ -107,8 +97,7 @@ class ConflictAnalyzerTest {
             val seed = intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false))
 
             val learned = assertIs<ConflictAnalyzer.AnalysisResult.Learned>(
-                state.conflictAnalyzer.analyzeConflictClause(seed),
-            )
+                state.conflictAnalyzer.analyzeConflictClause(seed))
 
             assertTrue(learned.asserting)
             assertEquals(if (enabled) 1 else 2, learned.backjumpLevel)
@@ -121,12 +110,8 @@ class ConflictAnalyzerTest {
     fun `historical table replay should preserve the ordinary marker memo`() {
         val tuples = (0 until 8).flatMap { listOf(0L, (it / 4).toLong(), (it / 2 % 2).toLong(), (it % 2).toLong()) }
             .toLongArray() + longArrayOf(1, 0, 0, 1, 1, 1, 1, 0)
-        val problem = Problem(
-            1,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)),
-        )
+        val problem = Problem(1, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)))
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         state.historicalTableReasons = true
@@ -142,8 +127,7 @@ class ConflictAnalyzerTest {
         val ordinary = state.reasonOf(marker)!!.toList()
 
         state.conflictAnalyzer.analyzeConflictClause(
-            intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false)),
-        )
+            intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false)))
 
         assertEquals(ordinary, state.reasonOf(marker)!!.toList())
     }
@@ -152,12 +136,8 @@ class ConflictAnalyzerTest {
     fun `cancelled historical table analysis should discard unfinished learning`() {
         val tuples = (0 until 8).flatMap { listOf(0L, (it / 4).toLong(), (it / 2 % 2).toLong(), (it % 2).toLong()) }
             .toLongArray() + longArrayOf(1, 0, 0, 1, 1, 1, 1, 0)
-        val problem = Problem(
-            1,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)),
-        )
+        val problem = Problem(1, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1, 2, 3), tuples)))
         for (stop in 1..8) {
             val state = PropagationState(problem, Assumptions.None)
             state.undoLogging = true
@@ -175,28 +155,18 @@ class ConflictAnalyzerTest {
             state.finiteWork.cancellation = ExecutionControl { ++polls >= stop }
 
             val result = state.conflictAnalyzer.analyzeConflictClause(
-                intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false)),
-            )
+                intArrayOf(Lit.make(x, true), Lit.make(b, false), Lit.make(0, false)))
 
-            if (state.runCancelled) {
-                assertIs<ConflictAnalyzer.AnalysisResult.NotApplicable>(result)
-            } else {
-                assertIs<ConflictAnalyzer.AnalysisResult.Learned>(result)
-            }
+            if (state.runCancelled) assertIs<ConflictAnalyzer.AnalysisResult.NotApplicable>(result)
+            else assertIs<ConflictAnalyzer.AnalysisResult.Learned>(result)
             assertNull(state.historicalTableReason)
         }
     }
 
     @Test
     fun `historical table selection should leave extended reasons and scope premises intact`() {
-        val problem = Problem(
-            1,
-            2,
-            Array(2) { IntDomain(0, 1) },
-            arrayOf<Factor>(
-                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
-            ),
-        )
+        val problem = Problem(1, 2, Array(2) { IntDomain(0, 1) }, arrayOf<Factor>(
+            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0))))
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         check(state.pinBoolAsDecision(0, true))

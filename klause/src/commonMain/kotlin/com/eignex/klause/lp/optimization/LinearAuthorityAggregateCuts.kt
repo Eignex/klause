@@ -37,10 +37,8 @@ internal data class LinearAuthorityAggregateLimits(
     val allocation: Long = 1024L * 1024L,
 ) {
     init {
-        require(
-            rows >= 2 && support > 0 && scalarBits in 1..4096 &&
-                proofBytes >= 0L && work >= 0L && allocation >= 0L,
-        )
+        require(rows >= 2 && support > 0 && scalarBits in 1..4096 &&
+            proofBytes >= 0L && work >= 0L && allocation >= 0L)
     }
 }
 
@@ -57,28 +55,22 @@ internal object LinearAuthorityAggregateCuts {
     val pointSourcePairLimits = LinearAuthorityAggregateLimits()
 
     fun prepareSourcePairs(
-        source: SourceProofContext,
-        cancellation: ExecutionControl,
-        observe: (String, Long) -> Unit = { _, _ -> },
-        maximumCandidates: Int = 64,
+        source: SourceProofContext, cancellation: ExecutionControl,
+        observe: (String, Long) -> Unit = { _, _ -> }, maximumCandidates: Int = 64,
         limits: LinearAuthorityAggregateLimits = sourcePairLimits,
         point: Map<SourceCoordinate, Double>? = null,
     ): List<LinearAuthorityCut> {
         require(maximumCandidates in 0..64)
         val meter = AggregateMeter(limits, cancellation, observe)
-        val attemptLimits = limits.copy(
-            work = minOf(limits.work, 65_536L),
-            allocation = minOf(limits.allocation, 1_048_576L),
-        )
+        val attemptLimits = limits.copy(work = minOf(limits.work, 65_536L),
+            allocation = minOf(limits.allocation, 1_048_576L))
         val candidates = ArrayList<LinearAuthorityCut>()
         var eligibilityKnown = true
         var retainedContinuationUsed = false
         try {
             meter.reserve(source.premiseCount.toLong(), 512L)
             val rows = ArrayList<ProbeRow>()
-            val integerRows = if (point == null) {
-                null
-            } else {
+            val integerRows = if (point == null) null else {
                 meter.reserve(1L, 128L)
                 ArrayList<ProbeRow>()
             }
@@ -132,9 +124,7 @@ internal object LinearAuthorityAggregateCuts {
             val charge: (String, Long) -> Unit = { name, count ->
                 when (name) {
                     "AggregateWork" -> meter.reserve(count)
-
                     "AggregateAllocation" -> meter.reserve(0L, count)
-
                     else -> {
                         if (name.endsWith("Limit") || name == "AggregateStopped" || name.endsWith("Identity")) {
                             eligibilityKnown = false
@@ -148,39 +138,26 @@ internal object LinearAuthorityAggregateCuts {
                 override fun deadline() = cancellation.deadline()
             }
             val selectedBounds = if (point == null) bounds else pointBounds(bounds, point, meter, observe)
-            val integerBounds = if (point == null) {
-                null
-            } else {
+            val integerBounds = if (point == null) null else {
                 meter.reserve(1L, 64L)
                 IntegerBoundIndex(source)
             }
-            val extension = if (point == null) {
-                null
-            } else {
+            val extension = if (point == null) null else {
                 meter.reserve(1L, 320L)
-                PairExtension(
-                    incidence, selectedBounds, bounds, point, meter, attemptLimits, derivedStop,
-                    observe, checkNotNull(integerBounds),
-                )
+                PairExtension(incidence, selectedBounds, bounds, point, meter, attemptLimits, derivedStop,
+                    observe, checkNotNull(integerBounds))
             }
             if (!integerRows.isNullOrEmpty() && point != null) {
                 eligibilityKnown = false
                 meter.reserve(1L, 128L)
-                val integerLimits = attemptLimits.copy(
-                    work = minOf(meter.remainingWork / 4L, 16_384L),
-                    allocation = minOf(meter.remainingAllocation / 4L, 262_144L),
-                )
+                val integerLimits = attemptLimits.copy(work = minOf(meter.remainingWork / 4L, 16_384L),
+                    allocation = minOf(meter.remainingAllocation / 4L, 262_144L))
                 val integerMeter = AggregateMeter(integerLimits, derivedStop, charge)
                 try {
                     integerMeter.reserve(1L, 320L)
-                    PairExtension(
-                        incidence, selectedBounds, bounds, point, integerMeter, integerLimits,
-                        derivedStop, charge, checkNotNull(integerBounds),
-                    ).integerRows(
-                        integerRows,
-                        candidates,
-                        maximumCandidates,
-                    )
+                    PairExtension(incidence, selectedBounds, bounds, point, integerMeter, integerLimits,
+                        derivedStop, charge, checkNotNull(integerBounds)).integerRows(
+                        integerRows, candidates, maximumCandidates)
                 } catch (stop: AggregateStop) {
                     charge("AggregateInteger" + stop.reason, 1L)
                 }
@@ -201,27 +178,15 @@ internal object LinearAuthorityAggregateCuts {
                         if (candidates.size >= maximumCandidates) stopAggregate("RetentionLimit")
                         observe("AggregatePairAttempts", 1L)
                         val pivot = other.coefficients.getValue(id)
-                        val rightWeight = meter.number(
-                            if (coefficient > BigFraction.ZERO) {
-                                coefficient
-                            } else {
-                                coefficient.negated()
-                            },
-                        )
+                        val rightWeight = meter.number(if (coefficient > BigFraction.ZERO) coefficient
+                            else coefficient.negated())
                         val leftWeight = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
                         meter.reserve(1L, 320L)
                         val terms = listOf(row.term.copy(weight = leftWeight), other.term.copy(weight = rightWeight))
                         val snapshots = listOf(row.coefficients, other.coefficients)
-                        var cut = deriveWithCoefficients(
-                            terms,
-                            derivedStop,
-                            charge,
-                            attemptLimits,
-                            allowMixed = true,
-                            continuousBounds = selectedBounds,
-                            coefficientSnapshots = snapshots,
-                            capture = extension?.capture,
-                        )
+                        var cut = deriveWithCoefficients(terms, derivedStop, charge, attemptLimits,
+                            allowMixed = true, continuousBounds = selectedBounds,
+                            coefficientSnapshots = snapshots, capture = extension?.capture)
                         var continuedAfterRetention = false
                         if (point != null) {
                             val initial = cut
@@ -259,10 +224,8 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     private fun redundantContinuation(
-        candidate: LinearAuthorityCut,
-        retained: List<LinearAuthorityCut>,
-        meter: AggregateMeter,
-        limits: LinearAuthorityAggregateLimits,
+        candidate: LinearAuthorityCut, retained: List<LinearAuthorityCut>,
+        meter: AggregateMeter, limits: LinearAuthorityAggregateLimits,
     ): Boolean {
         for (earlier in retained) {
             meter.reserve(1L + candidate.owners.size + earlier.owners.size)
@@ -271,48 +234,36 @@ internal object LinearAuthorityAggregateCuts {
             meter.reserve(support * (1L + (limits.scalarBits + 63L) / 64L))
             if (candidate.inequality != earlier.inequality) continue
             if (sourcePremisesOnly(candidate.derivation, meter, limits) &&
-                sourcePremisesOnly(earlier.derivation, meter, limits)
-            ) {
-                return true
-            }
+                sourcePremisesOnly(earlier.derivation, meter, limits)) return true
         }
         return false
     }
 
     private fun sourcePremisesOnly(
-        proof: SourceDerivation,
-        meter: AggregateMeter,
-        limits: LinearAuthorityAggregateLimits,
-        depth: Int = 0,
+        proof: SourceDerivation, meter: AggregateMeter, limits: LinearAuthorityAggregateLimits, depth: Int = 0,
     ): Boolean {
         meter.reserve(1L)
         if (depth >= 8) return false
         return when (proof) {
             is SourceDerivation.Premise -> true
-
             is SourceDerivation.IntegerRounding -> sourcePremisesOnly(proof.inequality, meter, limits, depth + 1)
-
             is SourceDerivation.MixedIntegerRounding -> {
                 meter.reserve(limits.support.toLong() + 1L, 64L + limits.support * 16L)
                 sourcePremisesOnly(proof.inequality, meter, limits, depth + 1) &&
                     proof.bounds.all { sourcePremisesOnly(it, meter, limits, depth + 1) }
             }
-
             is SourceDerivation.Combination -> {
                 val terms = limits.support.toLong() + limits.rows + 1L
                 meter.reserve(terms, 64L + terms * 16L)
                 proof.terms.all { sourcePremisesOnly(it.derivation, meter, limits, depth + 1) }
             }
-
             else -> false
         }
     }
 
     private fun admitPointRowOrder(
-        rows: List<ProbeRow>,
-        incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
-        meter: AggregateMeter,
-        observe: (String, Long) -> Unit,
+        rows: List<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, List<ProbeRow>>,
+        meter: AggregateMeter, observe: (String, Long) -> Unit,
     ): Boolean {
         if (rows.size < 3) return false
         meter.reserve(rows.size.toLong() + incidence.size * 2L, 128L)
@@ -327,8 +278,7 @@ internal object LinearAuthorityAggregateCuts {
         val allocation = 192L + rows.size * 80L + (entries + rows.size) * 96L +
             references * 16L + incidence.size * 64L
         if (projectionWork + comparisonWork > meter.remainingWork / 2L ||
-            allocation > meter.remainingAllocation / 2L
-        ) {
+            allocation > meter.remainingAllocation / 2L) {
             observe("AggregatePointRowOrderDeclined", 1L)
             return false
         }
@@ -336,11 +286,8 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     private fun orderPointRows(
-        rows: MutableList<ProbeRow>,
-        incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>,
-        point: Map<SourceCoordinate, Double>,
-        meter: AggregateMeter,
-        observe: (String, Long) -> Unit,
+        rows: MutableList<ProbeRow>, incidence: Map<Pair<SourceCoordinate, Boolean>, MutableList<ProbeRow>>,
+        point: Map<SourceCoordinate, Double>, meter: AggregateMeter, observe: (String, Long) -> Unit,
         source: SourceProofContext,
     ) {
         if (!admitPointRowOrder(rows, incidence, meter, observe)) return
@@ -388,11 +335,8 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     private fun prioritizeScopedRows(
-        rows: MutableList<ProbeRow>,
-        priorities: Map<Int, Double>,
-        source: SourceProofContext,
-        meter: AggregateMeter,
-        observe: (String, Long) -> Unit,
+        rows: MutableList<ProbeRow>, priorities: Map<Int, Double>, source: SourceProofContext,
+        meter: AggregateMeter, observe: (String, Long) -> Unit,
     ) {
         val condition = source.scope.condition
         if (!condition.hasNumericBounds) return
@@ -409,38 +353,27 @@ internal object LinearAuthorityAggregateCuts {
         for (row in rows) {
             meter.reserve(1L)
             var relevant = false
-            if (priorities.getValue(row.term.owner).isFinite()) {
-                for (id in row.coefficients.keys) {
-                    meter.reserve(3L)
-                    if (id.kind == SourceCoordinate.Kind.Integer &&
-                        (condition.boundValue(id, false) != null || condition.boundValue(id, true) != null)
-                    ) {
-                        relevant = true
-                    }
-                }
+            if (priorities.getValue(row.term.owner).isFinite()) for (id in row.coefficients.keys) {
+                meter.reserve(3L)
+                if (id.kind == SourceCoordinate.Kind.Integer &&
+                    (condition.boundValue(id, false) != null || condition.boundValue(id, true) != null)) relevant = true
             }
             if (relevant) {
                 scoped += row
                 observe("AggregatePointScopedRows", 1L)
-            } else {
-                other += row
-            }
+            } else other += row
         }
         var index = 0
-        for (group in listOf(scoped, other)) {
-            for (row in group) {
-                meter.reserve(1L)
-                rows[index++] = row
-            }
+        for (group in listOf(scoped, other)) for (row in group) {
+            meter.reserve(1L)
+            rows[index++] = row
         }
         observe("AggregatePointScopedOrderComplete", 1L)
     }
 
     private fun pointBounds(
         bounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm>,
-        point: Map<SourceCoordinate, Double>,
-        meter: AggregateMeter,
-        observe: (String, Long) -> Unit,
+        point: Map<SourceCoordinate, Double>, meter: AggregateMeter, observe: (String, Long) -> Unit,
     ): Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> {
         meter.reserve(bounds.size.toLong(), 128L + bounds.size * 96L)
         val selected = HashMap(bounds)
@@ -471,9 +404,7 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     private fun separates(
-        cut: LinearAuthorityCut,
-        point: Map<SourceCoordinate, Double>,
-        meter: AggregateMeter,
+        cut: LinearAuthorityCut, point: Map<SourceCoordinate, Double>, meter: AggregateMeter,
         observe: (String, Long) -> Unit,
     ): Boolean? {
         meter.reserve(1L, 256L)
@@ -503,17 +434,14 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     private class ProbeRow(
-        val term: LinearAuthorityAggregateTerm,
-        val coefficients: Map<SourceCoordinate, BigFraction>,
+        val term: LinearAuthorityAggregateTerm, val coefficients: Map<SourceCoordinate, BigFraction>,
     ) {
         val realCount = coefficients.keys.count { it.kind == SourceCoordinate.Kind.Real }
         val hasInteger = coefficients.keys.any { it.kind == SourceCoordinate.Kind.Integer }
     }
 
     private fun integerScale(
-        values: Collection<BigFraction>,
-        meter: AggregateMeter,
-        observe: (String, Long) -> Unit,
+        values: Collection<BigFraction>, meter: AggregateMeter, observe: (String, Long) -> Unit,
     ): BigFraction {
         meter.reserve(values.size.toLong(), 64L)
         var allIntegral = true
@@ -545,19 +473,14 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     private class IntegerAggregate(
-        val coefficients: Map<SourceCoordinate, BigFraction>,
-        val rhs: BigFraction,
-        val strict: Boolean,
-        val combination: SourceDerivation.Combination,
-        val terms: List<LinearAuthorityAggregateTerm>,
+        val coefficients: Map<SourceCoordinate, BigFraction>, val rhs: BigFraction, val strict: Boolean,
+        val combination: SourceDerivation.Combination, val terms: List<LinearAuthorityAggregateTerm>,
         val proofBytes: Long,
     )
 
     private class HalfIntegerCut(
-        val cut: LinearAuthorityCut,
-        val coefficients: Map<SourceCoordinate, BigFraction>,
-        val rhs: BigFraction,
-        val strictSources: Int,
+        val cut: LinearAuthorityCut, val coefficients: Map<SourceCoordinate, BigFraction>,
+        val rhs: BigFraction, val strictSources: Int,
     )
 
     private class AggregateCapture {
@@ -568,25 +491,18 @@ internal object LinearAuthorityAggregateCuts {
     private fun halfHasNoIntegerActivity(
         aggregate: IntegerAggregate,
         bounds: IntegerBoundIndex,
-        meter: AggregateMeter,
-        observe: (String, Long) -> Unit,
-        upperChoices: Set<SourceCoordinate>,
+        meter: AggregateMeter, observe: (String, Long) -> Unit, upperChoices: Set<SourceCoordinate>,
     ): Boolean {
         for ((id, value) in aggregate.coefficients) {
             meter.reserve(1L)
             observe("AggregateHalfPreviewCoordinates", 1L)
             if (id.kind != SourceCoordinate.Kind.Integer ||
-                (value != BigFraction.ONE && value != BigFraction.MINUS_ONE)
-            ) {
-                return false
-            }
+                (value != BigFraction.ONE && value != BigFraction.MINUS_ONE)) return false
             val lower = bounds.lookup(id, false, meter)
             val upper = lower == null || id in upperChoices
             if (upper) {
                 if (bounds.lookup(id, true, meter) == null || value != BigFraction.MINUS_ONE) return false
-            } else if (value != BigFraction.ONE) {
-                return false
-            }
+            } else if (value != BigFraction.ONE) return false
         }
         return true
     }
@@ -594,9 +510,7 @@ internal object LinearAuthorityAggregateCuts {
     private fun halfIntegerCut(
         aggregate: IntegerAggregate,
         bounds: IntegerBoundIndex,
-        cancellation: ExecutionControl,
-        observe: (String, Long) -> Unit,
-        limits: LinearAuthorityAggregateLimits,
+        cancellation: ExecutionControl, observe: (String, Long) -> Unit, limits: LinearAuthorityAggregateLimits,
         upperChoices: Set<SourceCoordinate> = emptySet(),
     ): HalfIntegerCut? {
         val meter = AggregateMeter(limits, cancellation, observe)
@@ -632,22 +546,14 @@ internal object LinearAuthorityAggregateCuts {
                     proofBytes += bytes
                     meter.reserve(bound.identityBytes / 2L + 1L, bytes)
                     if ((bound.owner == null && bound.derivation !is SourceDerivation.Assumption) ||
-                        bound.inequality.supportSize != 1
-                    ) {
-                        stopAggregate("BoundIdentity")
-                    }
+                        bound.inequality.supportSize != 1) stopAggregate("BoundIdentity")
                     val (coordinate, coefficient) = bound.inequality.coefficients.entries.single()
                     if (coordinate != id || (coefficient > BigFraction.ZERO) != upper) {
                         stopAggregate("BoundIdentity")
                     }
                     meter.arithmetic(value, BigFraction.ONE)
-                    val rounded = meter.number(
-                        if (upper) {
-                            BigFraction.of(value.ceilInteger(), BIG_ONE)
-                        } else {
-                            BigFraction.of(value.negated().ceilInteger(), BIG_ONE).negated()
-                        },
-                    )
+                    val rounded = meter.number(if (upper) BigFraction.of(value.ceilInteger(), BIG_ONE)
+                        else BigFraction.of(value.negated().ceilInteger(), BIG_ONE).negated())
                     val delta = meter.add(rounded, meter.number(value.negated()))
                     meter.number(coefficient)
                     meter.arithmetic(BigFraction.ONE, coefficient)
@@ -666,24 +572,15 @@ internal object LinearAuthorityAggregateCuts {
                 return null
             }
             meter.arithmetic(rhs, BigFraction.ONE)
-            val rounded = meter.number(
-                if (strictSources > 0) {
-                    BigFraction.of(rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
-                } else {
-                    BigFraction.of(rhs.negated().ceilInteger(), BIG_ONE).negated()
-                },
-            )
+            val rounded = meter.number(if (strictSources > 0)
+                BigFraction.of(rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
+                else BigFraction.of(rhs.negated().ceilInteger(), BIG_ONE).negated())
             meter.reserve(1L)
             val proof = SourceDerivation.IntegerRounding(SourceDerivation.Combination(proofTerms))
             observe("AggregateCandidates", 1L)
             observe("AggregateHalfCandidates", 1L)
-            val cut = LinearAuthorityCut(
-                aggregate.terms.first().owner,
-                SourceInequality(coefficients, rounded),
-                proof,
-                owners = owners,
-                family = CutFamily.AGGREGATION_MIR,
-            )
+            val cut = LinearAuthorityCut(aggregate.terms.first().owner, SourceInequality(coefficients, rounded), proof,
+                owners = owners, family = CutFamily.AGGREGATION_MIR)
             HalfIntegerCut(cut, coefficients, rhs, strictSources)
         } catch (stop: AggregateStop) {
             observe("AggregateHalf${stop.reason}", 1L)
@@ -695,9 +592,7 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     private class IntegerBound(
-        val owner: Int?,
-        val inequality: SourceInequality,
-        val derivation: SourceDerivation,
+        val owner: Int?, val inequality: SourceInequality, val derivation: SourceDerivation,
         val identityBytes: Long,
     )
 
@@ -710,8 +605,7 @@ internal object LinearAuthorityAggregateCuts {
         private var singletonCoordinates: Array<SourceCoordinate?>? = null
 
         fun prepare(
-            coefficients: Map<SourceCoordinate, BigFraction>,
-            meter: AggregateMeter,
+            coefficients: Map<SourceCoordinate, BigFraction>, meter: AggregateMeter,
             observe: (String, Long) -> Unit,
         ) {
             meter.reserve(coefficients.size.toLong(), 128L + coefficients.size * 64L)
@@ -762,34 +656,25 @@ internal object LinearAuthorityAggregateCuts {
                 observe("AggregateIntegerBoundRetained", 1L)
             }
             observe("AggregateIntegerBoundSourceScanComplete", 1L)
-            if (source.scope.condition.hasNumericBounds) {
-                for (id in missing) {
-                    meter.reserve(1L)
-                    if (id.kind != SourceCoordinate.Kind.Integer) continue
-                    for (upper in listOf(false, true)) {
-                        meter.reserve(2L, 64L)
-                        val value = source.scope.condition.boundValue(id, upper) ?: continue
-                        meter.number(value)
-                        val side = id to upper
-                        val original = pending[side]
-                        if (original != null) {
-                            val coefficient = meter.number(checkNotNull(original.inequality.coefficient(id)))
-                            val rhs = meter.number(original.inequality.rhs)
-                            if (meter.multiply(coefficient, value) >= rhs) continue
-                        }
-                        meter.reserve(4L, 320L)
-                        val sign = if (upper) BigFraction.ONE else BigFraction.MINUS_ONE
-                        pending[side] = IntegerBound(
-                            null,
-                            SourceInequality(
-                                mapOf(id to sign),
-                                meter.multiply(sign, value),
-                            ),
-                            SourceDerivation.Assumption(id, upper),
-                            32L,
-                        )
-                        observe("AggregateIntegerBoundScopedRetained", 1L)
+            if (source.scope.condition.hasNumericBounds) for (id in missing) {
+                meter.reserve(1L)
+                if (id.kind != SourceCoordinate.Kind.Integer) continue
+                for (upper in listOf(false, true)) {
+                    meter.reserve(2L, 64L)
+                    val value = source.scope.condition.boundValue(id, upper) ?: continue
+                    meter.number(value)
+                    val side = id to upper
+                    val original = pending[side]
+                    if (original != null) {
+                        val coefficient = meter.number(checkNotNull(original.inequality.coefficient(id)))
+                        val rhs = meter.number(original.inequality.rhs)
+                        if (meter.multiply(coefficient, value) >= rhs) continue
                     }
+                    meter.reserve(4L, 320L)
+                    val sign = if (upper) BigFraction.ONE else BigFraction.MINUS_ONE
+                    pending[side] = IntegerBound(null, SourceInequality(mapOf(id to sign),
+                        meter.multiply(sign, value)), SourceDerivation.Assumption(id, upper), 32L)
+                    observe("AggregateIntegerBoundScopedRetained", 1L)
                 }
             }
             val size = completed?.size ?: 0
@@ -805,7 +690,9 @@ internal object LinearAuthorityAggregateCuts {
             observe("AggregateIntegerBoundScanComplete", 1L)
         }
 
-        fun lookup(id: SourceCoordinate, upper: Boolean, meter: AggregateMeter): IntegerBound? {
+        fun lookup(
+            id: SourceCoordinate, upper: Boolean, meter: AggregateMeter,
+        ): IntegerBound? {
             val batches = completed ?: return null
             meter.reserve(1L, 64L)
             val side = id to upper
@@ -843,8 +730,7 @@ internal object LinearAuthorityAggregateCuts {
         }
 
         private fun continuation(
-            terms: List<LinearAuthorityAggregateTerm>,
-            aggregate: Map<SourceCoordinate, BigFraction>,
+            terms: List<LinearAuthorityAggregateTerm>, aggregate: Map<SourceCoordinate, BigFraction>,
             snapshots: List<Map<SourceCoordinate, BigFraction>>,
         ): Continuation? {
             meter.reserve(snapshots.size.toLong(), 128L + snapshots.size * 32L)
@@ -909,10 +795,7 @@ internal object LinearAuthorityAggregateCuts {
         }
 
         private fun cancelsTerm(
-            row: ProbeRow,
-            terms: List<LinearAuthorityAggregateTerm>,
-            residual: BigFraction,
-            pivot: BigFraction,
+            row: ProbeRow, terms: List<LinearAuthorityAggregateTerm>, residual: BigFraction, pivot: BigFraction,
         ): Boolean {
             if (row.term.inequality.strict) return false
             for (term in terms) {
@@ -971,16 +854,9 @@ internal object LinearAuthorityAggregateCuts {
                     val second = rows[right]
                     val terms = listOf(first.term, second.term)
                     val snapshots = listOf(first.coefficients, second.coefficients)
-                    var cut = deriveWithCoefficients(
-                        terms,
-                        cancellation,
-                        charge,
-                        limits,
-                        allowMixed = false,
-                        continuousBounds = emptyMap(),
-                        coefficientSnapshots = snapshots,
-                        capture = capture,
-                    )
+                    var cut = deriveWithCoefficients(terms, cancellation, charge, limits,
+                        allowMixed = false, continuousBounds = emptyMap(),
+                        coefficientSnapshots = snapshots, capture = capture)
                     val separating = if (cut == null) false else separates(cut, point, meter, observe)
                     if (separating == null) continue
                     if (!separating) cut = halfInteger()
@@ -1005,27 +881,16 @@ internal object LinearAuthorityAggregateCuts {
                 val scale = integerScale(row.coefficients.values, meter, observe)
                 val unitScale = scale == BigFraction.ONE
                 observe(if (unitScale) "AggregateIntegerRowUnitScale" else "AggregateIntegerRowScaled", 1L)
-                val normalized = if (unitScale) {
-                    row.coefficients
-                } else {
+                val normalized = if (unitScale) row.coefficients else {
                     meter.reserve(row.coefficients.size.toLong(), row.coefficients.size * 96L)
                     row.coefficients.mapValues { (_, value) -> meter.multiply(value, scale) }
                 }
                 val originalRhs = meter.number(term.inequality.rhs)
                 val rhs = if (unitScale) originalRhs else meter.multiply(originalRhs, scale)
-                val combination = SourceDerivation.Combination(
-                    listOf(
-                        SourceDerivation.Combination.Term(scale, SourceDerivation.Premise(term.premise)),
-                    ),
-                )
-                capture.integer = IntegerAggregate(
-                    normalized,
-                    rhs,
-                    term.inequality.strict,
-                    combination,
-                    listOf(term),
-                    proofBytes,
-                )
+                val combination = SourceDerivation.Combination(listOf(
+                    SourceDerivation.Combination.Term(scale, SourceDerivation.Premise(term.premise))))
+                capture.integer = IntegerAggregate(normalized, rhs, term.inequality.strict,
+                    combination, listOf(term), proofBytes)
                 observe("AggregateIntegerRowNormalized", 1L)
                 halfInteger()
             } catch (stop: AggregateStop) {
@@ -1045,9 +910,7 @@ internal object LinearAuthorityAggregateCuts {
                     observe("AggregateHalfEligible", 1L)
                     return initial.cut
                 }
-
                 null -> return null
-
                 false -> Unit
             }
             val side = integerSide(aggregate, bounds, initial)
@@ -1070,7 +933,9 @@ internal object LinearAuthorityAggregateCuts {
             return alternative.cut
         }
 
-        private fun integerPointSides(aggregate: IntegerAggregate, bounds: IntegerBoundIndex): Set<SourceCoordinate>? {
+        private fun integerPointSides(
+            aggregate: IntegerAggregate, bounds: IntegerBoundIndex,
+        ): Set<SourceCoordinate>? {
             meter.reserve(1L, 128L)
             val selected = linkedSetOf<SourceCoordinate>()
             val half = meter.number(BigFraction.ofLong(2).reciprocal())
@@ -1103,8 +968,7 @@ internal object LinearAuthorityAggregateCuts {
 
         private fun integerSide(
             aggregate: IntegerAggregate,
-            bounds: IntegerBoundIndex,
-            initial: HalfIntegerCut,
+            bounds: IntegerBoundIndex, initial: HalfIntegerCut,
         ): SourceCoordinate? {
             meter.reserve(1L, 128L)
             var activity = 0.0
@@ -1141,13 +1005,9 @@ internal object LinearAuthorityAggregateCuts {
                 val strictSources = initial.strictSources - (if (lower.inequality.strict) 1 else 0) +
                     (if (upper.inequality.strict) 1 else 0)
                 meter.arithmetic(rhs, BigFraction.ONE)
-                val rounded = meter.number(
-                    if (strictSources > 0) {
-                        BigFraction.of(rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
-                    } else {
-                        BigFraction.of(rhs.negated().ceilInteger(), BIG_ONE).negated()
-                    },
-                )
+                val rounded = meter.number(if (strictSources > 0)
+                    BigFraction.of(rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
+                    else BigFraction.of(rhs.negated().ceilInteger(), BIG_ONE).negated())
                 meter.reserve(8L)
                 val coefficient = initial.coefficients.getValue(id).toDouble()
                 val norm = sqrt(normSquared + 2.0 * coefficient + 1.0)
@@ -1163,16 +1023,13 @@ internal object LinearAuthorityAggregateCuts {
         }
 
         private fun preferredSide(
-            terms: List<LinearAuthorityAggregateTerm>,
-            snapshots: List<Map<SourceCoordinate, BigFraction>>,
+            terms: List<LinearAuthorityAggregateTerm>, snapshots: List<Map<SourceCoordinate, BigFraction>>,
         ): LinearAuthorityCut? {
             if (continuousBounds.size == preferredBounds.size) return null
             val aggregate = capture.coefficients ?: return null
             meter.reserve(aggregate.size.toLong(), 128L)
             val different = aggregate.any { (id, value) ->
-                if (id.kind != SourceCoordinate.Kind.Real) {
-                    false
-                } else {
+                if (id.kind != SourceCoordinate.Kind.Real) false else {
                     meter.reserve(1L, 64L)
                     val preferred = id to (value > BigFraction.ZERO)
                     preferred in preferredBounds && preferred !in continuousBounds
@@ -1181,16 +1038,8 @@ internal object LinearAuthorityAggregateCuts {
             if (!different) return null
             attempted = true
             observe("AggregatePreferredSideAttempts", 1L)
-            val cut = deriveWithCoefficients(
-                terms,
-                cancellation,
-                charge,
-                limits,
-                allowMixed = true,
-                continuousBounds = preferredBounds,
-                coefficientSnapshots = snapshots,
-                capture = capture,
-            )
+            val cut = deriveWithCoefficients(terms, cancellation, charge, limits, allowMixed = true,
+                continuousBounds = preferredBounds, coefficientSnapshots = snapshots, capture = capture)
                 ?: return null
             if (separates(cut, point, meter, observe) != true) return null
             observe("AggregatePreferredSideEligible", 1L)
@@ -1198,8 +1047,7 @@ internal object LinearAuthorityAggregateCuts {
         }
 
         fun extend(
-            seed: List<LinearAuthorityAggregateTerm>,
-            seedCoefficients: List<Map<SourceCoordinate, BigFraction>>,
+            seed: List<LinearAuthorityAggregateTerm>, seedCoefficients: List<Map<SourceCoordinate, BigFraction>>,
         ): LinearAuthorityCut? {
             attempted = false
             var terms = seed
@@ -1212,20 +1060,10 @@ internal object LinearAuthorityAggregateCuts {
                 if (terms.size >= minOf(4, limits.rows)) return null
                 val aggregate = capture.coefficients ?: return null
                 val next = continuation(terms, aggregate, snapshots) ?: return null
-                val existingScale = meter.number(
-                    if (next.pivot > BigFraction.ZERO) {
-                        next.pivot
-                    } else {
-                        next.pivot.negated()
-                    },
-                )
-                val appendedScale = meter.number(
-                    if (next.residual > BigFraction.ZERO) {
-                        next.residual
-                    } else {
-                        next.residual.negated()
-                    },
-                )
+                val existingScale = meter.number(if (next.pivot > BigFraction.ZERO) next.pivot
+                    else next.pivot.negated())
+                val appendedScale = meter.number(if (next.residual > BigFraction.ZERO) next.residual
+                    else next.residual.negated())
                 meter.reserve(terms.size + 1L, 128L + (terms.size + 1L) * 160L)
                 terms = terms.map { it.copy(weight = meter.multiply(it.weight, existingScale)) } +
                     next.row.term.copy(weight = appendedScale)
@@ -1233,16 +1071,8 @@ internal object LinearAuthorityAggregateCuts {
                 attempted = true
                 observe("AggregateExtendedAttempts", 1L)
                 observe(if (terms.size == 3) "AggregateThreeRowAttempts" else "AggregateFourRowAttempts", 1L)
-                val cut = deriveWithCoefficients(
-                    terms,
-                    cancellation,
-                    charge,
-                    limits,
-                    allowMixed = true,
-                    continuousBounds = continuousBounds,
-                    coefficientSnapshots = snapshots,
-                    capture = capture,
-                )
+                val cut = deriveWithCoefficients(terms, cancellation, charge, limits, allowMixed = true,
+                    continuousBounds = continuousBounds, coefficientSnapshots = snapshots, capture = capture)
                     ?: continue
                 val separating = separates(cut, point, meter, observe) ?: return null
                 if (separating) {
@@ -1254,10 +1084,8 @@ internal object LinearAuthorityAggregateCuts {
     }
 
     fun inspectPairs(
-        rows: List<LinearAuthorityAggregateTerm>,
-        inactive: Set<Int>,
-        point: Map<SourceCoordinate, BigFraction>,
-        cancellation: ExecutionControl,
+        rows: List<LinearAuthorityAggregateTerm>, inactive: Set<Int>,
+        point: Map<SourceCoordinate, BigFraction>, cancellation: ExecutionControl,
         observe: (String, Long) -> Unit = { _, _ -> },
         limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(),
         maximumCandidates: Int = 64,
@@ -1301,9 +1129,7 @@ internal object LinearAuthorityAggregateCuts {
                 meter.reserve(row.supportSize.toLong(), row.supportSize * 64L)
                 val coefficients = row.coefficients
                 val value = residual(row, coefficients)
-                if (value == null) {
-                    pointKnown = false
-                } else {
+                if (value == null) pointKnown = false else {
                     maximumResidual = maximumResidual?.let { if (it > value) it else value } ?: value
                     if (value > BigFraction.ZERO || (row.strict && value.isZero)) pointSatisfied = false
                 }
@@ -1319,8 +1145,7 @@ internal object LinearAuthorityAggregateCuts {
                     }
                 }
                 if (coefficients.keys.any { it.kind == SourceCoordinate.Kind.Real } &&
-                    coefficients.keys.none { it.kind == SourceCoordinate.Kind.Boolean }
-                ) {
+                    coefficients.keys.none { it.kind == SourceCoordinate.Kind.Boolean }) {
                     continuous += ProbeRow(term, coefficients)
                 }
             }
@@ -1328,15 +1153,10 @@ internal object LinearAuthorityAggregateCuts {
             val charge: (String, Long) -> Unit = { stage, count ->
                 when (stage) {
                     "AggregateWork" -> meter.reserve(count)
-
                     "AggregateAllocation" -> meter.reserve(0L, count)
-
                     else -> {
                         if (stage.endsWith("Limit") || stage == "AggregateStopped" ||
-                            stage.endsWith("Identity")
-                        ) {
-                            eligibilityKnown = false
-                        }
+                            stage.endsWith("Identity")) eligibilityKnown = false
                         observe(stage, count)
                     }
                 }
@@ -1359,8 +1179,7 @@ internal object LinearAuthorityAggregateCuts {
                         meter.reserve(1L)
                         val other = b.coefficients[entry.key]
                         if (entry.key.kind == SourceCoordinate.Kind.Real && other != null &&
-                            (entry.value > BigFraction.ZERO) != (other > BigFraction.ZERO)
-                        ) {
+                            (entry.value > BigFraction.ZERO) != (other > BigFraction.ZERO)) {
                             pivots += entry
                             if (!allowMixed) break
                         }
@@ -1371,14 +1190,8 @@ internal object LinearAuthorityAggregateCuts {
                         val other = b.coefficients.getValue(pivot.key)
                         val aWeight = if (other > BigFraction.ZERO) other else other.negated()
                         val bWeight = if (pivot.value > BigFraction.ZERO) pivot.value else pivot.value.negated()
-                        val cut = derive(
-                            listOf(a.term.copy(weight = aWeight), b.term.copy(weight = bWeight)),
-                            derivedStop,
-                            charge,
-                            limits,
-                            allowMixed,
-                            bounds,
-                        ) ?: continue
+                        val cut = derive(listOf(a.term.copy(weight = aWeight), b.term.copy(weight = bWeight)),
+                            derivedStop, charge, limits, allowMixed, bounds) ?: continue
                         val violation = residual(cut.inequality, cut.inequality.coefficients)
                         if (violation == null) {
                             candidatesKnown = false
@@ -1399,41 +1212,22 @@ internal object LinearAuthorityAggregateCuts {
         } catch (stop: AggregateStop) {
             observe("AggregateProbe${stop.reason}", 1L)
         }
-        return LinearAuthorityAggregateProbeResult(
-            candidates.toList(),
-            violations.toList(),
-            if (!pointSatisfied) {
-                false
-            } else if (pointKnown && sourceScanComplete) {
-                true
-            } else {
-                null
-            },
-            maximumResidual,
-            complete,
-        )
+        return LinearAuthorityAggregateProbeResult(candidates.toList(), violations.toList(),
+            if (!pointSatisfied) false else if (pointKnown && sourceScanComplete) true else null,
+            maximumResidual, complete)
     }
 
     fun derive(
-        terms: List<LinearAuthorityAggregateTerm>,
-        cancellation: ExecutionControl,
+        terms: List<LinearAuthorityAggregateTerm>, cancellation: ExecutionControl,
         observe: (String, Long) -> Unit = { _, _ -> },
         limits: LinearAuthorityAggregateLimits = LinearAuthorityAggregateLimits(),
         allowMixed: Boolean = false,
         continuousBounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> = emptyMap(),
-    ): LinearAuthorityCut? = deriveWithCoefficients(
-        terms,
-        cancellation,
-        observe,
-        limits,
-        allowMixed,
-        continuousBounds,
-        coefficientSnapshots = null,
-    )
+    ): LinearAuthorityCut? = deriveWithCoefficients(terms, cancellation, observe, limits, allowMixed,
+        continuousBounds, coefficientSnapshots = null)
 
     private fun deriveWithCoefficients(
-        terms: List<LinearAuthorityAggregateTerm>,
-        cancellation: ExecutionControl,
+        terms: List<LinearAuthorityAggregateTerm>, cancellation: ExecutionControl,
         observe: (String, Long) -> Unit,
         limits: LinearAuthorityAggregateLimits,
         allowMixed: Boolean,
@@ -1455,10 +1249,7 @@ internal object LinearAuthorityAggregateCuts {
             meter.reserve(identityCharacters, proofBytes)
             if (terms.any { it.owner < 0 || it.premise.isBlank() } ||
                 terms.map { it.owner }.distinct().size != terms.size ||
-                terms.map { it.premise }.distinct().size != terms.size
-            ) {
-                stopAggregate("SourceIdentity")
-            }
+                terms.map { it.premise }.distinct().size != terms.size) stopAggregate("SourceIdentity")
             val coefficients = linkedMapOf<SourceCoordinate, BigFraction>()
             var rhs = BigFraction.ZERO
             var strict = false
@@ -1495,14 +1286,10 @@ internal object LinearAuthorityAggregateCuts {
             val normalized = activity.mapValues { (_, value) -> meter.multiply(value, scale) }
             val scaledRhs = meter.multiply(rhs, scale)
             meter.reserve(terms.size.toLong() + normalized.size, terms.size * 128L + normalized.size * 64L)
-            val combination = SourceDerivation.Combination(
-                terms.map {
-                    SourceDerivation.Combination.Term(
-                        meter.multiply(it.weight, scale),
-                        SourceDerivation.Premise(it.premise),
-                    )
-                },
-            )
+            val combination = SourceDerivation.Combination(terms.map {
+                SourceDerivation.Combination.Term(meter.multiply(it.weight, scale),
+                    SourceDerivation.Premise(it.premise))
+            })
             if (capture != null && !mixed) {
                 meter.reserve(1L, 128L)
                 capture.integer = IntegerAggregate(normalized, scaledRhs, strict, combination, terms, proofBytes)
@@ -1524,10 +1311,7 @@ internal object LinearAuthorityAggregateCuts {
                     proofBytes += bytes
                     meter.reserve(bound.premise.length.toLong() + 1L, bytes)
                     if (bound.owner < 0 || bound.premise.isBlank() || bound.weight != BigFraction.ONE ||
-                        bound.inequality.supportSize != 1
-                    ) {
-                        stopAggregate("BoundIdentity")
-                    }
+                        bound.inequality.supportSize != 1) stopAggregate("BoundIdentity")
                     val (coordinate, coefficient) = bound.inequality.coefficients.entries.single()
                     if (coordinate != id || (coefficient > BigFraction.ZERO) != side.second) {
                         stopAggregate("BoundIdentity")
@@ -1536,14 +1320,9 @@ internal object LinearAuthorityAggregateCuts {
                     meter.number(bound.inequality.rhs)
                     bound
                 }
-                val conclusion = mixedIntegerRounding(
-                    SourceInequality(normalized, scaledRhs, strict),
+                val conclusion = mixedIntegerRounding(SourceInequality(normalized, scaledRhs, strict),
                     sides.map { it.inequality },
-                    ExecutionControl {
-                        meter.reserve(1L)
-                        cancellation()
-                    },
-                ) { left, right ->
+                        ExecutionControl { meter.reserve(1L); cancellation() }) { left, right ->
                     meter.number(left)
                     meter.number(right)
                     meter.arithmetic(left, right)
@@ -1553,30 +1332,18 @@ internal object LinearAuthorityAggregateCuts {
                     return null
                 }
                 for (value in conclusion.coefficients.values + conclusion.rhs) meter.number(value)
-                val proof = SourceDerivation.MixedIntegerRounding(
-                    combination,
-                    sides.map { SourceDerivation.Premise(it.premise) },
-                )
+                val proof = SourceDerivation.MixedIntegerRounding(combination,
+                    sides.map { SourceDerivation.Premise(it.premise) })
                 meter.reserve(1L)
                 observe("AggregateCandidates", 1L)
                 observe("AggregateMixedCandidates", 1L)
-                return LinearAuthorityCut(
-                    terms.first().owner,
-                    conclusion,
-                    proof,
-                    mixed = true,
-                    owners = (terms + sides).mapTo(linkedSetOf()) { it.owner },
-                    family = CutFamily.SOURCE_AGGREGATION,
-                )
+                return LinearAuthorityCut(terms.first().owner, conclusion, proof, mixed = true,
+                    owners = (terms + sides).mapTo(linkedSetOf()) { it.owner }, family = CutFamily.SOURCE_AGGREGATION)
             }
             meter.reserve(1L + limits.scalarBits / 64L, 64L + limits.scalarBits / 4L)
-            val rounded = meter.number(
-                if (strict) {
-                    BigFraction.of(scaledRhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
-                } else {
-                    BigFraction.of(scaledRhs.negated().ceilInteger(), BIG_ONE).negated()
-                },
-            )
+            val rounded = meter.number(if (strict) {
+                BigFraction.of(scaledRhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
+            } else BigFraction.of(scaledRhs.negated().ceilInteger(), BIG_ONE).negated())
             if (!strict && rounded == scaledRhs) {
                 observe("AggregateIntegralRhs", 1L)
                 return null
@@ -1584,13 +1351,8 @@ internal object LinearAuthorityAggregateCuts {
             val proof = SourceDerivation.IntegerRounding(combination)
             meter.reserve(1L)
             observe("AggregateCandidates", 1L)
-            LinearAuthorityCut(
-                terms.first().owner,
-                SourceInequality(normalized, rounded),
-                proof,
-                owners = terms.mapTo(linkedSetOf()) { it.owner },
-                family = CutFamily.SOURCE_AGGREGATION,
-            )
+            LinearAuthorityCut(terms.first().owner, SourceInequality(normalized, rounded), proof,
+                owners = terms.mapTo(linkedSetOf()) { it.owner }, family = CutFamily.SOURCE_AGGREGATION)
         } catch (stop: AggregateStop) {
             observe("Aggregate${stop.reason}", 1L)
             null

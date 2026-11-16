@@ -12,7 +12,6 @@ class SourceMappingEvidence(
     transformations: List<SourceTransformation?>,
 ) {
     private val captured = transformations.toList()
-
     /** Ordered source-to-target stages; a null entry represents missing capture. */
     val transformations: List<SourceTransformation?> get() = captured.toList()
 
@@ -31,21 +30,14 @@ class SourceMappingEvidence(
     ): SourceEvidence = select(claim, context, cancellation, allowance).first
 
     private fun select(
-        claim: SourceClaim,
-        context: SourceProofContext,
-        cancellation: ExecutionControl,
-        allowance: SourceProofAllowance,
+        claim: SourceClaim, context: SourceProofContext, cancellation: ExecutionControl,
+            allowance: SourceProofAllowance,
     ): Pair<SourceEvidence, SourceEvidenceCheck> {
         fun absent(reason: String) = SourceEvidence(source, claim, SourceDerivation.Unavailable(reason)) to
             SourceEvidenceCheck.Unavailable(reason)
-        if (context.scope != source) {
-            return SourceEvidence(
-                source,
-                claim,
-                SourceDerivation.Unavailable("mapping has a foreign original invocation"),
-            ) to
-                SourceEvidenceCheck.Rejected("mapping has a foreign original invocation")
-        }
+        if (context.scope != source) return SourceEvidence(source, claim,
+            SourceDerivation.Unavailable("mapping has a foreign original invocation")) to
+            SourceEvidenceCheck.Rejected("mapping has a foreign original invocation")
         val payload = target ?: return absent("reduced-source evidence capture unavailable")
         if (payload.derivations.any { it.scope != payload.scope }) {
             return absent("mapped evidence has mixed target scopes")
@@ -62,9 +54,7 @@ class SourceMappingEvidence(
             if (limited()) return absent("mapping evidence capture allowance exhausted")
             if (claim is SourceClaim.Bound) {
                 if (terminal.claim !is SourceClaim.Bound && terminal.claim !is SourceClaim.Optimal) continue
-            } else if (claim != SourceClaim.Refutation || terminal.claim != SourceClaim.Refutation) {
-                continue
-            }
+            } else if (claim != SourceClaim.Refutation || terminal.claim != SourceClaim.Refutation) continue
             val proof = try {
                 translator.project(source, payload.scope, captured, terminal, claim)
             } catch (stop: MappingProofUnavailable) {
@@ -101,11 +91,8 @@ private class MappingProofTranslation(
         step(0)
         val bound = claim is SourceClaim.Bound
         if (claim is SourceClaim.Bound) matchBound(source, target, transformations, terminal.claim, claim)
-        var proof = if (terminal.claim is SourceClaim.Optimal) {
-            optimumBound(terminal, target, 0)
-        } else {
-            terminal.derivation
-        }
+        var proof = if (terminal.claim is SourceClaim.Optimal) optimumBound(terminal, target, 0)
+            else terminal.derivation
         var scope = target
         if (scope == source) return proof
         if (transformations.isEmpty()) missing("mapping has no captured transformation stages")
@@ -113,21 +100,15 @@ private class MappingProofTranslation(
             step(0)
             val transformation = stage ?: missing("mapping transformation justification unavailable")
             if (transformation.target != scope) missing("mapping target revision or invocation does not match")
-            if (bound && (
-                    transformation.objectiveScale <= BigFraction.ZERO ||
-                        transformation.source.objective == null || transformation.target.objective == null ||
-                        transformation.source.objective.sense != transformation.target.objective.sense
-                    )
-            ) {
-                missing("mapping objective direction or scale is incompatible")
-            }
+            if (bound && (transformation.objectiveScale <= BigFraction.ZERO ||
+                    transformation.source.objective == null || transformation.target.objective == null ||
+                    transformation.source.objective.sense != transformation.target.objective.sense)
+            ) missing("mapping objective direction or scale is incompatible")
             proof = translate(proof, transformation, scope, 0)
             if (bound && transformation.objectiveScale != BigFraction.ONE) {
-                proof = SourceDerivation.Combination(
-                    listOf(
-                        SourceDerivation.Combination.Term(transformation.objectiveScale, proof),
-                    ),
-                )
+                proof = SourceDerivation.Combination(listOf(
+                    SourceDerivation.Combination.Term(transformation.objectiveScale, proof),
+                ))
             }
             scope = transformation.source
         }
@@ -136,11 +117,8 @@ private class MappingProofTranslation(
     }
 
     private fun matchBound(
-        source: SourceScope,
-        target: SourceScope,
-        transformations: List<SourceTransformation?>,
-        terminal: SourceClaim,
-        claim: SourceClaim.Bound,
+        source: SourceScope, target: SourceScope, transformations: List<SourceTransformation?>,
+        terminal: SourceClaim, claim: SourceClaim.Bound,
     ) {
         val value = when (terminal) {
             is SourceClaim.Bound -> terminal.value
@@ -171,138 +149,77 @@ private class MappingProofTranslation(
         }
         if (scope != source || matchSourceClaims(SourceClaim.Bound(rational, strict), claim, cancellation) !=
             SourceEvidenceCheck.Checked
-        ) {
-            missing("mapped bound does not match the requested original claim")
-        }
+        ) missing("mapped bound does not match the requested original claim")
     }
 
     private fun optimumBound(evidence: SourceEvidence, scope: SourceScope, depth: Int): SourceDerivation {
         step(depth)
         return when (val proof = evidence.derivation) {
             is SourceDerivation.Optimum -> proof.bound
-
             is SourceDerivation.Import -> {
                 val imported = proof.evidence
                 if (imported.scope.revision != scope.revision || imported.scope.objective != scope.objective ||
                     !scope.condition.implies(imported.scope.condition) ||
                     matchSourceClaims(imported.claim, evidence.claim, cancellation) != SourceEvidenceCheck.Checked
-                ) {
-                    missing("mapped optimum import has a foreign invocation or claim")
-                }
+                ) missing("mapped optimum import has a foreign invocation or claim")
                 optimumBound(imported, imported.scope, depth + 1)
             }
-
             else -> missing("mapped optimum has no actual bound derivation")
         }
     }
 
     private fun translate(
-        proof: SourceDerivation,
-        transformation: SourceTransformation,
-        scope: SourceScope,
-        depth: Int,
+        proof: SourceDerivation, transformation: SourceTransformation, scope: SourceScope, depth: Int,
     ): SourceDerivation {
         step(depth)
         return when (proof) {
             is SourceDerivation.Premise -> transformation.premiseDerivations[proof.id]
                 ?: missing("mapping original premise justification unavailable")
-
             is SourceDerivation.Assumption -> {
                 val coordinate = proof.coordinate
                 val side = if (proof.upper) "upper" else "lower"
                 transformation.premiseDerivations["assumption/${coordinate.kind}/${coordinate.id}/$side"]
                     ?: missing("mapping invocation justification unavailable")
             }
-
-            is SourceDerivation.Combination -> SourceDerivation.Combination(
-                proof.terms.map {
-                    step(depth)
-                    SourceDerivation.Combination.Term(
-                        it.weight,
-                        translate(
-                            it.derivation,
-                            transformation,
-                            scope,
-                            depth + 1,
-                        ),
-                    )
-                },
-            )
-
+            is SourceDerivation.Combination -> SourceDerivation.Combination(proof.terms.map {
+                step(depth)
+                SourceDerivation.Combination.Term(it.weight, translate(it.derivation, transformation, scope, depth + 1))
+            })
             is SourceDerivation.IntegerRounding -> SourceDerivation.IntegerRounding(
-                translate(proof.inequality, transformation, scope, depth + 1),
-            )
-
+                translate(proof.inequality, transformation, scope, depth + 1))
             is SourceDerivation.MixedIntegerRounding -> missing(
-                "mapping mixed integer rounding requires an integrality-preserving coordinate justification",
-            )
-
+                "mapping mixed integer rounding requires an integrality-preserving coordinate justification")
             is SourceDerivation.Import -> {
                 val imported = proof.evidence
                 if (imported.scope.revision != scope.revision || imported.scope.objective != scope.objective ||
                     !scope.condition.implies(imported.scope.condition)
-                ) {
-                    missing("mapping import has a foreign revision, objective or stronger invocation")
-                }
+                ) missing("mapping import has a foreign revision, objective or stronger invocation")
                 translate(imported.derivation, transformation, imported.scope, depth + 1)
             }
-
             is SourceDerivation.BooleanSplit -> {
                 val coordinate = SourceCoordinate(SourceCoordinate.Kind.Boolean, proof.id)
                 val image = transformation.images[coordinate]
                 if (image?.constant != BigFraction.ZERO || image.coefficients != mapOf(coordinate to BigFraction.ONE)) {
                     missing("mapping Boolean coverage image unavailable")
                 }
-                SourceDerivation.BooleanSplit(
-                    proof.id,
-                    translate(
-                        proof.whenFalse,
-                        transformation,
-                        scope.copy(condition = scope.condition.pin(proof.id, false)),
-                        depth + 1,
-                    ),
-                    translate(
-                        proof.whenTrue,
-                        transformation,
-                        scope.copy(condition = scope.condition.pin(proof.id, true)),
-                        depth + 1,
-                    ),
-                )
+                SourceDerivation.BooleanSplit(proof.id,
+                    translate(proof.whenFalse, transformation,
+                        scope.copy(condition = scope.condition.pin(proof.id, false)), depth + 1),
+                    translate(proof.whenTrue, transformation,
+                        scope.copy(condition = scope.condition.pin(proof.id, true)), depth + 1))
             }
-
             is SourceDerivation.IntegerSplit -> {
                 val image = transformation.images[proof.coordinate]
                 if (image?.constant != BigFraction.ZERO ||
                     image.coefficients != mapOf(proof.coordinate to BigFraction.ONE)
-                ) {
-                    missing("mapping integer coverage image unavailable")
-                }
-                SourceDerivation.IntegerSplit(
-                    proof.coordinate,
-                    proof.threshold,
-                    translate(
-                        proof.below,
-                        transformation,
-                        scope.copy(
-                            condition =
-                            scope.condition.bound(proof.coordinate, proof.threshold, true),
-                        ),
-                        depth + 1,
-                    ),
-                    translate(
-                        proof.above,
-                        transformation,
-                        scope.copy(
-                            condition =
-                            scope.condition.bound(proof.coordinate, proof.threshold + BigFraction.ONE, false),
-                        ),
-                        depth + 1,
-                    ),
-                )
+                ) missing("mapping integer coverage image unavailable")
+                SourceDerivation.IntegerSplit(proof.coordinate, proof.threshold,
+                    translate(proof.below, transformation, scope.copy(condition =
+                        scope.condition.bound(proof.coordinate, proof.threshold, true)), depth + 1),
+                    translate(proof.above, transformation, scope.copy(condition =
+                        scope.condition.bound(proof.coordinate, proof.threshold + BigFraction.ONE, false)), depth + 1))
             }
-
             is SourceDerivation.Unavailable -> missing(proof.reason)
-
             else -> missing("mapping source-specific or non-affine derivation transfer unavailable")
         }
     }

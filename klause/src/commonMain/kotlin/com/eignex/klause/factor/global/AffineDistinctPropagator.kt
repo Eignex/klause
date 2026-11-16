@@ -133,9 +133,7 @@ internal class AffineDistinctPropagator(private val vars: IntArray, private val 
             roots[k].forEach { value ->
                 if (value in d.min..d.max && !state.inDomainAt(v, value, atTrail, d) &&
                     bigIntOf(value) + offsets[i] !in union
-                ) {
-                    add(state.exclusionLiteral(v, value, atTrail, d))
-                }
+                ) add(state.exclusionLiteral(v, value, atTrail, d))
             }
         }
         return out.toIntArray()

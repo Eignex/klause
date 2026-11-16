@@ -93,39 +93,22 @@ class FinitePortfolioLpCaptureTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `omitted policy should retain the companion configuration`(handoff: Boolean) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to handoff.toString(),
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to handoff.toString())
 
         val parameters = FinitePortfolioLpCapture.parameters(options)
 
-        assertEquals(
-            listOf(
-                "companion-integers=true", "companion-active-ms=4000",
-                "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",
-                "source-incumbent-completion=$handoff", "portfolio-progress=true", "portfolio-reward=ordinary",
-                "phase-retention=0.25", "reseed-stale-threshold=3", "portfolio-probes=ordinary",
-                "portfolio-proof-workers=retained", "portfolio-proof-share=0.5",
-            ),
-            parameters,
-        )
+        assertEquals(listOf("companion-integers=true", "companion-active-ms=4000",
+            "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",
+            "source-incumbent-completion=$handoff", "portfolio-progress=true", "portfolio-reward=ordinary",
+            "phase-retention=0.25", "reseed-stale-threshold=3", "portfolio-probes=ordinary",
+            "portfolio-proof-workers=retained", "portfolio-proof-share=0.5"), parameters)
     }
 
     @Test
     fun `ordinary policy should leave algorithm selection at source defaults`() {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "false",
-            "portfolio-policy" to "ordinary",
-            "portfolio-progress" to "false",
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary", "portfolio-progress" to "false")
 
         val parameters = FinitePortfolioLpCapture.parameters(options)
 
@@ -135,14 +118,8 @@ class FinitePortfolioLpCaptureTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `complete coverage should preserve supported handoff selection`(handoff: Boolean) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to handoff.toString(),
-            "portfolio-policy" to "complete",
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to handoff.toString(), "portfolio-policy" to "complete")
 
         val parameters = FinitePortfolioLpCapture.parameters(options).associate {
             it.substringBefore('=') to it.substringAfter('=')
@@ -156,15 +133,9 @@ class FinitePortfolioLpCaptureTest {
     @ParameterizedTest
     @CsvSource("ordinary,false", "ordinary,true", "retained,false", "retained,true", "complete,false", "complete,true")
     fun `progress logging should be independent of policy selection`(policy: String, progress: Boolean) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "false",
-            "portfolio-policy" to policy,
-            "portfolio-progress" to progress.toString(),
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to policy,
+            "portfolio-progress" to progress.toString())
 
         val parameters = FinitePortfolioLpCapture.parameters(options)
 
@@ -173,14 +144,8 @@ class FinitePortfolioLpCaptureTest {
 
     @Test
     fun `ordinary joint capture should preserve quiet production companion controls`() {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "true",
-            "capture-mode" to "joint-ordinary",
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary")
 
         val parameters = FinitePortfolioLpCapture.parameters(options)
 
@@ -193,19 +158,12 @@ class FinitePortfolioLpCaptureTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `ordinary joint capture should forward explicit center progress`(enabled: Boolean) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "true",
-            "capture-mode" to "joint-ordinary",
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary")
         val expected = FinitePortfolioLpCapture.parameters(options) + "source-refutation-center-step=$enabled"
 
         val parameters = FinitePortfolioLpCapture.parameters(
-            options + ("source-refutation-center-step" to enabled.toString()),
-        )
+            options + ("source-refutation-center-step" to enabled.toString()))
 
         assertEquals(expected, parameters)
     }
@@ -213,15 +171,9 @@ class FinitePortfolioLpCaptureTest {
     @ParameterizedTest
     @ValueSource(strings = ["yes", "1", "TRUE"])
     fun `ordinary joint capture should reject invalid center progress values`(value: String) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "true",
-            "capture-mode" to "joint-ordinary",
-            "source-refutation-center-step" to value,
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary",
+            "source-refutation-center-step" to value)
 
         assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.parameters(options) }
     }
@@ -229,15 +181,9 @@ class FinitePortfolioLpCaptureTest {
     @ParameterizedTest
     @CsvSource("portfolio,false", "portfolio,true", "joint-before,false", "joint-before,true")
     fun `other capture modes should reject center progress selection`(mode: String, value: String) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "true",
-            "capture-mode" to mode,
-            "source-refutation-center-step" to value,
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to mode,
+            "source-refutation-center-step" to value)
 
         val failure = assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.parameters(options) }
 
@@ -247,28 +193,16 @@ class FinitePortfolioLpCaptureTest {
     @ParameterizedTest
     @CsvSource("captures,1", "handoff,false", "portfolio-progress,true", "inspect-rays,true", "capture-guidance,true")
     fun `ordinary joint capture should reject unrelated observer controls`(key: String, value: String) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "true",
-            "capture-mode" to "joint-ordinary",
-        ) + (key to value)
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-ordinary") + (key to value)
 
         assertFailsWith<IllegalArgumentException> { FinitePortfolioLpCapture.parameters(options) }
     }
 
     @Test
     fun `joint capture should retain ordinary pre incumbent grants`() {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "true",
-            "capture-mode" to "joint-before",
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-before")
 
         val parameters = FinitePortfolioLpCapture.parameters(options).associate {
             it.substringBefore('=') to it.substringAfter('=')
@@ -282,22 +216,11 @@ class FinitePortfolioLpCaptureTest {
     }
 
     @ParameterizedTest
-    @CsvSource(
-        "handoff,false",
-        "portfolio-policy,retained",
-        "portfolio-progress,true",
-        "capture-worker,any",
-        "inspect-rays,unknown",
-    )
+    @CsvSource("handoff,false", "portfolio-policy,retained", "portfolio-progress,true", "capture-worker,any",
+        "inspect-rays,unknown")
     fun `joint capture should reject incompatible controls before corpus resolution`(key: String, value: String) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "true",
-            "capture-mode" to "joint-before",
-        ) + (key to value)
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-before") + (key to value)
 
         assertFailsWith<IllegalArgumentException> {
             FinitePortfolioLpCapture.main(options.map { (name, setting) -> "$name=$setting" }.toTypedArray())
@@ -305,22 +228,11 @@ class FinitePortfolioLpCaptureTest {
     }
 
     @ParameterizedTest
-    @CsvSource(
-        "portfolio-policy,unknown",
-        "portfolio-progress,yes",
-        "handoff,true",
-        "unsupported,true",
-        "inspect-rays,true",
-    )
+    @CsvSource("portfolio-policy,unknown", "portfolio-progress,yes", "handoff,true", "unsupported,true",
+        "inspect-rays,true")
     fun `invalid policy requests should fail before corpus resolution`(key: String, value: String) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "false",
-            "portfolio-policy" to "ordinary",
-        ) + (key to value)
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "false", "portfolio-policy" to "ordinary") + (key to value)
 
         assertFailsWith<IllegalArgumentException> {
             FinitePortfolioLpCapture.main(options.map { (name, setting) -> "$name=$setting" }.toTypedArray())
@@ -330,14 +242,8 @@ class FinitePortfolioLpCaptureTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `ray inspection should preserve producer parameters`(enabled: Boolean) {
-        val options = mapOf(
-            "suite" to "unused",
-            "problem" to "unused",
-            "sha256" to "unused",
-            "seed" to "1",
-            "handoff" to "true",
-            "capture-mode" to "joint-before",
-        )
+        val options = mapOf("suite" to "unused", "problem" to "unused", "sha256" to "unused",
+            "seed" to "1", "handoff" to "true", "capture-mode" to "joint-before")
         val expected = FinitePortfolioLpCapture.parameters(options)
 
         val parameters = FinitePortfolioLpCapture.parameters(options + ("inspect-rays" to enabled.toString()))

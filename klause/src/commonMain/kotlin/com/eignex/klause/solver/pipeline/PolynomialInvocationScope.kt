@@ -26,23 +26,18 @@ internal class PolynomialInvocationScope(
     fun worker(slot: PortfolioWorkerSlot): PolynomialTheoryInvocation {
         val limit = params.maximumWork?.let(slot::nativeAllowance)
         val scope = native.worker(slot.index, limit)
-        val invocation = service.invocation(
-            QfNraParams(
-                scope.polynomial or slot.cancellation,
-                maximumWork = null,
-                polynomialLimits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),
-            ),
-        )
-        slot.own(
-            AutoCloseable {
-                scope.observe(invocation.stats)
-                invocation.lastUnknown?.resource?.let { limited ->
-                    scope.decline(limited)
-                    lock.withLock { if (decline == null) decline = scope.resource }
-                }
-                invocation.close()
-            },
-        )
+        val invocation = service.invocation(QfNraParams(
+            scope.polynomial or slot.cancellation, maximumWork = null,
+            polynomialLimits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),
+        ))
+        slot.own(AutoCloseable {
+            scope.observe(invocation.stats)
+            invocation.lastUnknown?.resource?.let { limited ->
+                scope.decline(limited)
+                lock.withLock { if (decline == null) decline = scope.resource }
+            }
+            invocation.close()
+        })
         return invocation
     }
 }

@@ -5,7 +5,10 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.util.ExecutionControl
 
-internal class PrivateRebuildParityRows(private val masks: Array<LongArray>, private val rhs: IntArray) {
+internal class PrivateRebuildParityRows(
+    private val masks: Array<LongArray>,
+    private val rhs: IntArray,
+) {
     fun rowWidth(row: Int, cancellation: ExecutionControl): Int? {
         cancellation.charge(masks[row].size * 2L + 4L)
         if (cancellation()) return null

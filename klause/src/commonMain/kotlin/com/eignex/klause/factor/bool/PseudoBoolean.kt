@@ -33,7 +33,11 @@ import kotlin.concurrent.Volatile
  * true, 0 when false). Terms pair [constants] with [literals]; [op] compares the sum with the exact
  * right-hand side. Consumers choose their own arithmetic width.
  */
-class PseudoBoolean private constructor(override val constants: IntegralConstants, literals: IntArray, val op: PbOp) :
+class PseudoBoolean private constructor(
+    override val constants: IntegralConstants,
+    literals: IntArray,
+    val op: PbOp,
+) :
     Factor,
     LinearRow {
 
@@ -67,11 +71,9 @@ class PseudoBoolean private constructor(override val constants: IntegralConstant
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.PSEUDO_BOOLEAN, ::buildKey)
 
-    override fun remapStructuralHash(mapping: VarRemap): Int = if (integerConstants != null) {
-        hashRemappedKey(FactorKind.PSEUDO_BOOLEAN, mapping, ::buildKey)
-    } else {
-        remap(mapping).structuralKey().hashCode()
-    }
+    override fun remapStructuralHash(mapping: VarRemap): Int =
+        if (integerConstants != null) hashRemappedKey(FactorKind.PSEUDO_BOOLEAN, mapping, ::buildKey)
+        else remap(mapping).structuralKey().hashCode()
 
     private fun buildKey(sink: KeySink) {
         pseudoBooleanKey(sink, constants, literals, op)

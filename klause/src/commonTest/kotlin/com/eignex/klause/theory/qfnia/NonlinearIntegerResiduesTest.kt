@@ -188,13 +188,9 @@ class NonlinearIntegerResiduesTest {
 
     @Test
     fun `composite zero divisors should preserve a real integer witness`() {
-        val residues = NonlinearIntegerResidues(
-            source(
-                "(assert (= (* x y) 4)) (assert (= x 2)) (assert (= y 2))",
-            ),
-            PolynomialArithmetic(),
-            PolynomialLimits(),
-        )
+        val residues = NonlinearIntegerResidues(source(
+            "(assert (= (* x y) 4)) (assert (= x 2)) (assert (= y 2))",
+        ), PolynomialArithmetic(), PolynomialLimits())
 
         assertFalse(residues.refutes())
         assertEquals(5L, residues.stats.rings)
@@ -220,11 +216,8 @@ class NonlinearIntegerResiduesTest {
     @Test
     fun `containing storage limits should decline before a refutation`() {
         for (limits in listOf(PolynomialLimits(maxMatrixCells = 0), PolynomialLimits(maxDenseCoefficients = 1))) {
-            val residues = NonlinearIntegerResidues(
-                source("(assert (= (+ (* x x) (* y y)) 3))"),
-                PolynomialArithmetic(),
-                limits,
-            )
+            val residues = NonlinearIntegerResidues(source("(assert (= (+ (* x x) (* y y)) 3))"),
+                PolynomialArithmetic(), limits)
 
             assertFalse(residues.refutes())
             assertEquals(1L, residues.stats.declined)
@@ -246,10 +239,8 @@ class NonlinearIntegerResiduesTest {
 
     @Test
     fun `compositional images should refute large powers before enumerating tuples`() {
-        val source = source(
-            "(assert (= (+ (^ x 2147483646) (^ y 2147483646) " +
-                "(^ z 2147483646) (^ w 2147483646)) 7))",
-        )
+        val source = source("(assert (= (+ (^ x 2147483646) (^ y 2147483646) " +
+            "(^ z 2147483646) (^ w 2147483646)) 7))")
 
         val execution = solveNonlinearIntegers(source, NonlinearIntegerParams(residueRefutation = true))
 
@@ -280,13 +271,9 @@ class NonlinearIntegerResiduesTest {
 
     @Test
     fun `scaled disjoint images should preserve exact denominator edge factors`() {
-        val residues = NonlinearIntegerResidues(
-            source(
-                "(assert (= (+ (* (/ 1 2) (^ x 2)) (* (/ 1 2) (^ y 2))) (/ 3 2)))",
-            ),
-            PolynomialArithmetic(),
-            PolynomialLimits(),
-        )
+        val residues = NonlinearIntegerResidues(source(
+            "(assert (= (+ (* (/ 1 2) (^ x 2)) (* (/ 1 2) (^ y 2))) (/ 3 2)))",
+        ), PolynomialArithmetic(), PolynomialLimits())
 
         assertTrue(residues.refutes())
         assertEquals(0L, residues.stats.tuples)
@@ -294,13 +281,9 @@ class NonlinearIntegerResiduesTest {
 
     @Test
     fun `overlapping individual equations should retain shared tuple refutations`() {
-        val residues = NonlinearIntegerResidues(
-            source(
-                "(assert (= (* x y) 2)) (assert (= (+ x y) 4))",
-            ),
-            PolynomialArithmetic(),
-            PolynomialLimits(),
-        )
+        val residues = NonlinearIntegerResidues(source(
+            "(assert (= (* x y) 2)) (assert (= (+ x y) 4))",
+        ), PolynomialArithmetic(), PolynomialLimits())
 
         assertTrue(residues.refutes())
         assertTrue(residues.stats.tuples > 0)
@@ -313,11 +296,8 @@ class NonlinearIntegerResiduesTest {
             override fun isCancelled(): Boolean = charged >= 40
             override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
-        val residues = NonlinearIntegerResidues(
-            source("(assert (= (+ (* x x) (* y y)) 3))"),
-            PolynomialArithmetic(token),
-            PolynomialLimits(),
-        )
+        val residues = NonlinearIntegerResidues(source("(assert (= (+ (* x x) (* y y)) 3))"),
+            PolynomialArithmetic(token), PolynomialLimits())
 
         assertFailsWith<PolynomialInterrupted> { residues.refutes() }
         assertEquals(40L, charged)
@@ -326,10 +306,8 @@ class NonlinearIntegerResiduesTest {
 
     @Test
     fun `private residue work should share the containing allowance and preserve a stopped verdict`() {
-        val execution = solveNonlinearIntegers(
-            source("(assert (= (+ (* x x) (* y y)) 3))"),
-            NonlinearIntegerParams(arithmetic = QfNraParams(maximumWork = 40), residueRefutation = true),
-        )
+        val execution = solveNonlinearIntegers(source("(assert (= (+ (* x x) (* y y)) 3))"),
+            NonlinearIntegerParams(arithmetic = QfNraParams(maximumWork = 40), residueRefutation = true))
 
         assertIs<QfNraResult.Unknown>(execution.result)
         assertEquals(0L, execution.stats.residues.refuted)
@@ -364,14 +342,8 @@ class NonlinearIntegerResiduesTest {
             "(declare-const x Int) (declare-const y Int) (assert (= (+ (* x x) (* y y)) 2))",
             allowIntegers = true,
         )
-        val source = NonlinearIntegerProblem(
-            parsed.formula,
-            parsed.realCount,
-            parsed.boolCount,
-            parsed.intVarNames,
-            parsed.realVarNames,
-            parsed.boolVarNames,
-        )
+        val source = NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
         val params = NonlinearIntegerParams(residueRefutation = true)
         val zero = mapOf(0 to BigFraction.ZERO, 1 to BigFraction.ZERO)
         val one = mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE)
@@ -388,16 +360,9 @@ class NonlinearIntegerResiduesTest {
     private fun source(assertions: String): NonlinearIntegerProblem {
         val parsed = SmtLibPolynomial.parse(
             "(declare-const x Int) (declare-const y Int) (declare-const z Int) (declare-const w Int) " +
-                "(declare-const r Real) (declare-const b Bool) $assertions",
-            allowIntegers = true,
+                "(declare-const r Real) (declare-const b Bool) $assertions", allowIntegers = true,
         )
-        return NonlinearIntegerProblem(
-            parsed.formula,
-            parsed.realCount,
-            parsed.boolCount,
-            parsed.intVarNames,
-            parsed.realVarNames,
-            parsed.boolVarNames,
-        )
+        return NonlinearIntegerProblem(parsed.formula, parsed.realCount, parsed.boolCount,
+            parsed.intVarNames, parsed.realVarNames, parsed.boolVarNames)
     }
 }

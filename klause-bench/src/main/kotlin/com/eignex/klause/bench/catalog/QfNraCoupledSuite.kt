@@ -18,12 +18,8 @@ internal object QfNraCoupledSuite {
             "weak-cycle-sat" to Expected.Sat,
             "uncovered-singular-sat" to Expected.Sat,
         )) {
-            vendored(
-                name,
-                expected = expected,
-                relPath = "qfnra-coupled-v1/$name.smt2",
-                tags = setOf("polynomial-real", "qfnra-coupled-v1"),
-            )
+            vendored(name, expected = expected, relPath = "qfnra-coupled-v1/$name.smt2",
+                tags = setOf("polynomial-real", "qfnra-coupled-v1"))
         }
     }
 }

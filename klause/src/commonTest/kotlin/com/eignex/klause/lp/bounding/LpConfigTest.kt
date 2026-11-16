@@ -30,11 +30,8 @@ class LpConfigTest {
 
     @Test
     fun `preparation policy should reject unknown and repeated choices`() {
-        for (spec in listOf(
-            "default,preparation=unknown",
-            "preparation=",
-            "preparation=object,preparation=index",
-        )) {
+        for (spec in listOf("default,preparation=unknown", "preparation=",
+            "preparation=object,preparation=index")) {
             assertFailsWith<IllegalStateException> { LpConfig.parse(spec) }
         }
     }
@@ -57,11 +54,8 @@ class LpConfigTest {
     @Test
     fun `resolved plans should retain the requested source preparation policy`() {
         val problem = Problem(0, 0, emptyArray(), emptyArray())
-        val plan = LpAutoConfig.resolve(
-            problem,
-            LpConfig.parse("off,preparation=disabled"),
-            LpPlan(sourcePreparation = LpSourcePreparation.INDEX),
-        )
+        val plan = LpAutoConfig.resolve(problem, LpConfig.parse("off,preparation=disabled"),
+            LpPlan(sourcePreparation = LpSourcePreparation.INDEX))
 
         assertEquals(LpSourcePreparation.DISABLED, plan.sourcePreparation)
     }

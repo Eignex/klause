@@ -16,11 +16,8 @@ internal fun AlgebraicArithmetic.ceilInteger(value: AlgebraicReal): BigInt {
     while (lower < upper) {
         arithmetic.step()
         val middle = -BigFraction.of(-(lower + upper), BIG_TWO).ceilInteger()
-        if (compare(value, rational(BigFraction.of(middle, BIG_ONE))) <= 0) {
-            upper = middle
-        } else {
-            lower = middle + BIG_ONE
-        }
+        if (compare(value, rational(BigFraction.of(middle, BIG_ONE))) <= 0) upper = middle
+        else lower = middle + BIG_ONE
     }
     return lower
 }

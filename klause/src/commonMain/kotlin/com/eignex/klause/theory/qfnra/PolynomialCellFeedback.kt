@@ -69,26 +69,20 @@ internal class PolynomialCellFeedback(
     private var candidateDeclines = 0L
     private var candidateParentStopped = false
     private val candidateArithmetic = parent?.let { caller ->
-        val meter = WorkMeter { units ->
-            completedCandidateWork += units
-            caller.charge(units)
-        }
-        PolynomialArithmetic(
-            object : ExecutionControl() {
-                override fun isCancelled(): Boolean {
-                    if (caller()) candidateParentStopped = true
-                    return candidateParentStopped || candidateWork >= maximumCandidateWork
-                }
-                override fun deadline() = caller.deadline()
-                override val accounting: WorkMeter get() = meter
+        val meter = WorkMeter { units -> completedCandidateWork += units; caller.charge(units) }
+        PolynomialArithmetic(object : ExecutionControl() {
+            override fun isCancelled(): Boolean {
+                if (caller()) candidateParentStopped = true
+                return candidateParentStopped || candidateWork >= maximumCandidateWork
+            }
+            override fun deadline() = caller.deadline()
+            override val accounting: WorkMeter get() = meter
                 override val admission get() = serialArithmeticSource(
                     caller,
                     { maximumCandidateWork - candidateWork },
                     { completedCandidateWork += it },
                 )
-            },
-            limits,
-        ).also { pendingCandidateWork = { it.execution.admittedWork } }
+        }, limits).also { pendingCandidateWork = { it.execution.admittedWork } }
     }
     private val candidateAlgebraic = candidateArithmetic?.let(::AlgebraicArithmetic)
     var firstCrossRegionUse: PolynomialCellFeedbackUse? = null
@@ -110,27 +104,13 @@ internal class PolynomialCellFeedback(
         step(arithmetic)
         if (candidateWork >= maximumCandidateWork) return null
         if (premises.atoms.size > MAX_FEEDBACK_PREMISES ||
-            premises.bools.size > MAX_FEEDBACK_PREMISES - premises.atoms.size
-        ) {
+            premises.bools.size > MAX_FEEDBACK_PREMISES - premises.atoms.size) {
             scopeDeclines++
             return null
         }
-        return producer ?: PolynomialCellScope.Region(
-            source,
-            condition,
-            snapshot,
-            PolynomialBooleanRegion(
-                premises.atoms.mapValues {
-                    step(arithmetic)
-                    it.value
-                },
-                premises.bools.mapValues {
-                    step(arithmetic)
-                    it.value
-                },
-            ),
-            Any(),
-        )
+        return producer ?: PolynomialCellScope.Region(source, condition, snapshot,
+            PolynomialBooleanRegion(premises.atoms.mapValues { step(arithmetic); it.value },
+                premises.bools.mapValues { step(arithmetic); it.value }), Any())
     }
 
     fun candidateRejection(
@@ -145,11 +125,11 @@ internal class PolynomialCellFeedback(
         val algebraic = checkNotNull(candidateAlgebraic)
         return try {
             arithmetic.execution.operation {
-                step(arithmetic)
-                val cells = arithmetic.execution.handoff(available)
-                repeat(cells.size) { step(arithmetic) }
-                rejection(required, scope, cells, arithmetic, algebraic, coordinates::get)?.also { candidateUses++ }
-            }
+            step(arithmetic)
+            val cells = arithmetic.execution.handoff(available)
+            repeat(cells.size) { step(arithmetic) }
+            rejection(required, scope, cells, arithmetic, algebraic, coordinates::get)?.also { candidateUses++ }
+        }
         } catch (stop: PolynomialInterrupted) {
             if (candidateParentStopped) throw stop
             candidateDeclines++
@@ -210,12 +190,9 @@ internal class PolynomialCellFeedback(
             val origin = entry.firstRegion
             val crossing = origin != null && current != null && origin.reduction !== current.reduction
             val captured = if (current != null &&
-                (firstRegionUse == null || (crossing && firstCrossRegionUse == null))
-            ) {
+                (firstRegionUse == null || (crossing && firstCrossRegionUse == null))) {
                 traceValue(value, arithmetic)
-            } else {
-                null
-            }
+            } else null
             step(arithmetic)
             uses++
             if (entry.uses > 0) reuses++
@@ -235,18 +212,17 @@ internal class PolynomialCellFeedback(
         return null
     }
 
-    fun admit(cell: CheckedPolynomialCell, arithmetic: PolynomialArithmetic, origin: PolynomialCellScope? = active) {
+    fun admit(
+        cell: CheckedPolynomialCell,
+        arithmetic: PolynomialArithmetic,
+        origin: PolynomialCellScope? = active,
+    ) {
         step(arithmetic)
         val context = active ?: return
         if (cell.scope.source !== source) return
         val regional = cell.scope as? PolynomialCellScope.Region
-        if (regional != null && (
-                regional.premises.atoms.size > MAX_FEEDBACK_PREMISES ||
-                    regional.premises.bools.size > MAX_FEEDBACK_PREMISES - regional.premises.atoms.size
-                )
-        ) {
-            return
-        }
+        if (regional != null && (regional.premises.atoms.size > MAX_FEEDBACK_PREMISES ||
+                regional.premises.bools.size > MAX_FEEDBACK_PREMISES - regional.premises.atoms.size)) return
         val entry = Entry(cell, origin)
         if (!valid(entry, context)) return
         for (retained in entries) {
@@ -263,9 +239,7 @@ internal class PolynomialCellFeedback(
         step(arithmetic)
         val requested = when (scope) {
             is PolynomialCellScope.Source -> null
-
             is PolynomialCellScope.Query -> scope.snapshot.takeIf { scope.condition === condition }
-
             is PolynomialCellScope.Region -> scope.snapshot.takeIf {
                 scope.condition === condition && scope.premises.atoms.size <= MAX_FEEDBACK_PREMISES &&
                     scope.premises.bools.size <= MAX_FEEDBACK_PREMISES - scope.premises.atoms.size
@@ -298,7 +272,11 @@ internal class PolynomialCellFeedback(
         }
     }
 
-    private fun samePredicate(left: PolynomialAtom, right: PolynomialAtom, arithmetic: PolynomialArithmetic): Boolean {
+    private fun samePredicate(
+        left: PolynomialAtom,
+        right: PolynomialAtom,
+        arithmetic: PolynomialArithmetic,
+    ): Boolean {
         step(arithmetic)
         if (left === right) return true
         if (left.relation != right.relation || left.polynomial.termCount != right.polynomial.termCount) return false
@@ -341,7 +319,11 @@ internal class PolynomialCellFeedback(
         return AlgebraicReal(polynomial, value.rootIndex, value.interval)
     }
 
-    private class Entry(val cell: CheckedPolynomialCell, origin: PolynomialCellScope?, var uses: Long = 0) {
+    private class Entry(
+        val cell: CheckedPolynomialCell,
+        origin: PolynomialCellScope?,
+        var uses: Long = 0,
+    ) {
         var firstRegion: PolynomialCellScope.Region? = origin as? PolynomialCellScope.Region
     }
 }

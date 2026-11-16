@@ -326,10 +326,8 @@ class LinearPortfolioTerminalTest {
                 request.preparedPlan,
                 listOf(factory),
                 PortfolioInvocationControls(),
-                PortfolioEvidence(
-                    identity,
-                    source.linearWitnessVerifier(ExecutionControl.Never),
-                ).bindInvocation(binding),
+                PortfolioEvidence(identity,
+                    source.linearWitnessVerifier(ExecutionControl.Never)).bindInvocation(binding),
                 objective,
             )
         }

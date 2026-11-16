@@ -30,9 +30,7 @@ class LpDirectionalHistoryTest {
                     history.record(12.0)
                     history.branch(VarRef.Bool(3), 0.5)
                 }
-
                 "commit" -> history.commit(SearchDecision.Bool(2), 4)
-
                 else -> history.clear()
             }
 
@@ -40,6 +38,7 @@ class LpDirectionalHistoryTest {
             assertEquals(retained + if (operation == "clear") 0 else 1, history.retainedEntries, operation)
         }
     }
+
 
     @Test
     fun `unusable observations do not satisfy two sided sample availability`() {
@@ -68,23 +67,15 @@ class LpDirectionalHistoryTest {
     @Test
     fun `two sided availability does not establish variable reliability`() {
         val history = LpDirectionalHistory({})
-        for (up in listOf(false, true)) {
-            repeat(2) {
-                val variable = if (up) 1 else 0
-                history.beginNode(0)
-                history.record(10.0)
-                history.branch(VarRef.IntVar(variable), 2.25)
-                history.commit(
-                    if (up) {
-                        SearchDecision.IntAtLeast(variable, 3)
-                    } else {
-                        SearchDecision.IntAtMost(variable, 2)
-                    },
-                    1,
-                )
-                history.beginNode(1)
-                history.record(if (up) 13.0 else 11.0)
-            }
+        for (up in listOf(false, true)) repeat(2) {
+            val variable = if (up) 1 else 0
+            history.beginNode(0)
+            history.record(10.0)
+            history.branch(VarRef.IntVar(variable), 2.25)
+            history.commit(if (up) SearchDecision.IntAtLeast(variable, 3)
+                else SearchDecision.IntAtMost(variable, 2), 1)
+            history.beginNode(1)
+            history.record(if (up) 13.0 else 11.0)
         }
 
         assertTrue(history.hasTwoSidedSamples)

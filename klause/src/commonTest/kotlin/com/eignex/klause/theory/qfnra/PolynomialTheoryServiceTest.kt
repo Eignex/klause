@@ -204,14 +204,10 @@ class PolynomialTheoryServiceTest {
     fun `widening a numeric condition discards its nonlinear refutation`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         val service = PolynomialTheoryService(source.formula, source.boolCount, source.realCount)
-        val narrow = PolynomialCondition(
-            lower = mapOf(0 to BigFraction.ZERO),
-            upper = mapOf(0 to BigFraction.ONE),
-        )
-        val wide = PolynomialCondition(
-            lower = mapOf(0 to BigFraction.ZERO),
-            upper = mapOf(0 to BigFraction.ofLong(2)),
-        )
+        val narrow = PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO),
+            upper = mapOf(0 to BigFraction.ONE))
+        val wide = PolynomialCondition(lower = mapOf(0 to BigFraction.ZERO),
+            upper = mapOf(0 to BigFraction.ofLong(2)))
 
         service.invocation().use { invocation ->
             assertIs<QfNraResult.Unsatisfiable>(invocation.check(narrow))
@@ -234,17 +230,11 @@ class PolynomialTheoryServiceTest {
 
         service.invocation().use { invocation ->
             for (pin in listOf(true, false, true)) {
-                val result = invocation.check(
-                    PolynomialCondition(
-                        bools = mapOf(0 to pin),
-                        lower = fixed,
-                        upper = fixed,
-                    ),
-                )
+                val result = invocation.check(PolynomialCondition(
+                    bools = mapOf(0 to pin), lower = fixed, upper = fixed,
+                ))
 
-                if (pin) {
-                    assertIs<QfNraResult.Unsatisfiable>(result)
-                } else {
+                if (pin) assertIs<QfNraResult.Unsatisfiable>(result) else {
                     val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
                     assertFalse(witness.boolValue(0))
                     assertEquals(BigFraction.ZERO, witness.realValue(0).rational)
@@ -420,6 +410,7 @@ class PolynomialTheoryServiceTest {
         assertEquals(invocation.stats.workSpent, charges)
     }
 
+
     @Test
     fun `cancellation at retained witness publication should withhold the result`() {
         val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
@@ -440,6 +431,7 @@ class PolynomialTheoryServiceTest {
             assertEquals(charges, invocation.stats.workSpent)
         }
     }
+
 
     @Test
     fun `closed invocation should discard Boolean witness preferences`() {

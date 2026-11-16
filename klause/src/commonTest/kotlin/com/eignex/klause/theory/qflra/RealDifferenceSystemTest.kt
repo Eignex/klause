@@ -335,12 +335,8 @@ class RealDifferenceSystemTest {
         )
         val system = assertNotNull(RealDifferenceSystem.prepare(model, emptyList()))
 
-        val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(
-            system.check(
-                intArrayOf(),
-                ExecutionControl.Never,
-            ),
-        )
+        val conflict = assertIs<RealDifferenceSystem.Result.Infeasible>(system.check(intArrayOf(),
+            ExecutionControl.Never))
 
         assertContentEquals(intArrayOf(), conflict.clause)
     }

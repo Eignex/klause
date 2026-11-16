@@ -64,9 +64,7 @@ class OpenTheoryRequest internal constructor(
     internal val presolveBudget: PresolveBudget? = null,
     /** Shared ownership preparation, retaining source identity through routing. */
     val preparedPlan: PreparedSourcePlan = model.preparedWithComponents(
-        componentPlan,
-        objective = objective,
-        maximize = maximize,
+        componentPlan, objective = objective, maximize = maximize,
     ),
     internal val linearContext: SourceProofContext? = null,
 ) {
@@ -119,10 +117,8 @@ class OpenTheoryRequest internal constructor(
             repeat(preparedPlan.sourceRealCount) { add(SourceCoordinate(SourceCoordinate.Kind.Real, it)) }
         }
         require(context.coordinates == coordinates) { "linear authority requires original source coordinates" }
-        return OpenTheoryRequest(
-            model, objective, maximize, componentPlan, presolveConfig, solutionSetSensitive,
-            presolveCancellation, presolveBudget, preparedPlan, context,
-        )
+        return OpenTheoryRequest(model, objective, maximize, componentPlan, presolveConfig, solutionSetSensitive,
+            presolveCancellation, presolveBudget, preparedPlan, context)
     }
 }
 
@@ -233,17 +229,9 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         completeOnly: Boolean = false,
     ): OpenTheoryExecution {
-        val portfolio = OpenPortfolio(
-            request.model,
-            request,
-            params,
-            seed = params.randomSeed,
-            lanes = cores,
-            sourceObjective = values,
-            publication = publication,
-            completeOnly = completeOnly,
-        )
-        val stop = params.cancellation.includingStop(params.timeout)
+        val portfolio = OpenPortfolio(request.model, request, params, seed = params.randomSeed, lanes = cores,
+            sourceObjective = values, publication = publication, completeOnly = completeOnly)
+        val stop = params.cancellation .includingStop( params.timeout)
         val objective = request.minimizedObjective ?: return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, integralMinimizer(request, objective), stop))
     }
@@ -260,15 +248,8 @@ object OpenTheoryPipeline {
         cores: Int = 1,
         searchesContinuousOnly: Boolean = false,
     ): OpenTheoryExecution = observed(model.semantics, null) { publication ->
-        heuristicExecution(
-            model,
-            params,
-            objective,
-            cores,
-            searchesContinuousOnly,
-            objective?.let { OpenSourceObjective(it) },
-            publication,
-        )
+        heuristicExecution(model, params, objective, cores, searchesContinuousOnly,
+            objective?.let { OpenSourceObjective(it) }, publication)
     }
 
     private fun heuristicExecution(
@@ -281,28 +262,14 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val stop = params.cancellation.includingStop(params.timeout)
-        val prepared = preparedSource ?: model.prepareExecutionPlan(
-            values?.original,
-            values?.maximize ?: false,
-            cancellation = stop,
-        )
-        if (stop() || prepared.decline == PreparedPlanDecline.RESOURCE) {
-            return incompleteOpenExecution(
-                objective,
-                if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
-            )
-        }
-        val portfolio = OpenPortfolio(
-            model,
-            request = null,
-            params,
-            lanes = cores,
-            searchesContinuousOnly = searchesContinuousOnly,
-            sourceObjective = values,
-            publication = publication,
-            preparedSource = prepared,
-        )
+        val stop = params.cancellation .includingStop( params.timeout)
+        val prepared = preparedSource ?: model.prepareExecutionPlan(values?.original, values?.maximize ?: false,
+            cancellation = stop)
+        if (stop() || prepared.decline == PreparedPlanDecline.RESOURCE) return incompleteOpenExecution(objective,
+            if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted)
+        val portfolio = OpenPortfolio(model, request = null, params, lanes = cores,
+            searchesContinuousOnly = searchesContinuousOnly, sourceObjective = values, publication = publication,
+            preparedSource = prepared)
         if (objective == null) return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, minimizer = null, stop))
     }
@@ -360,24 +327,13 @@ object OpenTheoryPipeline {
         }
         return when (engine) {
             FiniteEngine.MIXED -> portfolioExecution(request, params, cores, values, publication)
-
             FiniteEngine.BACKTRACK -> if (cores > 1) {
                 portfolioExecution(request, params, cores, values, publication, completeOnly = true)
-            } else {
-                executeDirect(request, params, values, publication)
-            }
-
+            } else executeDirect(request, params, values, publication)
             FiniteEngine.FIXED -> executeDirect(request, params, values, publication)
-
             FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> linearNeighborhoodInvocation(
-                request.model,
-                params,
-                request.minimizedObjective,
-                engine == FiniteEngine.ALNS,
-                cores,
-                request.preparedPlan,
-                values,
-                publication,
+                request.model, params, request.minimizedObjective, engine == FiniteEngine.ALNS, cores,
+                request.preparedPlan, values, publication,
             )
         }
     }
@@ -442,7 +398,7 @@ object OpenTheoryPipeline {
         cores: Int,
         onAccepted: ((SourceIncumbentPublication) -> Unit)?,
     ): OpenTheoryExecution = observed(preparedSource.sourceSemantics, onAccepted) { publication ->
-        val stop = params.cancellation.includingStop(params.timeout)
+        val stop = params.cancellation .includingStop( params.timeout)
         if (stop() || preparedSource.decline == PreparedPlanDecline.RESOURCE) {
             incompleteOpenExecution(
                 objective,
@@ -465,59 +421,25 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val stop = params.cancellation.includingStop(params.timeout)
+        val stop = params.cancellation .includingStop( params.timeout)
         if (stop()) return incompleteOpenExecution(objective, params.preparationStopReason(stop))
         val selected = if (preparedSource == null) model.componentPlan(cancellation = stop) else null
         if (stop() || selected?.encodingDecline == EncoderDecline.RESOURCE ||
             preparedSource?.decline == PreparedPlanDecline.RESOURCE
-        ) {
-            return incompleteOpenExecution(
-                objective,
-                if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
-            )
-        }
-        val prepared = preparedSource ?: model.preparedWithComponents(
-            checkNotNull(selected),
-            objective = values?.original,
-            maximize = values?.maximize ?: false,
-        )
+        ) return incompleteOpenExecution(objective,
+            if (stop()) params.preparationStopReason(stop) else TerminationReason.BudgetExhausted)
+        val prepared = preparedSource ?: model.preparedWithComponents(checkNotNull(selected),
+            objective = values?.original, maximize = values?.maximize ?: false)
         val operation = if (objective == null) ExecutionOperation.SATISFY else ExecutionOperation.OPTIMIZE
         if (!prepared.capabilities.admission(engine, operation).runnable) return unsupportedExecution(objective)
         return when (engine) {
-            FiniteEngine.MIXED -> heuristicExecution(
-                model,
-                params,
-                objective,
-                cores,
-                false,
-                values,
-                publication,
-                prepared,
-            )
-
-            FiniteEngine.LOCAL_SEARCH -> heuristicExecution(
-                model,
-                params,
-                objective,
-                cores,
-                true,
-                values,
-                publication,
-                prepared,
-            )
-
+            FiniteEngine.MIXED -> heuristicExecution(model, params, objective, cores, false,
+                values, publication, prepared)
+            FiniteEngine.LOCAL_SEARCH -> heuristicExecution(model, params, objective, cores, true,
+                values, publication, prepared)
             FiniteEngine.BACKTRACK, FiniteEngine.FIXED -> unsupportedExecution(objective)
-
-            FiniteEngine.ALNS -> linearNeighborhoodInvocation(
-                model,
-                params,
-                objective,
-                adaptive = true,
-                cores,
-                preparedSource = prepared,
-                sourceObjective = values,
-                publication = publication,
-            )
+            FiniteEngine.ALNS -> linearNeighborhoodInvocation(model, params, objective, adaptive = true, cores,
+                preparedSource = prepared, sourceObjective = values, publication = publication)
         }
     }
 
@@ -543,72 +465,36 @@ object OpenTheoryPipeline {
         val objective = request.minimizedObjective
         if (objective == null) return OpenTheoryExecution.Satisfy(engineFor(request).solve(params))
         val context = values?.context
-        val binding = EngineInvocation(
-            request.preparedPlan,
-            ModelIdentity.of(request.model, objective),
-            objective,
-            scope = context?.scope,
-            condition = context?.scope?.condition,
-        )
+        val binding = EngineInvocation(request.preparedPlan, ModelIdentity.of(request.model, objective), objective,
+            scope = context?.scope, condition = context?.scope?.condition)
         if (context == null) {
             val integral = integralMinimizer(request, objective)
             if (integral != null) {
                 return integral.descent(params).use { descent ->
-                    OpenTheoryExecution.Optimize(
-                        requireNotNull(
-                            descent.runSlice(
-                                params.cancellation.includingStop(params.timeout),
-                                Long.MAX_VALUE,
-                                -1,
-                            ) { assignment, _ ->
-                                values?.publish(
-                                    assignment.toSample(request.model, binding),
-                                    publication,
-                                )
-                            },
-                        ),
-                    )
+                    OpenTheoryExecution.Optimize(requireNotNull(descent.runSlice(
+                        params.cancellation .includingStop( params.timeout), Long.MAX_VALUE, -1,
+                    ) { assignment, _ -> values?.publish(assignment.toSample(request.model, binding), publication) }))
                 }
             }
         }
-        return RationalTheoryDescent(
-            request.model,
-            objective,
-            params,
-            context,
-            publicationInvocation = binding,
-        ).use { descent ->
-            val result = requireNotNull(
-                descent.runSlice(
-                    params.cancellation.includingStop(params.timeout),
-                    Long.MAX_VALUE,
-                    -1,
-                ) { incumbent -> values?.publish(incumbent.sample, publication) },
-            )
+        return RationalTheoryDescent(request.model, objective, params, context,
+            publicationInvocation = binding).use { descent ->
+            val result = requireNotNull(descent.runSlice(
+                params.cancellation .includingStop( params.timeout), Long.MAX_VALUE, -1,
+            ) { incumbent -> values?.publish(incumbent.sample, publication) })
             val authority = descent.linearResult
-            val folded = if (authority == null) {
-                result.openOptimum(objective)
-            } else {
-                requireNotNull(values).completed(
-                    authority,
-                    params.cancellation.includingStop(params.timeout),
-                    if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
-                )
-            }
+            val folded = if (authority == null) result.openOptimum(objective) else requireNotNull(values).completed(
+                authority, params.cancellation .includingStop( params.timeout),
+                if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled)
             OpenTheoryExecution.Optimize(folded)
         }
     }
 
     private fun sourceObjective(request: OpenTheoryRequest, params: TheoryParams): OpenSourceObjective? =
-        request.objective?.let { original ->
-            OpenSourceObjective(
-                requireNotNull(request.minimizedObjective),
-                original,
-                request.maximize,
-                request.linearAuthorityContext(params.cancellation.includingStop(params.timeout)),
-                params.cancellation.includingStop(params.timeout),
-            )
-        }
+        request.objective?.let { original -> OpenSourceObjective(requireNotNull(request.minimizedObjective), original,
+            request.maximize, request.linearAuthorityContext(params.cancellation .includingStop( params.timeout)),
+            params.cancellation .includingStop( params.timeout),
+            ) }
 
     private fun observed(
         semantics: EffectiveSourceSemantics?,
@@ -631,9 +517,7 @@ object OpenTheoryPipeline {
     private fun integralMinimizer(request: OpenTheoryRequest, objective: LinearObjective): OpenTheoryMinimizer? {
         if (objective.realCoefficientValues.any { it != 0.0 } ||
             objective.boolWeightValues.any { it != 0L }
-        ) {
-            return null
-        }
+        ) return null
         return minimizerFor(request, objective).takeIf { it.decidesEveryRound }
     }
 
@@ -650,15 +534,9 @@ object OpenTheoryPipeline {
 }
 
 internal fun TheoryParams.preparationStopReason(stop: ExecutionControl): TerminationReason =
-    if (timeout() || stop.deadline()?.hasPassedNow() == true) {
-        TerminationReason.Timeout
-    } else {
-        TerminationReason.Cancelled
-    }
+    if (timeout() || stop.deadline()?.hasPassedNow() == true) TerminationReason.Timeout
+    else TerminationReason.Cancelled
 
 internal fun incompleteOpenExecution(objective: LinearObjective?, reason: TerminationReason): OpenTheoryExecution =
-    if (objective == null) {
-        OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(reason, SolveStats.EMPTY))
-    } else {
-        OpenTheoryExecution.Optimize(OpenTheoryOptimum.Bounded(null, null, reason, SolveStats.EMPTY))
-    }
+    if (objective == null) OpenTheoryExecution.Satisfy(OpenTheoryResult.Unknown(reason, SolveStats.EMPTY))
+    else OpenTheoryExecution.Optimize(OpenTheoryOptimum.Bounded(null, null, reason, SolveStats.EMPTY))

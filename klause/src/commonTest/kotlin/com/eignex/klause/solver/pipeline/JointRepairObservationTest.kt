@@ -19,19 +19,14 @@ class JointRepairObservationTest {
     fun `proposal capture should retain exact pins and actual free coordinates`() {
         val funding = SourceLpFunding(1_000_000, 1_000_000)
         val records = mutableListOf<JointRepairObservation>()
-        val capture = JointRepairObservationCapture(
-            SourceLpBudget(funding = funding),
-            ExecutionControl.Never,
-            records::add,
-        )
+        val capture = JointRepairObservationCapture(SourceLpBudget(funding = funding), ExecutionControl.Never,
+            records::add)
         val centers = mutableListOf(BigFraction.ONE, BigFraction.ofLong(2))
         val pins = linkedMapOf(0 to BigFraction.ONE)
         val bools = linkedMapOf(0 to true)
 
-        capture.proposal(
-            7, 2, 0, 1, 5, 2, "checked-pooled", centers, 2, null, listOf(1),
-            ExactNeighborhoodCondition(bools, pins, pins, BigFraction.ofLong(3)),
-        )
+        capture.proposal(7, 2, 0, 1, 5, 2, "checked-pooled", centers, 2, null, listOf(1),
+            ExactNeighborhoodCondition(bools, pins, pins, BigFraction.ofLong(3)))
         centers[0] = BigFraction.ZERO
         pins.clear()
         bools.clear()
@@ -56,34 +51,20 @@ class JointRepairObservationTest {
     fun `feedback capture should preserve bound direction and missing condition values`() {
         val records = mutableListOf<JointRepairObservation>()
         val capture = JointRepairObservationCapture(
-            SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)),
-            ExecutionControl.Never,
-            records::add,
-        )
+            SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)), ExecutionControl.Never, records::add)
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val real = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
-        val assumptions = linkedSetOf(
-            SourceDerivation.Assumption(integer, false),
-            SourceDerivation.Assumption(integer, true),
-            SourceDerivation.Assumption(real, true),
-        )
-        val condition = ExactNeighborhoodCondition(
-            emptyMap(),
-            mapOf(0 to BigFraction.ONE),
-            mapOf(0 to BigFraction.ofLong(2)),
-        )
+        val assumptions = linkedSetOf(SourceDerivation.Assumption(integer, false),
+            SourceDerivation.Assumption(integer, true), SourceDerivation.Assumption(real, true))
+        val condition = ExactNeighborhoodCondition(emptyMap(), mapOf(0 to BigFraction.ONE),
+            mapOf(0 to BigFraction.ofLong(2)))
 
         capture.feedback(3, 2, "Guidance", assumptions, condition, 1)
         assumptions.clear()
 
-        assertEquals(
-            listOf(
-                JointRepairObservedBound(integer, false, BigFraction.ONE),
-                JointRepairObservedBound(integer, true, BigFraction.ofLong(2)),
-                JointRepairObservedBound(real, true, null),
-            ),
-            records.single().support,
-        )
+        assertEquals(listOf(JointRepairObservedBound(integer, false, BigFraction.ONE),
+            JointRepairObservedBound(integer, true, BigFraction.ofLong(2)),
+            JointRepairObservedBound(real, true, null)), records.single().support)
         assertEquals(3L, records.single().proposal)
         assertEquals(2L, records.single().query)
     }
@@ -92,11 +73,8 @@ class JointRepairObservationTest {
     fun `capture should spend containing funding without renewing a paused query`() {
         val funding = SourceLpFunding(1_000_000, 1_000_000)
         val records = mutableListOf<JointRepairObservation>()
-        val capture = JointRepairObservationCapture(
-            SourceLpBudget(funding = funding),
-            ExecutionControl.Never,
-            records::add,
-        )
+        val capture = JointRepairObservationCapture(SourceLpBudget(funding = funding), ExecutionControl.Never,
+            records::add)
 
         capture.event(1, 1, "query", "opened")
 
@@ -111,11 +89,8 @@ class JointRepairObservationTest {
     fun `spent funding should withhold a capture without charging more work`() {
         val funding = SourceLpFunding(0, 1_000_000)
         val records = mutableListOf<JointRepairObservation>()
-        val capture = JointRepairObservationCapture(
-            SourceLpBudget(funding = funding),
-            ExecutionControl.Never,
-            records::add,
-        )
+        val capture = JointRepairObservationCapture(SourceLpBudget(funding = funding), ExecutionControl.Never,
+            records::add)
 
         capture.event(1, 1, "query", "opened")
 
@@ -129,10 +104,7 @@ class JointRepairObservationTest {
         val funding = SourceLpFunding(1_000_000, 1_000_000)
         val records = mutableListOf<JointRepairObservation>()
         val capture = JointRepairObservationCapture(
-            SourceLpBudget(funding = funding),
-            ExecutionControl { true },
-            records::add,
-        )
+            SourceLpBudget(funding = funding), ExecutionControl { true }, records::add)
 
         capture.event(1, 1, "query", "opened")
 
@@ -145,16 +117,11 @@ class JointRepairObservationTest {
     fun `oversized scalars should withhold the entire proposal`() {
         val records = mutableListOf<JointRepairObservation>()
         val capture = JointRepairObservationCapture(
-            SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)),
-            ExecutionControl.Never,
-            records::add,
-        )
+            SourceLpBudget(funding = SourceLpFunding(1_000_000, 1_000_000)), ExecutionControl.Never, records::add)
         val value = BigFraction.of(bigIntOf(1) shl 4096, BIG_ONE)
 
-        capture.proposal(
-            1, 0, 1, 1, 1, 1, "stored", listOf(value), 1, null, emptyList(),
-            ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
-        )
+        capture.proposal(1, 0, 1, 1, 1, 1, "stored", listOf(value), 1, null, emptyList(),
+            ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()))
 
         assertTrue(records.isEmpty())
         assertEquals(1L, capture.observations()["jointRepairObservationDeclinedScalar"])
@@ -165,11 +132,8 @@ class JointRepairObservationTest {
     fun `record exhaustion should stop capture and retain dropped event counts`() {
         val funding = SourceLpFunding(1_000_000, 1_000_000)
         val records = mutableListOf<JointRepairObservation>()
-        val capture = JointRepairObservationCapture(
-            SourceLpBudget(funding = funding),
-            ExecutionControl.Never,
-            records::add,
-        )
+        val capture = JointRepairObservationCapture(SourceLpBudget(funding = funding), ExecutionControl.Never,
+            records::add)
         repeat(64) { capture.event(it.toLong(), 0, "result", "undecided") }
         val spent = funding.spent
 
@@ -185,17 +149,12 @@ class JointRepairObservationTest {
     fun `large proposals should stay within cumulative capture bounds`() {
         val funding = SourceLpFunding(10_000_000, 10_000_000)
         val records = mutableListOf<JointRepairObservation>()
-        val capture = JointRepairObservationCapture(
-            SourceLpBudget(funding = funding),
-            ExecutionControl.Never,
-            records::add,
-        )
+        val capture = JointRepairObservationCapture(SourceLpBudget(funding = funding), ExecutionControl.Never,
+            records::add)
         val centers = List(16_385) { BigFraction.ONE }
 
-        capture.proposal(
-            1, 2, 0, 0, centers.size, centers.size, "stored", centers, centers.size, null,
-            emptyList(), ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()),
-        )
+        capture.proposal(1, 2, 0, 0, centers.size, centers.size, "stored", centers, centers.size, null,
+            emptyList(), ExactNeighborhoodCondition(emptyMap(), emptyMap(), emptyMap()))
 
         assertTrue(records.isEmpty())
         assertTrue(capture.observations().getValue("jointRepairObservationEntries") <= 16_384)

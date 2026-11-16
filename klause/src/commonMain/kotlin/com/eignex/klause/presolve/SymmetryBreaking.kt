@@ -60,9 +60,7 @@ internal object SymmetryBreaking {
         val objective = context.linearObjective ?: return PassDelta()
         if (context.solutionSetSensitive || context.modelBreaksSymmetry || problem.numRealVars != 0 ||
             problem.semantics.isApproximate || objective.realCoefficientValues.any { it != 0.0 }
-        ) {
-            return PassDelta()
-        }
+        ) return PassDelta()
         val ints = objective.intCoefficientValues
         val bools = objective.boolWeightValues
         context.cancellation.charge(ints.size.toLong() + bools.size)
@@ -71,12 +69,8 @@ internal object SymmetryBreaking {
         val objectiveBools = bools.indices.filter { bools[it] != 0L }.toSet()
         if (objectiveInts.isEmpty() && objectiveBools.isEmpty()) return PassDelta()
         val extra = breakings(
-            problem,
-            FiniteColumns(problem),
-            objectiveInts,
-            objectiveBools,
-            context.cancellation,
-            objective,
+            problem, FiniteColumns(problem), objectiveInts, objectiveBools,
+            context.cancellation, objective,
         )
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
     }
@@ -108,9 +102,7 @@ internal object SymmetryBreaking {
         val bounds = problem.intBounds
         if (problem.numRealVars == 0 &&
             (0 until problem.numIntVars).all { bounds.hasLower(it) && bounds.hasUpper(it) }
-        ) {
-            return SourceDelta()
-        }
+        ) return SourceDelta()
         if (problem.factors.any { it is SymmetryHandling }) return SourceDelta()
         if (generatorRoundCost(problem) > GENERATOR_ROUND_COST_BUDGET) return SourceDelta()
         val columns = activeColumns(problem, SourceColumns(problem), cancellation) ?: return SourceDelta()
@@ -154,12 +146,7 @@ internal object SymmetryBreaking {
         // itself an automorphism — a scalar symmetric group, not a lockstep matrix), the full total
         // order is sound and strictly stronger than the generator lex, so post it too.
         val scalarLex = scalarTotalOrders(
-            problem,
-            generators,
-            variableHeldInts,
-            variableHeldBools,
-            objective,
-            cancellation,
+            problem, generators, variableHeldInts, variableHeldBools, objective, cancellation,
         )
         val valuePins = breakValueSymmetry(problem, active, heldInts, cancellation, chainPrecedence = true)
         val extra = ArrayList<Factor>()
@@ -544,7 +531,8 @@ internal object SymmetryBreaking {
     private fun activeColumns(problem: Problem, columns: ColumnValues, cancellation: ExecutionControl): ActiveColumns? =
         PresolveScan(cancellation).use { activeColumnsWithin(problem, columns, it) }
 
-    private fun activeColumnsWithin(problem: Problem, columns: ColumnValues, cancellation: PresolveScan): ActiveColumns? {
+    private fun activeColumnsWithin(problem: Problem, columns: ColumnValues,
+        cancellation: PresolveScan): ActiveColumns? {
         cancellation.charge(problem.numIntVars.toLong() + problem.numBoolVars)
         if (cancellation.poll()) return null
         val readInts = BooleanArray(problem.numIntVars)
@@ -554,12 +542,12 @@ internal object SymmetryBreaking {
             if (cancellation.poll()) return null
             for (variable in factor.intVars) {
                 cancellation.charge(1L)
-                if (cancellation.poll()) return null
+                if ( cancellation.poll()) return null
                 readInts[variable] = true
             }
             for (variable in factor.boolVars) {
                 cancellation.charge(1L)
-                if (cancellation.poll()) return null
+                if ( cancellation.poll()) return null
                 readBools[variable] = true
             }
         }
@@ -880,20 +868,12 @@ internal object SymmetryBreaking {
 
         val base = PresolveShared.structuralKeyMultiset(problem.factors.asList())
         val seedIntBase = Array(nInt) { v ->
-            if (v in objectiveIntVars) {
-                objectiveSeed(SPACE_INT, v)
-            } else {
-                columns.seed(v)
-                    .withCoefficient(objective?.intCoefficientValues?.getOrElse(v) { 0L })
-            }
+            if (v in objectiveIntVars) objectiveSeed(SPACE_INT, v) else columns.seed(v)
+                .withCoefficient(objective?.intCoefficientValues?.getOrElse(v) { 0L })
         }
         val seedBoolBase = Array(nBool) { v ->
-            if (v in objectiveBoolVars) {
-                objectiveSeed(SPACE_BOOL, v)
-            } else {
-                columns.boolSeed(v)
-                    .withCoefficient(objective?.boolWeightValues?.getOrElse(v) { 0L })
-            }
+            if (v in objectiveBoolVars) objectiveSeed(SPACE_BOOL, v) else columns.boolSeed(v)
+                .withCoefficient(objective?.boolWeightValues?.getOrElse(v) { 0L })
         }
 
         val budget = intArrayOf(GENERATOR_WORK_BUDGET)

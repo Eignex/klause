@@ -22,11 +22,9 @@ data class PolynomialStrategyParams(
     /** Common finite pins captured for this invocation. */
     val assumptions: Assumptions = Assumptions.None,
     /** ALNS destroy/repair iteration cap. */
-    val alnsIterations: Int = 50
+    val alnsIterations: Int = 50,
 ) {
-    init {
-        require(alnsIterations >= 0)
-    }
+    init { require(alnsIterations >= 0) }
 }
 
 internal class PolynomialStrategyAdapters(
@@ -35,19 +33,16 @@ internal class PolynomialStrategyAdapters(
     private val scope: PolynomialInvocationScope,
     private val params: PolynomialStrategyParams,
     private val cancellation: ExecutionControl,
-    private val parallelism: Int
+    private val parallelism: Int,
 ) {
     fun solve(engine: FiniteEngine): SolveResult = if (usesPortfolio(engine)) {
         portfolio(engine).use { it.solve(cancellation) }
-    } else {
-        standalone(engine) { it.solve(engine) }
-    }
+    } else standalone(engine) { it.solve(engine) }
 
-    fun minimize(objective: LinearObjective, engine: FiniteEngine): MinimizeResult = if (usesPortfolio(engine)) {
-        portfolio(engine, objective).use { it.minimize(cancellation) }
-    } else {
-        standalone(engine, objective) { it.minimize(objective, engine) }
-    }
+    fun minimize(objective: LinearObjective, engine: FiniteEngine): MinimizeResult =
+        if (usesPortfolio(engine)) {
+            portfolio(engine, objective).use { it.minimize(cancellation) }
+        } else standalone(engine, objective) { it.minimize(objective, engine) }
 
     private fun usesPortfolio(engine: FiniteEngine): Boolean = engine == FiniteEngine.MIXED ||
         (engine != FiniteEngine.FIXED && parallelism > 1)
@@ -55,40 +50,24 @@ internal class PolynomialStrategyAdapters(
     private fun <T> standalone(
         engine: FiniteEngine,
         objective: LinearObjective? = null,
-        action: (PolynomialWorkerAdapter) -> T
+        action: (PolynomialWorkerAdapter) -> T,
     ): T {
         val complete = engine == FiniteEngine.BACKTRACK || engine == FiniteEngine.FIXED
         val budget = if (complete) params.backtrack.nodeBudget else params.localSearch.nodeBudget
-        return PortfolioInvocationResources(
-            1,
-            1,
-            params.localSearch.randomSeed ?: 0,
-            cancellation,
-            budget,
-            if (complete) setOf(0) else emptySet()
-        ).use { resources ->
+        return PortfolioInvocationResources(1, 1, params.localSearch.randomSeed ?: 0,
+            cancellation, budget, if (complete) setOf(0) else emptySet()).use { resources ->
             val slot = resources.slots.single()
-            val execution = if (complete) {
-                params.backtrack.withAssumptions(params.assumptions).assumptions
-            } else {
-                params.localSearch.withAssumptions(params.assumptions).assumptions
-            }
-            val binding = EngineInvocation(
-                plan,
-                ModelIdentity.of(model.source, objective),
-                objective,
-                params.assumptions,
-                execution
-            )
+            val execution = if (complete) params.backtrack.withAssumptions(params.assumptions).assumptions
+                else params.localSearch.withAssumptions(params.assumptions).assumptions
+            val binding = EngineInvocation(plan, ModelIdentity.of(model.source, objective), objective,
+                params.assumptions, execution)
             action(PolynomialWorkerAdapter(model, scope.worker(slot), params, binding, scope.workerCancellation(slot)))
         }
     }
 
     private fun workerParams(slot: PortfolioWorkerSlot): PolynomialStrategyParams = params.copy(
-        backtrack = slot.backtrack(params.backtrack
-        ),
-        localSearch = slot.localSearch( params.localSearch
-        )
+        backtrack = slot.backtrack(params.backtrack),
+        localSearch = slot.localSearch(params.localSearch),
     )
 
     private fun portfolio(engine: FiniteEngine, objective: LinearObjective? = null): PortfolioInvocation {
@@ -102,28 +81,17 @@ internal class PolynomialStrategyAdapters(
                 ExecutionStrategy.ALNS -> 2
                 ExecutionStrategy.MIXED -> error("admission supplies participating arms")
             }
-            val family = when (arm) {
-                0 -> ArmFamily.Backtrack
-                1 -> ArmFamily.LocalSearch
-                else -> ArmFamily.Lns
-            }
+            val family = when (arm) { 0 -> ArmFamily.Backtrack; 1 -> ArmFamily.LocalSearch; else -> ArmFamily.Lns }
             val executionAssumptions = if (arm == 0) {
                 params.backtrack.withAssumptions(params.assumptions).assumptions
-            } else {
-                params.localSearch.withAssumptions(params.assumptions).assumptions
-            }
+            } else params.localSearch.withAssumptions(params.assumptions).assumptions
             val workerBinding = EngineInvocation(plan, identity, objective, params.assumptions, executionAssumptions)
             PortfolioArmFactory(plan, arm, family, binding = {
                 SourceWorkerBinding(workerBinding, provesResults = it.permitsSourceProofs)
             }) { slot ->
                 val controls = workerParams(slot)
-                PolynomialWorkerAdapter(
-                    model,
-                    scope.worker(slot),
-                    controls,
-                    workerBinding,
-                    scope.workerCancellation(slot)
-                ).worker(arm, objective, slot)
+                PolynomialWorkerAdapter(model, scope.worker(slot), controls, workerBinding,
+                    scope.workerCancellation(slot)).worker(arm, objective, slot)
             }
         }
         val complete = engine == FiniteEngine.BACKTRACK
@@ -132,19 +100,11 @@ internal class PolynomialStrategyAdapters(
             FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> params.localSearch.nodeBudget
             else -> params.backtrack.nodeBudget ?: params.localSearch.nodeBudget
         }
-        return PortfolioInvocation(
-            plan,
-            factories,
-            PortfolioInvocationControls(
-                parallelism = parallelism,
-                seed = seed ?: 0,
-                cancellation = cancellation,
-                nodeBudget = budget,
-                reseedStaleThreshold = 0
-            ),
+        return PortfolioInvocation(plan, factories,
+            PortfolioInvocationControls(parallelism = parallelism,
+                seed = seed ?: 0, cancellation = cancellation,
+                nodeBudget = budget, reseedStaleThreshold = 0),
             PortfolioEvidence(identity, polynomialWitnessVerifier(binding, cancellation))
-                .bindInvocation(binding, cancellation),
-            objective
-        )
+                .bindInvocation(binding, cancellation), objective)
     }
 }

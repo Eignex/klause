@@ -32,8 +32,7 @@ class SourceOptionsTest {
             "-2.50E+1" to SemanticRational.ofLong(-25),
             "1/3" to SemanticRational.of(bigIntOf(1), bigIntOf(3)),
             "0.10000000000000000001" to SemanticRational.of(
-                parseBigInt("10000000000000000001"),
-                parseBigInt("100000000000000000000"),
+                parseBigInt("10000000000000000001"), parseBigInt("100000000000000000000"),
             ),
         )
 
@@ -43,13 +42,7 @@ class SourceOptionsTest {
     @Test
     fun `invalid source numbers should produce usage errors`() {
         for (text in listOf(
-            "NaN",
-            "Infinity",
-            "1/0",
-            "word",
-            "1e10001",
-            "1e-10001",
-            "1e999999999999999999999",
+            "NaN", "Infinity", "1/0", "word", "1e10001", "1e-10001", "1e999999999999999999999",
         )) {
             assertFailsWith<CliUsageException>(text) { semanticNumber(text) }
         }
@@ -76,16 +69,8 @@ class SourceOptionsTest {
     fun `grid controls should replace requested fields and preserve declared defaults`() {
         val common = CommonOptions()
         parseArgs(
-            arrayOf(
-                "--float-semantics",
-                "grid",
-                "--float-buckets",
-                "17",
-                "--float-scale",
-                "3000000000",
-                "--float-grid-lo",
-                "-2.5",
-            ),
+            arrayOf("--float-semantics", "grid", "--float-buckets", "17", "--float-scale", "3000000000",
+                "--float-grid-lo", "-2.5"),
             commonFlagSpecs(common),
         ) {}
 
@@ -96,24 +81,15 @@ class SourceOptionsTest {
         assertEquals(17, grid.buckets)
         assertEquals(3_000_000_000L, grid.linearScale)
         assertEquals(SemanticRational.of(bigIntOf(-5), bigIntOf(2)), grid.unrangedBounds.lower)
-        assertEquals(
-            assertIs<FloatSemantics.Grid>(flatZincSemantics.floats).unrangedBounds.upper,
-            grid.unrangedBounds.upper,
-        )
+        assertEquals(assertIs<FloatSemantics.Grid>(flatZincSemantics.floats).unrangedBounds.upper,
+            grid.unrangedBounds.upper)
         assertEquals(flatZincSemantics, capture.declared)
     }
 
     @Test
     fun `exact source controls should require continuous floats and zero applicable tolerance`() {
-        for (declared in listOf(
-            flatZincSemantics,
-            smtLibSemantics,
-            mpsSemantics,
-            dimacsSemantics,
-            wcnfSemantics,
-            opbSemantics,
-            xcsp3Semantics,
-        )) {
+        for (declared in listOf(flatZincSemantics, smtLibSemantics, mpsSemantics, dimacsSemantics,
+            wcnfSemantics, opbSemantics, xcsp3Semantics)) {
             val common = CommonOptions()
             parseArgs(arrayOf("--exact"), commonFlagSpecs(common)) {}
 
@@ -131,8 +107,7 @@ class SourceOptionsTest {
     @Test
     fun `one tolerance replacement should preserve the other effective component`() {
         for ((flag, absolute) in listOf(
-            "--source-absolute-tolerance" to true,
-            "--source-relative-tolerance" to false,
+            "--source-absolute-tolerance" to true, "--source-relative-tolerance" to false,
         )) {
             val common = CommonOptions()
             parseArgs(arrayOf(flag, "0"), commonFlagSpecs(common)) {}
@@ -201,8 +176,7 @@ class SourceOptionsTest {
             }
             val common = CommonOptions()
             parseArgs(
-                arrayOf("--unbounded-int-lo", "2", "--unbounded-int-hi", "3"),
-                commonFlagSpecs(common),
+                arrayOf("--unbounded-int-lo", "2", "--unbounded-int-hi", "3"), commonFlagSpecs(common),
             ) {}
 
             val model = assertNotNull(mode.newSession().load(input.absolutePath, common).problem)
@@ -233,4 +207,5 @@ class SourceOptionsTest {
             assertFalse(assertNotNull(common.sourceSemantics).isApproximate)
         }
     }
+
 }

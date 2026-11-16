@@ -270,10 +270,7 @@ internal fun continueExactLp(
         allocationByPhase = addContinuationCosts(metrics.allocationByPhase, capture.allocationByPhase),
     )
     return LpContinuationVerification(
-        point,
-        conflict,
-        support,
-        combineContinuationMetrics(selection.metrics, metrics),
+        point, conflict, support, combineContinuationMetrics(selection.metrics, metrics),
         pointRejection.takeIf {
             metrics.phase == ContinuationPhase.VERIFY && metrics.decline == ContinuationDecline.CANDIDATE
         },
@@ -334,18 +331,15 @@ private fun selectContinuation(
             stop.reason
         }
         return ContinuationSelection(
-            combineContinuationMetrics(
-                exported,
-                ExactContinuationMetrics(
-                    work = budget.work,
-                    allocation = budget.allocation,
-                    elapsedNs = budget.elapsedNs,
-                    phase = budget.phase,
-                    decline = decline,
-                    workByPhase = budget.workByPhase.toMap(),
-                    allocationByPhase = budget.allocationByPhase.toMap(),
-                ),
-            ),
+            combineContinuationMetrics(exported, ExactContinuationMetrics(
+                work = budget.work,
+                allocation = budget.allocation,
+                elapsedNs = budget.elapsedNs,
+                phase = budget.phase,
+                decline = decline,
+                workByPhase = budget.workByPhase.toMap(),
+                allocationByPhase = budget.allocationByPhase.toMap(),
+            )),
         )
     }
     var decline: ContinuationDecline? = null

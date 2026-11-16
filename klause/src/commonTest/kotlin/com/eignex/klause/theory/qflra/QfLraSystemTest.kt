@@ -51,16 +51,8 @@ class QfLraSystemTest {
                 session.publish(SearchDecision.Bool(Lit.make(1, true)))
                 val op = if (upper) LinearOp.LE else LinearOp.GE
                 val comparisons = listOf(false, true, false).mapIndexed { index, strict ->
-                    PremisedSmtComparison(
-                        ExactComparison(
-                            mapOf(0 to BigFraction.ONE),
-                            BigFraction.ONE,
-                            op,
-                            strict,
-                            hasReals = true,
-                        ),
-                        premise(if (index == 1) 1 else 0),
-                    )
+                    PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                        op, strict, hasReals = true), premise(if (index == 1) 1 else 0))
                 }
                 val committed = ArrayList<Int>()
 
@@ -69,10 +61,8 @@ class QfLraSystemTest {
                 assertEquals(listOf(0, 1, 2), committed)
                 val active = assertNotNull(lp.state?.activeSide(0, upper))
                 assertTrue(active.side.strict)
-                assertEquals(
-                    listOf(Lit.make(1, false)),
-                    assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.toList(),
-                )
+                assertEquals(listOf(Lit.make(1, false)),
+                    assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.toList())
                 session.popTo(0)
                 assertNull(lp.state?.activeSide(0, upper))
             }
@@ -89,36 +79,12 @@ class QfLraSystemTest {
             session.push(SearchDecision.Bool(Lit.make(0, true)))
             session.publish(SearchDecision.Bool(Lit.make(1, true)))
             val comparisons = listOf(
-                PremisedSmtComparison(
-                    ExactComparison(
-                        mapOf(0 to BigFraction.ONE),
-                        BigFraction.ONE,
-                        LinearOp.GE,
-                        false,
-                        true,
-                    ),
-                    premise(0),
-                ),
-                PremisedSmtComparison(
-                    ExactComparison(
-                        mapOf(0 to BigFraction.ONE),
-                        BigFraction.ZERO,
-                        LinearOp.EQ,
-                        false,
-                        true,
-                    ),
-                    premise(1),
-                ),
-                PremisedSmtComparison(
-                    ExactComparison(
-                        mapOf(1 to BigFraction.ONE),
-                        BigFraction.ONE,
-                        LinearOp.LE,
-                        false,
-                        true,
-                    ),
-                    axiom,
-                ),
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.GE, false, true), premise(0)),
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ZERO,
+                    LinearOp.EQ, false, true), premise(1)),
+                PremisedSmtComparison(ExactComparison(mapOf(1 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), axiom),
             )
             val committed = ArrayList<Int>()
 
@@ -147,16 +113,8 @@ class QfLraSystemTest {
             assertTrue(lp.atLevel(1))
             val before = lp.state
             val comparisons = listOf(LinearOp.LE, LinearOp.GE).map {
-                PremisedSmtComparison(
-                    ExactComparison(
-                        mapOf(0 to BigFraction.ONE),
-                        BigFraction.ONE,
-                        it,
-                        false,
-                        true,
-                    ),
-                    axiom,
-                )
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                    it, false, true), axiom)
             }
             val committed = ArrayList<Int>()
             armed = true
@@ -183,26 +141,11 @@ class QfLraSystemTest {
             assertTrue(system.install())
             assertTrue(lp.atLevel(1))
             val comparisons = listOf(
-                PremisedSmtComparison(
-                    ExactComparison(
-                        mapOf(0 to BigFraction.ONE),
-                        BigFraction.ONE,
-                        LinearOp.LE,
-                        false,
-                        true,
-                    ),
-                    axiom,
-                ),
-                PremisedSmtComparison(
-                    ExactComparison(
-                        mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
-                        BigFraction.ONE,
-                        LinearOp.LE,
-                        false,
-                        true,
-                    ),
-                    axiom,
-                ),
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), axiom),
+                PremisedSmtComparison(ExactComparison(
+                    mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), axiom),
             )
             val committed = ArrayList<Int>()
 
@@ -230,26 +173,11 @@ class QfLraSystemTest {
             session.initialize()
             for (variable in 0..1) session.publish(SearchDecision.Bool(Lit.make(variable, true)))
             val comparisons = listOf(
-                PremisedSmtComparison(
-                    ExactComparison(
-                        mapOf(0 to BigFraction.ONE),
-                        BigFraction.ONE,
-                        LinearOp.EQ,
-                        false,
-                        true,
-                    ),
-                    premise(0),
-                ),
-                PremisedSmtComparison(
-                    ExactComparison(
-                        mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE),
-                        BigFraction.ONE,
-                        LinearOp.LE,
-                        false,
-                        true,
-                    ),
-                    premise(1),
-                ),
+                PremisedSmtComparison(ExactComparison(mapOf(0 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.EQ, false, true), premise(0)),
+                PremisedSmtComparison(ExactComparison(
+                    mapOf(0 to BigFraction.ONE, 1 to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), premise(1)),
             )
             val committed = ArrayList<Int>()
 
@@ -259,10 +187,8 @@ class QfLraSystemTest {
             assertEquals(0, assertNotNull(lp.state).model.m)
             val active = assertNotNull(lp.state?.activeSide(1, true))
             assertEquals(BigFraction.ZERO, active.side.number.value)
-            assertEquals(
-                (0..1).map { Lit.make(it, false) },
-                assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.sorted(),
-            )
+            assertEquals((0..1).map { Lit.make(it, false) },
+                assertNotNull(session.explainAtoms(lp.boundPremise(active.witness))).literals.sorted())
         }
     }
 
@@ -275,18 +201,9 @@ class QfLraSystemTest {
             val before = lp.state
             val committed = ArrayList<Int>()
 
-            assertTrue(
-                system.assertComparisons(
-                    listOf(
-                        PremisedSmtComparison(
-                            ExactComparison(emptyMap(), BigFraction.ZERO, LinearOp.EQ, false, true),
-                            axiom,
-                        ),
-                    ),
-                    ExecutionControl.Never,
-                    committed::add,
-                ),
-            )
+            assertTrue(system.assertComparisons(listOf(PremisedSmtComparison(
+                ExactComparison(emptyMap(), BigFraction.ZERO, LinearOp.EQ, false, true), axiom,
+            )), ExecutionControl.Never, committed::add))
 
             assertEquals(listOf(0), committed)
             assertSame(before, lp.state)
@@ -301,16 +218,8 @@ class QfLraSystemTest {
             assertTrue(lp.atLevel(1))
             val before = lp.state
             val comparisons = (0..1).map { column ->
-                PremisedSmtComparison(
-                    ExactComparison(
-                        mapOf(column to BigFraction.ONE),
-                        BigFraction.ONE,
-                        LinearOp.LE,
-                        false,
-                        true,
-                    ),
-                    axiom,
-                )
+                PremisedSmtComparison(ExactComparison(mapOf(column to BigFraction.ONE), BigFraction.ONE,
+                    LinearOp.LE, false, true), axiom)
             }
             val committed = ArrayList<Int>()
             var polls = 0
@@ -332,18 +241,9 @@ class QfLraSystemTest {
             val value = BigFraction.ofLong(9007199254740993L)
             val committed = ArrayList<Int>()
 
-            assertTrue(
-                system.assertComparisons(
-                    listOf(
-                        PremisedSmtComparison(
-                            ExactComparison(mapOf(0 to BigFraction.ONE), value, LinearOp.EQ, false, true),
-                            axiom,
-                        ),
-                    ),
-                    ExecutionControl.Never,
-                    committed::add,
-                ),
-            )
+            assertTrue(system.assertComparisons(listOf(PremisedSmtComparison(
+                ExactComparison(mapOf(0 to BigFraction.ONE), value, LinearOp.EQ, false, true), axiom,
+            )), ExecutionControl.Never, committed::add))
 
             assertEquals(listOf(0), committed)
             for (upper in listOf(false, true)) {
@@ -728,15 +628,8 @@ class QfLraSystemTest {
 
     @Test
     fun `an unresolved guarded term should retain source columns without a numerical definition`() {
-        val factor = ReifiedRealLinear(
-            0,
-            intArrayOf(),
-            doubleArrayOf(),
-            intArrayOf(0, 1),
-            doubleArrayOf(1.0, 2.0),
-            LinearOp.LE,
-            3.0,
-        )
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
         val source = source().withFactors(arrayOf(factor))
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
             val system = LiveQfLraSystem(source, lp)
@@ -751,16 +644,8 @@ class QfLraSystemTest {
 
     @Test
     fun `a guarded definition should survive retraction while its strict bound retracts`() {
-        val factor = ReifiedRealLinear(
-            0,
-            intArrayOf(),
-            doubleArrayOf(),
-            intArrayOf(0, 1),
-            doubleArrayOf(1.0, 2.0),
-            LinearOp.LE,
-            0.0,
-            strict = true,
-        )
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 0.0, strict = true)
         val source = source().withFactors(arrayOf(factor))
         val form = factor.linearRows.single().exactForm(2)
         LpPropagator(object : LpSearchPolicy {}).use { lp ->
@@ -776,13 +661,8 @@ class QfLraSystemTest {
             session.popTo(0)
             assertIs<ComponentResult.Consistent>(session.propagate())
             session.push(SearchDecision.Bool(Lit.make(0, false)))
-            assertTrue(
-                system.assertComparison(
-                    form.comparison(false) { false },
-                    null,
-                    SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(0, false))),
-                ),
-            )
+            assertTrue(system.assertComparison(form.comparison(false) { false }, null,
+                SearchAtomPremise.Asserted(SearchDecision.Bool(Lit.make(0, false)))))
 
             val sibling = assertNotNull(assertNotNull(lp.solve()).exactPrimal)
             assertTrue(sibling[0] + BigFraction.ofLong(2) * sibling[1] >= BigFraction.ZERO)
@@ -794,15 +674,8 @@ class QfLraSystemTest {
 
     @Test
     fun `a deferred definition should retain the numerical row limit across siblings`() {
-        val factor = ReifiedRealLinear(
-            0,
-            intArrayOf(),
-            doubleArrayOf(),
-            intArrayOf(0, 1),
-            doubleArrayOf(1.0, 2.0),
-            LinearOp.LE,
-            3.0,
-        )
+        val factor = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+            doubleArrayOf(1.0, 2.0), LinearOp.LE, 3.0)
         val source = source().withFactors(arrayOf(factor))
         val form = factor.linearRows.single().exactForm(2)
         LpPropagator(object : LpSearchPolicy {}, effort = { LpEffortProfile(maxRows = 0) }).use { lp ->

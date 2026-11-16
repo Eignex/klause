@@ -44,72 +44,49 @@ class LinearAuthorityTest {
     @Test
     fun `pinned refutation scope reduction should require complete Boolean substitution`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val source = SourceProofContext(
-            scope,
-            setOf(bool),
-            mapOf(
-                "row" to SourcePremise(SourceInequality(mapOf(bool to BigFraction.ONE), BigFraction.ZERO)),
-            ),
-        )
+        val source = SourceProofContext(scope, setOf(bool), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(bool to BigFraction.ONE), BigFraction.ZERO)),
+        ))
         val proof = LinearPinnedRefutation(SourceDerivation.Premise("row"))
         val complete = scope.copy(condition = SourceCondition(bools = mapOf(0 to true)))
         val checked = SourceEvidence(complete, SourceClaim.Refutation, proof)
 
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.atScope(complete).withLinearAuthority()).verify(checked),
-        )
-        assertIs<SourceEvidenceCheck.Rejected>(
-            SourceEvidenceVerifier(source.withLinearAuthority()).verify(
-                SourceEvidence(scope, SourceClaim.Refutation, proof),
-            ),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.atScope(complete).withLinearAuthority()).verify(checked))
+        assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source.withLinearAuthority()).verify(
+            SourceEvidence(scope, SourceClaim.Refutation, proof)))
     }
 
     @Test
     fun `pinned refutation replay should recompute Boolean coefficients after a polarity change`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val complete = scope.copy(condition = SourceCondition(bools = mapOf(0 to false)))
-        val source = SourceProofContext(
-            complete,
-            setOf(bool),
-            mapOf(
-                "row" to SourcePremise(SourceInequality(mapOf(bool to BigFraction.ONE), BigFraction.ZERO)),
-            ),
-        )
+        val source = SourceProofContext(complete, setOf(bool), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(bool to BigFraction.ONE), BigFraction.ZERO)),
+        ))
         val proof = LinearPinnedRefutation(SourceDerivation.Premise("row"))
 
         val check = SourceEvidenceVerifier(source.withLinearAuthority()).verify(
-            SourceEvidence(complete, SourceClaim.Refutation, proof),
-        )
+            SourceEvidence(complete, SourceClaim.Refutation, proof))
 
         assertIs<SourceEvidenceCheck.Rejected>(check)
     }
 
     @Test
     fun `pinned refutation imports should replay under stronger scopes with the original source checker`() {
-        val source = SourceProofContext(
-            scope,
-            setOf(real),
-            mapOf(
-                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
-            ),
-        ).withLinearAuthority()
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+        )).withLinearAuthority()
         val restricted = scope.copy(condition = SourceCondition(upper = mapOf(real to BigFraction.ZERO)))
-        val proof = LinearPinnedRefutation(
-            SourceDerivation.Combination(
-                listOf(
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(real, upper = true)),
-                ),
-            ),
-        )
+        val proof = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(real, upper = true)),
+        )))
         val imported = SourceEvidence(restricted, SourceClaim.Refutation, proof)
         val stronger = scope.copy(condition = SourceCondition(upper = mapOf(real to BigFraction.MINUS_ONE)))
 
         val check = SourceEvidenceVerifier(source.atScope(stronger)).verify(
-            SourceEvidence(stronger, SourceClaim.Refutation, SourceDerivation.Import(imported)),
-        )
+            SourceEvidence(stronger, SourceClaim.Refutation, SourceDerivation.Import(imported)))
 
         assertEquals(SourceEvidenceCheck.Checked, check)
     }
@@ -118,21 +95,12 @@ class LinearAuthorityTest {
     fun `suspended sparse refutations should lift column sides and charge certificate work once`() {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val other = coordinates[1]
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            mapOf(
-                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "sum" to SourcePremise(
-                    SourceInequality(
-                        mapOf(real to BigFraction.ONE, other to BigFraction.ONE),
-                        BigFraction.MINUS_ONE,
-                    ),
-                ),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE, other to BigFraction.ONE),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
         val budget = SourceLpBudget(maxOperations = 1)
 
         LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
@@ -145,10 +113,8 @@ class LinearAuthorityTest {
 
             val evidence = assertNotNull(result.evidence)
             assertEquals(SourceClaim.Refutation, evidence.claim)
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence),
-            )
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
             assertTrue(result.relaxedPoint.isEmpty())
             val certificateWork = budget.measuredConflictCertificationWork
             val floatWork = budget.measuredFloatWork
@@ -164,37 +130,21 @@ class LinearAuthorityTest {
     fun `sparse refutations should lose authority after a scoped bound retracts`() {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val other = coordinates[1]
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            mapOf(
-                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "sum" to SourcePremise(
-                    SourceInequality(
-                        mapOf(real to BigFraction.ONE, other to BigFraction.ONE),
-                        BigFraction.ONE,
-                    ),
-                ),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
-        val restricted = source.atScope(
-            scope.copy(
-                condition = SourceCondition(
-                    lower = mapOf(real to BigFraction.ofLong(2)),
-                ),
-            ),
-        )
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE, other to BigFraction.ONE),
+                BigFraction.ONE)),
+        ), mapOf(real to BigFraction.ONE))
+        val restricted = source.atScope(scope.copy(condition = SourceCondition(
+            lower = mapOf(real to BigFraction.ofLong(2)))))
         val budget = SourceLpBudget(maxOperations = 2)
 
         LinearAuthority(budget, retainLp = true).use { authority ->
             val evidence = assertNotNull(authority.advance(restricted, ExecutionControl.Never).evidence)
             assertEquals(SourceClaim.Refutation, evidence.claim)
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(evidence),
-            )
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(restricted.withLinearAuthority()).verify(evidence))
             val globalCheck = SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence)
             assertTrue(globalCheck != SourceEvidenceCheck.Checked)
 
@@ -207,35 +157,16 @@ class LinearAuthorityTest {
     @Test
     fun `exhausted sparse conflict certification should leave the source undecided`() {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            mapOf(
-                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "right" to SourcePremise(
-                    SourceInequality(
-                        mapOf(coordinates[1] to BigFraction.MINUS_ONE),
-                        BigFraction.ZERO,
-                    ),
-                ),
-                "sum" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            real to BigFraction.ONE,
-                            coordinates[1] to BigFraction.ONE,
-                        ),
-                        BigFraction.MINUS_ONE,
-                    ),
-                ),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                coordinates[1] to BigFraction.ONE), BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
 
-        LinearAuthority(
-            SourceLpBudget(maxOperations = 1),
-            retainLp = true,
-            guidancePolicy = SparseSourceLpPolicy(certificate = ReconstructionLimits(maxWork = 0L)),
-        ).use { authority ->
+        LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true,
+            guidancePolicy = SparseSourceLpPolicy(certificate = ReconstructionLimits(maxWork = 0L))).use { authority ->
             val result = authority.advance(source, ExecutionControl.Never)
 
             assertNull(result.evidence)
@@ -248,30 +179,13 @@ class LinearAuthorityTest {
     fun `sparse conflicts should retire when a contributing guarded row is disabled`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
-        val source = SourceProofContext(
-            scope,
-            (coordinates + bool).toSet(),
-            mapOf(
-                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "right" to SourcePremise(
-                    SourceInequality(
-                        mapOf(coordinates[1] to BigFraction.MINUS_ONE),
-                        BigFraction.ZERO,
-                    ),
-                ),
-                "sum" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            real to BigFraction.ONE,
-                            coordinates[1] to BigFraction.ONE,
-                        ),
-                        BigFraction.MINUS_ONE,
-                    ),
-                    guards = mapOf(0 to true),
-                ),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
+        val source = SourceProofContext(scope, (coordinates + bool).toSet(), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE,
+                coordinates[1] to BigFraction.ONE), BigFraction.MINUS_ONE), guards = mapOf(0 to true)),
+        ), mapOf(real to BigFraction.ONE))
         val enabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))))
         val disabled = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to false))))
 
@@ -282,10 +196,8 @@ class LinearAuthorityTest {
 
             val evidence = assertNotNull(result.evidence)
             assertIs<SourceClaim.Optimal>(evidence.claim)
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(disabled.withLinearAuthority()).verify(evidence),
-            )
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(disabled.withLinearAuthority()).verify(evidence))
         }
     }
 
@@ -294,39 +206,24 @@ class LinearAuthorityTest {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
             val coefficients = mapOf(real to sign, coordinates[1] to sign)
-            val source = SourceProofContext(
-                scope,
-                coordinates.toSet(),
-                mapOf(
-                    "first" to SourcePremise(SourceInequality(coefficients, sign.negated())),
-                    "opposite" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() }, sign)),
-                    "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                    "right" to SourcePremise(
-                        SourceInequality(
-                            mapOf(coordinates[1] to BigFraction.MINUS_ONE),
-                            BigFraction.ZERO,
-                        ),
-                    ),
-                ),
-                mapOf(real to BigFraction.ONE),
-            )
+            val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+                "first" to SourcePremise(SourceInequality(coefficients, sign.negated())),
+                "opposite" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() }, sign)),
+                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+            ), mapOf(real to BigFraction.ONE))
             val shapes = ArrayList<LinearAuthorityLpShape>()
 
-            LinearAuthority(
-                SourceLpBudget(maxOperations = 1),
-                shapes::add,
-                retainLp = true,
-                guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES),
-            )
+            LinearAuthority(SourceLpBudget(maxOperations = 1), shapes::add, retainLp = true,
+                guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES))
                 .use { authority ->
                     val result = authority.advance(source, ExecutionControl.Never)
 
                     val evidence = assertNotNull(result.evidence)
                     assertEquals(SourceClaim.Refutation, evidence.claim)
-                    assertEquals(
-                        SourceEvidenceCheck.Checked,
-                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence),
-                    )
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
                     assertEquals(1, shapes.single().rows)
                 }
         }
@@ -337,43 +234,25 @@ class LinearAuthorityTest {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         for (sign in listOf(BigFraction.ONE, BigFraction.MINUS_ONE)) {
             val coefficients = mapOf(real to sign, coordinates[1] to sign)
-            val source = SourceProofContext(
-                scope,
-                coordinates.toSet(),
-                mapOf(
-                    "first" to SourcePremise(SourceInequality(coefficients, sign)),
-                    "opposite" to SourcePremise(
-                        SourceInequality(
-                            coefficients.mapValues { it.value.negated() },
-                            sign.negated(),
-                        ),
-                    ),
-                    "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                    "right" to SourcePremise(
-                        SourceInequality(
-                            mapOf(coordinates[1] to BigFraction.MINUS_ONE),
-                            BigFraction.ZERO,
-                        ),
-                    ),
-                ),
-                mapOf(real to BigFraction.ONE, coordinates[1] to BigFraction.ONE),
-            )
+            val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+                "first" to SourcePremise(SourceInequality(coefficients, sign)),
+                "opposite" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                    sign.negated())),
+                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                    BigFraction.ZERO)),
+            ), mapOf(real to BigFraction.ONE, coordinates[1] to BigFraction.ONE))
 
-            LinearAuthority(
-                SourceLpBudget(maxOperations = 1),
-                retainLp = true,
-                guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES),
-            )
+            LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true,
+                guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES))
                 .use { authority ->
                     val result = authority.advance(source, ExecutionControl.Never)
 
                     val evidence = assertNotNull(result.evidence)
                     val optimum = assertIs<SourceClaim.Optimal>(evidence.claim)
                     assertEquals(SourceValue.Rational(BigFraction.ONE), optimum.value)
-                    assertEquals(
-                        SourceEvidenceCheck.Checked,
-                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence),
-                    )
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(source.withLinearAuthority()).verify(evidence))
                 }
         }
     }
@@ -383,36 +262,18 @@ class LinearAuthorityTest {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val coefficients = mapOf(real to BigFraction.ONE, coordinates[1] to BigFraction.ONE)
-        val source = SourceProofContext(
-            scope,
-            (coordinates + bool).toSet(),
-            mapOf(
-                "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ONE)),
-                "guarded" to SourcePremise(
-                    SourceInequality(
-                        coefficients.mapValues { it.value.negated() },
-                        BigFraction.MINUS_ONE,
-                    ),
-                    guards = mapOf(0 to true),
-                ),
-                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "right" to SourcePremise(
-                    SourceInequality(
-                        mapOf(coordinates[1] to BigFraction.MINUS_ONE),
-                        BigFraction.ZERO,
-                    ),
-                ),
-            ),
-            coefficients,
-        )
+        val source = SourceProofContext(scope, (coordinates + bool).toSet(), mapOf(
+            "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ONE)),
+            "guarded" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                BigFraction.MINUS_ONE), guards = mapOf(0 to true)),
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(coordinates[1] to BigFraction.MINUS_ONE),
+                BigFraction.ZERO)),
+        ), coefficients)
         val shapes = ArrayList<LinearAuthorityLpShape>()
 
-        LinearAuthority(
-            SourceLpBudget(maxOperations = 2),
-            shapes::add,
-            retainLp = true,
-            guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES),
-        )
+        LinearAuthority(SourceLpBudget(maxOperations = 2), shapes::add, retainLp = true,
+            guidancePolicy = SparseSourceLpPolicy(rowPolicy = SparseSourceLpRowPolicy.UNCONDITIONAL_EQUALITIES))
             .use { authority ->
                 for (enabled in listOf(true, false)) {
                     val branch = source.atScope(scope.copy(condition = SourceCondition(bools = mapOf(0 to enabled))))
@@ -421,10 +282,8 @@ class LinearAuthorityTest {
                     val evidence = assertNotNull(result.evidence)
                     val expected = if (enabled) BigFraction.ONE else BigFraction.ZERO
                     assertEquals(SourceValue.Rational(expected), assertIs<SourceClaim.Optimal>(evidence.claim).value)
-                    assertEquals(
-                        SourceEvidenceCheck.Checked,
-                        SourceEvidenceVerifier(branch.withLinearAuthority()).verify(evidence),
-                    )
+                    assertEquals(SourceEvidenceCheck.Checked,
+                        SourceEvidenceVerifier(branch.withLinearAuthority()).verify(evidence))
                 }
                 assertEquals(listOf(2, 2), shapes.map { it.rows })
             }
@@ -433,24 +292,12 @@ class LinearAuthorityTest {
     @Test
     fun `paused source guidance should retain one admitted operation across slices`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val source = SourceProofContext(
-            scope,
-            setOf(real, other),
-            mapOf(
-                "sum" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            real to BigFraction.MINUS_ONE,
-                            other to BigFraction.MINUS_ONE,
-                        ),
-                        BigFraction.ofLong(-3),
-                    ),
-                ),
-                "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            ),
-            mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)),
-        )
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
         val budget = SourceLpBudget(maxOperations = 1)
 
         LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
@@ -463,14 +310,10 @@ class LinearAuthorityTest {
             }
 
             val terminal = assertNotNull(result.evidence)
-            assertEquals(
-                SourceValue.Rational(BigFraction.ofLong(3)),
-                assertIs<SourceClaim.Optimal>(terminal.claim).value,
-            )
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal),
-            )
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(3)),
+                assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
             val floatWork = budget.measuredFloatWork
             val certificateWork = budget.measuredBoundCertificationWork
             authority.advance(source, ExecutionControl.Never)
@@ -486,30 +329,18 @@ class LinearAuthorityTest {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val premises = coordinates.withIndex().associate { (id, coordinate) ->
             "lower$id" to SourcePremise(SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO))
-        } + (
-            "sum" to SourcePremise(
-                SourceInequality(
-                    coordinates.associateWith { BigFraction.MINUS_ONE },
-                    BigFraction.MINUS_ONE,
-                ),
-            )
-            )
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            premises,
-            coordinates.associateWith { BigFraction.ONE },
-        )
+        } + ("sum" to SourcePremise(SourceInequality(coordinates.associateWith { BigFraction.MINUS_ONE },
+            BigFraction.MINUS_ONE)))
+        val source = SourceProofContext(scope, coordinates.toSet(), premises,
+            coordinates.associateWith { BigFraction.ONE })
 
         LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use { authority ->
             val result = authority.advance(source, ExecutionControl.Never)
 
             val terminal = assertNotNull(result.evidence)
             assertEquals(SourceValue.Rational(BigFraction.ONE), assertIs<SourceClaim.Optimal>(terminal.claim).value)
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal),
-            )
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         }
     }
 
@@ -517,15 +348,10 @@ class LinearAuthorityTest {
     fun `sparse guidance should reconstruct fixed source values beyond floating precision`() {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val value = BigFraction.ofLong(9007199254740993L)
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            mapOf(
-                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), value.negated())),
-                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), value)),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), value.negated())),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), value)),
+        ), mapOf(real to BigFraction.ONE))
 
         LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use { authority ->
             val result = authority.advance(source, ExecutionControl.Never)
@@ -533,10 +359,8 @@ class LinearAuthorityTest {
             val terminal = assertNotNull(result.evidence)
             assertEquals(SourceValue.Rational(value), assertIs<SourceClaim.Optimal>(terminal.claim).value)
             assertEquals(value, assertNotNull(result.incumbent?.exactReals).first())
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal),
-            )
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(terminal))
         }
     }
 
@@ -544,27 +368,13 @@ class LinearAuthorityTest {
     fun `sparse guidance should recover a strict real residual without changing a wide integer`() {
         val coordinates = (0 until 128).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val value = BigFraction.ofLong(9007199254740993L)
-        val source = SourceProofContext(
-            scope,
-            (coordinates + integer).toSet(),
-            mapOf(
-                "positive" to SourcePremise(
-                    SourceInequality(
-                        mapOf(real to BigFraction.MINUS_ONE),
-                        BigFraction.ZERO,
-                        strict = true,
-                    ),
-                ),
-                "integerLower" to SourcePremise(
-                    SourceInequality(
-                        mapOf(integer to BigFraction.MINUS_ONE),
-                        value.negated(),
-                    ),
-                ),
-                "integerUpper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), value)),
-            ),
-            emptyMap(),
-        )
+        val source = SourceProofContext(scope, (coordinates + integer).toSet(), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+            "integerLower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),
+                value.negated())),
+            "integerUpper" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.ONE), value)),
+        ), emptyMap())
         val budget = SourceLpBudget(maxOperations = 2)
 
         LinearAuthority(budget, retainLp = true).use { authority ->
@@ -574,10 +384,8 @@ class LinearAuthorityTest {
             assertEquals(value.num, sample.exactIntValue(0))
             assertTrue(assertNotNull(sample.exactReals).first() > BigFraction.ZERO)
             assertEquals(1L, result.primalStages["PrimalRecoveryResidual"])
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.evidence)),
-            )
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(result.evidence)))
             val operations = budget.operations
             val repeated = authority.advance(source, ExecutionControl.Never)
             assertNotNull(repeated.incumbent)
@@ -589,20 +397,10 @@ class LinearAuthorityTest {
     @Test
     fun `sparse recovery should decline when its shared source operations are exhausted`() {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            mapOf(
-                "positive" to SourcePremise(
-                    SourceInequality(
-                        mapOf(real to BigFraction.MINUS_ONE),
-                        BigFraction.ZERO,
-                        strict = true,
-                    ),
-                ),
-            ),
-            emptyMap(),
-        )
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+        ), emptyMap())
 
         val result = LinearAuthority(SourceLpBudget(maxOperations = 1), retainLp = true).use {
             it.advance(source, ExecutionControl.Never)
@@ -619,21 +417,10 @@ class LinearAuthorityTest {
         val other = coordinates[1]
         val value = checkNotNull(BigFraction.ofDouble(0.1))
         val coefficients = mapOf(real to BigFraction.ofLong(3), other to BigFraction.ofLong(3))
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            mapOf(
-                "upper" to SourcePremise(SourceInequality(coefficients, value)),
-                "lower" to SourcePremise(
-                    SourceInequality(
-                        coefficients.mapValues { it.value.negated() },
-                        value
-                            .negated(),
-                    ),
-                ),
-            ),
-            emptyMap(),
-        )
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "upper" to SourcePremise(SourceInequality(coefficients, value)),
+            "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() }, value.negated())),
+        ), emptyMap())
         val funding = SourceLpFunding(1_000_000_000L, Long.MAX_VALUE)
         var pauseGuide = true
         val budget = SourceLpBudget(maxOperations = 2, funding = funding, onWork = { work ->
@@ -657,43 +444,26 @@ class LinearAuthorityTest {
             assertEquals(2, budget.operations)
             assertEquals(1L, authority.preparations)
             assertEquals(resumed.primalStages["PrimalRecoveryAllocation"], funding.allocated - allocation)
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(resumed.evidence)),
-            )
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority()).verify(assertNotNull(resumed.evidence)))
         }
     }
 
     @Test
     fun `a recovered nominal point should still require the original source checker`() {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            mapOf(
-                "positive" to SourcePremise(
-                    SourceInequality(
-                        mapOf(real to BigFraction.MINUS_ONE),
-                        BigFraction.ZERO,
-                        strict = true,
-                    ),
-                ),
-            ),
-            emptyMap(),
-            semanticsChecker = object : SourceSemanticsChecker {
-                override fun witness(
-                    sample: Sample,
-                    scope: SourceScope,
-                    cancellation: ExecutionControl,
-                ): SourceEvidenceCheck = SourceEvidenceCheck.Rejected("source restriction")
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+        ), emptyMap(), semanticsChecker = object : SourceSemanticsChecker {
+            override fun witness(
+                sample: Sample, scope: SourceScope, cancellation: ExecutionControl,
+            ): SourceEvidenceCheck = SourceEvidenceCheck.Rejected("source restriction")
 
-                override fun ray(
-                    claim: SourceClaim.Ray,
-                    scope: SourceScope,
-                    cancellation: ExecutionControl,
-                ): SourceEvidenceCheck = SourceEvidenceCheck.Unavailable("no source ray")
-            },
-        )
+            override fun ray(
+                claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl,
+            ): SourceEvidenceCheck = SourceEvidenceCheck.Unavailable("no source ray")
+        })
 
         val result = LinearAuthority(SourceLpBudget(), retainLp = true).use {
             it.advance(source, ExecutionControl.Never)
@@ -710,20 +480,11 @@ class LinearAuthorityTest {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val other = coordinates[1]
         val coefficients = mapOf(real to BigFraction.ofLong(3), other to BigFraction.ofLong(3))
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            mapOf(
-                "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ONE)),
-                "lower" to SourcePremise(
-                    SourceInequality(
-                        coefficients.mapValues { it.value.negated() },
-                        BigFraction.MINUS_ONE,
-                    ),
-                ),
-            ),
-            coefficients,
-        )
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ONE)),
+            "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
+                BigFraction.MINUS_ONE)),
+        ), coefficients)
         val budget = SourceLpBudget()
 
         val result = LinearAuthority(budget, retainLp = true).use { it.advance(source, ExecutionControl.Never) }
@@ -735,63 +496,32 @@ class LinearAuthorityTest {
     @Test
     fun `wide strict recovery should preserve the gap between a feasible point and its bound`() {
         val coordinates = (0 until 129).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            mapOf(
-                "positive" to SourcePremise(
-                    SourceInequality(
-                        mapOf(real to BigFraction.MINUS_ONE),
-                        BigFraction.ZERO,
-                        strict = true,
-                    ),
-                ),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
+        val source = SourceProofContext(scope, coordinates.toSet(), mapOf(
+            "positive" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE),
+                BigFraction.ZERO, strict = true)),
+        ), mapOf(real to BigFraction.ONE))
 
         val result = LinearAuthority(SourceLpBudget(), retainLp = true).use {
             it.advance(source, ExecutionControl.Never)
         }
 
         assertTrue(assertNotNull(assertNotNull(result.incumbent).exactReals).first() > BigFraction.ZERO)
-        assertEquals(
-            SourceValue.Rational(BigFraction.ZERO),
-            assertIs<SourceClaim.Bound>(
-                assertNotNull(result.bound).claim,
-            ).value,
-        )
+        assertEquals(SourceValue.Rational(BigFraction.ZERO), assertIs<SourceClaim.Bound>(
+            assertNotNull(result.bound).claim).value)
         assertNull(result.evidence)
     }
 
     @Test
     fun `changed source conditions should discard a suspended guidance cursor`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val source = SourceProofContext(
-            scope,
-            setOf(real, other),
-            mapOf(
-                "sum" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            real to BigFraction.MINUS_ONE,
-                            other to BigFraction.MINUS_ONE,
-                        ),
-                        BigFraction.ofLong(-3),
-                    ),
-                ),
-                "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            ),
-            mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)),
-        )
-        val changed = source.atScope(
-            scope.copy(
-                condition = SourceCondition(
-                    lower = mapOf(real to BigFraction.ofLong(4)),
-                ),
-            ),
-        )
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
+        val changed = source.atScope(scope.copy(condition = SourceCondition(
+            lower = mapOf(real to BigFraction.ofLong(4)))))
         val budget = SourceLpBudget(maxOperations = 2)
 
         LinearAuthority(budget, retainLp = true, guidancePolicy = SparseSourceLpPolicy(quantum = 1L)).use { authority ->
@@ -802,14 +532,10 @@ class LinearAuthorityTest {
             }
 
             val terminal = assertNotNull(result.evidence)
-            assertEquals(
-                SourceValue.Rational(BigFraction.ofLong(4)),
-                assertIs<SourceClaim.Optimal>(terminal.claim).value,
-            )
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(changed.withLinearAuthority()).verify(terminal),
-            )
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(4)),
+                assertIs<SourceClaim.Optimal>(terminal.claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(changed.withLinearAuthority()).verify(terminal))
             assertEquals(2, budget.operations)
         }
     }
@@ -831,30 +557,15 @@ class LinearAuthorityTest {
     @Test
     fun `retained branch bounds should match cold queries after sibling retraction`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val source = SourceProofContext(
-            scope,
-            setOf(real, other),
-            mapOf(
-                "sum" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            real to BigFraction.MINUS_ONE,
-                            other to BigFraction.MINUS_ONE,
-                        ),
-                        BigFraction.ofLong(-3),
-                    ),
-                ),
-                "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            ),
-            mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)),
-        )
-        val conditions = listOf(
-            SourceCondition(),
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3))),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
+        val conditions = listOf(SourceCondition(),
             SourceCondition(upper = mapOf(real to BigFraction.ONE)),
-            SourceCondition(lower = mapOf(real to BigFraction.ofLong(2))),
-            SourceCondition(),
-        )
+            SourceCondition(lower = mapOf(real to BigFraction.ofLong(2))), SourceCondition())
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { retained ->
             for (condition in conditions) {
@@ -862,14 +573,10 @@ class LinearAuthorityTest {
                 val cold = LinearAuthority(SourceLpBudget()).use { it.check(branch, ExecutionControl.Never) }
                 val result = retained.check(branch, ExecutionControl.Never)
 
-                assertEquals(
-                    assertIs<SourceClaim.Optimal>(assertNotNull(cold.evidence).claim).value,
-                    assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value,
-                )
-                assertEquals(
-                    SourceEvidenceCheck.Checked,
-                    SourceEvidenceVerifier(branch.withLinearAuthority()).verify(result.evidence),
-                )
+                assertEquals(assertIs<SourceClaim.Optimal>(assertNotNull(cold.evidence).claim).value,
+                    assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(branch.withLinearAuthority()).verify(result.evidence))
             }
             assertEquals(1L, retained.preparations)
             assertEquals(3L, retained.reuses)
@@ -879,26 +586,13 @@ class LinearAuthorityTest {
     @Test
     fun `conditional source rows should retract across retained sibling queries`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val source = SourceProofContext(
-            scope,
-            setOf(integer, real, other),
-            mapOf(
-                "conditional" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            real to BigFraction.MINUS_ONE,
-                            other to BigFraction.MINUS_ONE,
-                        ),
-                        BigFraction.ofLong(-3),
-                    ),
-                    emptyMap(),
-                    mapOf(integer to BigFraction.ZERO),
-                ),
-                "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            ),
-            mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)),
-        )
+        val source = SourceProofContext(scope, setOf(integer, real, other), mapOf(
+            "conditional" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE,
+                other to BigFraction.MINUS_ONE), BigFraction.ofLong(-3)), emptyMap(),
+                mapOf(integer to BigFraction.ZERO)),
+            "x" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "y" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ), mapOf(real to BigFraction.ONE, other to BigFraction.ofLong(2)))
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { retained ->
             for (pin in listOf(BigFraction.ZERO, BigFraction.ONE, BigFraction.ZERO)) {
@@ -906,14 +600,10 @@ class LinearAuthorityTest {
                 val branch = source.atScope(scope.copy(condition = condition))
                 val result = retained.check(branch, ExecutionControl.Never)
 
-                assertEquals(
-                    SourceValue.Rational(if (pin.isZero) BigFraction.ofLong(3) else BigFraction.ZERO),
-                    assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value,
-                )
-                assertEquals(
-                    SourceEvidenceCheck.Checked,
-                    SourceEvidenceVerifier(branch.withLinearAuthority()).verify(result.evidence),
-                )
+                assertEquals(SourceValue.Rational(if (pin.isZero) BigFraction.ofLong(3) else BigFraction.ZERO),
+                    assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value)
+                assertEquals(SourceEvidenceCheck.Checked,
+                    SourceEvidenceVerifier(branch.withLinearAuthority()).verify(result.evidence))
             }
             assertEquals(1L, retained.preparations)
             assertEquals(2L, retained.reuses)
@@ -922,34 +612,21 @@ class LinearAuthorityTest {
 
     @Test
     fun `retained objective replacement should not reuse a preceding bound`() {
-        val source = SourceProofContext(
-            scope,
-            setOf(real),
-            mapOf(
-                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(3))),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
-        val changed = SourceProofContext(
-            scope.copy(objective = SourceObjective("negative-x", ObjectiveSense.MINIMIZE)),
-            source.coordinates,
-            source.premises,
-            mapOf(real to BigFraction.MINUS_ONE),
-        )
+        val source = SourceProofContext(scope, setOf(real), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(3))),
+        ), mapOf(real to BigFraction.ONE))
+        val changed = SourceProofContext(scope.copy(objective = SourceObjective("negative-x", ObjectiveSense.MINIMIZE)),
+            source.coordinates, source.premises, mapOf(real to BigFraction.MINUS_ONE))
 
         LinearAuthority(SourceLpBudget(), retainLp = true).use { retained ->
             retained.check(source, ExecutionControl.Never)
             val result = retained.check(changed, ExecutionControl.Never)
 
-            assertEquals(
-                SourceValue.Rational(BigFraction.ofLong(-3)),
-                assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value,
-            )
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(changed.withLinearAuthority()).verify(result.evidence),
-            )
+            assertEquals(SourceValue.Rational(BigFraction.ofLong(-3)),
+                assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim).value)
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(changed.withLinearAuthority()).verify(result.evidence))
         }
     }
 
@@ -957,15 +634,10 @@ class LinearAuthorityTest {
     fun `fractional proposals should retain every eligible coordinate and floor negative values`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         val half = BigFraction.of(bigIntOf(1), bigIntOf(2))
-        val source = SourceProofContext(
-            scope,
-            setOf(integer, other),
-            mapOf(
-                "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), half)),
-                "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), half.negated())),
-            ),
-            mapOf(integer to BigFraction.ONE, other to BigFraction.ONE),
-        )
+        val source = SourceProofContext(scope, setOf(integer, other), mapOf(
+            "first" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), half)),
+            "second" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), half.negated())),
+        ), mapOf(integer to BigFraction.ONE, other to BigFraction.ONE))
 
         val result = LinearAuthority(SourceLpBudget()).check(source, ExecutionControl.Never)
 
@@ -1027,94 +699,62 @@ class LinearAuthorityTest {
 
         val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(SourceValue.Rational(BigFraction.ONE), claim.value)
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence))
     }
 
     @Test
     fun `redundant coordinate bounds should admit a checked optimum within one operation`() {
         val coordinates = List(32) { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val premises = coordinates.flatMap { coordinate ->
-            List(2) { copy ->
-                listOf(
-                    "lower-${coordinate.id}-$copy" to SourcePremise(
-                        SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO),
-                    ),
-                    "upper-${coordinate.id}-$copy" to SourcePremise(
-                        SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ONE),
-                    ),
-                )
-            }.flatten()
+            List(2) { copy -> listOf(
+                "lower-${coordinate.id}-$copy" to SourcePremise(
+                    SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                "upper-${coordinate.id}-$copy" to SourcePremise(
+                    SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ONE)),
+            ) }.flatten()
         }.toMap()
-        val source = SourceProofContext(
-            scope,
-            coordinates.toSet(),
-            premises,
-            coordinates.associateWith { BigFraction.ONE },
-        )
+        val source = SourceProofContext(scope, coordinates.toSet(), premises,
+            coordinates.associateWith { BigFraction.ONE })
 
         val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, ExecutionControl.Never)
 
         val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(SourceValue.Rational(BigFraction.ZERO), claim.value)
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence))
     }
 
     @Test
     fun `scaled upper column side should preserve a maximized source objective`() {
-        val source = SourceProofContext(
-            scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
-            setOf(real),
-            mapOf(
-                "upper" to SourcePremise(
-                    SourceInequality(mapOf(real to BigFraction.ofLong(3)), BigFraction.ofLong(2)),
-                ),
-            ),
-            mapOf(real to BigFraction.ofLong(6)),
-            objectiveConstant = BigFraction.ONE,
-        )
+        val source = SourceProofContext(scope.copy(objective = SourceObjective("x", ObjectiveSense.MAXIMIZE)),
+            setOf(real), mapOf("upper" to SourcePremise(
+                SourceInequality(mapOf(real to BigFraction.ofLong(3)), BigFraction.ofLong(2)))),
+            mapOf(real to BigFraction.ofLong(6)), objectiveConstant = BigFraction.ONE)
 
         val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, ExecutionControl.Never)
 
         val claim = assertIs<SourceClaim.Optimal>(assertNotNull(result.evidence).claim)
         assertEquals(SourceValue.Rational(BigFraction.ofLong(5)), claim.value)
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence))
     }
 
     @Test
     fun `infeasible row over column sides should lift a checked source refutation`() {
         val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-        val source = SourceProofContext(
-            scope,
-            setOf(real, other),
-            mapOf(
-                "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "sum" to SourcePremise(
-                    SourceInequality(
-                        mapOf(real to BigFraction.ONE, other to BigFraction.ONE),
-                        BigFraction.MINUS_ONE,
-                    ),
-                ),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
+        val source = SourceProofContext(scope, setOf(real, other), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "right" to SourcePremise(SourceInequality(mapOf(other to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+            "sum" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE, other to BigFraction.ONE),
+                BigFraction.MINUS_ONE)),
+        ), mapOf(real to BigFraction.ONE))
 
         val result = LinearAuthority(SourceLpBudget(maxOperations = 1)).check(source, ExecutionControl.Never)
 
         assertEquals(SourceClaim.Refutation, assertNotNull(result.evidence).claim)
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority()).verify(result.evidence))
     }
 
     @Test
@@ -1290,15 +930,10 @@ class LinearAuthorityTest {
 
     @Test
     fun `cancelled query preparation should charge only the visited source prefix`() {
-        val source = SourceProofContext(
-            scope,
-            setOf(real),
-            linkedMapOf(
-                "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
-                "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
-            ),
-            mapOf(real to BigFraction.ONE),
-        )
+        val source = SourceProofContext(scope, setOf(real), linkedMapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(real to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "upper" to SourcePremise(SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ofLong(2))),
+        ), mapOf(real to BigFraction.ONE))
         val funding = SourceLpFunding(1000L, 1_000_000L).apply { grant(1000L) }
         val budget = SourceLpBudget(funding = funding)
         var polls = 0

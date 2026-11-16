@@ -14,18 +14,11 @@ class SourceProgressRewardTest {
         var slices = 0
         val base = ScriptedSearch({ false }) {}
         val proof = object : ResumableSearch by base {
-            override fun runSlice(
-                global: ExecutionControl,
-                sliceMillis: Long,
-                sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit,
-            ): MinimizeResult? {
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                 base.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
-                return if (++slices == 3) {
-                    MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
-                } else {
-                    null
-                }
+                return if (++slices == 3) MinimizeResult.Optimal(Sample(booleanArrayOf(), longArrayOf()), 999.0)
+                else null
             }
         }
         val workers = listOf(
@@ -33,35 +26,25 @@ class SourceProgressRewardTest {
             trackingWorker("proof", 1, proof),
         )
 
-        val result = Portfolio(
-            workers,
-            fixedBandit(2, 0),
-            baseSliceWork = 2,
-            maxSliceWork = 2,
-            reseedStaleThreshold = 0,
-            diagnostics = PortfolioDiagnostics(32, 1) {},
-            rewardPolicy = SourceProgressReward,
-        ).use { it.minimize(ExecutionControl.Never) }
+        val result = Portfolio(workers, fixedBandit(2, 0), baseSliceWork = 2, maxSliceWork = 2,
+            reseedStaleThreshold = 0, diagnostics = PortfolioDiagnostics(32, 1) {},
+            rewardPolicy = SourceProgressReward).use { it.minimize(ExecutionControl.Never) }
 
         assertIs<MinimizeResult.Optimal>(result)
     }
 
     @Test
     fun `feasibility should retain ordinary progress rewards`() {
-        val progress = PortfolioProgress(
-            0, PortfolioPhase.FEASIBILITY, 100, 1_000, 0, false, false,
-            mapOf("Violation" to 0.5), 0.75,
-        )
+        val progress = PortfolioProgress(0, PortfolioPhase.FEASIBILITY, 100, 1_000, 0, false, false,
+            mapOf("Violation" to 0.5), 0.75)
 
         assertEquals(0.75, SourceProgressReward.reward(progress))
     }
 
     @Test
     fun `improvement rewards should require accepted source progress`() {
-        val progress = PortfolioProgress(
-            0, PortfolioPhase.IMPROVEMENT, 100, 1_000, 0, false, false,
-            mapOf("Violation" to 0.5, "Glue" to 3.0), 0.75,
-        )
+        val progress = PortfolioProgress(0, PortfolioPhase.IMPROVEMENT, 100, 1_000, 0, false, false,
+            mapOf("Violation" to 0.5, "Glue" to 3.0), 0.75)
 
         assertEquals(0.0, SourceProgressReward.reward(progress))
         assertEquals(1.0, SourceProgressReward.reward(progress.copy(acceptedIncumbent = true)))

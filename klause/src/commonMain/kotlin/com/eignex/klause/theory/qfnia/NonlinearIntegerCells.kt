@@ -59,10 +59,8 @@ internal class NonlinearIntegerCells(
     private var allowed = 0L
     private var duplicates = 0L
     val stats: NonlinearIntegerCellStats get() =
-        NonlinearIntegerCellStats(
-            observed, retained, declined, excluded, repeated,
-            selections, steered, allowed, duplicates,
-        )
+        NonlinearIntegerCellStats(observed, retained, declined, excluded, repeated,
+            selections, steered, allowed, duplicates)
 
     fun retain(cell: CheckedPolynomialCell) {
         arithmetic.step()
@@ -96,12 +94,8 @@ internal class NonlinearIntegerCells(
 
     fun clear() = entries.clear()
 
-    fun recordDuplicate() {
-        duplicates++
-    }
-    fun recordAllowed() {
-        allowed++
-    }
+    fun recordDuplicate() { duplicates++ }
+    fun recordAllowed() { allowed++ }
 
     fun propose(
         tuple: List<BigInt>,
@@ -152,11 +146,8 @@ internal class NonlinearIntegerCells(
                 entry.prepared && !entry.declined && entry.coordinate == index &&
                     entry.lower?.let { value < it } != true && entry.upper?.let { value > it } != true
             } ?: return value
-            value = if (forward) {
-                covering.upper?.plus(BIG_ONE) ?: return null
-            } else {
-                covering.lower?.minus(BIG_ONE) ?: return null
-            }
+            value = if (forward) covering.upper?.plus(BIG_ONE) ?: return null
+            else covering.lower?.minus(BIG_ONE) ?: return null
         }
         return null
     }
@@ -181,21 +172,13 @@ internal class NonlinearIntegerCells(
             val ceiling = algebraic.ceilInteger(endpoint)
             if (!cell.lowerClosed &&
                 algebraic.compare(endpoint, algebraic.rational(BigFraction.of(ceiling, BIG_ONE))) == 0
-            ) {
-                ceiling + BIG_ONE
-            } else {
-                ceiling
-            }
+            ) ceiling + BIG_ONE else ceiling
         }
         entry.upper = cell.upper?.let { endpoint ->
             val ceiling = algebraic.ceilInteger(endpoint)
             if (!cell.upperClosed ||
                 algebraic.compare(endpoint, algebraic.rational(BigFraction.of(ceiling, BIG_ONE))) < 0
-            ) {
-                ceiling - BIG_ONE
-            } else {
-                ceiling
-            }
+            ) ceiling - BIG_ONE else ceiling
         }
         entry.prepared = true
     }

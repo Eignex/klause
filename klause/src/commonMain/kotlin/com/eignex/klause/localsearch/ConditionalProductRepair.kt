@@ -33,9 +33,7 @@ internal class ConditionalProductRepair(
         val domain = state.rootDomains[variable]
         if (domain.min < 0L || domain.max > 1L || 0L !in domain ||
             state.assignment.intValue(variable) != 1L
-        ) {
-            return
-        }
+        ) return
         if (state.invariants?.literalChannel(variable) != null) {
             added += LiteralChannelRepair(state, sink, limit - added).propose(variable, 0L)
             return

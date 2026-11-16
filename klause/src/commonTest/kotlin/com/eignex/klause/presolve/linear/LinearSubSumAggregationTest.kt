@@ -34,9 +34,7 @@ class LinearSubSumAggregationTest {
     fun `a three column definition should contract its target in both schedules`() {
         for (lane in PresolveLane.entries) {
             val problem = Problem(
-                0,
-                3,
-                Array(3) { IntDomain(0, 10) },
+                0, 3, Array(3) { IntDomain(0, 10) },
                 listOf(sumDef(), Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.LE, 7)),
             )
             val config = PresolveConfig.parse("off,+aggregate")

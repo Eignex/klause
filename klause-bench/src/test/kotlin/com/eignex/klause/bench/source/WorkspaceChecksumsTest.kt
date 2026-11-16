@@ -25,9 +25,9 @@ class WorkspaceChecksumsTest {
         var reads = 0
         repeat(2) {
             WorkspaceChecksums(root, cache, hash = { source ->
-                reads++
-                digest(source)
-            }).use { checksums ->
+            reads++
+            digest(source)
+        }).use { checksums ->
                 assertEquals(digest(file), checksums.checksum(file))
             }
         }

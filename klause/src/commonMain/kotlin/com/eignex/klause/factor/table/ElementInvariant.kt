@@ -103,13 +103,16 @@ internal class ElementInvariant(
         if (firstMatch >= 0) proposeAlternativeIndexes(state, factorId, sink, firstMatch)
     }
 
-    private fun proposeAlternativeIndexes(state: LocalSearchState, factorId: Int, sink: MoveSink, firstMatch: Int) {
+    private fun proposeAlternativeIndexes(
+        state: LocalSearchState,
+        factorId: Int,
+        sink: MoveSink,
+        firstMatch: Int,
+    ) {
         val network = state.invariants
         if (network?.isDefinedInt(idx) == true &&
             network.linearDefinition(idx) == null && !network.hasExtremumRepair(idx)
-        ) {
-            return
-        }
+        ) return
         val alternatives = sink.alternativeRepairs ?: sink
         alternatives.proposer = sink.proposer
         val idxVal = state.assignment.intValue(idx)

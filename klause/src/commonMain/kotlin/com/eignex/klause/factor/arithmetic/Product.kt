@@ -52,7 +52,6 @@ class Product(
 
     private fun fixOperand(c: Long, other: Int): FactorReduction = when (c) {
         0L -> Rewrite(listOf(Linear(longArrayOf(1L), intArrayOf(result), LinearOp.EQ, 0L)))
-
         Long.MIN_VALUE -> {
             val coefficient = -bigIntOf(c)
             val row = if (other == result) {
@@ -62,7 +61,6 @@ class Product(
             }
             Rewrite(listOf(row))
         }
-
         else -> Rewrite(listOf(Linear(longArrayOf(1L, -c), intArrayOf(result, other), LinearOp.EQ, 0L)))
     }
 

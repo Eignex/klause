@@ -40,10 +40,8 @@ class RealElement private constructor(
     /** Number of ordered entries. */
     val size: Int get() = if (arrIsVars) entries.size else constants.size
 
-    override val variables: VarList = MixedVars(
-        boundInts = intArrayOf(idx),
-        reals = (intArrayOf(result) + entries).distinct().toIntArray(),
-    )
+    override val variables: VarList = MixedVars(boundInts = intArrayOf(idx),
+        reals = (intArrayOf(result) + entries).distinct().toIntArray())
 
     override val structuralKeyWeight: Int get() = (size.toLong() + 3).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 
@@ -55,9 +53,7 @@ class RealElement private constructor(
 
     override fun remap(mapping: VarRemap): Factor = if (arrIsVars) {
         RealElement(mapping.int(idx), mapping.real(result), IntArray(size) { mapping.real(entries[it]) }, indexOffset)
-    } else {
-        RealElement(mapping.int(idx), mapping.real(result), constants, indexOffset)
-    }
+    } else RealElement(mapping.int(idx), mapping.real(result), constants, indexOffset)
 
     override fun structuralKey(): StructuralKey = materializeKey(FactorKind.REAL_ELEMENT, ::buildKey)
 
@@ -67,10 +63,7 @@ class RealElement private constructor(
         sink.long(indexOffset.toLong())
         sink.long(if (arrIsVars) 1L else 0L)
         sink.long(size.toLong())
-        if (arrIsVars) {
-            for (entry in entries) sink.realVar(entry)
-        } else {
-            for (value in constants) sink.long(value.toRawBits())
-        }
+        if (arrIsVars) for (entry in entries) sink.realVar(entry)
+        else for (value in constants) sink.long(value.toRawBits())
     }
 }

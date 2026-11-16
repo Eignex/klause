@@ -126,17 +126,13 @@ class PresolveBudget(
     var probeCalls: Long = 0
         private set
 
-    internal fun recordRound() {
-        rounds++
-    }
+    internal fun recordRound() { rounds++ }
 
     internal fun recordPass(pass: PresolvePass) {
         calls[pass.id] = (calls[pass.id] ?: 0) + 1
     }
 
-    internal fun recordProbe() {
-        probeCalls++
-    }
+    internal fun recordProbe() { probeCalls++ }
 
     /** Work units charged so far; may exceed [allowance] by the last charge before a poll noticed. */
     fun spent(): Long = spent
@@ -160,7 +156,7 @@ class PresolveBudget(
     fun slice(share: Long): ExecutionControl {
         if (share <= 0L) return observeStops(Metered(remaining()))
         val floor = (remaining() - share).coerceAtLeast(0L)
-        return observeStops(Metered(floor))
+        return observeStops(Metered( floor ))
     }
 
     /**
@@ -168,10 +164,10 @@ class PresolveBudget(
      * lands here, whatever meter [outer] carries, and it keeps [outer]'s deadline.
      */
     fun orSpent(outer: ExecutionControl): ExecutionControl {
-        if (outer is StopObserver && outer.budget === this &&
-            (outer.token as? Metered)?.budget === this
-        ) return outer
-        return observeStops(Metered(0L, outer))
+        if(
+        outer is StopObserver && outer.budget === this &&(outer.token as? Metered) ?.budget === this) return outer
+        return observeStops(Metered( 0L , outer,
+    ))
     }
 
     internal fun observeStops(token: ExecutionControl): ExecutionControl =
@@ -188,11 +184,12 @@ class PresolveBudget(
         override val admission get() = admissionFrom(token)
     }
 
-    private inner class Metered(private val floor: Long, private val outer: ExecutionControl = ExecutionControl.Never) :
-        ExecutionControl(outer) {
+    private inner class Metered(private val floor: Long, private val outer: ExecutionControl =
+        ExecutionControl.Never) : ExecutionControl(outer) {
         val budget get() = this@PresolveBudget
         override val containingStop get() = outer
         override fun isCancelled(): Boolean = remaining() <= floor || outer()
+
         override fun deadline() = outer.deadline()
 
         override val accounting: WorkMeter get() = nativeMeter
@@ -247,13 +244,8 @@ internal fun ExecutionControl.recordPresolveProbe() {
     presolveBudget()?.recordProbe()
 }
 
-private fun saturatedSum(total: Long, units: Long): Long = if (units <= 0L) {
-    total
-} else if (units > Long.MAX_VALUE - total) {
-    Long.MAX_VALUE
-} else {
-    total + units
-}
+private fun saturatedSum(total: Long, units: Long): Long =
+    if (units <= 0L) total else if (units > Long.MAX_VALUE - total) Long.MAX_VALUE else total + units
 
 private fun weighted(units: Long, weight: Long): Long =
     if (units > Long.MAX_VALUE / weight) Long.MAX_VALUE else units * weight

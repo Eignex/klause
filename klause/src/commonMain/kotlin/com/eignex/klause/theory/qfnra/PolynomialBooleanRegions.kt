@@ -21,13 +21,8 @@ internal class PolynomialBooleanRegions(
     private val coupled: PolynomialCoupledSections? = null,
     private val onCoupledConflict: ((List<PolynomialAtom>) -> Unit)? = null,
 ) {
-    private val state = PolynomialBooleanPropagation(
-        nodes,
-        root,
-        arithmetic,
-        skipConfirmedParents = true,
-        trackWitnesses = true,
-    )
+    private val state = PolynomialBooleanPropagation(nodes, root, arithmetic,
+        skipConfirmedParents = true, trackWitnesses = true)
     private val exclusions = ArrayList<Exclusion>()
     private val signs = PolynomialBooleanSigns(nodes, atoms, state, arithmetic)
     private var partialAvailable = true
@@ -109,9 +104,7 @@ internal class PolynomialBooleanRegions(
             if (value == UNASSIGNED) {
                 unknowns++
                 pending = literal
-            } else if (value != literal.value) {
-                return true
-            }
+            } else if (value != literal.value) return true
         }
         if (unknowns == 0) {
             used(excluded)
@@ -147,23 +140,14 @@ internal class PolynomialBooleanRegions(
             val value = state.value(index)
             if (value == UNASSIGNED) continue
             val atom = atoms[node.atom]
-            required.add(
-                if (value == TRUE) {
-                    atom
-                } else {
-                    PolynomialAtom(
-                        atom.polynomial,
-                        when (atom.relation) {
-                            PolynomialRelation.EQ -> PolynomialRelation.NE
-                            PolynomialRelation.NE -> PolynomialRelation.EQ
-                            PolynomialRelation.LT -> PolynomialRelation.GE
-                            PolynomialRelation.LE -> PolynomialRelation.GT
-                            PolynomialRelation.GT -> PolynomialRelation.LE
-                            PolynomialRelation.GE -> PolynomialRelation.LT
-                        },
-                    )
-                },
-            )
+            required.add(if (value == TRUE) atom else PolynomialAtom(atom.polynomial, when (atom.relation) {
+                PolynomialRelation.EQ -> PolynomialRelation.NE
+                PolynomialRelation.NE -> PolynomialRelation.EQ
+                PolynomialRelation.LT -> PolynomialRelation.GE
+                PolynomialRelation.LE -> PolynomialRelation.GT
+                PolynomialRelation.GT -> PolynomialRelation.LE
+                PolynomialRelation.GE -> PolynomialRelation.LT
+            }))
             premises.add(Literal(index, value))
         }
     }
@@ -182,15 +166,7 @@ internal class PolynomialBooleanRegions(
         }
         val support = sections.refute(required, identities, coupledSupports) ?: return false
         // The support's signed predicates have no common real point, so the exclusion holds under every prefix.
-        exclusions.add(
-            Exclusion(
-                support.map {
-                    arithmetic.step()
-                    premises[it]
-                },
-                ExclusionKind.Coupled,
-            ),
-        )
+        exclusions.add(Exclusion(support.map { arithmetic.step(); premises[it] }, ExclusionKind.Coupled))
         progress?.let {
             it.coupledConflicts++
             it.coupledConflictPremises += support.size
@@ -252,7 +228,8 @@ internal class PolynomialBooleanRegions(
                     it.partialConflicts++
                     it.partialConflictPremises += premises.size
                 }
-                onConflict?.let { observer -> arithmetic.execution.handoff { observer(required.toList()) } }
+                onConflict?.let { observer -> arithmetic.execution.handoff { observer(required.toList())
+            } }
             } else {
                 for (premise in premises) {
                     arithmetic.step()
@@ -289,7 +266,6 @@ internal class PolynomialBooleanRegions(
             visited[index] = true
             when (val node = nodes[index]) {
                 is FormulaNode.Not -> pending.addLast(node.child)
-
                 is FormulaNode.Junction -> {
                     val decisive = if (node.conjunction) FALSE else TRUE
                     if (state.value(index) == decisive) {
@@ -298,14 +274,11 @@ internal class PolynomialBooleanRegions(
                             state.witnessed(child) && state.value(child) == decisive
                         }
                         pending.addLast(selected)
-                    } else {
-                        for (child in node.children) {
-                            arithmetic.step()
-                            pending.addLast(child)
-                        }
+                    } else for (child in node.children) {
+                        arithmetic.step()
+                        pending.addLast(child)
                     }
                 }
-
                 else -> Unit
             }
         }
@@ -322,12 +295,10 @@ internal class PolynomialBooleanRegions(
                     atoms[node.atom] = value == TRUE
                     literals.add(Literal(index, value))
                 }
-
                 is FormulaNode.BooleanVariable -> {
                     bools[node.variable] = value == TRUE
                     literals.add(Literal(index, value))
                 }
-
                 else -> Unit
             }
         }

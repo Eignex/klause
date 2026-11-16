@@ -15,8 +15,10 @@ import com.eignex.klause.util.ExecutionControl
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
-internal class LinearPortfolioSearch(private val descent: RationalTheoryDescent, val invocation: EngineInvocation) :
-    ResumableSearch by descent {
+internal class LinearPortfolioSearch(
+    private val descent: RationalTheoryDescent,
+    val invocation: EngineInvocation,
+) : ResumableSearch by descent {
     init {
         if (!descent.matchesInvocation(invocation)) {
             val failure = IllegalArgumentException("linear handle differs from its runtime invocation")
@@ -27,14 +29,11 @@ internal class LinearPortfolioSearch(private val descent: RationalTheoryDescent,
     private val snapshot = AtomicReference<LinearOptimizationResult?>(null)
     val result: LinearOptimizationResult? get() = snapshot.load()
 
-    override fun runSlice(
-        global: ExecutionControl,
-        sliceMillis: Long,
-        sliceNodes: Long,
-        onIncumbent: (MinimizeResult.WithSample) -> Unit,
-    ): MinimizeResult? = descent.runSlice(global, sliceMillis, sliceNodes, onIncumbent).also {
-        snapshot.store(descent.linearSnapshot())
-    }
+    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+        descent.runSlice(global, sliceMillis, sliceNodes, onIncumbent).also {
+            snapshot.store(descent.linearSnapshot())
+        }
 }
 
 internal class LinearPortfolioTerminal(
@@ -51,8 +50,7 @@ internal class LinearPortfolioTerminal(
             return PortfolioTerminalPublication(Verification.Indeterminate("linear arm is witness-only")) {}
         }
         val workerInvocation = worker.evidenceInvocation ?: return PortfolioTerminalPublication(
-            Verification.Indeterminate("linear worker lacks runtime binding"),
-        ) {}
+            Verification.Indeterminate("linear worker lacks runtime binding")) {}
         val checked = if (!workerInvocation.matches(completed.invocation)) {
             Verification.Rejected("linear handle differs from its worker invocation")
         } else {

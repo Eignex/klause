@@ -67,9 +67,7 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: E
         val root = (problem as? BakedProblem)?.rootDeductions as? PropagationResult.Implied
         return current({ root?.boolValueOrNull(it) }) { v ->
             val domain = (problem as? BakedProblem)?.rootIntDomain(v) ?: problem.intDomainOrNull(v)
-            if (domain != null) {
-                domain.min to domain.max
-            } else {
+            if (domain != null) domain.min to domain.max else {
                 val bounds = problem.intBounds
                 (if (bounds.hasLower(v)) bounds.lower(v) else null) to
                     (if (bounds.hasUpper(v)) bounds.upper(v) else null)
@@ -119,7 +117,6 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: E
                 update(units, lit, direction)
                 if (boolColumns.containsKey(Lit.variable(lit)) && wasPresent != units.containsKey(lit)) dirty = true
             }
-
             is Xor -> {
                 revision++
                 dirty = true
@@ -131,7 +128,6 @@ internal class ParityInputRevision(problem: Problem, private val cancellation: E
                 }
                 if (!recordColumns(boolColumns, columns, direction, work)) return false
             }
-
             is Linear -> {
                 if (factor.op != LinearOp.EQ || factor.realVars.isNotEmpty()) return true
                 val narrow = factor.integerConstants

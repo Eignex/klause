@@ -529,22 +529,11 @@ private fun Lowering.run(def: SchemaDef<SchemaEntry>): CompiledSchema {
     val source = buildProblem()
     val namedReals = realVarIdByName.toMap()
     val specsById = namedReals.entries.associate { (name, id) -> id to floatDecoders.getValue(name) }
-    val binding = CompiledSourceBinding(
-        source,
-        intVarIdByName,
-        namedReals,
+    val binding = CompiledSourceBinding(source, intVarIdByName, namedReals,
         (0 until source.numRealVars).map { id ->
-            FloatGridVariable(
-                SourceRealId(id),
-                specsById[id]?.buckets,
-                id in auxiliaryReals,
-                floatAbsentPins[id],
-                preserveBuckets = id in specsById,
-            )
-        },
-        schemaFloatRepresentations(def),
-        truncatedFloatRows,
-    )
+            FloatGridVariable(SourceRealId(id), specsById[id]?.buckets, id in auxiliaryReals, floatAbsentPins[id],
+                preserveBuckets = id in specsById)
+        }, schemaFloatRepresentations(def), truncatedFloatRows)
     return CompiledSchema(
         problem = source,
         boolVarIdByName = boolVarIdByName.toMap(),
@@ -580,11 +569,8 @@ private fun Lowering.emitOptVarPins(def: SchemaDef<SchemaEntry>) {
                 val rows = (first until factors.size).filter {
                     factors[it] is com.eignex.klause.factor.arithmetic.ReifiedRealLinear
                 }
-                floatAbsentPins[id] = FloatGridAbsentPin(
-                    SourceBoolId(boolVarIdByName.getValue(name)),
-                    checkNotNull(BigFraction.ofDouble(default)),
-                    rows,
-                )
+                floatAbsentPins[id] = FloatGridAbsentPin(SourceBoolId(boolVarIdByName.getValue(name)),
+                    checkNotNull(BigFraction.ofDouble(default)), rows)
             }
 
             intVarIdByName.containsKey(base) -> {

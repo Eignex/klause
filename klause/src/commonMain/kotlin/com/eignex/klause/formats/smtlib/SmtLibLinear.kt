@@ -70,11 +70,9 @@ internal fun Compiler.Builder.assertLinearRow(coeffs: LongArray, vars: IntArray,
 /** Assert `a ⟨op⟩ b` (an SMT relation operator) as a hard linear row, lowering to a wide [Linear]
  *  when a coefficient or the bound exceeds the 64-bit range. */
 internal fun Compiler.Builder.assertRelation(op: String, a: IntComb, b: IntComb) {
-    if (op == "=") {
-        conditionalEquality(a, b)?.let {
-            forceTrue(it)
-            return
-        }
+    if (op == "=") conditionalEquality(a, b)?.let {
+        forceTrue(it)
+        return
     }
     val linOp = relLinearOp(op)
     when (val rel = intCombDiff(a, b, strictDelta(op).toLong())) {
@@ -120,9 +118,7 @@ private fun Compiler.Builder.reifyIntegerRelation(rel: LinRelation.LongRel, op: 
 
 private fun Compiler.Builder.conditionalEquality(a: IntComb, b: IntComb): Int? {
     if (a !is IntComb.Narrow || b !is IntComb.Narrow) return null
-    val variable = if (b.lin.coeffs.isEmpty()) {
-        a.lin.asSimpleVar()
-    } else {
+    val variable = if (b.lin.coeffs.isEmpty()) a.lin.asSimpleVar() else {
         if (a.lin.coeffs.isEmpty()) b.lin.asSimpleVar() else null
     } ?: return null
     closeIteChain(variable)

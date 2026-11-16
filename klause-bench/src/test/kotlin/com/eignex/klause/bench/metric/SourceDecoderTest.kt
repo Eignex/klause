@@ -11,18 +11,13 @@ class SourceDecoderTest {
     fun `decoder identity binds the selected executable bytes without running it`() {
         val root = Files.createTempDirectory("source-decoder").toFile()
         try {
-            val executable = root.resolve("zstd").apply {
-                writeBytes(byteArrayOf())
-                setExecutable(true)
-            }
+            val executable = root.resolve("zstd").apply { writeBytes(byteArrayOf()); setExecutable(true) }
 
             val identity = SourceDecoder.capture({}, root.path)
 
             assertEquals(executable.canonicalPath, identity["sourceDecoderExecutable"])
-            assertEquals(
-                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-                identity["sourceDecoderSha256"],
-            )
+            assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                identity["sourceDecoderSha256"])
         } finally {
             root.deleteRecursively()
         }

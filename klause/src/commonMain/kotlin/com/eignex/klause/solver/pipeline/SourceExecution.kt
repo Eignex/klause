@@ -94,49 +94,37 @@ class SourceExecutionRequest private constructor(
     internal fun withPortfolioLpQueryObserver(
         observer: (String, Double?, LpQueryObservation) -> Unit,
     ): SourceExecutionRequest {
-        require(
-            invocation.request.engine == FiniteEngine.MIXED &&
-                SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly,
-        ) {
+        require(invocation.request.engine == FiniteEngine.MIXED &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
             "LP query observation requires mixed finite source execution"
         }
-        return SourceExecutionRequest(
-            invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair,
-        )
+            prepareOnly, observer, onPortfolioGuidance, onPortfolioJointRepair)
     }
 
     internal fun withPortfolioGuidanceObserver(
         observer: (String, PooledGuidanceObservation) -> Unit,
     ): SourceExecutionRequest {
-        require(
-            invocation.request.engine == FiniteEngine.MIXED &&
-                SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly,
-        ) {
+        require(invocation.request.engine == FiniteEngine.MIXED &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
             "guidance observation requires mixed finite source execution"
         }
-        return SourceExecutionRequest(
-            invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair,
-        )
+            prepareOnly, onPortfolioLpQuery, observer, onPortfolioJointRepair)
     }
 
     internal fun withPortfolioJointRepairObserver(
         observer: (String, Long, JointRepairObservation) -> Unit,
     ): SourceExecutionRequest {
-        require(
-            invocation.request.engine == FiniteEngine.MIXED &&
-                SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly,
-        ) {
+        require(invocation.request.engine == FiniteEngine.MIXED &&
+            SourceSetup.executionKind(invocation) == SourceExecutionKind.FINITE && !prepareOnly) {
             "joint repair observation requires mixed finite source execution"
         }
-        return SourceExecutionRequest(
-            invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
+        return SourceExecutionRequest(invocation, finiteRequest, theory, polynomial, cores, presolveConfig,
             presolveCancellation, presolveBudget, nonlinearInteger, transcendental, nodeBudget, policy,
-            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer,
-        )
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer)
     }
 
     /**
@@ -241,13 +229,9 @@ class SourceExecutionRequest private constructor(
         if (invocation.request.engine == FiniteEngine.FIXED && cores > 1) {
             throw PipelineConfigException("engine 'fixed' is single-core; use 'backtrack' for a parallel pool")
         }
-        policy.validate(
-            SourceSetup.executionKind(invocation),
-            invocation.request.engine,
-            prepareOnly = prepareOnly,
+        policy.validate(SourceSetup.executionKind(invocation), invocation.request.engine, prepareOnly = prepareOnly,
             presolveConfig = presolveConfig,
-            canonicalPolynomial = invocation.canonicalPolynomial,
-        )
+            canonicalPolynomial = invocation.canonicalPolynomial)
     }
 }
 
@@ -307,9 +291,7 @@ sealed class SourceExecutionResult protected constructor(
     val completeSearchAdmitted: Boolean?
         get() = when (this) {
             is Finite -> result.completeSearchAdmitted
-
             is Prepared, is Declined, is Refuted -> null
-
             else -> invocation.admission?.let { admission ->
                 ExecutionStrategy.COMPLETE in admission.arms &&
                     SourceSetup.executionKind(invocation) != SourceExecutionKind.HEURISTIC
@@ -419,24 +401,19 @@ fun SourceSetup.execute(
     if (request.prepareOnly && kind == SourceExecutionKind.LINEAR) return prepareSourceExecution(request)
     val result = if (request.invocation.linearSource != null) {
         executeLinearSource(request, callbacks, ::executeCapturedSource)
-    } else {
-        executeCapturedSource(request, callbacks)
-    }
+    } else executeCapturedSource(request, callbacks)
     if (kind != SourceExecutionKind.FINITE) {
         val observed = result.preparationStats ?: when (result) {
             is SourceExecutionResult.Linear -> when (val execution = result.result) {
                 is OpenTheoryExecution.Satisfy -> execution.result.stats.presolve
                 is OpenTheoryExecution.Optimize -> execution.result.stats.presolve
             }
-
             else -> null
         }
         val config = request.presolveConfig ?: PresolveConfig.DEFAULT
         val effort = if (request.presolveBudget == null && observed?.effort != null) {
             observed.effort
-        } else {
-            config.effortStats(request.presolveBudget, observed?.effort?.elapsed ?: Duration.ZERO)
-        }
+        } else config.effortStats(request.presolveBudget, observed?.effort?.elapsed ?: Duration.ZERO)
         result.preparationStats = (observed ?: PresolveStats()).copy(effort = effort)
     }
     return result
@@ -488,40 +465,30 @@ private fun executeCapturedSource(
                 finite.cancellation or ExecutionControl { finite.deadlineExceeded() },
                 finite.toleranceCheck == null,
             )
-            val result = FinitePipeline.solve(
-                finite,
-                callbacks.finite,
-                finite.lpSolveContext,
+            val result = FinitePipeline.solve(finite, callbacks.finite, finite.lpSolveContext,
                 if (invocation.requestsFiniteNumericalCompanions) request.theory.boundTo(invocation) else null,
-                request.onPortfolioLpQuery,
-                request.onPortfolioGuidance,
-                request.onPortfolioJointRepair,
-            )
+                request.onPortfolioLpQuery, request.onPortfolioGuidance, request.onPortfolioJointRepair)
             SourceExecutionResult.Finite(invocation, result)
         }
 
         is SourceProblemRoute.OpenTheory -> {
             val params = request.theory.boundTo(invocation)
             // Native workers own the lowered view; the linear source stays with the invocation to qualify claims.
-            val native = if (invocation.linearSource == null) {
-                route.request
-            } else {
+            val native = if (invocation.linearSource == null) route.request else
                 route.request.withPreparedPlan(route.preparedPlan.linearWorkingPlan())
-            }
             val result = if (kind == SourceExecutionKind.HEURISTIC) {
                 executeSourceHeuristic(invocation, native.preparedPlan, params, request.cores, callbacks)
             } else {
                 val prepared = native.withPresolve(
                     request.presolveConfig ?: route.request.presolveConfig,
-                    cancellation = route.request.presolveCancellation.withAccounting(
+                    cancellation = route.request.presolveCancellation .withAccounting(
                         if (request.presolveBudget !=
                             null
-                        ) {
-                            request.presolveCancellation
-                        } else {
+                        ) { request.presolveCancellation } else {
                             route.request.presolveCancellation
                         },
-                    ).includingStop(request.presolveCancellation).includingStop(invocation.cancellation),
+                    ).includingStop(request.presolveCancellation).includingStop(
+                        invocation.cancellation),
                     budget = request.presolveBudget ?: route.request.presolveBudget,
                 )
                 OpenTheoryPipeline.execute(prepared, params, engine, request.cores, callbacks.onLinearIncumbent)
@@ -534,25 +501,23 @@ private fun executeCapturedSource(
                 route.request
             } else {
                 PolynomialTheoryRequest(
-                    route.request.problem,
-                    route.preparedPlan.linearWorkingPlan(),
-                )
+                route.request.problem,
+                route.preparedPlan.linearWorkingPlan(),
+            )
             }
             val params = request.polynomial.boundTo(invocation)
             val objective = invocation.workingLinearObjective
             val source = original.prepareSource(
                 request.presolveConfig ?: PresolveConfig.DEFAULT,
                 objective?.let { if (invocation.maximizeSourceObjective) it.negated() else it },
-                request.presolveCancellation.includingStop(params.cancellation).includingStop(params.timeout),
-                invocation.cancellation.includingStop(params.cancellation).includingStop(params.timeout),
+                request.presolveCancellation .includingStop( params.cancellation ).includingStop( params.timeout),
+                invocation.cancellation .includingStop( params.cancellation ).includingStop( params.timeout),
                 request.presolveBudget,
             )
-            if (source.infeasible) {
-                return SourceExecutionResult.Refuted(invocation).also {
-                    it.preparationStats = source.stats
-                }
+            if (source.infeasible) return SourceExecutionResult.Refuted(invocation).also {
+                it.preparationStats = source.stats
             }
-            val prepared = original.afterSourcePreparation(source, params.cancellation.includingStop(params.timeout))
+            val prepared = original.afterSourcePreparation(source, params.cancellation .includingStop( params.timeout))
                 ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
                     it.preparationStats = source.stats
                 }
@@ -611,20 +576,21 @@ private fun executeSourceHeuristic(
 )
 
 internal fun TheoryParams.boundTo(invocation: PreparedSourceInvocation): TheoryParams = copy(
-    cancellation = cancellation.withAccounting(
+    cancellation = cancellation .withAccounting(
         if (cancellation.accounting != null) cancellation else invocation.cancellation,
-    ).includingStop(invocation.cancellation),
-    timeout = timeout.includingStop(invocation.containingDeadline(timeout)),
+    ).includingStop( invocation.cancellation),
+    timeout = timeout .includingStop( invocation.containingDeadline(timeout)),
 )
 
 private fun PolynomialTheoryParams.boundTo(invocation: PreparedSourceInvocation): PolynomialTheoryParams = copy(
-    cancellation = cancellation.withAccounting(
+    cancellation = cancellation .withAccounting(
         if (cancellation.accounting != null) cancellation else invocation.cancellation,
     ).includingStop(invocation.cancellation),
-    timeout = timeout.includingStop(invocation.containingDeadline(timeout)),
+    timeout = timeout .includingStop( invocation.containingDeadline(timeout)),
 )
 
 private fun PreparedSourceInvocation.containingDeadline(timeout: ExecutionControl): ExecutionControl {
-    val end = cancellation.deadline() ?: return ExecutionControl.Never
+    val end =
+    cancellation.deadline()?: return ExecutionControl.Never
     return if (timeout.deadline() == end) ExecutionControl.Never else ExecutionControl.until(end)
 }

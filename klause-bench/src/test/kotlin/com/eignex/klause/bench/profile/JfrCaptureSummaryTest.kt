@@ -57,13 +57,8 @@ class JfrCaptureSummaryTest {
     @CsvSource("gzip-base64, false", "gzip-base64, true", "zstd-base64, false", "zstd-base64, true")
     fun `capture payload and event selection survive the frozen case protocol`(codec: String, events: Boolean) {
         val payload = "AAAA".repeat(100_000)
-        val request = BenchRequest(
-            mapOf(
-                "source" to "retained/capture.jfr",
-                "sha256" to "a".repeat(64),
-                codec to payload,
-            ) + if (events) mapOf("events" to "true") else emptyMap(),
-        )
+        val request = BenchRequest(mapOf("source" to "retained/capture.jfr", "sha256" to "a".repeat(64),
+            codec to payload) + if (events) mapOf("events" to "true") else emptyMap())
 
         val planned = JfrCaptureSummary.plan(request).single()
         val frozen = BenchProtocol.json.encodeToString(BenchCase.serializer(), planned)
@@ -75,14 +70,8 @@ class JfrCaptureSummaryTest {
 
     @Test
     fun `invalid event selection fails before capture decoding`() {
-        val request = BenchRequest(
-            mapOf(
-                "source" to "retained/capture.jfr",
-                "sha256" to "a".repeat(64),
-                "gzip-base64" to "AAAA",
-                "events" to "yes",
-            ),
-        )
+        val request = BenchRequest(mapOf("source" to "retained/capture.jfr", "sha256" to "a".repeat(64),
+            "gzip-base64" to "AAAA", "events" to "yes"))
 
         assertFailsWith<IllegalArgumentException> { JfrCaptureSummary.plan(request) }
     }
@@ -93,16 +82,13 @@ class JfrCaptureSummaryTest {
         val bytes = "retained capture bytes".toByteArray()
         val compressed = when (codec) {
             "zstd-base64" -> Zstd.compress(bytes)
-
             else -> ByteArrayOutputStream().also { output ->
                 GZIPOutputStream(output).use { it.write(bytes) }
             }.toByteArray()
         }
-        val parameters = mapOf(
-            "source" to "retained/capture.jfr",
+        val parameters = mapOf("source" to "retained/capture.jfr",
             "sha256" to HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)),
-            codec to Base64.getEncoder().encodeToString(compressed),
-        )
+            codec to Base64.getEncoder().encodeToString(compressed))
         val capture = output.resolve("capture.jfr")
 
         JfrCaptureSummary.decode(parameters, capture)
@@ -112,28 +98,16 @@ class JfrCaptureSummaryTest {
 
     @Test
     fun `ambiguous capture codecs fail before decoding`() {
-        val request = BenchRequest(
-            mapOf(
-                "source" to "retained/capture.jfr",
-                "sha256" to "a".repeat(64),
-                "gzip-base64" to "AAAA",
-                "zstd-base64" to "AAAA",
-            ),
-        )
+        val request = BenchRequest(mapOf("source" to "retained/capture.jfr", "sha256" to "a".repeat(64),
+            "gzip-base64" to "AAAA", "zstd-base64" to "AAAA"))
 
         assertFailsWith<IllegalArgumentException> { JfrCaptureSummary.plan(request) }
     }
-
     @ParameterizedTest
     @ValueSource(strings = ["gzip-base64", "zstd-base64"])
     fun `oversized encoded captures fail before decoding`(codec: String) {
-        val request = BenchRequest(
-            mapOf(
-                "source" to "retained/capture.jfr",
-                "sha256" to "a".repeat(64),
-                codec to "A".repeat(2_097_153),
-            ),
-        )
+        val request = BenchRequest(mapOf("source" to "retained/capture.jfr", "sha256" to "a".repeat(64),
+            codec to "A".repeat(2_097_153)))
 
         assertFailsWith<IllegalArgumentException> { JfrCaptureSummary.plan(request) }
     }

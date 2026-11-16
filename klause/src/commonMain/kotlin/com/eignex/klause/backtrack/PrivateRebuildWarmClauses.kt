@@ -18,7 +18,8 @@ internal class PrivateRebuildWarmClauses private constructor(
     val normalizationWork: Long,
 ) {
     companion object {
-        fun empty(): PrivateRebuildWarmClauses = PrivateRebuildWarmClauses(emptyArray(), 0L, 0L, 0L, 0, 0L, 0L)
+        fun empty(): PrivateRebuildWarmClauses =
+            PrivateRebuildWarmClauses(emptyArray(), 0L, 0L, 0L, 0, 0L, 0L)
 
         fun capture(
             session: PropagationSession,
@@ -42,27 +43,15 @@ internal class PrivateRebuildWarmClauses private constructor(
             var translated = 0
             var scratchBytes = 0L
             var normalizationWork = 0L
-            fun result(): PrivateRebuildWarmClauses? = if (cancellation()) {
-                null
-            } else {
-                PrivateRebuildWarmClauses(
-                    clauses.toTypedArray(),
-                    literals,
-                    bytes + scratchBytes,
-                    spent,
-                    translated,
-                    scratchBytes,
-                    normalizationWork,
-                )
+            fun result(): PrivateRebuildWarmClauses? = if (cancellation()) null else {
+                PrivateRebuildWarmClauses(clauses.toTypedArray(), literals, bytes + scratchBytes, spent,
+                    translated, scratchBytes, normalizationWork)
             }
             val projection = PrivateRebuildClauseProjection.prepare(rebuild, fixed.size, ::visit) ?: return result()
             for (index in 0 until session.learnedClauseCount) {
                 if (!visit(5L)) break
                 if (!session.isLearnedClause(index) || session.learnedClausePermanent(index) ||
-                    session.learnedClauseOrigin(index) != OWN_ORIGIN
-                ) {
-                    continue
-                }
+                    session.learnedClauseOrigin(index) != OWN_ORIGIN) continue
                 val size = session.learnedClauseLiteralCount(index)
                 if ((size + 1L) * 512L > byteLimit - bytes - scratchBytes) continue
                 if (!visit(size * 3L + 1L)) break
@@ -71,10 +60,7 @@ internal class PrivateRebuildWarmClauses private constructor(
                 var supported = true
                 for (literal in source) {
                     val variable = Lit.variable(literal)
-                    if (variable >= fixed.size) {
-                        supported = false
-                        break
-                    }
+                    if (variable >= fixed.size) { supported = false; break }
                     needsProjection = needsProjection || projection.eliminates(variable)
                 }
                 if (!supported) continue

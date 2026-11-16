@@ -52,12 +52,10 @@ fun Problem.sourceProofContext(
         bound("bool/$id/lower", coordinate, BigFraction.ZERO, false)
         bound("bool/$id/upper", coordinate, BigFraction.ONE, true)
         premises["bool/$id/false"] = SourcePremise(
-            SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ZERO),
-            mapOf(id to false),
+            SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ZERO), mapOf(id to false),
         )
         premises["bool/$id/true"] = SourcePremise(
-            SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
-            mapOf(id to true),
+            SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE), mapOf(id to true),
         )
     }
     for (id in 0 until numIntVars) {
@@ -73,14 +71,10 @@ fun Problem.sourceProofContext(
         BigFraction.ofDouble(realUpper[id])?.let { bound("real/$id/upper", coordinate, it, true) }
     }
     for ((factorId, factor) in factors.withIndex()) {
-        val integerPins = if (factor is LinearIndicator) {
-            mapOf(
-                SourceCoordinate(SourceCoordinate.Kind.Integer, factor.indicator) to
-                    if (factor.whenOne) BigFraction.ONE else BigFraction.ZERO,
-            )
-        } else {
-            emptyMap()
-        }
+        val integerPins = if (factor is LinearIndicator) mapOf(
+            SourceCoordinate(SourceCoordinate.Kind.Integer, factor.indicator) to
+                if (factor.whenOne) BigFraction.ONE else BigFraction.ZERO,
+        ) else emptyMap()
         val rows = if (factor is LinearIndicator) factor.row.impliedLinearRows else factor.impliedLinearRows
         for ((rowId, row) in rows.withIndex()) {
             if (cancellation()) return null
@@ -94,28 +88,20 @@ fun Problem.sourceProofContext(
             for (bits in 0 until (1 shl ids.size)) {
                 if (cancellation()) return null
                 val guards = ids.withIndex().associate { (bit, id) -> id to (bits and (1 shl bit) != 0) }
-                val form = row.exactComparison(
-                    numRealVars,
-                    row.activator == LinearRow.ALWAYS || guards.getValue(row.activator),
-                    guards::getValue,
-                )
+                val form = row.exactComparison(numRealVars,
+                    row.activator == LinearRow.ALWAYS || guards.getValue(row.activator), guards::getValue)
                 if (form.op == LinearOp.NE) continue
                 val exact = mutableListOf<ExactRationalInequality>()
                 form.rowsInto(exact)
                 for ((side, inequality) in exact.withIndex()) {
                     val coefficients = inequality.columns.indices.associate { position ->
                         val column = inequality.columns[position]
-                        val coordinate = if (column < numRealVars) {
-                            SourceCoordinate(SourceCoordinate.Kind.Real, column)
-                        } else {
-                            SourceCoordinate(SourceCoordinate.Kind.Integer, column - numRealVars)
-                        }
+                        val coordinate = if (column < numRealVars) SourceCoordinate(SourceCoordinate.Kind.Real, column)
+                            else SourceCoordinate(SourceCoordinate.Kind.Integer, column - numRealVars)
                         coordinate to inequality.coefficients[position]
                     }
                     premises["factor/$factorId/row/$rowId/booleans/$bits/side/$side"] = SourcePremise(
-                        SourceInequality(coefficients, inequality.rhs, inequality.strict),
-                        guards,
-                        integerPins,
+                        SourceInequality(coefficients, inequality.rhs, inequality.strict), guards, integerPins,
                     )
                 }
             }
@@ -133,12 +119,8 @@ fun Problem.sourceProofContext(
         coefficients[SourceCoordinate(SourceCoordinate.Kind.Real, id)] = BigFraction.ofDouble(value) ?: return null
     }
     if (coefficients.keys.any { it !in coordinates }) return null
-    val restrictionChecker = LinearSourceSemanticsChecker(
-        coordinates,
-        premises.values.toList(),
-        coefficients,
-        BigFraction.ofLong(objective?.constant ?: 0L),
-    )
+    val restrictionChecker = LinearSourceSemanticsChecker(coordinates, premises.values.toList(), coefficients,
+        BigFraction.ofLong(objective?.constant ?: 0L))
     val source = this
     val completeAffine = source.factors.all { factor ->
         if (factor !is Linear || factor.op == LinearOp.NE) return@all false
@@ -168,35 +150,23 @@ fun Problem.sourceProofContext(
                     it.variables.reals.isEmpty() &&
                         it.executionCapabilities().propagationCheck != AssignmentCheckCapability.EXACT
                 }
-            ) {
-                return SourceEvidenceCheck.Unavailable("original finite factor has no complete source witness checker")
-            }
+            ) return SourceEvidenceCheck.Unavailable("original finite factor has no complete source witness checker")
             if (cancellation()) return SourceEvidenceCheck.Unavailable("original-source check cancelled")
             return when (val checked = verifyOpenWitness(source, sample, cancellation)) {
                 is Verification.Accepted -> if (cancellation()) {
                     SourceEvidenceCheck.Unavailable("original-source check cancelled")
-                } else {
-                    SourceEvidenceCheck.Checked
-                }
-
+                } else SourceEvidenceCheck.Checked
                 is Verification.Rejected -> SourceEvidenceCheck.Rejected(checked.reason)
-
                 is Verification.Indeterminate -> SourceEvidenceCheck.Unavailable(checked.reason)
             }
         }
 
         override fun objectiveEquals(
-            sample: Sample,
-            value: SourceValue,
-            scope: SourceScope,
-            cancellation: ExecutionControl,
+            sample: Sample, value: SourceValue, scope: SourceScope, cancellation: ExecutionControl,
         ): SourceEvidenceCheck = restrictionChecker.objectiveEquals(sample, value, scope, cancellation)
 
-        override fun ray(
-            claim: SourceClaim.Ray,
-            scope: SourceScope,
-            cancellation: ExecutionControl,
-        ): SourceEvidenceCheck {
+        override fun ray(claim: SourceClaim.Ray, scope: SourceScope,
+            cancellation: ExecutionControl): SourceEvidenceCheck {
             if (!completeAffine) {
                 return SourceEvidenceCheck.Unavailable("original source recession derivation unavailable")
             }
@@ -205,13 +175,6 @@ fun Problem.sourceProofContext(
             return restrictionChecker.ray(claim, scope, cancellation)
         }
     }
-    return SourceProofContext(
-        scope,
-        coordinates,
-        premises,
-        coefficients,
-        BigFraction.ofLong(objective?.constant ?: 0L),
-        checker,
-        semantics,
-    )
+    return SourceProofContext(scope, coordinates, premises, coefficients,
+        BigFraction.ofLong(objective?.constant ?: 0L), checker, semantics)
 }

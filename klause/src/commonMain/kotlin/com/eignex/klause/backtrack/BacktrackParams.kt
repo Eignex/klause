@@ -487,13 +487,9 @@ data class BacktrackParams(
         require(rootSimplifyBatch > 0) { "root simplification batch must be positive" }
         require(rootProbeBatch >= 0) { "root probe batch must be nonnegative" }
         require(rootProbeWork > 0L) { "root probe work must be positive" }
-        require(
-            listOf(
-                inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
-                inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval,
-                inprocessingCooldown, inprocessingWarmupWork, inprocessingProbeInterval,
-            ).all { it >= 0L },
-        ) {
+        require(listOf(inprocessingWork, inprocessingRootWork, inprocessingProbeWork,
+            inprocessingSubsumeWork, inprocessingVivifyWork, inprocessingInterval,
+            inprocessingCooldown, inprocessingWarmupWork, inprocessingProbeInterval).all { it >= 0L }) {
             "inprocessing work limits must be nonnegative"
         }
         require(inprocessingGrowth >= 0) { "inprocessing growth must be nonnegative" }
@@ -503,11 +499,8 @@ data class BacktrackParams(
     }
 
     override fun withAssumptions(assumptions: Assumptions): BacktrackParams =
-        if (assumptions.isEmpty && assumptions.deductions.isEmpty) {
-            this
-        } else {
-            copy(assumptions = merge(this.assumptions, assumptions))
-        }
+        if (assumptions.isEmpty && assumptions.deductions.isEmpty) this
+        else copy(assumptions = merge(this.assumptions, assumptions))
 
     override fun withCancellation(cancellation: ExecutionControl): BacktrackParams =
         copy(cancellation = this.cancellation.forInvocation(cancellation))

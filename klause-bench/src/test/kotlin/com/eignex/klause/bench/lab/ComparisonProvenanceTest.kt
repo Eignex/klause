@@ -80,14 +80,11 @@ class ComparisonProvenanceTest {
     fun `runtime identity retains launchers and dependency bytes across solver revisions`(kind: String) {
         val before = BuildProvenance(
             mapOf(
-                "bin/klause-cli" to "launcher",
-                "lib/klause-jvm-SNAPSHOT.jar" to "solver",
-                "lib/dependency.jar" to "library",
-            ),
-            mapOf("bin/java" to "java"),
-            emptyMap(),
-            "Linux",
-            "amd64",
+            "bin/klause-cli" to "launcher",
+            "lib/klause-jvm-SNAPSHOT.jar" to "solver",
+            "lib/dependency.jar" to "library",
+        ),
+            mapOf("bin/java" to "java"), emptyMap(), "Linux", "amd64"
         )
         val key = when (kind) {
             "solver" -> "lib/klause-jvm-SNAPSHOT.jar"

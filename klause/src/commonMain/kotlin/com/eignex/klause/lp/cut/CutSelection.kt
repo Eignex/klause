@@ -12,10 +12,7 @@ internal fun <T> selectNonparallelCuts(
     for (candidate in candidates) {
         if (selected.size >= maximum) break
         if (forced.none { cosine(it, candidate) > maximumCosine } &&
-            selected.none { cosine(it, candidate) > maximumCosine }
-        ) {
-            selected += candidate
-        }
+            selected.none { cosine(it, candidate) > maximumCosine }) selected += candidate
     }
     return selected
 }

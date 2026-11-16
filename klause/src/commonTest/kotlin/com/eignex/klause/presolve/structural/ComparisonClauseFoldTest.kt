@@ -29,38 +29,36 @@ import kotlin.test.assertTrue
 class ComparisonClauseFoldTest {
     @Test
     fun `source and finite folding should restore every original comparison independently of clause polarity`() {
-        for (op in LinearOp.entries) {
-            for (positive in listOf(false, true)) {
-                val model = problemOf(
-                    2,
-                    Array(2) { IntDomain(0, 2) },
-                    listOf(
-                        reif(0, 0, op, 1),
-                        reif(1, 1, LinearOp.EQ, 1),
-                        Clause(intArrayOf(Lit.make(0, positive), Lit.make(1, true))),
-                    ),
-                )
-                val source = ComparisonClauseFold.foldSource(model)
-                val finite = ComparisonClauseFold.fold(model.bake())
-                for (x in 0L..2L) {
-                    val expected = when (op) {
-                        LinearOp.LE -> x <= 1L
-                        LinearOp.EQ -> x == 1L
-                        LinearOp.GE -> x >= 1L
-                        LinearOp.NE -> x != 1L
-                    }
-                    val sample = Sample(booleanArrayOf(!expected, false), longArrayOf(x, 1))
-                    val restored = listOf(
-                        assertNotNull(source.rebuild.asSampleLift())(sample),
-                        assertNotNull(finite.reconstruct)(sample),
-                    )
-
-                    for (point in restored) {
-                        assertContentEquals(booleanArrayOf(expected, true), point.bools, "$op $positive $x")
-                        assertContentEquals(sample.ints, point.ints)
-                    }
-                    assertContentEquals(booleanArrayOf(!expected, false), sample.bools)
+        for (op in LinearOp.entries) for (positive in listOf(false, true)) {
+            val model = problemOf(
+                2,
+                Array(2) { IntDomain(0, 2) },
+                listOf(
+                    reif(0, 0, op, 1),
+                    reif(1, 1, LinearOp.EQ, 1),
+                    Clause(intArrayOf(Lit.make(0, positive), Lit.make(1, true))),
+                ),
+            )
+            val source = ComparisonClauseFold.foldSource(model)
+            val finite = ComparisonClauseFold.fold(model.bake())
+            for (x in 0L..2L) {
+                val expected = when (op) {
+                    LinearOp.LE -> x <= 1L
+                    LinearOp.EQ -> x == 1L
+                    LinearOp.GE -> x >= 1L
+                    LinearOp.NE -> x != 1L
                 }
+                val sample = Sample(booleanArrayOf(!expected, false), longArrayOf(x, 1))
+                val restored = listOf(
+                    assertNotNull(source.rebuild.asSampleLift())(sample),
+                    assertNotNull(finite.reconstruct)(sample),
+                )
+
+                for (point in restored) {
+                    assertContentEquals(booleanArrayOf(expected, true), point.bools, "$op $positive $x")
+                    assertContentEquals(sample.ints, point.ints)
+                }
+                assertContentEquals(booleanArrayOf(!expected, false), sample.bools)
             }
         }
     }

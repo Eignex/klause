@@ -39,32 +39,13 @@ import kotlin.test.assertTrue
 class BuiltInEncoderProviderTest {
     @Test
     fun `polynomial clauses preserve literal polarity and aliases`() {
-        for (literals in listOf(
-            intArrayOf(0),
-            intArrayOf(1),
-            intArrayOf(0, 3),
-            intArrayOf(0, 2, 4),
-            intArrayOf(0, 0, 3),
-            intArrayOf(0, 1),
-        )) {
-            val source = Problem(
-                3,
-                0,
-                emptyArray(),
-                arrayOf<Factor>(
-                    ExactLinear.of(
-                        intArrayOf(Term.ofRealVar(0)),
-                        listOf(BigFraction.ONE),
-                        LinearOp.GE,
-                        BigFraction.ZERO,
-                        activator = 0,
-                    ),
-                    Clause(literals),
-                ),
-                numRealVars = 1,
-                realLower = doubleArrayOf(-1.0),
-                realUpper = doubleArrayOf(1.0),
-            )
+        for (literals in listOf(intArrayOf(0), intArrayOf(1), intArrayOf(0, 3),
+            intArrayOf(0, 2, 4), intArrayOf(0, 0, 3), intArrayOf(0, 1))) {
+            val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+                ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                    LinearOp.GE, BigFraction.ZERO, activator = 0),
+                Clause(literals),
+            ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
             val model = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
             for (mask in 0 until 8) {
                 val bools = IntArray(3) { id -> (mask ushr id) and 1 }
@@ -73,35 +54,19 @@ class BuiltInEncoderProviderTest {
                 val truth = truthAt(model.service.formula, mapOf(0 to point), bools)
 
                 val expected = literals.any { Lit.evaluate(it, bools[Lit.variable(it)] == PolynomialFormula.TRUE) }
-                assertEquals(
-                    if (expected) PolynomialFormula.TRUE else PolynomialFormula.FALSE,
-                    truth,
-                    "${literals.toList()} $mask",
-                )
+                assertEquals(if (expected) PolynomialFormula.TRUE else PolynomialFormula.FALSE, truth,
+                    "${literals.toList()} $mask")
             }
         }
     }
 
     @Test
     fun `polynomial clauses retain Boolean source ownership without numeric auxiliaries`() {
-        val source = Problem(
-            3,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(
-                ExactLinear.of(
-                    intArrayOf(Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE),
-                    LinearOp.GE,
-                    BigFraction.ZERO,
-                    activator = 0,
-                ),
-                Clause(intArrayOf(0, 3, 4)),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(-1.0),
-            realUpper = doubleArrayOf(1.0),
-        )
+        val source = Problem(3, 0, emptyArray(), arrayOf<Factor>(
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+                LinearOp.GE, BigFraction.ZERO, activator = 0),
+            Clause(intArrayOf(0, 3, 4)),
+        ), numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
 
         val model = assertNotNull(source.preparePolynomialExecutionPlan().polynomialModel)
         val clause = model.encodingAttributions.single { it.sourceFactorIndex == 1 }

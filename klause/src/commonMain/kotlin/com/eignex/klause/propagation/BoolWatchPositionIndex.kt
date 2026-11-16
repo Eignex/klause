@@ -94,19 +94,9 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
         lastWork += 4L
         when {
             row.firstKey == literal -> row.first = pack(literal, value)
-
             row.secondKey == literal -> row.second = pack(literal, value)
-
-            row.firstKey < 0 -> {
-                row.first = pack(literal, value)
-                size++
-            }
-
-            row.secondKey < 0 -> {
-                row.second = pack(literal, value)
-                size++
-            }
-
+            row.firstKey < 0 -> { row.first = pack(literal, value); size++ }
+            row.secondKey < 0 -> { row.second = pack(literal, value); size++ }
             else -> {
                 val index = row.overflow ?: MutableLongIntIndex().also {
                     row.overflow = it
@@ -161,10 +151,7 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
         fun valid(literal: Int, position: Int): Boolean = literal in postings.indices &&
             position in 0 until postings[literal].size && postings[literal][position] == factor
         if (!valid(row.firstKey, row.firstValue) ||
-            (row.secondKey >= 0 && !valid(row.secondKey, row.secondValue))
-        ) {
-            return null
-        }
+            (row.secondKey >= 0 && !valid(row.secondKey, row.secondValue))) return null
         size -= if (row.secondKey >= 0) 2 else 1
         lastWork++
         dropRow(factor)
@@ -199,11 +186,9 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
         val updatedOverflow = updated?.let { row ->
             row.overflow?.takeIf { !hasInlinePosition(row, updateKey!!.toInt()) }
         }
-        fund(
-            16L + (depth + 1L) * 7L +
-                (removedOverflow?.let { it.readWork + it.mutationWork } ?: 0L) +
-                (updatedOverflow?.mutationWork ?: 0L),
-        )
+        fund(16L + (depth + 1L) * 7L +
+            (removedOverflow?.let { it.readWork + it.mutationWork } ?: 0L) +
+            (updatedOverflow?.mutationWork ?: 0L))
         ready()
         lastWork = 0L
         if (updated != null) update(updated, updateKey!!.toInt(), updateValue)
@@ -228,9 +213,7 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
         if (record) lastWork += 2L
         return when (literal) {
             row.firstKey -> row.firstValue
-
             row.secondKey -> row.secondValue
-
             else -> {
                 val index = row.overflow ?: return default
                 if (record) lastWork += index.readWork
@@ -252,9 +235,7 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
         lastWork += 2L
         val previous = when (literal) {
             row.firstKey -> row.firstValue.also { row.first = -1L }
-
             row.secondKey -> row.secondValue.also { row.second = -1L }
-
             else -> {
                 val index = row.overflow ?: return default
                 val bytes = index.primitiveCapacityBytes
@@ -301,16 +282,9 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
 
     private fun ensureRow(factor: Int): Row {
         if (factor < baseLimit) {
-            if (baseRows.isEmpty()) {
-                baseRows = arrayOfNulls(baseLimit)
-                lastWork += baseLimit + 1L
-            }
+            if (baseRows.isEmpty()) { baseRows = arrayOfNulls(baseLimit); lastWork += baseLimit + 1L }
             lastWork++
-            return baseRows[factor] ?: Row().also {
-                baseRows[factor] = it
-                rows++
-                lastWork += 8L
-            }
+            return baseRows[factor] ?: Row().also { baseRows[factor] = it; rows++; lastWork += 8L }
         }
         val reserved = factor.toLong() - reservationFirst
         if (reserved >= 0 && reserved < reservationRows.size) {
@@ -363,22 +337,14 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
     }
 
     private fun dropRow(factor: Int) {
-        if (factor < baseLimit) {
-            baseRows[factor] = null
-            rows--
-            lastWork += 2L
-            return
-        }
+        if (factor < baseLimit) { baseRows[factor] = null; rows--; lastWork += 2L; return }
         val reserved = factor.toLong() - reservationFirst
         if (reserved >= 0 && reserved < reservationRows.size) {
             reservationRows[reserved.toInt()] = null
             rows--
             reservationLive--
             lastWork += 3L
-            if (reservationLive == 0) {
-                reservationRows = emptyArray()
-                lastWork++
-            }
+            if (reservationLive == 0) { reservationRows = emptyArray(); lastWork++ }
             return
         }
         removeRow(checkNotNull(root), factor, depth)
@@ -388,12 +354,7 @@ internal class BoolWatchPositionIndex(private val baseLimit: Int = 0) {
             directories--
             lastWork += 3L
         }
-        if (root?.live == 0) {
-            root = null
-            depth = 0
-            directories--
-            lastWork += 3L
-        }
+        if (root?.live == 0) { root = null; depth = 0; directories--; lastWork += 3L }
     }
 
     private fun removeRow(node: Directory, factor: Int, level: Int) {

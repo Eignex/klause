@@ -100,15 +100,10 @@ class ProblemTest {
     @Test
     fun `source rewrites and baking should retain effective semantic policy`() {
         val semantics = SourceSemantics(
-            SourceFormat.FLATZINC,
-            undeclaredIntegers = UndeclaredIntegerBounds(-1_000_000, 1_000_000),
+            SourceFormat.FLATZINC, undeclaredIntegers = UndeclaredIntegerBounds(-1_000_000, 1_000_000),
         ).resolve(SemanticOverrides(undeclaredIntegers = BoundsOverride(upper = BoundOverride.Value(3_000_000))))
         val source = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 2)),
-            emptyArray(),
-            semantics = semantics,
+            0, 1, arrayOf(IntDomain(0, 2)), emptyArray(), semantics = semantics,
         )
 
         val views = listOf(

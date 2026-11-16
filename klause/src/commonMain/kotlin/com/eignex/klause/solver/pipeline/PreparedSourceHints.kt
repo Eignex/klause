@@ -68,9 +68,7 @@ internal fun PreparedSourceInvocation.heuristicHints(
         if (stop()) return null
         stop.charge(1)
         val direct = hint.remap(coordinates)
-        val reconstructed = if (direct != null || reconstructions.isEmpty()) {
-            null
-        } else {
+        val reconstructed = if (direct != null || reconstructions.isEmpty()) null else {
             when (val original = hint.remap(planned)) {
                 is DefinitionHint.Linear -> original.reconstructed(reconstructions)
                 is DefinitionHint.Comparison -> original.reconstructed(reconstructions, stop)
@@ -97,9 +95,7 @@ internal fun PreparedSourceInvocation.heuristicHints(
         val allFolds = DefinitionalSweep.infer(problem, references.integers, references.folds, stop)
         if (stop()) return null
         DefinitionalSweep.withSource(problem, allFolds, hints, stop)
-    } else {
-        sweep
-    }
+    } else sweep
     if (stop()) return null
     val captureBooleanCosts = sweep == null && ExecutionStrategy.LOCAL_SEARCH in strategies &&
         problem.semantics.effective.format == SourceFormat.WCNF &&

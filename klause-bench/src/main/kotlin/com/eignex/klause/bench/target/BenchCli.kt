@@ -61,6 +61,7 @@ object BenchCli {
                 InstalledBuild.writeManifest(File(output))
             }
 
+
             "corpus" -> corpus(args.drop(1))
 
             else ->

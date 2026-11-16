@@ -114,17 +114,14 @@ private class RealDifferenceFragment(
                     add(target, source, bound.negated(), !row.strict, Lit.negate(guard))
                 }
             }
-
             LinearOp.GE -> {
                 add(target, source, bound.negated(), row.strict, guard)
                 if (guard != DifferenceEdge.ALWAYS) add(source, target, bound, !row.strict, Lit.negate(guard))
             }
-
             LinearOp.EQ -> {
                 add(source, target, bound, guard = guard)
                 add(target, source, bound.negated(), guard = guard)
             }
-
             LinearOp.NE -> Unit
         }
         return true
@@ -172,15 +169,8 @@ private class RealDifferenceFragment(
             val numerator = edge.bound.num.toLongExact()
             if (numerator < -room / multiplier || numerator > room / multiplier) return null
             edge.selector?.let { selectors[result.size] = it }
-            result.add(
-                DifferenceEdge(
-                    edge.source,
-                    edge.target,
-                    numerator * multiplier - if (edge.strict) 1L else 0L,
-                    edge.guard,
-                    edge.domain,
-                ),
-            )
+            result.add(DifferenceEdge(edge.source, edge.target,
+                numerator * multiplier - if (edge.strict) 1L else 0L, edge.guard, edge.domain))
         }
         if (stop()) return null
         return DifferenceSystem(result, privateVertices = true, indexGuards = selectors)

@@ -37,10 +37,8 @@ internal class AffineAbsInvariant(private val factor: AffineAbs) : Invariant {
 
     private fun score(state: LocalSearchState, changed: Int = -1, value: Long = 0L): Int {
         val residual = residual(state, changed, value)
-        return compressViolation(
-            if (residual.fitsLong()) residual.toLongExact() else Long.MAX_VALUE,
-            state.violationSoftCap,
-        )
+        return compressViolation(if (residual.fitsLong()) residual.toLongExact() else Long.MAX_VALUE,
+            state.violationSoftCap)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean = residual(state) != BIG_ZERO

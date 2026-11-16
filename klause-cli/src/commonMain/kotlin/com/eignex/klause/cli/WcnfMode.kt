@@ -28,8 +28,7 @@ internal object WcnfMode : CliMode {
         override fun load(path: String, common: CommonOptions): Solvable {
             val overrides = common.sourceOverrides(wcnfSemantics)
             val parsed = openTextFile(path).useSource { Dimacs.parseWcnf(it) }.toProblem(
-                common.config.problemSettings(),
-                semanticOverrides = overrides,
+                common.config.problemSettings(), semanticOverrides = overrides,
             )
             cliLogger(common.verbose).v {
                 "parsed ${fileName(path)}: vars=${parsed.numOriginalBoolVars} " +
@@ -38,11 +37,7 @@ internal object WcnfMode : CliMode {
             val render: (Sample) -> String = { s -> renderWcnfModel(parsed.numOriginalBoolVars, s) }
             // MaxSAT minimises the weight of falsified soft clauses.
             return sourceSolvable(
-                parsed.problem,
-                parsed.objective.toLinearObjective(),
-                false,
-                common,
-                render,
+                parsed.problem, parsed.objective.toLinearObjective(), false, common, render,
                 { assignment -> renderWcnfModel(parsed.numOriginalBoolVars, assignment::boolValue) },
                 boolFolds = parsed.boolFolds,
             )
@@ -53,7 +48,8 @@ internal object WcnfMode : CliMode {
 }
 
 /** Render a MaxSAT-Evaluation `v` line: `v` followed by one `0`/`1` bit per original variable (1-based). */
-internal fun renderWcnfModel(numOriginalVars: Int, s: Sample): String = renderWcnfModel(numOriginalVars, s::boolValue)
+internal fun renderWcnfModel(numOriginalVars: Int, s: Sample): String =
+    renderWcnfModel(numOriginalVars, s::boolValue)
 
 private fun renderWcnfModel(numOriginalVars: Int, boolValue: (Int) -> Boolean): String = buildString {
     append("v ")

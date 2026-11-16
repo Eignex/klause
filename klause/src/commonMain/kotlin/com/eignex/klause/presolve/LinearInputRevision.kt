@@ -51,10 +51,8 @@ internal class LinearInputRevision(
         for (index in dropped) {
             if (!record(factors[index], -1, work)) break
         }
-        if (!work.stopped) {
-            for (factor in added) {
-                if (!record(factor, 1, work)) break
-            }
+        if (!work.stopped) for (factor in added) {
+            if (!record(factor, 1, work)) break
         }
         dirty = dirty || deductionsChanged
         complete = work.check()
@@ -63,9 +61,7 @@ internal class LinearInputRevision(
 
     fun current(problem: Problem): Long? = current { v ->
         val domain = (problem as? BakedProblem)?.rootIntDomain(v)
-        if (domain != null) {
-            domain.min to domain.max
-        } else {
+        if (domain != null) domain.min to domain.max else {
             val bounds = problem.intBounds
             (if (bounds.hasLower(v)) bounds.lower(v) else null) to
                 (if (bounds.hasUpper(v)) bounds.upper(v) else null)
@@ -123,9 +119,7 @@ internal class LinearInputRevision(
             if (integral || (pass == PresolvePass.STRENGTHEN_COEFFICIENTS && narrow)) relevant = true
             if (!integral || pass != PresolvePass.STRENGTHEN_COEFFICIENTS ||
                 (row.relation != LinearOp.LE && row.relation != LinearOp.GE)
-            ) {
-                continue
-            }
+            ) continue
             for (k in 0 until row.size) {
                 if (!work.visit(1L)) return false
                 val v = Term.intVar(row.ref(k))
@@ -133,9 +127,7 @@ internal class LinearInputRevision(
                 if (count == 0) {
                     columns.remove(v)
                     ranges.remove(v)
-                } else {
-                    columns.put(v, count)
-                }
+                } else columns.put(v, count)
             }
         }
         if (relevant) revision++

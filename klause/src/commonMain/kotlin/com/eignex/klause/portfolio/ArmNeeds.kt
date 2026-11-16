@@ -61,15 +61,10 @@ internal class ProblemFacts(
     /** Whether the model offers [need]. */
     fun offers(need: ArmNeed): Boolean = when (need) {
         ArmNeed.Clausal -> profile.problemClass == ProblemClass.Sat
-
         ArmNeed.Objective -> profile.optimizing
-
         ArmNeed.BooleanObjective -> booleanObjective
-
-        ArmNeed.ExtensionalSupports ->
-            extensionalSupports && !profile.optimizing &&
-                profile.problemClass == ProblemClass.FiniteCp
-
+        ArmNeed.ExtensionalSupports -> extensionalSupports && !profile.optimizing &&
+            profile.problemClass == ProblemClass.FiniteCp
         is ArmNeed.Relaxation -> relaxations.getOrPut(need.emphasis) { relaxation(need.emphasis) }
     }
 
@@ -77,13 +72,8 @@ internal class ProblemFacts(
     fun offersAll(needs: Collection<ArmNeed>): Boolean = needs.all(::offers)
 
     fun eligibility(label: String, needs: Set<ArmNeed>): WorkerEligibility {
-        val requirements = WorkerRequirements(
-            WorkerFragment.FINITE,
-            WorkerObjectiveView.CANONICAL,
-            WorkerProofAuthority.CHECKED_TERMINALS,
-            construction,
-            needs.toSet(),
-        )
+        val requirements = WorkerRequirements(WorkerFragment.FINITE, WorkerObjectiveView.CANONICAL,
+            WorkerProofAuthority.CHECKED_TERMINALS, construction, needs.toSet())
         return WorkerEligibility(requirements, requirements.needs.filterNot(::offers).map { "missing:" + it }).also {
             observer?.invoke(label, it)
         }
@@ -104,11 +94,8 @@ internal class ProblemFacts(
             val binaryView = binarySource != null
             return ProblemFacts(
                 profile,
-                construction = WorkerConstructionCost(
-                    problem.numBoolVars.toLong() + problem.numIntVars +
-                        problem.numRealVars,
-                    problem.factors.size,
-                ),
+                construction = WorkerConstructionCost(problem.numBoolVars.toLong() + problem.numIntVars +
+                    problem.numRealVars, problem.factors.size),
                 observer = observer,
                 binaryIntegers = binary,
                 binaryEqualityObjective = (binary && problem.hasBinaryEqualityObjective(objective)) ||
@@ -138,10 +125,7 @@ internal class ProblemFacts(
                     },
                 relaxation = { emphasis ->
                     LpAutoConfig.resolve(
-                        problem,
-                        LpConfig(emphasis).cappedUnder(lpCeiling),
-                        LpPlan(),
-                        objective,
+                        problem, LpConfig(emphasis).cappedUnder(lpCeiling), LpPlan(), objective,
                     ).hasDefaultNumericalSettings().not()
                 },
             )

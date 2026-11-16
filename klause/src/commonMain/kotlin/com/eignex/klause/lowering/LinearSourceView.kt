@@ -39,7 +39,6 @@ internal class LinearSourceView(
 
 // [negativeZeroBound] reports whether a zero bound of source column `index` was written as binary64 -0.0; its
 // sign is applied before the model takes ownership of the bound arrays.
-
 internal fun lowerLinearSource(
     source: LinearSourceProblem,
     settings: ProblemSettings,
@@ -63,9 +62,7 @@ internal fun lowerLinearSource(
         val variable = source.variableValues[index]
         columns[index] = if (variable.integer || integralBounds[index] != null) {
             Term.ofIntVar(integers++)
-        } else {
-            Term.ofRealVar(reals++)
-        }
+        } else Term.ofRealVar(reals++)
         if (variable.integer) sourceIntegers += Term.intVar(columns[index]) else sourceReals += columns[index]
     }
     val lower = LongArray(integers)
@@ -133,9 +130,7 @@ internal fun lowerLinearSource(
         fun add(bound: BigFraction, relation: LinearOp) {
             val comparison = row(original.termValues, relation, bound)
             val guard = original.indicator
-            factors += if (guard == null) {
-                comparison as Factor
-            } else {
+            factors += if (guard == null) comparison as Factor else {
                 LinearIndicator(Term.intVar(columns[guard.column]), guard.whenOne, comparison as ExactLinear)
             }
         }
@@ -157,9 +152,7 @@ internal fun lowerLinearSource(
             val reference = columns[term.column]
             if (Term.isReal(reference)) {
                 onlyIntegers = false
-            } else {
-                integral[Term.intVar(reference)] += term.coefficient.fraction()
-            }
+            } else integral[Term.intVar(reference)] += term.coefficient.fraction()
         }
         var multiplier = BIG_ONE
         if (onlyIntegers) {
@@ -241,15 +234,11 @@ private fun LinearSourceProblem.canProjectToDouble(stop: ExecutionControl): Bool
         return projected.isFinite() && (fraction.isZero || projected != 0.0)
     }
     return variableValues.all { supported(it.lower) && supported(it.upper) } &&
-        rowValues.all { row ->
-            supported(row.lower) && supported(row.upper) &&
-                row.termValues.all { supported(it.coefficient) }
-        } &&
-        (
-            objective?.let { objective ->
-                supported(objective.constant) && objective.termValues.all { supported(it.coefficient) }
-            } != false
-            )
+        rowValues.all { row -> supported(row.lower) && supported(row.upper) &&
+            row.termValues.all { supported(it.coefficient) } } &&
+        (objective?.let { objective ->
+            supported(objective.constant) && objective.termValues.all { supported(it.coefficient) }
+        } != false)
 }
 
 private fun SemanticRational.fraction(): BigFraction = BigFraction.of(numerator, denominator)

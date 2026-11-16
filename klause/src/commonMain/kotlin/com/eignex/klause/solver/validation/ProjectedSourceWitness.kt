@@ -19,18 +19,14 @@ internal fun verifyProjectedSourceWitness(
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
     if (sample.numBoolVars != source.numBoolVars || sample.numIntVars != source.numIntVars ||
         sample.numRealVars != source.numRealVars
-    ) {
-        return Verification.Rejected("assignment does not cover original source coordinates")
-    }
+    ) return Verification.Rejected("assignment does not cover original source coordinates")
     for (id in 0 until source.numIntVars) {
         cancellation.charge(1)
         if (cancellation()) return Verification.Indeterminate("source bounds check cancelled")
         val value = sample.intValue(id)
         if (value < source.intBounds.lower(id) || value > source.intBounds.upper(id) ||
             source.intDomainOrNull(id)?.let { value !in it } == true
-        ) {
-            return Verification.Rejected("assignment violates an original integer declaration")
-        }
+        ) return Verification.Rejected("assignment violates an original integer declaration")
     }
     checkProjectedRealBounds(source, sample, cancellation)?.let { return it }
     val policy = source.semantics.effective.feasibilityTolerance
@@ -48,11 +44,8 @@ internal fun verifyProjectedSourceWitness(
         if (!admitted) return Verification.Rejected("additional source acceptance filter refutes the assignment")
     }
     if (cancellation()) return Verification.Indeterminate("source verification cancelled")
-    return points.check(
-        Candidate(sample, Unit),
-        cancellation,
-        onWork = { cancellation.charge(it) },
-    )
+    return points.check(Candidate(sample, Unit), cancellation,
+        onWork = { cancellation.charge(it) })
 }
 
 private fun checkProjectedRealBounds(

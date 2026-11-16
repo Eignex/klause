@@ -19,14 +19,9 @@ class ParityInputRevisionTest {
     @Test
     fun `only odd equality columns should invalidate parity on a range change`() {
         for (column in 0..2) {
-            val source = Problem(
-                0,
-                3,
-                Array(3) { IntDomain(0, 2) },
-                listOf(
-                    Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.EQ, 1),
-                ),
-            )
+            val source = Problem(0, 3, Array(3) { IntDomain(0, 2) }, listOf(
+                Linear(intArrayOf(1, 2), intArrayOf(0, 1), LinearOp.EQ, 1),
+            ))
             val inputs = ParityInputRevision(source, ExecutionControl.Never)
             val before = assertNotNull(inputs.current(source))
             val delta = SourceDelta(bounds = source.intBounds.tightening().also { it.atMost(column, 1) }.build())

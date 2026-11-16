@@ -90,22 +90,9 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
             check(row >= 0 && remap.row(row) >= 0)
             val cut = previous.numeric
             val columns = IntArray(cut.cols.size) { remap.column(cut.cols[it]).also { column -> check(column >= 0) } }
-            if (columns.contentEquals(cut.cols)) {
-                previous
-            } else {
-                Binding(
-                    previous.id,
-                    previous.source,
-                    Cut(
-                        columns,
-                        cut.coeffs,
-                        cut.rel,
-                        cut.rhs,
-                        cut.global,
-                        previous.proof,
-                        family = cut.family,
-                    ),
-                )
+            if (columns.contentEquals(cut.cols)) previous else {
+                Binding(previous.id, previous.source, Cut(columns, cut.coeffs, cut.rel, cut.rhs,
+                    cut.global, previous.proof, family = cut.family))
             }
         }
         val next = bindings.map {
@@ -163,21 +150,15 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
             val active = previous?.let { state.rows.index(it.id) }?.let { it >= 0 && state.rows.row(it).active } == true
             val priorCut = if (previous != null && active) {
                 if (previous.source === source) cut else previous.source.toCut(map).orNull()
-            } else {
-                null
-            }
+            } else null
             val numericKey = if (priorCut != null) cut.key() else null
             if (previous != null && priorCut != null &&
                 (priorCut === cut || priorCut.key() == numericKey) && previous.numericKey == numericKey
             ) {
                 val proof = requireNotNull(priorCut.provenance)
-                next.add(
-                    if (previous.proof.auxiliaryDefinitions == proof.auxiliaryDefinitions) {
-                        previous
-                    } else {
-                        Binding(previous.id, previous.source, priorCut)
-                    },
-                )
+                next.add(if (previous.proof.auxiliaryDefinitions == proof.auxiliaryDefinitions) previous else {
+                    Binding(previous.id, previous.source, priorCut)
+                })
                 continue
             }
             check(lastId < Long.MAX_VALUE)
@@ -196,10 +177,8 @@ internal class LpRetainedCuts(private val observe: (CutFamily, String) -> Unit =
             }
             for (binding in bindings) if (binding.id in retired) observe(binding.numeric.family, "PREMISE_OR_SELECTION")
             val priorIds = bindings.mapTo(HashSet()) { it.id }
-            for (binding in next) {
-                if (binding.id !in priorIds) {
-                    observe(binding.numeric.family, "INSTALLED")
-                }
+            for (binding in next) if (binding.id !in priorIds) {
+                observe(binding.numeric.family, "INSTALLED")
             }
             bindings = next.toList()
             depth = state.depth

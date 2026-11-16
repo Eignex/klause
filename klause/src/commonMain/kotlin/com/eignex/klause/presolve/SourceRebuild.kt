@@ -120,42 +120,26 @@ internal class SourceRebuilds(steps: List<RebuildStep>, val sourceBoolVars: Int?
     internal val steps: List<RebuildStep> = steps.map { step ->
         when (step) {
             is RebuildStep.CopyLiteral -> RebuildStep.CopyLiteral(step.variable, step.source)
-
             is RebuildStep.IntegerFromLiteral -> RebuildStep.IntegerFromLiteral(step.variable, step.literal)
-
             is RebuildStep.TupleValue -> {
                 require(step.literals.size == step.values.size)
                 RebuildStep.TupleValue(step.variable, step.literals.copyOf(), step.values.copyOf())
             }
-
             is RebuildStep.ComparisonValue ->
                 RebuildStep.ComparisonValue(step.variable, step.intVar, step.op, step.bound)
-
             is RebuildStep.SatisfyClauses -> RebuildStep.SatisfyClauses(step.variable, step.clauses.map { it.copyOf() })
-
             is RebuildStep.RepairClause -> RebuildStep.RepairClause(step.clause.copyOf(), step.literal)
-
             is RebuildStep.AffineValue -> {
                 require(step.divisor != 0L && step.termVars.size == step.termCoeffs.size)
                 RebuildStep.AffineValue(
-                    step.variable,
-                    step.constTerm,
-                    step.termVars.copyOf(),
-                    step.termCoeffs.copyOf(),
-                    step.divisor,
+                    step.variable, step.constTerm, step.termVars.copyOf(), step.termCoeffs.copyOf(), step.divisor,
                 )
             }
-
             is RebuildStep.QuotientValue -> {
                 require(step.divisor != 0L && step.termVars.size == step.termCoeffs.size)
                 RebuildStep.QuotientValue(
-                    step.variable,
-                    step.constTerm,
-                    step.termVars.copyOf(),
-                    step.termCoeffs.copyOf(),
-                    step.divisor,
-                    step.roundDown,
-                    step.clamp,
+                    step.variable, step.constTerm, step.termVars.copyOf(), step.termCoeffs.copyOf(),
+                    step.divisor, step.roundDown, step.clamp,
                 )
             }
         }
@@ -396,11 +380,8 @@ internal fun SourceRebuilds.asSampleLift(): ((Sample) -> Sample)? = if (isEmpty)
             } else {
                 emptyLongArray()
             }
-            sample.copy(
-                bools = if (sourceBools == bools.size) bools else bools.copyOf(sourceBools),
-                ints = finite,
-                exactInts = ints.toList(),
-            )
+            sample.copy(bools = if (sourceBools == bools.size) bools else bools.copyOf(sourceBools),
+                ints = finite, exactInts = ints.toList())
         }
     }
 }

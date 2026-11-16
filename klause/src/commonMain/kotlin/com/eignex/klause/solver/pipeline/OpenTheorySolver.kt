@@ -215,8 +215,10 @@ sealed interface OpenTheoryResult {
     ) : OpenTheoryResult
 
     /** A proof that the source model is infeasible. */
-    data class Unsat(override val stats: SolveStats, override val semantics: EffectiveSourceSemantics? = null) :
-        OpenTheoryResult
+    data class Unsat(
+        override val stats: SolveStats,
+        override val semantics: EffectiveSourceSemantics? = null,
+    ) : OpenTheoryResult
 
     /** An explicit budget or cancellation interrupted exact search. */
     data class Unknown(
@@ -229,9 +231,8 @@ sealed interface OpenTheoryResult {
 
 internal fun OpenTheoryResult.withSourceSemantics(semantics: EffectiveSourceSemantics): OpenTheoryResult {
     val previous = this.semantics
-    require(
-        previous == null ||
-            (previous.declared == semantics.declared && previous.effective == semantics.effective),
+    require(previous == null ||
+        (previous.declared == semantics.declared && previous.effective == semantics.effective)
     ) {
         "result belongs to a different source interpretation"
     }
@@ -299,7 +300,7 @@ class OpenTheoryEngine internal constructor(
                 cancellation = cancellation,
                 budget = presolveBudget,
                 projections = projections,
-                presolveCancellation = presolveCancellation.withAccounting(cancellation).includingStop(cancellation),
+                presolveCancellation = presolveCancellation .withAccounting(cancellation).includingStop( cancellation),
                 capturedPlan = capturedPlan,
             )
         },
@@ -314,13 +315,8 @@ class OpenTheoryEngine internal constructor(
         preparationCancellation: ExecutionControl,
         reuseOpeningBoundAttempt: Boolean,
         declaredRoute: ProblemPipeline = planned.route,
-    ) : this(
-        declaredRoute,
-        { planned },
-        preparationCancellation,
-        reuseOpeningBoundAttempt,
-        planned.prepared.source.semantics,
-    )
+    ) : this(declaredRoute, { planned }, preparationCancellation, reuseOpeningBoundAttempt,
+        planned.prepared.source.semantics)
 
     init {
         require(declaredRoute != ProblemPipeline.FINITE_CP && declaredRoute != ProblemPipeline.UNSUPPORTED_OPEN) {
@@ -369,7 +365,7 @@ class OpenTheoryEngine internal constructor(
         nodePolicy: SearchNodePolicy,
     ): OpenTheoryStart {
         val work = state.work
-        val cancellation = params.timeout.withAccounting(params.cancellation).includingStop(params.cancellation)
+        val cancellation = params.timeout .withAccounting(params.cancellation).includingStop( params.cancellation)
         val stats = SolveStatsSink(backend = declaredRoute.backendName())
         stats.start()
         // Preparation reads the whole model, so a budget already spent is answered before that work
@@ -467,12 +463,7 @@ class OpenTheoryEngine internal constructor(
             val selectedBranching = when (params.openBranching) {
                 OpenBranching.Automatic -> if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
                     (planned.theory as? ExactLiraSearchComponent)?.defaultMixedPointOwner == true
-                ) {
-                    OpenBranching.Activity
-                } else {
-                    OpenBranching.SourceOrder
-                }
-
+                ) OpenBranching.Activity else OpenBranching.SourceOrder
                 else -> params.openBranching
             }
             val branching = when (selectedBranching) {
@@ -488,26 +479,12 @@ class OpenTheoryEngine internal constructor(
                 nodePolicy = nodePolicy,
                 candidateHints = observedCandidateHints(hints, planned.candidateHints, state.smt.hintUsage),
                 branchSelection = if (plan.theoryPipeline == ProblemPipeline.DIFFERENCE_THEORY) {
-                    SearchBranchSelection.Priority(
-                        listOf(
-                            SearchBranchKind.Arithmetic,
-                            SearchBranchKind.Boolean,
-                            SearchBranchKind.Finite,
-                        ),
-                    )
+                    SearchBranchSelection.Priority(listOf(SearchBranchKind.Arithmetic, SearchBranchKind.Boolean,
+                        SearchBranchKind.Finite))
                 } else if (plan.theoryPipeline == ProblemPipeline.EXACT_LIRA &&
                     plan.cpIntVars.isNotEmpty()
-                ) {
-                    SearchBranchSelection.Priority(
-                        listOf(
-                            SearchBranchKind.Boolean,
-                            SearchBranchKind.Arithmetic,
-                            SearchBranchKind.Finite,
-                        ),
-                    )
-                } else {
-                    SearchBranchSelection.Default
-                },
+                ) SearchBranchSelection.Priority(listOf(SearchBranchKind.Boolean, SearchBranchKind.Arithmetic,
+                    SearchBranchKind.Finite)) else SearchBranchSelection.Default,
             )
             handedOff = true
             return OpenTheoryStart.Running(OpenTheoryRun(planned, run, prepared, stats, state, params))
@@ -570,9 +547,7 @@ class OpenTheoryEngine internal constructor(
         ?: prepareSource(cancellation).also {
             if (!cancellation() &&
                 (it as? OpenSourcePreparation.Planned)?.plan?.encodingDecline != EncoderDecline.RESOURCE
-            ) {
-                preparation = it
-            }
+            ) preparation = it
         }
 
     /** The bound-closing phase's allowance: what is left of preparation's, capped by the solve's own. */
@@ -581,7 +556,7 @@ class OpenTheoryEngine internal constructor(
 
     /** The preparation allowance and the solve's own stop, whichever fires first. */
     private fun alsoStoppedBy(cancellation: ExecutionControl): ExecutionControl =
-        preparationCancellation.includingStop(cancellation)
+        preparationCancellation .includingStop( cancellation)
 
     private fun unknown(
         timedOut: Boolean,
@@ -596,12 +571,12 @@ class OpenTheoryEngine internal constructor(
             when {
                 timedOut || cause == SearchStopCause.Timeout -> TerminationReason.Timeout
 
+
                 budgetExhausted || state.work.exhausted || cause == SearchStopCause.WorkAllowance ||
                     cause == SearchStopCause.CheckAllowance || cause == SearchStopCause.DecisionAllowance ||
                     cause == SearchStopCause.OperationAllowance -> TerminationReason.BudgetExhausted
 
                 cause == SearchStopCause.Cancelled -> TerminationReason.Cancelled
-
                 cause == SearchStopCause.RepresentationDecline -> TerminationReason.RepresentationDeclined
 
                 else -> TerminationReason.Cancelled
@@ -652,8 +627,7 @@ internal class OpenTheorySolveState(private val params: TheoryParams) {
 
     /** What the request's hint draw produced, cost, and has steered so far. */
     val hints: OpenHintStats get() = drawStats.copy(
-        steeredSplits = steering?.steeredSplits ?: 0L,
-        usage = smt.hintUsage.snapshot(),
+        steeredSplits = steering?.steeredSplits ?: 0L, usage = smt.hintUsage.snapshot(),
     )
 
     private var drawStats = OpenHintStats()

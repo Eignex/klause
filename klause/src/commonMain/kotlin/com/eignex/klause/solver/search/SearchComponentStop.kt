@@ -17,37 +17,26 @@ data class SearchComponentStop(
     enum class Site {
         /** Exhaustion with retained unresolved coverage. */
         Coverage,
-
         /** Run-start lifecycle callback. */
         Start,
-
         /** Run-resume lifecycle callback. */
         Resume,
-
         /** Root-model blocking or its propagation. */
         ModelBlock,
-
         /** Lifecycle callback after a completed root-model block. */
         ModelBlocked,
-
         /** Completed-model policy. */
         ModelPolicy,
-
         /** Policy before branching at a node. */
         NodePolicy,
-
         /** Applying an asserting learned node conflict. */
         LearnedConflict,
-
         /** A required leaf check without a resumable continuation. */
         LeafCheck,
-
         /** Restart lifecycle callback. */
         Restart,
-
         /** Shared propagation during restart. */
         RestartPropagation,
-
         /** ExecutionControl lifecycle callback. */
         ExecutionControl,
     }

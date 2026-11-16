@@ -54,9 +54,7 @@ internal fun LpEngine.repairRootComponent(
                         repair.states[frame] = SECOND_PENDING
                         repair.position = repair.positions[frame]
                         repair.retreat = false
-                    } else {
-                        repair.depth--
-                    }
+                    } else repair.depth--
                 }
                 charge()
                 continue
@@ -129,12 +127,8 @@ internal fun LpEngine.repairRootComponent(
         }
     } finally {
         charge()
-        sink.lp.observePrimalPhase(
-            "PRIMAL_COMPONENT_REPAIR",
-            outcome,
-            started.elapsedNow().inWholeNanoseconds,
-            session.work - before,
-        )
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_REPAIR", outcome,
+            started.elapsedNow().inWholeNanoseconds, session.work - before)
     }
 }
 

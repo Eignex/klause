@@ -40,13 +40,10 @@ internal fun pseudoBooleanKey(sink: KeySink, constants: IntegralConstants, liter
             sink.long(constants.bound)
             sink.pairsByLitKey(literals) { constants.coeff(it) }
         }
-
         is WideConstants -> {
             sink.constLongs(constants.keyDigits[0])
-            val order = literals.indices.sortedWith(
-                compareBy<Int> { literals[it] }
-                    .thenBy { constants.exactCoeff(it).toString() },
-            )
+            val order = literals.indices.sortedWith(compareBy<Int> { literals[it] }
+                .thenBy { constants.exactCoeff(it).toString() })
             sink.int(order.size)
             for (k in order) {
                 sink.boolLit(literals[k])

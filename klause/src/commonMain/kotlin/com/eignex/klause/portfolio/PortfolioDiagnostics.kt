@@ -17,9 +17,7 @@ class PortfolioDiagnostics(
     /** Inline sink; exceptions terminate the invocation. */
     val onEvent: (PortfolioEvent) -> Unit = {},
 ) {
-    init {
-        require(workLimit > 0L) { "diagnostic work limit must be positive" }
-    }
+    init { require(workLimit > 0L) { "diagnostic work limit must be positive" } }
 }
 
 /** Streamed portfolio events. Work-schedule events and physical lifecycle observations have separate sinks. */
@@ -87,7 +85,6 @@ sealed interface PortfolioEvent {
         /** Segment accounting and ordinary reward. */
         val progress: PortfolioProgress,
     ) : PortfolioEvent
-
     /** A fresh invocation and its scheduler seed and containing work allowance. */
     data class Started(
         /** Scheduler seed. */

@@ -33,11 +33,8 @@ class SourceExecutionPolicyTest {
         for (mode in LpSourcePreparation.entries) {
             for (applicationDefault in listOf(false, true)) {
                 val config = LpConfig(sourcePreparation = mode)
-                val policy = if (applicationDefault) {
-                    SourceExecutionPolicy(portfolioLpCeiling = config)
-                } else {
-                    SourceExecutionPolicy(lpCeiling = config)
-                }
+                val policy = if (applicationDefault) SourceExecutionPolicy(portfolioLpCeiling = config)
+                else SourceExecutionPolicy(lpCeiling = config)
 
                 val resolved = policy.lpConfig(FiniteEngine.BACKTRACK)
 
@@ -63,13 +60,9 @@ class SourceExecutionPolicyTest {
             "(declare-const x Real) (assert (= (sin x) 0))",
         )
         for (source in sources) {
-            val invocation = SourceSetup.prepare(
-                SourceSetupRequest(
-                    SmtLib.parse(source).source,
-                    ExecutionOperation.SATISFY,
-                    FiniteEngine.BACKTRACK,
-                ),
-            )
+            val invocation = SourceSetup.prepare(SourceSetupRequest(
+                SmtLib.parse(source).source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+            ))
 
             val request = SourceExecutionRequest(invocation, ExecutionOptions(), presolveConfig = PresolveConfig.NONE)
 
@@ -79,20 +72,14 @@ class SourceExecutionPolicyTest {
 
     @Test
     fun `native formula sources should explain unavailable individual reductions`() {
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-                SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
-                ExecutionOperation.SATISFY,
-                FiniteEngine.BACKTRACK,
-            ),
-        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            SmtLib.parse("(declare-const x Int) (assert (= (* x x) 2))").source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
 
         val failure = assertFailsWith<PipelineConfigException> {
-            SourceExecutionRequest(
-                invocation,
-                ExecutionOptions(),
-                presolveConfig = PresolveConfig.parse("off,+probe-open"),
-            )
+            SourceExecutionRequest(invocation, ExecutionOptions(),
+                presolveConfig = PresolveConfig.parse("off,+probe-open"))
         }
 
         assertTrue("canonical factor model" in assertNotNull(failure.message))
@@ -112,10 +99,10 @@ class SourceExecutionPolicyTest {
     fun `deferred finite policy should retain containing controls and application hooks`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-                SmtLib.parse("(declare-const b Bool) (assert b)").source,
-                ExecutionOperation.SATISFY,
-                FiniteEngine.BACKTRACK,
-            ),
+            SmtLib.parse("(declare-const b Bool) (assert b)").source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
         )
         val budget = NodeBudget(7)
         val stop = ExecutionControl { true }
@@ -154,19 +141,18 @@ class SourceExecutionPolicyTest {
     fun `linear source preparation should receive typed presolve tuning`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-                SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
-                ExecutionOperation.SATISFY,
-                FiniteEngine.BACKTRACK,
-            ),
+            SmtLib.parse("(declare-const x Real) (assert (> x 0))").source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.BACKTRACK,
+        )
         )
 
         val request = SourceExecutionRequest(
-            invocation,
-            SourceExecutionPolicy(),
+            invocation, SourceExecutionPolicy(),
             ExecutionOptions(
-                ExecutionOption.affinePivotOrder(AffinePivotOrder.STABLE_ID),
-                ExecutionOption.presolveMaxRounds(2),
-            ),
+            ExecutionOption.affinePivotOrder(AffinePivotOrder.STABLE_ID),
+            ExecutionOption.presolveMaxRounds(2),
+        )
         )
 
         val preparation = assertNotNull(request.presolveConfig)
@@ -179,18 +165,17 @@ class SourceExecutionPolicyTest {
     fun `presolve effort tuning should preserve implicit local search emphasis`() {
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-                SmtLib.parse("(declare-const b Bool) (assert b)").source,
-                ExecutionOperation.SATISFY,
-                FiniteEngine.LOCAL_SEARCH,
-            ),
+            SmtLib.parse("(declare-const b Bool) (assert b)").source,
+            ExecutionOperation.SATISFY,
+            FiniteEngine.LOCAL_SEARCH,
+        )
         )
         val request = SourceExecutionRequest(
-            invocation,
-            SourceExecutionPolicy(),
+            invocation, SourceExecutionPolicy(),
             ExecutionOptions(
-                ExecutionOption.presolveMaxRounds(2),
-            ),
-            presolveConfig = PresolveConfig.DEFAULT,
+            ExecutionOption.presolveMaxRounds(2),
+        ),
+            presolveConfig = PresolveConfig.DEFAULT
         )
 
         val finite = assertNotNull(request.finiteRequest).invoke(invocation.finiteShape())
@@ -218,10 +203,7 @@ class SourceExecutionPolicyTest {
 
     private fun finiteRequest(tolerance: SourceTolerance?): FiniteSolveRequest {
         val source = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 3)),
-            arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
+            0, 1, arrayOf(IntDomain(0, 3)), arrayOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
             semantics = SourceSemantics(SourceFormat.IR, feasibilityTolerance = tolerance).resolve(),
         )
         val invocation = SourceSetup.prepare(

@@ -36,7 +36,6 @@ internal object GbdHash {
             val ch = byte.toInt() and BYTE_MASK
             when {
                 !skip && (ch in '0'.code..'9'.code || ch == '-'.code) -> literal(byte, ch)
-
                 ch <= ' '.code -> {
                     space = !start
                     skip = skip && ch != '\n'.code && ch != '\r'.code

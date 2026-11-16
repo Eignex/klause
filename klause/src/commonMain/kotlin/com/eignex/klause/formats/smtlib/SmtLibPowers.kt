@@ -18,7 +18,6 @@ private fun powerExponent(term: IntComb): Int {
             if (!term.isConstant()) smtUnsupported("power requires a fixed nonnegative integer exponent")
             bigIntOf(term.lin.constant)
         }
-
         is IntComb.Wide -> {
             if (!term.isConstant()) smtUnsupported("power requires a fixed nonnegative integer exponent")
             term.lin.constant
@@ -54,23 +53,15 @@ internal fun Compiler.Builder.realPower(base: RealComb, power: IntComb): Res.R {
     if (exponent == 0) return Res.R(RealComb(emptyMap(), emptyMap(), BigFraction.ONE))
     if (exponent == 1) return Res.R(base)
     if (base.isConstant) {
-        val value = PolynomialRealLowering.power(
-            PolynomialRealLowering.constant(base.constant),
-            exponent,
-            sourceCancellation,
-        )
+        val value = PolynomialRealLowering.power(PolynomialRealLowering.constant(base.constant), exponent,
+            sourceCancellation)
         val coefficient = PolynomialRealLowering.rational(value)
             ?: smtUnsupported("constant power requires an exact source expression")
         return Res.R(RealComb(emptyMap(), emptyMap(), coefficient))
     }
     if (inferringBounds) smtUnsupported("power requires source lowering")
     val result = nextReal++
-    factors.add(
-        Power(
-            Power.Coordinate.Real(SourceRealId(productRealColumn(base))),
-            exponent,
-            Power.Coordinate.Real(SourceRealId(result)),
-        ),
-    )
+    factors.add(Power(Power.Coordinate.Real(SourceRealId(productRealColumn(base))), exponent,
+        Power.Coordinate.Real(SourceRealId(result))))
     return Res.R(RealComb(emptyMap(), mapOf(result to BigFraction.ONE), BigFraction.ZERO))
 }

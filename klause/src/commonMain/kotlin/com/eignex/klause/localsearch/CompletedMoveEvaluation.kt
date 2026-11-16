@@ -114,9 +114,7 @@ internal class CompletedMoveEvaluation(
         val exploring = exploration?.takeIf { it in distinct }
             ?: distinct[proposal % distinct.size]
         proposal = if (proposal == Int.MAX_VALUE) 0 else proposal + 1
-        val ranked = if (deterministic) {
-            finiteMoves.minByOrNull(rawScore)
-        } else {
+        val ranked = if (deterministic) finiteMoves.minByOrNull(rawScore) else {
             AcceptanceRule.Greedy.choose(state.rng, finiteMoves, emptyList(), 1.0, rawScore)
         }
         if (ranked != null && rawScore(ranked) < 0.0) {

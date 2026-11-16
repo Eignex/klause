@@ -36,8 +36,7 @@ class LinearSourceSolvingTest(private val engine: String) {
             emptyList(),
             LinearSourceObjective(
                 listOf(LinearSourceTerm(0, SemanticRational.of(BIG_ONE, bigIntOf(3)))),
-                SemanticRational.of(BIG_ONE, bigIntOf(10)),
-                ObjectiveSense.MAXIMIZE,
+                SemanticRational.of(BIG_ONE, bigIntOf(10)), ObjectiveSense.MAXIMIZE,
             ),
         )
         val common = CommonOptions().apply {

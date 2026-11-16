@@ -92,9 +92,7 @@ internal class MddPathWeights private constructor(
                 val dst = transitions[p + 2].toInt()
                 if (transitions[p + 1] !in domain || dst !in suffix[layer + 1].indices ||
                     suffix[layer + 1][dst] == 0
-                ) {
-                    continue
-                }
+                ) continue
                 val sum = prefix[layer + 1][dst].toLong() + prefix[layer][src]
                 if (sum > Int.MAX_VALUE) return decline(state)
                 prefix[layer + 1][dst] = sum.toInt()

@@ -77,12 +77,8 @@ class PolynomialSignRefutationTest {
             solveQfNra(source.formula, source.boolCount, source.realCount),
         )
 
-        val stopped = solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(maximumWork = completed.stats.workSpent - 1),
-        )
+        val stopped = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1))
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
     }

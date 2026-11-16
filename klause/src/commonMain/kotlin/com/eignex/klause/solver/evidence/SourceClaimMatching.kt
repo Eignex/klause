@@ -22,49 +22,31 @@ internal fun sameSourceClaimKind(first: SourceClaim, second: SourceClaim): Boole
 }
 
 internal fun matchSourceClaims(
-    first: SourceClaim,
-    second: SourceClaim,
-    cancellation: ExecutionControl,
+    first: SourceClaim, second: SourceClaim, cancellation: ExecutionControl,
 ): SourceEvidenceCheck = try {
     val algebraic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
     algebraic.arithmetic.step()
     val matches = when (first) {
         is SourceClaim.Witness -> second is SourceClaim.Witness && matchSample(first.sample, second.sample, algebraic)
-
-        is SourceClaim.Bound ->
-            second is SourceClaim.Bound && first.strict == second.strict &&
-                matchValue(first.value, second.value, algebraic)
-
-        is SourceClaim.Optimal ->
-            second is SourceClaim.Optimal &&
-                matchSample(first.sample, second.sample, algebraic) &&
-                matchValue(first.value, second.value, algebraic)
-
+        is SourceClaim.Bound -> second is SourceClaim.Bound && first.strict == second.strict &&
+            matchValue(first.value, second.value, algebraic)
+        is SourceClaim.Optimal -> second is SourceClaim.Optimal &&
+            matchSample(first.sample, second.sample, algebraic) &&
+            matchValue(first.value, second.value, algebraic)
         is SourceClaim.Limit -> second is SourceClaim.Limit && matchSample(first.sample, second.sample, algebraic) &&
             matchValue(first.value, second.value, algebraic)
-
-        is SourceClaim.Unbounded ->
-            second is SourceClaim.Unbounded &&
-                matchSample(first.sample, second.sample, algebraic)
-
+        is SourceClaim.Unbounded -> second is SourceClaim.Unbounded &&
+            matchSample(first.sample, second.sample, algebraic)
         is SourceClaim.Clause -> second is SourceClaim.Clause && first.literals == second.literals
-
-        is SourceClaim.Ray ->
-            second is SourceClaim.Ray && first.direction == second.direction &&
-                matchSample(first.sample, second.sample, algebraic)
-
+        is SourceClaim.Ray -> second is SourceClaim.Ray && first.direction == second.direction &&
+            matchSample(first.sample, second.sample, algebraic)
         is SourceClaim.Consequence -> second is SourceClaim.Consequence && first.inequality == second.inequality
-
         SourceClaim.Refutation -> second == SourceClaim.Refutation
-
         is SourceClaim.Extension -> first === second
     }
     algebraic.arithmetic.step()
-    if (matches) {
-        SourceEvidenceCheck.Checked
-    } else {
-        SourceEvidenceCheck.Rejected("captured evidence does not match the actual source claim")
-    }
+    if (matches) SourceEvidenceCheck.Checked
+    else SourceEvidenceCheck.Rejected("captured evidence does not match the actual source claim")
 } catch (_: IncompleteClaim) {
     SourceEvidenceCheck.Unavailable("source claim lacks exact real coordinates")
 } catch (_: PolynomialInterrupted) {
@@ -86,9 +68,7 @@ private fun matchValue(first: SourceValue, second: SourceValue, algebraic: Algeb
 private fun matchSample(first: Sample, second: Sample, algebraic: AlgebraicArithmetic): Boolean {
     if (first.numBoolVars != second.numBoolVars || first.numIntVars != second.numIntVars ||
         first.numRealVars != second.numRealVars
-    ) {
-        return false
-    }
+    ) return false
     for (id in 0 until first.numBoolVars) {
         algebraic.arithmetic.step()
         if (first.boolValue(id) != second.boolValue(id)) return false

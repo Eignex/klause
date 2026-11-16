@@ -16,34 +16,21 @@ internal object PolynomialSigns {
         (if (signs and NEGATIVE_SIGN == 0) 0 else POSITIVE_SIGN) or
         (if (signs and POSITIVE_SIGN == 0) 0 else NEGATIVE_SIGN)
 
-    fun multiplySigns(left: Int, right: Int): Int = (if ((left or right) and ZERO_SIGN == 0) 0 else ZERO_SIGN) or
-        (
-            if ((left and NEGATIVE_SIGN != 0 && right and POSITIVE_SIGN != 0) ||
+    fun multiplySigns(left: Int, right: Int): Int =
+        (if ((left or right) and ZERO_SIGN == 0) 0 else ZERO_SIGN) or
+            (if ((left and NEGATIVE_SIGN != 0 && right and POSITIVE_SIGN != 0) ||
                 (left and POSITIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0)
-            ) {
-                NEGATIVE_SIGN
-            } else {
-                0
-            }
-            ) or
-        (
-            if ((left and NEGATIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0) ||
+            ) NEGATIVE_SIGN else 0) or
+            (if ((left and NEGATIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0) ||
                 (left and POSITIVE_SIGN != 0 && right and POSITIVE_SIGN != 0)
-            ) {
-                POSITIVE_SIGN
-            } else {
-                0
-            }
-            )
+            ) POSITIVE_SIGN else 0)
 
     fun addSigns(left: Int, right: Int): Int {
         if (left == ZERO_SIGN) return right
         if (right == ZERO_SIGN) return left
         if ((left and NEGATIVE_SIGN != 0 && right and POSITIVE_SIGN != 0) ||
             (left and POSITIVE_SIGN != 0 && right and NEGATIVE_SIGN != 0)
-        ) {
-            return ALL_SIGNS
-        }
+        ) return ALL_SIGNS
         return left or right
     }
 

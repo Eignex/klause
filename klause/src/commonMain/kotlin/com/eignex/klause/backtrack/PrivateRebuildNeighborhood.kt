@@ -22,27 +22,20 @@ internal class PrivateRebuildNeighborhood private constructor(
     fun eliminate(cancellation: ExecutionControl): Reduction = Reduction(cancellation)
 
     inner class Reduction internal constructor(cancellation: ExecutionControl) {
-        private val delta = BoundedVariableElimination.eliminateSource(
-            problem,
-            objectiveBoolVars = protectedColumns,
-            cancellation = cancellation,
-        )
+        private val delta = BoundedVariableElimination.eliminateSource(problem, objectiveBoolVars = protectedColumns,
+            cancellation = cancellation)
         val rebuild get() = delta.rebuild
         val infeasible get() = delta.infeasible
 
         fun materialize(cancellation: ExecutionControl): Problem? {
             if (cancellation()) return null
             val indices = sourceIndices
-            val restored = if (indices == null) {
-                delta
-            } else {
+            val restored = if (indices == null) delta else {
                 cancellation.charge(delta.droppedIndices.size * 2L + 1L)
                 if (cancellation()) return null
                 SourceDelta(
                     droppedIndices = IntArray(delta.droppedIndices.size) { indices[delta.droppedIndices[it]] },
-                    addedFactors = delta.addedFactors,
-                    bounds = delta.bounds,
-                    infeasible = delta.infeasible,
+                    addedFactors = delta.addedFactors, bounds = delta.bounds, infeasible = delta.infeasible,
                     rebuild = delta.rebuild,
                 ).also { it.objective = delta.objective }
             }
@@ -86,12 +79,8 @@ internal class PrivateRebuildNeighborhood private constructor(
             cancellation.charge(factors.size * 2L)
             if (cancellation()) return null
             // Outside rows contain no pivot literal, so existential projection commutes with them.
-            return PrivateRebuildNeighborhood(
-                source,
-                source.withFactors(factors.toTypedArray()),
-                admission.protectedColumns,
-                indices.toIntArray(),
-            )
+            return PrivateRebuildNeighborhood(source, source.withFactors(factors.toTypedArray()),
+                admission.protectedColumns, indices.toIntArray())
         }
     }
 }

@@ -22,9 +22,7 @@ internal object SourceDecoder {
                 digest.update(buffer, 0, count)
             }
         }
-        return mapOf(
-            "sourceDecoderExecutable" to executable.path,
-            "sourceDecoderSha256" to HexFormat.of().formatHex(digest.digest()),
-        )
+        return mapOf("sourceDecoderExecutable" to executable.path,
+            "sourceDecoderSha256" to HexFormat.of().formatHex(digest.digest()))
     }
 }

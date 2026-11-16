@@ -482,14 +482,8 @@ internal object Compiler {
             if (rhsVar == null) {
                 factors.add(Linear(LongArray(coeffs.size) { coeffs[it].toLong() }, vars, op, k))
             } else {
-                factors.add(
-                    Linear(
-                        LongArray(coeffs.size + 1) { if (it < coeffs.size) coeffs[it].toLong() else -1L },
-                        vars + rhsVar,
-                        op,
-                        k,
-                    ),
-                )
+                factors.add(Linear(LongArray(coeffs.size + 1) { if (it < coeffs.size) coeffs[it].toLong() else -1L },
+                    vars + rhsVar, op, k))
                 // `(eq, v)` makes v the sum's value: v = Σ coeffs·vars. Orienting a bare equality could
                 // pick a decision var as the output, so the front-end records the definition itself.
                 if (op == LinearOp.EQ) definedVars.add(rhsVar)
@@ -527,13 +521,9 @@ internal object Compiler {
 
         internal fun intension(node: FExpr) {
             if (node is FExpr.Call && node.fn == "ne" && node.args.size == 2 &&
-                (
-                    postDistanceDisequality(node.args[0], node.args[1]) ||
-                        postDistanceDisequality(node.args[1], node.args[0])
-                    )
-            ) {
-                return
-            }
+                (postDistanceDisequality(node.args[0], node.args[1]) ||
+                    postDistanceDisequality(node.args[1], node.args[0]))
+            ) return
             if (node is FExpr.Call && node.fn == "eq" && node.args.size == 2) {
                 // A direct Product keeps its declared output in the maintained definition cone.
                 (directProduct(node.args[0], node.args[1]) ?: directProduct(node.args[1], node.args[0]))
@@ -543,9 +533,7 @@ internal object Compiler {
                     }
                 if (postDeclaredExtreme(node.args[0], node.args[1]) ||
                     postDeclaredExtreme(node.args[1], node.args[0])
-                ) {
-                    return
-                }
+                ) return
             }
             // n-ary eq (x = y = z = …) is the conjunction of its consecutive pairwise equalities, posted
             // directly as top-level factors (cf. allEqual) rather than reified onto an aux literal.
@@ -575,13 +563,11 @@ internal object Compiler {
             if (distance !is FExpr.Call || constant !is FExpr.Num) return false
             val operands = when {
                 distance.fn == "dist" && distance.args.size == 2 -> distance.args
-
                 distance.fn == "abs" && distance.args.size == 1 -> {
                     val difference = distance.args[0] as? FExpr.Call ?: return false
                     if (difference.fn != "sub" || difference.args.size != 2) return false
                     difference.args
                 }
-
                 else -> return false
             }
             val arguments = operands.map { linear(it) }
@@ -723,9 +709,7 @@ internal object Compiler {
             if (output !is FExpr.Ref || expression !is FExpr.Call ||
                 (expression.fn != "min" && expression.fn != "max") || expression.args.isEmpty() ||
                 readsVariable(expression, output.name)
-            ) {
-                return false
-            }
+            ) return false
             val result = ref(output.name)
             val inputs = expression.args.map { materializeVar(linear(it)) }.toIntArray()
             val maximum = expression.fn == "max"
@@ -968,11 +952,9 @@ internal object Compiler {
         }
 
         /** `if(cond, a, b)` as a linear term: a fresh int pinned to `a` or `b` by the condition. */
-        internal fun ifTerm(args: List<FExpr>): IntComb = selectionTerm(
-            compileBool(args[0]),
+        internal fun ifTerm(args: List<FExpr>): IntComb = selectionTerm(compileBool(args[0]),
             materializeVar(linear(args[1])),
-            materializeVar(linear(args[2])),
-        )
+                materializeVar(linear(args[2])))
 
         internal fun divModTerm(args: List<FExpr>, mod: Boolean): IntComb {
             val a = divModOperand(args[0]) { linear(args[0]) }
@@ -1003,15 +985,9 @@ internal object Compiler {
         }
 
         private fun retainedDivMod(a: Int, b: Int, mod: Boolean): IntComb {
-            val relation = divModRelations.retain(
-                a,
-                b,
-                domains[a],
-                domains[b],
-                quotient = null,
-                remainder = null,
-                freshInt = { domain -> newAuxVar(domain.min, domain.max) },
-            )
+            val relation = divModRelations.retain(a, b, domains[a], domains[b],
+                quotient = null, remainder = null,
+                freshInt = { domain -> newAuxVar(domain.min, domain.max) })
             val start = factors.size
             factors.addAll(relation.factors)
             classes.define(relation.quotient, start)
@@ -1255,9 +1231,7 @@ internal object Compiler {
                         val group = requireNotNull(enterStreamed(reader)) { "group without a template constraint" }
                         classes.within(group) { streamGroup(reader) }
                     }
-
                     "block" -> enterStreamed(reader)?.let { classes.within(it) { streamConstraints(reader) } }
-
                     else -> constraint(reader.materializeChild())
                 }
             }
@@ -1347,11 +1321,8 @@ internal object Compiler {
         fun build(): Xcsp3Problem {
             recoverAffineDistinctness(affineDistinctness, recoveryCancellation)
             objective = objective?.let { spec ->
-                if (spec.intCoefficientValues.size >= domains.size) {
-                    spec
-                } else {
-                    spec.copy(intCoefficients = spec.intCoefficientValues.copyOf(domains.size))
-                }
+                if (spec.intCoefficientValues.size >= domains.size) spec
+                else spec.copy(intCoefficients = spec.intCoefficientValues.copyOf(domains.size))
             }
             val implied = classes.mask(factors.size)?.also { mask ->
                 // The forced-true literal is a constant every constraint shares, so no class owns its unit clause.

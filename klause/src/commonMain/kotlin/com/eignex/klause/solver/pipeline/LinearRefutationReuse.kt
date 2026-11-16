@@ -42,15 +42,8 @@ internal class LinearRefutationReuse(
     )
     private data class Side(val coordinate: SourceCoordinate, val upper: Boolean)
     private data class Predicate(val coordinate: SourceCoordinate, val value: BigFraction, val upper: Boolean)
-    private class Entry(
-        val evidence: SourceEvidence,
-        val anchor: Side?,
-        val bytes: Long,
-        val restrictions: Long,
-        val clause: IntArray?,
-        val nodes: Int,
-        val depth: Int,
-    ) {
+    private class Entry(val evidence: SourceEvidence, val anchor: Side?, val bytes: Long, val restrictions: Long,
+        val clause: IntArray?, val nodes: Int, val depth: Int) {
         var consumed = false
         var asserted = false
     }
@@ -71,10 +64,8 @@ internal class LinearRefutationReuse(
     private var retainedBytes = 0L
     private var peakBytes = 0L
     private var allocated = 0L
-    private val allocationLimit = minOf(
-        maximumAllocation,
-        budget.funding?.remainingAllocation?.div(8L) ?: maximumAllocation,
-    )
+    private val allocationLimit = minOf(maximumAllocation,
+        budget.funding?.remainingAllocation?.div(8L) ?: maximumAllocation)
     private var retired = false
     private var work = 0L
     private var verificationWork = 0L
@@ -85,25 +76,21 @@ internal class LinearRefutationReuse(
     private var sourceShape: Pair<Long, Long>? = null
     private var sourceWidthDeclined = false
 
-    init {
-        require(maximumEntries >= 0 && maximumBytes >= 0L && maximumAllocation >= 0L)
-    }
+    init { require(maximumEntries >= 0 && maximumBytes >= 0L && maximumAllocation >= 0L) }
 
     fun observations(): Map<String, Long> = counts.mapKeys { "numericalRefutationReuse${it.key}" } +
         lifecycle.snapshot() + mapOf(
-            "numericalRefutationReuseRetained" to entries.size.toLong(),
-            "numericalRefutationReuseBytes" to retainedBytes,
-            "numericalRefutationReuseNameBytes" to nameBytes,
-            "numericalRefutationReusePeakBytes" to peakBytes,
-            "numericalRefutationReuseAllocation" to allocated,
-            "numericalRefutationReuseWork" to work,
-            "numericalRefutationReuseVerificationWork" to verificationWork,
-            "numericalRefutationReuseVerificationAllocation" to verificationAllocation,
-        )
+        "numericalRefutationReuseRetained" to entries.size.toLong(),
+        "numericalRefutationReuseBytes" to retainedBytes,
+        "numericalRefutationReuseNameBytes" to nameBytes,
+        "numericalRefutationReusePeakBytes" to peakBytes,
+        "numericalRefutationReuseAllocation" to allocated,
+        "numericalRefutationReuseWork" to work,
+        "numericalRefutationReuseVerificationWork" to verificationWork,
+        "numericalRefutationReuseVerificationAllocation" to verificationAllocation,
+    )
 
-    private fun observe(name: String) {
-        counts[name] = (counts[name] ?: 0L) + 1L
-    }
+    private fun observe(name: String) { counts[name] = (counts[name] ?: 0L) + 1L }
 
     fun name(coordinate: SourceCoordinate, threshold: BigFraction, positive: Int) {
         if (!resolve) return
@@ -163,29 +150,23 @@ internal class LinearRefutationReuse(
         if (captured.bytes > maximumBytes) return false
         return when (proof) {
             is LinearPinnedRefutation -> support(proof.conflict, captured, depth + 1)
-
             is SourceDerivation.Premise -> {
                 captured.bytes += proof.id.length * 2L
                 captured.bytes <= maximumBytes
             }
-
             is SourceDerivation.Assumption -> {
                 captured.assumptions += Side(proof.coordinate, proof.upper)
                 true
             }
-
             is SourceDerivation.Combination -> {
                 val terms = proof.terms
                 spend(terms.size.toLong(), terms.size * 8L) && terms.all {
                     scalar(it.weight, captured) && support(it.derivation, captured, depth + 1)
                 }
             }
-
             is SourceDerivation.IntegerRounding -> support(proof.inequality, captured, depth + 1)
-
             is SourceDerivation.MixedIntegerRounding -> support(proof.inequality, captured, depth + 1) &&
                 proof.bounds.all { support(it, captured, depth + 1) }
-
             else -> false
         }
     }
@@ -201,11 +182,8 @@ internal class LinearRefutationReuse(
             val entries = 1L + premise.inequality.supportSize + premise.guardCount + premise.integerPinCount
             val rowBytes = 128L + 96L * entries
             if (!spend(entries - 1L, rowBytes)) return null
-            if (!(
-                    premise.inequality.coefficients.values + premise.inequality.rhs +
-                        premise.integerPins.values
-                    ).all(::admitted)
-            ) {
+            if (!(premise.inequality.coefficients.values + premise.inequality.rhs +
+                    premise.integerPins.values).all(::admitted)) {
                 sourceWidthDeclined = true
                 observe("WidthDeclines")
                 return null
@@ -231,12 +209,9 @@ internal class LinearRefutationReuse(
                 return SourceEvidenceCheck.Unavailable("refutation reuse verification stopped")
             }
             observe("Verifications")
-            return SourceEvidenceVerifier(checker.atScope(evidence.scope)).verify(
-                evidence,
-                ExecutionControl {
-                    ++proofPolls > 100_000 || !spend(1L)
-                },
-            )
+            return SourceEvidenceVerifier(checker.atScope(evidence.scope)).verify(evidence, ExecutionControl {
+                ++proofPolls > 100_000 || !spend(1L)
+            })
         } finally {
             verificationWork += work - before
             verificationAllocation += allocated - beforeAllocation
@@ -248,15 +223,10 @@ internal class LinearRefutationReuse(
         if (retired || maximumEntries == 0 || maximumBytes == 0L || evidence.claim != SourceClaim.Refutation ||
             evidence.scope.revision != source.scope.revision || evidence.scope.objective != source.scope.objective ||
             cancellation() || budget.funding?.paused == true
-        ) {
-            return
-        }
+        ) return
         val condition = evidence.scope.condition
         if (!spend(1L + 3L * source.coordinateCount, 192L * source.coordinateCount) ||
-            !condition.implies(source.scope.condition)
-        ) {
-            return
-        }
+            !condition.implies(source.scope.condition)) return
         val bools = condition.bools
         if (source.coordinates.any { it.kind == SourceCoordinate.Kind.Boolean && it.id !in bools }) return
         proofPolls = 0
@@ -272,26 +242,19 @@ internal class LinearRefutationReuse(
             return
         }
         val required = source.scope.condition
-        val reduced = SourceCondition(
-            bools,
+        val reduced = SourceCondition(bools,
             required.lower + lower.filterKeys { Side(it, false) in captured.assumptions },
-            required.upper + upper.filterKeys { Side(it, true) in captured.assumptions },
-        )
-        var retained = SourceEvidence(
-            evidence.scope.copy(condition = reduced),
-            SourceClaim.Refutation,
-            evidence.derivation,
-        )
+            required.upper + upper.filterKeys { Side(it, true) in captured.assumptions })
+        var retained = SourceEvidence(evidence.scope.copy(condition = reduced), SourceClaim.Refutation,
+            evidence.derivation)
         observe("ReductionAttempts")
         when (verify(retained)) {
             SourceEvidenceCheck.Checked -> if (reduced != condition) observe("ReducedScopes")
-
             is SourceEvidenceCheck.Rejected -> {
                 observe("ReductionRejected")
                 if (reduced == condition || verify(evidence) != SourceEvidenceCheck.Checked) return
                 retained = evidence
             }
-
             is SourceEvidenceCheck.Unavailable -> {
                 observe("Unavailable")
                 return
@@ -317,15 +280,8 @@ internal class LinearRefutationReuse(
         while (entries.size >= maximumEntries || bytes > maximumBytes - nameBytes - retainedBytes) evict()
         val anchor = sides.minWithOrNull(compareBy({ it.coordinate.kind.ordinal }, { it.coordinate.id }, { it.upper }))
         val id = nextId++
-        val entry = Entry(
-            evidence,
-            anchor,
-            bytes,
-            (sides.size + retainedCondition.bools.size).toLong(),
-            clause,
-            nodes,
-            depth,
-        )
+        val entry = Entry(evidence, anchor, bytes, (sides.size + retainedCondition.bools.size).toLong(),
+            clause, nodes, depth)
         entries[id] = entry
         if (resolve) scopes[retainedCondition] = id
         if (anchor == null) unconditional += id else indexed.getOrPut(anchor) { linkedSetOf() }.add(id)
@@ -342,10 +298,8 @@ internal class LinearRefutationReuse(
         if (size > 4096 || !spend(1L + size, 128L * size)) return null
         val literals = ArrayList<Int>()
         val openingBools = opening.bools
-        for ((id, value) in condition.bools) {
-            if (openingBools[id] != value) {
-                literals += (id shl 1) or if (value) 1 else 0
-            }
+        for ((id, value) in condition.bools) if (openingBools[id] != value) {
+            literals += (id shl 1) or if (value) 1 else 0
         }
         for ((upper, bounds) in listOf(false to condition.lower, true to condition.upper)) {
             for ((coordinate, value) in bounds) {
@@ -369,9 +323,7 @@ internal class LinearRefutationReuse(
         val upper = opening.upper.toMutableMap()
         for (literal in clause) {
             val bound = predicates[literal xor 1]
-            if (bound == null) {
-                bools[literal ushr 1] = literal and 1 != 0
-            } else {
+            if (bound == null) bools[literal ushr 1] = literal and 1 != 0 else {
                 val bounds = if (bound.upper) upper else lower
                 val previous = bounds[bound.coordinate]
                 if (previous == null || if (bound.upper) bound.value < previous else bound.value > previous) {
@@ -394,42 +346,26 @@ internal class LinearRefutationReuse(
                 val bound = predicates[pivot xor 1] ?: continue
                 if (pivot xor 1 !in other) continue
                 observe("ResolutionCandidates")
-                if (!spend(
-                        clause.size.toLong() + other.size,
-                        256L * (clause.size + other.size + added.restrictions + entry.restrictions),
-                    )
-                ) {
-                    return
-                }
+                if (!spend(clause.size.toLong() + other.size,
+                        256L * (clause.size + other.size + added.restrictions + entry.restrictions))) return
                 val resolved = resolveSearchClauses(clause, other, pivot) ?: continue
                 val required = condition(resolved)
                 if (required in scopes) continue
                 val threshold = if (bound.upper) bound.value else bound.value - BigFraction.ONE
                 val first = SourceDerivation.Import(added.evidence)
                 val second = SourceDerivation.Import(entry.evidence)
-                val proof = SourceDerivation.IntegerSplit(
-                    bound.coordinate,
-                    threshold,
-                    if (bound.upper) first else second,
-                    if (bound.upper) second else first,
-                )
+                val proof = SourceDerivation.IntegerSplit(bound.coordinate, threshold,
+                    if (bound.upper) first else second, if (bound.upper) second else first)
                 lifecycle.note(LearnedKind.SourceRefutation, LearnedStage.Constructed)
                 val evidence = SourceEvidence(source.scope.copy(condition = required), SourceClaim.Refutation, proof)
                 when (verify(evidence)) {
                     SourceEvidenceCheck.Checked -> {
-                        if (store(
-                                evidence,
-                                added.bytes + entry.bytes + 256L,
-                                added.nodes + entry.nodes + 3,
-                                maxOf(added.depth, entry.depth) + 1,
-                            ) != null
-                        ) {
+                        if (store(evidence, added.bytes + entry.bytes + 256L,
+                                added.nodes + entry.nodes + 3, maxOf(added.depth, entry.depth) + 1) != null) {
                             observe("ResolutionProofs")
                         }
                     }
-
                     is SourceEvidenceCheck.Rejected -> observe("ResolutionRejected")
-
                     is SourceEvidenceCheck.Unavailable -> {
                         observe("Unavailable")
                         if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return
@@ -468,11 +404,8 @@ internal class LinearRefutationReuse(
             if (!spend(1L + entry.restrictions)) return null
             observe("Candidates")
             if (!condition.implies(entry.evidence.scope.condition)) continue
-            val imported = SourceEvidence(
-                source.scope.copy(condition = condition),
-                SourceClaim.Refutation,
-                SourceDerivation.Import(entry.evidence),
-            )
+            val imported = SourceEvidence(source.scope.copy(condition = condition), SourceClaim.Refutation,
+                SourceDerivation.Import(entry.evidence))
             val unfixed = unfixedPivot(entry, condition) ?: return null
             when (verify(imported)) {
                 SourceEvidenceCheck.Checked -> {
@@ -484,9 +417,7 @@ internal class LinearRefutationReuse(
                     if (unfixed) observe("ResolutionUnfixedHits")
                     return imported
                 }
-
                 is SourceEvidenceCheck.Rejected -> observe("Rejected")
-
                 is SourceEvidenceCheck.Unavailable -> {
                     observe("Unavailable")
                     if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return null
@@ -504,10 +435,7 @@ internal class LinearRefutationReuse(
         val upper = condition.upper
         val bools = condition.bools
         if (!spend(1L + lower.size + upper.size + bools.size, 48L * (lower.size + upper.size + bools.size)) ||
-            !condition.implies(source.scope.condition) || !(lower.values + upper.values).all(::admitted)
-        ) {
-            return null
-        }
+            !condition.implies(source.scope.condition) || !(lower.values + upper.values).all(::admitted)) return null
         for ((id, entry) in entries) {
             if (!spend(1L + entry.restrictions, 96L * entry.restrictions)) return null
             val required = entry.evidence.scope.condition
@@ -526,11 +454,8 @@ internal class LinearRefutationReuse(
             if (opposite != null && if (isUpper) opposite >= complement else opposite <= complement) continue
             observe("UnitCandidates")
             val scoped = condition.bound(coordinate, value, isUpper)
-            val imported = SourceEvidence(
-                source.scope.copy(condition = scoped),
-                SourceClaim.Refutation,
-                SourceDerivation.Import(entry.evidence),
-            )
+            val imported = SourceEvidence(source.scope.copy(condition = scoped), SourceClaim.Refutation,
+                SourceDerivation.Import(entry.evidence))
             val unfixed = unfixedPivot(entry, scoped) ?: return null
             when (verify(imported)) {
                 SourceEvidenceCheck.Checked -> {
@@ -538,20 +463,10 @@ internal class LinearRefutationReuse(
                     observe("UnitChecks")
                     if (entry.depth > 0) observe("ResolutionUnits")
                     asserted(entry)
-                    return UnitExclusion(
-                        id,
-                        coordinate,
-                        threshold,
-                        isUpper,
-                        imported,
-                        required,
-                        entry.depth > 0,
-                        unfixed,
-                    )
+                    return UnitExclusion(id, coordinate, threshold, isUpper, imported, required,
+                        entry.depth > 0, unfixed)
                 }
-
                 is SourceEvidenceCheck.Rejected -> observe("UnitRejected")
-
                 is SourceEvidenceCheck.Unavailable -> {
                     observe("Unavailable")
                     if (retired || cancellation() || budget.funding?.paused == true || proofPolls > 100_000) return null

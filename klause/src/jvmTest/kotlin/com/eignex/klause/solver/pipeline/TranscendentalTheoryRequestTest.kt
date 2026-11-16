@@ -120,10 +120,8 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
         var signalledAt: Long? = null
         val meter = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
-            override val accounting: WorkMeter get() = WorkMeter {
-                charged += it
-                if (charged >= 8 && signalledAt == null) signalledAt = charged
-            }
+            override val accounting: WorkMeter get() = WorkMeter { charged += it
+                if (charged >= 8 && signalledAt == null) signalledAt = charged }
         }
         val cancelled = ExecutionControl { signalledAt != null }
         val controls = params()
@@ -138,10 +136,8 @@ class TranscendentalTheoryRequestTest(private val engine: FiniteEngine) {
         val execution = OpenTheoryPipeline.execute(source.pipelineRequest(), params, engine)
 
         assertIs<OpenTheoryResult.Unknown>(execution.result)
-        assertTrue(
-            execution.workSpent - checkNotNull(signalledAt) in 0L..64L,
-            "work=${execution.workSpent}, stop=$signalledAt",
-        )
+        assertTrue(execution.workSpent - checkNotNull(signalledAt) in 0L..64L,
+            "work=${execution.workSpent}, stop=$signalledAt")
         assertEquals(execution.workSpent, charged)
     }
 

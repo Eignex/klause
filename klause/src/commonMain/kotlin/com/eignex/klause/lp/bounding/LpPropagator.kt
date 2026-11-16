@@ -270,24 +270,16 @@ internal class LpPropagator(
             if (nextWitness > Long.MAX_VALUE - assertions.size - 1L) {
                 return@withOwner LpBoundBatchResult.Declined(assertions.size + 1)
             }
-            assertions.add(
-                LpBoundAssertion(
-                    bound.column,
-                    bound.upper,
-                    bound.side,
-                    nextWitness + assertions.size,
-                    current.state.depth,
-                ),
-            )
+            assertions.add(LpBoundAssertion(
+                bound.column, bound.upper, bound.side, nextWitness + assertions.size, current.state.depth,
+            ))
             premises.add(bound.premise)
             sides.put(bound.column, bound.side)
             if (!ExactLpBounds(
                     lower[bound.column] ?: current.state.activeSide(bound.column, false)?.side,
                     upper[bound.column] ?: current.state.activeSide(bound.column, true)?.side,
                 ).consistent
-            ) {
-                break
-            }
+            ) break
         }
         if (cancellation.pollStop()) return@withOwner LpBoundBatchResult.Declined(assertions.size)
         if (assertions.isEmpty()) return@withOwner LpBoundBatchResult.Applied(0)
@@ -400,13 +392,8 @@ internal class LpPropagator(
             val premises = assertions.map { premise(it.column, it.upper) }
             onEdit((before.model.numVars + edit.columns.size + edit.rows.size).toLong())
             if (!current.replaceRows(
-                    edit.retired,
-                    edit.columns,
-                    edit.rows,
-                    before.depth > 0,
-                    permanentRows = edit.permanentRows,
-                    objective = edit.objective,
-                    assertions = assertions,
+                    edit.retired, edit.columns, edit.rows, before.depth > 0,
+                    permanentRows = edit.permanentRows, objective = edit.objective, assertions = assertions,
                 )
             ) {
                 return@withOwner false
@@ -439,69 +426,70 @@ internal class LpPropagator(
         token: ExecutionControl = cancellation,
         continuationWorkAllowance: (() -> Long?)? = null,
         queryAllowance: (() -> Long?)? = null,
-    ): Pair<LpSolver, FloatLpResult?>? = solveOwned(token.takeIf { onPreparation != null }) { current ->
-        val standard = queryWorkAllowance()
-        val requested = queryAllowance?.invoke()
-        val offered = when {
-            requested == null -> standard
-            standard == null || standard == 0L -> requested
-            else -> minOf(standard, requested)
+    ): Pair<LpSolver, FloatLpResult?>? =
+        solveOwned(token.takeIf { onPreparation != null }) { current ->
+            val standard = queryWorkAllowance()
+            val requested = queryAllowance?.invoke()
+            val offered = when {
+                requested == null -> standard
+                standard == null || standard == 0L -> requested
+                else -> minOf(standard, requested)
+            }
+            val spent = (requested != null && requested <= 0L) || (standard != null && standard < 0L)
+            val queryToken = if (spent) token or ExecutionControl { true } else token
+            val continuation = (continuationWorkAllowance ?: continuationAllowance)()
+            if (continuation != null && current.state.depth == 0) {
+                val profile = effort()
+                return@solveOwned current.advanceFloat(
+                    (offered ?: profile.work).coerceAtLeast(1L),
+                    LpFloatAllowance(continuation.coerceAtLeast(1L), profile.iterations), queryToken,
+                ).also { solved = true }
+            }
+            val allowance = if (solved || offered != null) {
+                effort().let { LpFloatAllowance((offered ?: it.work).coerceAtLeast(0L), it.iterations) }
+            } else null
+            // An explicit query allowance uses the scoped owner's retained basis and factors.
+            current.solveFloat(if (allowance != null) null else warm, queryToken, allowance).also { solved = true }
         }
-        val spent = (requested != null && requested <= 0L) || (standard != null && standard < 0L)
-        val queryToken = if (spent) token or ExecutionControl { true } else token
-        val continuation = (continuationWorkAllowance ?: continuationAllowance)()
-        if (continuation != null && current.state.depth == 0) {
-            val profile = effort()
-            return@solveOwned current.advanceFloat(
-                (offered ?: profile.work).coerceAtLeast(1L),
-                LpFloatAllowance(continuation.coerceAtLeast(1L), profile.iterations),
-                queryToken,
-            ).also { solved = true }
-        }
-        val allowance = if (solved || offered != null) {
-            effort().let { LpFloatAllowance((offered ?: it.work).coerceAtLeast(0L), it.iterations) }
-        } else {
-            null
-        }
-        // An explicit query allowance uses the scoped owner's retained basis and factors.
-        current.solveFloat(if (allowance != null) null else warm, queryToken, allowance).also { solved = true }
-    }
 
     fun solve(
         token: ExecutionControl = cancellation,
         sparsePointRecovery: Boolean = false,
         claim: LpClaim = LpClaim.ATTAINED_OPTIMUM,
-    ): CertifiedLpResult? = solveOwned {
-        val profile = effort()
-        it.solve(
-            token = if (token === cancellation) cancellation else cancellation or token,
-            continuationLimits = profile.continuation,
-            fullContinuation = profile.fullContinuation,
-            observer = certificationObserver,
-            sparsePointRecovery = sparsePointRecovery,
-            claim = claim,
-        ).also { solved = true }
-    }
-
-    private inline fun <T> solveOwned(prepareToken: ExecutionControl? = null, action: (LpScopedSolver) -> T): T? =
-        withOwner { current ->
-            var queryStarted = false
-            try {
-                if (prepareToken != null) {
-                    val ready = try {
-                        current.prepare(prepareToken)
-                    } finally {
-                        onPreparation?.invoke(takePreparationMetrics(current))
-                    }
-                    if (!ready) return@withOwner null
-                }
-                queryStarted = true
-                action(current)
-            } finally {
-                lastMetrics = (if (queryStarted) current.lastMetrics else LpSolveMetrics()) +
-                    takePreparationMetrics(current)
-            }
+    ): CertifiedLpResult? =
+        solveOwned {
+            val profile = effort()
+            it.solve(
+                token = if (token === cancellation) cancellation else cancellation or token,
+                continuationLimits = profile.continuation,
+                fullContinuation = profile.fullContinuation,
+                observer = certificationObserver,
+                sparsePointRecovery = sparsePointRecovery,
+                claim = claim,
+            ).also { solved = true }
         }
+
+    private inline fun <T> solveOwned(
+        prepareToken: ExecutionControl? = null,
+        action: (LpScopedSolver) -> T,
+    ): T? = withOwner { current ->
+        var queryStarted = false
+        try {
+            if (prepareToken != null) {
+                val ready = try {
+                    current.prepare(prepareToken)
+                } finally {
+                    onPreparation?.invoke(takePreparationMetrics(current))
+                }
+                if (!ready) return@withOwner null
+            }
+            queryStarted = true
+            action(current)
+        } finally {
+            lastMetrics = (if (queryStarted) current.lastMetrics else LpSolveMetrics()) +
+                takePreparationMetrics(current)
+        }
+    }
 
     @Suppress("TooGenericExceptionCaught") // A failed owner is invalid; preserve its primary and cleanup failures.
     private inline fun <T> withOwner(action: (LpScopedSolver) -> T): T? {
@@ -551,11 +539,8 @@ internal class LpPropagator(
     override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
         assertWithin(decision, context, ExecutionControl.Never)
 
-    internal fun assertWithin(
-        decision: SearchDecision,
-        context: SearchContext,
-        token: ExecutionControl,
-    ): ComponentResult {
+    internal fun assertWithin(decision: SearchDecision, context: SearchContext,
+        token: ExecutionControl): ComponentResult {
         if (proofContext != null && proofContext !== context) return ComponentResult.Indeterminate
         proofContext = context
         if (owner != null && policy.eagerAssertionScopes && !atLevel(context.decisionLevel, token)) {

@@ -49,11 +49,8 @@ private fun FlatZincCompiler.materialisePinnedSetLayout(name: String, members: I
 internal fun FlatZincCompiler.resolveSetLiteral(e: FznExpr): IntArray = when (e) {
     is FznExpr.IntSetLit -> universeElements(FznType.IntSet(e.values), "<literal>")
 
-    is FznExpr.IntRangeLit -> if (e.lo > e.hi) {
-        IntArray(0)
-    } else {
+    is FznExpr.IntRangeLit -> if (e.lo > e.hi) IntArray(0) else
         universeElements(FznType.IntRange(e.lo, e.hi), "<literal>")
-    }
 
     is FznExpr.Ident -> {
         val pv = params[e.name] ?: failHere("undefined set parameter `${e.name}`")

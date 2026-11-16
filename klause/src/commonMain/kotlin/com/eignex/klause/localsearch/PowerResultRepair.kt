@@ -14,16 +14,11 @@ internal class PowerResultRepair(private val state: LocalSearchState, private va
             }
             if (depth == MAX_POWER_DEPTH || !sink.allowsDefinedInt(variable) ||
                 state.assumptions.isFrozenInt(variable) || definition.exponent == 0 || definition.base.varId < 0
-            ) {
-                return
-            }
+            ) return
             val base = definition.base.varId
             val domain = state.rootDomains[base]
-            val segments = if (definition.exponent and 1 != 0) {
-                listOf(domain.min to domain.max)
-            } else {
+            val segments = if (definition.exponent and 1 != 0) listOf(domain.min to domain.max) else
                 listOf(domain.min to minOf(-1L, domain.max), maxOf(0L, domain.min) to domain.max)
-            }
             for ((lo, hi) in segments) {
                 val roots = powerPreimage(lo, hi, definition.exponent, value, value) ?: continue
                 solve(base, roots.first, depth + 1)

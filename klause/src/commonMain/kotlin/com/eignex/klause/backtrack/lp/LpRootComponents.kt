@@ -37,9 +37,7 @@ internal fun LpEngine.prepareRootComponentOrder(
                 if (rootPrimalTargets === targets && !cancellation()) {
                     targets.components = prepared
                     outcome = if (prepared == null) "CONNECTED_DECLINED" else "RETAINED"
-                } else {
-                    outcome = "EXPIRED_OR_CANCELLED"
-                }
+                } else outcome = "EXPIRED_OR_CANCELLED"
             } catch (_: LpProjectionStop) {
                 targets.componentOrderAttempted = meter.work > 0L
                 outcome = if (meter.work == 0L) "PENDING" else "PREPARATION_STOPPED"
@@ -48,12 +46,8 @@ internal fun LpEngine.prepareRootComponentOrder(
                 noteNodeOverhead(preparationWork)
             }
         }
-        sink.lp.observePrimalPhase(
-            "PRIMAL_COMPONENT_ORDER",
-            outcome,
-            started.elapsedNow().inWholeNanoseconds,
-            preparationWork,
-        )
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_ORDER", outcome,
+            started.elapsedNow().inWholeNanoseconds, preparationWork)
     }
     if (rootPrimalTargets !== targets || cancellation()) return null
     return targets.components
@@ -90,9 +84,7 @@ internal fun LpEngine.retainRootComponentValues(
         val work = 8L * (end - start)
         if (!rootComponentPreparationAllowed(targets, 0L, work) ||
             rootComponentPreparationWork(targets, 0L) < work || cancellation()
-        ) {
-            return
-        }
+        ) return
         noteNodeOverhead(work)
         outcome = "CANCELLED_OR_UNFIXED"
         for (index in start until end) {
@@ -112,16 +104,13 @@ internal fun LpEngine.retainRootComponentValues(
         values.known[order.members[start]] = true
         outcome = "RETAINED"
     } finally {
-        sink.lp.observePrimalPhase(
-            "PRIMAL_COMPONENT_VALUES",
-            outcome,
-            started.elapsedNow().inWholeNanoseconds,
-            totalSolveWork() - before,
-        )
+        sink.lp.observePrimalPhase("PRIMAL_COMPONENT_VALUES", outcome,
+            started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
     }
 }
 
-internal fun rootComponentPreparationBytes(variables: Int): Long = 512L + (6L * variables + 2L) * Int.SIZE_BYTES
+internal fun rootComponentPreparationBytes(variables: Int): Long =
+    512L + (6L * variables + 2L) * Int.SIZE_BYTES
 
 internal fun rootComponentOrder(
     problem: Problem,

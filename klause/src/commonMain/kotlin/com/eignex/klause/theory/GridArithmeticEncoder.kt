@@ -14,10 +14,7 @@ import com.eignex.klause.lowering.polynomialRow
 
 internal fun gridArithmeticEncoder(factor: GridArithmetic, target: EncodingTarget): Encoder {
     if (target !in setOf(EncodingTarget.LINEAR, EncodingTarget.POLYNOMIAL) ||
-        factor.encodingSize() > GRID_ARITHMETIC_ENCODING_LIMIT
-    ) {
-        return Encoder(EncoderSupport.UNSUPPORTED)
-    }
+        factor.encodingSize() > GRID_ARITHMETIC_ENCODING_LIMIT) return Encoder(EncoderSupport.UNSUPPORTED)
     return Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
         view as GridArithmetic
         val tuples = gridArithmeticTuples(view, encoding.cancellation) ?: return@Encoder EncoderDecline.RESOURCE
@@ -41,19 +38,10 @@ internal fun gridArithmeticEncoder(factor: GridArithmetic, target: EncodingTarge
                     encoding.cancellation.charge(1)
                     val inputValue = tuple[position]
                     val outputPosition = view.intVars.indexOf(view.output.variable)
-                    encoding.linear(
-                        LinearForm.Disjunction(
-                            listOf(
-                                Linear(longArrayOf(1L), intArrayOf(input), LinearOp.NE, inputValue),
-                                Linear(
-                                    longArrayOf(1L),
-                                    intArrayOf(view.output.variable),
-                                    LinearOp.EQ,
-                                    tuple[outputPosition],
-                                ),
-                            ),
-                        ),
-                    )
+                    encoding.linear(LinearForm.Disjunction(listOf(
+                        Linear(longArrayOf(1L), intArrayOf(input), LinearOp.NE, inputValue),
+                        Linear(longArrayOf(1L), intArrayOf(view.output.variable), LinearOp.EQ, tuple[outputPosition]),
+                    )))
                 }
             } else {
                 val first = inputs[0]
@@ -61,13 +49,9 @@ internal fun gridArithmeticEncoder(factor: GridArithmetic, target: EncodingTarge
                 val firstPosition = view.intVars.indexOf(first)
                 val secondPosition = view.intVars.indexOf(second)
                 val groups = tuples.groupBy { it[firstPosition] }
-                encoding.linear(
-                    LinearForm.Disjunction(
-                        groups.keys.map { value ->
-                            Linear(longArrayOf(1L), intArrayOf(first), LinearOp.EQ, value)
-                        },
-                    ),
-                )
+                encoding.linear(LinearForm.Disjunction(groups.keys.map { value ->
+                    Linear(longArrayOf(1L), intArrayOf(first), LinearOp.EQ, value)
+                }))
                 for ((value, group) in groups) {
                     if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
                     encoding.cancellation.charge(group.size.toLong())
@@ -80,38 +64,20 @@ internal fun gridArithmeticEncoder(factor: GridArithmetic, target: EncodingTarge
                         if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
                         encoding.cancellation.charge(1)
                         val outputPosition = view.intVars.indexOf(view.output.variable)
-                        encoding.linear(
-                            LinearForm.Disjunction(
-                                listOf(
-                                    absent,
-                                    Linear(longArrayOf(1L), intArrayOf(second), LinearOp.NE, tuple[secondPosition]),
-                                    Linear(
-                                        longArrayOf(1L),
-                                        intArrayOf(view.output.variable),
-                                        LinearOp.EQ,
-                                        tuple[outputPosition],
-                                    ),
-                                ),
-                            ),
-                        )
+                        encoding.linear(LinearForm.Disjunction(listOf(absent,
+                            Linear(longArrayOf(1L), intArrayOf(second), LinearOp.NE, tuple[secondPosition]),
+                            Linear(longArrayOf(1L), intArrayOf(view.output.variable),
+                                LinearOp.EQ, tuple[outputPosition]),
+                        )))
                     }
                 }
             }
         } else {
-            val formula = PolynomialRealFormula.Or(
-                alternatives.map { rows ->
-                    PolynomialRealFormula.And(
-                        rows.map { row ->
-                            polynomialRow(
-                                row,
-                                { id -> encoding.integer(SourceIntId(id)) },
-                                { id -> encoding.real(SourceRealId(id)) },
-                                encoding::conditional,
-                            )
-                        },
-                    )
-                },
-            )
+            val formula = PolynomialRealFormula.Or(alternatives.map { rows ->
+                PolynomialRealFormula.And(rows.map { row -> polynomialRow(row,
+                    { id -> encoding.integer(SourceIntId(id)) }, { id -> encoding.real(SourceRealId(id)) },
+                    encoding::conditional) })
+            })
             encoding.polynomial(formula)
         }
         null

@@ -443,8 +443,7 @@ class EncoderTest {
         val source = (
             SmtLib.parse(
                 "(declare-const x Real) (assert (= x 1))",
-            )
-            ).model
+            )).model
         var cancelled = false
         var entered = 0
         val token = ExecutionControl { cancelled }
@@ -475,14 +474,11 @@ class EncoderTest {
 
     @Test
     fun `selected linear encoders should detect correlated source contradiction`() {
-        val input = assertIs<Problem>(
-            (
-                SmtLib.parse(
-                    "(declare-const x Real) (declare-const y Real) " +
-                        "(assert (<= x y)) (assert (< y x))",
-                )
-                ).source.originalSource,
-        )
+        val input = assertIs<Problem>((
+            SmtLib.parse(
+                "(declare-const x Real) (declare-const y Real) " +
+                    "(assert (<= x y)) (assert (< y x))",
+            )).source.originalSource)
         var installations = 0
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
@@ -604,14 +600,11 @@ class EncoderTest {
 
     @Test
     fun `guarded provider installation should retract a refuted query before its sibling`() {
-        val input = assertIs<Problem>(
-            (
-                SmtLib.parse(
-                    "(declare-const b Bool) (declare-const x Real) " +
-                        "(assert (or (not b) (>= x 1))) (assert (= x 0))",
-                )
-                ).source.originalSource,
-        )
+        val input = assertIs<Problem>((
+            SmtLib.parse(
+                "(declare-const b Bool) (declare-const x Real) " +
+                    "(assert (or (not b) (>= x 1))) (assert (= x 0))",
+            )).source.originalSource)
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)
@@ -645,13 +638,10 @@ class EncoderTest {
 
     @Test
     fun `a resource decline should discard an emitted relation before source admission`() {
-        val input = assertIs<Problem>(
-            (
-                SmtLib.parse(
-                    "(declare-const x Real) (assert (= x 1))",
-                )
-                ).source.originalSource,
-        )
+        val input = assertIs<Problem>((
+            SmtLib.parse(
+                "(declare-const x Real) (assert (= x 1))",
+            )).source.originalSource)
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)
@@ -676,8 +666,7 @@ class EncoderTest {
         val input = (
             SmtLib.parse(
                 "(declare-const x Real) (assert (= x 1)) (minimize x)",
-            )
-            )
+            ))
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 val selected = BuiltInEncoderProvider.select(factor, target)

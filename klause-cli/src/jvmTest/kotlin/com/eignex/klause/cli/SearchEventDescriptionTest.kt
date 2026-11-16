@@ -23,21 +23,15 @@ class SearchEventDescriptionTest(private val worker: String?) {
         val text = describeEvent(event, 7L, worker)
 
         assertEquals(
-            "[7 ms]${worker?.let { " $it" }.orEmpty()} incomplete optimization: path=Component stop=null",
-            text,
+            "[7 ms]${worker?.let { " $it" }.orEmpty()} incomplete optimization: path=Component stop=null", text,
         )
     }
 
     @Test
     fun `a component terminal event should distinguish its first stop from cached consumption`() {
         val event = SearchEvent.BacktrackComponentStop(
-            SearchComponentStop(
-                SearchComponentStop.Site.ModelBlock,
-                SearchStopCause.Cancelled,
-                cancelled = true,
-                unresolvedCoverage = false,
-                decisionLevel = 0,
-            ),
+            SearchComponentStop(SearchComponentStop.Site.ModelBlock, SearchStopCause.Cancelled,
+                cancelled = true, unresolvedCoverage = false, decisionLevel = 0),
             replayed = true,
         )
 

@@ -63,7 +63,6 @@ internal class LinearSupportBranching(
             if (cut.inequality.coefficients.keys.none { it in distances }) continue
             val violation = when (val evaluated = feedback.violation(available, cut)) {
                 is LinearAuthorityCutViolation.Available -> evaluated.value.toDouble()
-
                 is LinearAuthorityCutViolation.Unavailable -> when (evaluated.reason) {
                     LinearAuthorityCutViolation.Reason.NoPoint, LinearAuthorityCutViolation.Reason.Uncovered -> continue
                     else -> return fallback()

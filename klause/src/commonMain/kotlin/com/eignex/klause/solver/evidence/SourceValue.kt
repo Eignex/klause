@@ -10,13 +10,11 @@ sealed interface SourceValue {
         /** Exact reduced fraction. */
         val value: BigFraction,
     ) : SourceValue
-
     /** Exact algebraic coordinate, including its defining polynomial and root identity. */
     data class Algebraic(
         /** Owned exact algebraic scalar. */
         val value: AlgebraicReal,
     ) : SourceValue
-
     /** Source-specific exact symbolic value interpreted only by its declared semantics checker. */
     interface Extension : SourceValue
 }

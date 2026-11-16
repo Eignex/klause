@@ -10,12 +10,14 @@ data class QuadraticIncumbentPublication(
     val incumbent: QuadraticIncumbent,
 )
 
-internal class QuadraticPublicationObserver( callback: ((QuadraticIncumbentPublication) -> Unit)?) {
+internal class QuadraticPublicationObserver(callback: ((QuadraticIncumbentPublication) -> Unit)?) {
     private val observer = IncumbentPublicationObserver(callback)
 
     val latest: QuadraticIncumbentPublication? get() = observer.latest
+
     fun accepted(point: QuadraticIncumbent, version: Long = observer.version + 1) {
-        observer.accepted( QuadraticIncumbentPublication(version, point), version)
-        }
+        observer.accepted(QuadraticIncumbentPublication(version, point), version)
+    }
+
     fun <T> execute(action: () -> T): T = observer.execute(action)
 }

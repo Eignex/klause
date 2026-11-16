@@ -37,14 +37,8 @@ class LinearRepairGuidanceTest {
     fun `an equal foreign context should not receive another capture guidance`() {
         val funding = SourceLpFunding(1000, 1000).also { it.grant(1000) }
         val guidance = LinearRepairGuidance()
-        assertTrue(
-            guidance.remember(
-                source,
-                mapOf(integer to 0.5),
-                SourceLpBudget(funding = funding),
-                ExecutionControl.Never,
-            ),
-        )
+        assertTrue(guidance.remember(source, mapOf(integer to 0.5),
+            SourceLpBudget(funding = funding), ExecutionControl.Never))
 
         assertNull(guidance.find(SourceProofContext(scope, setOf(integer), emptyMap())))
     }
@@ -73,14 +67,8 @@ class LinearRepairGuidanceTest {
             }
             val guidance = LinearRepairGuidance()
 
-            assertFalse(
-                guidance.remember(
-                    source,
-                    point,
-                    SourceLpBudget(funding = funding),
-                    ExecutionControl { variant == "cancelled" },
-                ),
-            )
+            assertFalse(guidance.remember(source, point, SourceLpBudget(funding = funding),
+                ExecutionControl { variant == "cancelled" }))
 
             assertNull(guidance.find(source))
         }
@@ -92,14 +80,8 @@ class LinearRepairGuidanceTest {
             val funding = SourceLpFunding(work, allocation).also { it.grant(work) }
             val guidance = LinearRepairGuidance()
 
-            assertFalse(
-                guidance.remember(
-                    source,
-                    mapOf(integer to 0.5),
-                    SourceLpBudget(funding = funding),
-                    ExecutionControl.Never,
-                ),
-            )
+            assertFalse(guidance.remember(source, mapOf(integer to 0.5),
+                SourceLpBudget(funding = funding), ExecutionControl.Never))
 
             assertNull(guidance.find(source))
         }

@@ -9,9 +9,7 @@ data class SourceEngineAttestation(
     /** Mathematical claim reported by that engine. */
     val claim: SourceClaim,
 ) {
-    init {
-        require(producer.isNotBlank())
-    }
+    init { require(producer.isNotBlank()) }
 }
 
 /** Optional immutable evidence retained by a completed solver result. */
@@ -32,25 +30,18 @@ class SourceResultEvidence private constructor(
     ) : this(scope, derivations, attestations, scope, emptyList())
 
     private val capturedMappings = mappings.toList()
-
     /** Retained reduced-source evidence and optional transformation justifications. */
     val mappings: List<SourceMappingEvidence> get() = capturedMappings.toList()
 
-    internal fun withMappings(engineScope: SourceScope?, mappings: List<SourceMappingEvidence>): SourceResultEvidence =
-        SourceResultEvidence(
-            scope,
-            capturedDerivations,
-            capturedAttestations,
-            engineScope,
-            capturedMappings + mappings,
-        )
+    internal fun withMappings(
+        engineScope: SourceScope?, mappings: List<SourceMappingEvidence>,
+    ): SourceResultEvidence = SourceResultEvidence(scope, capturedDerivations, capturedAttestations,
+        engineScope, capturedMappings + mappings)
 
     private val capturedDerivations = derivations.toList()
     private val capturedAttestations = attestations.toList()
-
     /** Captured checkable claims; unavailable capture is represented explicitly in its derivation. */
     val derivations: List<SourceEvidence> get() = capturedDerivations.toList()
-
     /** Reported engine completions, which confer no independent derivation coverage. */
     val attestations: List<SourceEngineAttestation> get() = capturedAttestations.toList()
 
@@ -62,10 +53,8 @@ class SourceResultEvidence private constructor(
     ): SourceEvidenceCheck = verify(claim, context, cancellation, SourceProofAllowance(100_000, 128))
 
     internal fun verify(
-        claim: SourceClaim,
-        context: SourceProofContext,
-        cancellation: ExecutionControl,
-        allowance: SourceProofAllowance,
+        claim: SourceClaim, context: SourceProofContext, cancellation: ExecutionControl,
+            allowance: SourceProofAllowance,
     ): SourceEvidenceCheck {
         if (scope != context.scope || capturedDerivations.any { it.scope != scope }) {
             return SourceEvidenceCheck.Rejected("completed result evidence has mismatched original-source scopes")
@@ -87,9 +76,7 @@ class SourceResultEvidence private constructor(
                     is SourceEvidenceCheck.Rejected -> return checked
                     is SourceEvidenceCheck.Unavailable -> unavailable = checked
                 }
-
                 is SourceEvidenceCheck.Unavailable -> unavailable = matching
-
                 is SourceEvidenceCheck.Rejected -> mismatch = matching
             }
         }

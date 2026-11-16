@@ -239,7 +239,7 @@ internal class LiveQfLraSystem(
         stop: ExecutionControl,
         committed: (Int) -> Unit,
     ): Boolean {
-        if (stop() || lp.state == null) return false
+        if (stop() ||lp.state == null) return false
         val batch = SmtSourceBoundBatch(lp, ::assertBounds, committed)
         for ((index, input) in comparisons.withIndex()) {
             if (stop.pollStop()) return false
@@ -257,14 +257,8 @@ internal class LiveQfLraSystem(
             for ((side, row) in rows.withIndex()) {
                 if (stop.pollStop()) return false
                 val negated = comparison.op == LinearOp.GE || (comparison.op == LinearOp.EQ && side == 1)
-                val bound = prepareBound(
-                    if (negated) keys.negative else keys.positive,
-                    true,
-                    row.rhs,
-                    row.strict,
-                    input.premise,
-                    { !stop() && batch.flush() },
-                )
+                val bound = prepareBound(if (negated) keys.negative else keys.positive,
+                    true, row.rhs, row.strict, input.premise, { !stop() && batch.flush() })
                     ?: return batch.conflict
                 val consistent = batch.add(bound)
                 if (!consistent) {

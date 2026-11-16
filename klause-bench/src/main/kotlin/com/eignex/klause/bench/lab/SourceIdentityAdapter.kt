@@ -39,12 +39,9 @@ internal object SourceIdentitySuite : BenchSuite {
             require(input.root == BenchInputRoot.CORPUS && input.role == "model")
             require(input.sha256?.matches(Regex("[a-f0-9]{64}")) == true)
             require(case.attributes.getValue("suite").isNotBlank() && case.attributes.getValue("problem").isNotBlank())
-            case.copy(
-                parameters = emptyMap(),
-                resources = BenchResources(1, 2048, 300),
+            case.copy(parameters = emptyMap(), resources = BenchResources(1, 2048, 300),
                 attributes = case.attributes.filterKeys { !it.startsWith("lab") } +
-                    mapOf("recordSchema" to "source-identity-v1"),
-            )
+                    mapOf("recordSchema" to "source-identity-v1"))
         }
     }
 
@@ -76,11 +73,7 @@ internal object SourceIdentitySuite : BenchSuite {
             put("solverExecuted", false)
         }
         Files.writeString(report, "$details\n")
-        return BenchResult(
-            case.id,
-            BenchStatus.SUCCESS,
-            details = details,
-            artifacts = listOf(context.artifact("source-identity.json", "application/json")),
-        )
+        return BenchResult(case.id, BenchStatus.SUCCESS, details = details,
+            artifacts = listOf(context.artifact("source-identity.json", "application/json")))
     }
 }

@@ -12,19 +12,11 @@ import kotlin.test.assertNull
 class PrivateRebuildNeighborhoodTest {
     @Test
     fun `a cancelled neighborhood scan should withhold its incomplete source view`() {
-        val source = Problem(
-            4,
-            0,
-            emptyArray(),
-            arrayOf(
-                Clause(intArrayOf(3, 5, 6)),
-                Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(3, 5, 7)),
-                Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(2, 4, 6)),
-                Clause(intArrayOf(2, 4, 7)),
-            ),
-        )
+        val source = Problem(4, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(3, 5, 6)), Clause(intArrayOf(0, 2)),
+            Clause(intArrayOf(3, 5, 7)), Clause(intArrayOf(1, 2)),
+            Clause(intArrayOf(2, 4, 6)), Clause(intArrayOf(2, 4, 7)),
+        ))
         val admission = assertNotNull(PrivateRebuildAdmission.analyze(source, ExecutionControl.Never))
         var spent = 0L
         val meter = WorkMeter { spent += it }

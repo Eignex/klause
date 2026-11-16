@@ -3,7 +3,12 @@ package com.eignex.klause.lp.engine
 import com.eignex.util.arrays.argsortBy
 import kotlin.math.abs
 
-internal data class PrimalPhaseOneStep(val length: Double, val leaving: Int, val toUpper: Boolean, val passed: Int)
+internal data class PrimalPhaseOneStep(
+    val length: Double,
+    val leaving: Int,
+    val toUpper: Boolean,
+    val passed: Int,
+)
 
 internal class PrimalPhaseOneRatio(rows: Int) {
     private val times = DoubleArray(2 * rows)

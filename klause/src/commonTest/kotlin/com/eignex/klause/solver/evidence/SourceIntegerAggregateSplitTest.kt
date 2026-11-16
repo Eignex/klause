@@ -18,31 +18,24 @@ class SourceIntegerAggregateSplitTest {
     private val below = SourceInequality(form, BigFraction.ZERO)
     private val above = below.adjacentIntegerAbove()
     private val quarter = BigFraction.ofLong(4).reciprocal()
-    private val source = SourceProofContext(
-        scope,
-        setOf(x, y),
-        mapOf(
-            "lower" to SourcePremise(SourceInequality(form.mapValues { it.value.negated() }, quarter.negated())),
-            "upper" to SourcePremise(SourceInequality(form, BigFraction.ONE - quarter)),
-        ),
-    )
+    private val source = SourceProofContext(scope, setOf(x, y), mapOf(
+        "lower" to SourcePremise(SourceInequality(form.mapValues { it.value.negated() }, quarter.negated())),
+        "upper" to SourcePremise(SourceInequality(form, BigFraction.ONE - quarter)),
+    ))
 
-    private fun child(id: String, row: SourceInequality): SourceDerivation = SourceDerivation.Combination(
-        listOf(
+    private fun child(id: String, row: SourceInequality): SourceDerivation =
+        SourceDerivation.Combination(listOf(
             SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise(id)),
             SourceDerivation.Combination.Term(BigFraction.ONE, SourceIntegerRowAssumption(row)),
-        ),
-    )
+        ))
 
     private fun proof(): SourceDerivation =
         SourceIntegerAggregateSplit(below, child("lower", below), child("upper", above))
 
     @Test
     fun `adjacent aggregate alternatives should cover declared integers`() {
-        for (split in listOf(
-            proof(),
-            SourceIntegerAggregateSplit(above, child("upper", above), child("lower", below)),
-        )) {
+        for (split in listOf(proof(),
+            SourceIntegerAggregateSplit(above, child("upper", above), child("lower", below)))) {
             val result = SourceEvidenceVerifier(source).verify(SourceEvidence(scope, SourceClaim.Refutation, split))
 
             assertEquals(SourceEvidenceCheck.Checked, result)
@@ -64,19 +57,15 @@ class SourceIntegerAggregateSplitTest {
         for (row in listOf(
             SourceInequality(mapOf(x to quarter, y to BigFraction.ONE), BigFraction.ZERO),
             SourceInequality(mapOf(real to BigFraction.ONE), BigFraction.ZERO),
-            SourceInequality(
-                mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 2) to BigFraction.ONE),
-                BigFraction.ZERO,
-            ),
+            SourceInequality(mapOf(SourceCoordinate(SourceCoordinate.Kind.Integer, 2) to BigFraction.ONE),
+                BigFraction.ZERO),
             SourceInequality(form, quarter),
             SourceInequality(form, BigFraction.ZERO, strict = true),
         )) {
             val proof = SourceIntegerAggregateSplit(row, child("lower", below), child("upper", above))
 
-            assertIs<SourceEvidenceCheck.Rejected>(
-                SourceEvidenceVerifier(source)
-                    .verify(SourceEvidence(scope, SourceClaim.Refutation, proof)),
-            )
+            assertIs<SourceEvidenceCheck.Rejected>(SourceEvidenceVerifier(source)
+                .verify(SourceEvidence(scope, SourceClaim.Refutation, proof)))
         }
     }
 
@@ -105,11 +94,8 @@ class SourceIntegerAggregateSplitTest {
         for ((condition, proof) in listOf(below to child("lower", below), above to child("upper", above))) {
             val branch = scope.copy(condition = scope.condition.integerBound(condition))
             val context = SourceProofContext(branch, source.coordinates, source.premises)
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(context, maximumSteps = 24)
-                    .verify(SourceEvidence(branch, SourceClaim.Refutation, proof)),
-            )
+            assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(context, maximumSteps = 24)
+                .verify(SourceEvidence(branch, SourceClaim.Refutation, proof)))
         }
         val result = SourceEvidenceVerifier(source, maximumSteps = 24)
             .verify(SourceEvidence(scope, SourceClaim.Refutation, proof()))
@@ -120,9 +106,7 @@ class SourceIntegerAggregateSplitTest {
     @Test
     fun `cancelled aggregate coverage should supply no refutation`() {
         val result = SourceEvidenceVerifier(source).verify(
-            SourceEvidence(scope, SourceClaim.Refutation, proof()),
-            ExecutionControl { true },
-        )
+            SourceEvidence(scope, SourceClaim.Refutation, proof()), ExecutionControl { true })
 
         assertIs<SourceEvidenceCheck.Unavailable>(result)
     }
@@ -130,23 +114,12 @@ class SourceIntegerAggregateSplitTest {
     @Test
     fun `aggregate semantic children should debit the containing proof allowance`() {
         val context = source.withLinearAuthority()
-        val derivation = SourceIntegerAggregateSplit(
-            below,
-            LinearPinnedRefutation(child("lower", below)),
-            LinearPinnedRefutation(child("upper", above)),
-        )
+        val derivation = SourceIntegerAggregateSplit(below,
+            LinearPinnedRefutation(child("lower", below)), LinearPinnedRefutation(child("upper", above)))
         val evidence = SourceEvidence(scope, SourceClaim.Refutation, derivation)
         var polls = 0
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(context).verify(
-                evidence,
-                ExecutionControl {
-                    polls++
-                    false
-                },
-            ),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(context).verify(evidence, ExecutionControl { polls++; false }))
 
         val result = SourceEvidenceVerifier(context, maximumSteps = polls - 1).verify(evidence)
 
@@ -182,8 +155,7 @@ class SourceIntegerAggregateSplitTest {
         val sample = Sample(booleanArrayOf(), longArrayOf(1, 0))
 
         val result = SourceEvidenceVerifier(context).verify(
-            SourceEvidence(branch, SourceClaim.Witness(sample), SourceDerivation.SourceWitness),
-        )
+            SourceEvidence(branch, SourceClaim.Witness(sample), SourceDerivation.SourceWitness))
 
         assertIs<SourceEvidenceCheck.Rejected>(result)
     }

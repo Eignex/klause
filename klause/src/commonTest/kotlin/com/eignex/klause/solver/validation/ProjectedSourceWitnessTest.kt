@@ -24,22 +24,11 @@ import kotlin.test.assertIs
 class ProjectedSourceWitnessTest {
     @Test
     fun `an additional callback cannot establish a violated original product`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray<IntDomain>(),
-            arrayOf(ContinuousProduct(0, 0, 1)),
-            numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0),
-            realUpper = doubleArrayOf(1.0, 1.0),
-        )
+        val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(ContinuousProduct(0, 0, 1)), numRealVars = 2,
+            realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0))
         val checker = source.withFactors(emptyArray()).bake()
-        val point = Sample(
-            booleanArrayOf(),
-            longArrayOf(),
-            doubleArrayOf(0.5, 0.0),
-            exactReals = listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.ZERO),
-        )
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5, 0.0),
+            exactReals = listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.ZERO))
 
         val result = verifyProjectedSourceWitness(source, checker, point, ExecutionControl.Never) { true }
 
@@ -48,58 +37,25 @@ class ProjectedSourceWitnessTest {
 
     @Test
     fun `captured linear tolerance should admit a covered row independently of an extra callback`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray<IntDomain>(),
-            arrayOf(
-                Linear(
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.EQ,
-                    0.25,
-                ),
-            ),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(1.0),
-            semantics = SourceSemantics(
-                SourceFormat.IR,
-                floats = FloatSemantics.Grid(2, 1000),
-                feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(3), bigIntOf(10))),
-            ).resolve(),
-        )
+        val source = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(Linear(intArrayOf(), doubleArrayOf(),
+            intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 0.25)), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000),
+                feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(3), bigIntOf(10)))).resolve())
         val checker = source.withFactors(emptyArray()).bake()
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0), exactReals = listOf(BigFraction.ZERO))
         for (filter in listOf<((Sample) -> Boolean)?>(null, { true })) {
-            val result = verifyProjectedSourceWitness(
-                source,
-                checker,
-                point,
-                ExecutionControl.Never,
-                toleranceCheck = filter,
-            )
+            val result = verifyProjectedSourceWitness(source, checker, point, ExecutionControl.Never,
+                toleranceCheck = filter)
 
             assertIs<Verification.Accepted<*, *>>(result)
         }
     }
 
-    private
-    fun tolerantProduct() = Problem(
-            0,
-            0,
-            emptyArray<IntDomain>(),
-            arrayOf(ContinuousProduct(0, 0, 1)),
-            numRealVars = 2,
-            realLower = doubleArrayOf(0.0, 0.0),
-            realUpper = doubleArrayOf(1.0, 1.0),
-            semantics = SourceSemantics(
-                SourceFormat.IR,
-                feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(3), bigIntOf(10))),
-            ).resolve(),
-        )
+    private fun tolerantProduct() = Problem(0, 0, emptyArray<IntDomain>(), arrayOf(ContinuousProduct(0, 0, 1)),
+        numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0),
+        semantics = SourceSemantics(SourceFormat.IR,
+            feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(3), bigIntOf(10)))).resolve())
 
     @Test
     fun `captured tolerance should admit a product residual within the slack`() {
@@ -116,13 +72,11 @@ class ProjectedSourceWitnessTest {
     @Test
     fun `captured tolerance should reject a product residual beyond the slack despite an extra callback`() {
         val source = tolerantProduct()
-        val point = Sample(
-            booleanArrayOf(),
-            longArrayOf(),
-            doubleArrayOf(0.75, 0.0),
+        val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.75, 0.0),
             exactReals = listOf(BigFraction.of(bigIntOf(3), bigIntOf(4)), BigFraction.ZERO))
 
-        val result = verifyProjectedSourceWitness(source, source.withFactors(emptyArray()).bake(), point, ExecutionControl.Never) { true }
+        val result = verifyProjectedSourceWitness(source, source.withFactors(emptyArray()).bake(), point,
+            ExecutionControl.Never) { true }
 
         assertIs<Verification.Rejected>(result)
     }
@@ -135,10 +89,10 @@ class ProjectedSourceWitnessTest {
         }
         val source = tolerantProduct().withFactors(arrayOf(unchecked))
         val point = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.5, 0.5),
-            exactReals = listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.of(bigIntOf(1), bigIntOf(2))),
-        )
+            exactReals = listOf(BigFraction.of(bigIntOf(1), bigIntOf(2)), BigFraction.of(bigIntOf(1), bigIntOf(2))))
 
-        val result = verifyProjectedSourceWitness(source, source.withFactors(emptyArray()).bake(), point, ExecutionControl.Never) { true }
+        val result = verifyProjectedSourceWitness(source, source.withFactors(emptyArray()).bake(), point,
+            ExecutionControl.Never) { true }
 
         assertIs<Verification.Indeterminate>(result)
     }

@@ -64,22 +64,15 @@ internal object MpsLpCheckpoint {
         val sink = Class.forName("com.eignex.klause.solver.result.LpStatsSink").constructors.single {
             it.parameterCount == 1
         }.newInstance(routeType.enumConstants.single { it.toString() == "STANDALONE" })
-        val observer = requireNotNull(
-            call(
-                sink,
-                "certificationObserver",
-                routeType.enumConstants.single { it.toString() == "STANDALONE" },
-            ),
-        )
+        val observer = requireNotNull(call(sink, "certificationObserver",
+            routeType.enumConstants.single { it.toString() == "STANDALONE" }))
         val claim = Class.forName(ENGINE + "LpClaim").enumConstants.single {
             it.toString() == "ATTAINED_OPTIMUM"
         }
         val defaultSolve = type.methods.single { it.name == "solve\$default" && it.parameterCount == 12 }
         val cursor = if (mode == "checkpointed") {
             requireNotNull(call(owner, "openSolve", model, stop, TOTAL_WORK, observer, null, 0.0, claim))
-        } else {
-            null
-        }
+        } else null
         var floatingWork = 0L
         var preparationWork = 0L
         var pivots = 0L
@@ -91,9 +84,7 @@ internal object MpsLpCheckpoint {
         var iteration = 0
         try {
             while (!stop() && (floatingWork < TOTAL_WORK || cursor != null)) {
-                val quantum = if (mode == "uninterrupted") {
-                    TOTAL_WORK
-                } else {
+                val quantum = if (mode == "uninterrupted") TOTAL_WORK else {
                     maxOf(1L, minOf(1_000_000L shl minOf(iteration, 6), 50_000_000L, TOTAL_WORK - floatingWork))
                 }
                 val started = System.nanoTime()
@@ -101,15 +92,9 @@ internal object MpsLpCheckpoint {
                 val step = cursor?.let { call(it, "advance", quantum, { false }) }
                 val completed = cursor == null || step?.javaClass?.simpleName == "Completed"
                 val result = if (cursor == null) {
-                    defaultSolve.invoke(
-                        null, owner, model, stop, quantum, observer, null, null, 0.0,
-                        null, claim, 240, null,
-                    )
-                } else if (completed) {
-                    call(requireNotNull(step), "getValue")
-                } else {
-                    null
-                }
+                    defaultSolve.invoke(null, owner, model, stop, quantum, observer, null, null, 0.0,
+                        null, claim, 240, null)
+                } else if (completed) call(requireNotNull(step), "getValue") else null
                 val elapsed = System.nanoTime() - started
                 val bytes = bean.getThreadAllocatedBytes(thread) - allocated
                 val solver = requireNotNull(solverField.get(owner))
@@ -137,58 +122,45 @@ internal object MpsLpCheckpoint {
                 val headingBytes = headings.joinToString(",").toByteArray()
                 val filename = "headings-$mode-$round-$iteration.json"
                 out.resolve(filename).writeText(JsonArray(headings.map(::JsonPrimitive)).toString())
-                emit(
-                    buildJsonObject {
-                        put("scope", "immutable-full-prepared-root-continuation")
-                        put("sourceVerdictClaim", false)
-                        put("round", round)
-                        put("warmup", round == 0)
-                        put("mode", mode)
-                        put("iteration", iteration)
-                        put("offeredWork", quantum)
-                        put("cumulativeWorkLimit", TOTAL_WORK)
-                        put("floatingWorkDelta", deltaWork)
-                        put("floatingWork", floatingWork)
-                        put("preparationWork", preparationWork)
-                        put("observerNumericalWork", call(sink, "getStandaloneWork") as Long)
-                        put("pivotsDelta", deltaPivots)
-                        put("pivots", pivots)
-                        put("refactorizations", refactors)
-                        put("completed", completed)
-                        put("cancelled", stop())
-                        put("solveNs", elapsed)
-                        put("solveThreadBytes", bytes)
-                        put("headings", filename)
-                        put("headingsSha256", sha256(headingBytes))
-                        put("artificialBounds", field(solver, "artificialLower") != null)
-                        put(
-                            "phaseContinuation",
-                            field(solver, "activeSolve")?.let {
-                                field(it, "continuation")?.toString()
-                            },
-                        )
-                        put("numericalMetrics", NumericalResidualProfile.json(call(solver, "getLastNumericalMetrics")))
-                        put("floatTermination", call(solver, "getLastTermination")?.toString())
-                        put("verdict", result?.let { call(it, "getVerdict").toString() })
-                        put("checkedNativeBound", result?.let { call(it, "getLowerBound")?.toString() })
-                        put(
-                            "exactPoint",
-                            result?.let {
-                                NumericalResidualProfile.json(call(it, "getExactPrimal"))
-                            } ?: JsonNull,
-                        )
-                        put("observerCounters", NumericalResidualProfile.json(call(sink, "snapshot")))
-                    },
-                )
+                emit(buildJsonObject {
+                    put("scope", "immutable-full-prepared-root-continuation")
+                    put("sourceVerdictClaim", false)
+                    put("round", round)
+                    put("warmup", round == 0)
+                    put("mode", mode)
+                    put("iteration", iteration)
+                    put("offeredWork", quantum)
+                    put("cumulativeWorkLimit", TOTAL_WORK)
+                    put("floatingWorkDelta", deltaWork)
+                    put("floatingWork", floatingWork)
+                    put("preparationWork", preparationWork)
+                    put("observerNumericalWork", call(sink, "getStandaloneWork") as Long)
+                    put("pivotsDelta", deltaPivots)
+                    put("pivots", pivots)
+                    put("refactorizations", refactors)
+                    put("completed", completed)
+                    put("cancelled", stop())
+                    put("solveNs", elapsed)
+                    put("solveThreadBytes", bytes)
+                    put("headings", filename)
+                    put("headingsSha256", sha256(headingBytes))
+                    put("artificialBounds", field(solver, "artificialLower") != null)
+                    put("phaseContinuation", field(solver, "activeSolve")?.let {
+                        field(it, "continuation")?.toString()
+                    })
+                    put("numericalMetrics", NumericalResidualProfile.json(call(solver, "getLastNumericalMetrics")))
+                    put("floatTermination", call(solver, "getLastTermination")?.toString())
+                    put("verdict", result?.let { call(it, "getVerdict").toString() })
+                    put("checkedNativeBound", result?.let { call(it, "getLowerBound")?.toString() })
+                    put("exactPoint", result?.let {
+                        NumericalResidualProfile.json(call(it, "getExactPrimal"))
+                    } ?: JsonNull)
+                    put("observerCounters", NumericalResidualProfile.json(call(sink, "snapshot")))
+                })
                 iteration++
-                if (completed && (
-                        cursor != null || mode == "uninterrupted" || result?.let {
-                            call(it, "getVerdict").toString() in setOf("ATTAINED_OPTIMUM", "INFEASIBLE", "UNBOUNDED")
-                        } == true
-                        )
-                ) {
-                    break
-                }
+                if (completed && (cursor != null || mode == "uninterrupted" || result?.let {
+                        call(it, "getVerdict").toString() in setOf("ATTAINED_OPTIMUM", "INFEASIBLE", "UNBOUNDED")
+                    } == true)) break
                 check(iteration <= 256) { "root continuation made no bounded progress" }
             }
         } finally {

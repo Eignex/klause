@@ -61,8 +61,9 @@ internal class RewardLedger(
     /** Whether [arm] holds credit no settle has paid out yet. */
     fun hasPending(arm: Int): Boolean = pending.any { it[arm] > 0.0 }
 
-    fun pendingCreditOf(arm: Int): Map<String, Double> = Signal.entries.filter { pending[it.ordinal][arm] > 0.0 }
-        .associate { it.name to pending[it.ordinal][arm] }
+    fun pendingCreditOf(arm: Int): Map<String, Double> =
+        Signal.entries.filter { pending[it.ordinal][arm] > 0.0 }
+            .associate { it.name to pending[it.ordinal][arm] }
 
     /**
      * Settle the credit [arm] earned while it was not running, scored as if over [overWork] of its own work. No work

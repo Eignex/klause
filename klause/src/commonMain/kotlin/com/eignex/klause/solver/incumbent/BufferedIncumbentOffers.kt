@@ -3,17 +3,7 @@ package com.eignex.klause.solver.incumbent
 import com.eignex.klause.util.ExecutionControl
 
 internal enum class IncumbentOfferEvent {
-    Segments,
-    Offered,
-    Coalesced,
-    Checked,
-    Installed,
-    Rejected,
-    Indeterminate,
-    NotImproving,
-    Dropped,
-    Expired,
-    Failed,
+    Segments, Offered, Coalesced, Checked, Installed, Rejected, Indeterminate, NotImproving, Dropped, Expired, Failed,
 }
 
 internal class BufferedIncumbentOffers<A, V>(
@@ -30,9 +20,8 @@ internal class BufferedIncumbentOffers<A, V>(
     fun add(assignment: A, objective: V, measure: (() -> Unit) -> Unit) {
         observe(IncumbentOfferEvent.Offered)
         val previous = pending
-        if (previous == null) {
-            pending = Pending(assignment, objective, measure)
-        } else {
+        if (previous == null) pending = Pending(assignment, objective, measure)
+        else {
             val replace = runCatching {
                 improves(objective, previous.objective)
             }.getOrElse { failure ->
@@ -44,7 +33,11 @@ internal class BufferedIncumbentOffers<A, V>(
         }
     }
 
-    fun flush(cancellation: ExecutionControl, measure: (() -> Unit) -> Unit, offer: (A, V) -> Publication<A, V>?) {
+    fun flush(
+        cancellation: ExecutionControl,
+        measure: (() -> Unit) -> Unit,
+        offer: (A, V) -> Publication<A, V>?,
+    ) {
         val candidate = pending ?: return
         if (cancellation()) {
             observe(IncumbentOfferEvent.Expired)

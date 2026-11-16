@@ -27,13 +27,8 @@ class MddTableCompositionTest {
     @Test
     fun `composition should refute disjoint shared tuples before search`() {
         val mdd = Mdd(
-            intArrayOf(0, 1),
-            intArrayOf(1, 2, 1),
-            intArrayOf(0, 6, 12),
-            longArrayOf(0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0),
-            0,
-            intArrayOf(0),
-            3,
+            intArrayOf(0, 1), intArrayOf(1, 2, 1), intArrayOf(0, 6, 12),
+            longArrayOf(0, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0), 0, intArrayOf(0), 3,
         )
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))
 
@@ -45,13 +40,8 @@ class MddTableCompositionTest {
     @Test
     fun `composition should retain correlations through reconverging states and gaps`() {
         val mdd = Mdd(
-            intArrayOf(0, 1, 2),
-            intArrayOf(1, 1, 1, 1),
-            intArrayOf(0, 6, 9, 15),
-            longArrayOf(0, 0, 0, 0, 1, 0, 0, 7, 0, 0, 0, 0, 0, 1, 0),
-            0,
-            intArrayOf(0),
-            3,
+            intArrayOf(0, 1, 2), intArrayOf(1, 1, 1, 1), intArrayOf(0, 6, 9, 15),
+            longArrayOf(0, 0, 0, 0, 1, 0, 0, 7, 0, 0, 0, 0, 0, 1, 0), 0, intArrayOf(0), 3,
         )
         val table = Table(intArrayOf(2, 3, 0), longArrayOf(0, 8, 0, 1, 9, 1))
 
@@ -70,14 +60,9 @@ class MddTableCompositionTest {
     @Test
     fun `composition should retain weighted nondeterministic paths`() {
         val mdd = Mdd(
-            intArrayOf(0, 1),
-            intArrayOf(1, 1, 1),
-            intArrayOf(0, 12, 20),
+            intArrayOf(0, 1), intArrayOf(1, 1, 1), intArrayOf(0, 12, 20),
             longArrayOf(0, 0, 0, 2, 0, 0, 0, 4, 0, 1, 0, 8, 0, 0, 0, 1, 0, 1, 0, 3),
-            0,
-            intArrayOf(0),
-            4,
-            2,
+            0, intArrayOf(0), 4, 2,
         )
         val table = Table(intArrayOf(0, 1), longArrayOf(0, 0))
 
@@ -90,10 +75,7 @@ class MddTableCompositionTest {
         assertEquals(2, composed.cost)
         for (cost in listOf(3L, 5L, 7L)) {
             val problem = Problem(
-                0,
-                3,
-                arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(cost, cost)),
-                arrayOf(composed),
+                0, 3, arrayOf(IntDomain(0, 0), IntDomain(0, 0), IntDomain(cost, cost)), arrayOf(composed),
             )
             val state = PropagationState(problem, Assumptions.None)
             assertEquals(cost == 7L, state.runToFixpoint(allFactors = true) != null)
@@ -103,13 +85,8 @@ class MddTableCompositionTest {
     @Test
     fun `reconverging composition should preserve both shared tuple alternatives`() {
         val mdd = Mdd(
-            intArrayOf(0, 1, 2),
-            intArrayOf(1, 1, 1, 1),
-            intArrayOf(0, 6, 12, 18),
-            longArrayOf(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0),
-            0,
-            intArrayOf(0),
-            3,
+            intArrayOf(0, 1, 2), intArrayOf(1, 1, 1, 1), intArrayOf(0, 6, 12, 18),
+            longArrayOf(0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0), 0, intArrayOf(0), 3,
         )
         val table = Table(intArrayOf(2, 0), longArrayOf(0, 0, 1, 1))
         val result = assertIs<ExtensionalIntersection.Restricted>(
@@ -117,15 +94,11 @@ class MddTableCompositionTest {
         )
         val composed = assertIs<Mdd>(result.factor)
 
-        for (first in 0L..1L) {
-            for (middle in 0L..1L) {
-                for (last in 0L..1L) {
-                    val domains = arrayOf(IntDomain(first, first), IntDomain(middle, middle), IntDomain(last, last))
-                    val state = PropagationState(Problem(0, 3, domains, arrayOf<Factor>(composed)), Assumptions.None)
+        for (first in 0L..1L) for (middle in 0L..1L) for (last in 0L..1L) {
+            val domains = arrayOf(IntDomain(first, first), IntDomain(middle, middle), IntDomain(last, last))
+            val state = PropagationState(Problem(0, 3, domains, arrayOf<Factor>(composed)), Assumptions.None)
 
-                    assertEquals(first == last, state.runToFixpoint(allFactors = true) == null)
-                }
-            }
+            assertEquals(first == last, state.runToFixpoint(allFactors = true) == null)
         }
     }
 
@@ -179,12 +152,7 @@ class MddTableCompositionTest {
     }
 
     private fun independent(): Mdd = Mdd(
-        intArrayOf(0, 1),
-        intArrayOf(1, 1, 1),
-        intArrayOf(0, 9, 18),
-        longArrayOf(0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 0, 2, 0),
-        0,
-        intArrayOf(0),
-        3,
+        intArrayOf(0, 1), intArrayOf(1, 1, 1), intArrayOf(0, 9, 18),
+        longArrayOf(0, 0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 0, 2, 0), 0, intArrayOf(0), 3,
     )
 }

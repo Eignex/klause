@@ -149,10 +149,7 @@ internal interface InstructionSlicedSolve : ResumableSolve {
     fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long): SolveResult?
 
     fun runScheduledSlice(
-        global: ExecutionControl,
-        sliceMillis: Long,
-        sliceInstructions: Long,
-        sliceWork: Long,
+        global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long, sliceWork: Long,
         instructionsPerWork: Double,
     ): SolveResult? = runInstructionSlice(global, sliceMillis, sliceInstructions)
 }
@@ -203,12 +200,9 @@ internal interface RepairSearch : AutoCloseable {
 
     fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: ExecutionControl)
 
-    fun beginExact(
-        assumptions: Assumptions,
-        decisionBudget: Long,
-        cutoff: BigFraction,
-        cancellation: ExecutionControl,
-    ): Unit = throw UnsupportedOperationException("exact repair cutoffs are unavailable")
+    fun beginExact(assumptions: Assumptions, decisionBudget: Long, cutoff: BigFraction,
+        cancellation: ExecutionControl) : Unit =
+        throw UnsupportedOperationException("exact repair cutoffs are unavailable")
 
     fun runSlice(cancellation: ExecutionControl, millis: Long, work: Long): RepairSearchStep
 
@@ -219,18 +213,11 @@ internal interface RepairSearch : AutoCloseable {
      * monotone cutoff keeps every stale bound looser than the current one (never a wrong prune). Returns
      * the best strictly-better completion found, or null.
      */
-    fun repair(
-        assumptions: Assumptions,
-        decisionBudget: Long,
-        cutoff: Double,
-        cancellation: ExecutionControl,
-    ): Sample? = repairStep(assumptions, decisionBudget, cutoff, cancellation).sample
+    fun repair(assumptions: Assumptions, decisionBudget: Long, cutoff: Double,
+        cancellation: ExecutionControl): Sample? = repairStep(assumptions, decisionBudget, cutoff, cancellation).sample
 
     fun repairStep(
-        assumptions: Assumptions,
-        decisionBudget: Long,
-        cutoff: Double,
-        cancellation: ExecutionControl,
+        assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: ExecutionControl,
     ): RepairSearchStep {
         begin(assumptions, decisionBudget, cutoff, cancellation)
         while (true) {

@@ -126,4 +126,5 @@ class MutableIntObjectIndexTest {
         assertEquals(24L, protected.first)
         assertEquals(12L, protected.second)
     }
+
 }

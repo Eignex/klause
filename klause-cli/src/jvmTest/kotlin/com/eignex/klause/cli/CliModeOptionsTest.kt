@@ -22,18 +22,8 @@ class CliModeOptionsTest {
         }
         for (work in listOf(0L, 4096L)) {
             val output = captureStdout {
-                assertEquals(
-                    0,
-                    runCli(
-                        arrayOf(
-                    "-e",
-                    "cp",
-                    "--param",
-                    "inprocessing-warmup-work=$work",
-                    source.absolutePath,
-                )
-                    )
-                )
+                assertEquals(0, runCli(arrayOf("-e", "cp", "--param",
+                    "inprocessing-warmup-work=$work", source.absolutePath)))
             }
 
             assertTrue("s SATISFIABLE" in output.lines(), output)
@@ -49,18 +39,8 @@ class CliModeOptionsTest {
         for (engine in listOf("fixed", "backtrack", "mixed")) {
             for (enabled in listOf(false, true)) {
                 val output = captureStdout {
-                    assertEquals(
-                        0,
-                        runCli(
-                            arrayOf(
-                        "-e",
-                        engine,
-                        "--param",
-                        "open-linear-incremental=$enabled",
-                        source.absolutePath,
-                    )
-                        )
-                    )
+                    assertEquals(0, runCli(arrayOf("-e", engine, "--param",
+                        "open-linear-incremental=$enabled", source.absolutePath)))
                 }
 
                 assertTrue("sat" in output.lines(), output)
@@ -483,7 +463,9 @@ class CliModeOptionsTest {
         }
         assertTrue("ls dry-run: 1 arm(s)" in dry, dry)
         assertTrue("cbls-plateau/ils-basin" in dry, dry)
-        val out = captureStdout { main(arrayOf("-e", "ls", "--param", "arm=cbls/fixed", "-t", "5000", fzn.absolutePath)) }
+        val out = captureStdout {
+            main(arrayOf("-e", "ls", "--param", "arm=cbls/fixed", "-t", "5000", fzn.absolutePath))
+        }
         assertTrue("x = " in out, out)
         assertTrue("----------" in out, out)
     }

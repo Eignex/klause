@@ -37,18 +37,12 @@ internal class PolynomialWitnessSupports(
             if (!rationals.admitted(value)) return null
             point[variable] = value
         }
-        val owners = IntArray(realCount) {
-            arithmetic.step()
-            -1
-        }
+        val owners = IntArray(realCount) { arithmetic.step(); -1 }
         val supports = ArrayList<Support>()
         for (row in rows) {
             arithmetic.step()
             if (row.atom.relation != PolynomialRelation.EQ) continue
-            val variables = row.variables.filter {
-                arithmetic.step()
-                it !in fixed
-            }
+            val variables = row.variables.filter { arithmetic.step(); it !in fixed }
             if (variables.isEmpty()) continue
             for (variable in variables) {
                 arithmetic.step()
@@ -58,10 +52,7 @@ internal class PolynomialWitnessSupports(
             supports.add(Support(row, variables))
         }
         if (supports.size < 2) return null
-        val closing = List(supports.size) {
-            arithmetic.step()
-            ArrayList<Row>()
-        }
+        val closing = List(supports.size) { arithmetic.step(); ArrayList<Row>() }
         for (row in rows) {
             var last = -1
             for (variable in row.variables) {
@@ -71,9 +62,7 @@ internal class PolynomialWitnessSupports(
             // Coordinates outside equality supports retain their proposed zero or fixed seed.
             if (last < 0) {
                 if (!row.atom.holds((evaluate(row.terms, point) ?: return null).signum())) return null
-            } else {
-                closing[last].add(row)
-            }
+            } else closing[last].add(row)
         }
         val algebraic = AlgebraicArithmetic(arithmetic)
         for ((index, support) in supports.withIndex()) {
@@ -124,7 +113,11 @@ internal class PolynomialWitnessSupports(
         return point.toMap()
     }
 
-    private fun rows(atoms: List<PolynomialAtom>, payloads: List<List<PolynomialTerm>>, realCount: Int): List<Row>? {
+    private fun rows(
+        atoms: List<PolynomialAtom>,
+        payloads: List<List<PolynomialTerm>>,
+        realCount: Int,
+    ): List<Row>? {
         var count = 0
         val rows = ArrayList<Row>()
         for ((index, atom) in atoms.withIndex()) {
@@ -173,9 +166,8 @@ internal class PolynomialWitnessSupports(
             var coefficient = term.coefficient
             for ((id, exponent) in term.powers) {
                 arithmetic.step()
-                if (id == variable) {
-                    degree = exponent
-                } else {
+                if (id == variable) degree = exponent
+                else {
                     val coordinate = point.getValue(id)
                     if (coordinate.isZero) {
                         coefficient = BigFraction.ZERO

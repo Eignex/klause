@@ -29,17 +29,15 @@ class LinearSourceWitnessTest {
         val third = BigFraction.ofLong(3).reciprocal()
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false)),
-            listOf(
-                LinearSourceRow(
-                    listOf(LinearSourceTerm(0, SemanticRational.ONE)),
-                    lower = SemanticRational.of(BIG_ONE, bigIntOf(3)),
-                ),
-            ),
+            listOf(LinearSourceRow(
+                listOf(LinearSourceTerm(0, SemanticRational.ONE)),
+                lower = SemanticRational.of(BIG_ONE, bigIntOf(3)),
+            )),
             semantics = SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                    absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
-                ),
+                absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+            )
             ).resolve(),
         )
         val value = third - BigFraction.ofLong(2_000_000).reciprocal()
@@ -59,17 +57,17 @@ class LinearSourceWitnessTest {
             listOf(
                 LinearSourceRow(
                     listOf(
-                        LinearSourceTerm(0, SemanticRational.ONE),
-                        LinearSourceTerm(0, SemanticRational.ofLong(-1)),
-                    ),
-                    lower = SemanticRational.ONE,
-                ),
+                LinearSourceTerm(0, SemanticRational.ONE),
+                LinearSourceTerm(0, SemanticRational.ofLong(-1)),
+            ),
+                lower = SemanticRational.ONE
+                )
             ),
             semantics = SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                    relative = SemanticRational.of(BIG_ONE, bigIntOf(10)),
-                ),
+                relative = SemanticRational.of(BIG_ONE, bigIntOf(10)),
+            )
             ).resolve(),
         )
 
@@ -86,16 +84,13 @@ class LinearSourceWitnessTest {
             semantics = SourceSemantics(
                 SourceFormat.MPS,
                 feasibilityTolerance = SourceTolerance(
-                    absolute = SemanticRational.ONE,
-                ),
+                absolute = SemanticRational.ONE,
+            )
             ).resolve(),
         )
 
-        val result = checkLinearSourceWitness(
-            source,
-            listOf(BigFraction.ofLong(2).reciprocal()),
-            ExecutionControl.Never,
-        )
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(2).reciprocal()),
+            ExecutionControl.Never)
 
         assertIs<LinearSourceCheck.Rejected>(result)
     }
@@ -106,18 +101,15 @@ class LinearSourceWitnessTest {
             listOf(LinearSourceVariable("guard", true), LinearSourceVariable("x", false)),
             listOf(
                 LinearSourceRow(
-                    listOf(LinearSourceTerm(1, SemanticRational.ONE)),
-                    lower = SemanticRational.ONE,
-                    indicator = LinearSourceIndicator(0, true),
-                ),
+                listOf(LinearSourceTerm(1, SemanticRational.ONE)),
+                lower = SemanticRational.ONE,
+                indicator = LinearSourceIndicator(0, true),
+            )
             ),
         )
 
-        val result = checkLinearSourceWitness(
-            source,
-            listOf(BigFraction.ZERO, BigFraction.ZERO),
-            ExecutionControl.Never,
-        )
+        val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO, BigFraction.ZERO),
+            ExecutionControl.Never)
 
         assertTrue(assertIs<LinearSourceCheck.Accepted>(result).witness.exact)
     }
@@ -136,10 +128,8 @@ class LinearSourceWitnessTest {
 
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ofLong(3)), ExecutionControl.Never)
 
-        assertEquals(
-            BigFraction.ofLong(11) * BigFraction.ofLong(10).reciprocal(),
-            assertIs<LinearSourceCheck.Accepted>(result).witness.objective,
-        )
+        assertEquals(BigFraction.ofLong(11) * BigFraction.ofLong(10).reciprocal(),
+            assertIs<LinearSourceCheck.Accepted>(result).witness.objective)
     }
 
     @Test
@@ -161,9 +151,7 @@ class LinearSourceWitnessTest {
                 listOf(LinearSourceRow(terms, lower = SemanticRational.ZERO)),
             ),
             LinearSourceProblem(
-                listOf(LinearSourceVariable("x", false)),
-                emptyList(),
-                LinearSourceObjective(terms),
+                listOf(LinearSourceVariable("x", false)), emptyList(), LinearSourceObjective(terms),
             ),
         )
         for (source in sources) {
@@ -252,10 +240,7 @@ class LinearSourceWitnessTest {
             listOf(LinearSourceRow(List(128) { LinearSourceTerm(0, SemanticRational.ONE) })),
         )
         var polls = 0
-        val stop = ExecutionControl {
-            polls++
-            false
-        }
+        val stop = ExecutionControl { polls++; false }
 
         checkLinearSourceWitness(source, listOf(BigFraction.ZERO), stop)
 
@@ -266,12 +251,9 @@ class LinearSourceWitnessTest {
     fun `unmetered point checks should reject a violation beyond the first batch`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("x", false)),
-            listOf(
-                LinearSourceRow(
-                    List(128) { LinearSourceTerm(0, SemanticRational.ONE) },
-                    lower = SemanticRational.ONE,
-                ),
-            ),
+            listOf(LinearSourceRow(
+                List(128) { LinearSourceTerm(0, SemanticRational.ONE) }, lower = SemanticRational.ONE,
+            )),
         )
 
         val result = checkLinearSourceWitness(source, listOf(BigFraction.ZERO), ExecutionControl.Never)

@@ -129,9 +129,7 @@ internal fun intDomainFromRuns(
  */
 internal fun IntDomain.runBounds(): LongArray = when (this) {
     is ContiguousDomain -> longArrayOf(min, max)
-
     is RunsDomain -> copyRuns()
-
     else -> {
         val values = requireNotNull(spanOrNull()) { "domain [$min, $max] holds too many values to list" }
         val runs = LongArrayList()

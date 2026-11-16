@@ -32,11 +32,7 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : StatelessSess
 
     /** Release the active search and discard learned weights; idempotent. */
     override fun close() {
-        try {
-            super.close()
-        } finally {
-            warm.reset()
-        }
+        try { super.close() } finally { warm.reset() }
     }
 
     internal val warmState: WarmState get() = warm
@@ -72,17 +68,20 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : StatelessSess
     internal override fun improvementsScoped(
         objective: LinearObjective,
         params: LocalSearchParams,
-    ): Sequence<MinimizeResult> = solver.engine.improvements(objective, params, warm)
+    ): Sequence<MinimizeResult> =
+        solver.engine.improvements(objective, params, warm)
     internal override fun openSamplesScoped(params: LocalSearchParams): SearchStream<Sample> =
         solver.engine.openSamples(params, warm)
     internal override fun openQualitySamplesScoped(
         config: SamplingConfig,
         params: LocalSearchParams,
-    ): SearchStream<Sample> = solver.openSamples(config, params, warm)
+    ): SearchStream<Sample> =
+        solver.openSamples(config, params, warm)
     internal override fun openEnumerateScoped(params: LocalSearchParams): SearchStream<Sample> =
         solver.engine.openSamples(params, warm)
     internal override fun openImprovementsScoped(
         objective: LinearObjective,
         params: LocalSearchParams,
-    ): SearchStream<MinimizeResult> = solver.engine.openImprovements(objective, params, warm)
+    ): SearchStream<MinimizeResult> =
+        solver.engine.openImprovements(objective, params, warm)
 }

@@ -69,13 +69,8 @@ class PropagationSessionTest {
         val session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()))
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 1)
 
-        val stopped = session.exportGlueClausesBounded(
-            6,
-            12,
-            false,
-            alreadyShared = { null },
-            cancelled = { false },
-        )
+        val stopped = session.exportGlueClausesBounded(6, 12, false,
+            alreadyShared = { null }, cancelled = { false })
 
         assertNull(stopped)
         assertEquals(1, session.exportGlueClauses(6, 12).size)
@@ -91,13 +86,8 @@ class PropagationSessionTest {
             for (literals in clauses) session.addLearnedClause(Clause(literals), 1)
             val expected = clauses.map { session.asSharedClause(it, 1).key }
 
-            val result = session.exportGlueClausesBounded(
-                6,
-                12,
-                false,
-                alreadyShared = { it == expected[0] },
-                cancelled = { false },
-            )
+            val result = session.exportGlueClausesBounded(6, 12, false,
+                alreadyShared = { it == expected[0] }, cancelled = { false })
 
             assertEquals(expected.drop(1), result?.map { it.key })
             assertEquals(clauses.drop(1).map { it.toList() }, result?.map { it.boolLits.toList() })
@@ -106,32 +96,18 @@ class PropagationSessionTest {
 
     @Test
     fun `glue export should match portable keys for wide signed integer atoms`() {
-        val session = PropagationSession(
-            Problem(
-                2,
-                1,
-                arrayOf(IntDomain(-10_000_000_000L, 10_000_000_000L)),
-                emptyList(),
-            ),
-        )
+        val session = PropagationSession(Problem(2, 1, arrayOf(IntDomain(-10_000_000_000L, 10_000_000_000L)),
+            emptyList()))
         val clauses = listOf(
-            intArrayOf(
-                0,
-                session.boundGeLit(0, -9_000_000_000L, true),
-                session.boundLeLit(0, 8_000_000_000L, false),
-            ),
+            intArrayOf(0, session.boundGeLit(0, -9_000_000_000L, true),
+                session.boundLeLit(0, 8_000_000_000L, false)),
             intArrayOf(session.equalityLit(0, -3L), 3),
         )
         for (literals in clauses) session.addLearnedClause(Clause(literals), 2)
         val expected = clauses.map { session.asSharedClause(it, 2) }
 
-        val result = session.exportGlueClausesBounded(
-            6,
-            12,
-            false,
-            alreadyShared = { it == expected[0].key },
-            cancelled = { false },
-        )
+        val result = session.exportGlueClausesBounded(6, 12, false,
+            alreadyShared = { it == expected[0].key }, cancelled = { false })
 
         assertEquals(listOf(expected[1].key), result?.map { it.key })
         assertEquals(expected[1].boolLits.toList(), result?.single()?.boolLits?.toList())
@@ -174,15 +150,9 @@ class PropagationSessionTest {
         for (maximum in listOf(3L, Long.MAX_VALUE)) {
             val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, maximum)), emptyArray()))
             val assumptions = Assumptions(
-                intArrayOf(),
-                booleanArrayOf(),
-                intArrayOf(),
-                longArrayOf(),
-                DeducedRestrictions(
-                    intSetKeys = intArrayOf(0),
-                    intSetOffsets = intArrayOf(0, 2),
-                    intSetValues = longArrayOf(1, maximum),
-                ),
+                intArrayOf(), booleanArrayOf(), intArrayOf(), longArrayOf(),
+                DeducedRestrictions(intSetKeys = intArrayOf(0), intSetOffsets = intArrayOf(0, 2),
+                    intSetValues = longArrayOf(1, maximum)),
             )
             assertIs<PropagationResult.Implied>(session.seed(assumptions))
 
@@ -212,15 +182,9 @@ class PropagationSessionTest {
     @Test
     fun `domain restriction seeds should apply and disappear on reseeding`() {
         val allowed = Assumptions(
-            intArrayOf(),
-            booleanArrayOf(),
-            intArrayOf(),
-            longArrayOf(),
-            DeducedRestrictions(
-                intSetKeys = intArrayOf(0),
-                intSetOffsets = intArrayOf(0, 2),
-                intSetValues = longArrayOf(1, 3),
-            ),
+            intArrayOf(), booleanArrayOf(), intArrayOf(), longArrayOf(),
+            DeducedRestrictions(intSetKeys = intArrayOf(0), intSetOffsets = intArrayOf(0, 2),
+                intSetValues = longArrayOf(1, 3)),
         )
         val cases = listOf(
             Assumptions.None.withTightenedMin(0, 1L) to listOf(1L, 2L, 3L),
@@ -233,11 +197,8 @@ class PropagationSessionTest {
             for (prepared in listOf(false, true)) {
                 val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 3)), emptyArray()))
 
-                val result = if (prepared) {
-                    session.prepareSeed(assumptions).asSequence().filterNotNull().last()
-                } else {
-                    session.seed(assumptions)
-                }
+                val result = if (prepared) session.prepareSeed(assumptions).asSequence().filterNotNull().last()
+                else session.seed(assumptions)
 
                 assertIs<PropagationResult.Implied>(result)
                 assertEquals(values, (0L..3L).filter { it in session.intDomain(0) })
@@ -276,12 +237,9 @@ class PropagationSessionTest {
         assertIs<PropagationResult.Implied>(session.pinIntAtLeast(0, 1))
         val excluded = session.boundLeLit(1, 5, false)
         for (positive in listOf(false, true)) {
-            assertIs<PropagationResult.Implied>(
-                session.addLearnedClause(
-                    Clause(intArrayOf(excluded, Lit.make(0, positive))),
-                    2,
-                ),
-            )
+            assertIs<PropagationResult.Implied>(session.addLearnedClause(
+                Clause(intArrayOf(excluded, Lit.make(0, positive))), 2,
+            ))
         }
 
         val conflict = assertIs<PropagationResult.Unsat>(session.implyIntAtMost(1, 5))

@@ -18,10 +18,7 @@ internal class LinearAuthorityPointCuts(
     private val onCut: (CutFamily, String, Long) -> Unit = { _, _, _ -> },
 ) {
     private data class Scored(
-        val id: Int,
-        val values: Map<SourceCoordinate, Double>,
-        val norm: Double,
-        val score: Double,
+        val id: Int, val values: Map<SourceCoordinate, Double>, val norm: Double, val score: Double,
     )
     private val counts = linkedMapOf<String, Long>()
     val observations: Map<String, Long> get() = counts.toMap()
@@ -36,7 +33,8 @@ internal class LinearAuthorityPointCuts(
     var adoptedCurrent: Boolean = false
         private set
 
-    fun candidatesRetired(rows: List<LinearAuthorityCut>?): Boolean = rows != null && family === rows && retired
+    fun candidatesRetired(rows: List<LinearAuthorityCut>?): Boolean =
+        rows != null && family === rows && retired
 
     fun managesCurrentRecipe(rows: List<LinearAuthorityCut>?): Boolean =
         rows != null && family === rows && managedCurrent
@@ -70,8 +68,7 @@ internal class LinearAuthorityPointCuts(
         var limited = false
         fun charge(amount: Long, bytes: Long = 0L): Boolean {
             if (cancellation() || amount > limit - work || bytes > 1_048_576L - allocation ||
-                budget.funding?.exhausted == true
-            ) {
+                budget.funding?.exhausted == true) {
                 limited = true
                 return false
             }
@@ -129,8 +126,7 @@ internal class LinearAuthorityPointCuts(
         try {
             val pointEntryBytes = if (retired) 64L else 128L
             if (point.size != coordinates.size || point.size > maximumSupport ||
-                !meter.charge(point.size.toLong(), 128L + point.size * pointEntryBytes)
-            ) {
+                !meter.charge(point.size.toLong(), 128L + point.size * pointEntryBytes)) {
                 observe("PointUnavailable")
                 return installed
             }
@@ -155,20 +151,14 @@ internal class LinearAuthorityPointCuts(
             if (aggregateOnly) {
                 for (row in rows) {
                     if (!meter.charge(1L)) return installed
-                    aggregateOnly = aggregateOnly && (
-                        row.family == CutFamily.SOURCE_AGGREGATION ||
-                            row.family == CutFamily.AGGREGATION_MIR
-                        )
+                    aggregateOnly = aggregateOnly && (row.family == CutFamily.SOURCE_AGGREGATION ||
+                        row.family == CutFamily.AGGREGATION_MIR)
                 }
             }
             if ((integerOnly || aggregateOnly) && installed.isEmpty() && rows.size <= maximumCuts &&
-                checked.size == rows.size
-            ) {
+                checked.size == rows.size) {
                 if (!meter.charge(rows.size.toLong(), 128L + rows.size * 64L) ||
-                    rows.indices.any { it !in checked }
-                ) {
-                    return installed
-                }
+                    rows.indices.any { it !in checked }) return installed
                 for (row in rows) {
                     visitedFamilies.add(row.family)
                     onCut(row.family, "POINT_ADOPTED_INSTALLED", 1L)
@@ -184,13 +174,8 @@ internal class LinearAuthorityPointCuts(
             val objectiveNorm = sqrt(objectiveNormSquared)
             val candidates = ArrayList<Scored>()
             val forced = ArrayList<Scored>()
-            if (!meter.charge(
-                    installed.size.toLong() + inactiveScans.size,
-                    128L + installed.size * 128L,
-                )
-            ) {
-                return installed
-            }
+            if (!meter.charge(installed.size.toLong() + inactiveScans.size,
+                    128L + installed.size * 128L)) return installed
             val observedInactive = HashMap<Int, Int>()
             var support = 0
             for ((id, row) in rows.withIndex()) {
@@ -233,48 +218,30 @@ internal class LinearAuthorityPointCuts(
                     observe("ScoreUnavailable")
                     continue
                 }
-                val alignment = if (objectiveNorm > 0.0 && objectiveNorm.isFinite()) {
-                    abs(parallel) / (norm * objectiveNorm)
-                } else {
-                    0.0
-                }
+                val alignment = if (objectiveNorm > 0.0 && objectiveNorm.isFinite())
+                    abs(parallel) / (norm * objectiveNorm) else 0.0
                 val score = efficacy / sqrt(maxOf(1, size).toDouble()) + 0.01 * alignment
                 if (!score.isFinite()) {
                     observe("ScoreUnavailable")
                     continue
                 }
-                onCut(
-                    row.family,
-                    when {
-                        id in installed -> "POINT_RETAINED"
-                        efficacy >= CutPool.MIN_EFFICACY -> "POINT_ELIGIBLE"
-                        else -> "POINT_LOW_EFFICACY"
-                    },
-                    1L,
-                )
+                onCut(row.family, when {
+                    id in installed -> "POINT_RETAINED"
+                    efficacy >= CutPool.MIN_EFFICACY -> "POINT_ELIGIBLE"
+                    else -> "POINT_LOW_EFFICACY"
+                }, 1L)
                 if (id in installed) {
                     if (projected != null) forced += Scored(id, projected, norm, score)
-                    observedInactive[id] = if (activity - checkNotNull(rhs) >= -CutPool.ACTIVE_TOLERANCE) {
-                        0
-                    } else {
-                        minOf(4, (inactiveScans[id] ?: 0) + 1)
-                    }
+                    observedInactive[id] = if (activity - checkNotNull(rhs) >= -CutPool.ACTIVE_TOLERANCE) 0
+                        else minOf(4, (inactiveScans[id] ?: 0) + 1)
                 } else if (efficacy >= CutPool.MIN_EFFICACY) {
                     candidates += Scored(id, checkNotNull(projected), norm, score)
                 }
             }
-            val selected = selectNonparallelCuts(
-                candidates.sortedWith(
-                    compareByDescending<Scored> { it.score }
-                        .thenBy { it.id },
-                ),
-                minOf(1, maximumCuts - installed.size),
-                1.0 - CutPool.MIN_ORTHOGONALITY,
-                forced,
-            ) { a, b ->
-                if (!meter.charge(a.values.size.toLong() + b.values.size)) {
-                    Double.POSITIVE_INFINITY
-                } else {
+            val selected = selectNonparallelCuts(candidates.sortedWith(compareByDescending<Scored> { it.score }
+                .thenBy { it.id }), minOf(1, maximumCuts - installed.size),
+                1.0 - CutPool.MIN_ORTHOGONALITY, forced) { a, b ->
+                if (!meter.charge(a.values.size.toLong() + b.values.size)) Double.POSITIVE_INFINITY else {
                     var dot = 0.0
                     for ((coordinate, value) in a.values) dot += value * (b.values[coordinate] ?: 0.0)
                     val cosine = abs(dot) / (a.norm * b.norm)

@@ -17,18 +17,14 @@ class ElementLpProjectionTest {
     @Test
     fun `shared choices preserve correlations between constant properties`() {
         val problem = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1)),
+            0, 3, arrayOf(IntDomain(0, 2), IntDomain(0, 1), IntDomain(0, 1)),
             arrayOf(
                 Element(0, 1, longArrayOf(0, 1, 0), false, 0),
                 Element(0, 2, longArrayOf(1, 0, 1), false, 0),
             ),
         )
         val relaxation = CpToLpRelaxation(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(0, 1, 1)),
-            elementHull = true,
+            problem, LinearObjective(intCoefficients = longArrayOf(0, 1, 1)), elementHull = true,
         ).build(RootDomains(problem))
 
         val solution = solveLp(relaxation.model)
@@ -82,18 +78,14 @@ class ElementLpProjectionTest {
     @Test
     fun `different indexes retain independent choices`() {
         val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
+            0, 4, Array(4) { IntDomain(0, 1) },
             arrayOf(
                 Element(0, 2, longArrayOf(0, 1), false, 0),
                 Element(1, 3, longArrayOf(1, 0), false, 0),
             ),
         )
         val relaxation = CpToLpRelaxation(
-            problem,
-            LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 1)),
-            elementHull = true,
+            problem, LinearObjective(intCoefficients = longArrayOf(0, 0, 1, 1)), elementHull = true,
         ).build(RootDomains(problem))
 
         val solution = solveLp(relaxation.model)

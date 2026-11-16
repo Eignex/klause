@@ -22,9 +22,7 @@ internal class LearnedMemoryMaintenance {
     )
 
     private var observed: Position? = null
-    fun reset() {
-        observed = null
-    }
+    fun reset() { observed = null }
 
     fun run(
         session: PropagationSession,
@@ -33,22 +31,15 @@ internal class LearnedMemoryMaintenance {
         stats: SearchStatsSink?,
     ) {
         val limit = params.learnedMemoryBytes ?: return
-        fun position() = Position(
-            session.sharingIdentity, limit, params.learnedMemoryWork,
+        fun position() = Position(session.sharingIdentity, limit, params.learnedMemoryWork,
             params.learnedMemoryScratchBytes, session.learnedClauseCount, session.learnedClauseRevision,
             session.decisionLevel, session.explanationState.undoTop, session.explanationState.atoms.intVar.size,
             session.ownershipWork, session.retainedSharingSize?.invoke() ?: 0L,
             session.sharedLearningPosition?.invoke(),
-            inprocessing?.retainedRevision ?: 0L, inprocessing?.retainsPublication == true,
-        )
+            inprocessing?.retainedRevision ?: 0L, inprocessing?.retainsPublication == true)
         if (observed == position()) return
-        val result = session.reclaimLearnedMemory(
-            limit,
-            params.learnedMemoryWork,
-            params.learnedMemoryScratchBytes,
-            { inprocessing?.releaseRetainedBuffers() ?: false },
-            inprocessing?.retainsPublication == true,
-        )
+        val result = session.reclaimLearnedMemory(limit, params.learnedMemoryWork, params.learnedMemoryScratchBytes,
+            { inprocessing?.releaseRetainedBuffers() ?: false }, inprocessing?.retainsPublication == true)
         // Cancelled observation yields to search; funded physical cleanup retains its next opportunity.
         observed = if (result.continuationPending) null else position()
         stats?.noteInprocessing("learnedMemory${result.status.name}", 1L)

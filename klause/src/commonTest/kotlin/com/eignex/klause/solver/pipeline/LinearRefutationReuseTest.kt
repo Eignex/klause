@@ -34,30 +34,12 @@ class LinearRefutationReuseTest {
         val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         val scope = SourceScope(SourceRevision("resolved-unit", "exact-affine"))
-        val source = SourceProofContext(
-            scope,
-            setOf(x, y),
-            mapOf(
-                "left" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            x to BigFraction.MINUS_ONE,
-                            y to BigFraction.MINUS_ONE,
-                        ),
-                        BigFraction.MINUS_ONE,
-                    ),
-                ),
-                "right" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            x to BigFraction.ONE,
-                            y to BigFraction.MINUS_ONE,
-                        ),
-                        BigFraction.ZERO,
-                    ),
-                ),
-            ),
-        )
+        val source = SourceProofContext(scope, setOf(x, y), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                y to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+            "right" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
+                y to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
         val cache = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never)
         val learned = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never, resolve = true)
         learned.name(x, BigFraction.ZERO, 0)
@@ -65,18 +47,12 @@ class LinearRefutationReuseTest {
         for (upper in listOf(true, false)) {
             val condition = SourceCondition().bound(x, if (upper) BigFraction.ZERO else BigFraction.ONE, upper)
                 .bound(y, BigFraction.ZERO, true)
-            val conflict = LinearPinnedRefutation(
-                SourceDerivation.Combination(
-                    listOf(
-                        SourceDerivation.Combination.Term(
-                            BigFraction.ONE,
-                            SourceDerivation.Premise(if (upper) "left" else "right"),
-                        ),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(y, true)),
-                    ),
-                ),
-            )
+            val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE,
+                    SourceDerivation.Premise(if (upper) "left" else "right")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(y, true)),
+            )))
             val evidence = SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, conflict)
             cache.retain(evidence)
             learned.retain(evidence)
@@ -89,10 +65,8 @@ class LinearRefutationReuseTest {
         assertEquals(BigFraction.ZERO, unit.threshold)
         assertTrue(unit.upper)
         assertTrue(unit.unfixedPivot)
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority().atScope(unit.evidence.scope)).verify(unit.evidence),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority().atScope(unit.evidence.scope)).verify(unit.evidence))
     }
 
     @Test
@@ -104,63 +78,26 @@ class LinearRefutationReuseTest {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val opening = SourceCondition(upper = mapOf(window to BigFraction.ZERO))
         val scope = SourceScope(SourceRevision("resolution", "exact-affine"), opening)
-        val source = SourceProofContext(
-            scope,
-            setOf(x, y, z, window, bool),
-            mapOf(
-                "left" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            x to BigFraction.MINUS_ONE,
-                            y to BigFraction.MINUS_ONE,
-                        ),
-                        BigFraction.MINUS_ONE,
-                    ),
-                    mapOf(0 to true),
-                ),
-                "right" to SourcePremise(
-                    SourceInequality(
-                        mapOf(
-                            x to BigFraction.ONE,
-                            z to BigFraction.MINUS_ONE,
-                        ),
-                        BigFraction.ZERO,
-                    ),
-                ),
-            ),
-        )
-        val left = SourceEvidence(
-            scope.copy(
-                condition = opening.pin(0, true)
-                    .bound(x, BigFraction.ZERO, true).bound(y, BigFraction.ZERO, true),
-            ),
-            SourceClaim.Refutation,
-            LinearPinnedRefutation(
-                SourceDerivation.Combination(
-                    listOf(
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("left")),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, true)),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(y, true)),
-                    ),
-                ),
-            ),
-        )
-        val right = SourceEvidence(
-            scope.copy(
-                condition = opening.pin(0, true)
-                    .bound(x, BigFraction.ONE, false).bound(z, BigFraction.ZERO, true),
-            ),
-            SourceClaim.Refutation,
-            LinearPinnedRefutation(
-                SourceDerivation.Combination(
-                    listOf(
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("right")),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, false)),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(z, true)),
-                    ),
-                ),
-            ),
-        )
+        val source = SourceProofContext(scope, setOf(x, y, z, window, bool), mapOf(
+            "left" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE,
+                y to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE), mapOf(0 to true)),
+            "right" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE,
+                z to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
+        val left = SourceEvidence(scope.copy(condition = opening.pin(0, true)
+            .bound(x, BigFraction.ZERO, true).bound(y, BigFraction.ZERO, true)), SourceClaim.Refutation,
+            LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("left")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, true)),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(y, true)),
+            ))))
+        val right = SourceEvidence(scope.copy(condition = opening.pin(0, true)
+            .bound(x, BigFraction.ONE, false).bound(z, BigFraction.ZERO, true)), SourceClaim.Refutation,
+            LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("right")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, false)),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(z, true)),
+            ))))
         val cache = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl.Never)
         var stopped = false
         val learned = LinearRefutationReuse(source, SourceLpBudget(), ExecutionControl { stopped }, resolve = true)
@@ -177,12 +114,8 @@ class LinearRefutationReuseTest {
             learned.retain(proof)
         }
         stopped = true
-        assertNull(
-            learned.find(
-                opening.pin(0, true).bound(y, BigFraction.ZERO, true)
-                    .bound(z, BigFraction.ZERO, true),
-            ),
-        )
+        assertNull(learned.find(opening.pin(0, true).bound(y, BigFraction.ZERO, true)
+            .bound(z, BigFraction.ZERO, true)))
         stopped = false
         for (endpoint in listOf(BigFraction.ZERO, BigFraction.MINUS_ONE)) {
             val region = opening.pin(0, true).bound(y, endpoint, true).bound(z, endpoint, true)
@@ -190,62 +123,32 @@ class LinearRefutationReuseTest {
 
             val excluded = assertNotNull(learned.find(region))
 
-            assertEquals(
-                SourceEvidenceCheck.Checked,
-                SourceEvidenceVerifier(source.withLinearAuthority().atScope(excluded.scope)).verify(excluded),
-            )
+            assertEquals(SourceEvidenceCheck.Checked,
+                SourceEvidenceVerifier(source.withLinearAuthority().atScope(excluded.scope)).verify(excluded))
         }
-        assertNull(
-            learned.find(
-                opening.pin(0, true).bound(y, BigFraction.ONE, true)
-                    .bound(z, BigFraction.ZERO, true),
-            ),
-        )
-        assertNull(
-            learned.find(
-                SourceCondition(
-                    bools = mapOf(0 to true),
-                    upper = mapOf(y to BigFraction.ZERO, z to BigFraction.ZERO),
-                ),
-            ),
-        )
-        assertNull(
-            learned.find(
-                opening.pin(0, false).bound(y, BigFraction.ZERO, true)
-                    .bound(z, BigFraction.ZERO, true),
-            ),
-        )
+        assertNull(learned.find(opening.pin(0, true).bound(y, BigFraction.ONE, true)
+            .bound(z, BigFraction.ZERO, true)))
+        assertNull(learned.find(SourceCondition(bools = mapOf(0 to true),
+            upper = mapOf(y to BigFraction.ZERO, z to BigFraction.ZERO))))
+        assertNull(learned.find(opening.pin(0, false).bound(y, BigFraction.ZERO, true)
+            .bound(z, BigFraction.ZERO, true)))
         assertEquals(2L, learned.observations()["numericalRefutationReuseResolutionHits"])
         assertEquals(2L, learned.observations()["numericalRefutationReuseResolutionUnfixedHits"])
     }
 
     private val x = SourceCoordinate(SourceCoordinate.Kind.Real, 0)
     private val other = SourceCoordinate(SourceCoordinate.Kind.Real, 1)
-    private val scope = SourceScope(
-        SourceRevision("reuse-source", "exact-affine"),
-        objective = SourceObjective("reuse-objective", ObjectiveSense.MINIMIZE),
-    )
-    private val source = SourceProofContext(
-        scope,
-        setOf(x, other),
-        mapOf(
-            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
-        ),
-    )
-    private val proof = LinearPinnedRefutation(
-        SourceDerivation.Combination(
-            listOf(
-                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
-            ),
-        ),
-    )
-    private val restricted = scope.copy(
-        condition = SourceCondition(
-            lower = mapOf(other to BigFraction.ONE),
-            upper = mapOf(x to BigFraction.ZERO),
-        ),
-    )
+    private val scope = SourceScope(SourceRevision("reuse-source", "exact-affine"),
+        objective = SourceObjective("reuse-objective", ObjectiveSense.MINIMIZE))
+    private val source = SourceProofContext(scope, setOf(x, other), mapOf(
+        "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE)),
+    ))
+    private val proof = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper = true)),
+    )))
+    private val restricted = scope.copy(condition = SourceCondition(
+        lower = mapOf(other to BigFraction.ONE), upper = mapOf(x to BigFraction.ZERO)))
     private val evidence = SourceEvidence(restricted, SourceClaim.Refutation, proof)
 
     @Test
@@ -255,10 +158,8 @@ class LinearRefutationReuseTest {
 
         val reused = assertNotNull(reuse.find(restricted.condition))
 
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority().atScope(reused.scope)).verify(reused),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority().atScope(reused.scope)).verify(reused))
         assertEquals(1L, reuse.observations()["numericalRefutationReuseResolutionNameDeclines"])
         assertNull(reuse.observations()["numericalRefutationReuseResolutionProofs"])
     }
@@ -269,24 +170,13 @@ class LinearRefutationReuseTest {
         val right = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
         for (upper in listOf(true, false)) {
             val coefficient = if (upper) BigFraction.MINUS_ONE else BigFraction.ONE
-            val context = SourceProofContext(
-                scope,
-                setOf(left, right),
-                mapOf(
-                    "sum" to SourcePremise(
-                        SourceInequality(mapOf(left to coefficient, right to coefficient), BigFraction.MINUS_ONE),
-                    ),
-                ),
-            )
-            val conflict = LinearPinnedRefutation(
-                SourceDerivation.Combination(
-                    listOf(
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("sum")),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(left, upper)),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(right, upper)),
-                    ),
-                ),
-            )
+            val context = SourceProofContext(scope, setOf(left, right), mapOf("sum" to SourcePremise(
+                SourceInequality(mapOf(left to coefficient, right to coefficient), BigFraction.MINUS_ONE))))
+            val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("sum")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(left, upper)),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(right, upper)),
+            )))
             val reuse = LinearRefutationReuse(context, SourceLpBudget(), ExecutionControl.Never)
             val full = SourceCondition().bound(left, BigFraction.ZERO, upper).bound(right, BigFraction.ZERO, upper)
             reuse.retain(SourceEvidence(scope.copy(condition = full), SourceClaim.Refutation, conflict))
@@ -299,20 +189,14 @@ class LinearRefutationReuseTest {
                 assertEquals(right, unit.coordinate)
                 assertEquals(upper, unit.upper)
                 assertEquals(if (upper) BigFraction.ZERO else BigFraction.MINUS_ONE, unit.threshold)
-                assertEquals(
-                    SourceEvidenceCheck.Checked,
+                assertEquals(SourceEvidenceCheck.Checked,
                     SourceEvidenceVerifier(context.withLinearAuthority().atScope(unit.evidence.scope))
-                        .verify(unit.evidence),
-                )
+                        .verify(unit.evidence))
             }
             assertNull(reuse.unit(SourceCondition().bound(left, coefficient.negated(), upper)))
             assertNull(reuse.unit(full))
-            assertNull(
-                reuse.unit(
-                    SourceCondition().bound(left, BigFraction.ZERO, upper)
-                        .bound(right, coefficient.negated(), !upper),
-                ),
-            )
+            assertNull(reuse.unit(SourceCondition().bound(left, BigFraction.ZERO, upper)
+                .bound(right, coefficient.negated(), !upper)))
         }
     }
 
@@ -321,38 +205,16 @@ class LinearRefutationReuseTest {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
         val opening = SourceCondition(upper = mapOf(other to BigFraction.ZERO))
-        val local = SourceProofContext(
-            scope.copy(condition = opening),
-            setOf(integer, bool, x, other),
-            mapOf(
-                "lower" to SourcePremise(
-                    SourceInequality(
-                        mapOf(integer to BigFraction.MINUS_ONE),
-                        BigFraction.MINUS_ONE,
-                    ),
-                    mapOf(0 to true),
-                ),
-            ),
-        )
-        val conflict = LinearPinnedRefutation(
-            SourceDerivation.Combination(
-                listOf(
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(integer, true)),
-                ),
-            ),
-        )
+        val local = SourceProofContext(scope.copy(condition = opening), setOf(integer, bool, x, other),
+            mapOf("lower" to SourcePremise(SourceInequality(mapOf(integer to BigFraction.MINUS_ONE),
+                BigFraction.MINUS_ONE), mapOf(0 to true))))
+        val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(integer, true)),
+        )))
         val reuse = LinearRefutationReuse(local, SourceLpBudget(), ExecutionControl.Never)
-        reuse.retain(
-            SourceEvidence(
-                local.scope.copy(
-                    condition = opening.pin(0, true)
-                        .bound(integer, BigFraction.ZERO, true),
-                ),
-                SourceClaim.Refutation,
-                conflict,
-            ),
-        )
+        reuse.retain(SourceEvidence(local.scope.copy(condition = opening.pin(0, true)
+            .bound(integer, BigFraction.ZERO, true)), SourceClaim.Refutation, conflict))
 
         assertNotNull(reuse.unit(opening.pin(0, true)))
         assertNull(reuse.unit(opening))
@@ -364,33 +226,17 @@ class LinearRefutationReuseTest {
     @Test
     fun `stopped unit verification should leave the prefix unchanged`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val local = SourceProofContext(
-            scope,
-            setOf(integer),
-            mapOf(
-                "lower" to SourcePremise(
-                    SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
-                ),
-            ),
-        )
-        val conflict = LinearPinnedRefutation(
-            SourceDerivation.Combination(
-                listOf(
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(integer, true)),
-                ),
-            ),
-        )
+        val local = SourceProofContext(scope, setOf(integer), mapOf("lower" to SourcePremise(
+            SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))))
+        val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(integer, true)),
+        )))
         var polls = 0
         var stopAfter = Int.MAX_VALUE
         val reuse = LinearRefutationReuse(local, SourceLpBudget(), ExecutionControl { ++polls >= stopAfter })
-        reuse.retain(
-            SourceEvidence(
-                scope.copy(condition = SourceCondition(upper = mapOf(integer to BigFraction.ZERO))),
-                SourceClaim.Refutation,
-                conflict,
-            ),
-        )
+        reuse.retain(SourceEvidence(scope.copy(condition = SourceCondition(upper = mapOf(integer to BigFraction.ZERO))),
+            SourceClaim.Refutation, conflict))
         polls = 0
         stopAfter = 20
 
@@ -407,36 +253,15 @@ class LinearRefutationReuseTest {
         reuse.retain(evidence)
         assertNull(reuse.unit(SourceCondition()))
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val local = SourceProofContext(
-            scope,
-            setOf(integer),
-            mapOf(
-                "lower" to SourcePremise(
-                    SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE),
-                ),
-            ),
-        )
-        val conflict = LinearPinnedRefutation(
-            SourceDerivation.Combination(
-                listOf(
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
-                    SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(integer, true)),
-                ),
-            ),
-        )
+        val local = SourceProofContext(scope, setOf(integer), mapOf("lower" to SourcePremise(
+            SourceInequality(mapOf(integer to BigFraction.MINUS_ONE), BigFraction.MINUS_ONE))))
+        val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("lower")),
+            SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(integer, true)),
+        )))
         val integral = LinearRefutationReuse(local, SourceLpBudget(), ExecutionControl.Never)
-        integral.retain(
-            SourceEvidence(
-                scope.copy(
-                    condition = SourceCondition(
-                        upper =
-                        mapOf(integer to BigFraction.ofLong(2).reciprocal()),
-                    ),
-                ),
-                SourceClaim.Refutation,
-                conflict,
-            ),
-        )
+        integral.retain(SourceEvidence(scope.copy(condition = SourceCondition(upper =
+            mapOf(integer to BigFraction.ofLong(2).reciprocal()))), SourceClaim.Refutation, conflict))
 
         assertNull(integral.unit(SourceCondition()))
     }
@@ -449,10 +274,8 @@ class LinearRefutationReuseTest {
 
         val reused = assertNotNull(reuse.find(condition))
 
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority().atScope(reused.scope)).verify(reused),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(source.withLinearAuthority().atScope(reused.scope)).verify(reused))
         assertEquals(1L, reuse.observations()["numericalRefutationReuseReducedScopes"])
     }
 
@@ -460,23 +283,12 @@ class LinearRefutationReuseTest {
     fun `support lookup should accept equal and stronger bounds`() {
         for (upper in listOf(true, false)) {
             val coefficient = if (upper) BigFraction.MINUS_ONE else BigFraction.ONE
-            val context = SourceProofContext(
-                scope,
-                setOf(x),
-                mapOf(
-                    "bound" to SourcePremise(
-                        SourceInequality(mapOf(x to coefficient), BigFraction.MINUS_ONE),
-                    ),
-                ),
-            )
-            val conflict = LinearPinnedRefutation(
-                SourceDerivation.Combination(
-                    listOf(
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("bound")),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
-                    ),
-                ),
-            )
+            val context = SourceProofContext(scope, setOf(x), mapOf("bound" to SourcePremise(
+                SourceInequality(mapOf(x to coefficient), BigFraction.MINUS_ONE))))
+            val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("bound")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
+            )))
             val condition = SourceCondition().bound(x, BigFraction.ZERO, upper)
             val reuse = LinearRefutationReuse(context, SourceLpBudget(), ExecutionControl.Never)
             reuse.retain(SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, conflict))
@@ -491,31 +303,18 @@ class LinearRefutationReuseTest {
     fun `support lookup should reject weaker and unrelated bounds`() {
         for (upper in listOf(true, false)) {
             val coefficient = if (upper) BigFraction.MINUS_ONE else BigFraction.ONE
-            val context = SourceProofContext(
-                scope,
-                setOf(x),
-                mapOf(
-                    "bound" to SourcePremise(
-                        SourceInequality(mapOf(x to coefficient), BigFraction.MINUS_ONE),
-                    ),
-                ),
-            )
-            val conflict = LinearPinnedRefutation(
-                SourceDerivation.Combination(
-                    listOf(
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("bound")),
-                        SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
-                    ),
-                ),
-            )
+            val context = SourceProofContext(scope, setOf(x), mapOf("bound" to SourcePremise(
+                SourceInequality(mapOf(x to coefficient), BigFraction.MINUS_ONE))))
+            val conflict = LinearPinnedRefutation(SourceDerivation.Combination(listOf(
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Premise("bound")),
+                SourceDerivation.Combination.Term(BigFraction.ONE, SourceDerivation.Assumption(x, upper)),
+            )))
             val condition = SourceCondition().bound(x, BigFraction.ZERO, upper)
             val reuse = LinearRefutationReuse(context, SourceLpBudget(), ExecutionControl.Never)
             reuse.retain(SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, conflict))
-            val conditions = listOf(
-                SourceCondition(),
+            val conditions = listOf(SourceCondition(),
                 SourceCondition().bound(x, coefficient.negated(), upper),
-                SourceCondition().bound(x, coefficient.negated(), !upper),
-            )
+                SourceCondition().bound(x, coefficient.negated(), !upper))
 
             for (candidate in conditions) assertNull(reuse.find(candidate))
         }
@@ -523,10 +322,8 @@ class LinearRefutationReuseTest {
 
     @Test
     fun `reuse should retain the invocation window when a proof has smaller support`() {
-        val window = SourceCondition(
-            lower = mapOf(other to BigFraction.ZERO),
-            upper = mapOf(other to BigFraction.ONE),
-        )
+        val window = SourceCondition(lower = mapOf(other to BigFraction.ZERO),
+            upper = mapOf(other to BigFraction.ONE))
         val local = source.atScope(scope.copy(condition = window))
         val reuse = LinearRefutationReuse(local, SourceLpBudget(), ExecutionControl.Never)
         val conditioned = SourceCondition(window.bools, window.lower, window.upper + (x to BigFraction.ZERO))
@@ -564,19 +361,12 @@ class LinearRefutationReuseTest {
     @Test
     fun `implicit integer activation bounds should survive a rejected support reduction`() {
         val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-        val rows = mapOf(
-            "guarded" to SourcePremise(
-                SourceInequality(emptyMap(), BigFraction.MINUS_ONE),
-                emptyMap(),
-                mapOf(integer to BigFraction.ZERO),
-            ),
-        )
+        val rows = mapOf("guarded" to SourcePremise(SourceInequality(emptyMap(), BigFraction.MINUS_ONE),
+            emptyMap(), mapOf(integer to BigFraction.ZERO)))
         val guarded = SourceProofContext(scope, setOf(integer), rows)
         val reuse = LinearRefutationReuse(guarded, SourceLpBudget(), ExecutionControl.Never)
-        val condition = SourceCondition(
-            lower = mapOf(integer to BigFraction.ZERO),
-            upper = mapOf(integer to BigFraction.ZERO),
-        )
+        val condition = SourceCondition(lower = mapOf(integer to BigFraction.ZERO),
+            upper = mapOf(integer to BigFraction.ZERO))
         val derived = LinearPinnedRefutation(SourceDerivation.Premise("guarded"))
 
         reuse.retain(SourceEvidence(scope.copy(condition = condition), SourceClaim.Refutation, derived))
@@ -605,13 +395,9 @@ class LinearRefutationReuseTest {
 
     @Test
     fun `proofs should be freshly checked against rows with matching identifiers`() {
-        val changed = SourceProofContext(
-            scope,
-            setOf(x, other),
-            mapOf(
-                "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-            ),
-        )
+        val changed = SourceProofContext(scope, setOf(x, other), mapOf(
+            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+        ))
         val reuse = LinearRefutationReuse(changed, SourceLpBudget(), ExecutionControl.Never)
 
         reuse.retain(evidence)
@@ -662,12 +448,8 @@ class LinearRefutationReuseTest {
     fun `reuse allocation admission should retire the cache before exhausting numerical funding`() {
         for (allocation in listOf(32_768L, 1_000_000L)) {
             val funding = SourceLpFunding(1_000_000L, allocation).apply { grant(1_000_000L) }
-            val reuse = LinearRefutationReuse(
-                source,
-                SourceLpBudget(funding = funding),
-                ExecutionControl.Never,
-                maximumAllocation = 8192L,
-            )
+            val reuse = LinearRefutationReuse(source, SourceLpBudget(funding = funding), ExecutionControl.Never,
+                maximumAllocation = 8192L)
             reuse.retain(evidence)
             assertNotNull(reuse.find(restricted.condition))
 
@@ -705,12 +487,8 @@ class LinearRefutationReuseTest {
         }
         val context = SourceProofContext(scope, source.coordinates, rows)
         val funding = SourceLpFunding(1_000_000L, 96_000L).apply { grant(1_000_000L) }
-        val reuse = LinearRefutationReuse(
-            context,
-            SourceLpBudget(funding = funding),
-            ExecutionControl.Never,
-            maximumAllocation = 6_000L,
-        )
+        val reuse = LinearRefutationReuse(context, SourceLpBudget(funding = funding), ExecutionControl.Never,
+            maximumAllocation = 6_000L)
 
         reuse.retain(evidence)
 

@@ -82,12 +82,8 @@ class PresolveInvocationTest {
 
     @Test
     fun `full model passes should bound factor reads after a midscan stop in either lane`() {
-        val passes = listOf(
-            PresolvePass.MERGE_DUPLICATE_COLUMNS,
-            PresolvePass.FUSE_LINEAR_BOUNDS,
-            PresolvePass.REMOVE_REDUNDANT,
-            PresolvePass.REDUCE_STRUCTURAL,
-        )
+        val passes = listOf(PresolvePass.MERGE_DUPLICATE_COLUMNS, PresolvePass.FUSE_LINEAR_BOUNDS,
+            PresolvePass.REMOVE_REDUNDANT, PresolvePass.REDUCE_STRUCTURAL)
         for (pass in passes) {
             for (lane in PresolveLane.entries) {
                 var reads = 0
@@ -108,11 +104,7 @@ class PresolveInvocationTest {
                     }
                 }
                 val problem = BakedProblem(
-                    0,
-                    2,
-                    Array(2) { IntDomain(0, 10) },
-                    List(128) { factor },
-                    alreadyFolded = true,
+                    0, 2, Array(2) { IntDomain(0, 10) }, List(128) { factor }, alreadyFolded = true,
                 )
                 reads = 0
                 val budget = PresolveBudget(200L)
@@ -132,11 +124,8 @@ class PresolveInvocationTest {
 
     @Test
     fun `row analyses should stop inside a long term scan in either lane`() {
-        for (pass in listOf(
-            PresolvePass.MERGE_DUPLICATE_COLUMNS,
-            PresolvePass.FUSE_LINEAR_BOUNDS,
-            PresolvePass.REMOVE_REDUNDANT,
-        )) {
+        for (pass in listOf(PresolvePass.MERGE_DUPLICATE_COLUMNS, PresolvePass.FUSE_LINEAR_BOUNDS,
+            PresolvePass.REMOVE_REDUNDANT)) {
             for (lane in PresolveLane.entries) {
                 var refs = 0
                 val linear = Linear(IntArray(256) { 1 }, IntArray(256) { it }, LinearOp.LE, 100)
@@ -175,30 +164,18 @@ class PresolveInvocationTest {
     @Test
     fun `row scans should poll a live token once per stride without changing their charged work`() {
         val count = 1_000
-        val problem = BakedProblem(
-            0,
-            count,
-            Array(count) { IntDomain(0, 10) },
+        val problem = BakedProblem(0, count, Array(count) { IntDomain(0, 10) },
             List(count) { Linear(intArrayOf(1, 1), intArrayOf(it, (it + 1) % count), LinearOp.LE, 10) },
-            alreadyFolded = true,
-        )
-        for (pass in listOf(
-            PresolvePass.MERGE_DUPLICATE_COLUMNS,
-            PresolvePass.FUSE_LINEAR_BOUNDS,
-            PresolvePass.REMOVE_REDUNDANT,
-        )) {
+            alreadyFolded = true)
+        for (pass in listOf(PresolvePass.MERGE_DUPLICATE_COLUMNS, PresolvePass.FUSE_LINEAR_BOUNDS,
+            PresolvePass.REMOVE_REDUNDANT)) {
             for (lane in PresolveLane.entries) {
                 var polls = 0
                 val budgets = List(2) { PresolveBudget(Long.MAX_VALUE) }
-                val tokens = listOf(
-                    budgets[0].orSpent(ExecutionControl.Never),
-                    budgets[1].orSpent(
-                        ExecutionControl {
-                            polls++
-                            false
-                        },
-                    ),
-                )
+                val tokens = listOf(budgets[0].orSpent(ExecutionControl.Never), budgets[1].orSpent(ExecutionControl {
+                    polls++
+                    false
+                }))
 
                 val empty = tokens.map {
                     val context = PresolveContext(cancellation = it)
@@ -217,11 +194,8 @@ class PresolveInvocationTest {
 
     @Test
     fun `a live stop should end row scans within one poll stride in either lane`() {
-        for (pass in listOf(
-            PresolvePass.MERGE_DUPLICATE_COLUMNS,
-            PresolvePass.FUSE_LINEAR_BOUNDS,
-            PresolvePass.REMOVE_REDUNDANT,
-        )) {
+        for (pass in listOf(PresolvePass.MERGE_DUPLICATE_COLUMNS, PresolvePass.FUSE_LINEAR_BOUNDS,
+            PresolvePass.REMOVE_REDUNDANT)) {
             for (lane in PresolveLane.entries) {
                 var reads = 0
                 val factors = List(4096) {
@@ -252,35 +226,15 @@ class PresolveInvocationTest {
     fun `full model passes should retain productive metered controls in either lane`() {
         val upper = Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)
         val cases = listOf(
-            PresolvePass.MERGE_DUPLICATE_COLUMNS to BakedProblem(
-                0,
-                2,
-                Array(2) { IntDomain(0, 2) },
-                listOf(upper),
-                openIntHi = booleanArrayOf(true, false),
-                alreadyFolded = true,
-            ),
-            PresolvePass.FUSE_LINEAR_BOUNDS to BakedProblem(
-                0,
-                2,
-                Array(2) { IntDomain(0, 2) },
-                listOf(upper, Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)),
-                alreadyFolded = true,
-            ),
-            PresolvePass.REMOVE_REDUNDANT to BakedProblem(
-                0,
-                2,
-                Array(2) { IntDomain(0, 2) },
-                listOf(upper, upper),
-                alreadyFolded = true,
-            ),
-            PresolvePass.REDUCE_STRUCTURAL to BakedProblem(
-                0,
-                2,
-                arrayOf(IntDomain(2, 2), IntDomain(0, 100)),
+            PresolvePass.MERGE_DUPLICATE_COLUMNS to BakedProblem(0, 2, Array(2) { IntDomain(0, 2) },
+                listOf(upper), openIntHi = booleanArrayOf(true, false), alreadyFolded = true),
+            PresolvePass.FUSE_LINEAR_BOUNDS to BakedProblem(0, 2, Array(2) { IntDomain(0, 2) },
+                listOf(upper, Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3)), alreadyFolded = true),
+            PresolvePass.REMOVE_REDUNDANT to BakedProblem(0, 2, Array(2) { IntDomain(0, 2) },
+                listOf(upper, upper), alreadyFolded = true),
+            PresolvePass.REDUCE_STRUCTURAL to BakedProblem(0, 2, arrayOf(IntDomain(2, 2), IntDomain(0, 100)),
                 listOf(Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false)),
-                alreadyFolded = true,
-            ),
+                alreadyFolded = true),
         )
         for ((pass, problem) in cases) {
             for (lane in PresolveLane.entries) {
@@ -341,15 +295,9 @@ class PresolveInvocationTest {
         val problem = Problem(2, 0, emptyArray(), listOf(Clause(intArrayOf(0, 2)), Clause(intArrayOf(1))))
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        Presolver.runSource(
-            problem,
-            PresolveConfig.parse("off,+dual-fix"),
-            PresolveContext(
-                objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L),
-                presolveBudget = budget,
-            ),
-            budget.orSpent(ExecutionControl.Never),
-        )
+        Presolver.runSource(problem, PresolveConfig.parse("off,+dual-fix"), PresolveContext(
+            objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L), presolveBudget = budget,
+        ), budget.orSpent(ExecutionControl.Never))
 
         assertEquals(0, budget.invocations.sumOf { it.fixedColumns })
         assertEquals(2L, budget.entrySizeVisits)
@@ -373,27 +321,15 @@ class PresolveInvocationTest {
 
     @Test
     fun `finite root fixings should receive no credit when a pass emits their unit again`() {
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(
-                Cardinality(intArrayOf(0), min = 1, max = 1),
-                Clause(intArrayOf(2, 4)),
-            ),
-        ).bake()
+        val problem = Problem(3, 0, emptyArray(), listOf(
+            Cardinality(intArrayOf(0), min = 1, max = 1), Clause(intArrayOf(2, 4)),
+        )).bake()
         for (config in listOf("off,+dual-fix", "off,+dual-fix,+bce")) {
             val budget = PresolveBudget(Long.MAX_VALUE)
 
-            Presolver.run(
-                problem,
-                PresolveConfig.parse(config),
-                PresolveContext(
-                    objectiveBoolCoeffs = mapOf(1 to 2L, 2 to 1L),
-                    presolveBudget = budget,
-                ),
-                budget.orSpent(ExecutionControl.Never),
-            )
+            Presolver.run(problem, PresolveConfig.parse(config), PresolveContext(
+                objectiveBoolCoeffs = mapOf(1 to 2L, 2 to 1L), presolveBudget = budget,
+            ), budget.orSpent(ExecutionControl.Never))
 
             val call = budget.invocations.first { it.pass == "dual-fix" }
             assertEquals(2, call.output.factors - call.input.factors)
@@ -449,20 +385,12 @@ class PresolveInvocationTest {
 
     @Test
     fun `closed integer source probing should skip before entry accounting`() {
-        val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 10)),
-            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
-        )
+        val problem = Problem(0, 1, arrayOf(IntDomain(0, 10)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)))
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        Presolver.runSource(
-            problem,
-            PresolveConfig.parse("off,+probe-open"),
-            PresolveContext(presolveBudget = budget),
-            budget.orSpent(ExecutionControl.Never),
-        )
+        Presolver.runSource(problem, PresolveConfig.parse("off,+probe-open"),
+            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
 
         assertEquals(PresolveInvocationOutcome.ELIGIBILITY_SKIP, budget.invocations.single().outcome)
         assertEquals(0L, budget.spent())
@@ -473,10 +401,7 @@ class PresolveInvocationTest {
     fun `comparison folding without integers should skip entry work in either lane`() {
         for (reals in 0..1) {
             val source = Problem(
-                3,
-                0,
-                emptyArray(),
-                List(8) { Clause(intArrayOf(0, 2, 4)) },
+                3, 0, emptyArray(), List(8) { Clause(intArrayOf(0, 2, 4)) },
                 numRealVars = reals,
                 realLower = DoubleArray(reals) { Double.NEGATIVE_INFINITY },
                 realUpper = DoubleArray(reals) { Double.POSITIVE_INFINITY },
@@ -509,9 +434,7 @@ class PresolveInvocationTest {
         for (reals in 0..1) {
             val integers = 2 + reals
             val source = Problem(
-                2,
-                integers,
-                Array(integers) { IntDomain(0, 3) },
+                2, integers, Array(integers) { IntDomain(0, 3) },
                 listOf(
                     ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.LE, 1),
                     ReifiedLinear(1, intArrayOf(1), intArrayOf(1), LinearOp.GE, 2),
@@ -557,10 +480,8 @@ class PresolveInvocationTest {
                 Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.EQ, 4),
                 Linear(intArrayOf(1, 2, 1), intArrayOf(0, 1, 2), LinearOp.EQ, 7),
             ),
-            "sparsify" to listOf(
-                equality,
-                Linear(intArrayOf(2, 2, 3), intArrayOf(0, 1, 2), LinearOp.LE, 7),
-            ),
+            "sparsify" to listOf(equality,
+                Linear(intArrayOf(2, 2, 3), intArrayOf(0, 1, 2), LinearOp.LE, 7)),
         )
         for ((pass, factors) in cases) {
             for (lane in PresolveLane.entries) {
@@ -583,22 +504,13 @@ class PresolveInvocationTest {
 
     @Test
     fun `probing without integer columns should retain constant row refutation`() {
-        val problem = Problem(
-            0,
-            0,
-            emptyArray(),
-            listOf(
-                ExactLinear.of(intArrayOf(), emptyList(), LinearOp.LE, BigFraction.ONE.negated()),
-            ),
-        )
+        val problem = Problem(0, 0, emptyArray(), listOf(
+            ExactLinear.of(intArrayOf(), emptyList(), LinearOp.LE, BigFraction.ONE.negated()),
+        ))
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val result = Presolver.runSource(
-            problem,
-            PresolveConfig.parse("off,+probe"),
-            PresolveContext(presolveBudget = budget),
-            budget.orSpent(ExecutionControl.Never),
-        )
+        val result = Presolver.runSource(problem, PresolveConfig.parse("off,+probe"),
+            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
 
         assertTrue(result.infeasible)
         assertEquals(PresolveInvocationOutcome.REFUTED, budget.invocations.single().outcome)
@@ -625,20 +537,12 @@ class PresolveInvocationTest {
     @Test
     fun `finite clause subsumption should read clauses retained by earlier reductions`() {
         val shorter = Clause(intArrayOf(0, 2))
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            listOf(shorter, Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 2, 4))),
-        )
+        val problem = Problem(3, 0, emptyArray(),
+            listOf(shorter, Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 2, 4))))
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val result = Presolver.run(
-            problem.bake(),
-            PresolveConfig.parse("off,+subsume,+clause-subsume"),
-            PresolveContext(presolveBudget = budget),
-            budget.orSpent(ExecutionControl.Never),
-        )
+        val result = Presolver.run(problem.bake(), PresolveConfig.parse("off,+subsume,+clause-subsume"),
+            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
 
         assertEquals(1, result.problem.factors.size)
         val call = budget.invocations.first { it.pass == "clause-subsume" }
@@ -651,9 +555,7 @@ class PresolveInvocationTest {
         for (numInts in 0..2) {
             for (lane in PresolveLane.entries) {
                 val problem = Problem(
-                    3,
-                    numInts,
-                    Array(numInts) { IntDomain(0, 10) },
+                    3, numInts, Array(numInts) { IntDomain(0, 10) },
                     listOf(Clause(IntArray(3) { Lit.make(it, true) })),
                 )
                 val budget = PresolveBudget(Long.MAX_VALUE)
@@ -677,19 +579,15 @@ class PresolveInvocationTest {
     @Test
     fun `Boolean namespace skips should avoid whole model entry work`() {
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 10)),
+            0, 1, arrayOf(IntDomain(0, 10)),
             List(2_048) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7) },
         )
         val budget = PresolveBudget(1L)
         val token = budget.orSpent(ExecutionControl.Never)
 
         val result = Presolver.runSource(
-            problem,
-            PresolveConfig.parse("off,+bve,+bce,+impl-graph"),
-            PresolveContext(presolveBudget = budget),
-            token,
+            problem, PresolveConfig.parse("off,+bve,+bce,+impl-graph"),
+            PresolveContext(presolveBudget = budget), token,
         )
 
         assertSame(problem, result.problem)
@@ -739,9 +637,7 @@ class PresolveInvocationTest {
     @Test
     fun `unchanged source calls should reuse aggregate size and retain complete misses`() {
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 10)),
+            0, 1, arrayOf(IntDomain(0, 10)),
             List(8) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7) },
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
@@ -762,17 +658,13 @@ class PresolveInvocationTest {
     @Test
     fun `budget interruption should retain an empty analysis and its charge`() {
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 10)),
+            0, 1, arrayOf(IntDomain(0, 10)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
         )
         val budget = PresolveBudget(1L)
 
         Presolver.runSource(
-            problem,
-            PresolveConfig.parse("off,+strengthen"),
-            PresolveContext(presolveBudget = budget),
+            problem, PresolveConfig.parse("off,+strengthen"), PresolveContext(presolveBudget = budget),
             budget.orSpent(ExecutionControl.Never),
         )
 
@@ -785,17 +677,13 @@ class PresolveInvocationTest {
     @Test
     fun `source refutations should retain their invocation outcome`() {
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 2)),
+            0, 1, arrayOf(IntDomain(0, 2)),
             listOf(Linear(intArrayOf(2), intArrayOf(0), LinearOp.EQ, 1)),
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
 
         val result = Presolver.runSource(
-            problem,
-            PresolveConfig.parse("off,+strengthen"),
-            PresolveContext(presolveBudget = budget),
+            problem, PresolveConfig.parse("off,+strengthen"), PresolveContext(presolveBudget = budget),
             budget.orSpent(ExecutionControl.Never),
         )
 
@@ -809,24 +697,15 @@ class PresolveInvocationTest {
         val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyList())
             .bake(budget.orSpent(ExecutionControl.Never))
 
-        RootBaker.bake(
-            problem,
-            BakeConfig(
-                probeFailedLiterals = true,
-                probeIntBounds = true,
-                probeIntHoles = true,
-                probeTotalBudget = 0,
-            ),
-        )
+        RootBaker.bake(problem, BakeConfig(
+            probeFailedLiterals = true, probeIntBounds = true, probeIntHoles = true, probeTotalBudget = 0,
+        ))
 
-        assertEquals(
-            listOf(
-                PresolveInvocationOutcome.ELIGIBILITY_SKIP,
-                PresolveInvocationOutcome.INTERRUPTED,
-                PresolveInvocationOutcome.INTERRUPTED,
-            ),
-            budget.invocations.map { it.outcome },
-        )
+        assertEquals(listOf(
+            PresolveInvocationOutcome.ELIGIBILITY_SKIP,
+            PresolveInvocationOutcome.INTERRUPTED,
+            PresolveInvocationOutcome.INTERRUPTED,
+        ), budget.invocations.map { it.outcome })
         assertEquals(0L, budget.probeCalls)
     }
 
@@ -836,11 +715,8 @@ class PresolveInvocationTest {
         val problem = Problem(0, 0, emptyArray(), emptyList())
 
         PresolvePipeline.run(
-            problem,
-            null,
-            PresolveConfig.parse("off,+binary-columns,+lp-harvest,+difference-system"),
-            false,
-            presolveBudget = budget,
+            problem, null, PresolveConfig.parse("off,+binary-columns,+lp-harvest,+difference-system"),
+            false, presolveBudget = budget,
         )
 
         assertEquals(listOf("binary-columns", "lp-harvest", "difference-system"), budget.invocations.map { it.pass })
@@ -853,18 +729,13 @@ class PresolveInvocationTest {
     fun `nested construction charges should reconcile without billing the parent twice`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
 
         val result = PresolvePipeline.run(
-            problem,
-            null,
-            PresolveConfig.parse("off,+binary-columns,+probe-failed-literals"),
-            false,
-            presolveBudget = budget,
+            problem, null, PresolveConfig.parse("off,+binary-columns,+probe-failed-literals"),
+            false, presolveBudget = budget,
         )
 
         val substitution = budget.invocations.single { it.pass == "binary-columns" }
@@ -875,8 +746,7 @@ class PresolveInvocationTest {
         assertTrue(budget.invocations.any { it.pass == "probe-failed-literals" && it.rebuildWork > 0L })
         assertTrue(budget.invocations.all { it.rebuildWork <= it.work })
         assertEquals(
-            budget.spent(),
-            budget.invocations.sumOf { it.work } + budget.preparationStages.sumOf { it.work },
+            budget.spent(), budget.invocations.sumOf { it.work } + budget.preparationStages.sumOf { it.work },
         )
         assertTrue(result.changed)
     }
@@ -885,9 +755,7 @@ class PresolveInvocationTest {
     fun `unchanged finite schedules should reuse the source factor aggregate`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 2) },
+            0, 2, Array(2) { IntDomain(0, 2) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3)),
         ).bake()
         val context = PresolveContext(objectiveIntCoeffs = mapOf(0 to 1L, 1 to 1L), presolveBudget = budget)
@@ -905,16 +773,12 @@ class PresolveInvocationTest {
     fun `source reductions should report factor and occurrence yield from their delta`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 10)),
+            0, 1, arrayOf(IntDomain(0, 10)),
             List(2) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7) },
         )
 
         Presolver.runSource(
-            problem,
-            PresolveConfig.parse("off,+subsume"),
-            PresolveContext(presolveBudget = budget),
+            problem, PresolveConfig.parse("off,+subsume"), PresolveContext(presolveBudget = budget),
             budget.orSpent(ExecutionControl.Never),
         )
 
@@ -930,27 +794,20 @@ class PresolveInvocationTest {
     fun `an affine rerun without touched equality shapes should charge only candidate visits`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 2) },
+            0, 2, Array(2) { IntDomain(0, 2) },
             List(2) { Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3) },
         ).bake()
 
         Presolver.run(
-            problem,
-            PresolveConfig.parse("off,+affine,+subsume"),
-            PresolveContext(presolveBudget = budget),
+            problem, PresolveConfig.parse("off,+affine,+subsume"), PresolveContext(presolveBudget = budget),
             budget.orSpent(ExecutionControl.Never),
         )
 
         val calls = budget.invocations.filter { it.pass == "affine" }
-        assertEquals(
-            listOf(
-                PresolveInvocationOutcome.COMPLETE_MISS,
-                PresolveInvocationOutcome.ELIGIBILITY_SKIP,
-            ),
-            calls.map { it.outcome },
-        )
+        assertEquals(listOf(
+            PresolveInvocationOutcome.COMPLETE_MISS,
+            PresolveInvocationOutcome.ELIGIBILITY_SKIP,
+        ), calls.map { it.outcome })
         assertEquals(2L, calls.last().work)
         assertEquals(null, calls.last().input.occurrences)
         assertEquals(2L, budget.entrySizeVisits)
@@ -961,9 +818,7 @@ class PresolveInvocationTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val config = PresolveConfig.parse("off,+binary-columns,+probe-failed-literals")
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            0, 2, Array(2) { IntDomain(0, 1) },
             listOf(Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 1)),
         )
 
@@ -972,8 +827,7 @@ class PresolveInvocationTest {
         val work = effort.invocations.sumOf { it.work }
 
         assertEquals(
-            budget.spent(),
-            work + effort.preparationStages.sumOf { it.work } + requireNotNull(effort.unattributedWork),
+            budget.spent(), work + effort.preparationStages.sumOf { it.work } + requireNotNull(effort.unattributedWork),
         )
         assertEquals(0L, effort.unattributedWork)
         assertEquals(budget.entrySizeVisits, effort.entrySizeVisits)
@@ -994,26 +848,18 @@ class PresolveInvocationTest {
     @Test
     fun `a complete miss that spends the final unit should remain complete`() {
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 10)),
+            0, 1, arrayOf(IntDomain(0, 10)),
             listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 7)),
         )
         val config = PresolveConfig.parse("off,+strengthen")
         val reference = PresolveBudget(Long.MAX_VALUE)
         Presolver.runSource(
-            problem,
-            config,
-            PresolveContext(presolveBudget = reference),
-            reference.orSpent(ExecutionControl.Never),
+            problem, config, PresolveContext(presolveBudget = reference), reference.orSpent(ExecutionControl.Never),
         )
         val budget = PresolveBudget(reference.spent())
 
         Presolver.runSource(
-            problem,
-            config,
-            PresolveContext(presolveBudget = budget),
-            budget.orSpent(ExecutionControl.Never),
+            problem, config, PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never),
         )
 
         assertEquals(0L, budget.remaining())

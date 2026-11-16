@@ -162,9 +162,7 @@ internal fun Lowering.reifyNValueOpt(expr: NValueExprOpt): Int {
     val op = when (expr.mode) {
         NValueMode.EQ -> IntCmpOp.EQ
 
-        NValueMode.AT_LEAST -> IntCmpOp.LE
-
-        // n ≤ |distinct|
+        NValueMode.AT_LEAST -> IntCmpOp.LE // n ≤ |distinct|
 
         NValueMode.AT_MOST -> IntCmpOp.GE // n ≥ |distinct|
     }

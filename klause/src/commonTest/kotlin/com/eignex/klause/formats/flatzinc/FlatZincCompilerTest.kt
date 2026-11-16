@@ -395,10 +395,8 @@ class FlatZincCompilerTest {
     @Test
     fun `annotation wrappers should retain source contradictions under either search hint`() {
         for (name in listOf(
-            "redundant_constraint",
-            "fzn_redundant_constraint",
-            "symmetry_breaking_constraint",
-            "fzn_symmetry_breaking_constraint",
+            "redundant_constraint", "fzn_redundant_constraint",
+            "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
         )) {
             for (forLocalSearch in listOf(false, true)) {
                 val program = parseFlatZinc(
@@ -416,10 +414,8 @@ class FlatZincCompilerTest {
     @Test
     fun `annotation wrappers should retain the local search implied weight`() {
         for (name in listOf(
-            "redundant_constraint",
-            "fzn_redundant_constraint",
-            "symmetry_breaking_constraint",
-            "fzn_symmetry_breaking_constraint",
+            "redundant_constraint", "fzn_redundant_constraint",
+            "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
         )) {
             for (forLocalSearch in listOf(false, true)) {
                 val program = parseFlatZinc(
@@ -465,10 +461,8 @@ class FlatZincCompilerTest {
     @Test
     fun `annotation wrapper arity should be validated under either search hint`() {
         for (name in listOf(
-            "redundant_constraint",
-            "fzn_redundant_constraint",
-            "symmetry_breaking_constraint",
-            "fzn_symmetry_breaking_constraint",
+            "redundant_constraint", "fzn_redundant_constraint",
+            "symmetry_breaking_constraint", "fzn_symmetry_breaking_constraint",
         )) {
             for (forLocalSearch in listOf(false, true)) {
                 assertFailsWith<FlatZincParseException> {

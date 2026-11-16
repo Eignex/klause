@@ -55,9 +55,7 @@ data class TabuFilter(
             val tabu = state.tabu.isTaboo(m, effective)
             val aspired = if (tabu && completedImprovement != null && aspiration == AspirationCriterion.OrImproving) {
                 completedImprovement(m)
-            } else {
-                tabu && aspiration.admitsTabu(state, m)
-            }
+            } else tabu && aspiration.admitsTabu(state, m)
             if (!tabu || aspired) admitted.add(m)
         }
         return when {

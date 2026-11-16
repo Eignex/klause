@@ -16,9 +16,7 @@ internal class BoundedCompanionSearch(
     private val activeLimit: Duration = 4_000.milliseconds,
     private val sliceLimit: Duration = 250.milliseconds,
     private val clock: TimeSource = TimeSource.Monotonic,
-) : InstructionSlicedSearch,
-    ReseedGuard,
-    ResumableSearch by search {
+) : InstructionSlicedSearch, ReseedGuard, ResumableSearch by search {
     private var active = Duration.ZERO
     private var terminal: MinimizeResult? = null
     private var retired = false
@@ -35,33 +33,19 @@ internal class BoundedCompanionSearch(
             "${prefix}Optimal" to if (terminal is MinimizeResult.Optimal) 1L else 0L,
             "${prefix}Refuted" to if (terminal is MinimizeResult.Infeasible) 1L else 0L,
         )
-        original.copy(
-            smt = original.smt.copy(
-                completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages,
-            ),
-        )
+        original.copy(smt = original.smt.copy(
+            completeSearchStages = original.smt.completeSearchStages.orEmpty() + stages))
     }
 
-    override fun runSlice(
-        global: ExecutionControl,
-        sliceMillis: Long,
-        sliceNodes: Long,
-        onIncumbent: (MinimizeResult.WithSample) -> Unit,
-    ): MinimizeResult? =
+    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
         advance(sliceMillis) { millis -> search.runSlice(global, millis, boundedWork(sliceNodes), onIncumbent) }
 
-    override fun runInstructionSlice(
-        global: ExecutionControl,
-        sliceMillis: Long,
-        sliceInstructions: Long,
-        onIncumbent: (MinimizeResult.WithSample) -> Unit,
-    ): MinimizeResult? = advance(sliceMillis) { millis ->
+    override fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long, sliceInstructions: Long,
+        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? = advance(sliceMillis) { millis ->
         val instructions = search as? InstructionSlicedSearch
-        if (instructions == null) {
-            search.runSlice(global, millis, boundedWork(sliceInstructions), onIncumbent)
-        } else {
-            instructions.runInstructionSlice(global, millis, boundedWork(sliceInstructions), onIncumbent)
-        }
+        if (instructions == null) search.runSlice(global, millis, boundedWork(sliceInstructions), onIncumbent)
+        else instructions.runInstructionSlice(global, millis, boundedWork(sliceInstructions), onIncumbent)
     }
 
     private fun advance(sliceMillis: Long, run: (Long) -> MinimizeResult?): MinimizeResult? {
@@ -72,13 +56,8 @@ internal class BoundedCompanionSearch(
         }
         val mark = clock.markNow()
         try {
-            terminal = run(
-                minOf(
-                    sliceMillis,
-                    sliceLimit.inWholeMilliseconds,
-                    (activeLimit - active).inWholeMilliseconds.coerceAtLeast(1),
-                ),
-            )
+            terminal = run(minOf(sliceMillis, sliceLimit.inWholeMilliseconds,
+                (activeLimit - active).inWholeMilliseconds.coerceAtLeast(1)))
         } finally {
             active += mark.elapsedNow()
         }

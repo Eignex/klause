@@ -57,11 +57,9 @@ data class HeuristicStartStats(
         this(requiredWork, workByArm, completed, null)
 
     /** Copy work observations while retaining the observed completion time. */
-    fun copy(
-        requiredWork: Long = this.requiredWork,
-        workByArm: Map<String, Long> = this.workByArm,
-        completed: Boolean = this.completed,
-    ): HeuristicStartStats = HeuristicStartStats(requiredWork, workByArm, completed, completionNanos)
+    fun copy(requiredWork: Long = this.requiredWork, workByArm: Map<String, Long> = this.workByArm,
+        completed: Boolean = this.completed): HeuristicStartStats =
+        HeuristicStartStats(requiredWork, workByArm, completed, completionNanos)
 }
 
 /** One arm of a sequential portfolio's schedule; see [PortfolioStats]. */

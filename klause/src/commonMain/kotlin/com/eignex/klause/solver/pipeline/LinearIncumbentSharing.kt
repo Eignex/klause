@@ -8,29 +8,26 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class LinearIncumbentSharing {
-    class Key(private val source: SourceProofContext, offered: Sample, private val originalChecker: Any?) {
+    class Key(
+        private val source: SourceProofContext,
+        offered: Sample,
+        private val originalChecker: Any?,
+    ) {
         private val semantics = offered.semantics
         private val frame = offered.coordinateFrame
         private val seed = offered.copy().also { it.witnessCertificate = null }
         val hasOriginalCheck: Boolean get() = originalChecker != null
 
-        fun matches(
-            source: SourceProofContext,
-            offered: Sample,
-            checker: Any?,
-            token: ExecutionControl,
-            budget: SourceLpBudget,
-        ): Boolean {
+        fun matches(source: SourceProofContext, offered: Sample, checker: Any?,
+            token: ExecutionControl, budget: SourceLpBudget): Boolean {
             budget.observe(preparation = offered.numBoolVars.toLong() + offered.numIntVars + offered.numRealVars)
             return !token() && originalChecker === checker && sameSource(source, token, budget) &&
                 samePoint(offered, offered.semantics, offered.coordinateFrame)
         }
 
         fun matches(other: Key, token: ExecutionControl, budget: SourceLpBudget): Boolean {
-            budget.observe(
-                preparation =
-                other.seed.numBoolVars.toLong() + other.seed.numIntVars + other.seed.numRealVars,
-            )
+            budget.observe(preparation =
+                other.seed.numBoolVars.toLong() + other.seed.numIntVars + other.seed.numRealVars)
             return !token() && originalChecker === other.originalChecker && sameSource(other.source, token, budget) &&
                 samePoint(other.seed, other.semantics, other.frame)
         }
@@ -41,13 +38,11 @@ internal class LinearIncumbentSharing {
         private fun sameSource(right: SourceProofContext, token: ExecutionControl, budget: SourceLpBudget): Boolean {
             val left = source
             if (left === right) return true
-            budget.observe(
-                preparation = 2L * left.coordinateCount + 2L * right.coordinateCount +
-                    left.premiseCount + right.premiseCount +
-                    listOf(left.scope.condition, right.scope.condition).sumOf {
-                        it.bools.size.toLong() + it.lower.size + it.upper.size + it.integerRows.size
-                    },
-            )
+            budget.observe(preparation = 2L * left.coordinateCount + 2L * right.coordinateCount +
+                left.premiseCount + right.premiseCount +
+                listOf(left.scope.condition, right.scope.condition).sumOf {
+                    it.bools.size.toLong() + it.lower.size + it.upper.size + it.integerRows.size
+                })
             return !token() && left.scope == right.scope && left.coordinates == right.coordinates &&
                 left.premises == right.premises &&
                 left.affineObjectiveAvailable == right.affineObjectiveAvailable && left.objective == right.objective &&

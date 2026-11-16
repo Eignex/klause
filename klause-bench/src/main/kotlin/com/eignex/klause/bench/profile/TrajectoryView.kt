@@ -36,14 +36,13 @@ internal class TrajectoryView(
         state.moveSink.setOwners(capturedOwners)
     }
 
-    fun load(source: Sample): String? = loadSourceCenter(source, state, coordinates, reconstruct, synchronize)
+    fun load(source: Sample): String? =
+        loadSourceCenter(source, state, coordinates, reconstruct, synchronize)
 
     private fun projectedMove(sourceMove: Move): Move? = when (sourceMove) {
         is Move.BoolFlip -> coordinates.bool(sourceMove.varId).takeIf { it >= 0 }?.let { Move.BoolFlip(it) }
-
         is Move.IntSet -> coordinates.int(sourceMove.varId).takeIf { it >= 0 }
             ?.let { Move.IntSet(it, sourceMove.newValue) }
-
         else -> null
     }
 
@@ -53,14 +52,12 @@ internal class TrajectoryView(
         val sink = proposalSink()
         when (move) {
             is Move.BoolFlip -> sink.addBoolFlip(move.varId)
-
             is Move.IntSet -> {
                 if (move.newValue !in state.rootDomains[move.varId]) {
                     return "candidate-domain"
                 }
                 sink.addIntSet(move.varId, move.newValue)
             }
-
             else -> error("primitive expected")
         }
         return if (sink.list.isEmpty()) "candidate-filter" else null
@@ -81,9 +78,7 @@ internal class TrajectoryView(
         val sourceEffect = when (sourceMove) {
             is Move.BoolFlip -> destination.boolValue(sourceMove.varId) !=
                 reconstruct(state.assignment.snapshot()).boolValue(sourceMove.varId)
-
             is Move.IntSet -> destination.intValue(sourceMove.varId) == sourceMove.newValue
-
             else -> false
         }
         return buildJsonObject {
@@ -99,30 +94,15 @@ internal class TrajectoryView(
 
     fun snapshot(): JsonObject = buildJsonObject {
         put("source", trajectorySource(reconstruct(state.assignment.snapshot())))
-        put(
-            "workingBooleans",
-            JsonArray(
-                (0 until state.problem.numBoolVars).map {
-                    JsonPrimitive(state.assignment.boolValue(it))
-                },
-            ),
-        )
-        put(
-            "workingIntegers",
-            JsonArray(
-                (0 until state.problem.numIntVars).map {
-                    JsonPrimitive(state.assignment.intValue(it))
-                },
-            ),
-        )
-        put(
-            "sourceBooleanSlots",
-            JsonArray(
-                (0 until coordinates.boolCount).map {
-                    JsonPrimitive(coordinates.bool(it))
-                },
-            ),
-        )
+        put("workingBooleans", JsonArray((0 until state.problem.numBoolVars).map {
+            JsonPrimitive(state.assignment.boolValue(it))
+        }))
+        put("workingIntegers", JsonArray((0 until state.problem.numIntVars).map {
+            JsonPrimitive(state.assignment.intValue(it))
+        }))
+        put("sourceBooleanSlots", JsonArray((0 until coordinates.boolCount).map {
+            JsonPrimitive(coordinates.bool(it))
+        }))
         put("sourceIntegerSlots", JsonArray((0 until coordinates.intCount).map { JsonPrimitive(coordinates.int(it)) }))
         put("cost", state.cost)
         put("degrees", JsonArray(state.factorDegree.map(::JsonPrimitive)))
@@ -159,25 +139,17 @@ internal fun trajectoryPair(
             val rightBefore = right.snapshot()
             put("leftState", leftBefore)
             put("rightState", rightBefore)
-            put(
-                "candidates",
-                JsonArray(
-                    candidates.map { move ->
-                        val a = left.probe(move)
-                        val b = right.probe(move)
-                        buildJsonObject {
-                            put("move", move.toString())
-                            put("left", a)
-                            put("right", b)
-                            put(
-                                "pairedDestination",
-                                a["decline"] == null && b["decline"] == null &&
-                                    a["source"] != null && a["source"] == b["source"],
-                            )
-                        }
-                    },
-                ),
-            )
+            put("candidates", JsonArray(candidates.map { move ->
+                val a = left.probe(move)
+                val b = right.probe(move)
+                buildJsonObject {
+                    put("move", move.toString())
+                    put("left", a)
+                    put("right", b)
+                    put("pairedDestination", a["decline"] == null && b["decline"] == null &&
+                        a["source"] != null && a["source"] == b["source"])
+                }
+            }))
             check(leftBefore == left.snapshot() && rightBefore == right.snapshot())
         }
         put("diagnosticNanos", System.nanoTime() - started)
@@ -189,10 +161,11 @@ internal fun trajectorySource(sample: Sample): JsonObject = buildJsonObject {
     put("ints", JsonArray(sample.ints.map(::JsonPrimitive)))
 }
 
-internal fun sameSource(left: Sample, right: Sample): Boolean = left.numRealVars == 0 && right.numRealVars == 0 &&
-    left.numBoolVars == right.numBoolVars && left.numIntVars == right.numIntVars &&
-    (0 until left.numBoolVars).all { left.boolValue(it) == right.boolValue(it) } &&
-    (0 until left.numIntVars).all { left.intValue(it) == right.intValue(it) }
+internal fun sameSource(left: Sample, right: Sample): Boolean =
+    left.numRealVars == 0 && right.numRealVars == 0 &&
+        left.numBoolVars == right.numBoolVars && left.numIntVars == right.numIntVars &&
+        (0 until left.numBoolVars).all { left.boolValue(it) == right.boolValue(it) } &&
+        (0 until left.numIntVars).all { left.intValue(it) == right.intValue(it) }
 
 internal fun trajectoryRandomBoundary(state: LocalSearchState): JsonObject = buildJsonObject {
     put("implementation", state.rng.javaClass.name)

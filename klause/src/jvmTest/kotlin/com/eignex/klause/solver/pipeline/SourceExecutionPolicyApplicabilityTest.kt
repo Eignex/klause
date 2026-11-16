@@ -64,8 +64,8 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
             SourceExecutionRequest(
                 invocation,
                 SourceExecutionPolicy(
-                    zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
-                ),
+                zeroObjectivePricing = LpZeroObjectivePricing.MIN_BOUND_SUPPORT,
+            )
             )
         }
     }
@@ -91,16 +91,11 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
     @Test
     fun `preparation diagnostics should require a supported source phase`() {
         val source = sourceText?.let { SmtLib.parse(it).source } ?: SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
-            ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-            source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
-        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
         val options = ExecutionOptions(ExecutionOption.dryRunPresolve(true))
 
         if (SourceSetup.executionKind(invocation) == SourceExecutionKind.LINEAR && sourceText != null) {
@@ -113,19 +108,15 @@ class SourceExecutionPolicyApplicabilityTest(private val sourceText: String?) {
     @Test
     fun `disabled preparation diagnostics should retain native execution admission`() {
         val source = sourceText?.let { SmtLib.parse(it).source } ?: SourceAttachment(
-            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()),
-            ProblemSettings(),
+            LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
         )
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-            source,
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-        )
-        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(
+            source, ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+        ))
 
         val request = SourceExecutionRequest(invocation, ExecutionOptions(ExecutionOption.dryRunPresolve(false)))
 
         assertEquals(false, request.prepareOnly)
     }
+
 }

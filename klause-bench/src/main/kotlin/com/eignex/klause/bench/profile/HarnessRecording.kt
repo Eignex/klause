@@ -28,40 +28,22 @@ internal object HarnessRecording {
             check(Files.isRegularFile(recording)) { "Harness recording is unavailable" }
             Files.newBufferedWriter(report.resolve("harness-events.jsonl")).use { output ->
                 RecordingFile(recording).use { input ->
-                    output.appendLine(
-                        buildJsonObject {
-                            put("scope", scope)
-                            put(
-                                "omissions",
-                                "recording thresholds, sampling and retention settings can omit observations",
-                            )
-                            put("overlapPolicy", "nested phases and JVM events overlap; durations are not additive")
-                            put(
-                                "failurePolicy",
-                                "aborted source-preparation may include cleanup before its phase closes",
-                            )
-                            put("stackDepthLimit", 32)
-                            put(
-                                "fieldPolicy",
-                                "scalar fields only; nested objects remain in raw capture; timespans in nanoseconds; " +
-                                    "unrepresentable times are null and listed in unavailableTemporalFields",
-                            )
-                            put(
-                                "ioPolicy",
-                                "IO call duration includes scheduling and GC; it does not prove device wait",
-                            )
-                            putJsonArray("eventTypes") {
-                                input.readEventTypes().filter { it.name in events }.forEach { type ->
-                                    add(
-                                        buildJsonObject {
-                                            put("name", type.name)
-                                            put("id", type.id)
-                                        },
-                                    )
-                                }
+                    output.appendLine(buildJsonObject {
+                        put("scope", scope)
+                        put("omissions", "recording thresholds, sampling and retention settings can omit observations")
+                        put("overlapPolicy", "nested phases and JVM events overlap; durations are not additive")
+                        put("failurePolicy", "aborted source-preparation may include cleanup before its phase closes")
+                        put("stackDepthLimit", 32)
+                        put("fieldPolicy",
+                            "scalar fields only; nested objects remain in raw capture; timespans in nanoseconds; " +
+                                "unrepresentable times are null and listed in unavailableTemporalFields")
+                        put("ioPolicy", "IO call duration includes scheduling and GC; it does not prove device wait")
+                        putJsonArray("eventTypes") {
+                            input.readEventTypes().filter { it.name in events }.forEach { type ->
+                                add(buildJsonObject { put("name", type.name); put("id", type.id) })
                             }
-                        }.toString(),
-                    )
+                        }
+                    }.toString())
                     while (input.hasMoreEvents()) {
                         val event = input.readEvent()
                         if (event.eventType.name in events) {
@@ -73,20 +55,15 @@ internal object HarnessRecording {
             }
         }.exceptionOrNull()
         if (failure != null) {
-            Files.writeString(
-                report.resolve("harness-analysis-error.txt"),
-                "${failure.javaClass.name}: ${failure.message}\n",
-            )
+            Files.writeString(report.resolve("harness-analysis-error.txt"),
+                "${failure.javaClass.name}: ${failure.message}\n")
         }
-        Files.writeString(
-            report.resolve("harness-analysis.json"),
-            buildJsonObject {
-                put("scope", "extraction outside recorded interval; inside current case/job ceiling")
-                put("elapsedNanos", System.nanoTime() - start)
-                put("complete", failure == null)
-                put("extractedEvents", extractedEvents)
-            }.toString(),
-        )
+        Files.writeString(report.resolve("harness-analysis.json"), buildJsonObject {
+            put("scope", "extraction outside recorded interval; inside current case/job ceiling")
+            put("elapsedNanos", System.nanoTime() - start)
+            put("complete", failure == null)
+            put("extractedEvents", extractedEvents)
+        }.toString())
     }
 
     private fun describe(event: RecordedEvent): JsonObject = buildJsonObject {
@@ -94,12 +71,9 @@ internal object HarnessRecording {
         put("event", event.eventType.name)
         put("eventTypeId", event.eventType.id)
         put("start", instantText { event.startTime }.also { if (it == null) unavailable.add("start") })
-        put(
-            "durationNanos",
-            durationNanos { event.duration }.also {
-                if (it == null) unavailable.add("durationNanos")
-            },
-        )
+        put("durationNanos", durationNanos { event.duration }.also {
+            if (it == null) unavailable.add("durationNanos")
+        })
         val thread = if (event.hasField("sampledThread")) event.getThread("sampledThread") else event.thread
         put("thread", thread?.javaName)
         put("stackTruncated", event.stackTrace?.isTruncated)
@@ -113,20 +87,12 @@ internal object HarnessRecording {
             for (field in event.fields) {
                 if (field.name in setOf("startTime", "duration", "eventThread", "stackTrace")) continue
                 when (field.contentType) {
-                    "jdk.jfr.Timespan" -> put(
-                        field.name,
-                        durationNanos { event.getDuration(field.name) }.also {
-                            if (it == null) unavailable.add("fields.${field.name}")
-                        },
-                    )
-
-                    "jdk.jfr.Timestamp" -> put(
-                        field.name,
-                        instantText { event.getInstant(field.name) }.also {
-                            if (it == null) unavailable.add("fields.${field.name}")
-                        },
-                    )
-
+                    "jdk.jfr.Timespan" -> put(field.name, durationNanos { event.getDuration(field.name) }.also {
+                        if (it == null) unavailable.add("fields.${field.name}")
+                    })
+                    "jdk.jfr.Timestamp" -> put(field.name, instantText { event.getInstant(field.name) }.also {
+                        if (it == null) unavailable.add("fields.${field.name}")
+                    })
                     else -> when (val value = event.getValue<Any?>(field.name)) {
                         null -> put(field.name, JsonNull)
                         is String -> put(field.name, value)

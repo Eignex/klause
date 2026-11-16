@@ -45,11 +45,8 @@ internal class LearnedClauseDb(
     val units = IntArrayList()
     var unitsPending = false
 
-    private val rowStore = if (initializeRows) {
-        lazyOf(GeneralLearnedRows(rowOwner))
-    } else {
-        lazy(LazyThreadSafetyMode.NONE) { GeneralLearnedRows(rowOwner) }
-    }
+    private val rowStore = if (initializeRows) lazyOf(GeneralLearnedRows(rowOwner))
+        else lazy(LazyThreadSafetyMode.NONE) { GeneralLearnedRows(rowOwner) }
     val store: GeneralLearnedRows get() = rowStore.value
     val initializedStore: GeneralLearnedRows? get() = if (rowStore.isInitialized()) store else null
     internal var integerRows: LearnedIntegerRows? = null
@@ -131,27 +128,23 @@ internal class LearnedClauseDb(
         store.releaseRetired()
     }
 
-    internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) {
-        emptyMap()
-    } else {
-        mapOf(
-            "learnedCapGeneralBackend" to 1L,
-            "learnedCapCalls" to capCalls,
-            "learnedCapWork" to capWork,
-            "learnedCapVisits" to capVisits,
-            "learnedCapBoundaryDefers" to capBoundaryDefers,
-            "learnedCapFloorDefers" to 0L,
-            "learnedCapPreparationDefers" to capPreparationDefers,
-            "learnedCapRankedPasses" to capRanking.passes,
-            "learnedCapPermanentClauses" to permanentClauseCount.toLong(),
-            "learnedCapPermanentArithmetic" to permanentArithmeticCount.toLong(),
-            "learnedCapNonClauseFloor" to 0L,
-            "learnedCapActiveArithmetic" to nonClauseCount.toLong(),
-            "learnedCapRetainedSlots" to size.toLong(),
-            "learnedCapRetiredSlots" to retiredCount.toLong(),
-            "learnedCapActiveClauses" to activeCount.toLong(),
-        )
-    }
+    internal fun capWindowStatistics(): Map<String, Long> = if (capCalls == 0L) emptyMap() else mapOf(
+        "learnedCapGeneralBackend" to 1L,
+        "learnedCapCalls" to capCalls,
+        "learnedCapWork" to capWork,
+        "learnedCapVisits" to capVisits,
+        "learnedCapBoundaryDefers" to capBoundaryDefers,
+        "learnedCapFloorDefers" to 0L,
+        "learnedCapPreparationDefers" to capPreparationDefers,
+        "learnedCapRankedPasses" to capRanking.passes,
+        "learnedCapPermanentClauses" to permanentClauseCount.toLong(),
+        "learnedCapPermanentArithmetic" to permanentArithmeticCount.toLong(),
+        "learnedCapNonClauseFloor" to 0L,
+        "learnedCapActiveArithmetic" to nonClauseCount.toLong(),
+        "learnedCapRetainedSlots" to size.toLong(),
+        "learnedCapRetiredSlots" to retiredCount.toLong(),
+        "learnedCapActiveClauses" to activeCount.toLong(),
+    )
 
     private companion object {
         const val RETIRED = 8

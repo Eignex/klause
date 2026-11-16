@@ -28,12 +28,8 @@ import kotlin.test.assertTrue
 class MpsLpAdmissionTest {
     @Test
     fun `root inspection retains an emitted row with appended constructor defaults`() {
-        val problem = Problem.of(
-            0,
-            1,
-            arrayOf(IntDomain(0, 2)),
-            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
-        )
+        val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 2)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)))
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
 
         val relaxation = MpsLpAdmission.rootRelaxation(problem, objective, false, ExecutionControl.Never)
@@ -45,12 +41,8 @@ class MpsLpAdmissionTest {
     @ParameterizedTest
     @EnumSource(value = EngineMix::class, names = ["MIXED", "BACKTRACK"])
     fun `recipe inspection accepts the current portfolio fact API`(mix: EngineMix) {
-        val problem = Problem.of(
-            0,
-            1,
-            arrayOf(IntDomain(0, 2)),
-            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1)),
-        ).bake()
+        val problem = Problem.of(0, 1, arrayOf(IntDomain(0, 2)),
+            listOf(Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, 1))).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
 
         val report = MpsLpAdmission.recipes(problem, objective, mix)

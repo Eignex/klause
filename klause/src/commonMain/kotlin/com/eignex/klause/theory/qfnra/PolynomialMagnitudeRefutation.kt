@@ -68,21 +68,20 @@ private class PolynomialMagnitudeRefutation(
         return payloads
     }
 
-    private fun magnitudes(atoms: List<PolynomialAtom>, payloads: List<List<PolynomialTerm>>): Map<Int, BigFraction>? {
+    private fun magnitudes(
+        atoms: List<PolynomialAtom>,
+        payloads: List<List<PolynomialTerm>>,
+    ): Map<Int, BigFraction>? {
         val bounds = HashMap<Int, BigFraction>()
         for (index in atoms.indices) {
             arithmetic.step()
             val terms = payloads[index]
             val orientation = when (atoms[index].relation) {
                 PolynomialRelation.LT, PolynomialRelation.LE -> 1
-
                 PolynomialRelation.GT, PolynomialRelation.GE -> -1
-
                 PolynomialRelation.EQ -> terms.firstOrNull {
-                    arithmetic.step()
-                    it.monomial != Monomial.ONE
+                    arithmetic.step(); it.monomial != Monomial.ONE
                 }?.coefficient?.signum() ?: continue
-
                 PolynomialRelation.NE -> continue
             }
             var constant = BigFraction.ZERO
@@ -118,7 +117,10 @@ private class PolynomialMagnitudeRefutation(
         return bounds
     }
 
-    private fun enclose(terms: List<PolynomialTerm>, bounds: Map<Int, BigFraction>): Pair<BigFraction, BigFraction>? {
+    private fun enclose(
+        terms: List<PolynomialTerm>,
+        bounds: Map<Int, BigFraction>,
+    ): Pair<BigFraction, BigFraction>? {
         var lower = BigFraction.ZERO
         var upper = BigFraction.ZERO
         for (term in terms) {

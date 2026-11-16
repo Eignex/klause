@@ -18,13 +18,10 @@ class MiniZincModeRoutingTest(private val engine: String, private val sourceText
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun sources(): List<Array<String>> = listOf(
-            arrayOf(
-                "cp",
-                "var int: n; var int: m; var float: r; constraint int2float(n,r); " +
-                    "constraint int_lin_le([2,3],[n,m],4); " +
-                    "constraint int_lin_le([-3,-2],[n,m],0); " +
-                    "constraint int_lin_le([1,-1],[n,m],1); solve satisfy;",
-            ),
+            arrayOf("cp", "var int: n; var int: m; var float: r; constraint int2float(n,r); " +
+                "constraint int_lin_le([2,3],[n,m],4); " +
+                "constraint int_lin_le([-3,-2],[n,m],0); " +
+                "constraint int_lin_le([1,-1],[n,m],1); solve satisfy;"),
             arrayOf("ls", "var 0.0..2.0: x; constraint float_le(x,1.0); solve satisfy;"),
         )
     }
@@ -53,9 +50,7 @@ class MiniZincModeRoutingTest(private val engine: String, private val sourceText
                     "No routing LP work: standalone=${stats.standalonePasses.sum}, " +
                         "component=${stats.componentPasses.sum}",
                 )
-            } else {
-                assertNotNull(solvable.sourceInvocation.floatProjection)
-            }
+            } else assertNotNull(solvable.sourceInvocation.floatProjection)
         } finally {
             source.delete()
         }

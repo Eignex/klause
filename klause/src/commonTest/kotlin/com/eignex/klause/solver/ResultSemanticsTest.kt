@@ -41,8 +41,7 @@ class ResultSemanticsTest {
     @Test
     fun `satisfaction verdicts should retain the effective caller interpretation`() {
         val semantics = SourceSemantics(
-            SourceFormat.FLATZINC,
-            undeclaredIntegers = UndeclaredIntegerBounds(-10, 10),
+            SourceFormat.FLATZINC, undeclaredIntegers = UndeclaredIntegerBounds(-10, 10),
         ).resolve(SemanticOverrides(undeclaredIntegers = BoundsOverride(upper = BoundOverride.Value(20))))
         val verdicts = listOf(
             SolveResult.Sat(Sample(booleanArrayOf(true), longArrayOf())),
@@ -115,11 +114,7 @@ class ResultSemanticsTest {
     fun `finite satisfaction engines should qualify ordinary witnesses`() {
         val semantics = SourceSemantics(SourceFormat.DIMACS).resolve()
         val source = Problem(
-            1,
-            0,
-            emptyArray(),
-            arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
-            semantics = semantics,
+            1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))), semantics = semantics,
         )
         val model = source.bake()
 
@@ -138,16 +133,9 @@ class ResultSemanticsTest {
     @Test
     fun `finite root refutations should retain source qualification`() {
         val semantics = SourceSemantics(SourceFormat.DIMACS).resolve()
-        val model = Problem(
-            1,
-            0,
-            emptyArray(),
-            arrayOf(
-                Clause(intArrayOf(Lit.make(0, true))),
-                Clause(intArrayOf(Lit.make(0, false))),
-            ),
-            semantics = semantics,
-        ).bake()
+        val model = Problem(1, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(0, true))), Clause(intArrayOf(Lit.make(0, false))),
+        ), semantics = semantics).bake()
 
         val results = listOf(
             BacktrackSolver(model).solve(BacktrackParams()),
@@ -172,11 +160,7 @@ class ResultSemanticsTest {
     fun `finite optimization engines should qualify objective results and incumbents`() {
         val semantics = SourceSemantics(SourceFormat.WCNF).resolve()
         val model = Problem(
-            1,
-            0,
-            emptyArray(),
-            arrayOf(Clause(intArrayOf(Lit.make(0, true)))),
-            semantics = semantics,
+            1, 0, emptyArray(), arrayOf(Clause(intArrayOf(Lit.make(0, true)))), semantics = semantics,
         ).bake()
         val objective = LinearObjective(boolWeights = longArrayOf(1), constant = 7)
 
@@ -243,8 +227,7 @@ class ResultSemanticsTest {
         val solver = Alns(LocalSearchSolver(model), maxIterations = 0)
 
         val result = solver.minimize(
-            LinearObjective(longArrayOf(1)),
-            LocalSearchParams(cancellation = ExecutionControl { true }),
+            LinearObjective(longArrayOf(1)), LocalSearchParams(cancellation = ExecutionControl { true }),
         )
 
         assertSame(semantics, assertIs<MinimizeResult.Unknown>(result).semantics)
@@ -278,8 +261,7 @@ class ResultSemanticsTest {
         val solver = BacktrackSolver(model)
 
         val point = solver.samples(
-            SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0),
-            BacktrackParams(),
+            SamplingConfig(quality = SampleQuality.ACCURATE, seed = 0), BacktrackParams(),
         ).first()
 
         assertSame(semantics, point.semantics)

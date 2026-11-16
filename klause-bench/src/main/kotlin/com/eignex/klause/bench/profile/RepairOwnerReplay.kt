@@ -46,62 +46,35 @@ internal object RepairOwnerReplay {
     val DEFAULT_OWNERS = listOf("ls", "cp-cold", "cp-retained", "mixed-cold", "mixed-retained")
 
     private data class Scope(
-        val id: Int,
-        val center: Sample,
-        val freedBools: IntArray,
-        val freedInts: IntArray,
-        val pins: Assumptions,
-        val cutoff: BigFraction,
-        val nativeCutoff: Double,
-        val selector: String,
-        val sourceCutoff: BigFraction?,
-        val captured: JsonObject,
-        val unavailable: String?,
+        val id: Int, val center: Sample, val freedBools: IntArray, val freedInts: IntArray,
+        val pins: Assumptions, val cutoff: BigFraction, val nativeCutoff: Double, val selector: String,
+        val sourceCutoff: BigFraction?, val captured: JsonObject, val unavailable: String?,
     )
 
     data class PointCheck(val accepted: Boolean, val objective: BigFraction? = null, val exact: Boolean? = null)
 
     private data class Outcome(
-        val sample: Sample?,
-        val reason: TerminationReason?,
-        val stats: SolveStats,
-        val preparationNs: Long = 0L,
-        val bound: Any? = null,
-        val pauses: Long = 0L,
+        val sample: Sample?, val reason: TerminationReason?, val stats: SolveStats,
+        val preparationNs: Long = 0L, val bound: Any? = null, val pauses: Long = 0L,
         val structured: JsonObject? = null,
     )
 
     private data class ClauseUsage(
-        val used: BooleanArray,
-        val permanent: BooleanArray,
-        val total: Int,
-        val complete: Boolean,
+        val used: BooleanArray, val permanent: BooleanArray, val total: Int, val complete: Boolean,
     )
 
     fun replay(
-        controls: File,
-        problem: BakedProblem,
-        objective: LinearObjective,
-        prepared: FinitePipelinePreparation,
-        source: BakedProblem,
-        inputs: IntArray,
-        file: File,
-        seed: Long,
-        allowance: Long = 100_000L,
+        controls: File, problem: BakedProblem, objective: LinearObjective, prepared: FinitePipelinePreparation,
+        source: BakedProblem, inputs: IntArray, file: File, seed: Long, allowance: Long = 100_000L,
         fragmentAllowance: Long = 2_000L,
-        sourceCheck: ((Sample, ExecutionControl) -> PointCheck)? = null,
-        mixedContext: SourceProofContext? = null,
-        sourceMaximize: Boolean = false,
-        structured: List<StructuredInner> = emptyList(),
-        descent: RepairDescent? = null,
-        ownerSequence: List<String>? = null,
+        sourceCheck: ((Sample, ExecutionControl) -> PointCheck)? = null, mixedContext: SourceProofContext? = null,
+        sourceMaximize: Boolean = false, structured: List<StructuredInner> = emptyList(),
+        descent: RepairDescent? = null, ownerSequence: List<String>? = null,
         completionReplay: ((Sample, ExecutionControl) -> JsonObject)? = null,
         completionObjective: ((Sample, ExecutionControl) -> BigFraction?)? = null,
     ) {
-        val owners = ownerSequence ?: (
-            DEFAULT_OWNERS.take(1) + structured.map(StructuredInner::owner) +
-                DEFAULT_OWNERS.drop(1)
-            )
+        val owners = ownerSequence ?: (DEFAULT_OWNERS.take(1) + structured.map(StructuredInner::owner) +
+            DEFAULT_OWNERS.drop(1))
         require(allowance > 0 && fragmentAllowance > 0)
         require(owners.isNotEmpty() && owners.distinct().size == owners.size)
         val inner = structured.associateBy(StructuredInner::owner)
@@ -119,23 +92,18 @@ internal object RepairOwnerReplay {
         val controlHash = sha256(controlBytes)
         val entries = controlBytes.decodeToString().lines().filter(String::isNotBlank)
         if (problem.numRealVars != 0 && entries.any {
-                (Json.parseToJsonElement(it).jsonObject.getValue("center").jsonObject["exactReals"] as? JsonArray)
-                    ?.size != problem.numRealVars
-            }
-        ) {
+            (Json.parseToJsonElement(it).jsonObject.getValue("center").jsonObject["exactReals"] as? JsonArray)
+                ?.size != problem.numRealVars
+        }) {
             file.bufferedWriter().use { writer ->
-                for (id in entries.indices) {
-                    for (owner in owners) {
-                        writer.appendLine(
-                            buildJsonObject {
-                                put("controlIndex", id)
-                                put("owner", owner)
-                                put("status", "unavailable")
-                                put("reason", "finite control has no authoritative exact real snapshot")
-                                put("globalProofClaim", false)
-                            }.toString(),
-                        )
-                    }
+                for (id in entries.indices) for (owner in owners) {
+                    writer.appendLine(buildJsonObject {
+                        put("controlIndex", id)
+                        put("owner", owner)
+                        put("status", "unavailable")
+                        put("reason", "finite control has no authoritative exact real snapshot")
+                        put("globalProofClaim", false)
+                    }.toString())
                 }
             }
             return
@@ -147,14 +115,9 @@ internal object RepairOwnerReplay {
                 rational(it.jsonPrimitive.content)
             }.orEmpty()
             require(reals.size == problem.numRealVars)
-            val center = Sample(
-                saved.getValue("bools").jsonArray.map { it.jsonPrimitive.content.toBooleanStrict() }
-                    .toBooleanArray(),
-                saved.getValue("ints").jsonArray.map { it.jsonPrimitive.content.toLong() }
-                    .toLongArray(),
-                reals.map { it.toDouble() }.toDoubleArray(),
-                exactReals = reals,
-            )
+            val center = Sample(saved.getValue("bools").jsonArray.map { it.jsonPrimitive.content.toBooleanStrict() }
+                .toBooleanArray(), saved.getValue("ints").jsonArray.map { it.jsonPrimitive.content.toLong() }
+                .toLongArray(), reals.map { it.toDouble() }.toDoubleArray(), exactReals = reals)
             require(center.numBoolVars == problem.numBoolVars && center.numIntVars == problem.numIntVars)
             val cutoff = objective.evaluateExact(center)
             val bools = entry["effectiveBools"]?.jsonArray?.map { it.jsonPrimitive.content.toInt() }?.toIntArray()
@@ -169,32 +132,27 @@ internal object RepairOwnerReplay {
             check(checked.accepted)
             val decline = entry["decline"]?.takeUnless { it == JsonNull }?.jsonPrimitive?.content
             val requested = entry["requestedCount"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
-            Scope(
-                index, center, bools, ints, pins, cutoff,
+            Scope(index, center, bools, ints, pins, cutoff,
                 objective.evaluate(center), entry.getValue("selector").jsonPrimitive.content, checked.objective,
-                entry,
-                when {
+                entry, when {
                     bools.isNotEmpty() || ints.isNotEmpty() -> null
                     decline != null -> "selector declined: $decline"
                     requested > 0 -> "selector supplied no effective scope"
                     else -> null
-                },
-            )
+                })
         }
-        file.resolveSibling("${file.nameWithoutExtension}-preparation.json").writeText(
-            buildJsonObject {
-                put("controlFileSha256", controlHash)
-                put("controlBytes", controlBytes.size)
-                put("sourceCheckedCenters", scopes.size)
-                put("elapsedNs", System.nanoTime() - setupStarted)
-                put("threadBytes", bean.getThreadAllocatedBytes(thread) - setupAllocation)
-                put("containingOwnerAllowanceStarted", false)
-                put("independentWitnessCheck", false)
-                put("owners", JsonArray(owners.map(::JsonPrimitive)))
-                put("structuredOwners", JsonArray(structured.map(StructuredInner::preparation)))
-                put("postRepairDescent", descent != null)
-            }.toString(),
-        )
+        file.resolveSibling("${file.nameWithoutExtension}-preparation.json").writeText(buildJsonObject {
+            put("controlFileSha256", controlHash)
+            put("controlBytes", controlBytes.size)
+            put("sourceCheckedCenters", scopes.size)
+            put("elapsedNs", System.nanoTime() - setupStarted)
+            put("threadBytes", bean.getThreadAllocatedBytes(thread) - setupAllocation)
+            put("containingOwnerAllowanceStarted", false)
+            put("independentWitnessCheck", false)
+            put("owners", JsonArray(owners.map(::JsonPrimitive)))
+            put("structuredOwners", JsonArray(structured.map(StructuredInner::preparation)))
+            put("postRepairDescent", descent != null)
+        }.toString())
         file.bufferedWriter().use { writer ->
             for (kind in owners) {
                 val budget = NodeBudget(allowance)
@@ -210,10 +168,8 @@ internal object RepairOwnerReplay {
                     val stages = (call(owner, "getStats") as SolveStats).smt.completeSearchStages.orEmpty()
                     mixedWork += stages["jointRepairFundedWork"] ?: 0L
                     mixedAllocation += stages["jointRepairFundedAllocation"] ?: 0L
-                    mixedOperations += call(
-                        checkNotNull(NumericalFrontierSnapshot.field(owner, "budget")),
-                        "getOperations",
-                    ) as Int
+                    mixedOperations += call(checkNotNull(NumericalFrontierSnapshot.field(owner, "budget")),
+                        "getOperations") as Int
                 }
                 var activeStop: ExecutionControl = ExecutionControl.Never
                 var activeCenter: Sample? = null
@@ -248,31 +204,15 @@ internal object RepairOwnerReplay {
                         var observationBytes = 0L
                         val nativeOutcome = when {
                             stop() -> Outcome(null, stopped(stop), before)
-
                             budget.exhausted() -> Outcome(null, TerminationReason.BudgetExhausted, before)
-
                             unavailable != null -> Outcome(null, TerminationReason.Unsupported, before)
-
                             kind == "ls" -> local(problem, objective, scope, stop, budget, seed, fragmentAllowance)
-
-                            kind in inner -> structuredLocal(
-                                problem,
-                                objective,
-                                scope,
-                                stop,
-                                budget,
-                                seed,
-                                fragmentAllowance,
-                                inner.getValue(kind),
-                            )
-
+                            kind in inner -> structuredLocal(problem, objective, scope, stop, budget, seed,
+                                fragmentAllowance, inner.getValue(kind))
                             kind.startsWith("cp") -> {
                                 val opened = System.nanoTime()
                                 val check: ((Sample) -> Boolean)? = if (completionReplay == null &&
-                                    completionObjective == null
-                                ) {
-                                    null
-                                } else {
+                                    completionObjective == null) null else {
                                     val accepts: (Sample) -> Boolean = { sample ->
                                         if (firstFloat == null) firstFloat = sample
                                         completionObjective?.invoke(sample, dynamic) != null
@@ -281,41 +221,23 @@ internal object RepairOwnerReplay {
                                         { sample -> sourceScore(sample, dynamic) }
                                     }
                                     @Suppress("UNCHECKED_CAST")
-                                    (
-                                        Class.forName("com.eignex.klause.solver.validation.FiniteSourceAcceptance")
-                                            .constructors.single { it.parameterCount == 3 }
-                                            .newInstance(accepts, false, score) as (Sample) -> Boolean
-                                        )
+                                    (Class.forName("com.eignex.klause.solver.validation.FiniteSourceAcceptance")
+                                        .constructors.single { it.parameterCount == 3 }
+                                        .newInstance(accepts, false, score) as (Sample) -> Boolean)
                                 }
-                                native = retained ?: call(
-                                    BacktrackSolver(problem),
-                                    "openRepair",
-                                    objective,
-                                    BacktrackParams(
-                                        nodeBudget = budget,
-                                        randomSeed = seed,
-                                        cancellation = dynamic,
-                                        toleranceCheck = check,
-                                    ),
-                                )
+                                native = retained ?: call(BacktrackSolver(problem), "openRepair", objective,
+                                    BacktrackParams(nodeBudget = budget, randomSeed = seed, cancellation = dynamic,
+                                        toleranceCheck = check))
                                 val preparation = System.nanoTime() - opened
-                                if (kind == "cp-retained") {
-                                    retained = native
-                                } else {
-                                    transient = native as AutoCloseable
-                                }
+                                if (kind == "cp-retained") retained = native
+                                else transient = native as AutoCloseable
                                 val observationStart = System.nanoTime()
                                 val beforeAllocation = bean.getThreadAllocatedBytes(thread)
                                 usageBefore = clauseUsage(checkNotNull(native), stop)
                                 observationNs += System.nanoTime() - observationStart
                                 observationBytes += bean.getThreadAllocatedBytes(thread) - beforeAllocation
-                                val completed = complete(
-                                    checkNotNull(native),
-                                    scope,
-                                    stop,
-                                    preparation,
-                                    fragmentAllowance,
-                                )
+                                val completed = complete(checkNotNull(native), scope, stop, preparation,
+                                    fragmentAllowance)
                                 val afterStart = System.nanoTime()
                                 val afterAllocation = bean.getThreadAllocatedBytes(thread)
                                 usageAfter = clauseUsage(checkNotNull(native), stop)
@@ -323,32 +245,23 @@ internal object RepairOwnerReplay {
                                 observationBytes += bean.getThreadAllocatedBytes(thread) - afterAllocation
                                 completed
                             }
-
                             else -> {
                                 val opened = System.nanoTime()
-                                native = retained ?: mixed(
-                                    problem, objective, dynamic, budget,
+                                native = retained ?: mixed(problem, objective, dynamic, budget,
                                     { activeCenter }, 1_000_000_000L - mixedWork,
-                                    512L * 1024 * 1024 - mixedAllocation, 256 - mixedOperations, mixedContext,
-                                )
+                                    512L * 1024 * 1024 - mixedAllocation, 256 - mixedOperations, mixedContext)
                                 val preparation = System.nanoTime() - opened
-                                if (kind == "mixed-retained") {
-                                    retained = native
-                                } else {
-                                    transient = native as? AutoCloseable
-                                }
+                                if (kind == "mixed-retained") retained = native
+                                else transient = native as? AutoCloseable
                                 native?.let { numerical(it, scope, stop, budget, preparation) }
                                     ?: Outcome(null, TerminationReason.Unsupported, SolveStats.EMPTY, preparation)
                             }
                         }
                         if (native != null) previousCutoff = scope.cutoff
                         val outcome = if (funded() &&
-                            nativeOutcome.reason != TerminationReason.SearchExhausted
-                        ) {
+                            nativeOutcome.reason != TerminationReason.SearchExhausted)
                             nativeOutcome.copy(reason = TerminationReason.BudgetExhausted)
-                        } else {
-                            nativeOutcome
-                        }
+                            else nativeOutcome
                         if (native != null && kind.endsWith("cold")) {
                             if (kind == "mixed-cold") {
                                 accountMixed(native)
@@ -360,20 +273,14 @@ internal object RepairOwnerReplay {
                         val allocation = bean.getThreadAllocatedBytes(thread) - allocationStart
                         val sample = outcome.sample
                         if (sample != null) {
-                            check(
-                                sample.numBoolVars == scope.center.numBoolVars &&
-                                    sample.numIntVars == scope.center.numIntVars,
-                            )
-                            check(
-                                (0 until sample.numBoolVars).all {
-                                    it in scope.freedBools || sample.boolValue(it) == scope.center.boolValue(it)
-                                },
-                            )
-                            check(
-                                (0 until sample.numIntVars).all {
-                                    it in scope.freedInts || sample.exactIntValue(it) == scope.center.exactIntValue(it)
-                                },
-                            )
+                            check(sample.numBoolVars == scope.center.numBoolVars &&
+                                sample.numIntVars == scope.center.numIntVars)
+                            check((0 until sample.numBoolVars).all {
+                                it in scope.freedBools || sample.boolValue(it) == scope.center.boolValue(it)
+                            })
+                            check((0 until sample.numIntVars).all {
+                                it in scope.freedInts || sample.exactIntValue(it) == scope.center.exactIntValue(it)
+                            })
                         }
                         val verificationStarted = System.nanoTime()
                         val verificationAllocation = bean.getThreadAllocatedBytes(thread)
@@ -383,180 +290,118 @@ internal object RepairOwnerReplay {
                         val checked = verification?.accepted
                         val verificationNs = System.nanoTime() - verificationStarted
                         val verificationBytes = bean.getThreadAllocatedBytes(thread) - verificationAllocation
-                        val sourceImproving = scope.sourceCutoff?.let { cutoff ->
-                            verification?.objective?.let {
-                                if (sourceMaximize) it > cutoff else it < cutoff
-                            }
-                        }
+                        val sourceImproving = scope.sourceCutoff?.let { cutoff -> verification?.objective?.let {
+                            if (sourceMaximize) it > cutoff else it < cutoff
+                        } }
                         val score = sample?.let { point ->
-                            if (kind.startsWith("cp") && completionObjective != null) {
-                                completionObjective(point, lifetime)
-                            } else {
-                                objective.evaluateExact(point)
-                            }
+                            if (kind.startsWith("cp") && completionObjective != null)
+                                completionObjective(point, lifetime) else objective.evaluateExact(point)
                         }
                         val workingImproving = score != null && score < scope.cutoff
                         val improving = checked == true && workingImproving &&
                             (scope.sourceCutoff == null || sourceImproving == true)
                         val status = when {
                             improving -> "improvement"
-
                             checked == true -> "feasible-nonimprovement"
-
                             !realAuthority -> "unavailable"
-
                             sample != null && checked == false && !lifetime() -> "source-rejected"
-
                             sample != null && checked != true -> "unavailable"
-
                             outcome.reason == TerminationReason.SearchExhausted -> "conditioned-closure"
-
                             outcome.reason == TerminationReason.BudgetExhausted -> "budget-exhaustion"
-
                             outcome.reason in setOf(TerminationReason.Cancelled, TerminationReason.Timeout) ->
                                 "cancelled"
-
                             outcome.reason == null -> "pause"
-
                             else -> "unavailable"
                         }
-                        val continued = if (!improving) {
-                            null
-                        } else {
-                            descent?.continueFrom(
-                                problem,
-                                objective,
-                                checkNotNull(sample),
-                                seed,
-                                kind,
-                                scope.id,
-                                ::accepted,
-                            )
-                        }
+                        val continued = if (!improving) null else
+                            descent?.continueFrom(problem, objective, checkNotNull(sample), seed, kind, scope.id,
+                                ::accepted)
                         val completion = firstFloat?.let { point ->
                             completionReplay?.invoke(point, ExecutionControl.after(2000.milliseconds))
                         }
-                        writer.appendLine(
-                            buildJsonObject {
-                                put("centerId", scope.id)
-                                put("owner", kind)
-                                put("ownerSeed", seed)
-                                put("selector", scope.selector)
-                                put("epoch", epoch)
-                                put("status", status)
-                                put("reason", outcome.reason?.toString())
-                                put("nativeReason", nativeOutcome.reason?.toString())
-                                put(
-                                    "completion",
-                                    outcome.reason?.toString() ?: if (sample !=
-                                        null
-                                    ) {
-                                        "point"
-                                    } else {
-                                        "paused"
-                                    },
-                                )
-                                put("unavailable", unavailable)
-                                put("strictWorkingCutoff", scope.cutoff.toString())
-                                put("cutoffRule", "strict improvement on the checked control center")
-                                put("controlFileSha256", controlHash)
-                                put("capturedCenterObjective", scope.captured.getValue("centerObjective"))
-                                put("nativeCenterObjective", scope.nativeCutoff)
-                                put("selectorUnavailable", scope.unavailable != null)
-                                put("selectorSeed", scope.captured["seed"] ?: JsonNull)
-                                put(
-                                    "selectionCountMatched",
-                                    scope.captured["sourceCountMatched"]
-                                        ?: scope.captured["effectiveCountMatched"] ?: JsonNull,
-                                )
-                                put("selectionGuidanceStatus", scope.captured["guidanceStatus"] ?: JsonNull)
-                                put("effectiveBools", JsonArray(scope.freedBools.map(::JsonPrimitive)))
-                                put("effectiveInts", JsonArray(scope.freedInts.map(::JsonPrimitive)))
-                                put("scopeNamespace", "captured prepared finite slots")
-                                put(
-                                    "sourceInputChanges",
-                                    sample?.let { candidate ->
-                                        val from = prepared.reconstruct(scope.center)
-                                        val to = prepared.reconstruct(candidate)
-                                        inputs.count { from.exactIntValue(it) != to.exactIntValue(it) }
-                                    },
-                                )
-                                put(
-                                    "complementBoolPins",
-                                    buildJsonObject {
-                                        for (id in 0 until scope.center.numBoolVars) {
-                                            if (id !in scope.freedBools) {
-                                                put(id.toString(), scope.center.boolValue(id))
-                                            }
-                                        }
-                                    },
-                                )
-                                put(
-                                    "complementIntPins",
-                                    buildJsonObject {
-                                        for (id in 0 until scope.center.numIntVars) {
-                                            if (id !in scope.freedInts) {
-                                                put(id.toString(), scope.center.exactIntValue(id).toString())
-                                            }
-                                        }
-                                    },
-                                )
-                                put("center", sample(scope.center))
-                                put("nativeSourceAccepted", checked)
-                                put("sourceExactlyFeasible", verification?.exact)
-                                put("sourceCenterObjective", scope.sourceCutoff?.toString())
-                                put("sourceCandidateObjective", verification?.objective?.toString())
-                                put("sourceStrictImprovement", sourceImproving)
-                                put("workingStrictImprovement", workingImproving)
-                                put("objective", score?.toString())
-                                put("nativeAuxiliaryObjective", sample?.let { objective.evaluateExact(it).toString() })
-                                put("sourcePrimalCompletion", completionObjective != null)
-                                put("candidate", sample?.let { sample(prepared.reconstruct(it)) } ?: JsonNull)
-                                put("conditionedSearchComplete", outcome.reason == TerminationReason.SearchExhausted)
-                                put(
-                                    "conditionedCutoffClosure",
-                                    outcome.reason == TerminationReason.SearchExhausted &&
-                                        !workingImproving,
-                                )
-                                put("conditionedBound", NumericalResidualProfile.json(outcome.bound))
-                                put("globalProofClaim", false)
-                                put("independentWitnessCheck", false)
-                                put("containingAllowance", allowance)
-                                put("containingSpent", budget.spent)
-                                put("fragmentAllowance", fragmentAllowance)
-                                put("fragmentSpent", budget.spent - fragmentStart)
-                                put(
-                                    "fragmentCooperativeOverspend",
-                                    (budget.spent - fragmentStart - fragmentAllowance)
-                                        .coerceAtLeast(0L),
-                                )
-                                put("workCurrency", "NodeBudget decision equivalents; native counters are separate")
-                                put("elapsedNs", elapsed)
-                                put("threadBytes", allocation)
-                                put("sourceVerificationNs", verificationNs)
-                                put("sourceVerificationThreadBytes", verificationBytes)
-                                put("preparationNs", outcome.preparationNs)
-                                put("slicePauses", outcome.pauses)
-                                put("carriedSourceLpWork", mixedWork)
-                                put("carriedSourceLpAllocation", mixedAllocation)
-                                put("carriedSourceLpOperations", mixedOperations)
-                                put("reuseObservationNs", observationNs)
-                                put("reuseObservationThreadBytes", observationBytes)
-                                put(
-                                    "reuseObservationVisits",
-                                    (usageBefore?.used?.size ?: 0) +
-                                        (usageAfter?.used?.size ?: 0),
-                                )
-                                put("reuseObservationIncludedInWorkAllowance", false)
-                                put("elapsedIncludesReuseObservation", true)
-                                put("retainedClauseUses", reuse(usageBefore, usageAfter))
-                                put("statsBefore", NumericalResidualProfile.json(before))
-                                put("statsAfter", NumericalResidualProfile.json(outcome.stats))
-                                put("structuredInner", outcome.structured ?: JsonNull)
-                                put("postRepairDescent", continued ?: JsonNull)
-                                put("completionReplay", completion ?: JsonNull)
-                            }.toString(),
-                        )
+                        writer.appendLine(buildJsonObject {
+                            put("centerId", scope.id)
+                            put("owner", kind)
+                            put("ownerSeed", seed)
+                            put("selector", scope.selector)
+                            put("epoch", epoch)
+                            put("status", status)
+                            put("reason", outcome.reason?.toString())
+                            put("nativeReason", nativeOutcome.reason?.toString())
+                            put("completion", outcome.reason?.toString() ?: if (sample != null) "point" else "paused")
+                            put("unavailable", unavailable)
+                            put("strictWorkingCutoff", scope.cutoff.toString())
+                            put("cutoffRule", "strict improvement on the checked control center")
+                            put("controlFileSha256", controlHash)
+                            put("capturedCenterObjective", scope.captured.getValue("centerObjective"))
+                            put("nativeCenterObjective", scope.nativeCutoff)
+                            put("selectorUnavailable", scope.unavailable != null)
+                            put("selectorSeed", scope.captured["seed"] ?: JsonNull)
+                            put("selectionCountMatched", scope.captured["sourceCountMatched"]
+                                ?: scope.captured["effectiveCountMatched"] ?: JsonNull)
+                            put("selectionGuidanceStatus", scope.captured["guidanceStatus"] ?: JsonNull)
+                            put("effectiveBools", JsonArray(scope.freedBools.map(::JsonPrimitive)))
+                            put("effectiveInts", JsonArray(scope.freedInts.map(::JsonPrimitive)))
+                            put("scopeNamespace", "captured prepared finite slots")
+                            put("sourceInputChanges", sample?.let { candidate ->
+                                val from = prepared.reconstruct(scope.center)
+                                val to = prepared.reconstruct(candidate)
+                                inputs.count { from.exactIntValue(it) != to.exactIntValue(it) }
+                            })
+                            put("complementBoolPins", buildJsonObject {
+                                for (id in 0 until scope.center.numBoolVars) if (id !in scope.freedBools)
+                                    put(id.toString(), scope.center.boolValue(id))
+                            })
+                            put("complementIntPins", buildJsonObject {
+                                for (id in 0 until scope.center.numIntVars) if (id !in scope.freedInts)
+                                    put(id.toString(), scope.center.exactIntValue(id).toString())
+                            })
+                            put("center", sample(scope.center))
+                            put("nativeSourceAccepted", checked)
+                            put("sourceExactlyFeasible", verification?.exact)
+                            put("sourceCenterObjective", scope.sourceCutoff?.toString())
+                            put("sourceCandidateObjective", verification?.objective?.toString())
+                            put("sourceStrictImprovement", sourceImproving)
+                            put("workingStrictImprovement", workingImproving)
+                            put("objective", score?.toString())
+                            put("nativeAuxiliaryObjective", sample?.let { objective.evaluateExact(it).toString() })
+                            put("sourcePrimalCompletion", completionObjective != null)
+                            put("candidate", sample?.let { sample(prepared.reconstruct(it)) } ?: JsonNull)
+                            put("conditionedSearchComplete", outcome.reason == TerminationReason.SearchExhausted)
+                            put("conditionedCutoffClosure", outcome.reason == TerminationReason.SearchExhausted &&
+                                !workingImproving)
+                            put("conditionedBound", NumericalResidualProfile.json(outcome.bound))
+                            put("globalProofClaim", false)
+                            put("independentWitnessCheck", false)
+                            put("containingAllowance", allowance)
+                            put("containingSpent", budget.spent)
+                            put("fragmentAllowance", fragmentAllowance)
+                            put("fragmentSpent", budget.spent - fragmentStart)
+                            put("fragmentCooperativeOverspend", (budget.spent - fragmentStart - fragmentAllowance)
+                                .coerceAtLeast(0L))
+                            put("workCurrency", "NodeBudget decision equivalents; native counters are separate")
+                            put("elapsedNs", elapsed)
+                            put("threadBytes", allocation)
+                            put("sourceVerificationNs", verificationNs)
+                            put("sourceVerificationThreadBytes", verificationBytes)
+                            put("preparationNs", outcome.preparationNs)
+                            put("slicePauses", outcome.pauses)
+                            put("carriedSourceLpWork", mixedWork)
+                            put("carriedSourceLpAllocation", mixedAllocation)
+                            put("carriedSourceLpOperations", mixedOperations)
+                            put("reuseObservationNs", observationNs)
+                            put("reuseObservationThreadBytes", observationBytes)
+                            put("reuseObservationVisits", (usageBefore?.used?.size ?: 0) +
+                                (usageAfter?.used?.size ?: 0))
+                            put("reuseObservationIncludedInWorkAllowance", false)
+                            put("elapsedIncludesReuseObservation", true)
+                            put("retainedClauseUses", reuse(usageBefore, usageAfter))
+                            put("statsBefore", NumericalResidualProfile.json(before))
+                            put("statsAfter", NumericalResidualProfile.json(outcome.stats))
+                            put("structuredInner", outcome.structured ?: JsonNull)
+                            put("postRepairDescent", continued ?: JsonNull)
+                            put("completionReplay", completion ?: JsonNull)
+                        }.toString())
                         writer.flush()
                     }
                 } finally {
@@ -567,85 +412,47 @@ internal object RepairOwnerReplay {
                     } finally {
                         (retained as? AutoCloseable)?.close()
                     }
-                    file.resolveSibling("${file.nameWithoutExtension}-close-$kind.json").writeText(
-                        buildJsonObject {
-                            put("elapsedNs", System.nanoTime() - closeStart)
-                            put("threadBytes", bean.getThreadAllocatedBytes(thread) - closeAllocation)
-                        }.toString(),
-                    )
+                    file.resolveSibling("${file.nameWithoutExtension}-close-$kind.json").writeText(buildJsonObject {
+                        put("elapsedNs", System.nanoTime() - closeStart)
+                        put("threadBytes", bean.getThreadAllocatedBytes(thread) - closeAllocation)
+                    }.toString())
                 }
             }
         }
     }
 
-    private fun local(
-        problem: BakedProblem,
-        objective: LinearObjective,
-        scope: Scope,
-        stop: ExecutionControl,
-        budget: NodeBudget,
-        seed: Long,
-        allowance: Long,
+    private fun local(problem: BakedProblem, objective: LinearObjective, scope: Scope, stop: ExecutionControl,
+        budget: NodeBudget, seed: Long, allowance: Long,
     ): Outcome {
         val start = System.nanoTime()
-        val completion = if (problem.numRealVars == 0) {
-            null
-        } else {
+        val completion = if (problem.numRealVars == 0) null else
             Class.forName("com.eignex.klause.portfolio.LeafRealCompletion").constructors
                 .single { it.parameterCount == 2 }.newInstance(problem, objective) as CandidateCompletion
-        }
         val solver = LocalSearchSolver(problem, completion = completion)
         val preparation = System.nanoTime() - start
         val available = minOf(allowance, (budget.limit - budget.spent).coerceAtLeast(0L))
         val instructions = available / 5 * 4 + available % 5 * 4 / 5
-        val result = solver.minimize(
-            objective,
-            LocalSearchParams(
-                assumptions = scope.pins,
-                initialAssignment = scope.center,
-                cancellation = stop,
-                nodeBudget = budget,
-                randomSeed = seed,
-                maxInstructions = instructions,
-            ),
-        )
-        return Outcome(
-            result.assignment,
-            when (result) {
-                is MinimizeResult.BestFound -> result.reason
-                is MinimizeResult.Unknown -> result.reason
-                is MinimizeResult.Unbounded -> TerminationReason.Unsupported
-                else -> TerminationReason.SearchExhausted
-            },
-            result.stats,
-            preparation,
-        )
+        val result = solver.minimize(objective, LocalSearchParams(assumptions = scope.pins,
+            initialAssignment = scope.center, cancellation = stop, nodeBudget = budget, randomSeed = seed,
+            maxInstructions = instructions))
+        return Outcome(result.assignment, when (result) {
+            is MinimizeResult.BestFound -> result.reason
+            is MinimizeResult.Unknown -> result.reason
+            is MinimizeResult.Unbounded -> TerminationReason.Unsupported
+            else -> TerminationReason.SearchExhausted
+        }, result.stats, preparation)
     }
 
-    private fun structuredLocal(
-        problem: BakedProblem,
-        objective: LinearObjective,
-        scope: Scope,
-        stop: ExecutionControl,
-        budget: NodeBudget,
-        seed: Long,
-        allowance: Long,
-        inner: StructuredInner,
+    private fun structuredLocal(problem: BakedProblem, objective: LinearObjective, scope: Scope, stop: ExecutionControl,
+        budget: NodeBudget, seed: Long, allowance: Long, inner: StructuredInner,
     ): Outcome {
-        val run = inner.repair(
-            problem, objective, scope.center, scope.pins, scope.freedBools, scope.freedInts, stop,
-            budget, seed, allowance,
-        )
+        val run = inner.repair(problem, objective, scope.center, scope.pins, scope.freedBools, scope.freedInts, stop,
+            budget, seed, allowance)
         return Outcome(run.sample, run.reason, run.stats, run.preparationNs, structured = run.report)
     }
 
-    private fun complete(
-        owner: Any,
-        scope: Scope,
-        stop: ExecutionControl,
-        preparation: Long,
-        allowance: Long,
-    ): Outcome {
+    private fun complete(owner: Any, scope: Scope, stop: ExecutionControl, preparation: Long,
+        allowance: Long): Outcome {
         val start = System.nanoTime()
         call(owner, "beginExact", scope.pins, allowance, scope.cutoff, stop)
         val prepared = preparation + System.nanoTime() - start
@@ -657,33 +464,16 @@ internal object RepairOwnerReplay {
         } while (call(result, "getReason") == null && !stop())
         val reason = call(result, "getReason") as TerminationReason?
             ?: if (stop()) stopped(stop) else null
-        return Outcome(
-            call(result, "getSample") as Sample?,
-            reason,
-            call(owner, "getStats") as SolveStats,
-            prepared,
-            pauses = pauses,
-        )
+        return Outcome(call(result, "getSample") as Sample?, reason,
+            call(owner, "getStats") as SolveStats, prepared, pauses = pauses)
     }
 
-    private fun mixed(
-        problem: BakedProblem,
-        objective: LinearObjective,
-        stop: ExecutionControl,
-        budget: NodeBudget,
-        center: () -> Sample?,
-        work: Long,
-        allocation: Long,
-        operations: Int,
+    private fun mixed(problem: BakedProblem, objective: LinearObjective, stop: ExecutionControl, budget: NodeBudget,
+        center: () -> Sample?, work: Long, allocation: Long, operations: Int,
         originalContext: SourceProofContext?,
     ): Any? {
-        val limits = TheoryParams(
-            cancellation = stop,
-            nodeBudget = budget,
-            sourceLpWorkLimit = work.coerceAtLeast(0),
-            sourceLpAllocationLimit = allocation.coerceAtLeast(0),
-            sourceLpOperations = operations.coerceAtLeast(0),
-        )
+        val limits = TheoryParams(cancellation = stop, nodeBudget = budget, sourceLpWorkLimit = work.coerceAtLeast(0),
+            sourceLpAllocationLimit = allocation.coerceAtLeast(0), sourceLpOperations = operations.coerceAtLeast(0))
         val context = originalContext ?: run {
             val type = Class.forName(PIPELINE + "FiniteNumericalCompanions").getField("Companion").get(null)
             val companion = call(type, "prepare", problem, objective, limits, stop) ?: return null
@@ -694,11 +484,7 @@ internal object RepairOwnerReplay {
             .newInstance(problem, context, objective, limits, policy, true, center, stop, null)
     }
 
-    private fun numerical(
-        owner: Any,
-        scope: Scope,
-        stop: ExecutionControl,
-        budget: NodeBudget,
+    private fun numerical(owner: Any, scope: Scope, stop: ExecutionControl, budget: NodeBudget,
         preparation: Long,
     ): Outcome {
         val bools = (0 until scope.center.numBoolVars).filter { it !in scope.freedBools }
@@ -723,14 +509,8 @@ internal object RepairOwnerReplay {
             budget.exhausted() -> TerminationReason.BudgetExhausted
             else -> call(attempt, "getReason") as TerminationReason?
         }
-        return Outcome(
-            call(attempt, "getFeasiblePoint") as Sample?,
-            reason,
-            call(owner, "getStats") as SolveStats,
-            preparation,
-            call(attempt, "getBound"),
-            pauses,
-        )
+        return Outcome(call(attempt, "getFeasiblePoint") as Sample?, reason,
+            call(owner, "getStats") as SolveStats, preparation, call(attempt, "getBound"), pauses)
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -747,13 +527,10 @@ internal object RepairOwnerReplay {
     fun sample(value: Sample) = buildJsonObject {
         put("bools", JsonArray(value.bools.map(::JsonPrimitive)))
         put("ints", JsonArray((0 until value.numIntVars).map { JsonPrimitive(value.exactIntValue(it).toString()) }))
-        put(
-            "exactReals",
-            value.exactReals?.let {
-                JsonArray(it.map { coordinate -> JsonPrimitive(coordinate.toString()) })
-            }
-                ?: JsonNull,
-        )
+        put("exactReals", value.exactReals?.let {
+            JsonArray(it.map { coordinate -> JsonPrimitive(coordinate.toString()) })
+        }
+            ?: JsonNull)
         put("approximateReals", JsonArray(value.reals.map(::JsonPrimitive)))
     }
 
@@ -788,18 +565,12 @@ internal object RepairOwnerReplay {
         if (compatible) {
             val earlier = checkNotNull(before)
             val later = checkNotNull(after)
-            put(
-                "newlyUsedRetainedNogoods",
-                earlier.used.indices.count {
-                    !earlier.used[it] && later.used[it] && !earlier.permanent[it]
-                },
-            )
-            put(
-                "newlyUsedRetainedPermanentClauses",
-                earlier.used.indices.count {
-                    !earlier.used[it] && later.used[it] && earlier.permanent[it]
-                },
-            )
+            put("newlyUsedRetainedNogoods", earlier.used.indices.count {
+                !earlier.used[it] && later.used[it] && !earlier.permanent[it]
+            })
+            put("newlyUsedRetainedPermanentClauses", earlier.used.indices.count {
+                !earlier.used[it] && later.used[it] && earlier.permanent[it]
+            })
         }
     }
 
@@ -813,10 +584,7 @@ internal object RepairOwnerReplay {
         val parts = text.split('/')
         if (parts.size == 2) return BigFraction.of(parts[0].toBigInteger(), parts[1].toBigInteger())
         val value = BigDecimal(text)
-        return if (value.scale() < 0) {
-            BigFraction.of(value.toBigIntegerExact(), BigInteger.ONE)
-        } else {
+        return if (value.scale() < 0) BigFraction.of(value.toBigIntegerExact(), BigInteger.ONE) else
             BigFraction.of(value.unscaledValue(), BigInteger.TEN.pow(value.scale()))
-        }
     }
 }

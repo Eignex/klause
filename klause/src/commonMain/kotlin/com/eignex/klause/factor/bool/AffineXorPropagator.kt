@@ -50,28 +50,20 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
         }
         cache.fires++
         cache.conflict = null
-        if (cache.valid) {
-            for (variable in seed.variables) {
-                state.checkFiniteWork()
-                val previous = cache.seen[variable]
-                if (previous != -1 && (
-                        !state.boolAssignedAt(variable) ||
-                            previous != if (state.boolValueAt(variable)) 1 else 0
-                        )
-                ) {
-                    cache.valid = false
-                    break
-                }
+        if (cache.valid) for (variable in seed.variables) {
+            state.checkFiniteWork()
+            val previous = cache.seen[variable]
+            if (previous != -1 && (!state.boolAssignedAt(variable) ||
+                    previous != if (state.boolValueAt(variable)) 1 else 0)) {
+                cache.valid = false
+                break
             }
         }
         if (!cache.valid) reset(state, cache)
         for (variable in seed.variables) {
             state.checkFiniteWork()
             if (seed.coordinates[variable] == Int.MIN_VALUE || cache.seen[variable] != -1 ||
-                !state.boolAssignedAt(variable)
-            ) {
-                continue
-            }
+                !state.boolAssignedAt(variable)) continue
             expression(state, cache, variable)
             cache.value = cache.value xor if (state.boolValueAt(variable)) 1 else 0
             cache.facts[cache.rank] = variable
@@ -89,10 +81,7 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
         for (variable in seed.variables) {
             state.checkFiniteWork()
             if (seed.coordinates[variable] == Int.MIN_VALUE || state.boolAssignedAt(variable) ||
-                cache.nonzeroWords[variable] != 0
-            ) {
-                continue
-            }
+                cache.nonzeroWords[variable] != 0) continue
             support(state, cache, variable)
             val width = reasonWidth(state, cache)
             if (width > 64) {
@@ -130,13 +119,8 @@ internal class AffineXorPropagator(private val seed: AffineXorSeed) : Interrupti
             var nonzero = 0
             for (word in 0 until seed.words) {
                 state.checkFiniteWork()
-                val bits = if (coordinate >= 0) {
-                    seed.dependencies[coordinate][word]
-                } else if (word == (free ushr 6)) {
-                    1L shl (free and 63)
-                } else {
-                    0L
-                }
+                val bits = if (coordinate >= 0) seed.dependencies[coordinate][word]
+                else if (word == (free ushr 6)) 1L shl (free and 63) else 0L
                 cache.rows[variable * seed.words + word] = bits
                 if (bits != 0L) nonzero++
             }

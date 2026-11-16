@@ -65,7 +65,8 @@ internal class QuadraticWorkerRuntime(
             quadraticScalar(it.incumbent, sense, snapshot())
         } ?: MinimizeResult.Unknown(TerminationReason.BudgetExhausted, snapshot())
 
-    fun completeHandle(countedWork: () -> Long, advance: (ExecutionControl, Long, Long) -> Unit): QuadraticPortfolioSearch =
+    fun completeHandle(countedWork: () -> Long, advance: (ExecutionControl, Long, Long) ->
+        Unit): QuadraticPortfolioSearch =
         object : QuadraticPortfolioSearch, ReseedGuard {
             override val canReseed: Boolean get() = false
             override val completion: QuadraticOptimizationResult? get() = terminal

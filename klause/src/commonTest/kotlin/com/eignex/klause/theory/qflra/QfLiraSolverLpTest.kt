@@ -77,11 +77,8 @@ class QfLiraSolverLpTest {
 
             assertIs<ComponentCheck.Feasible>(session.check())
             assertIs<ComponentCheck.Feasible>(session.check())
-            assertEquals(
-                1L,
-                stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
-                    .outcomes["FEASIBLE_COMPLETION"],
-            )
+            assertEquals(1L, stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
+                .outcomes["FEASIBLE_COMPLETION"])
         }
     }
 
@@ -105,11 +102,8 @@ class QfLiraSolverLpTest {
 
             session.initialize()
 
-            assertEquals(
-                1L,
-                stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
-                    .outcomes["CONTRADICTION"],
-            )
+            assertEquals(1L, stats.snapshot().phases.getValue("CLAIM_CONSUMPTION_STANDALONE")
+                .outcomes["CONTRADICTION"])
         }
     }
 
@@ -124,13 +118,7 @@ class QfLiraSolverLpTest {
             factors = arrayOf(
                 Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(3.0, 5.0), LinearOp.EQ, 1.0),
                 ReifiedRealLinear(
-                    0,
-                    intArrayOf(),
-                    doubleArrayOf(),
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    LinearOp.GE,
-                    1.0,
+                    0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.GE, 1.0,
                 ),
             ),
         )
@@ -141,10 +129,8 @@ class QfLiraSolverLpTest {
 
             session.initialize()
 
-            assertTrue(
-                stats.snapshot().phases.getValue("CLAIM_FEASIBLE_COMPLETION_STANDALONE")
-                    .outcomes.getValue("SATISFIED") > 0L,
-            )
+            assertTrue(stats.snapshot().phases.getValue("CLAIM_FEASIBLE_COMPLETION_STANDALONE")
+                .outcomes.getValue("SATISFIED") > 0L)
             assertNull(stats.snapshot().phases["CLAIM_CONSUMPTION_STANDALONE"])
         }
     }

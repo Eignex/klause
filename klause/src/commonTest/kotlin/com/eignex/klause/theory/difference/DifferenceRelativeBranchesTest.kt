@@ -157,11 +157,8 @@ class DifferenceRelativeBranchesTest {
         var stopped = false
         val source = DifferenceFragment(listOf(DifferenceEdge(0, 1, 1), DifferenceEdge(1, 0, 0)))
         val brancher = assertNotNull(DifferenceRelativeBranches.create(source, 1, ExecutionControl.Never))
-        val session = SearchSession(
-            emptyList(),
-            cancellation = ExecutionControl { stopped },
-            atoms = SearchAtomRegistry(1),
-        )
+        val session = SearchSession(emptyList(), cancellation = ExecutionControl { stopped }, atoms =
+            SearchAtomRegistry(1))
         stopped = true
 
         assertNull(brancher.nextBranch(session))

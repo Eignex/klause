@@ -19,18 +19,11 @@ class ExactNeighborhoodTest {
     fun `a paused root operation should resume without spending a candidate allowance`() {
         var preparations = 0
         var checks = 0
-        val search = ExactNeighborhood(
-            0,
-            emptyList(),
-            ExactNeighborhoodCompletion { _, _ ->
-                checks++
-                ExactNeighborhoodResult.Refuted
-            },
-            coordinateValues = { emptyList() },
-            maximumMoves = 1,
-            prepareBooleanCenter = { ++preparations > 1 },
-            centerPreparationPending = { preparations == 1 },
-        )
+        val search = ExactNeighborhood(0, emptyList(), ExactNeighborhoodCompletion { _, _ ->
+            checks++
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1,
+            prepareBooleanCenter = { ++preparations > 1 }, centerPreparationPending = { preparations == 1 })
 
         assertFalse(search.advance(ExecutionControl.Never, 10))
         assertEquals(0.0, search.stats.ls.completions.sum)
@@ -44,20 +37,13 @@ class ExactNeighborhoodTest {
     fun `completion exhaustion should stop retries after preparation spends its allowance`() {
         var exhausted = false
         var checks = 0
-        val search = ExactNeighborhood(
-            0,
-            listOf(BigFraction.ZERO),
-            ExactNeighborhoodCompletion { _, _ ->
-                checks++
-                ExactNeighborhoodResult.Undecided
-            },
-            coordinateValues = { emptyList() },
-            prepareBooleanCenter = {
-                exhausted = true
-                false
-            },
-            completionExhausted = { exhausted },
-        )
+        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { _, _ ->
+            checks++
+            ExactNeighborhoodResult.Undecided
+        }, coordinateValues = { emptyList() }, prepareBooleanCenter = {
+            exhausted = true
+            false
+        }, completionExhausted = { exhausted })
 
         assertTrue(search.advance(ExecutionControl.Never, Long.MAX_VALUE))
 
@@ -69,20 +55,14 @@ class ExactNeighborhoodTest {
     fun `a paused completion should resume the same candidate before drawing another move`() {
         val conditions = ArrayList<ExactNeighborhoodCondition>()
         var proposals = 0L
-        val search = ExactNeighborhood(
-            0,
-            listOf(BigFraction.ZERO),
-            ExactNeighborhoodCompletion { condition, _ ->
-                conditions += condition
-                if (conditions.size == 1) ExactNeighborhoodResult.Paused else ExactNeighborhoodResult.Refuted
-            },
-            coordinateValues = { emptyList() },
-            maximumMoves = 1,
+        val search = ExactNeighborhood(0, listOf(BigFraction.ZERO), ExactNeighborhoodCompletion { condition, _ ->
+            conditions += condition
+            if (conditions.size == 1) ExactNeighborhoodResult.Paused else ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1,
             proposal = ExactNeighborhoodProposal { _, _, _, _, _, _ ->
                 val pins = mapOf(0 to BigFraction.ofLong(++proposals))
                 ExactNeighborhoodCondition(emptyMap(), pins, pins)
-            },
-        )
+            })
 
         assertFalse(search.advance(ExecutionControl.Never, 10))
         assertEquals(0.0, search.stats.ls.completions.sum)
@@ -97,18 +77,11 @@ class ExactNeighborhoodTest {
     @Test
     fun `root coordinate copying should resume before proposing a joint repair`() {
         val conditions = ArrayList<ExactNeighborhoodCondition>()
-        val search = ExactNeighborhood(
-            0,
-            List(2) { BigFraction.ZERO },
-            ExactNeighborhoodCompletion { condition, _ ->
-                conditions += condition
-                ExactNeighborhoodResult.Refuted
-            },
-            coordinateValues = { emptyList() },
-            maximumMoves = 1,
-            prepareBooleanCenter = { true },
-            rootCoordinateValue = { BigFraction.ofLong(it + 3L) },
-        )
+        val search = ExactNeighborhood(0, List(2) { BigFraction.ZERO }, ExactNeighborhoodCompletion { condition, _ ->
+            conditions += condition
+            ExactNeighborhoodResult.Refuted
+        }, coordinateValues = { emptyList() }, maximumMoves = 1, prepareBooleanCenter = { true },
+            rootCoordinateValue = { BigFraction.ofLong(it + 3L) })
 
         assertFalse(search.advance(ExecutionControl.Never, 1))
         assertTrue(conditions.isEmpty())

@@ -54,7 +54,11 @@ internal class PresolveBooleanPins {
     }
 }
 
-internal class PresolveInvocation(val pass: String, val lane: PresolveLane, var input: PresolveSizeStats) {
+internal class PresolveInvocation(
+    val pass: String,
+    val lane: PresolveLane,
+    var input: PresolveSizeStats,
+) {
     val start = TimeSource.Monotonic.markNow()
     var work = 0L
     var rebuildWork = 0L
@@ -100,43 +104,29 @@ internal fun <T> PresolveBudget?.observe(
             (!completed || invocation.interrupted) && invocation.outcome != PresolveInvocationOutcome.REFUTED
         ) {
             PresolveInvocationOutcome.INTERRUPTED
-        } else {
-            invocation.outcome
-        }
+        } else invocation.outcome
         val output = size().let {
             PresolveSizeStats(it.factors, it.booleans, it.integers, invocation.outputOccurrences, it.reals)
         }
         if (preparationStage != null) {
-            recordPreparation(
-                PresolvePreparationStats(
-                    preparationStage,
-                    lane,
-                    outcome,
-                    elapsed - invocation.childrenElapsed,
-                    invocation.work,
-                    invocation.nativeWork,
-                    invocation.input,
-                    output,
-                ),
-            )
-        } else {
-            recordInvocation(
-                PresolveInvocationStats(
-                    pass = invocation.pass,
-                    lane = invocation.lane,
-                    outcome = outcome,
-                    elapsed = elapsed - invocation.childrenElapsed,
-                    work = invocation.work,
-                    rebuildWork = invocation.rebuildWork,
-                    input = invocation.input,
-                    output = output,
-                    narrowedColumns = invocation.narrowedColumns,
-                    fixedColumns = invocation.fixedColumns,
-                    nativeWork = invocation.nativeWork,
-                    structuralImpact = invocation.structuralImpact,
-                ),
-            )
-        }
+            recordPreparation(PresolvePreparationStats(
+                preparationStage, lane, outcome, elapsed - invocation.childrenElapsed,
+                invocation.work, invocation.nativeWork, invocation.input, output,
+            ))
+        } else recordInvocation(PresolveInvocationStats(
+            pass = invocation.pass,
+            lane = invocation.lane,
+            outcome = outcome,
+            elapsed = elapsed - invocation.childrenElapsed,
+            work = invocation.work,
+            rebuildWork = invocation.rebuildWork,
+            input = invocation.input,
+            output = output,
+            narrowedColumns = invocation.narrowedColumns,
+            fixedColumns = invocation.fixedColumns,
+            nativeWork = invocation.nativeWork,
+            structuralImpact = invocation.structuralImpact,
+        ))
     }
 }
 
@@ -165,9 +155,7 @@ internal fun PresolveBudget?.observeRoundPass(
     }
     val result = if (outcome == PassOutcome.UNCHANGED && invocation?.interrupted == true) {
         PassOutcome.INTERRUPTED
-    } else {
-        outcome
-    }
+    } else outcome
     invocation.record(result)
     result
 }
@@ -189,14 +177,11 @@ internal fun <T> PresolveBudget?.observeTransform(
                 invocation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
                 unchanged()
             }
-
             cancellation() -> unchanged()
-
             !eligible() -> {
                 invocation?.outcome = PresolveInvocationOutcome.ELIGIBILITY_SKIP
                 unchanged()
             }
-
             else -> {
                 val units = PresolveEntrySize(this).units(input, cancellation)
                 invocation.recordEntries(units)

@@ -18,20 +18,11 @@ class PrivateRebuildAliasTest {
     fun `signed substitution should eliminate a column with a source lift`() {
         for (replacement in listOf(0, 1)) {
             val premises = arrayOf(
-                Clause(intArrayOf(replacement, 3)),
-                Clause(intArrayOf(Lit.negate(replacement), 2)),
+                Clause(intArrayOf(replacement, 3)), Clause(intArrayOf(Lit.negate(replacement), 2)),
             )
-            val source = Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(
-                    Clause(intArrayOf(0, 4)),
-                    Clause(intArrayOf(2, 6)),
-                    premises[0],
-                    premises[1],
-                ),
-            )
+            val source = Problem(4, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(0, 4)), Clause(intArrayOf(2, 6)), premises[0], premises[1],
+            ))
 
             val delta = PrivateRebuildAlias.reduce(source, premises, ExecutionControl.Never)
             val reduced = assertNotNull(source.withSourcePassDelta(delta))
@@ -42,14 +33,11 @@ class PrivateRebuildAliasTest {
                 val point = Sample(BooleanArray(4) { mask and (1 shl it) != 0 }, longArrayOf())
                 if (reduced.factors.all { factor ->
                         (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
-                    }
-                ) {
+                    }) {
                     val original = lift(point)
-                    assertTrue(
-                        source.factors.all { factor ->
-                            (factor as Clause).literals.any { Lit.evaluate(it, original.boolValue(Lit.variable(it))) }
-                        },
-                    )
+                    assertTrue(source.factors.all { factor ->
+                        (factor as Clause).literals.any { Lit.evaluate(it, original.boolValue(Lit.variable(it))) }
+                    })
                 }
             }
         }
@@ -61,11 +49,9 @@ class PrivateRebuildAliasTest {
         val premises = arrayOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3)))
         val source = Problem(4, 0, emptyArray(), arrayOf(unchanged, premises[0], premises[1]))
 
-        val reduced = assertNotNull(
-            source.withSourcePassDelta(
-                PrivateRebuildAlias.reduce(source, premises, ExecutionControl.Never),
-            ),
-        )
+        val reduced = assertNotNull(source.withSourcePassDelta(
+            PrivateRebuildAlias.reduce(source, premises, ExecutionControl.Never),
+        ))
 
         assertSame(unchanged, reduced.factors.single())
     }
@@ -84,16 +70,9 @@ class PrivateRebuildAliasTest {
     fun `partial substitution should withhold the changed view`() {
         for (allowance in listOf(0L, 8L, 16L, 32L)) {
             val premises = arrayOf(Clause(intArrayOf(1, 2)), Clause(intArrayOf(0, 3)))
-            val source = Problem(
-                3,
-                0,
-                emptyArray(),
-                arrayOf(
-                    Clause(intArrayOf(2, 4)),
-                    premises[0],
-                    premises[1],
-                ),
-            )
+            val source = Problem(3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(2, 4)), premises[0], premises[1],
+            ))
             var spent = 0L
             val meter = WorkMeter { spent += it }
             val cancellation = object : ExecutionControl() {

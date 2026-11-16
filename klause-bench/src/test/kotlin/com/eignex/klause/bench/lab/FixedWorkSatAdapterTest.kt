@@ -20,24 +20,16 @@ class FixedWorkSatAdapterTest {
         val cases = FixedWorkSatSuite.plan(BenchRequest(PARAMETERS + ("sources" to "$SHA:$PATH,$OTHER_SHA:$OTHER")))
 
         assertEquals(listOf("1", "3", "1", "3"), cases.map { it.parameters.getValue("seed") })
-        assertTrue(
-            cases.all {
-                it.inputs.single().sha256 == it.parameters["sha256"] &&
-                    it.inputs.single().path == it.parameters["source-path"]
-            },
-        )
+        assertTrue(cases.all { it.inputs.single().sha256 == it.parameters["sha256"] &&
+            it.inputs.single().path == it.parameters["source-path"] })
         assertTrue(cases.all { it.resources.cpus == 1 && it.resources.timeoutSeconds == 30L + 60L + 60L })
         assertEquals(4, cases.map { it.attributes.getValue("comparisonKey") }.distinct().size)
     }
 
     @ParameterizedTest
-    @ValueSource(
-        strings = [
-            "limit=0", "deadline-seconds=901", "unit=nodes", "warmups=1", "measurement=hot",
-            "sources=ABC:x.cnf", "sources=$SHA:../x.cnf", "sources=$SHA:x.cnf,$OTHER_SHA:x.cnf", "seeds=1,1",
-            "seed=1", "trace-rows=2000000", "heap-mib=8192", "colour=red",
-        ],
-    )
+    @ValueSource(strings = ["limit=0", "deadline-seconds=901", "unit=nodes", "warmups=1", "measurement=hot",
+        "sources=ABC:x.cnf", "sources=$SHA:../x.cnf", "sources=$SHA:x.cnf,$OTHER_SHA:x.cnf", "seeds=1,1",
+        "seed=1", "trace-rows=2000000", "heap-mib=8192", "colour=red"])
     fun `planning rejects controls outside the bounded contract`(override: String) {
         val (key, value) = override.split('=', limit = 2)
 
@@ -82,26 +74,18 @@ class FixedWorkSatAdapterTest {
         put("comparable", comparable)
         put("interrupted", !comparable)
         put("counters", buildJsonObject { listOf("work", "decisions", "failures").forEach { put(it, 5) } })
-        put(
-            "trajectory",
-            buildJsonObject {
-                put("rowsTruncated", false)
-                put("prefix", buildJsonObject { put("digest", "d") })
-            },
-        )
+        put("trajectory", buildJsonObject {
+            put("rowsTruncated", false)
+            put("prefix", buildJsonObject { put("digest", "d") })
+        })
         put("measured", buildJsonObject { put("elapsedNs", 2_000_000) })
         put("preparation", buildJsonObject { put("elapsedNs", 1_000_000) })
         put("limitPoint", buildJsonObject { put("reached", false) })
     }
 
     private fun outcome(records: List<JsonObject>, exit: Int?, killed: Boolean) = FixedWorkSatSuite.outcome(
-        "case",
-        FixedWorkSatSuite.Options.parse(PARAMETERS, planned = false),
-        JsonObject(emptyMap()),
-        null,
-        records,
-        exit,
-        killed,
+        "case", FixedWorkSatSuite.Options.parse(PARAMETERS, planned = false), JsonObject(emptyMap()), null,
+        records, exit, killed,
     )
 
     private fun JsonObject?.flag(key: String): Boolean = requireNotNull(this).getValue(key).jsonPrimitive.boolean
@@ -111,12 +95,7 @@ class FixedWorkSatAdapterTest {
         const val OTHER = "offline/other.cnf"
         const val SHA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
         const val OTHER_SHA = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-        val PARAMETERS = mapOf(
-            "sources" to "$SHA:$PATH",
-            "seeds" to "1,3",
-            "unit" to "conflicts",
-            "limit" to "1000",
-            "deadline-seconds" to "30",
-        )
+        val PARAMETERS = mapOf("sources" to "$SHA:$PATH", "seeds" to "1,3", "unit" to "conflicts",
+            "limit" to "1000", "deadline-seconds" to "30")
     }
 }

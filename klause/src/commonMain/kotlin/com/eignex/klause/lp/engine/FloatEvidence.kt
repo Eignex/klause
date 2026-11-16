@@ -336,7 +336,6 @@ internal class RowView(private val exact: FloatEvidenceModel) {
     private val leastInfinite = IntArray(exact.m)
     private val mostInfinite = IntArray(exact.m)
     private val terms = IntArray(exact.m)
-
     // Each row's terms as `column shl 1` plus one when the coefficient is positive, its slack included.
     private val members = Array(exact.m) { IntArrayList() }
 
@@ -507,7 +506,6 @@ internal class FloatEvidenceModel(val model: LpModel) {
     /** Whether a reason can cite row [i]'s validity: a global row, or one carrying its premises. */
     fun rowCitable(i: Int): Boolean = source?.row(i)?.let { it.global || it.premises != null }
         ?: (model.rowGlobal.getOrElse(i) { false } || model.rowPremises.getOrNull(i) != null)
-
     // A probe endpoint stands in for an open side.
     fun lower(column: Int): Double = if (model.hasFiniteLower(column) && !probeClamped(column, model.probeClampedLo)) {
         model.lowerD(column)
@@ -637,7 +635,6 @@ internal class FloatDeductionCertificate private constructor(
             val citedRows = BooleanArray(view.m)
             val rows = node.rows
             val cache = IntArray(2 * view.m) { NONE_CITED }
-
             // An open side is priced at the tightest bound one row implies; that row and each side the implied bound
             // reads are cited.
             fun implied(j: Int, lowSide: Boolean): Double? {

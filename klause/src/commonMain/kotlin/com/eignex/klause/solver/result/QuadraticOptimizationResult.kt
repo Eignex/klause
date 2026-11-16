@@ -17,16 +17,12 @@ import com.eignex.klause.util.ExecutionControl
 enum class QuadraticClaim {
     /** A global objective bound, which need not be attained. */
     Bound,
-
     /** An attained global optimum. */
     Optimal,
-
     /** An unattained infimum or supremum, according to the objective sense. */
     UnattainedLimit,
-
     /** Unlimited objective improvement in the source objective direction. */
     Unbounded,
-
     /** No source assignment exists under the invocation assumptions. */
     Infeasible,
 }
@@ -76,26 +72,19 @@ class QuadraticCertificate private constructor(
             QuadraticCertificate(model, claim, null, scope)
 
         fun captured(
-            original: QuadraticCertificate,
-            claim: QuadraticClaim,
-            evidence: SourceResultEvidence,
+            original: QuadraticCertificate, claim: QuadraticClaim, evidence: SourceResultEvidence,
         ): QuadraticCertificate = QuadraticCertificate(
-            original.model,
-            claim,
-            evidence,
-            derivation = original.derivation,
-            invocation = original.invocation,
+            original.model, claim, evidence, derivation = original.derivation, invocation = original.invocation,
         )
 
         fun engine(
-            model: ModelIdentity,
-            invocation: QuadraticEngineInvocation,
-            claim: QuadraticClaim,
-            derivation: SourceDerivation,
+            model: ModelIdentity, invocation: QuadraticEngineInvocation,
+            claim: QuadraticClaim, derivation: SourceDerivation,
         ): QuadraticCertificate {
             require(invocation.matchesModel(model)) { "quadratic certificate model differs from its native source" }
             return QuadraticCertificate(model, claim, null, derivation = derivation, invocation = invocation)
         }
+
     }
 }
 

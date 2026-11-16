@@ -48,14 +48,8 @@ class SolveCoreOpenLocalSearchTest(private val maximize: Boolean) {
             parallel = 1
             engineParams += "max-flips=12"
         }
-        val solvable = sourceSolvable(
-            model,
-            if (maximize) original.negated() else original,
-            maximize,
-            common,
-            { "" },
-            { renderOpenTheoryModel(emptyMap(), emptyMap(), mapOf("x" to 0), it) },
-        )
+        val solvable = sourceSolvable(model, if (maximize) original.negated() else original, maximize, common,
+            { "" }, { renderOpenTheoryModel(emptyMap(), emptyMap(), mapOf("x" to 0), it) })
         val values = mutableListOf<BigFraction>()
         var terminal = false
         var completed: Verdict? = null

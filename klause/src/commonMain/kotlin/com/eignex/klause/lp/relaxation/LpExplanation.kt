@@ -180,11 +180,8 @@ internal object LpExplanation {
         var integralSupport = true
         cert.forEachIntegralSupport { column ->
             val variable = relaxation.colVarId.getOrNull(column) ?: -1
-            val count = if (relaxation.colIsBool.getOrNull(column) == true) {
-                session.problem.numBoolVars
-            } else {
-                session.problem.numIntVars
-            }
+            val count = if (relaxation.colIsBool.getOrNull(column) == true) session.problem.numBoolVars
+                else session.problem.numIntVars
             if (variable !in 0 until count || relaxation.colRealId.getOrNull(column)?.let { it >= 0 } == true) {
                 integralSupport = false
             }
@@ -205,11 +202,8 @@ internal object LpExplanation {
                 }
             } else {
                 val premises = boundPremiseLits(relaxation, session, column, lower)
-                if (premises == null) {
-                    supported = false
-                } else {
-                    for (literal in premises) if (seen.add(literal)) lits.add(literal)
-                }
+                if (premises == null) supported = false
+                else for (literal in premises) if (seen.add(literal)) lits.add(literal)
             }
         }
         return if (supported) lits.toIntArray() else null
@@ -260,13 +254,7 @@ internal object LpExplanation {
         val dot = Int128()
         model.forEachInColumn(column) { row, value -> dot.addProduct(ray[row], value) }
         if (dot.overflow) return null
-        return if (dot.hi == 0L && dot.lo == 0L) {
-            0
-        } else if (dot.isNonNegative()) {
-            1
-        } else {
-            -1
-        }
+        return if (dot.hi == 0L && dot.lo == 0L) 0 else if (dot.isNonNegative()) 1 else -1
     }
 
     /**
@@ -327,8 +315,7 @@ internal object LpExplanation {
                 for (bound in premises.boundEntries()) {
                     val premise = CutPremise.Bound(
                         CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, bound.variable) to BigFraction.ONE)),
-                        bound.upper,
-                        bound.threshold.value,
+                        bound.upper, bound.threshold.value,
                     )
                     if (!addSourcePremise(lits, seen, premise, session)) return false
                 }
@@ -343,8 +330,7 @@ internal object LpExplanation {
                 if (prem.vars[k] !in 0 until session.problem.numIntVars) return false
                 val premise = CutPremise.Bound(
                     CutExpression(mapOf(CutSource(CutSourceKind.INTEGER, prem.vars[k]) to BigFraction.ONE)),
-                    prem.isUpper[k],
-                    BigFraction.ofLong(prem.thresholds[k]),
+                    prem.isUpper[k], BigFraction.ofLong(prem.thresholds[k]),
                 )
                 if (!addSourcePremise(lits, seen, premise, session)) return false
             }
@@ -449,13 +435,7 @@ internal object LpExplanation {
             upper == strict -> value.ceilInteger()
             else -> -value.negated().ceilInteger()
         }
-        return if (!strict) {
-            rounded
-        } else if (upper) {
-            rounded - BIG_ONE
-        } else {
-            rounded + BIG_ONE
-        }
+        return if (!strict) rounded else if (upper) rounded - BIG_ONE else rounded + BIG_ONE
     }
 
     private fun integerBoundLiteral(

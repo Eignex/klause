@@ -117,10 +117,8 @@ object SourceSetup {
     fun prepare(request: SourceSetupRequest, onLpStats: (LpStats) -> Unit): PreparedSourceInvocation =
         PreparedSourceInvocation(selectRoute(request, onLpStats))
 
-    internal fun prepare(
-        request: SourceSetupRequest,
-        polynomialCancellation: ExecutionControl,
-    ): PreparedSourceInvocation =
+    internal fun prepare(request: SourceSetupRequest,
+        polynomialCancellation: ExecutionControl): PreparedSourceInvocation =
         PreparedSourceInvocation(selectRoute(request, null, polynomialCancellation))
 
     // The grid consumer runs on the selected route before the invocation exists, so no execution view escapes first.
@@ -130,8 +128,7 @@ object SourceSetup {
         polynomialCancellation: ExecutionControl = request.cancellation,
         onLpStats: ((LpStats) -> Unit)? = null,
     ): PreparedSourceInvocation {
-        val selection = selectRoute(request, onLpStats,
-        polynomialCancellation)
+        val selection = selectRoute(request, onLpStats, polynomialCancellation)
         val prepared = privateGrid(selection) as? SelectedFloatGridPreparation.Prepared
             ?: return PreparedSourceInvocation(selection)
         require(prepared.invocation.selection === selection) {
@@ -155,11 +152,8 @@ object SourceSetup {
         }
         val problem = request.source.problem
         if (problem.factors.any {
-                it is com.eignex.klause.factor.arithmetic.ExactRealEquality && it.value.algebraic == null
-            }
-        ) {
-            return SourceRouteSelection(request, prepareExactRealSource(request, stop), stop)
-        }
+            it is com.eignex.klause.factor.arithmetic.ExactRealEquality && it.value.algebraic == null
+        }) return SourceRouteSelection(request, prepareExactRealSource(request, stop), stop)
         val projections = (problem as? BakedProblem)?.factorProjections
             ?.takeIf { it.providers === request.providers } ?: request.providers.prepare(problem)
         val exactNormalization = request.maximize && request.objective?.let { objective ->

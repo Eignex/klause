@@ -32,10 +32,12 @@ import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
 
 internal sealed interface QuadraticBranchResult {
-    data class Optimal(val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: SourceDerivation) :
-        QuadraticBranchResult
-    data class Limit(val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: SourceDerivation) :
-        QuadraticBranchResult
+    data class Optimal(
+        val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: SourceDerivation,
+    ) : QuadraticBranchResult
+    data class Limit(
+        val incumbent: QuadraticIncumbent, val limit: AlgebraicReal, val proof: SourceDerivation,
+    ) : QuadraticBranchResult
     data class Unbounded(val incumbent: QuadraticIncumbent, val proof: SourceDerivation) : QuadraticBranchResult
     data class Infeasible(val proof: SourceDerivation) : QuadraticBranchResult
     data object Unknown : QuadraticBranchResult
@@ -68,15 +70,11 @@ internal class QuadraticBranchCompletion(
     fun pointFixings(step: () -> Unit = arithmetic::step): Map<Int, BigFraction> =
         fixedPoints ?: polynomialPointFixings(model.service.formula, step).also { fixedPoints = it }
 
-    fun conditionedPointFixings(bools: Map<Int, Boolean>, step: () -> Unit = arithmetic::step): Map<Int, BigFraction> =
-        if (bools.isEmpty()) {
-            pointFixings(step)
-        } else {
-            polynomialPointFixings(
-                PolynomialBooleanCondition.apply(model.service.formula, bools, step),
-                step,
-            )
-        }
+    fun conditionedPointFixings(
+        bools: Map<Int, Boolean>, step: () -> Unit = arithmetic::step,
+    ): Map<Int, BigFraction> = if (bools.isEmpty()) pointFixings(step) else polynomialPointFixings(
+        PolynomialBooleanCondition.apply(model.service.formula, bools, step), step,
+    )
 
     fun check(
         finite: Sample,
@@ -103,32 +101,17 @@ internal class QuadraticBranchCompletion(
                 return QuadraticBranchResult.Infeasible(QuadraticEngineDerivation.Condition(condition))
             }
             val expression = objective.polynomialFor(finite).let {
-                if (sense == ObjectiveSense.MINIMIZE) {
-                    it
-                } else {
-                    PolynomialExpression.Product(
-                        listOf(
-                            PolynomialExpression.Constant.of(bigIntOf(-1)),
-                            it,
-                        ),
-                    )
-                }
+                if (sense == ObjectiveSense.MINIMIZE) it else PolynomialExpression.Product(listOf(
+                    PolynomialExpression.Constant.of(bigIntOf(-1)), it,
+                ))
             }
             val formula = condition.apply(
-                model.service.formula,
-                model.service.boolCount,
-                model.service.realCount,
-                arithmetic::step,
+                model.service.formula, model.service.boolCount, model.service.realCount, arithmetic::step,
             )
             val convex = try {
                 tryConvexPolynomialOptimum(
-                    formula,
-                    expression,
-                    model.service.boolCount,
-                    model.service.realCount,
-                    condition.bools,
-                    arithmetic,
-                    QuadraticControl(numerical, maximumMatrixCells = params.maximumMatrixCells),
+                    formula, expression, model.service.boolCount, model.service.realCount, condition.bools,
+                    arithmetic, QuadraticControl(numerical, maximumMatrixCells = params.maximumMatrixCells),
                 )
             } catch (stop: QuadraticInterrupted) {
                 if (stop.reason != QuadraticStop.MATRIX_LIMIT) throw stop
@@ -137,55 +120,34 @@ internal class QuadraticBranchCompletion(
             if (convex != null) {
                 val point = capture(convex.assignment, finite)
                 arithmetic.step()
-                QuadraticBranchResult.Optimal(
-                    point,
-                    point.value,
-                    QuadraticEngineDerivation.Both(
-                        QuadraticEngineDerivation.Condition(condition),
-                        QuadraticEngineDerivation.Convex(convex),
-                    ),
-                )
+                QuadraticBranchResult.Optimal(point, point.value, QuadraticEngineDerivation.Both(
+                    QuadraticEngineDerivation.Condition(condition), QuadraticEngineDerivation.Convex(convex),
+                ))
             } else {
                 val result = solvePolynomialObjectiveImage(
-                    model.service.formula,
-                    expression,
-                    model.service.boolCount,
-                    model.service.realCount,
-                    QfNraParams(polynomial, polynomialLimits = limits),
-                    condition,
+                    model.service.formula, expression, model.service.boolCount, model.service.realCount,
+                    QfNraParams(polynomial, polynomialLimits = limits), condition,
                 )
                 native.observe(result.stats)
                 when (result) {
                     is PolynomialObjectiveResult.Optimum -> QuadraticBranchResult.Optimal(
-                        capture(result.assignment, finite),
-                        sourceValue(result.value),
-                        QuadraticEngineDerivation.Both(
-                            QuadraticEngineDerivation.Condition(condition),
-                            QuadraticEngineDerivation.Image(result.evidence),
-                        ),
+                        capture(result.assignment, finite), sourceValue(result.value),
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
-
                     is PolynomialObjectiveResult.Infimum -> QuadraticBranchResult.Limit(
-                        capture(result.incumbent, finite),
-                        sourceValue(result.value),
-                        QuadraticEngineDerivation.Both(
-                            QuadraticEngineDerivation.Condition(condition),
-                            QuadraticEngineDerivation.Image(result.evidence),
-                        ),
+                        capture(result.incumbent, finite), sourceValue(result.value),
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
-
                     is PolynomialObjectiveResult.Unbounded -> QuadraticBranchResult.Unbounded(
                         capture(result.incumbent, finite),
-                        QuadraticEngineDerivation.Both(
-                            QuadraticEngineDerivation.Condition(condition),
-                            QuadraticEngineDerivation.Image(result.evidence),
-                        ),
+                        QuadraticEngineDerivation.Both(QuadraticEngineDerivation.Condition(condition),
+                            QuadraticEngineDerivation.Image(result.evidence)),
                     )
-
                     is PolynomialObjectiveResult.Infeasible -> QuadraticBranchResult.Infeasible(
                         QuadraticEngineDerivation.Condition(condition),
                     )
-
                     is PolynomialObjectiveResult.Unknown -> {
                         result.resource?.let(native::decline)
                         QuadraticBranchResult.Unknown
@@ -209,16 +171,11 @@ internal class QuadraticBranchCompletion(
 
     private fun capture(assignment: QfNraAssignment, finite: Sample): QuadraticIncumbent {
         val full = model.capture(assignment, finite.bools, finite.ints)
-        val sample = if (request.sharedModel != null) {
-            full
-        } else {
-            Sample(
-                BooleanArray(request.problem.sourceBoolCount) { full.boolValue(it) },
-                full.ints,
-                DoubleArray(request.problem.sourceRealCount) { full.approximateRealValue(it) },
-                algebraicReals = requireNotNull(full.algebraicReals).take(request.problem.sourceRealCount),
-            )
-        }
+        val sample = if (request.sharedModel != null) full else Sample(
+            BooleanArray(request.problem.sourceBoolCount) { full.boolValue(it) }, full.ints,
+            DoubleArray(request.problem.sourceRealCount) { full.approximateRealValue(it) },
+            algebraicReals = requireNotNull(full.algebraicReals).take(request.problem.sourceRealCount),
+        )
         val value = objective.evaluateExact(sample, algebraic)
         arithmetic.step()
         return QuadraticIncumbent(sample, value)

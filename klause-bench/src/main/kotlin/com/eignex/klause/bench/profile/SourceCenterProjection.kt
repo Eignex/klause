@@ -26,10 +26,8 @@ internal fun trajectoryThreadBytes(): Long = (ManagementFactory.getThreadMXBean(
 internal fun sourceCenter(encoded: String): Sample {
     val value = Json.parseToJsonElement(encoded).jsonObject
     require(value.keys == setOf("bools", "ints"))
-    return Sample(
-        value.getValue("bools").jsonArray.map { it.jsonPrimitive.boolean }.toBooleanArray(),
-        value.getValue("ints").jsonArray.map { it.jsonPrimitive.long }.toLongArray(),
-    )
+    return Sample(value.getValue("bools").jsonArray.map { it.jsonPrimitive.boolean }.toBooleanArray(),
+        value.getValue("ints").jsonArray.map { it.jsonPrimitive.long }.toLongArray())
 }
 
 internal fun loadSourceCenter(
@@ -41,9 +39,7 @@ internal fun loadSourceCenter(
 ): String? {
     if (source.numRealVars != 0 || source.numBoolVars != coordinates.boolCount ||
         source.numIntVars != coordinates.intCount
-    ) {
-        return "source-dimensions"
-    }
+    ) return "source-dimensions"
     val bools = arrayOfNulls<Boolean>(state.problem.numBoolVars)
     val ints = arrayOfNulls<Long>(state.problem.numIntVars)
     for (id in 0 until coordinates.boolCount) {
@@ -66,17 +62,13 @@ internal fun loadSourceCenter(
     for (id in bools.indices) {
         if (bools[id] == null && state.invariants?.isDefinedBool(id) != true &&
             !state.assumptions.isFrozenBool(id)
-        ) {
-            return "unmapped-searched-boolean"
-        }
+        ) return "unmapped-searched-boolean"
         state.assignment.setBool(id, bools[id] ?: state.assumptions.boolValueOrNull(id) ?: false)
     }
     for (id in ints.indices) {
         if (ints[id] == null && state.invariants?.isDefinedInt(id) != true &&
             state.rootDomains[id].min != state.rootDomains[id].max && !state.assumptions.isFrozenInt(id)
-        ) {
-            return "unmapped-searched-integer"
-        }
+        ) return "unmapped-searched-integer"
         state.assignment.setInt(id, ints[id] ?: state.assumptions.intValueOrNull(id) ?: state.rootDomains[id].min)
     }
     synchronize()
@@ -107,9 +99,6 @@ internal fun projectedSourceCenter(
                 .invoke(it, state.assignment, state.rootDomains, problem.factors, state.assumptions)
         }
     }
-    return if (decline == null && state.cost != 0L) {
-        null to "working-infeasible"
-    } else {
-        state.assignment.snapshot().takeIf { decline == null } to decline
-    }
+    return if (decline == null && state.cost != 0L) null to "working-infeasible"
+    else state.assignment.snapshot().takeIf { decline == null } to decline
 }

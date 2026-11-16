@@ -79,13 +79,8 @@ class PolynomialPredicateSharingTest {
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)
         val original = formula.atoms.toList()
 
-        val rewritten = formula.withAtoms(
-            listOf(
-                original[0],
-                PolynomialAtom(original[0].polynomial, PolynomialRelation.GE),
-            ),
-            arithmetic,
-        )
+        val rewritten = formula.withAtoms(listOf(original[0],
+            PolynomialAtom(original[0].polynomial, PolynomialRelation.GE)), arithmetic)
 
         assertTrue(rewritten.atoms.isEmpty())
         assertEquals(PolynomialFormula.TRUE, rewritten.truth(intArrayOf(), intArrayOf(), arithmetic))

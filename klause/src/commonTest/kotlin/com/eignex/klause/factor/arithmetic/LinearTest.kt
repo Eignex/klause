@@ -39,11 +39,8 @@ class LinearTest {
 
     @Test
     fun `promoted greater-equal rows should share keys with their exact negated forms`() {
-        for ((coefficient, bound) in listOf(
-            2L to Long.MIN_VALUE,
-            Long.MIN_VALUE to 0L,
-            Long.MIN_VALUE to Long.MIN_VALUE,
-        )) {
+        for ((coefficient, bound) in listOf(2L to Long.MIN_VALUE, Long.MIN_VALUE to 0L,
+            Long.MIN_VALUE to Long.MIN_VALUE)) {
             val row = Linear(longArrayOf(coefficient), intArrayOf(0), LinearOp.GE, bound)
             val negated = Linear(intArrayOf(0), arrayOf(-bigIntOf(coefficient)), LinearOp.LE, -bigIntOf(bound))
             val mapping = VarRemap(intArrayOf(), intArrayOf(1))

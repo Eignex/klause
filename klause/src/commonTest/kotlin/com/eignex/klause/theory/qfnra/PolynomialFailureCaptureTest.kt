@@ -40,13 +40,8 @@ class PolynomialFailureCaptureTest {
         )
         val capture = PolynomialFailureCapture()
         var stopped = false
-        val query = QfNraQuery(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(ExecutionControl { stopped }, maximumWork = 500_000),
-            PolynomialCondition(),
-        )
+        val query = QfNraQuery(source.formula, source.boolCount, source.realCount,
+            QfNraParams(ExecutionControl { stopped }, maximumWork = 500_000), PolynomialCondition())
         query.failureCapture = capture
 
         var result: QfNraResult? = null
@@ -54,9 +49,7 @@ class PolynomialFailureCaptureTest {
             val progress = query.progress
             if (progress.searchSnapshot > 0 && progress.rootFinishedWork == null &&
                 progress.rootWork >= progress.searchWork && capture.operation["stage"] == "root-reduction"
-            ) {
-                stopped = true
-            }
+            ) stopped = true
             result = query.next()
         }
 
@@ -77,21 +70,16 @@ class PolynomialFailureCaptureTest {
         capture.scope(formula, PolynomialCondition(), arithmetic)
         capture.context(checkNotNull(PolynomialFormulaReduction.stages(formula, 2, arithmetic).next()), arithmetic)
 
-        formula.booleanRegions(
-            arithmetic,
+        formula.booleanRegions(arithmetic,
             onPartialCheck = { owner, premises -> capture.signCheck(owner, premises, 7, 0, arithmetic) },
-            onConflict = { capture.signConflict(it, 7, 0, arithmetic) },
-        )
+            onConflict = { capture.signConflict(it, 7, 0, arithmetic) })
             .asSequence().filterNotNull().toList()
 
         val conflict = assertNotNull(capture.firstSignConflict)
         assertEquals("7", conflict["snapshot"])
         assertEquals("3", conflict["signedPremises.count"])
-        assertEquals(
-            mapOf("GT" to 2, "LT" to 1),
-            (0..2)
-                .map { conflict.getValue("signedPremises.$it.relation") }.groupingBy { it }.eachCount(),
-        )
+        assertEquals(mapOf("GT" to 2, "LT" to 1), (0..2)
+            .map { conflict.getValue("signedPremises.$it.relation") }.groupingBy { it }.eachCount())
         assertEquals("true", conflict["complete"])
     }
 
@@ -116,11 +104,9 @@ class PolynomialFailureCaptureTest {
 
     @Test
     fun `wide operands mark the capture incomplete`() {
-        val polynomial = Polynomial.of(
-            (0..128).map {
-                PolynomialTerm(Monomial.of(mapOf(0 to it)), BigFraction.ONE)
-            },
-        )
+        val polynomial = Polynomial.of((0..128).map {
+            PolynomialTerm(Monomial.of(mapOf(0 to it)), BigFraction.ONE)
+        })
         val capture = PolynomialFailureCapture()
 
         capture.operation("elimination", 2, 1, 10, PolynomialArithmetic(), listOf(polynomial), 0)
@@ -170,15 +156,8 @@ class PolynomialFailureCaptureTest {
         val formula = PolynomialFormula.conjunction(listOf(atom), arithmetic)
         capture.scope(formula, PolynomialCondition(lower = mapOf(0 to BigFraction.MINUS_ONE)), arithmetic)
 
-        capture.rejected(
-            formula,
-            PolynomialBooleanRegion(mapOf(0 to false), emptyMap()),
-            mapOf(0 to AlgebraicArithmetic().rational(BigFraction.MINUS_ONE)),
-            0,
-            3,
-            17,
-            arithmetic,
-        )
+        capture.rejected(formula, PolynomialBooleanRegion(mapOf(0 to false), emptyMap()),
+            mapOf(0 to AlgebraicArithmetic().rational(BigFraction.MINUS_ONE)), 0, 3, 17, arithmetic)
 
         val failure = assertNotNull(capture.firstCadFailure)
         assertEquals("false", failure["premise.0"])

@@ -46,7 +46,11 @@ internal object ExtensionalComposition {
         override fun equals(other: Any?): Boolean = other is Tuple && values.contentEquals(other.values)
     }
 
-    fun reduce(factors: Array<Factor>, cancellation: ExecutionControl, limits: Limits = Limits()): PassDelta {
+    fun reduce(
+        factors: Array<Factor>,
+        cancellation: ExecutionControl,
+        limits: Limits = Limits(),
+    ): PassDelta {
         val meter = Meter(cancellation, limits)
         val occurrences = HashMap<Int, MutableList<Table>>()
         for (factor in factors) {
@@ -107,35 +111,28 @@ internal object ExtensionalComposition {
 
     private fun intersectCycles(target: Table, neighbors: List<Table>, meter: Meter): ExtensionalIntersection? {
         var current = target
-        for (a in neighbors.indices) {
-            for (b in a + 1 until neighbors.size) {
-                meter.pairRemaining = Int.MAX_VALUE
-                if (meter.cyclicAttempts >= meter.limits.cyclicAttempts || !meter.visit()) {
-                    return if (current === target) null else ExtensionalIntersection.Restricted(current)
-                }
-                val left = neighbors[a]
-                val right = neighbors[b]
-                val bridge = CyclicTableComposition.sharedOutsideTarget(current, left, right, meter::visit)
-                if (bridge == null) {
-                    return if (current === target) null else ExtensionalIntersection.Restricted(current)
-                }
-                if (bridge.isEmpty()) continue
-                meter.cyclicAttempts++
-                meter.pairRemaining = meter.limits.cyclicWork
-                val intersection = CyclicTableComposition.intersect(
-                    current,
-                    left,
-                    right,
-                    meter::visit,
-                    meter.limits.cyclicCells,
-                    bridge,
-                ) ?: continue
-                if (intersection === ExtensionalIntersection.Refuted) return intersection
-                val next = (intersection as ExtensionalIntersection.Restricted).factor as Table
-                if (next.tuples.size > meter.limits.retainedCells - meter.retained) continue
-                meter.retained += next.tuples.size
-                current = next
+        for (a in neighbors.indices) for (b in a + 1 until neighbors.size) {
+            meter.pairRemaining = Int.MAX_VALUE
+            if (meter.cyclicAttempts >= meter.limits.cyclicAttempts || !meter.visit()) {
+                return if (current === target) null else ExtensionalIntersection.Restricted(current)
             }
+            val left = neighbors[a]
+            val right = neighbors[b]
+            val bridge = CyclicTableComposition.sharedOutsideTarget(current, left, right, meter::visit)
+            if (bridge == null) {
+                return if (current === target) null else ExtensionalIntersection.Restricted(current)
+            }
+            if (bridge.isEmpty()) continue
+            meter.cyclicAttempts++
+            meter.pairRemaining = meter.limits.cyclicWork
+            val intersection = CyclicTableComposition.intersect(
+                current, left, right, meter::visit, meter.limits.cyclicCells, bridge,
+            ) ?: continue
+            if (intersection === ExtensionalIntersection.Refuted) return intersection
+            val next = (intersection as ExtensionalIntersection.Restricted).factor as Table
+            if (next.tuples.size > meter.limits.retainedCells - meter.retained) continue
+            meter.retained += next.tuples.size
+            current = next
         }
         return if (current === target) null else ExtensionalIntersection.Restricted(current)
     }
@@ -196,11 +193,8 @@ internal object ExtensionalComposition {
             }
         }
         if (kept.size == left.tuples.size) return null
-        return if (kept.isEmpty()) {
-            ExtensionalIntersection.Refuted
-        } else {
-            ExtensionalIntersection.Restricted(Table(left.xs, kept.toLongArray()))
-        }
+        return if (kept.isEmpty()) ExtensionalIntersection.Refuted
+        else ExtensionalIntersection.Restricted(Table(left.xs, kept.toLongArray()))
     }
 
     internal const val MAX_SCOPE = 64

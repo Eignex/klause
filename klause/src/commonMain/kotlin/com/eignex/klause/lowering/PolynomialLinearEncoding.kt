@@ -22,9 +22,7 @@ internal fun polynomialRow(
         val ref = row.ref(index)
         val value = when {
             Term.isInt(ref) -> integer(Term.intVar(ref))
-
             Term.isReal(ref) -> real(Term.realVar(ref))
-
             else -> {
                 val literal = Term.lit(ref)
                 val boolean = PolynomialRealFormula.BooleanVariable(SourceBoolId(literal ushr 1))
@@ -34,22 +32,13 @@ internal fun polynomialRow(
         }
         val coefficient = when (val constants = row.constants) {
             is IntegralConstants -> BigFraction.of(constants.exactCoeff(index), BIG_ONE)
-
-            is RealConstants -> requireNotNull(
-                BigFraction.ofDouble(
-                    if (index < constants.intCoefficients.size) {
-                        constants.intCoefficients.at(index)
-                    } else {
-                        constants.realCoefficients.at(index - constants.intCoefficients.size)
-                    },
-                ),
-            )
+            is RealConstants -> requireNotNull(BigFraction.ofDouble(
+                if (index < constants.intCoefficients.size) constants.intCoefficients.at(index)
+                else constants.realCoefficients.at(index - constants.intCoefficients.size),
+            ))
         }
-        if (coefficient == BigFraction.ONE) {
-            value
-        } else {
-            PolynomialExpression.Product(listOf(constant(coefficient), value))
-        }
+        if (coefficient == BigFraction.ONE) value
+        else PolynomialExpression.Product(listOf(constant(coefficient), value))
     }
     val rhs = when (val constants = row.constants) {
         is IntegralConstants -> BigFraction.of(constants.exactBound, BIG_ONE)
@@ -63,14 +52,9 @@ internal fun polynomialRow(
     }
     val expression = if (terms.size == 1) terms.single() else PolynomialExpression.Sum(terms)
     val atom = PolynomialRealFormula.Atom(expression, relation, constant(rhs))
-    return if (row.activator == LinearRow.ALWAYS) {
-        atom
-    } else {
-        PolynomialRealLowering.equivalent(
-            PolynomialRealFormula.BooleanVariable(SourceBoolId(row.activator)),
-            atom,
-        )
-    }
+    return if (row.activator == LinearRow.ALWAYS) atom else PolynomialRealLowering.equivalent(
+        PolynomialRealFormula.BooleanVariable(SourceBoolId(row.activator)), atom,
+    )
 }
 
 private fun constant(value: BigFraction): PolynomialExpression = PolynomialRealLowering.constant(value)

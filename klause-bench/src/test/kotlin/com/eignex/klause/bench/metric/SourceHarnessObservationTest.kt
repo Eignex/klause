@@ -17,14 +17,8 @@ class SourceHarnessObservationTest {
 
         val stats = observation.finish()
 
-        assertEquals(
-            mapOf(
-                "sourceHarnessThreadCpuMs" to "8",
-                "sourceHarnessGcCount" to "2",
-                "sourceHarnessGcTimeMs" to "10",
-            ),
-            stats.filterKeys { it.startsWith("sourceHarness") },
-        )
+        assertEquals(mapOf("sourceHarnessThreadCpuMs" to "8", "sourceHarnessGcCount" to "2",
+            "sourceHarnessGcTimeMs" to "10"), stats.filterKeys { it.startsWith("sourceHarness") })
     }
 
     @Test
@@ -41,17 +35,10 @@ class SourceHarnessObservationTest {
         observation.cleanupStarted()
         val stats = observation.finish()
 
-        assertEquals(
-            mapOf(
-                "sourcePreparationThreadCpuMs" to "2",
-                "sourcePreparationGcCount" to "1",
-                "sourcePreparationGcTimeMs" to "10",
-                "sourceCleanupThreadCpuMs" to "5",
-                "sourceCleanupGcCount" to "2",
-                "sourceCleanupGcTimeMs" to "20",
-            ),
-            stats.filterKeys { !it.startsWith("sourceHarness") },
-        )
+        assertEquals(mapOf("sourcePreparationThreadCpuMs" to "2", "sourcePreparationGcCount" to "1",
+            "sourcePreparationGcTimeMs" to "10", "sourceCleanupThreadCpuMs" to "5",
+            "sourceCleanupGcCount" to "2", "sourceCleanupGcTimeMs" to "20"),
+            stats.filterKeys { !it.startsWith("sourceHarness") })
     }
 
     @Test
@@ -93,9 +80,7 @@ class SourceHarnessObservationTest {
         val observation = SourceHarnessObservation {
             when (kind) {
                 "missing" -> SourceHarnessCounters()
-
                 "failed" -> error("counter unavailable")
-
                 else -> {
                     reads++
                     val value = if (reads == 1) 10L else 5L

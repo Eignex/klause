@@ -96,8 +96,8 @@ class AffineObjectiveOperationTest {
     @Test
     fun `a changed affine objective should open a distinct operation without rebinding an earlier request`() {
         val source = SmtLibPolynomial.parse(
-            "(declare-const x Real) (assert (= (* x x) 2)) (check-sat)",
-        ).realSource()
+                "(declare-const x Real) (assert (= (* x x) 2)) (check-sat)",
+            ).realSource()
         val objective = LinearObjective(constant = 7, realCoefficients = doubleArrayOf(1.0))
         val request = source.pipelineRequest().affineOperation(objective, ObjectiveSense.MINIMIZE)
         val replacement = objective.copy(constant = 13)

@@ -36,9 +36,7 @@ internal class EvidenceCertificate private constructor(
     val quadraticPublication: QuadraticWitnessPublication? = null,
 ) {
     fun verifyDerivation(
-        claim: SourceClaim,
-        context: SourceProofContext,
-        cancellation: ExecutionControl = ExecutionControl.Never,
+        claim: SourceClaim, context: SourceProofContext, cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceEvidenceCheck {
         val completed = completion ?: return SourceEvidenceCheck.Unavailable("completed derivation capture unavailable")
         if (completed.scope == null || completed.invocation?.hasUncapturedSourceRestrictions == true) {
@@ -60,40 +58,24 @@ internal class EvidenceCertificate private constructor(
                 is SolveResult.Unsat -> SourceClaim.Refutation
                 is SolveResult.Unknown -> null
             }
-
             is CompletedEngineResult.Minimize -> when (val result = completed.result) {
                 is MinimizeResult.Optimal -> when (claim) {
                     is SourceClaim.Optimal -> SourceClaim.Optimal(result.sample, claim.value)
-
                     is SourceClaim.Bound -> {
                         if (claim.strict) return SourceEvidenceCheck.Rejected("attainment excludes a strict bound")
                         SourceClaim.Optimal(result.sample, claim.value)
                     }
-
                     is SourceClaim.Witness -> SourceClaim.Witness(result.sample)
-
                     else -> null
                 }
-
                 is MinimizeResult.Infeasible -> SourceClaim.Refutation
-
-                is MinimizeResult.Unbounded -> if (kind == EvidenceKind.Witness) {
-                    SourceClaim.Witness(result.sample)
-                } else {
-                    SourceClaim.Ray(
-                        result.sample,
-                        result.direction.withIndex().associate { (id, step) ->
-                            SourceCoordinate(SourceCoordinate.Kind.Real, id) to step
-                        },
-                    )
-                }
-
-                is MinimizeResult.BestFound -> if (kind == EvidenceKind.Bound) {
-                    completed.cutoff
-                } else {
-                    SourceClaim.Witness(result.sample)
-                }
-
+                is MinimizeResult.Unbounded -> if (kind == EvidenceKind.Witness) SourceClaim.Witness(result.sample)
+                    else SourceClaim.Ray(result.sample,
+                    result.direction.withIndex().associate { (id, step) ->
+                        SourceCoordinate(SourceCoordinate.Kind.Real, id) to step
+                    })
+                is MinimizeResult.BestFound -> if (kind == EvidenceKind.Bound) completed.cutoff
+                    else SourceClaim.Witness(result.sample)
                 is MinimizeResult.Unknown -> completed.cutoff
             }
         } ?: return SourceEvidenceCheck.Unavailable("completion has no actual claim of the requested kind")
@@ -106,21 +88,20 @@ internal class EvidenceCertificate private constructor(
     }
 
     companion object {
-        fun published(model: ModelIdentity, publication: QuadraticWitnessPublication): EvidenceCertificate {
+        fun published(
+            model: ModelIdentity, publication: QuadraticWitnessPublication,
+        ): EvidenceCertificate {
             require(publication.invocation.matchesModel(model)) { "quadratic witness has another source objective" }
             return EvidenceCertificate(model, EvidenceKind.Witness, quadraticPublication = publication)
         }
 
-        fun published(publication: CompletedEnginePublication): EvidenceCertificate = EvidenceCertificate(
-            publication.model,
-            if (publication is CompletedEnginePublication.Witness) EvidenceKind.Witness else EvidenceKind.Bound,
-            publication = publication,
-        )
+        fun published(publication: CompletedEnginePublication): EvidenceCertificate =
+            EvidenceCertificate(publication.model,
+                if (publication is CompletedEnginePublication.Witness) EvidenceKind.Witness else EvidenceKind.Bound,
+                publication = publication)
 
         fun completed(
-            model: ModelIdentity,
-            kind: EvidenceKind,
-            completion: CompletedEngineResult,
+            model: ModelIdentity, kind: EvidenceKind, completion: CompletedEngineResult,
         ): EvidenceCertificate? {
             val foreignCapture = completion.evidence?.let { captured ->
                 captured.scope != completion.scope || captured.derivations.any { it.scope != completion.scope }
@@ -129,9 +110,7 @@ internal class EvidenceCertificate private constructor(
             if (completion.invocation?.model?.matches(model) == false) return null
             if (kind != EvidenceKind.Witness &&
                 completion.evidence?.let { it.engineScope != completion.scope } == true
-            ) {
-                return null
-            }
+            ) return null
             if ((kind == EvidenceKind.Bound || kind == EvidenceKind.Unbounded) &&
                 completion.scope?.objective == null && completion.invocation?.hasSourceObjective != true
             ) {
@@ -139,11 +118,10 @@ internal class EvidenceCertificate private constructor(
             }
             if ((kind == EvidenceKind.Bound || kind == EvidenceKind.Unbounded) &&
                 completion.invocation?.let { it.executionObjective == null } == true
-            ) {
-                return null
-            }
+            ) return null
             return EvidenceCertificate(model, kind, completion)
         }
+
     }
 }
 
@@ -168,8 +146,10 @@ internal sealed interface ModelEvidence<out A, out V> {
         override val kind: EvidenceKind get() = EvidenceKind.Bound
     }
 
-    data class Infeasible(override val model: ModelIdentity, override val certificate: EvidenceCertificate?) :
-        ModelEvidence<Nothing, Nothing> {
+    data class Infeasible(
+        override val model: ModelIdentity,
+        override val certificate: EvidenceCertificate?,
+    ) : ModelEvidence<Nothing, Nothing> {
         override val kind: EvidenceKind get() = EvidenceKind.Infeasible
     }
 
@@ -197,9 +177,7 @@ internal class ModelEvidenceVerifier<A, V>(
     private val witnessVerifier: CandidateVerifier<A, V>,
 ) {
     fun verify(
-        evidence: ModelEvidence<A, V>,
-        scope: SourceScope? = null,
-        invocation: EngineInvocation? = null,
+        evidence: ModelEvidence<A, V>, scope: SourceScope? = null, invocation: EngineInvocation? = null,
         cancellation: ExecutionControl = ExecutionControl.Never,
     ): Verification<ModelEvidence<A, V>, Unit> {
         if (!model.matches(evidence.model)) {
@@ -219,9 +197,7 @@ internal class ModelEvidenceVerifier<A, V>(
                 val matching = if (witnessPublication != null) {
                     invocation.preparedPlan === completedInvocation.preparedPlan &&
                         invocation.model.matches(completedInvocation.model)
-                } else {
-                    invocation.matches(completedInvocation)
-                }
+                } else invocation.matches(completedInvocation)
                 if (!matching) return Verification.Rejected("evidence belongs to a different runtime invocation")
             }
             if ((invocation == null) != (completedInvocation == null)) {
@@ -231,9 +207,7 @@ internal class ModelEvidenceVerifier<A, V>(
             if (scope != null && completionScope != null) {
                 val matching = if (witnessPublication != null) {
                     scope.revision == completionScope.revision && scope.objective == completionScope.objective
-                } else {
-                    scope == completionScope
-                }
+                } else scope == completionScope
                 if (!matching) {
                     return Verification.Rejected("evidence belongs to a different original-source invocation")
                 }
@@ -250,19 +224,14 @@ internal class ModelEvidenceVerifier<A, V>(
         }
         certificate?.publication?.let { publication ->
             val matches = when (publication) {
-                is CompletedEnginePublication.Witness ->
-                    evidence is ModelEvidence.Witness &&
-                        publication.sample.equals(evidence.candidate.assignment) &&
-                        publication.value == evidence.candidate.objective
-
-                is CompletedEnginePublication.ObjectiveBound ->
-                    evidence is ModelEvidence.Bound &&
-                        publication.value.equals(evidence.value)
-
-                is CompletedEnginePublication.IntegerWindow ->
-                    evidence is ModelEvidence.IntegerWindow &&
-                        evidence.coordinate == publication.coordinate && evidence.lower == publication.lower &&
-                        evidence.upper == publication.upper
+                is CompletedEnginePublication.Witness -> evidence is ModelEvidence.Witness &&
+                    publication.sample.equals(evidence.candidate.assignment) &&
+                    publication.value == evidence.candidate.objective
+                is CompletedEnginePublication.ObjectiveBound -> evidence is ModelEvidence.Bound &&
+                    publication.value.equals(evidence.value)
+                is CompletedEnginePublication.IntegerWindow -> evidence is ModelEvidence.IntegerWindow &&
+                    evidence.coordinate == publication.coordinate && evidence.lower == publication.lower &&
+                    evidence.upper == publication.upper
             }
             if (!matches) return Verification.Rejected("published claim differs from the actual engine publication")
         }

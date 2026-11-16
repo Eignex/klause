@@ -14,16 +14,8 @@ class JointRepairLpCaptureTest {
 
         val encoded = JointRepairLpCapture.rayBits(ray, ray.size)
 
-        assertEquals(
-            listOf(
-                "0000000000000000",
-                "8000000000000000",
-                "3ff8000000000000",
-                "0000000000000001",
-                "7fefffffffffffff",
-            ),
-            encoded,
-        )
+        assertEquals(listOf("0000000000000000", "8000000000000000", "3ff8000000000000",
+            "0000000000000001", "7fefffffffffffff"), encoded)
     }
 
     @ParameterizedTest

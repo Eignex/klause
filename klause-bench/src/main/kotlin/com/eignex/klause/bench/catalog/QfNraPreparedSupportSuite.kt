@@ -5,12 +5,8 @@ internal object QfNraPreparedSupportSuite {
         format = Format.SMTLIB
         license = "Apache-2.0 (self-authored Eignex Klause fixtures)"
         for (name in listOf("degree-2-pairs-1-sat", "degree-8-pairs-1-sat", "strict-alternative")) {
-            vendored(
-                name,
-                expected = Expected.Sat,
-                relPath = "qfnra-prepared-support-v1/$name.smt2",
-                tags = setOf("polynomial-real", "qfnra-prepared-support-v1"),
-            )
+            vendored(name, expected = Expected.Sat, relPath = "qfnra-prepared-support-v1/$name.smt2",
+                tags = setOf("polynomial-real", "qfnra-prepared-support-v1"))
         }
     }
 }

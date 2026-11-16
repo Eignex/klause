@@ -37,14 +37,8 @@ class TablePropagatorTest {
 
     @Test
     fun `historical alternative should ignore a preferred hole carved after the deduction`() {
-        val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            arrayOf<Factor>(
-                Table(intArrayOf(0, 1, 2), longArrayOf(0, 0, 0, 1, 1, 1)),
-            ),
-        )
+        val problem = Problem(0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(
+            Table(intArrayOf(0, 1, 2), longArrayOf(0, 0, 0, 1, 1, 1))))
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         state.currentLevel = 1
@@ -53,14 +47,8 @@ class TablePropagatorTest {
         check(state.excludeIntValue(2, 1))
         val preferred = IntHashSet().apply { add(Lit.make(state.atomVarEq(2, 1), true)) }
 
-        val reason = assertNotNull(
-            (state.factorAt(0) as TablePropagator).historicalAlternative(
-                state,
-                intArrayOf(0, 2, 0, 1),
-                atTrail,
-                preferred,
-            ),
-        )
+        val reason = assertNotNull((state.factorAt(0) as TablePropagator).historicalAlternative(
+            state, intArrayOf(0, 2, 0, 1), atTrail, preferred))
 
         assertEquals(listOf(Lit.make(state.atomVarEq(1, 1), true)), reason.toList())
     }
@@ -68,22 +56,12 @@ class TablePropagatorTest {
     @Test
     fun `historical alternative should decline tables outside its row cell and column limits`() {
         for ((rows, columns) in listOf(257 to 2, 128 to 33, 1 to 65)) {
-            val problem = Problem(
-                0,
-                columns,
-                Array(columns) { IntDomain(0, 1) },
-                arrayOf<Factor>(
-                    Table(IntArray(columns) { it }, LongArray(rows * columns)),
-                ),
-            )
+            val problem = Problem(0, columns, Array(columns) { IntDomain(0, 1) }, arrayOf<Factor>(
+                Table(IntArray(columns) { it }, LongArray(rows * columns))))
             val state = PropagationState(problem, Assumptions.None)
 
             val reason = (state.factorAt(0) as TablePropagator).historicalAlternative(
-                state,
-                intArrayOf(0, 2, 0, 1),
-                0,
-                IntHashSet(),
-            )
+                state, intArrayOf(0, 2, 0, 1), 0, IntHashSet())
 
             assertNull(reason)
         }
@@ -92,53 +70,34 @@ class TablePropagatorTest {
     @Test
     fun `historical alternative should decline more than sixty four retained premises`() {
         val tuples = (1..65).flatMap { listOf(1L, it.toLong()) }.toLongArray()
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 1), IntDomain(0, 66)),
-            arrayOf<Factor>(
-                Table(intArrayOf(0, 1), tuples),
-            ),
-        )
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 1), IntDomain(0, 66)), arrayOf<Factor>(
+            Table(intArrayOf(0, 1), tuples)))
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         state.currentLevel = 1
         for (value in 1L..65L) check(state.excludeIntValue(1, value))
 
         val reason = (state.factorAt(0) as TablePropagator).historicalAlternative(
-            state,
-            intArrayOf(0, 2, 0, 1),
-            state.undo.size,
-            IntHashSet(),
-        )
+            state, intArrayOf(0, 2, 0, 1), state.undo.size, IntHashSet())
 
         assertNull(reason)
     }
 
     @Test
     fun `historical alternative should decline a target scope exceeding its hole allowance`() {
-        val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 65), IntDomain(0, 1)),
-            arrayOf<Factor>(
-                Table(intArrayOf(0, 1), longArrayOf(0, 0, 65, 1)),
-            ),
-        )
+        val problem = Problem(0, 2, arrayOf(IntDomain(0, 65), IntDomain(0, 1)), arrayOf<Factor>(
+            Table(intArrayOf(0, 1), longArrayOf(0, 0, 65, 1))))
         val state = PropagationState(problem, Assumptions.None)
         state.undoLogging = true
         state.currentLevel = 1
         for (value in 1L..63L) check(state.excludeIntValue(0, value))
 
         val reason = (state.factorAt(0) as TablePropagator).historicalAlternative(
-            state,
-            intArrayOf(0, 1, 0, 64),
-            state.undo.size,
-            IntHashSet(),
-        )
+            state, intArrayOf(0, 1, 0, 64), state.undo.size, IntHashSet())
 
         assertNull(reason)
     }
+
 
     @Test
     fun `indexed table deductions should be implied by their historical reasons`() {
@@ -151,10 +110,7 @@ class TablePropagatorTest {
             }
         }
         val problem = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 2) },
-            arrayOf<Factor>(Table(intArrayOf(0, 1, 2), tuples)),
+            0, 3, Array(3) { IntDomain(0, 2) }, arrayOf<Factor>(Table(intArrayOf(0, 1, 2), tuples)),
         )
 
         PropagationReasonOracle.assertReasonsImply(problem, "indexed-delta") { state ->
@@ -166,9 +122,7 @@ class TablePropagatorTest {
     fun `aliased table positions should filter the domains changed by their own pruning`() {
         val relation = longArrayOf(0, 1, 1, 0, 2, 1)
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 2)),
+            0, 1, arrayOf(IntDomain(0, 2)),
             arrayOf<Factor>(Table(intArrayOf(0, 0), LongArray(384) { relation[it % relation.size] })),
         )
         val session = PropagationSession(problem)
@@ -181,9 +135,7 @@ class TablePropagatorTest {
     @Test
     fun `indexed live supports should cold start after restoring above their construction branch`() {
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 3) },
+            0, 2, Array(2) { IntDomain(0, 3) },
             arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(512) { (it / 2 % 4).toLong() })),
         )
         val state = PropagationState(problem, Assumptions.None)
@@ -206,9 +158,7 @@ class TablePropagatorTest {
     @Test
     fun `indexed delta filtering should restore interior supports in a sibling branch`() {
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 3) },
+            0, 2, Array(2) { IntDomain(0, 3) },
             arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(512) { (it / 2 % 4).toLong() })),
         )
         val state = PropagationState(problem, Assumptions.None)
@@ -233,9 +183,7 @@ class TablePropagatorTest {
     fun `interrupted cold table preparation should resume its required filtering`() {
         for (limit in listOf(3, 6, 10)) {
             val problem = Problem(
-                0,
-                2,
-                Array(2) { IntDomain(0, 511) },
+                0, 2, Array(2) { IntDomain(0, 511) },
                 arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(512) { (it / 2 * 2).toLong() })),
             )
             val state = PropagationState(problem, Assumptions.None)
@@ -255,9 +203,7 @@ class TablePropagatorTest {
     @Test
     fun `interrupted table filtering should preserve sibling supports after undo`() {
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 255) },
+            0, 2, Array(2) { IntDomain(0, 255) },
             arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(512) { (it / 2).toLong() })),
         )
         val state = PropagationState(problem, Assumptions.None)
@@ -284,26 +230,15 @@ class TablePropagatorTest {
     @Test
     fun `interrupted delayed table reasons should withhold partial premises`() {
         val problem = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(0, 127), IntDomain(0, 2)),
-            arrayOf<Factor>(
-                Table(
-                    intArrayOf(0, 1),
-                    LongArray(256) { cell ->
-                        val row = cell / 2
-                        if (cell % 2 == 0) {
-                            row.toLong()
-                        } else {
-                            when (row) {
-                                0 -> 0L
-                                127 -> 2L
-                                else -> 1L
-                            }
-                        }
-                    },
-                ),
-            ),
+            0, 2, arrayOf(IntDomain(0, 127), IntDomain(0, 2)),
+            arrayOf<Factor>(Table(intArrayOf(0, 1), LongArray(256) { cell ->
+                val row = cell / 2
+                if (cell % 2 == 0) row.toLong() else when (row) {
+                    0 -> 0L
+                    127 -> 2L
+                    else -> 1L
+                }
+            })),
         )
         val state = PropagationState(problem, Assumptions.None).also { it.factorAttribution = FactorAttribution() }
         assertNull(state.runToFixpoint(allFactors = true))

@@ -59,12 +59,8 @@ class Xcsp3AffineDistinctnessTest {
             <intension>ne(add(y,1),sub(z,1))</intension></constraints></instance>"""
 
         assertFalse(
-            PropagationSession(
-                Xcsp3.parse(
-                    source,
-                    recoveryCancellation = ExecutionControl { true },
-                ).problem,
-            ).isUnsatAtRoot,
+            PropagationSession(Xcsp3.parse(source, recoveryCancellation =
+                ExecutionControl { true }).problem).isUnsatAtRoot,
         )
         assertTrue(PropagationSession(Xcsp3.parse(source).problem).isUnsatAtRoot)
     }

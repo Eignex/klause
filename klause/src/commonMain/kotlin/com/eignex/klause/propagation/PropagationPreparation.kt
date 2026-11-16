@@ -57,9 +57,7 @@ internal class PropagationPreparation(
         }
         if (!rootStarted) {
             val queue = rootQueue ?: live.beginRootFixpoint().also { rootQueue = it }
-            if (queue.hasNext()) {
-                queue.next()
-            } else {
+            if (queue.hasNext()) queue.next() else {
                 rootStarted = true
                 rootQueue = null
             }

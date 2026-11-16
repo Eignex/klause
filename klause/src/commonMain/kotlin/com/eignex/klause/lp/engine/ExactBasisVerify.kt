@@ -226,29 +226,25 @@ internal fun verifyExactBasis(
         if (rayRow != null && rayRow !in 0 until model.m) meter.stop(ExactBasisDecline.INVALID_BASIS)
         val cached = if (primalOnly) null else cache.find(authority)
         if (cached != null) meter.reuse++
-        val factors = if (primalOnly) {
-            null
-        } else {
-            cached ?: run {
-                val matrix = authority.basisMatrix()
-                meter.phase = ExactBasisPhase.FACTOR
-                val proposed = cache.proposedOrder(authority)
-                val allowance = meter.factorLimits()
-                meter.factoryCalls++
-                val build = RationalBasisFactors.factor(matrix, proposed, allowance, meter.token)
-                meter.record(build.stats)
-                when (build) {
-                    is RationalBasisBuild.Ready -> build.factors.also { cache.install(authority, it) }
+        val factors = if (primalOnly) null else cached ?: run {
+            val matrix = authority.basisMatrix()
+            meter.phase = ExactBasisPhase.FACTOR
+            val proposed = cache.proposedOrder(authority)
+            val allowance = meter.factorLimits()
+            meter.factoryCalls++
+            val build = RationalBasisFactors.factor(matrix, proposed, allowance, meter.token)
+            meter.record(build.stats)
+            when (build) {
+                is RationalBasisBuild.Ready -> build.factors.also { cache.install(authority, it) }
 
-                    is RationalBasisBuild.Singular -> {
-                        singularRank = build.rank
-                        meter.stop(ExactBasisDecline.SINGULAR)
-                    }
+                is RationalBasisBuild.Singular -> {
+                    singularRank = build.rank
+                    meter.stop(ExactBasisDecline.SINGULAR)
+                }
 
-                    is RationalBasisBuild.Declined -> {
-                        if (build.reason.name == "CANCELLED") meter.poll()
-                        meter.stop(ExactBasisDecline.valueOf(build.reason.name))
-                    }
+                is RationalBasisBuild.Declined -> {
+                    if (build.reason.name == "CANCELLED") meter.poll()
+                    meter.stop(ExactBasisDecline.valueOf(build.reason.name))
                 }
             }
         }
@@ -256,11 +252,8 @@ internal fun verifyExactBasis(
             meter.phase = ExactBasisPhase.ASSEMBLY
             val rhs = authority.primalRhs()
             meter.phase = ExactBasisPhase.PRIMAL
-            val basics = if (primalOnly) {
-                solveLogicalReducedPrimal(authority, rhs, meter)
-            } else {
-                solveExactBasis(checkNotNull(factors), rhs, false, meter)
-            }
+            val basics = if (primalOnly) solveLogicalReducedPrimal(authority, rhs, meter)
+                else solveExactBasis(checkNotNull(factors), rhs, false, meter)
             val primal = authority.sourcePrimal(basics)
             // Publish this complete independent witness before BTRAN can exhaust the remaining budget.
             val point = verifyBasisCandidates(model, authority, primal, null, null, meter)
@@ -348,9 +341,7 @@ private fun solveLogicalReducedPrimal(
         meter.record(build.stats)
         val factors = when (build) {
             is RationalBasisBuild.Ready -> build.factors
-
             is RationalBasisBuild.Singular -> meter.stop(ExactBasisDecline.SINGULAR)
-
             is RationalBasisBuild.Declined -> {
                 if (build.reason.name == "CANCELLED") meter.poll()
                 meter.stop(ExactBasisDecline.valueOf(build.reason.name))

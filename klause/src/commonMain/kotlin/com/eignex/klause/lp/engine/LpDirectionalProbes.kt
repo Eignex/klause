@@ -10,15 +10,7 @@ internal data class LpDirectionalValues(val down: Double, val up: Double)
 internal data class LpProbeSource(val model: LpModel, val basis: Basis)
 
 internal enum class LpProbeDecline {
-    CANCELLED,
-    ALLOWANCE,
-    OWNER,
-    BUSY,
-    STALE_POINT,
-    NO_OPTIMUM,
-    NO_POINT,
-    SPLIT,
-    CHILD,
+    CANCELLED, ALLOWANCE, OWNER, BUSY, STALE_POINT, NO_OPTIMUM, NO_POINT, SPLIT, CHILD,
 }
 
 internal enum class LpProbeReuse { INDEPENDENT, IDENTITY, SCALED }
@@ -119,17 +111,9 @@ internal class LpDirectionalProbes(
             observe(LpProbeMetrics(0L, 0L, 0, LpProbeDecline.NO_OPTIMUM))
             return null
         }
-        return query(
-            columns,
-            splits,
-            allowance,
-            token,
-            observe,
-            ResultMapping(
-                value = { objective -> (objective - reference).takeIf { it.isFinite() && it >= 0.0 } },
-                pair = ::LpDirectionalGain,
-            ),
-        )
+        return query(columns, splits, allowance, token, observe, ResultMapping(
+            value = { objective -> (objective - reference).takeIf { it.isFinite() && it >= 0.0 } },
+            pair = ::LpDirectionalGain))
     }
 
     fun runValues(
@@ -138,14 +122,8 @@ internal class LpDirectionalProbes(
         allowance: Long,
         token: ExecutionControl,
         observe: (LpProbeMetrics) -> Unit,
-    ): List<LpDirectionalValues>? = query(
-        columns,
-        splits,
-        allowance,
-        token,
-        observe,
-        ResultMapping(value = { objective -> objective.takeIf { it.isFinite() } }, pair = ::LpDirectionalValues),
-    )
+    ): List<LpDirectionalValues>? = query(columns, splits, allowance, token, observe,
+        ResultMapping(value = { objective -> objective.takeIf { it.isFinite() } }, pair = ::LpDirectionalValues))
 
     private class ResultMapping<T>(val value: (Double) -> Double?, val pair: (Double, Double) -> T)
 
@@ -159,13 +137,10 @@ internal class LpDirectionalProbes(
     ): List<T>? {
         val decline = when {
             token() -> LpProbeDecline.CANCELLED
-
             allowance <= 0L -> LpProbeDecline.ALLOWANCE
-
             columns.isEmpty() || columns.size > 2 || columns.size != splits.size ||
                 columns.any { it !in 0 until state.model.n } || splits.any { it == Long.MAX_VALUE } ||
                 (columns.size == 2 && columns[0] == columns[1]) -> LpProbeDecline.SPLIT
-
             else -> null
         }
         if (decline != null) {
@@ -216,11 +191,8 @@ internal class LpDirectionalProbes(
         if (token()) return budget.stop(LpProbeDecline.CANCELLED)
         if (budget.remaining() <= 0L) return budget.stop(LpProbeDecline.ALLOWANCE)
         val available = budget.remaining()
-        val projection = LpProjectionMeter(
-            available,
-            if (available > Long.MAX_VALUE / 16L) Long.MAX_VALUE else available * 16L,
-            token,
-        )
+        val projection = LpProjectionMeter(available,
+            if (available > Long.MAX_VALUE / 16L) Long.MAX_VALUE else available * 16L, token)
         val child: LpModel?
         try {
             child = state.probeBound(column, upper, endpoint, projection)?.ownerWorkingModel(projection)
@@ -237,23 +209,16 @@ internal class LpDirectionalProbes(
         val workspace = if (existing == null) {
             16L * child.numVars + 40L * child.m + 64L + orderPreparation + factorPreparation + parentValuePreparation +
                 sourceCopyWork - savedSourceWork
-        } else {
-            0L
-        }
+        } else 0L
         val scaling = when {
             sourceView != null -> sourceView.refreshWorkBound(child)
             else -> LpScalingView.constructionWorkBound(child)
         }
         val preparationStop = when {
             workspace >= budget.remaining() -> LpProbePreparationStop.WORKSPACE
-
             scaling >= budget.remaining() - workspace -> LpProbePreparationStop.SCALARS
-
-            existing == null && (
-                factorEntries > factorEntryLimit ||
-                    factorEntries >= budget.remaining() - workspace - scaling
-                ) -> LpProbePreparationStop.FACTORS
-
+            existing == null && (factorEntries > factorEntryLimit ||
+                factorEntries >= budget.remaining() - workspace - scaling) -> LpProbePreparationStop.FACTORS
             else -> null
         }
         val reuse = when {
@@ -261,12 +226,10 @@ internal class LpDirectionalProbes(
             sourceView.applied -> LpProbeReuse.SCALED
             else -> LpProbeReuse.IDENTITY
         }
-        budget.preflight = LpProbePreflight(
-            workspace, scaling, budget.remaining(), reuse,
+        budget.preflight = LpProbePreflight(workspace, scaling, budget.remaining(), reuse,
             existing != null, preparationStop, if (existing == null) factorPreparation else 0L,
             if (existing == null) factorEntries else 0L, savedSourceWork,
-            if (existing == null) parentValuePreparation else 0L,
-        )
+            if (existing == null) parentValuePreparation else 0L)
         if (preparationStop != null) {
             budget.decline = LpProbeDecline.ALLOWANCE
             return null
@@ -275,14 +238,9 @@ internal class LpDirectionalProbes(
         budget.prepare(scaling)
         val offered = budget.remaining()
         if (offered <= 0L) return budget.stop(LpProbeDecline.ALLOWANCE)
-        val entries = if (existing == null) {
-            minOf(
-                factorEntryLimit,
-                maxOf(factorEntries, (offered + orderPreparation + factorPreparation) / budget.remainingChildren / 4L),
-            )
-        } else {
-            budget.entryLimit
-        }
+        val entries = if (existing == null) minOf(factorEntryLimit,
+            maxOf(factorEntries, (offered + orderPreparation + factorPreparation) / budget.remainingChildren / 4L))
+            else budget.entryLimit
         // Keep capacity for retiring factors after a stopped or cancelled solve.
         val solveGrant = offered - entries
         if (entries <= 0L || solveGrant <= 0L) return budget.stop(LpProbeDecline.ALLOWANCE)
@@ -306,19 +264,14 @@ internal class LpDirectionalProbes(
         var recorded = false
         try {
             try {
-                val result = if (existing == null) {
-                    solver.solve(warm)
-                } else {
-                    solver.resolveBounds(LpFloatAllowance(solveGrant, 0))
-                }
+                val result = if (existing == null) solver.solve(warm)
+                    else solver.resolveBounds(LpFloatAllowance(solveGrant, 0))
                 if (result == null || !result.optimal || token()) {
-                    return budget.stop(
-                        when {
-                            token() -> LpProbeDecline.CANCELLED
-                            solver.lastTermination == LpFloatTermination.WORK -> LpProbeDecline.ALLOWANCE
-                            else -> LpProbeDecline.CHILD
-                        },
-                    )
+                    return budget.stop(when {
+                        token() -> LpProbeDecline.CANCELLED
+                        solver.lastTermination == LpFloatTermination.WORK -> LpProbeDecline.ALLOWANCE
+                        else -> LpProbeDecline.CHILD
+                    })
                 }
                 budget.record(solver, scaling, entries, solveGrant, existing == null)
                 recorded = true
@@ -355,34 +308,24 @@ internal class LpDirectionalProbes(
         var numerical: LpProbeNumerical? = null
         val remainingChildren: Int get() = queries - completed
 
-        fun remaining(): Long = if (preparation >= allowance || solving >= allowance - preparation) {
-            0L
-        } else {
-            allowance - preparation - solving
-        }
+        fun remaining(): Long = if (preparation >= allowance || solving >= allowance - preparation) 0L
+            else allowance - preparation - solving
 
         fun overspent(): Boolean = preparation > allowance || solving > allowance - preparation
 
-        fun prepare(work: Long) {
-            preparation += minOf(work, Long.MAX_VALUE - preparation)
-        }
+        fun prepare(work: Long) { preparation += minOf(work, Long.MAX_VALUE - preparation) }
 
         fun record(solver: RevisedSimplex, scaling: Long, entries: Long, grant: Long, initial: Boolean) {
             val metrics = solver.lastMetrics
             val build = if (metrics.basisBuildWork > 0L) solver.probeBasisBuild() else null
-            numerical = LpProbeNumerical(
-                grant, entries, solver.lastTermination, metrics.pivots,
+            numerical = LpProbeNumerical(grant, entries, solver.lastTermination, metrics.pivots,
                 metrics.basisBuildWork, metrics.basisBuildDeclines, metrics.factorEntriesBuilt,
                 initial && solver.hasInitialOrder, build?.reusedOrders ?: 0L, build?.fallbacks ?: 0L,
                 initial && solver.hasImportedFactors, if (initial) solver.importedFactorEntries else 0L,
-                initial && solver.hasImportedParentValues,
-            )
+                initial && solver.hasImportedParentValues)
             val construction = maxOf(metrics.preparationOps, solver.scalingMetrics.work)
-            if (construction <= scaling) {
-                preparation -= scaling - construction
-            } else {
-                prepare(construction - scaling)
-            }
+            if (construction <= scaling) preparation -= scaling - construction
+            else prepare(construction - scaling)
             prepare(if (metrics.basisBuildUnmeasured > 0L) entries else minOf(entries, metrics.factorEntriesBuilt))
             solving += minOf(metrics.workOps, Long.MAX_VALUE - solving)
         }
@@ -393,14 +336,8 @@ internal class LpDirectionalProbes(
         }
 
         fun publish(observe: (LpProbeMetrics) -> Unit) {
-            val metrics = LpProbeMetrics(
-                preparation - reportedPreparation,
-                solving - reportedSolving,
-                completed - reportedCompleted,
-                decline,
-                preflight,
-                numerical,
-            )
+            val metrics = LpProbeMetrics(preparation - reportedPreparation, solving - reportedSolving,
+                completed - reportedCompleted, decline, preflight, numerical)
             preflight = null
             numerical = null
             reportedPreparation = preparation

@@ -27,22 +27,13 @@ import kotlin.test.assertTrue
 
 class LinearAuthorityCaptureTest {
     private val x = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
-    private val scope = SourceScope(
-        SourceRevision("capture", "exact-affine"),
-        objective = SourceObjective("x", ObjectiveSense.MINIMIZE),
-    )
-    private val source = SourceProofContext(
-        scope,
-        setOf(x),
-        mapOf(
-            "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE)),
-        ),
-        mapOf(x to BigFraction.ONE),
-    )
-    private val installed = LinearAuthorityFeedbackRequest(
-        point = true,
-        cuts = LinearAuthorityFeedbackRequest.Cuts.Installed,
-    )
+    private val scope = SourceScope(SourceRevision("capture", "exact-affine"),
+        objective = SourceObjective("x", ObjectiveSense.MINIMIZE))
+    private val source = SourceProofContext(scope, setOf(x), mapOf(
+        "lower" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE)),
+    ), mapOf(x to BigFraction.ONE))
+    private val installed = LinearAuthorityFeedbackRequest(point = true,
+        cuts = LinearAuthorityFeedbackRequest.Cuts.Installed)
 
     @Test
     fun `candidate violation should precede insertion and survive owner close`() {
@@ -78,10 +69,8 @@ class LinearAuthorityCaptureTest {
         assertEquals(scope, record.generationScope)
         assertEquals(child.scope, record.context.scope)
         assertEquals(child.scope, record.numeric.scope)
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(record.bound)),
-        )
+        assertEquals(SourceEvidenceCheck.Checked,
+            SourceEvidenceVerifier(child.withLinearAuthority()).verify(assertNotNull(record.bound)))
     }
 
     @Test
@@ -123,66 +112,33 @@ class LinearAuthorityCaptureTest {
         assertEquals(original.inactive, query.inactive)
         assertEquals(original.bound?.claim, query.bound?.claim)
         assertEquals(1, replay.operations)
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(source.withLinearAuthority())
-                .verify(assertNotNull(query.bound)),
-        )
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source.withLinearAuthority())
+            .verify(assertNotNull(query.bound)))
     }
 
     @Test
     fun `explicit replay should preserve strict premises under established Boolean guards`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val guarded = SourceProofContext(
-            scope.copy(condition = SourceCondition(bools = mapOf(0 to true))),
-            setOf(x, bool),
-            mapOf(
-                "strict" to SourcePremise(
-                    SourceInequality(
-                        mapOf(x to BigFraction.ofLong(-2)),
-                        BigFraction.MINUS_ONE,
-                        strict = true,
-                    ),
-                    mapOf(0 to true),
-                ),
-            ),
-            mapOf(x to BigFraction.ONE),
-        )
+        val guarded = SourceProofContext(scope.copy(condition = SourceCondition(bools = mapOf(0 to true))),
+            setOf(x, bool), mapOf("strict" to SourcePremise(SourceInequality(
+                mapOf(x to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE, strict = true), mapOf(0 to true))),
+            mapOf(x to BigFraction.ONE))
         val template = assertNotNull(LinearAuthorityTemplate.prepare(guarded, ExecutionControl.Never, cuts = true))
-        val query = assertNotNull(
-            LinearAuthorityQuery.prepare(
-                guarded,
-                template,
-                ExecutionControl.Never,
-                cutMask = emptySet(),
-            ),
-        )
+        val query = assertNotNull(LinearAuthorityQuery.prepare(guarded, template, ExecutionControl.Never,
+            cutMask = emptySet()))
         val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
-        capture.record(
-            guarded,
-            query,
-            template,
-            mapOf(x to BigFraction.ofLong(2).reciprocal()),
-            LinearAuthorityResult(),
-        )
+        capture.record(guarded, query, template, mapOf(x to BigFraction.ofLong(2).reciprocal()),
+            LinearAuthorityResult())
 
-        val replay = LinearAuthorityReplay.run(
-            capture.records.single(),
-            emptySet(),
-            1_000_000L,
-            4_000_000L,
-            ExecutionControl.Never,
-        )
+        val replay = LinearAuthorityReplay.run(capture.records.single(), emptySet(), 1_000_000L, 4_000_000L,
+            ExecutionControl.Never)
 
         val record = assertNotNull(replay.query)
         assertEquals(guarded.scope, record.context.scope)
         assertTrue(record.cited.first().first.strict)
         assertEquals(BigFraction.ofLong(2).reciprocal(), record.cuts.single().violation)
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(guarded.withLinearAuthority())
-                .verify(assertNotNull(record.bound)),
-        )
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(guarded.withLinearAuthority())
+            .verify(assertNotNull(record.bound)))
     }
 
     @Test
@@ -221,10 +177,8 @@ class LinearAuthorityCaptureTest {
 
         assertEquals(baseline.value, treatment.value)
         assertEquals(baseline.terminal?.claim, treatment.terminal?.claim)
-        assertEquals(
-            assertNotNull(baseline.stats.smt.completeSearchStages).filterKeys { !it.endsWith("Nanos") },
-            assertNotNull(treatment.stats.smt.completeSearchStages).filterKeys { !it.endsWith("Nanos") },
-        )
+        assertEquals(assertNotNull(baseline.stats.smt.completeSearchStages).filterKeys { !it.endsWith("Nanos") },
+            assertNotNull(treatment.stats.smt.completeSearchStages).filterKeys { !it.endsWith("Nanos") })
         assertEquals(baseline.stats.openTheory.openTheoryChecks, treatment.stats.openTheory.openTheoryChecks)
         assertEquals(baseline.stats.smt.sourceLp.operations, treatment.stats.smt.sourceLp.operations)
         assertEquals(baseline.stats.smt.sourceLp.floatWork, treatment.stats.smt.sourceLp.floatWork)
@@ -235,64 +189,27 @@ class LinearAuthorityCaptureTest {
     @Test
     fun `guarded strict records should preserve activation across sibling retraction`() {
         val y = SourceCoordinate(SourceCoordinate.Kind.Integer, 1)
-        val guarded = SourceProofContext(
-            scope,
-            setOf(x, y),
-            mapOf(
-                "upper" to SourcePremise(
-                    SourceInequality(
-                        mapOf(x to BigFraction.ofLong(2)),
-                        BigFraction.ofLong(3),
-                        strict = true,
-                    ),
-                    emptyMap(),
-                    mapOf(y to BigFraction.ONE),
-                ),
-            ),
-            mapOf(x to BigFraction.MINUS_ONE),
-        )
-        val enabled = guarded.atScope(
-            scope.copy(
-                condition = SourceCondition(
-                    lower = mapOf(y to BigFraction.ONE),
-                    upper = mapOf(y to BigFraction.ONE),
-                ),
-            ),
-        )
+        val guarded = SourceProofContext(scope, setOf(x, y), mapOf(
+            "upper" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ofLong(2)),
+                BigFraction.ofLong(3), strict = true), emptyMap(), mapOf(y to BigFraction.ONE)),
+        ), mapOf(x to BigFraction.MINUS_ONE))
+        val enabled = guarded.atScope(scope.copy(condition = SourceCondition(
+            lower = mapOf(y to BigFraction.ONE), upper = mapOf(y to BigFraction.ONE))))
         val template = assertNotNull(LinearAuthorityTemplate.prepare(guarded, ExecutionControl.Never, cuts = true))
         val capture = LinearAuthorityCapture(3, 10_000L, 1_000_000L, ExecutionControl.Never)
         for (current in listOf(enabled, guarded, enabled)) {
-            val query = assertNotNull(
-                LinearAuthorityQuery.prepare(
-                    current,
-                    template,
-                    ExecutionControl.Never,
-                    cutMask = emptySet(),
-                ),
-            )
-            capture.record(
-                current,
-                query,
-                template,
-                mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
-                LinearAuthorityResult(),
-            )
+            val query = assertNotNull(LinearAuthorityQuery.prepare(current, template, ExecutionControl.Never,
+                cutMask = emptySet()))
+            capture.record(current, query, template, mapOf(x to BigFraction.ONE, y to BigFraction.ONE),
+                LinearAuthorityResult())
         }
 
         assertEquals(listOf(true, false, true), capture.records.map { it.cuts.single().checked })
         assertEquals(listOf(enabled.scope, guarded.scope, enabled.scope), capture.records.map { it.numeric.scope })
         assertTrue(capture.records.first().cited.first().first.strict)
         val cut = capture.records.first().cuts.single()
-        assertEquals(
-            SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(enabled).verify(
-                SourceEvidence(
-                    enabled.scope,
-                    SourceClaim.Consequence(cut.inequality),
-                    cut.derivation,
-                ),
-            ),
-        )
+        assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(enabled).verify(SourceEvidence(
+            enabled.scope, SourceClaim.Consequence(cut.inequality), cut.derivation)))
         assertEquals(listOf(false, false, false), capture.records.map { it.cuts.single().installed })
     }
 
@@ -371,19 +288,10 @@ class LinearAuthorityCaptureTest {
     @Test
     fun `open Boolean capture should not substitute an unknown pin`() {
         val bool = SourceCoordinate(SourceCoordinate.Kind.Boolean, 0)
-        val guarded = SourceProofContext(
-            scope,
-            setOf(x, bool),
-            mapOf(
-                "row" to SourcePremise(
-                    SourceInequality(
-                        mapOf(x to BigFraction.ONE, bool to BigFraction.ONE),
-                        BigFraction.ONE,
-                    ),
-                ),
-            ),
-            mapOf(x to BigFraction.ONE),
-        )
+        val guarded = SourceProofContext(scope, setOf(x, bool), mapOf(
+            "row" to SourcePremise(SourceInequality(mapOf(x to BigFraction.ONE, bool to BigFraction.ONE),
+                BigFraction.ONE)),
+        ), mapOf(x to BigFraction.ONE))
         val capture = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never)
 
         capture.record(guarded, null, null, null, LinearAuthorityResult())
@@ -395,11 +303,8 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `a requested projection should match the full record on its requested fields`() {
-        for (request in listOf(
-            installed,
-            LinearAuthorityFeedbackRequest(refutation = true),
-            LinearAuthorityFeedbackRequest(),
-        )) {
+        for (request in listOf(installed, LinearAuthorityFeedbackRequest(refutation = true),
+            LinearAuthorityFeedbackRequest())) {
             val full = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply { deliver(10_000L, 1_000_000L) }
             val narrow = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
                 deliver(10_000L, 1_000_000L, request)
@@ -418,15 +323,10 @@ class LinearAuthorityCaptureTest {
                 assertEquals(expected.context, actual.context)
                 assertEquals(expected.point.takeIf { request.point }, actual.point)
                 assertEquals(expected.refutation.takeIf { request.refutation }, actual.refutation)
-                val kept = if (request.cuts == LinearAuthorityFeedbackRequest.Cuts.None) {
-                    emptyList()
-                } else {
-                    expected.cuts.filter { it.installed && it.checked && it.ownerActive }
-                }
-                assertEquals(
-                    kept.map { listOf(it.id, it.inequality, it.installed, it.checked, it.ownerActive) },
-                    actual.cuts.map { listOf(it.id, it.inequality, it.installed, it.checked, it.ownerActive) },
-                )
+                val kept = if (request.cuts == LinearAuthorityFeedbackRequest.Cuts.None) emptyList()
+                    else expected.cuts.filter { it.installed && it.checked && it.ownerActive }
+                assertEquals(kept.map { listOf(it.id, it.inequality, it.installed, it.checked, it.ownerActive) },
+                    actual.cuts.map { listOf(it.id, it.inequality, it.installed, it.checked, it.ownerActive) })
                 assertTrue(actual.cuts.all { it.violation == null })
                 for ((reference, cut) in kept.zip(actual.cuts)) {
                     assertEquals(full.violation(expected, reference), narrow.violation(actual, cut))
@@ -456,14 +356,8 @@ class LinearAuthorityCaptureTest {
 
     @Test
     fun `a requested record should reference its scope condition instead of charging its bounds`() {
-        val bounded = source.atScope(
-            scope.copy(
-                condition = SourceCondition(
-                    lower = mapOf(x to BigFraction.ZERO),
-                    upper = mapOf(x to BigFraction.ONE),
-                ),
-            ),
-        )
+        val bounded = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO),
+            upper = mapOf(x to BigFraction.ONE))))
         fun charged(request: LinearAuthorityFeedbackRequest, context: SourceProofContext): Long {
             val capture = LinearAuthorityCapture(0, 0L, 0L, ExecutionControl.Never).apply {
                 deliver(10_000L, 1_000_000L, request)
@@ -473,22 +367,14 @@ class LinearAuthorityCaptureTest {
         }
 
         assertEquals(charged(installed, source), charged(installed, bounded))
-        assertTrue(
-            charged(LinearAuthorityFeedbackRequest.Full, source) <
-                charged(LinearAuthorityFeedbackRequest.Full, bounded),
-        )
+        assertTrue(charged(LinearAuthorityFeedbackRequest.Full, source) <
+            charged(LinearAuthorityFeedbackRequest.Full, bounded))
     }
 
     @Test
     fun `queries after an archive allowance overflow should be delivery-only`() {
-        val bounded = source.atScope(
-            scope.copy(
-                condition = SourceCondition(
-                    lower = mapOf(x to BigFraction.ZERO),
-                    upper = mapOf(x to BigFraction.ONE),
-                ),
-            ),
-        )
+        val bounded = source.atScope(scope.copy(condition = SourceCondition(lower = mapOf(x to BigFraction.ZERO),
+            upper = mapOf(x to BigFraction.ONE))))
         val single = LinearAuthorityCapture(1, 10_000L, 1_000_000L, ExecutionControl.Never).apply {
             record(source, null, null, null, LinearAuthorityResult())
         }.bytes
@@ -562,10 +448,8 @@ class LinearAuthorityCaptureTest {
         }
 
         for (record in listOf(replaced, released)) {
-            assertEquals(
-                LinearAuthorityCutViolation.Unavailable(LinearAuthorityCutViolation.Reason.Released),
-                capture.violation(record, record.cuts.single()),
-            )
+            assertEquals(LinearAuthorityCutViolation.Unavailable(LinearAuthorityCutViolation.Reason.Released),
+                capture.violation(record, record.cuts.single()))
         }
         assertEquals(0L, capture.evaluatedCuts)
     }

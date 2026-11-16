@@ -54,22 +54,13 @@ class DuplicateColumnsTest {
                             return row.linearForm
                         }
                 }
-                val problem = BakedProblem(
-                    0,
-                    2,
-                    Array(2) { IntDomain(0, 2) },
-                    List(4) { factor },
-                    openIntHi = booleanArrayOf(true, false),
-                    alreadyFolded = true,
-                )
+                val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, 2) }, List(4) { factor },
+                    openIntHi = booleanArrayOf(true, false), alreadyFolded = true)
                 forms = 0
                 val token = ExecutionControl { forms >= stopAt }
 
-                val empty = if (source) {
-                    DuplicateColumns.mergeSourceDuplicateColumns(problem, emptySet(), token).isEmpty
-                } else {
-                    DuplicateColumns.mergeDuplicateColumns(problem, cancellation = token).isEmpty
-                }
+                val empty = if (source) DuplicateColumns.mergeSourceDuplicateColumns(problem, emptySet(), token).isEmpty
+                else DuplicateColumns.mergeDuplicateColumns(problem, cancellation = token).isEmpty
 
                 assertTrue(empty, "$source $stopAt")
                 assertEquals(2L, problem.rootIntDomain(0).max)
@@ -80,28 +71,17 @@ class DuplicateColumnsTest {
     @Test
     fun `declining every unrepresentable merge should keep the model and its coordinates`() {
         val top = 1L shl 62
-        val problem = BakedProblem(
-            0,
-            2,
-            Array(2) { IntDomain(0, top) },
-            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.NE, -1L)),
-            alreadyFolded = true,
-        )
+        val problem = BakedProblem(0, 2, Array(2) { IntDomain(0, top) },
+            listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.NE, -1L)), alreadyFolded = true)
         val budget = PresolveBudget(Long.MAX_VALUE)
 
-        val result = Presolver.run(
-            problem,
-            PresolveConfig.parse("off,+dup-columns"),
-            PresolveContext(presolveBudget = budget),
-            budget.orSpent(ExecutionControl.Never),
-        )
+        val result = Presolver.run(problem, PresolveConfig.parse("off,+dup-columns"),
+            PresolveContext(presolveBudget = budget), budget.orSpent(ExecutionControl.Never))
 
         assertSame(problem, result.problem)
         assertTrue(result.passesFired.isEmpty())
-        assertEquals(
-            PresolveInvocationOutcome.COMPLETE_MISS,
-            budget.invocations.single { it.pass == "dup-columns" }.outcome,
-        )
+        assertEquals(PresolveInvocationOutcome.COMPLETE_MISS,
+            budget.invocations.single { it.pass == "dup-columns" }.outcome)
         val coordinates = assertNotNull(result.mapping.retainedCoordinates())
         assertEquals(listOf(0, 1), List(2) { coordinates.int(it) })
     }

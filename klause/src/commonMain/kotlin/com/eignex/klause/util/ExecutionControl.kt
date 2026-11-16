@@ -93,7 +93,8 @@ open class ExecutionControl(
         val Never = ExecutionControl()
 
         /** Execution stopped at [deadline]. */
-        fun until(deadline: ComparableTimeMark): ExecutionControl = when (val predicate = Cancellation.until(deadline)) {
+        fun until(deadline: ComparableTimeMark): ExecutionControl = when (val predicate =
+            Cancellation.until(deadline)) {
             is MonotonicDeadline -> MonotonicDeadlineExecutionControl(deadline, predicate)
             else -> GenericDeadlineExecutionControl(deadline, predicate)
         }

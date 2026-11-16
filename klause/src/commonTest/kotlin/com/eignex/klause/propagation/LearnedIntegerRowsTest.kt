@@ -11,19 +11,8 @@ import kotlin.test.assertTrue
 class LearnedIntegerRowsTest {
     @Test
     fun `large cache admissions should fit the existing work grant`() {
-        val row = assertNotNull(
-            IntegerConflictRow.source(
-                LinearPropagator(
-                    intArrayOf(),
-                    intArrayOf(0),
-                    longArrayOf(1),
-                    intArrayOf(0),
-                    LinearOp.LE,
-                    10,
-                ),
-                useLo = true,
-            ),
-        )
+        val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
         val rows = Array(20_000) { LearnedIntegerPropagator(row) }
         val cache = LearnedIntegerRows()
         var maximumWork = 0L
@@ -43,19 +32,8 @@ class LearnedIntegerRowsTest {
 
     @Test
     fun `retired tail capacity should release within the small surviving row grant`() {
-        val row = assertNotNull(
-            IntegerConflictRow.source(
-                LinearPropagator(
-                    intArrayOf(),
-                    intArrayOf(0),
-                    longArrayOf(1),
-                    intArrayOf(0),
-                    LinearOp.LE,
-                    10,
-                ),
-                useLo = true,
-            ),
-        )
+        val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
         val rows = Array(20_000) { LearnedIntegerPropagator(row) }
         val cache = LearnedIntegerRows()
         for (propagator in rows) cache.admit(propagator)
@@ -75,19 +53,8 @@ class LearnedIntegerRowsTest {
 
     @Test
     fun `a large surviving prefix should trim within the existing scratch grant`() {
-        val row = assertNotNull(
-            IntegerConflictRow.source(
-                LinearPropagator(
-                    intArrayOf(),
-                    intArrayOf(0),
-                    longArrayOf(1),
-                    intArrayOf(0),
-                    LinearOp.LE,
-                    10,
-                ),
-                useLo = true,
-            ),
-        )
+        val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
         val rows = Array(20_000) { LearnedIntegerPropagator(row) }
         val cache = LearnedIntegerRows()
         for (propagator in rows) cache.admit(propagator)
@@ -106,19 +73,8 @@ class LearnedIntegerRowsTest {
 
     @Test
     fun `trimmed partial pages should preserve swap removal after another admission`() {
-        val row = assertNotNull(
-            IntegerConflictRow.source(
-                LinearPropagator(
-                    intArrayOf(),
-                    intArrayOf(0),
-                    longArrayOf(1),
-                    intArrayOf(0),
-                    LinearOp.LE,
-                    10,
-                ),
-                useLo = true,
-            ),
-        )
+        val row = assertNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+            longArrayOf(1), intArrayOf(0), LinearOp.LE, 10), useLo = true))
         val rows = Array(130) { LearnedIntegerPropagator(row) }
         val cache = LearnedIntegerRows()
         for (propagator in rows) cache.admit(propagator)

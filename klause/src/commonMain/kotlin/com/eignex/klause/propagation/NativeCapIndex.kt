@@ -80,22 +80,14 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
     fun <T> usingBudget(budget: ReclamationPreparation, operation: () -> T): T {
         val previous = activeBudget
         activeBudget = budget
-        return try {
-            operation()
-        } finally {
-            activeBudget = previous
-        }
+        return try { operation() } finally { activeBudget = previous }
     }
 
     fun admissionPages(rows: Int): Long = if (readyForAdmissions) {
         ((requiredSlots(rows) - pool.slots).coerceAtLeast(0L) + 7L) / 8L
-    } else {
-        0L
-    }
+    } else 0L
 
-    fun reserveAdmission() {
-        pool.reserve()
-    }
+    fun reserveAdmission() { pool.reserve() }
 
     fun reservePages(budget: ReclamationPreparation) {
         while (pool.slots < requiredSlots(candidates.size)) {
@@ -130,9 +122,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
         captureSuppressed = true
     }
 
-    fun invalidateRetiredHandles() {
-        revision++
-    }
+    fun invalidateRetiredHandles() { revision++ }
 
     fun prepareUntrackedRetirement(retirement: Int, budget: ReclamationPreparation) {
         if (retirement <= retirementBaseline) return
@@ -193,7 +183,6 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
         while (true) {
             when (stage) {
                 Stage.Idle -> return Completion.None
-
                 Stage.Reserve -> {
                     reservePages(budget)
                     budget.visit(9L)
@@ -202,16 +191,11 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                     initialized = true
                     begin(policy.activeCount <= cap, budget)
                 }
-
                 Stage.Clean -> clean(budget, policy)
-
                 Stage.Repair -> {
                     if (repairRead < 0) {
-                        if (revision != observedRevision) {
-                            startClean(afterClean, budget)
-                        } else {
-                            transition(afterClean, budget)
-                        }
+                        if (revision != observedRevision) startClean(afterClean, budget)
+                        else transition(afterClean, budget)
                     } else {
                         budget.visit(8L)
                         budget.visit(0L)
@@ -221,19 +205,12 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         changed()
                     }
                 }
-
                 Stage.PruneDirty -> prune(dirty, true, budget, policy)
-
                 Stage.PruneAging -> prune(aging, false, budget, policy)
-
                 Stage.Aging -> take(aging, true, budget)
-
                 Stage.Dirty -> take(dirty, false, budget)
-
                 Stage.Admissions -> {
-                    if (read == candidates.size) {
-                        transition(Stage.Select, budget)
-                    } else {
+                    if (read == candidates.size) transition(Stage.Select, budget) else {
                         budget.visit(CAP_ROW_INSPECTION_WORK)
                         budget.visit(0L)
                         pending = candidates[read++]
@@ -243,7 +220,6 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         changed()
                     }
                 }
-
                 Stage.Scan -> {
                     if (scan == heapSize) {
                         budget.visit(1L)
@@ -261,7 +237,6 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         changed()
                     }
                 }
-
                 Stage.Inspect -> {
                     val alive = policy.alive(pending)
                     val classified = alive && policy.classified(pending)
@@ -274,16 +249,11 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                     } else if (cleanOnly) {
                         rescanNext = true
                         stage = if (insertPending) Stage.Admit else afterMark
-                    } else {
-                        stage = if (classified) {
-                            if (insertPending) Stage.Admit else afterMark
-                        } else {
-                            Stage.Classify
-                        }
-                    }
+                    } else stage = if (classified) {
+                        if (insertPending) Stage.Admit else afterMark
+                    } else Stage.Classify
                     changed()
                 }
-
                 Stage.Classify -> {
                     budget.visit(0L)
                     if (!policy.prepare(pending)) {
@@ -291,17 +261,12 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         rescanNext = true
                     } else {
                         callback = true
-                        pendingKeep = try {
-                            policy.keep(pending)
-                        } finally {
-                            callback = false
-                        }
+                        pendingKeep = try { policy.keep(pending) } finally { callback = false }
                         classifications++
                     }
                     stage = Stage.Mark
                     changed()
                 }
-
                 Stage.Mark -> {
                     budget.visit(24L)
                     val revisit = policy.markClassification(pending, pendingKeep)
@@ -310,7 +275,6 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                     stage = if (insertPending) Stage.Admit else afterMark
                     changed()
                 }
-
                 Stage.Admit -> {
                     budget.visit(4L)
                     budget.visit(0L)
@@ -322,17 +286,12 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                     stage = Stage.Up
                     changed()
                 }
-
                 Stage.Up -> up(budget, policy)
-
                 Stage.Down -> down(budget, policy)
-
                 Stage.Select -> {
                     when {
                         revision != observedRevision -> startClean(Stage.Select, budget)
-
                         read < candidates.size -> transition(Stage.Admissions, budget)
-
                         rescanRequested -> {
                             budget.visit(4L)
                             budget.visit(0L)
@@ -340,17 +299,13 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                             stage = Stage.Scan
                             changed()
                         }
-
                         cleanOnly || policy.activeCount <= cap || heapSize == 0 -> transition(Stage.Restore, budget)
-
                         else -> {
                             budget.visit(8L)
                             val index = candidates[0]
                             val key = policy.lbd(index)
                             budget.visit(0L)
-                            if (key <= glue) {
-                                stage = Stage.Restore
-                            } else {
+                            if (key <= glue) stage = Stage.Restore else {
                                 pending = index
                                 stage = Stage.Retire
                             }
@@ -358,7 +313,6 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         }
                     }
                 }
-
                 Stage.Retire -> {
                     budget.visit(8L)
                     budget.visit(0L)
@@ -366,7 +320,6 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                     stage = Stage.Remove
                     changed()
                 }
-
                 Stage.Remove -> {
                     budget.visit(12L)
                     budget.visit(0L)
@@ -379,7 +332,6 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                     stage = if (aborting || heapSize == 0) afterSift else Stage.Down
                     changed()
                 }
-
                 Stage.Restore -> {
                     if (retries.size == 0) {
                         budget.visit(4L)
@@ -400,13 +352,10 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                             sift = heapSize++
                             afterSift = Stage.Restore
                             stage = if (aborting) Stage.Restore else Stage.Up
-                        } else {
-                            retries.pop(pool)
-                        }
+                        } else retries.pop(pool)
                         changed()
                     }
                 }
-
                 Stage.Clear -> {
                     if (processed.size == 0) {
                         budget.visit(4L)
@@ -422,7 +371,6 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         changed()
                     }
                 }
-
                 Stage.Finalize -> {
                     if (finalRead < candidates.size) {
                         budget.visit(4L)
@@ -438,13 +386,9 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         changed()
                     }
                 }
-
                 Stage.TrimPool -> {
-                    val needed = if (candidates.size == 0 && dirty.size == 0 && aging.size == 0) {
-                        0L
-                    } else {
-                        maxOf(requiredSlots(candidates.size), dirty.size.toLong() + aging.size + 64L)
-                    }
+                    val needed = if (candidates.size == 0 && dirty.size == 0 && aging.size == 0) 0L
+                        else maxOf(requiredSlots(candidates.size), dirty.size.toLong() + aging.size + 64L)
                     if (pool.available > 0L && pool.slots - 8L >= needed) {
                         budget.visit(8L)
                         budget.visit(0L)
@@ -477,10 +421,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
             insertPending = false
             aborting = true
             if (stage != Stage.Finalize && stage != Stage.TrimPool &&
-                stage != Stage.Retire && stage != Stage.Remove
-            ) {
-                stage = Stage.Restore
-            }
+                stage != Stage.Retire && stage != Stage.Remove) stage = Stage.Restore
             changed()
         }
         return advance(Int.MAX_VALUE, NativeCapConfiguration(tiered, glue, mid), budget, policy)
@@ -509,19 +450,14 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
             rescanNext = false
         }
         captureSuppressed = false
-        if (revision != observedRevision) {
-            startClean(if (cleanupOnly) Stage.PruneDirty else Stage.Aging, budget)
-        } else {
-            stage = if (cleanupOnly) Stage.PruneDirty else Stage.Aging
-        }
+        if (revision != observedRevision) startClean(if (cleanupOnly) Stage.PruneDirty else Stage.Aging, budget)
+        else stage = if (cleanupOnly) Stage.PruneDirty else Stage.Aging
         changed()
     }
 
     private fun take(queue: NativeCapQueue, fromAging: Boolean, budget: ReclamationPreparation) {
         val remaining = if (fromAging) agingRemaining else dirtyRemaining
-        if (remaining == 0) {
-            transition(if (fromAging) Stage.Dirty else Stage.Admissions, budget)
-        } else {
+        if (remaining == 0) transition(if (fromAging) Stage.Dirty else Stage.Admissions, budget) else {
             budget.visit(CAP_ROW_INSPECTION_WORK)
             budget.visit(0L)
             pending = queue.pop(pool)
@@ -540,9 +476,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
         policy: NativeIndexedCapPolicy,
     ) {
         val remaining = if (fromDirty) dirtyRemaining else agingRemaining
-        if (remaining == 0) {
-            transition(if (fromDirty) Stage.PruneAging else afterPrune, budget)
-        } else {
+        if (remaining == 0) transition(if (fromDirty) Stage.PruneAging else afterPrune, budget) else {
             budget.visit(8L)
             val alive = policy.alive(queue.first())
             budget.visit(0L)
@@ -583,9 +517,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
         budget.visit(16L)
         val alive = policy.alive(candidates[cleanupRead])
         budget.visit(0L)
-        if (alive) {
-            cleanupRead++
-        } else {
+        if (alive) cleanupRead++ else {
             val last = heapSize - 1
             val replacement = candidates[last]
             val moveUp = cleanupRead < last && cleanupRead > 0 &&
@@ -603,9 +535,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
     }
 
     private fun up(budget: ReclamationPreparation, policy: NativeIndexedCapPolicy) {
-        if (sift == 0) {
-            transition(afterSift, budget)
-        } else {
+        if (sift == 0) transition(afterSift, budget) else {
             budget.visit(8L)
             val parent = (sift - 1) / 2
             val move = better(candidates[parent], candidates[sift], policy)
@@ -614,9 +544,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                 swap(parent, sift)
                 sift = parent
                 if (afterSift == Stage.Clean) cleanupRead = minOf(cleanupRead, parent)
-            } else {
-                stage = afterSift
-            }
+            } else stage = afterSift
             changed()
         }
     }
@@ -624,18 +552,14 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
     private fun down(budget: ReclamationPreparation, policy: NativeIndexedCapPolicy) {
         budget.visit(12L)
         var child = sift * 2 + 1
-        if (child >= heapSize) {
-            transition(afterSift, budget)
-        } else {
+        if (child >= heapSize) transition(afterSift, budget) else {
             if (child + 1 < heapSize && better(candidates[child], candidates[child + 1], policy)) child++
             val move = better(candidates[sift], candidates[child], policy)
             budget.visit(0L)
             if (move) {
                 swap(sift, child)
                 sift = child
-            } else {
-                stage = afterSift
-            }
+            } else stage = afterSift
             changed()
         }
     }
@@ -659,35 +583,12 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
         changed()
     }
 
-    private fun changed() {
-        serial = if (serial == Long.MAX_VALUE) 0L else serial + 1L
-    }
+    private fun changed() { serial = if (serial == Long.MAX_VALUE) 0L else serial + 1L }
 
     enum class Completion { None, Pass, Cleaned, Aborted }
     private enum class Stage {
-        Idle,
-        Reserve,
-        Clean,
-        Repair,
-        PruneDirty,
-        PruneAging,
-        Aging,
-        Dirty,
-        Admissions,
-        Scan,
-        Inspect,
-        Classify,
-        Mark,
-        Admit,
-        Up,
-        Down,
-        Select,
-        Retire,
-        Remove,
-        Restore,
-        Clear,
-        Finalize,
-        TrimPool,
+        Idle, Reserve, Clean, Repair, PruneDirty, PruneAging, Aging, Dirty, Admissions, Scan, Inspect,
+        Classify, Mark, Admit, Up, Down, Select, Retire, Remove, Restore, Clear, Finalize, TrimPool,
     }
 
     companion object {

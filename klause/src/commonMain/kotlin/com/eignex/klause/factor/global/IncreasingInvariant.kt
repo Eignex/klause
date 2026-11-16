@@ -142,16 +142,10 @@ internal class IncreasingInvariant(private val xs: IntArray, private val gap: In
         for (i in 0 until n) {
             val cur = state.assignment.intValue(xs[i])
             val d = state.rootDomains[xs[i]]
-            val lo = if (i == 0) {
-                d.min
-            } else {
+            val lo = if (i == 0) d.min else
                 maxOf(d.min, step(state.assignment.intValue(xs[i - 1]), raise = true) ?: continue)
-            }
-            val hi = if (i == n - 1) {
-                d.max
-            } else {
+            val hi = if (i == n - 1) d.max else
                 minOf(d.max, step(state.assignment.intValue(xs[i + 1]), raise = false) ?: continue)
-            }
             if (cur > d.min) {
                 val down = d.lower(cur)
                 if (down >= lo) sink.addChannelingIntSet(state, xs[i], down)

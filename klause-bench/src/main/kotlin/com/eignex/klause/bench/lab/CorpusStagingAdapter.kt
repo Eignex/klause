@@ -30,15 +30,11 @@ internal object CorpusStagingSuite : BenchSuite {
     override fun describe() = BenchDescriptor("corpus-staging", "Source IO diagnostics without solver execution")
 
     override fun plan(request: BenchRequest): List<BenchCase> {
-        require(
-            request.parameters.keys - setOf("order", "staging-target", "staging-buffer-kib") ==
-                setOf("inputs", "timeout-ms"),
-        )
-        val controls = CorpusStagingControls(
-            request.parameters["order"] ?: "forward",
+        require(request.parameters.keys - setOf("order", "staging-target", "staging-buffer-kib") ==
+            setOf("inputs", "timeout-ms"))
+        val controls = CorpusStagingControls(request.parameters["order"] ?: "forward",
             request.parameters["staging-target"] ?: "cache",
-            (request.parameters["staging-buffer-kib"] ?: "8").toInt(),
-        )
+            (request.parameters["staging-buffer-kib"] ?: "8").toInt())
         val budget = request.parameters.getValue("timeout-ms").toLong().also { require(it in 1..10_000) }
         val inputs = BenchProtocol.json.decodeFromString<List<FrozenStagingInput>>(
             request.parameters.getValue("inputs"),
@@ -48,27 +44,16 @@ internal object CorpusStagingSuite : BenchSuite {
             require(input.suite.isNotBlank() && input.problem.isNotBlank() && input.path.endsWith(".zst"))
             require(input.plainSha256.matches(Regex("[a-f0-9]{64}")))
             val variant = "${controls.order}/${controls.stagingTarget}/${controls.bufferKiB}"
-            BenchCase(
-                "${input.suite}/${input.problem}/staging/$variant",
-                parameters = mapOf(
-                    "timeout-ms" to budget.toString(),
-                    "plain-sha256" to input.plainSha256,
-                    "order" to controls.order,
-                    "staging-target" to controls.stagingTarget,
-                    "staging-buffer-kib" to controls.bufferKiB.toString(),
-                ),
+            BenchCase("${input.suite}/${input.problem}/staging/$variant",
+                parameters = mapOf("timeout-ms" to budget.toString(),
+                    "plain-sha256" to input.plainSha256, "order" to controls.order,
+                    "staging-target" to controls.stagingTarget, "staging-buffer-kib" to controls.bufferKiB.toString()),
                 resources = BenchResources(1, 4096, 280),
                 inputs = listOf(BenchInput(input.path, BenchInputRoot.CORPUS, "model", input.packedSha256)),
-                attributes = mapOf(
-                    "suite" to input.suite,
-                    "problem" to input.problem,
-                    "format" to input.format,
+                attributes = mapOf("suite" to input.suite, "problem" to input.problem, "format" to input.format,
                     "comparisonKey" to "${input.suite}/${input.problem}",
                     "pairKey" to "${input.suite}/${input.problem}",
-                    "budgetMs" to budget.toString(),
-                    "recordSchema" to "corpus-staging-v1",
-                ),
-            )
+                    "budgetMs" to budget.toString(), "recordSchema" to "corpus-staging-v1"))
         }
     }
 
@@ -83,25 +68,18 @@ internal object CorpusStagingSuite : BenchSuite {
                 out,
                 case.parameters.getValue("timeout-ms").toLong(),
                 expectedHash = case.parameters.getValue("plain-sha256"),
-                controls = CorpusStagingControls(
-                    case.parameters.getValue("order"),
-                    case.parameters.getValue("staging-target"),
-                    case.parameters.getValue("staging-buffer-kib").toInt(),
-                ),
+                controls = CorpusStagingControls(case.parameters.getValue("order"),
+                    case.parameters.getValue("staging-target"), case.parameters.getValue("staging-buffer-kib").toInt()),
             )
         }.exceptionOrNull()
-        return BenchResult(
-            case.id,
-            if (failure == null) BenchStatus.SUCCESS else BenchStatus.FAILED,
+        return BenchResult(case.id, if (failure == null) BenchStatus.SUCCESS else BenchStatus.FAILED,
             artifacts = context.artifacts(),
             details = buildJsonObject {
                 put("solverExecuted", false)
                 put("throughputQualification", false)
                 put("inputDigest", case.attributes["labInputDigest"])
                 put("failure", failure?.toString())
-            },
-            message = failure?.toString(),
-        )
+            }, message = failure?.toString())
     }
 }
 

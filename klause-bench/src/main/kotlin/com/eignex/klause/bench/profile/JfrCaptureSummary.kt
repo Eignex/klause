@@ -20,18 +20,12 @@ internal object JfrCaptureSummary : BenchSuite {
 
     override fun plan(request: BenchRequest): List<BenchCase> {
         validate(request.parameters)
-        return listOf(
-            BenchCase(
-                "jfr/${request.parameters.getValue("sha256")}",
-                request.parameters,
-                BenchResources(
-                    cpus = 1,
-                    memoryMiB = 2048,
-                    timeoutSeconds = 120,
-                    requiredTags = setOf("platform:linux", "arch:x86_64"),
-                ),
-            ),
-        )
+        return listOf(BenchCase(
+            "jfr/${request.parameters.getValue("sha256")}",
+            request.parameters,
+            BenchResources(cpus = 1, memoryMiB = 2048, timeoutSeconds = 120,
+                requiredTags = setOf("platform:linux", "arch:x86_64")),
+        ))
     }
 
     override fun run(case: BenchCase, context: BenchContext): BenchResult {
@@ -54,30 +48,20 @@ internal object JfrCaptureSummary : BenchSuite {
         val summary = samples.summary(case.parameters.getValue("source"), case.parameters.getValue("sha256"))
         Files.writeString(context.outputDirectory.resolve("summary.json"), summary.toString())
         val events = case.parameters["events"]?.toBooleanStrict() ?: false
-        if (events) {
-            HarnessRecording.extract(
-                context.outputDirectory,
-                capture,
-                "retained capture: ${case.parameters.getValue("source")}; original recording scope applies",
-            )
-        }
+        if (events) HarnessRecording.extract(context.outputDirectory, capture,
+            "retained capture: ${case.parameters.getValue("source")}; original recording scope applies")
         val error = context.outputDirectory.resolve("harness-analysis-error.txt")
         val extractionFailed = events && Files.exists(error)
         val artifacts = listOf("capture.jfr", "summary.json") +
-            if (events) {
-                listOf("harness-events.jsonl", "harness-analysis.json", "harness-analysis-error.txt")
-            } else {
-                emptyList()
-            }
-        return BenchResult(
-            case.id,
+            if (events) listOf("harness-events.jsonl", "harness-analysis.json", "harness-analysis-error.txt")
+            else emptyList()
+        return BenchResult(case.id,
             status = if (extractionFailed) BenchStatus.FAILED else BenchStatus.SUCCESS,
             message = if (extractionFailed) "JFR event extraction failed; see harness-analysis-error.txt" else null,
             artifacts = artifacts
                 .filter { Files.isRegularFile(context.outputDirectory.resolve(it)) }
                 .map { BenchArtifact(it) },
-            details = summary,
-        )
+            details = summary)
     }
 
     internal fun decode(parameters: Map<String, String>, capture: Path) {
@@ -144,21 +128,14 @@ internal object JfrCaptureSummary : BenchSuite {
             put("truncatedStacks", truncated)
             put("depthLimitedStacks", depthLimited)
             put("emptyStacks", emptyStacks)
-            put(
-                "sampledMethods",
-                buildJsonArray {
-                    for ((method, count) in methods.toList().sortedWith(
-                        compareByDescending<Pair<String, Long>> { it.second }.thenBy { it.first },
-                    )) {
-                        add(
-                            buildJsonObject {
-                                put("method", method)
-                                put("samples", count)
-                            },
-                        )
-                    }
-                },
-            )
+            put("sampledMethods", buildJsonArray {
+                for ((method, count) in methods.toList().sortedWith(
+                    compareByDescending<Pair<String, Long>> { it.second }.thenBy { it.first },
+                )) add(buildJsonObject {
+                    put("method", method)
+                    put("samples", count)
+                })
+            })
         }
     }
 

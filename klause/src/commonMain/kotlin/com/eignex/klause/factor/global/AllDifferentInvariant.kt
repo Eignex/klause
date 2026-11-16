@@ -212,9 +212,7 @@ internal class AllDifferentInvariant(
         for (k in 0 until m) {
             val v = freeVars[k]
             val id = matchVar[k]
-            val value = if (id >= 0) {
-                values[id]
-            } else {
+            val value = if (id >= 0) values[id] else {
                 var fallback: Long? = null
                 exceptValues.forEach { if (fallback == null && it in state.rootDomains[v]) fallback = it }
                 fallback ?: return false

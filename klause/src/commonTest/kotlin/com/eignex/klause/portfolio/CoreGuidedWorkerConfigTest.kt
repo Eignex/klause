@@ -25,26 +25,17 @@ import kotlin.test.assertNull
 class CoreGuidedWorkerConfigTest {
     @Test
     fun `selected propagation deletion should attain the source optimum through the core worker`() {
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            arrayOf(
-                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-            ),
-        ).bake()
+        val problem = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+        )).bake()
         val objective = LinearObjective(longArrayOf(1, 100, 100))
         val worker = CoreGuidedWorkerConfig(coreRefinement = CoreRefinementMode.DELETION) {
             it.copy(nativeSat = false, randomSeed = 3L)
         }.materialize(problem, 0, 0, 3L, 1.0, objective, null, null, null, null)
 
         worker.use {
-            requireNotNull(
-                worker.newResumableSearch(
-                    { Double.POSITIVE_INFINITY },
-                    ExecutionControl.Never,
-                ),
-            ).use { handle ->
+            requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY },
+                ExecutionControl.Never)).use { handle ->
                 val result = handle.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) {}
 
                 assertEquals(100L, objective.evaluateLong(assertIs<MinimizeResult.Optimal>(result).sample))
@@ -56,14 +47,9 @@ class CoreGuidedWorkerConfigTest {
 
     @Test
     fun `explicit core workers should consume selected seed reason refinement`() {
-        val problem = Problem(
-            3,
-            0,
-            emptyArray(),
-            arrayOf(
-                Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
-            ),
-        ).bake()
+        val problem = Problem(3, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
+        )).bake()
         val objective = LinearObjective(longArrayOf(1, 100, 100))
         var cancelled = false
         val floors = mutableListOf<Double>()
@@ -78,12 +64,8 @@ class CoreGuidedWorkerConfigTest {
         )
 
         worker.use {
-            requireNotNull(
-                worker.newResumableSearch(
-                    { Double.POSITIVE_INFINITY },
-                    ExecutionControl.Never,
-                ),
-            ).use { handle ->
+            requireNotNull(worker.newResumableSearch({ Double.POSITIVE_INFINITY },
+                ExecutionControl.Never)).use { handle ->
                 val paused = handle.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE, -1L) {
                     error("unfinished refinement")
                 }

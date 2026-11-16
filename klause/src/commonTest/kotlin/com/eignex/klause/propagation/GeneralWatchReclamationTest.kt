@@ -11,15 +11,8 @@ import kotlin.test.assertTrue
 class GeneralWatchReclamationTest {
     @Test
     fun `small grants should release retired postings without changing learned handles`() {
-        val session = PropagationSession(
-            Problem(
-                6,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(8, 10))),
-            ),
-            nativeSat = false,
-        )
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
         val state = session.explanationState
@@ -40,15 +33,8 @@ class GeneralWatchReclamationTest {
 
     @Test
     fun `cancelled cleanup should resume from the same watcher generation`() {
-        val session = PropagationSession(
-            Problem(
-                6,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(8, 10))),
-            ),
-            nativeSat = false,
-        )
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
         val state = session.explanationState
@@ -64,15 +50,8 @@ class GeneralWatchReclamationTest {
 
     @Test
     fun `a moved live watch should not hide retired entries in the scanned prefix`() {
-        val session = PropagationSession(
-            Problem(
-                6,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(8, 10))),
-            ),
-            nativeSat = false,
-        )
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
         session.addLearnedClause(Clause(intArrayOf(0, 2, 4)), 2, permanent = true)
         repeat(64) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
@@ -130,18 +109,10 @@ class GeneralWatchReclamationTest {
             assertEquals(true, session.boolValue(5))
         }
     }
-
     @Test
     fun `a missing live back pointer should leave full compaction available`() {
-        val session = PropagationSession(
-            Problem(
-                6,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(8, 10))),
-            ),
-            nativeSat = false,
-        )
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
         session.addLearnedClause(Clause(intArrayOf(0, 2, 4)), 2, permanent = true)
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }
@@ -159,15 +130,8 @@ class GeneralWatchReclamationTest {
     @Test
     fun `large surviving postings should trim independently within default grants`() {
         val base = Clause(intArrayOf(0, 2))
-        val session = PropagationSession(
-            Problem(
-                4,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(4, 6))),
-            ),
-            nativeSat = false,
-        )
+        val session = PropagationSession(Problem(4, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = false)
         repeat(20_000) { session.addLearnedClause(base, 2, permanent = true) }
         repeat(1024) { session.addLearnedClause(base, 9) }
         repeat(8) { session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false } }
@@ -212,15 +176,8 @@ class GeneralWatchReclamationTest {
     @Test
     fun `a larger grant should retry posting trims deferred by a completed scan`() {
         val clause = Clause(intArrayOf(0, 2))
-        val session = PropagationSession(
-            Problem(
-                6,
-                0,
-                emptyArray(),
-                arrayOf(Clause(intArrayOf(8, 10))),
-            ),
-            nativeSat = false,
-        )
+        val session = PropagationSession(Problem(6, 0, emptyArray(),
+            arrayOf(Clause(intArrayOf(8, 10)))), nativeSat = false)
         repeat(1000) { session.addLearnedClause(clause, 2, permanent = true) }
         repeat(64) { session.addLearnedClause(clause, 9) }
         session.maintainCapWindow(0, 65_536L, 1_048_576L, { false }) { false }

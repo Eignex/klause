@@ -31,11 +31,8 @@ internal data class NonlinearIntegerRootCounts(
     val excluded: Long = 0,
 ) {
     operator fun plus(other: NonlinearIntegerRootCounts): NonlinearIntegerRootCounts = NonlinearIntegerRootCounts(
-        admitted + other.admitted,
-        declined + other.declined,
-        reused + other.reused,
-        refuted + other.refuted,
-        excluded + other.excluded,
+        admitted + other.admitted, declined + other.declined, reused + other.reused,
+        refuted + other.refuted, excluded + other.excluded,
     )
 }
 
@@ -120,11 +117,9 @@ internal class NonlinearIntegerRootStore(val problem: NonlinearIntegerProblem) {
             step()
             when (val node = work.removeLast()) {
                 is PolynomialRealFormula.And -> work.addAll(node.operands)
-
                 is PolynomialRealFormula.Atom -> if (node.relation == PolynomialRelation.EQ) {
                     unaryVariable(node, step)?.takeIf { it in integers }?.let { equations.add(it to node) }
                 }
-
                 else -> Unit
             }
         }
@@ -146,13 +141,9 @@ internal class NonlinearIntegerRootStore(val problem: NonlinearIntegerProblem) {
                     if (variable != null && variable != node.id.index) return null
                     variable = node.id.index
                 }
-
                 is PolynomialExpression.Sum -> work.addAll(node.operands)
-
                 is PolynomialExpression.Product -> work.addAll(node.operands)
-
                 is PolynomialExpression.Power -> work.addLast(node.base)
-
                 is PolynomialExpression.Constant -> Unit
             }
         }
@@ -228,20 +219,16 @@ internal class NonlinearIntegerRootStore(val problem: NonlinearIntegerProblem) {
             expanded[node] = when (node) {
                 is PolynomialExpression.Constant ->
                     RationalPolynomial(listOf(BigFraction.of(node.numerator, node.denominator)))
-
                 is PolynomialExpression.Variable -> {
                     check(node.id.index == variable) { "unary equation names another coordinate" }
                     RationalPolynomial.X
                 }
-
                 is PolynomialExpression.Sum -> children.fold(RationalPolynomial.ZERO) { value, child ->
                     univariate.add(value, expanded.getValue(child))
                 }
-
                 is PolynomialExpression.Product -> children.fold(RationalPolynomial.ONE) { value, child ->
                     univariate.multiply(value, expanded.getValue(child))
                 }
-
                 is PolynomialExpression.Power -> {
                     var result = RationalPolynomial.ONE
                     var base = expanded.getValue(node.base)

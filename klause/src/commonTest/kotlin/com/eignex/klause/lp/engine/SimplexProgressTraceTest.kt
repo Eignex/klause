@@ -32,17 +32,8 @@ class SimplexProgressTraceTest {
 
         repeat(5000) {
             if (trace.iteration(SimplexPhase.PRIMAL_FEASIBILITY)) {
-                trace.samples.add(
-                    SimplexProgressSample(
-                        SimplexPhase.PRIMAL_FEASIBILITY,
-                        it,
-                        0L,
-                        0.0,
-                        0.0,
-                        0.0,
-                        0,
-                    ),
-                )
+                trace.samples.add(SimplexProgressSample(SimplexPhase.PRIMAL_FEASIBILITY, it, 0L,
+                    0.0, 0.0, 0.0, 0))
             }
         }
 
@@ -68,18 +59,11 @@ class SimplexProgressTraceTest {
             assertEquals(control.first.objective, result.objective)
             assertEquals(control.second.workOps, solver.lastMetrics.workOps)
             assertEquals(control.first.primal.toList(), result.primal.toList())
-            assertEquals(
-                integerDualLowerBoundCeil(model, control.first.duals),
-                integerDualLowerBoundCeil(model, result.duals),
-            )
+            assertEquals(integerDualLowerBoundCeil(model, control.first.duals),
+                integerDualLowerBoundCeil(model, result.duals))
             val trace = assertNotNull(solver.progressTrace)
-            for (phase in listOf(
-                SimplexProfilePhase.PRICING,
-                SimplexProfilePhase.FTRAN,
-                SimplexProfilePhase.BTRAN,
-                SimplexProfilePhase.REFACTOR,
-                SimplexProfilePhase.OUTPUT,
-            )) {
+            for (phase in listOf(SimplexProfilePhase.PRICING, SimplexProfilePhase.FTRAN,
+                SimplexProfilePhase.BTRAN, SimplexProfilePhase.REFACTOR, SimplexProfilePhase.OUTPUT)) {
                 assertTrue(trace.phaseCalls.getValue(phase) > 0L)
                 assertTrue(trace.phaseNanos.getValue(phase) >= 0L)
             }
@@ -154,52 +138,30 @@ class SimplexProgressTraceTest {
         }.build(Sense.MINIMIZE)
         val engines = mutableListOf<RevisedSimplex>()
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
-            override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: ExecutionControl,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
-            ): PersistentLpSolver = RevisedSimplex(
-                model,
-                cancellation,
-                refactorUpdateLimit = refactorUpdateLimit,
-                iterationLimit = iterationLimit,
-                workLimit = workLimit,
-                pricing = pricing,
-            ).also {
-                it.enableProgressTrace(profile = true)
-                engines.add(it)
-            }
+            override fun newPersistentSolver(model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean,
+                pricing: LpPricingOptions): PersistentLpSolver =
+                RevisedSimplex(model, cancellation, refactorUpdateLimit = refactorUpdateLimit,
+                    iterationLimit = iterationLimit, workLimit = workLimit, pricing = pricing).also {
+                    it.enableProgressTrace(profile = true)
+                    engines.add(it)
+                }
         }
-        LpScopedSolver(
-            LpExactState(requireNotNull(model.authoritativeModel())),
-            context = LpSolveContext(engineFactory = factory),
-        ).use { owner ->
+        LpScopedSolver(LpExactState(requireNotNull(model.authoritativeModel())),
+            context = LpSolveContext(engineFactory = factory)).use { owner ->
             for (stage in 0..4) {
                 when (stage) {
                     1 -> {
                         assertTrue(owner.push())
                         assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(5L)), 1L))
                     }
-
                     2, 4 -> assertTrue(owner.pop(0))
-
                     3 -> {
                         assertTrue(owner.push())
-                        assertTrue(
-                            owner.append(
-                                LpScopedRow(
-                                    1L,
-                                    listOf(0 to ExactLpNumber.of(-1L), 1 to ExactLpNumber.of(-1L)),
-                                    ExactLpNumber.of(-6L),
-                                    ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
-                                ),
-                                true,
-                            ),
-                        )
+                        assertTrue(owner.append(LpScopedRow(1L,
+                            listOf(0 to ExactLpNumber.of(-1L), 1 to ExactLpNumber.of(-1L)),
+                            ExactLpNumber.of(-6L),
+                            ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), true))
                     }
                 }
 

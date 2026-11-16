@@ -109,8 +109,7 @@ class QuadraticCandidatesTest {
     @Test
     fun `empty numerical model should select active constant rows`() {
         val model = QuadraticModel(
-            emptyList(),
-            emptyList(),
+            emptyList(), emptyList(),
             rows = listOf(
                 QuadraticRow(emptyList(), q(0), QuadraticRowRelation.EQ),
                 QuadraticRow(emptyList(), q(1), QuadraticRowRelation.LE),
@@ -144,8 +143,7 @@ class QuadraticCandidatesTest {
     @Test
     fun `numerical proposal should charge its containing work meter`() {
         val model = QuadraticModel(
-            listOf(q(0)),
-            listOf(listOf(q(2))),
+            listOf(q(0)), listOf(listOf(q(2))),
             rows = listOf(QuadraticRow(listOf(q(-1)), q(-2), QuadraticRowRelation.LE)),
         )
         var charged = 0L
@@ -179,9 +177,8 @@ class QuadraticCandidatesTest {
         val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = 2), concurrent = false)
 
         val stop = assertFailsWith<QuadraticInterrupted> {
-            QuadraticCandidates(
-                QuadraticControl(scope.numerical),
-            ).proposeActiveRows(model, listOf(1.0, 1.0), iterations = 1)
+            QuadraticCandidates(QuadraticControl(scope.numerical)).proposeActiveRows(model, listOf(1.0, 1.0),
+                iterations = 1)
         }
 
         assertEquals(QuadraticStop.CANCELLED, stop.reason)
@@ -208,8 +205,7 @@ class QuadraticCandidatesTest {
     fun `nonfinite constraint magnitudes should decline a numerical proposal`() {
         val coefficient = (1..9).fold(q(1)) { value, _ -> value * q(Long.MAX_VALUE) }
         val model = QuadraticModel(
-            listOf(q(0)),
-            listOf(listOf(q(2))),
+            listOf(q(0)), listOf(listOf(q(2))),
             rows = listOf(QuadraticRow(listOf(coefficient), q(0), QuadraticRowRelation.EQ)),
         )
 
@@ -221,8 +217,7 @@ class QuadraticCandidatesTest {
     @Test
     fun `nonfinite final row images should decline a numerical proposal`() {
         val model = QuadraticModel(
-            listOf(q(0)),
-            listOf(listOf(q(2))),
+            listOf(q(0)), listOf(listOf(q(2))),
             rows = listOf(QuadraticRow(listOf(q(2)), q(0), QuadraticRowRelation.LE)),
         )
 

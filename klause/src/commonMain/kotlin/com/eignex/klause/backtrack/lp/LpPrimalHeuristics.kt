@@ -53,11 +53,9 @@ internal fun LpEngine.lpRoundingProbe(
         if (!cancellation() && rootPrimalTargets?.coordinates !== pending.primal) retainRootPrimalTargets(cancellation)
         rootRoundingInterrupted = cancellation()
         if (!rootRoundingInterrupted) rootRoundingWarmStart = null
-        sink.lp.observePrimalPhase(
-            "PRIMAL_ROUNDING",
+        sink.lp.observePrimalPhase("PRIMAL_ROUNDING",
             if (rootRoundingInterrupted) "COMPLETED_PENDING" else "COMPLETED_REUSED",
-            started.elapsedNow().inWholeNanoseconds,
-        )
+            started.elapsedNow().inWholeNanoseconds)
         return null
     }
     if (pending != null && pending.primal == null) {
@@ -99,12 +97,8 @@ internal fun LpEngine.lpRoundingProbe(
                         rootRoundingInterrupted = true
                     }
                     if (iterate != null && (iterate.optimal || termination == LpFloatTermination.CANCELLED)) {
-                        rootRoundingWarmStart = RootRoundingWarmStart(
-                            objective,
-                            relaxation,
-                            iterate.basis,
-                            sourceProblem = sourceProblem,
-                        )
+                        rootRoundingWarmStart = RootRoundingWarmStart(objective, relaxation, iterate.basis,
+                            sourceProblem = sourceProblem)
                     }
                 }
             } catch (_: CheckedLongOverflowException) {
@@ -112,9 +106,7 @@ internal fun LpEngine.lpRoundingProbe(
             } ?: return null
             if (ownsRootPrimalModel(relaxation.model)) {
                 retainRootPrimalGuidance(relaxation, result, cancellation)
-            } else {
-                retainRoundingPrimalGuidance(relaxation, result, objective, sourceProblem)
-            }
+            } else retainRoundingPrimalGuidance(relaxation, result, objective, sourceProblem)
             rootRoundingWarmStart?.takeIf {
                 it.objective === objective && it.relaxation === relaxation && it.knownColumns == null
             }?.primal ?: result.primal
@@ -150,9 +142,7 @@ internal fun LpEngine.lpRoundingProbe(
                 rootRoundingInterrupted = true
                 return null
             }
-            val attempt = if (seed == null && (discrete || rounding == LpRounding.NEAREST)) {
-                session
-            } else {
+            val attempt = if (seed == null && (discrete || rounding == LpRounding.NEAREST)) session else {
                 PropagationSession(problem, cancellation)
             }
             try {
@@ -175,9 +165,7 @@ internal fun LpEngine.lpRoundingProbe(
                             val variable = relaxation.colVarId[col]
                             if (relaxation.colIsBool[col]) {
                                 if (seed.boolValue(variable)) 1.0 else 0.0
-                            } else {
-                                seed.intValue(variable).toDouble()
-                            }
+                            } else seed.intValue(variable).toDouble()
                         }
                     }
                 }
@@ -203,9 +191,7 @@ internal fun LpEngine.lpRoundingProbe(
                         rootRoundingInterrupted = true
                         keepPinning = attempt === session
                         outcome = "CANCELLED"
-                    } else {
-                        completeDirection(rounding)
-                    }
+                    } else completeDirection(rounding)
                 }
                 return accepted
             } finally {
@@ -241,9 +227,7 @@ internal fun LpEngine.lpRoundingProbe(
                 rootRoundingInterrupted = true
                 keepPinning = true
                 outcome = "CANCELLED"
-            } else {
-                guidance?.roundingComplete = true
-            }
+            } else guidance?.roundingComplete = true
             return accepted
         }
         fun roundings(): Sample? {
@@ -405,18 +389,14 @@ internal fun LpEngine.lpFeasibilityPump(
     var restarts = 0
     var preparedRoot = if (sourcePreparation == LpSourcePreparation.ADMITTED) {
         admitPumpPreparation(solved.first, cancellation)
-    } else {
-        null
-    }
+    } else null
     repeat(PUMP_ROUNDS) { step ->
         if (cancellation()) return null
         val (relaxation, primal) = solved
         val intTarget = LongArray(problem.numIntVars) { v ->
             val col = relaxation.intColOf[v]
             val d = problem.rootDomainOf(v)
-            if (step == 0 && seed != null) {
-                seed.intValue(v).coerceIn(d.min, d.max)
-            } else {
+            if (step == 0 && seed != null) seed.intValue(v).coerceIn(d.min, d.max) else {
                 if (col in 0 until primal.size) round(primal[col]).toLong().coerceIn(d.min, d.max) else d.min
             }
         }
@@ -494,9 +474,7 @@ private fun LpEngine.perturbRounding(
     // An integral distance optimum can repeat a feasible point the consumer declined.
     val order = if (cols.size == 0) {
         (0 until live.size).shuffled(rng).map { live[it] }
-    } else {
-        (0 until cols.size).sortedByDescending { fracs[it] }.map { cols[it] }
-    }
+    } else (0 until cols.size).sortedByDescending { fracs[it] }.map { cols[it] }
     for (rank in 0 until minOf(count, order.size)) {
         val col = order[rank]
         val v = relaxation.colVarId[col]
@@ -550,12 +528,8 @@ private fun LpEngine.solveRelaxation(
             return null
         } finally {
             primalPropagationWork += session.work
-            sink.lp.observePrimalPhase(
-                "PRIMAL_LP_ASSEMBLY",
-                outcome,
-                started.elapsedNow().inWholeNanoseconds,
-                totalSolveWork() - before,
-            )
+            sink.lp.observePrimalPhase("PRIMAL_LP_ASSEMBLY", outcome,
+                started.elapsedNow().inWholeNanoseconds, totalSolveWork() - before)
         }
     }
     if (relaxation.model.n == 0 || cancellation() || lpWorkAllowanceSpent()) return null
@@ -568,11 +542,18 @@ private fun LpEngine.solveRelaxation(
     return relaxation to result.primal
 }
 
-private class PumpPreparation(val source: Problem, val relaxation: LpRelaxation, val domains: LongArray?) {
+private class PumpPreparation(
+    val source: Problem,
+    val relaxation: LpRelaxation,
+    val domains: LongArray?,
+) {
     var valid: Boolean = true
 }
 
-private fun LpEngine.admitPumpPreparation(base: LpRelaxation, cancellation: ExecutionControl): PumpPreparation? {
+private fun LpEngine.admitPumpPreparation(
+    base: LpRelaxation,
+    cancellation: ExecutionControl,
+): PumpPreparation? {
     val model = base.model
     val started = TimeSource.Monotonic.markNow()
     var outcome = "LAYOUT"
@@ -581,9 +562,7 @@ private fun LpEngine.admitPumpPreparation(base: LpRelaxation, cancellation: Exec
         if (problem.numRealVars != 0 || model.doubleView != null || model.exactState != null ||
             model.sense != Sense.MINIMIZE || base.circuitArcs.isNotEmpty() || base.gatedRows.isNotEmpty() ||
             model.n != base.colVarId.size || model.n != base.colIsBool.size
-        ) {
-            return null
-        }
+        ) return null
         val construction = (model.n.toLong() + model.m + model.csc.rowIdx.size) * LpNodeOverhead.BUILD
         val domains = if (problem.declaredIntDomains.stableEndpoints) 0 else problem.numIntVars
         val admission = model.n.toLong() + model.m + 3L * domains + 1L
@@ -598,9 +577,7 @@ private fun LpEngine.admitPumpPreparation(base: LpRelaxation, cancellation: Exec
         outcome = "ALLOWANCE"
         if (lpWorkAllowanceSpent(admission + objectiveWork) ||
             rootPrimalWorkBudget().let { it > 0L && it <= admission + objectiveWork }
-        ) {
-            return null
-        }
+        ) return null
         work = admission
         noteNodeOverhead(work)
         cancellation.charge(work)
@@ -612,9 +589,7 @@ private fun LpEngine.admitPumpPreparation(base: LpRelaxation, cancellation: Exec
         for (column in 0 until model.n) {
             if (base.colVarId[column] < 0 || base.colRealId[column] >= 0 ||
                 base.colReq[column] != null || base.colPresence[column] != null
-            ) {
-                return null
-            }
+            ) return null
             outcome = "CANCELLED"
             if (cancellation()) return null
             outcome = "LAYOUT"
@@ -625,9 +600,7 @@ private fun LpEngine.admitPumpPreparation(base: LpRelaxation, cancellation: Exec
             if (cancellation()) return null
             outcome = "LAYOUT"
         }
-        val captured = if (domains == 0) {
-            null
-        } else {
+        val captured = if (domains == 0) null else {
             val endpoints = LongArray(2 * domains)
             for (variable in 0 until domains) {
                 val domain = problem.declaredIntDomains.statedOrNull(variable)
@@ -659,9 +632,7 @@ private fun LpEngine.preparePumpObjective(
     val work = 3L * model.n + model.m + 3L * (prepared.domains?.size?.div(2) ?: 0) + 1L
     if (objective.constant != 0L || lpWorkAllowanceSpent(work) ||
         rootPrimalWorkBudget().let { it > 0L && it <= work } || cancellation()
-    ) {
-        return null
-    }
+    ) return null
     val started = TimeSource.Monotonic.markNow()
     var outcome = "ALLOWANCE"
     try {
@@ -699,10 +670,8 @@ private fun LpEngine.preparePumpObjective(
             when {
                 base.colIsBool[column] && base.boolColOf[variable] == column ->
                     objective.boolWeightValues.getOrElse(variable) { 0L }
-
                 !base.colIsBool[column] && base.intColOf[variable] == column ->
                     objective.intCoefficientValues.getOrElse(variable) { 0L }
-
                 else -> 0L
             }
         }
@@ -713,12 +682,8 @@ private fun LpEngine.preparePumpObjective(
         }
         if (lpWorkAllowanceSpent()) return null
         outcome = "REUSED"
-        return base.withModel(
-            rebound,
-            sources = base.sourceMap,
-            objectiveConstant = 0L,
-            preparationTemplates = base.preparationTemplates,
-        )
+        return base.withModel(rebound, sources = base.sourceMap, objectiveConstant = 0L,
+            preparationTemplates = base.preparationTemplates)
     } catch (_: CheckedLongOverflowException) {
         outcome = "SCALAR_WIDTH"
         return null
@@ -738,19 +703,12 @@ private fun LpEngine.solvePrimalRelaxation(
     if (cancellation()) return null
     if (ownsRootPrimalModel(model)) return solveRetainedPrimalRelaxation(cancellation, observeResult)
     val started = TimeSource.Monotonic.markNow()
-    val simplex = newTableauCutSolver(
-        model,
-        cancellation,
-        workLimit = rootPrimalWorkBudget(),
-        factory = solveContext.engineFactory,
-        pricing = pricingOptions,
-    )
+    val simplex = newTableauCutSolver(model, cancellation,
+        workLimit = rootPrimalWorkBudget(), factory = solveContext.engineFactory, pricing = pricingOptions)
     var outcome = "FAILED"
     try {
         val result = if (primal) simplex.solvePrimal(warm) else simplex.solve(warm)
-        outcome = if (result?.optimal == true) {
-            "OPTIMAL"
-        } else {
+        outcome = if (result?.optimal == true) "OPTIMAL" else {
             val reason = simplex.lastTermination?.name ?: "OTHER"
             if (result == null) "NO_POINT_$reason" else "NON_OPTIMAL_$reason"
         }
@@ -786,16 +744,12 @@ private fun LpEngine.solveRetainedPrimalRelaxation(
         if (attempt == null) observeSparsePausedProgress()
         val result = attempt?.second
         val termination = propagator.floatTermination
-        outcome = if (result?.optimal == true) {
-            "RETAINED_OPTIMAL"
-        } else {
+        outcome = if (result?.optimal == true) "RETAINED_OPTIMAL" else {
             "RETAINED_${termination?.name ?: "OTHER"}"
         }
         observeResult?.invoke(result, termination)
-        if (result?.optimal != true && (
-                propagator.floatPaused || termination == LpFloatTermination.WORK ||
-                    termination == LpFloatTermination.PIVOTS || termination == LpFloatTermination.CANCELLED
-                )
+        if (result?.optimal != true && (propagator.floatPaused || termination == LpFloatTermination.WORK ||
+                termination == LpFloatTermination.PIVOTS || termination == LpFloatTermination.CANCELLED)
         ) {
             rootRoundingInterrupted = true
         }

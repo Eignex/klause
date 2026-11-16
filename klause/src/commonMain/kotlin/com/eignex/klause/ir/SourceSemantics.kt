@@ -9,28 +9,20 @@ import com.eignex.util.numbers.signum
 enum class SourceFormat {
     /** Programmatically constructed engine-neutral models. */
     IR,
-
     /** Typed schema declarations. */
     SCHEMA,
-
     /** FlatZinc source syntax. */
     FLATZINC,
-
     /** SMT-LIB source syntax. */
     SMTLIB,
-
     /** MPS decimal linear models. */
     MPS,
-
     /** XCSP3 integer constraint syntax. */
     XCSP3,
-
     /** OPB and WBO pseudo-Boolean syntax. */
     OPB,
-
     /** DIMACS conjunctive normal form. */
     DIMACS,
-
     /** Weighted conjunctive normal form. */
     WCNF,
 }
@@ -39,13 +31,10 @@ enum class SourceFormat {
 enum class NumericAuthority {
     /** Exact values explicitly supplied by the model producer. */
     EXACT_VALUES,
-
     /** Exact rational interpretation of parsed binary64 values. */
     BINARY64_LITERALS,
-
     /** Exact rational interpretation of decimal source tokens. */
     DECIMAL_LITERALS,
-
     /** Exact rational interpretation of rational source terms. */
     RATIONAL_LITERALS,
 }
@@ -87,8 +76,7 @@ sealed interface FloatSemantics {
         val linearScale: Long,
         /** Approximation window for a float without a declared finite range. */
         val unrangedBounds: UndeclaredRealBounds = UndeclaredRealBounds(
-            SemanticRational.ofLong(-1_000_000),
-            SemanticRational.ofLong(1_000_000),
+            SemanticRational.ofLong(-1_000_000), SemanticRational.ofLong(1_000_000),
         ),
     ) : FloatSemantics {
         init {

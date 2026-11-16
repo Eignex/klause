@@ -20,11 +20,8 @@ class FlatZincSolutionWriterTest {
     @Test
     fun `irrational source coordinates should retain their selected exact root`() {
         val program = parseFlatZinc("var 0.0..2.0: x :: output_var; solve minimize x;", exactFloats = true)
-        val root = AlgebraicArithmetic().roots(
-            RationalPolynomial(
-                listOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE),
-            ),
-        ).last()
+        val root = AlgebraicArithmetic().roots(RationalPolynomial(
+            listOf(BigFraction.ofLong(-2), BigFraction.ZERO, BigFraction.ONE))).last()
         val assignment = OpenTheoryAssignment.ExactNra(ExactNraAssignment(BooleanArray(0), listOf(root)))
 
         val output = writeFlatZincSolution(program.sourceProgram, assignment, outputObjective = true)

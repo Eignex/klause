@@ -19,23 +19,14 @@ internal enum class FactorFamily { Clause, Pb, Linear, Table, Mdd, Distinct, Sch
 
 internal fun Propagator.propagationFamily(): FactorFamily = when (this) {
     is ClausePropagator -> FactorFamily.Clause
-
     is PseudoBooleanPropagator -> FactorFamily.Pb
-
     is LinearPropagator, is ReifiedLinearPropagator, is WideLinearPropagator,
-    is WideReifiedLinearPropagator,
-    -> FactorFamily.Linear
-
+    is WideReifiedLinearPropagator, -> FactorFamily.Linear
     is TablePropagator -> FactorFamily.Table
-
     is MddPropagator -> FactorFamily.Mdd
-
     is AllDifferentPropagator, is AffineDistinctPropagator -> FactorFamily.Distinct
-
     is CumulativePropagator, is DiffnPropagator, is DisjunctivePropagator -> FactorFamily.Scheduling
-
     is LearnedIntegerPropagator -> FactorFamily.Integer
-
     else -> FactorFamily.Other
 }
 
@@ -51,52 +42,21 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
     var admissionFamilies = 0
 
     enum class Metric {
-        Fires,
-        Work,
-        Nanos,
-        Deductions,
-        Conflicts,
-        Interrupted,
-        EagerReasons,
-        ConflictReasonAttempts,
-        ConflictReasonUnavailable,
-        LazyAttempts,
-        LazyCompleted,
-        LazyInterrupted,
-        ReasonWork,
-        ReasonNanos,
-        Support,
-        MaxSupport,
-        MemoHits,
-        UipReasons,
-        UipSupport,
-        Learned,
-        Consumed,
-        UseEvents,
-        LaterUseEvents,
-        Untracked,
-        RefinementAttempts,
-        RefinementWork,
-        RefinementNanos,
-        RefinementSupport,
-        RefinementAccepted,
+        Fires, Work, Nanos, Deductions, Conflicts, Interrupted,
+        EagerReasons, ConflictReasonAttempts, ConflictReasonUnavailable,
+        LazyAttempts, LazyCompleted, LazyInterrupted, ReasonWork, ReasonNanos,
+        Support, MaxSupport, MemoHits, UipReasons, UipSupport, Learned, Consumed, UseEvents, LaterUseEvents, Untracked,
+        RefinementAttempts, RefinementWork, RefinementNanos, RefinementSupport, RefinementAccepted,
     }
 
-    init {
-        require(capacity in 1..1024)
-    }
+    init { require(capacity in 1..1024) }
 
     fun note(mask: Int, metric: Metric, value: Long = 1) {
-        for (family in FactorFamily.entries) {
-            if (mask and (1 shl family.ordinal) != 0) {
-                val row = counts[family.ordinal]
-                val i = metric.ordinal
-                row[i] = if (metric == Metric.MaxSupport) {
-                    maxOf(row[i], value)
-                } else {
-                    row[i] + value.coerceIn(0, Long.MAX_VALUE - row[i])
-                }
-            }
+        for (family in FactorFamily.entries) if (mask and (1 shl family.ordinal) != 0) {
+            val row = counts[family.ordinal]
+            val i = metric.ordinal
+            row[i] = if (metric == Metric.MaxSupport) maxOf(row[i], value)
+            else row[i] + value.coerceIn(0, Long.MAX_VALUE - row[i])
         }
     }
 
@@ -124,13 +84,9 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
         note(mask, Metric.MaxSupport, size.toLong())
     }
 
-    fun beginAnalysis() {
-        analysisFamilies = 0
-    }
+    fun beginAnalysis() { analysisFamilies = 0 }
 
-    fun selectFamilies(mask: Int) {
-        analysisFamilies = mask
-    }
+    fun selectFamilies(mask: Int) { analysisFamilies = mask }
 
     fun participate(mask: Int, size: Int) {
         analysisFamilies = analysisFamilies or mask
@@ -177,24 +133,19 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
     }
 
     fun snapshot(): Map<String, Long> = buildMap {
-        for (family in FactorFamily.entries) {
-            for (metric in Metric.entries) {
-                val value = counts[family.ordinal][metric.ordinal]
-                if (value != 0L) put("factor${family.name}${metric.name}", value)
-            }
+        for (family in FactorFamily.entries) for (metric in Metric.entries) {
+            val value = counts[family.ordinal][metric.ordinal]
+            if (value != 0L) put("factor${family.name}${metric.name}", value)
         }
         put("factorTrackedReasons", reasons.size.toLong())
         put("factorTrackedLearning", learned.size.toLong())
     }
 }
 
-internal fun PropagationState.attributionFamily(fid: Int): Int = if (nativeEngine != null) {
-    1 shl FactorFamily.Clause.ordinal
-} else if (fid >= 0) {
-    factorAttribution?.family(factorAt(fid)) ?: 0
-} else {
-    1 shl FactorFamily.Unattributed.ordinal
-}
+internal fun PropagationState.attributionFamily(fid: Int): Int =
+    if (nativeEngine != null) 1 shl FactorFamily.Clause.ordinal
+    else if (fid >= 0) factorAttribution?.family(factorAt(fid)) ?: 0
+    else 1 shl FactorFamily.Unattributed.ordinal
 
 internal fun PropagationState.attributeReason(reason: IntArray?) {
     factorAttribution?.let { it.remember(reason, attributionFamily(currentFactor), !isLazyReason(reason)) }

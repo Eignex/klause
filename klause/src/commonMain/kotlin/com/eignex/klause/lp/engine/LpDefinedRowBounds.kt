@@ -17,17 +17,12 @@ private fun expandDefinedRowSupports(
         if (entries.none {
                 meter.step()
                 continuousCounts[it.row] > 1 && selected[it.row] && state.rows.row(it.row).active
-            }
-        ) {
-            continue
-        }
+            }) continue
         for (entry in entries) {
             meter.step()
             if (continuousCounts[entry.row] == 1 && fixedLogicalRow(state, entry.row) &&
                 !entry.number.value.isZero
-            ) {
-                selected[entry.row] = true
-            }
+            ) selected[entry.row] = true
         }
     }
 }
@@ -45,10 +40,7 @@ private fun selectDefinedRowConsumers(
         if (entries.none {
                 meter.step()
                 continuousCounts[it.row] == 1 && selected[it.row] && fixedLogicalRow(state, it.row)
-            }
-        ) {
-            continue
-        }
+            }) continue
         for (entry in entries) {
             meter.step()
             if (continuousCounts[entry.row] > 1 && state.rows.row(entry.row).active) selected[entry.row] = true
@@ -67,10 +59,7 @@ internal fun definedRowBounds(
     if (continuousCounts.none {
             meter.step()
             it > 1
-        }
-    ) {
-        return
-    }
+        }) return
     prepareDefinedRows(state, rows, continuousCounts, selected, meter)
     meter.reserve(state.model.n.toLong() * 4L + 32L)
     val definitions = IntArray(state.model.n) { -1 }
@@ -110,10 +99,7 @@ private fun prepareDefinedRows(
     if (missing.none {
             meter.step()
             it
-        }
-    ) {
-        return
-    }
+        }) return
     for (column in 0 until state.model.n) {
         meter.step()
         for (entry in state.model.columnEntries(column)) {
@@ -166,10 +152,8 @@ private fun projectDefinedRow(
         for (entry in rows[definition]) {
             meter.step()
             if (entry.column == term.column) continue
-            coefficients[entry.column] = meter.add(
-                coefficients[entry.column] ?: BigFraction.ZERO,
-                meter.multiply(multiplier, entry.coefficient),
-            )
+            coefficients[entry.column] = meter.add(coefficients[entry.column] ?: BigFraction.ZERO,
+                meter.multiply(multiplier, entry.coefficient))
         }
         coefficients[state.model.n + definition] = multiplier
     }
@@ -189,13 +173,9 @@ private fun projectDefinedRow(
     for (term in terms) {
         meter.step()
         if (term.column >= state.model.n || !state.model.column(term.column).integral) continue
-        projectRowBound(
-            state, row, term, terms, minimum, true, meter, rhs,
-            definingRows = definingRows,
-        )?.let(completed::add)
-        projectRowBound(
-            state, row, term, terms, maximum, false, meter, rhs,
-            definingRows = definingRows,
-        )?.let(completed::add)
+        projectRowBound(state, row, term, terms, minimum, true, meter, rhs,
+            definingRows = definingRows)?.let(completed::add)
+        projectRowBound(state, row, term, terms, maximum, false, meter, rhs,
+            definingRows = definingRows)?.let(completed::add)
     }
 }

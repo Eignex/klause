@@ -34,25 +34,15 @@ class FactorAttributionTest {
 
     @Test
     fun `ordinary table conflicts carry family attribution into consumed learning`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
-            arrayOf(
-                Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
-                Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
-            ),
-        ).bake()
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) }, arrayOf(
+            Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1)),
+            Table(intArrayOf(0, 1), longArrayOf(0, 1, 1, 0)),
+        )).bake()
         for (refinement in listOf(false, true)) {
-            val result = BacktrackSolver(problem).solve(
-                BacktrackParams(
-                    randomSeed = 1L,
-                    maxDecisions = 8L,
-                    lpConfig = LpConfig.OFF,
-                    propagationAttribution = true,
-                    historicalTableReasons = refinement,
-                ),
-            )
+            val result = BacktrackSolver(problem).solve(BacktrackParams(
+                randomSeed = 1L, maxDecisions = 8L, lpConfig = LpConfig.OFF,
+                propagationAttribution = true, historicalTableReasons = refinement,
+            ))
 
             assertIs<SolveResult.Unsat>(result)
             assertTrue(result.stats.search.learning.getValue("factorTableUipReasons") > 0)
@@ -76,11 +66,8 @@ class FactorAttributionTest {
     @Test
     fun `attributed learning distinguishes immediate assertions from later sibling use`() {
         for (nativeSat in listOf(false, true)) {
-            val session = PropagationSession(
-                PropagationProblem(Problem(3, 0, emptyArray(), emptyArray())),
-                nativeSat = nativeSat,
-                attribution = true,
-            )
+            val session = PropagationSession(PropagationProblem(Problem(3, 0, emptyArray(), emptyArray())),
+                nativeSat = nativeSat, attribution = true)
             val family = 1 shl FactorFamily.Clause.ordinal
             session.pinBool(0, false)
             session.withAttribution(family) { session.addLearnedClause(Clause(intArrayOf(0, 2)), 2) }
@@ -99,16 +86,8 @@ class FactorAttributionTest {
     @Test
     fun `attribution preserves native and general first uip learning`() {
         for (nativeSat in listOf(false, true)) {
-            val problem = Problem(
-                3,
-                0,
-                emptyArray(),
-                arrayOf(
-                    Clause(intArrayOf(1, 2)),
-                    Clause(intArrayOf(3, 4)),
-                    Clause(intArrayOf(1, 3, 5)),
-                ),
-            )
+            val problem = Problem(3, 0, emptyArray(), arrayOf(
+                Clause(intArrayOf(1, 2)), Clause(intArrayOf(3, 4)), Clause(intArrayOf(1, 3, 5))))
             val session = PropagationSession(PropagationProblem(problem), nativeSat = nativeSat, attribution = true)
 
             val conflict = assertIs<PropagationResult.Unsat>(session.pinBool(0, true))

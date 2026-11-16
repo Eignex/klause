@@ -151,9 +151,7 @@ class BenchSelectionTest {
             problem("two", "flat-2", family = "flat"),
             problem("two", "empty/1", default = 0),
         ).map { candidate ->
-            if (candidate.suite == "one") {
-                candidate
-            } else {
+            if (candidate.suite == "one") candidate else {
                 candidate.copy(ref = candidate.ref.copy(format = Format.MINIZINC))
             }
         }
@@ -168,13 +166,7 @@ class BenchSelectionTest {
         }
 
         val selected = BenchSelection.select(
-            candidates,
-            perFamily,
-            seed,
-            maxInstances,
-            balanceFormats,
-            compatible,
-            accept,
+            candidates, perFamily, seed, maxInstances, balanceFormats, compatible, accept,
         )
 
         assertEquals(expected, selected)
@@ -183,14 +175,9 @@ class BenchSelectionTest {
     @Test
     fun `overall cap stops admission within a family round without checking later families`() {
         val candidates = listOf(
-            problem("s", "a/1"),
-            problem("s", "a/2"),
-            problem("s", "a/3"),
-            problem("s", "b/1"),
-            problem("s", "b/2"),
-            problem("s", "b/3"),
-            problem("s", "c/1"),
-            problem("s", "c/2"),
+            problem("s", "a/1"), problem("s", "a/2"), problem("s", "a/3"),
+            problem("s", "b/1"), problem("s", "b/2"), problem("s", "b/3"),
+            problem("s", "c/1"), problem("s", "c/2"),
         )
         val reached = mutableListOf<String>()
 
@@ -206,12 +193,8 @@ class BenchSelectionTest {
     @Test
     fun `empty and rejected families do not consume rounds or compatible admission slots`() {
         val candidates = listOf(
-            problem("s", "empty/no"),
-            problem("s", "a/no"),
-            problem("s", "a/broken"),
-            problem("s", "a/valid"),
-            problem("s", "a/unused"),
-            problem("s", "b/valid"),
+            problem("s", "empty/no"), problem("s", "a/no"), problem("s", "a/broken"),
+            problem("s", "a/valid"), problem("s", "a/unused"), problem("s", "b/valid"),
         )
         val read = mutableListOf<String>()
         val compiled = mutableListOf<String>()
@@ -260,17 +243,11 @@ class BenchSelectionTest {
         val candidates = listOf(problem("s", "a/1"), problem("s", "a/2"), problem("s", "b/1"))
         val reached = mutableListOf<String>()
         val select = {
-            BenchSelection.select(
-                candidates,
-                perFamily = 2,
-                seed = null,
-                maxInstances = maxInstances,
-                balanceFormats = balance,
-                compatible = {
+            BenchSelection.select(candidates, perFamily = 2, seed = null, maxInstances = maxInstances,
+                balanceFormats = balance, compatible = {
                     reached += it.ref.name
                     true
-                },
-            )
+                })
         }
 
         if (maxInstances == -1) assertFailsWith<IllegalArgumentException> { select() } else select()

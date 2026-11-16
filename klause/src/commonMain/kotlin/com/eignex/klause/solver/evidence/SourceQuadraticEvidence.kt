@@ -31,15 +31,13 @@ fun Problem.quadraticSourceProofContext(
     cancellation: ExecutionControl = ExecutionControl.Never,
 ): SourceProofContext? {
     if (scope.objective == null) return null
-    for (term in objective.terms) {
-        for (variable in listOfNotNull(term.first, term.second)) {
-            val declared = when (variable) {
-                is QuadraticVariable.Bool -> variable.id.index < numBoolVars
-                is QuadraticVariable.Int -> variable.id.index < numIntVars
-                is QuadraticVariable.Real -> variable.id.index < numRealVars
-            }
-            if (!declared) return null
+    for (term in objective.terms) for (variable in listOfNotNull(term.first, term.second)) {
+        val declared = when (variable) {
+            is QuadraticVariable.Bool -> variable.id.index < numBoolVars
+            is QuadraticVariable.Int -> variable.id.index < numIntVars
+            is QuadraticVariable.Real -> variable.id.index < numRealVars
         }
+        if (!declared) return null
     }
     val base = sourceProofContext(scope.copy(objective = null), cancellation = cancellation) ?: return null
     val original = this
@@ -48,17 +46,12 @@ fun Problem.quadraticSourceProofContext(
         override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck =
             witnessChecker.witness(sample, scope, cancellation)
 
-        override fun ray(
-            claim: SourceClaim.Ray,
-            scope: SourceScope,
-            cancellation: ExecutionControl,
-        ): SourceEvidenceCheck = SourceEvidenceCheck.Unavailable("quadratic source recession derivation unavailable")
+        override fun ray(claim: SourceClaim.Ray, scope: SourceScope,
+            cancellation: ExecutionControl): SourceEvidenceCheck =
+            SourceEvidenceCheck.Unavailable("quadratic source recession derivation unavailable")
 
         override fun objectiveEquals(
-            sample: Sample,
-            value: SourceValue,
-            scope: SourceScope,
-            cancellation: ExecutionControl,
+            sample: Sample, value: SourceValue, scope: SourceScope, cancellation: ExecutionControl,
         ): SourceEvidenceCheck = checkedQuadratic(cancellation) { arithmetic ->
             val checked = witness(sample, scope, cancellation)
             if (checked != SourceEvidenceCheck.Checked) return@checkedQuadratic checked
@@ -66,18 +59,13 @@ fun Problem.quadraticSourceProofContext(
                 "quadratic source value has no exact algebraic checker",
             )
             val actual = objective.evaluateExact(sample, arithmetic)
-            if (arithmetic.compare(actual, expected) == 0) {
-                SourceEvidenceCheck.Checked
-            } else {
-                SourceEvidenceCheck.Rejected("quadratic source objective differs from the claimed value")
-            }
+            if (arithmetic.compare(actual, expected) == 0) SourceEvidenceCheck.Checked
+            else SourceEvidenceCheck.Rejected("quadratic source objective differs from the claimed value")
         }
 
         override fun derivation(
-            claim: SourceClaim,
-            derivation: SourceDerivation.Extension,
-            scope: SourceScope,
-            cancellation: ExecutionControl,
+            claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope,
+                cancellation: ExecutionControl,
         ): SourceEvidenceCheck {
             if (derivation != SourceQuadraticBoxDerivation || claim !is SourceClaim.Bound) {
                 return SourceEvidenceCheck.Unavailable("quadratic source derivation checker unavailable")
@@ -96,21 +84,15 @@ fun Problem.quadraticSourceProofContext(
                             val value = if (it) BigFraction.ONE else BigFraction.ZERO
                             value to value
                         } ?: (BigFraction.ZERO to BigFraction.ONE)
-
                         is QuadraticVariable.Int -> variable.id.index.let { id ->
                             val lower = if (original.intBounds.hasLower(id)) {
                                 BigFraction.ofLong(original.intBounds.lower(id))
-                            } else {
-                                null
-                            }
+                            } else null
                             val upper = if (original.intBounds.hasUpper(id)) {
                                 BigFraction.ofLong(original.intBounds.upper(id))
-                            } else {
-                                null
-                            }
+                            } else null
                             lower to upper
                         }
-
                         is QuadraticVariable.Real -> variable.id.index.let { id ->
                             val lower = BigFraction.ofDouble(original.realLower[id])
                             val upper = BigFraction.ofDouble(original.realUpper[id])
@@ -134,26 +116,15 @@ fun Problem.quadraticSourceProofContext(
                 )
                 val bound = if (scope.objective?.sense == ObjectiveSense.MINIMIZE) bounds.first else bounds.second
                 val comparison = arithmetic.compare(arithmetic.rational(bound), value)
-                val establishes = if (scope.objective?.sense == ObjectiveSense.MINIMIZE) {
-                    comparison > 0
-                } else {
-                    comparison < 0
-                }
-                if (establishes || (comparison == 0 && !claim.strict)) {
-                    SourceEvidenceCheck.Checked
-                } else {
-                    SourceEvidenceCheck.Rejected("original quadratic intervals do not establish this bound")
-                }
+                val establishes = if (scope.objective?.sense == ObjectiveSense.MINIMIZE) comparison > 0
+                    else comparison < 0
+                if (establishes || (comparison == 0 && !claim.strict)) SourceEvidenceCheck.Checked
+                else SourceEvidenceCheck.Rejected("original quadratic intervals do not establish this bound")
             }
         }
     }
-    return SourceProofContext(
-        scope,
-        base.coordinates,
-        base.premises,
-        semanticsChecker = checker,
-        semantics = base.semantics,
-    )
+    return SourceProofContext(scope, base.coordinates, base.premises, semanticsChecker = checker,
+        semantics = base.semantics)
 }
 
 private fun quadraticValue(value: SourceValue, arithmetic: AlgebraicArithmetic) = when (value) {
@@ -163,8 +134,7 @@ private fun quadraticValue(value: SourceValue, arithmetic: AlgebraicArithmetic) 
 }
 
 private inline fun checkedQuadratic(
-    cancellation: ExecutionControl,
-    block: (AlgebraicArithmetic) -> SourceEvidenceCheck,
+    cancellation: ExecutionControl, block: (AlgebraicArithmetic) -> SourceEvidenceCheck,
 ): SourceEvidenceCheck = try {
     val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation))
     arithmetic.arithmetic.step()

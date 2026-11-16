@@ -130,7 +130,6 @@ class ModelJsonConformanceTest {
 
     private fun renamed(element: JsonElement, prefix: String): JsonElement = when (element) {
         is JsonArray -> JsonArray(element.map { renamed(it, prefix) })
-
         is JsonObject -> {
             val reference = element["ref"]?.takeIf { element.size == 1 }?.jsonPrimitive
             if (reference?.isString == true) {
@@ -139,7 +138,6 @@ class ModelJsonConformanceTest {
                 JsonObject(element.mapValues { (_, child) -> renamed(child, prefix) })
             }
         }
-
         else -> element
     }
 

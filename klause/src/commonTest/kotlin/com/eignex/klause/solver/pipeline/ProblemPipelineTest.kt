@@ -31,47 +31,27 @@ class ProblemPipelineTest {
 
     @Test
     fun `public route overloads should retain canonical pure real ownership`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            emptyArray(),
-            numRealVars = 1,
-            realLower = doubleArrayOf(-1.0),
-            realUpper = doubleArrayOf(1.0),
-        )
-        val expected = SourceSetup.prepare(
-            SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.SATISFY,
-                FiniteEngine.MIXED,
-            ),
-        )
+        val source = Problem(0, 0, emptyArray(), emptyArray(), numRealVars = 1,
+            realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0))
+        val expected = SourceSetup.prepare(SourceSetupRequest(
+            SourceAttachment(source), ExecutionOperation.SATISFY, FiniteEngine.MIXED,
+        ))
 
         for (real in listOf(false, true)) {
             for (linear in listOf(false, true)) {
                 val routes = listOf(
                     source.pipelineRoute(routePureRealToTheory = real, routeLinearToTheory = linear),
                     source.pipelineRoute(routePureRealToTheory = real, routeLinearToTheory = linear, onLpStats = {}),
-                    source.pipelineRoute(
-                        FactorProjectionProviders.Default,
-                        routePureRealToTheory = real,
-                        routeLinearToTheory = linear,
-                    ),
-                    source.pipelineRoute(
-                        ExecutionControl.Never,
-                        ExecutionControl.Never,
-                        routePureRealToTheory = real,
-                        routeLinearToTheory = linear,
-                    ),
+                    source.pipelineRoute(FactorProjectionProviders.Default,
+                        routePureRealToTheory = real, routeLinearToTheory = linear),
+                    source.pipelineRoute(ExecutionControl.Never, ExecutionControl.Never,
+                        routePureRealToTheory = real, routeLinearToTheory = linear),
                 )
 
                 for (route in routes) {
                     val selected = assertIs<SourceProblemRoute.OpenTheory>(route)
-                    assertEquals(
-                        assertIs<SourceProblemRoute.OpenTheory>(expected.route).request.route,
-                        selected.request.route,
-                    )
+                    assertEquals(assertIs<SourceProblemRoute.OpenTheory>(expected.route).request.route,
+                        selected.request.route)
                     assertSame(source, selected.preparedPlan.originalSource)
                 }
             }
@@ -80,24 +60,15 @@ class ProblemPipelineTest {
 
     @Test
     fun `public route flags should retain exact ownership for wide source objectives`() {
-        val source = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(-1, 1), IntDomain(-1, 1)),
-            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)),
-        )
+        val source = Problem(0, 2, arrayOf(IntDomain(-1, 1), IntDomain(-1, 1)),
+            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)))
         val objective = LinearObjective(intCoefficients = longArrayOf((1L shl 53) + 1, 0), constant = 7)
 
         for (real in listOf(false, true)) {
             for (linear in listOf(false, true)) {
-                val selected = assertIs<SourceProblemRoute.OpenTheory>(
-                    source.pipelineRoute(
-                        objective,
-                        maximize = true,
-                        routePureRealToTheory = real,
-                        routeLinearToTheory = linear,
-                    ),
-                )
+                val selected = assertIs<SourceProblemRoute.OpenTheory>(source.pipelineRoute(
+                    objective, maximize = true, routePureRealToTheory = real, routeLinearToTheory = linear,
+                ))
 
                 assertEquals(ProblemPipeline.EXACT_LIRA, selected.request.route)
                 assertSame(source, selected.preparedPlan.originalSource)
@@ -109,21 +80,13 @@ class ProblemPipelineTest {
 
     @Test
     fun `public route flags should retain finite ownership for exact integral objectives`() {
-        val source = Problem(
-            0,
-            2,
-            arrayOf(IntDomain(-1, 1), IntDomain(-1, 1)),
-            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)),
-        )
+        val source = Problem(0, 2, arrayOf(IntDomain(-1, 1), IntDomain(-1, 1)),
+            arrayOf(Linear(longArrayOf(2, 3), intArrayOf(0, 1), LinearOp.LE, 1)))
         val objective = LinearObjective(intCoefficients = longArrayOf(1L shl 53, 0))
 
-        val selected = assertIs<SourceProblemRoute.Finite>(
-            source.pipelineRoute(
-                objective,
-                routePureRealToTheory = true,
-                routeLinearToTheory = true,
-            ),
-        )
+        val selected = assertIs<SourceProblemRoute.Finite>(source.pipelineRoute(
+            objective, routePureRealToTheory = true, routeLinearToTheory = true,
+        ))
 
         assertSame(source, selected.preparedPlan.originalSource)
         assertSame(objective, selected.preparedPlan.objective)
@@ -132,12 +95,8 @@ class ProblemPipelineTest {
     @Test
     fun `public route defaults should retain baked source providers`() {
         val providers = FactorProjectionProviders()
-        val source = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0, 2)),
-            arrayOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 2)),
-        ).bake(providers)
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 2)),
+            arrayOf(Linear(longArrayOf(1), intArrayOf(0), LinearOp.LE, 2))).bake(providers)
 
         val routes = listOf(
             source.pipelineRoute(),
@@ -151,6 +110,7 @@ class ProblemPipelineTest {
             assertSame(source, selected.preparedPlan.originalSource)
         }
     }
+
 
     private fun withNValueOverOpenColumn(): Problem {
         val openHi = Bits(2).also { it.set(1) }
@@ -235,10 +195,7 @@ class ProblemPipelineTest {
 
     @Test
     fun `optional bound work exhaustion should retain complete linear admission`() {
-        val open = Bits(2).also {
-            it.set(0)
-            it.set(1)
-        }
+        val open = Bits(2).also { it.set(0); it.set(1) }
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
@@ -247,12 +204,10 @@ class ProblemPipelineTest {
         val budget = PresolveBudget(1)
         val optional = budget.orSpent(ExecutionControl.Never)
 
-        val route = assertIs<SourceProblemRoute.OpenTheory>(
-            model.pipelineRoute(
-                boundCancellation = optional,
-                preparationCancellation = ExecutionControl.Never,
-            ),
-        )
+        val route = assertIs<SourceProblemRoute.OpenTheory>(model.pipelineRoute(
+            boundCancellation = optional,
+            preparationCancellation = ExecutionControl.Never,
+        ))
 
         assertTrue(optional())
         assertTrue(budget.spent() >= budget.allowance)
@@ -264,10 +219,7 @@ class ProblemPipelineTest {
 
     @Test
     fun `containing cancellation after optional work should decline complete admission`() {
-        val open = Bits(2).also {
-            it.set(0)
-            it.set(1)
-        }
+        val open = Bits(2).also { it.set(0); it.set(1) }
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(0, 0), open, open),
@@ -276,12 +228,10 @@ class ProblemPipelineTest {
         val budget = PresolveBudget(1)
         val containing = ExecutionControl { budget.spent() > 0 }
 
-        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(
-            model.pipelineRoute(
-                boundCancellation = budget.orSpent(containing),
-                preparationCancellation = containing,
-            ),
-        )
+        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
+            boundCancellation = budget.orSpent(containing),
+            preparationCancellation = containing,
+        ))
 
         assertTrue(containing())
         assertEquals(PreparedPlanDecline.RESOURCE, route.preparedPlan.decline)
@@ -293,12 +243,10 @@ class ProblemPipelineTest {
         val model = withNValueOverOpenColumn()
         val budget = PresolveBudget(0)
 
-        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(
-            model.pipelineRoute(
-                boundCancellation = budget.orSpent(ExecutionControl.Never),
-                preparationCancellation = ExecutionControl.Never,
-            ),
-        )
+        val route = assertIs<SourceProblemRoute.UnsupportedOpen>(model.pipelineRoute(
+            boundCancellation = budget.orSpent(ExecutionControl.Never),
+            preparationCancellation = ExecutionControl.Never,
+        ))
 
         assertEquals(1, assertNotNull(route.unplaceable).column)
         assertEquals("NValue", route.unplaceable.factorKind)
@@ -317,13 +265,11 @@ class ProblemPipelineTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val optional = budget.orSpent(ExecutionControl.Never)
 
-        val route = assertIs<SourceProblemRoute.Finite>(
-            model.pipelineRoute(
-                boundCancellation = optional,
-                preparationCancellation = ExecutionControl.Never,
-                onLpStats = { budget.charge(budget.remaining()) },
-            ),
-        )
+        val route = assertIs<SourceProblemRoute.Finite>(model.pipelineRoute(
+            boundCancellation = optional,
+            preparationCancellation = ExecutionControl.Never,
+            onLpStats = { budget.charge(budget.remaining()) },
+        ))
 
         assertTrue(optional())
         assertEquals(IntDomain(0, 5), route.problem.finiteIntDomains().single())
@@ -332,10 +278,7 @@ class ProblemPipelineTest {
 
     @Test
     fun `optional stop should retain proved partial bounds for complete admission`() {
-        val open = Bits(3).also {
-            it.set(1)
-            it.set(2)
-        }
+        val open = Bits(3).also { it.set(1); it.set(2) }
         val model = Problem(
             numBoolVars = 0,
             intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0, 0), longArrayOf(5, 0, 0), null, open),
@@ -347,13 +290,11 @@ class ProblemPipelineTest {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val optional = budget.orSpent(ExecutionControl.Never)
 
-        val route = assertIs<SourceProblemRoute.OpenTheory>(
-            model.pipelineRoute(
-                boundCancellation = optional,
-                preparationCancellation = ExecutionControl.Never,
-                onLpStats = { budget.charge(budget.remaining()) },
-            ),
-        )
+        val route = assertIs<SourceProblemRoute.OpenTheory>(model.pipelineRoute(
+            boundCancellation = optional,
+            preparationCancellation = ExecutionControl.Never,
+            onLpStats = { budget.charge(budget.remaining()) },
+        ))
 
         assertTrue(optional())
         assertEquals(5L, route.request.model.intBounds.upper(1))

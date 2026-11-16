@@ -160,8 +160,8 @@ internal object Probing {
 // `Σ (sign·coeffs(k))·cols(k) ≤ sign·bound`, active unconditionally or only while its guard column holds
 // `guardValue`.
 @Suppress("TooManyFunctions")
-private class OpenRangeProbe(private val problem: Problem, private val cancellation: ExecutionControl) :
-    IntervalBounds {
+private class OpenRangeProbe(private val problem: Problem,
+    private val cancellation: ExecutionControl) : IntervalBounds {
     private val numInts = problem.numIntVars
     private val numCols = numInts + problem.numBoolVars
     private val lo = LongArray(numCols)

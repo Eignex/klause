@@ -49,22 +49,14 @@ internal fun bindSourceExecutionControls(
     ) {
         pipelineConfigError("dry-run-presolve requires finite execution of a linear source")
     }
-    policy.validate(
-        kind,
-        invocation.request.engine,
-        preparation.requested,
-        prepareOnly,
-        preparation.config,
-        invocation.canonicalPolynomial,
-    )
+    policy.validate(kind, invocation.request.engine, preparation.requested, prepareOnly, preparation.config,
+        invocation.canonicalPolynomial)
     val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }
-    val owner = if (cancellation.accounting != null) cancellation else invocation.cancellation
+    val owner = if ( cancellation .accounting != null) cancellation else invocation.cancellation
     val stop = invocation.cancellation.withAccounting(owner).includingStop(cancellation).includingStop(timeout)
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without(
-        "node-limit",
-        "dry-run-presolve",
-        "open-linear-incremental",
+        "node-limit", "dry-run-presolve", "open-linear-incremental",
     ).let {
         if (companions) it.withoutSourceCompanionControls() else it
     }
@@ -75,7 +67,7 @@ internal fun bindSourceExecutionControls(
             policy.finiteRequest(
                 shape, invocation.request.engine, resolvedPresolve ?: PresolveConfig.DEFAULT,
                 invocation.operation == ExecutionOperation.ENUMERATE,
-                cancellation = stop, presolveCancellation = presolveCancellation.includingStop(stop),
+                cancellation = stop, presolveCancellation = presolveCancellation .includingStop( stop),
                 presolveBudget = presolveBudget, cores = cores, executionOptions = finiteOptions,
                 randomSeed = seed, nodeBudget = budget,
                 solveBudgetMillis = null, allSolutions = invocation.operation == ExecutionOperation.ENUMERATE,
@@ -84,57 +76,37 @@ internal fun bindSourceExecutionControls(
             )
         } else {
             require(supplied.cores == cores) { "finite factory supplied a different lane count" }
-            supplied.withSourceControls(
-                finiteOptions,
-                budget,
-                seed,
-                stop,
-                policy,
-                resolvedPresolve,
-                prepareOnly,
-                numericalCompanions = companions,
-            )
+            supplied.withSourceControls(finiteOptions, budget, seed, stop, policy, resolvedPresolve, prepareOnly,
+                numericalCompanions = companions)
         }
     }
     if (kind == SourceExecutionKind.FINITE || kind == SourceExecutionKind.REFUTED) {
         options.validateKnown()
-        val defaults = TheoryParams(
-            nodeBudget = budget,
-            randomSeed = seed,
-            timeout = timeout,
-            cancellation = stop,
-        )
-        val theory = if (companions) {
-            defaults.copy(
-                maxDecisions = reader[ExecutionOption.maxDecisions] ?: defaults.maxDecisions,
-                maxFlips = reader[ExecutionOption.maxFlips] ?: defaults.maxFlips,
-                maxInstructions = reader[ExecutionOption.maxInstructions],
-                sourceLpWorkLimit = reader.defaulted(
-                    ExecutionOption.sourceLpWorkLimit,
-                    defaults.sourceLpWorkLimit,
-                ) ?: Long.MAX_VALUE,
-                sourceLpAllocationLimit = reader.defaulted(
-                    ExecutionOption.sourceLpAllocationLimit,
-                    defaults.sourceLpAllocationLimit,
-                ) ?: Long.MAX_VALUE,
-                sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
-                sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
-                sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
-                sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: defaults.sourceCutBranching,
-                sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
-                sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
-                    ?: defaults.sourceIncumbentCompletion,
-                sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
-                    ?: defaults.sourceRefutationCenterStep,
-                sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
-                sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
-                    ?: defaults.sourceRefutationPropagation,
-                sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
-                    ?: defaults.sourceRefutationResolution,
-            )
-        } else {
-            defaults
-        }
+        val defaults = TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout,
+            cancellation = stop)
+        val theory = if (companions) defaults.copy(
+            maxDecisions = reader[ExecutionOption.maxDecisions] ?: defaults.maxDecisions,
+            maxFlips = reader[ExecutionOption.maxFlips] ?: defaults.maxFlips,
+            maxInstructions = reader[ExecutionOption.maxInstructions],
+            sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit,
+                defaults.sourceLpWorkLimit) ?: Long.MAX_VALUE,
+            sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
+                defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
+            sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
+            sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
+            sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
+            sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: defaults.sourceCutBranching,
+            sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
+            sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
+                ?: defaults.sourceIncumbentCompletion,
+            sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
+                ?: defaults.sourceRefutationCenterStep,
+            sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
+            sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
+                ?: defaults.sourceRefutationPropagation,
+            sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
+                ?: defaults.sourceRefutationResolution,
+        ) else defaults
         return SourceExecutionControls(
             theory,
             PolynomialTheoryParams(),
@@ -175,10 +147,8 @@ internal fun bindSourceExecutionControls(
             openWorkLimit = reader.defaulted(ExecutionOption.openWorkLimit, defaults.openWorkLimit) ?: Long.MAX_VALUE,
             sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit, defaults.sourceLpWorkLimit)
                 ?: Long.MAX_VALUE,
-            sourceLpAllocationLimit = reader.defaulted(
-                ExecutionOption.sourceLpAllocationLimit,
-                defaults.sourceLpAllocationLimit,
-            ) ?: Long.MAX_VALUE,
+            sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
+                defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
             sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
             sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
             sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
@@ -271,14 +241,7 @@ internal fun bindSourceExecutionControls(
     }
     reader.finish("source ${kind.name.lowercase()}", "common strategy controls and the selected family's native limits")
     return SourceExecutionControls(
-        theory,
-        polynomial,
-        integer,
-        functions,
-        finite,
-        budget,
-        resolvedPresolve,
-        prepareOnly,
+        theory, polynomial, integer, functions, finite, budget, resolvedPresolve, prepareOnly,
     )
 }
 
@@ -300,19 +263,16 @@ private fun FiniteSolveRequest.withSourceControls(
     return FiniteSolveRequest(
         shape, engine, resolvedPresolve ?: presolveConfig,
         explicitPresolveConfig || policy.explicitPresolve, solutionSetSensitive,
-        cancellation = cancellation.withAccounting(
+        cancellation = cancellation .withAccounting(
             if (cancellation.accounting != null) cancellation else stop,
-        ).includingStop(stop),
-        presolveCancellation = presolveCancellation.withAccounting(
+        ).includingStop( stop), presolveCancellation = presolveCancellation .withAccounting(
             if (presolveCancellation.accounting != null) presolveCancellation else stop,
         ).includingStop(stop),
         presolveBudget = presolveBudget, cores = cores,
         executionOptions = policy.options(
             engine,
             executionOptions.withoutPresolve().without(
-                "node-limit",
-                "dry-run-presolve",
-                "open-linear-incremental",
+                "node-limit", "dry-run-presolve", "open-linear-incremental",
             ).let {
                 if (numericalCompanions) it.withoutSourceCompanionControls() else it
             }.overriddenBy(options),

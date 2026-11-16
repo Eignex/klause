@@ -38,50 +38,23 @@ class LinearSourceBoundTest {
         for (sense in ObjectiveSense.entries) {
             val third = SemanticRational.of(BIG_ONE, bigIntOf(3))
             val source = LinearSourceProblem(
-                listOf(
-                    LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
-                    LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE),
-                ),
-                listOf(
-                    LinearSourceRow(
-                        listOf(
-                            LinearSourceTerm(0, SemanticRational.ONE),
-                            LinearSourceTerm(1, SemanticRational.ONE),
-                        ),
-                        lower = SemanticRational.of(BIG_ONE, bigIntOf(2)),
-                    ),
-                ),
-                LinearSourceObjective(
-                    listOf(LinearSourceTerm(0, third), LinearSourceTerm(1, third)),
-                    SemanticRational.of(BIG_ONE, bigIntOf(10)),
-                    sense,
-                ),
+                listOf(LinearSourceVariable("x", true, SemanticRational.ZERO, SemanticRational.ONE),
+                    LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
+                listOf(LinearSourceRow(listOf(LinearSourceTerm(0, SemanticRational.ONE),
+                    LinearSourceTerm(1, SemanticRational.ONE)),
+                    lower = SemanticRational.of(BIG_ONE, bigIntOf(2)))),
+                LinearSourceObjective(listOf(LinearSourceTerm(0, third), LinearSourceTerm(1, third)),
+                    SemanticRational.of(BIG_ONE, bigIntOf(10)), sense),
             )
-            val invocation = SourceSetup.prepare(
-                SourceSetupRequest(
-                    SourceAttachment(source, ProblemSettings()),
-                    ExecutionOperation.OPTIMIZE,
-                    FiniteEngine.MIXED,
-                    maximize = sense == ObjectiveSense.MAXIMIZE,
-                ),
-            )
+            val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+                ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED, maximize = sense == ObjectiveSense.MAXIMIZE))
 
-            val result = assertIs<SourceExecutionResult.Finite>(
-                SourceSetup.execute(
-                    SourceExecutionRequest(
-                        invocation,
-                        ExecutionOptions(),
-                        presolveConfig = PresolveConfig.NONE,
-                    ),
-                ),
-            )
+            val result = assertIs<SourceExecutionResult.Finite>(SourceSetup.execute(SourceExecutionRequest(
+                invocation, ExecutionOptions(), presolveConfig = PresolveConfig.NONE)))
 
             val bound = assertNotNull(result.linearSource?.nativeObjectiveBound)
-            val expected = if (sense == ObjectiveSense.MINIMIZE) {
-                BigFraction.of(bigIntOf(4), bigIntOf(15))
-            } else {
-                BigFraction.of(bigIntOf(23), bigIntOf(30))
-            }
+            val expected = if (sense == ObjectiveSense.MINIMIZE) BigFraction.of(bigIntOf(4), bigIntOf(15))
+                else BigFraction.of(bigIntOf(23), bigIntOf(30))
             assertEquals(expected, bound.value)
             assertEquals(sense, bound.sense)
             assertFalse(bound.strict)
@@ -91,21 +64,12 @@ class LinearSourceBoundTest {
     @Test
     fun `finite bound translation should retain strictness through objective adjustment`() {
         val model = Problem(0, 0, emptyArray(), emptyArray())
-        val scope = SourceScope(
-            SourceRevision("working", "exact"),
-            objective = SourceObjective("cost", ObjectiveSense.MINIMIZE),
-        )
-        val evidence = SourceEvidence(
-            scope,
-            SourceClaim.Bound(BigFraction.ofLong(2), strict = true),
-            SourceDerivation.Unavailable("native claim"),
-        )
-        val mapping = SourceMapping(
-            model,
-            model,
-            TransformationGuarantees.IDENTITY,
-            objectiveAdjustment = ObjectiveAdjustment(BigFraction.ofLong(3), BigFraction.ofLong(5)),
-        )
+        val scope = SourceScope(SourceRevision("working", "exact"),
+            objective = SourceObjective("cost", ObjectiveSense.MINIMIZE))
+        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ofLong(2), strict = true),
+            SourceDerivation.Unavailable("native claim"))
+        val mapping = SourceMapping(model, model, TransformationGuarantees.IDENTITY,
+            objectiveAdjustment = ObjectiveAdjustment(BigFraction.ofLong(3), BigFraction.ofLong(5)))
 
         val bound = assertNotNull(finiteObjectiveBound(evidence, mapping))
 
@@ -117,15 +81,10 @@ class LinearSourceBoundTest {
     @Test
     fun `a mapping without objective preservation should withhold its bound`() {
         val model = Problem(0, 0, emptyArray(), emptyArray())
-        val scope = SourceScope(
-            SourceRevision("working", "exact"),
-            objective = SourceObjective("cost", ObjectiveSense.MINIMIZE),
-        )
-        val evidence = SourceEvidence(
-            scope,
-            SourceClaim.Bound(BigFraction.ONE),
-            SourceDerivation.Unavailable("native claim"),
-        )
+        val scope = SourceScope(SourceRevision("working", "exact"),
+            objective = SourceObjective("cost", ObjectiveSense.MINIMIZE))
+        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE),
+            SourceDerivation.Unavailable("native claim"))
         val mapping = SourceMapping(model, model, TransformationGuarantees.IDENTITY.copy(objective = false))
 
         val bound = finiteObjectiveBound(evidence, mapping)
@@ -137,37 +96,18 @@ class LinearSourceBoundTest {
     fun `restricted source claims should withhold a nominal global bound`() {
         val source = LinearSourceProblem(
             listOf(LinearSourceVariable("r", false, SemanticRational.ZERO, SemanticRational.ONE)),
-            emptyList(),
-            LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
+            emptyList(), LinearSourceObjective(listOf(LinearSourceTerm(0, SemanticRational.ONE))),
         )
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-                SourceAttachment(source, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.FIXED,
-            ),
-        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(source, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED))
         val prepared = assertNotNull(invocation.linearSource)
-        val scope = SourceScope(
-            SourceRevision("working", "exact"),
-            objective = SourceObjective("cost", ObjectiveSense.MINIMIZE),
-        )
-        val evidence = SourceEvidence(
-            scope,
-            SourceClaim.Bound(BigFraction.ONE),
-            SourceDerivation.Unavailable("native claim"),
-        )
-        val conditioned = SourceEvidence(
-            scope.copy(
-                condition = SourceCondition(
-                    lower = mapOf(
-                        SourceCoordinate(SourceCoordinate.Kind.Real, 0) to BigFraction.ONE,
-                    ),
-                ),
-            ),
-            evidence.claim,
-            evidence.derivation,
-        )
+        val scope = SourceScope(SourceRevision("working", "exact"),
+            objective = SourceObjective("cost", ObjectiveSense.MINIMIZE))
+        val evidence = SourceEvidence(scope, SourceClaim.Bound(BigFraction.ONE),
+            SourceDerivation.Unavailable("native claim"))
+        val conditioned = SourceEvidence(scope.copy(condition = SourceCondition(lower = mapOf(
+            SourceCoordinate(SourceCoordinate.Kind.Real, 0) to BigFraction.ONE))), evidence.claim,
+            evidence.derivation)
 
         assertNull(prepared.qualifyBound(evidence, unrestricted = false))
         assertNull(prepared.qualifyBound(conditioned, unrestricted = true))

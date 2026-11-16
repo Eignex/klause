@@ -63,7 +63,6 @@ class GeneralLearnedRowsTest {
         assertEquals(16, rows[1, GeneralLearnedRows.STAGES])
         assertEquals(42L, rows.admission(1))
     }
-
     @Test
     fun `unadmitted payload slots should reject reads and writes`() {
         val rows = GeneralLearnedRows()
@@ -74,4 +73,5 @@ class GeneralLearnedRowsTest {
         assertFailsWith<IndexOutOfBoundsException> { rows.setPayload(1, intArrayOf(0, 1)) }
         assertEquals(null, rows.payload(0))
     }
+
 }

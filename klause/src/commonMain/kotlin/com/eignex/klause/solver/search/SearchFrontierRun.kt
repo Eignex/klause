@@ -47,21 +47,16 @@ internal class SearchFrontierRun<K>(
             if (pause()) return SearchRunEvent.Paused
             retryUnresolved()
             val entry = selected ?: take()?.also { selected = it } ?: return finish(
-                if (unresolved.isEmpty()) SearchRunEvent.Exhausted else SearchRunEvent.Indeterminate.Component,
-            )
+                if (unresolved.isEmpty()) SearchRunEvent.Exhausted else SearchRunEvent.Indeterminate.Component)
             restore(entry.path)?.let { return it }
             when (nodePolicy.beforeBranch(session)) {
                 SearchNodeDisposition.Pause -> return SearchRunEvent.Paused
-
                 SearchNodeDisposition.Prune -> selected = null
-
                 SearchNodeDisposition.Indeterminate -> {
                     unresolved += Entry(entry.path, rank(), entry.sequence)
                     selected = null
                 }
-
                 is SearchNodeDisposition.Backjump -> return finish(SearchRunEvent.Indeterminate.Component)
-
                 SearchNodeDisposition.Expand -> {
                     val alternatives = booleanBranching.alternatives(session) ?: session.branchAlternatives()
                     if (alternatives == null) {
@@ -107,8 +102,7 @@ internal class SearchFrontierRun<K>(
             if (session.cancelled()) return finish(SearchRunEvent.Indeterminate.Cancelled)
             if (pause()) return SearchRunEvent.Paused
             if ((params.maxDecisions >= 0L && committed >= params.maxDecisions) ||
-                !session.executionControls.canCommitDecision()
-            ) {
+                !session.executionControls.canCommitDecision()) {
                 session.markDecisionBudgetExhausted()
                 return finish(SearchRunEvent.Indeterminate.Budget)
             }

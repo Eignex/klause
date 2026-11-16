@@ -34,19 +34,13 @@ internal class HistoricalTableReason(private val state: PropagationState) {
         attribution?.note(family, FactorAttribution.Metric.RefinementAttempts)
         replacement = try {
             (state.factorAt(marker[1]) as TablePropagator).historicalAlternative(
-                state,
-                marker.copyOfRange(LAZY_PAYLOAD, marker.size),
-                marker[2],
-                preferred,
+                state, marker.copyOfRange(LAZY_PAYLOAD, marker.size), marker[2], preferred,
             )
         } finally {
             attribution?.let {
                 it.note(family, FactorAttribution.Metric.RefinementWork, state.work - before)
-                it.note(
-                    family,
-                    FactorAttribution.Metric.RefinementNanos,
-                    requireNotNull(start).elapsedNow().inWholeNanoseconds,
-                )
+                it.note(family, FactorAttribution.Metric.RefinementNanos,
+                    requireNotNull(start).elapsedNow().inWholeNanoseconds)
             }
         }
         val alternate = replacement ?: return false

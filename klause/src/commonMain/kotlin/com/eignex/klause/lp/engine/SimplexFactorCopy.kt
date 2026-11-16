@@ -28,25 +28,18 @@ internal class SimplexFactorCopy(
             structuralColumns !in 0..matrix.cols || sourceHeadings.size != copy.dimension ||
             sourceColumns.size != copy.dimension || sourceUnits.size != copy.dimension ||
             !sourceHeadings.contentEquals(owner.basicVar)
-        ) {
-            return false
-        }
+        ) return false
         for (slot in sourceHeadings.indices) {
             val column = sourceColumns[slot]
             val unit = sourceUnits[slot]
             if (column < -1 || unit < -1 || column >= matrix.cols || unit >= copy.dimension ||
                 (column >= 0) == (unit >= 0) ||
                 (if (column >= 0) column else structuralColumns + unit) != sourceHeadings[slot]
-            ) {
-                return false
-            }
+            ) return false
         }
-        val solver = copy.create(
-            sourceColumns,
-            sourceUnits,
+        val solver = copy.create(sourceColumns, sourceUnits,
             LuPivotPolicy(maxEntries = entryLimit, maxWork = workLimit, cancelled = cancelled),
-            copy.additionalWork,
-        ) ?: return false
+            copy.additionalWork) ?: return false
         owner.installCopy(solver, sourceColumns, sourceUnits)
         return true
     }

@@ -35,8 +35,8 @@ internal class LinearAggregateBranches(private val budget: SourceLpBudget) {
         if (units > 16_384L - work || budget.funding?.paused == true ||
             bytes > 1_048_576L - allocation
         ) {
-            return false
-        }
+                return false
+            }
         work += units
         allocation += bytes
         budget.funding?.charge(units, bytes)
@@ -70,8 +70,8 @@ internal class LinearAggregateBranches(private val budget: SourceLpBudget) {
                     it.num.magnitudeBitLength() > 128 || it.den.magnitudeBitLength() > 128
                 }
             ) {
-                continue
-            }
+                    continue
+                }
             val opposite = coefficients.mapValues { it.value.negated() }
             if (!spend(rows.size.toLong(), 64L * (coefficients.size + rows.sumOf { it.supportSize }))) return null
             val lower = rows.filter { !it.strict && it.coefficients == opposite }.map { it.rhs }.reduceOrNull(::minimum)
@@ -135,8 +135,8 @@ internal class LinearAggregateBranches(private val budget: SourceLpBudget) {
                 if (proposed in condition.integerRows ||
                     proposed.adjacentIntegerAbove() in condition.integerRows
                 ) {
-                    continue
-                }
+                        continue
+                    }
                 proposals++
                 return proposed
             }

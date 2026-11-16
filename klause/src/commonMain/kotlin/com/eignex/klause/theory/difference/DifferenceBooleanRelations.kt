@@ -17,11 +17,8 @@ internal fun Problem.checkDifferenceBooleans(bools: BooleanArray, cancellation: 
         if (cancellation()) return null
         if (factor.intVars.isNotEmpty()) continue
         val form = factor.linearForm ?: return null
-        fun holds(row: LinearRow): Boolean = row.exactComparison(
-            0,
-            row.activator == LinearRow.ALWAYS || bools[row.activator],
-            witness::truth,
-        ).holdsAt(witness)
+        fun holds(row: LinearRow): Boolean = row.exactComparison(0,
+            row.activator == LinearRow.ALWAYS || bools[row.activator], witness::truth).holdsAt(witness)
         val satisfied = when (form) {
             is LinearForm.Conjunction -> form.rows.all(::holds)
             is LinearForm.Disjunction -> form.rows.any(::holds)

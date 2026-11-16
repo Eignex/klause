@@ -17,17 +17,10 @@ internal class LinearRepairGuidance : AutoCloseable {
     private var hint: Hint? = null
     private var closed = false
 
-    fun remember(
-        source: SourceProofContext,
-        point: Map<SourceCoordinate, Double>,
-        budget: SourceLpBudget,
-        token: ExecutionControl,
-    ): Boolean {
+    fun remember(source: SourceProofContext, point: Map<SourceCoordinate, Double>,
+        budget: SourceLpBudget, token: ExecutionControl): Boolean {
         if (closed || hint != null || point.isEmpty() || point.size > MAX_COLUMNS ||
-            source.coordinateCount > MAX_COLUMNS || token()
-        ) {
-            return false
-        }
+            source.coordinateCount > MAX_COLUMNS || token()) return false
         val funding = budget.funding ?: return false
         val work = 1L + 2L * point.size + source.coordinateCount
         val bytes = 256L + 128L * point.size + 64L * source.coordinateCount

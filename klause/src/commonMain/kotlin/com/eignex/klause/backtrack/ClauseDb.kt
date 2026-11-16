@@ -29,9 +29,7 @@ internal fun forgetIfOverCap(
     if (session.learnedClauseCount > session.activeLearnedClauseCount) {
         session.compactLearnedClauses(
             (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
-            params.learnedMemoryScratchBytes,
-            cancelled,
-        ) { _, _ -> true }
+            params.learnedMemoryScratchBytes, cancelled) { _, _ -> true }
     }
 }
 
@@ -42,30 +40,15 @@ private fun forgetWindow(
     startWork: Long,
     cancelled: () -> Boolean,
 ) {
-    val retired = session.maintainCapWindow(
-        cap,
+    val retired = session.maintainCapWindow(cap,
         (params.learnedMemoryWork - (session.work - startWork)).coerceAtLeast(0L),
-        params.learnedMemoryScratchBytes,
-        cancelled,
-        { index ->
+        params.learnedMemoryScratchBytes, cancelled, { index ->
             !session.learnedClausePermanent(index) && session.learnedClauseLbd(index) > params.lbdGlueThreshold &&
-                (
-                    !params.tieredLearnedDb || (
-                        session.learnedClauseTier(index) == ClauseTier.LOCAL &&
-                            !session.learnedClauseUsedSinceReduction(index)
-                        )
-                    )
-        },
-        nativePolicy = if (session.usesNativeSat) {
-            NativeCapConfiguration(
-                params.tieredLearnedDb,
-                params.lbdGlueThreshold,
-                params.midLbdThreshold,
-            )
-        } else {
-            null
-        },
-    ) { index ->
+                (!params.tieredLearnedDb || (session.learnedClauseTier(index) == ClauseTier.LOCAL &&
+                    !session.learnedClauseUsedSinceReduction(index)))
+        }, nativePolicy = if (session.usesNativeSat) NativeCapConfiguration(
+            params.tieredLearnedDb, params.lbdGlueThreshold, params.midLbdThreshold,
+        ) else null) { index ->
         val lbd = session.learnedClauseLbd(index)
         if (!params.tieredLearnedDb) {
             lbd <= params.lbdGlueThreshold
@@ -158,10 +141,8 @@ internal class VivificationPass(startCursor: Int = 0) : InprocessingPass {
                 val index = cursor
                 cursor = (cursor + 1) % count
                 budget.note("Candidates")
-                val literals = session.rootClauseLiterals(
-                    session.problem.numFactors + index,
-                    ROOT_LITERAL_LIMIT - literalsVisited,
-                ) ?: continue
+                val literals = session.rootClauseLiterals(session.problem.numFactors + index,
+                    ROOT_LITERAL_LIMIT - literalsVisited) ?: continue
                 budget.charge(literals.size)
                 literalsVisited += literals.size
                 if (literals.size < 3) continue
@@ -230,12 +211,10 @@ private fun vivifyClause(
                     budget.probe()
                     when (session.probeBool(Lit.variable(literal), !Lit.isPositive(literal))) {
                         null -> return null
-
                         is PropagationResult.Unsat -> {
                             result = kept.toIntArray()
                             break
                         }
-
                         else -> pushes++
                     }
                 }

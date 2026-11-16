@@ -53,11 +53,9 @@ internal class PropagationBuffers(
             val folded = (problem as? BakedProblem)?.foldedIntDomains
             val roots = if (folded == null) arrayOfNulls<IntDomain>(problem.numIntVars) else null
             yield(null)
-            if (roots != null) {
-                for (v in roots.indices) {
-                    roots[v] = problem.finiteIntDomain(v)
-                    if ((v + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
-                }
+            if (roots != null) for (v in roots.indices) {
+                roots[v] = problem.finiteIntDomain(v)
+                if ((v + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
             @Suppress("UNCHECKED_CAST")
             val rootDomains = folded ?: (roots as Array<IntDomain>)
@@ -170,43 +168,41 @@ internal class PropagationBuffers(
                 if (factor is Clause && factor.literals.size == 2) binaryClauseCount++
                 if ((fid + 1) % PROPAGATION_PREPARATION_BATCH_SIZE == 0) yield(null)
             }
-            yield(
-                PropagationBuffers(
-                    boolAssigned,
-                    boolValueBits,
-                    rootDomains,
-                    intDomains,
-                    dirtyBools,
-                    dirtyInts,
-                    intEvents,
-                    propQueue,
-                    propStamp,
-                    boolLevel,
-                    intLevel,
-                    intMinLevel,
-                    intMaxLevel,
-                    boolReason,
-                    intMinReason,
-                    intMaxReason,
-                    holeHistAnt,
-                    boundMoves,
-                    boundMovePriorMin,
-                    boundMovePriorMax,
-                    holeHistVal,
-                    holeHistIndex,
-                    holeHistLvl,
-                    holeHistPos,
-                    rootHoleHist,
-                    boolAntecedents,
-                    intMinAntecedents,
-                    intMaxAntecedents,
-                    boolPinPos,
-                    atoms,
-                    checkNotNull(watcherIndex),
-                    refPayloadStore,
-                    binaryClauseCount,
-                ),
-            )
+            yield(PropagationBuffers(
+                boolAssigned,
+                boolValueBits,
+                rootDomains,
+                intDomains,
+                dirtyBools,
+                dirtyInts,
+                intEvents,
+                propQueue,
+                propStamp,
+                boolLevel,
+                intLevel,
+                intMinLevel,
+                intMaxLevel,
+                boolReason,
+                intMinReason,
+                intMaxReason,
+                holeHistAnt,
+                boundMoves,
+                boundMovePriorMin,
+                boundMovePriorMax,
+                holeHistVal,
+                holeHistIndex,
+                holeHistLvl,
+                holeHistPos,
+                rootHoleHist,
+                boolAntecedents,
+                intMinAntecedents,
+                intMaxAntecedents,
+                boolPinPos,
+                atoms,
+                checkNotNull(watcherIndex),
+                refPayloadStore,
+                binaryClauseCount,
+            ))
         }
     }
 }

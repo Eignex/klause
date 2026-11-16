@@ -75,7 +75,6 @@ class LocalSearchState private constructor(
             }
         }
     }
-
     /** A search over the finite model [problem]. */
     constructor(
         problem: BakedProblem,
@@ -133,10 +132,8 @@ class LocalSearchState private constructor(
 
     // Clause degrees are binary, so their maintained break/make counts sum the exact raw delta.
     internal val repairChainClauseOnly: Boolean by lazy(LazyThreadSafetyMode.NONE) {
-        (
-            projection.selection == null ||
-            projection.selection.builtInScoring
-        ) &&
+        (projection.selection == null ||
+            projection.selection.builtInScoring) &&
             problem.factors.all { it is Clause }
     }
 
@@ -712,22 +709,17 @@ class LocalSearchState private constructor(
         if (feedsDefinitions(move)) return evaluateMove(move, scored).objectiveDelta
         return when (scored) {
             is LinearObjective -> probe.linearObjectiveDelta(move, scored)
-
             is FunctionalObjective -> {
                 val indexed = booleanDelta.takeIf { booleanDeltaOf === scored }
                 if (indexed != null) {
                     indexed.delta(assignment, move, ::checkScoringWork).also {
                         phaseTimer?.recordObjectiveScoring("indexed")
                     }
-                } else {
-                    scored.deltaIfApplied(assignment, move).also {
+                } else scored.deltaIfApplied(assignment, move).also {
                     phaseTimer?.recordObjectiveScoring("generic")
                 }
-                }
             }
-
             is IncrementalObjective -> scored.deltaIfApplied(assignment, move)
-
             else -> null
         }
     }
@@ -868,11 +860,8 @@ class LocalSearchState private constructor(
             for (id in violatedOrder) violated.add(id)
         }
         return LocalSearchMoveInspection(
-            checkNotNull(sample),
-            checkNotNull(degrees),
-            evaluation.netDelta,
-            evaluation.weightedNetDelta,
-            evaluation.objectiveDelta,
+            checkNotNull(sample), checkNotNull(degrees), evaluation.netDelta,
+            evaluation.weightedNetDelta, evaluation.objectiveDelta,
         )
     }
 
@@ -1233,9 +1222,7 @@ class LocalSearchState private constructor(
             if (factor.variables.reals.isEmpty() &&
                 (projection.selection?.capabilities(id) ?: factor.executionCapabilities()).assignmentCheck ==
                 AssignmentCheckCapability.EXACT
-            ) {
-                return null
-            }
+            ) return null
         }
         work?.charge(problem.numBoolVars.toLong() + problem.numIntVars + problem.numRealVars)
         return assignment.snapshot()
@@ -1253,14 +1240,8 @@ class LocalSearchState private constructor(
     ): LocalSearchProbe.Evaluation {
         check(!probe.active && !moveActive) { "local-search probes cannot be nested" }
         return probe.evaluate(
-            move,
-            objective,
-            booleanDelta.takeIf { booleanDeltaOf === objective },
-            refineCumulative,
-            weightedResidual,
-            elementEligibility,
-            feasibleObjective,
-            capture,
+            move, objective, booleanDelta.takeIf { booleanDeltaOf === objective },
+            refineCumulative, weightedResidual, elementEligibility, feasibleObjective, capture,
         )
     }
 

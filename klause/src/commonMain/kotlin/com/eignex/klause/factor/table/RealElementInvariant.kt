@@ -34,11 +34,8 @@ internal class RealElementInvariant(private val factor: RealElement) : Invariant
         if (current < domain.max) sink.addChannelingIntSet(state, factor.idx, domain.higher(current))
         if (current > domain.min) sink.addChannelingIntSet(state, factor.idx, domain.lower(current))
         val position = factor.position(current) ?: return
-        val selected = if (factor.arrIsVars) {
-            state.assignment.realValue(factor.entries[position])
-        } else {
-            factor.constants[position]
-        }
+        val selected = if (factor.arrIsVars) state.assignment.realValue(factor.entries[position])
+            else factor.constants[position]
         val lower = state.problem.realLower
         val upper = state.problem.realUpper
         val output = selected.coerceIn(lower[factor.result], upper[factor.result])

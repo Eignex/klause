@@ -33,16 +33,13 @@ fun Problem.bake(cancellation: ExecutionControl = ExecutionControl.Never): Baked
     bakeSelected(null, cancellation, null)
 
 /** Bake a private finite projection using the providers selected for this invocation. */
-fun Problem.bake(
-    providers: FactorProjectionProviders,
-    cancellation: ExecutionControl = ExecutionControl.Never,
-): BakedProblem = bakeSelected(providers, cancellation, null)
+fun Problem.bake(providers: FactorProjectionProviders, cancellation: ExecutionControl =
+    ExecutionControl.Never): BakedProblem =
+    bakeSelected(providers, cancellation, null)
 
 /** Bake private engine state while retaining the descriptors captured for this canonical source. */
-fun Problem.bake(
-    selection: PreparedFactorProjections,
-    cancellation: ExecutionControl = ExecutionControl.Never,
-): BakedProblem {
+fun Problem.bake(selection: PreparedFactorProjections, cancellation: ExecutionControl =
+    ExecutionControl.Never): BakedProblem {
     selection.requireSource(this)
     return bakeSelected(selection.providers, cancellation, selection)
 }
@@ -56,9 +53,7 @@ private fun Problem.bakeSelected(
         if (selection == null && (providers == null || projectionProviders === providers)) return this
         if ((selection != null && selection === factorProjections) ||
             (projectionProviders == null && providers === FactorProjectionProviders.Default)
-        ) {
-            return this
-        }
+        ) return this
     }
     return BakedProblem(
         settings = this.settings,

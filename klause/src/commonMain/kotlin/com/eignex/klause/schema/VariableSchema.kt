@@ -54,10 +54,12 @@ open class VariableSchema : Schema<SchemaEntry>() {
         register(NominalSpec(ls)) { NominalHandle(it, ls) }
     }
 
-    protected fun intVar(min: Int, max: Int) = register(IntSpec(min, max)) { IntHandle(it, min.toLong(), max.toLong()) }
+    protected fun intVar(min: Int, max: Int) =
+        register(IntSpec(min, max)) { IntHandle(it, min.toLong(), max.toLong()) }
 
     /** Integer variable over a 64-bit range. */
-    protected fun intVar(min: Long, max: Long) = register(IntDomainSpec(min, max)) { IntHandle(it, min, max) }
+    protected fun intVar(min: Long, max: Long) =
+        register(IntDomainSpec(min, max)) { IntHandle(it, min, max) }
 
     /** Integer variable with an open side: a `null` bound leaves that side unbounded. */
     protected fun openIntVar(min: Long? = null, max: Long? = null) =

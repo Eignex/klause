@@ -23,28 +23,20 @@ import kotlin.test.assertTrue
 class PolynomialFormulaTest {
     @Test
     fun `rational scalar equivalent comparisons preserve shared Boolean truth`() {
-        val relations = listOf(
-            "=" to "=",
-            "distinct" to "distinct",
-            "<" to ">",
-            "<=" to ">=",
-            ">" to "<",
-            ">=" to "<=",
-        )
-        for ((left, reversed) in relations) {
-            for ((right, scalar) in listOf(left to "3", reversed to "(- 3)")) {
-                val source = SmtLibPolynomial.parse(
-                    "(declare-const x Real) (declare-const y Real) (declare-const b Bool) (declare-const c Bool) " +
-                        "(assert (and (= b ($left (- x y) 0)) (= c ($right (* $scalar (- x y)) 0)) " +
-                        "(not (= b c))))",
-                )
-                val arithmetic = PolynomialArithmetic()
-                val formula = PolynomialFormula.normalize(source.formula, arithmetic)
+        val relations = listOf("=" to "=", "distinct" to "distinct", "<" to ">", "<=" to ">=",
+            ">" to "<", ">=" to "<=")
+        for ((left, reversed) in relations) for ((right, scalar) in listOf(left to "3", reversed to "(- 3)")) {
+            val source = SmtLibPolynomial.parse(
+                "(declare-const x Real) (declare-const y Real) (declare-const b Bool) (declare-const c Bool) " +
+                    "(assert (and (= b ($left (- x y) 0)) (= c ($right (* $scalar (- x y)) 0)) " +
+                    "(not (= b c))))",
+            )
+            val arithmetic = PolynomialArithmetic()
+            val formula = PolynomialFormula.normalize(source.formula, arithmetic)
 
-                val refuted = formula.refuteBooleans(arithmetic, 128, 2048, 4096)
+            val refuted = formula.refuteBooleans(arithmetic, 128, 2048, 4096)
 
-                assertTrue(refuted)
-            }
+            assertTrue(refuted)
         }
     }
 
@@ -122,22 +114,15 @@ class PolynomialFormulaTest {
 
         try {
             for (other in listOf(true, false, true)) {
-                val result = invocation.check(
-                    PolynomialCondition(
-                        bools = mapOf(0 to true, 1 to other),
-                        lower = fixed,
-                        upper = fixed,
-                    ),
-                )
+                val result = invocation.check(PolynomialCondition(bools = mapOf(0 to true, 1 to other),
+                    lower = fixed, upper = fixed))
 
                 if (other) {
                     val point = assertIs<QfNraResult.Satisfiable>(result).assignment
                     assertEquals(BigFraction.ONE, point.realValue(0).rational)
                     assertTrue(point.boolValue(0))
                     assertTrue(point.boolValue(1))
-                } else {
-                    assertIs<QfNraResult.Unsatisfiable>(result)
-                }
+                } else assertIs<QfNraResult.Unsatisfiable>(result)
             }
         } finally {
             invocation.close()

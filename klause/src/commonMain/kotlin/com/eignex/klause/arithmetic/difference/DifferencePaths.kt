@@ -60,14 +60,13 @@ internal class DifferencePathScratch(size: Int) {
 
     fun settled(node: Int): Boolean = settled[node] == stamp
     fun reached(node: Int): Boolean = reached[node] == stamp
-    fun reach(node: Int) {
-        reached[node] = stamp
-    }
+    fun reach(node: Int) { reached[node] = stamp }
 
     @Suppress("ReturnCount")
     fun pathTo(node: Int, source: IntArray, stop: ExecutionControl = ExecutionControl.Never): IntArray? {
         if (completion != DifferencePathCompletion.Completed || !settled(node)) return null
-        val accounting = stop.accounting
+        val accounting =
+        stop.accounting
         accounting?.charge(predecessor.size.toLong())
         if (stop()) return null
         val path = IntArrayList()
@@ -164,7 +163,7 @@ internal class DifferenceLongHeap(capacity: Int) {
 
     fun push(id: Int, key: Long, stop: ExecutionControl = ExecutionControl.Never) {
         val p = pos[id]
-        if (p >= 0 && key >= keys[id]) return
+        if (p >= 0&&key >= keys[id]) return
         val accounting = if (stop === ExecutionControl.Never) null else stop.accounting
         if (p >= 0) {
             keys[id] = key
@@ -185,7 +184,7 @@ internal class DifferenceLongHeap(capacity: Int) {
         if (size > 0) {
             heap[0] = heap[size]
             pos[heap[0]] = 0
-            siftDown(0, if (stop === ExecutionControl.Never) null else stop.accounting)
+            siftDown(0, if ( stop === ExecutionControl.Never) null else stop.accounting)
         }
         return top
     }

@@ -14,23 +14,20 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 
 @Suppress("TooGenericExceptionCaught") // preserve engine failures while releasing retained query state
-internal class BooleanSatisfactionRepair(solver: BacktrackSolver, private val params: BacktrackParams) : RepairSearch {
+internal class BooleanSatisfactionRepair(
+    solver: BacktrackSolver,
+    private val params: BacktrackParams,
+) : RepairSearch {
     init {
-        require(
-            solver.problem.numIntVars == 0 && solver.problem.numRealVars == 0 &&
-                solver.problem.factors.all { it is Clause } && !solver.problem.hasSymmetryBreaking,
-        )
-        require(
-            params.componentFactory == null && params.lpConfig == null &&
-                params.lpPlan.hasDefaultNumericalSettings() && !params.integerRowLearning,
-        )
-        require(
-            params.objectiveBoundSupplier == null && params.objectiveLowerBoundSupplier == null &&
-                params.globalVarLowerSupplier == null && params.globalVarUpperSupplier == null &&
-                params.toleranceCheck == null && params.cutExchange == null &&
-                (params.clauseExchange == null || params.clauseExchange is ConditionedClauseExchange) &&
-                params.improvedSolutionSink == null && params.pooledIncumbents == null,
-        )
+        require(solver.problem.numIntVars == 0 && solver.problem.numRealVars == 0 &&
+            solver.problem.factors.all { it is Clause } && !solver.problem.hasSymmetryBreaking)
+        require(params.componentFactory == null && params.lpConfig == null &&
+            params.lpPlan.hasDefaultNumericalSettings() && !params.integerRowLearning)
+        require(params.objectiveBoundSupplier == null && params.objectiveLowerBoundSupplier == null &&
+            params.globalVarLowerSupplier == null && params.globalVarUpperSupplier == null &&
+            params.toleranceCheck == null && params.cutExchange == null &&
+            (params.clauseExchange == null || params.clauseExchange is ConditionedClauseExchange) &&
+            params.improvedSolutionSink == null && params.pooledIncumbents == null)
     }
 
     private val problem = solver.problem
@@ -47,10 +44,8 @@ internal class BooleanSatisfactionRepair(solver: BacktrackSolver, private val pa
     internal fun retainPartition(literal: Int): Boolean {
         check(!closed && started)
         if (!handle.retainPartition(literal)) return false
-        assumptions = Assumptions(
-            bools = checkNotNull(assumptions).bools +
-                (Lit.variable(literal) to Lit.isPositive(literal)),
-        )
+        assumptions = Assumptions(bools = checkNotNull(assumptions).bools +
+            (Lit.variable(literal) to Lit.isPositive(literal)))
         return true
     }
 

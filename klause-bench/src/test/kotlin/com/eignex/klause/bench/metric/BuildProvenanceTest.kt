@@ -91,10 +91,8 @@ class BuildProvenanceTest {
 
     @Test
     fun `preflight options should remain distinct from measured solve options in provenance`() {
-        val environment = mapOf(
-            "KLAUSE_CLI_OPTS" to "-Xmx3g -XX:LogFile=solve.xml",
-            "KLAUSE_CLI_PREFLIGHT_OPTS" to "-Xmx3g",
-        )
+        val environment = mapOf("KLAUSE_CLI_OPTS" to "-Xmx3g -XX:LogFile=solve.xml",
+            "KLAUSE_CLI_PREFLIGHT_OPTS" to "-Xmx3g")
 
         assertEquals(environment, runtimeOptions(environment))
     }
@@ -164,10 +162,11 @@ class BuildProvenanceTest {
         }
     }
 
-    private fun write(root: File, path: String, text: String): File = File(root, path).apply {
-        parentFile.mkdirs()
-        writeText(text)
-    }
+    private fun write(root: File, path: String, text: String): File =
+        File(root, path).apply {
+            parentFile.mkdirs()
+            writeText(text)
+        }
 
     private fun distribution(root: File, prefix: String = ""): File {
         write(root, "${prefix}dist/lib/solver.jar", "solver")

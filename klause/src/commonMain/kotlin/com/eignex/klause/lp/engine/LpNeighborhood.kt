@@ -360,9 +360,7 @@ internal fun LpNeighborhood.rebindExact(state: LpExactState, token: ExecutionCon
         if (column.origin != previous.model.column(local).origin) return null
         if (column != previous.model.column(local) ||
             source.objective.cost(original) != previous.model.objective.cost(local)
-        ) {
-            changed = true
-        }
+        ) changed = true
     }
     // Global trail revisions do not invalidate a block whose complete numerical and premise authority is unchanged.
     for (local in rows.indices) {
@@ -371,9 +369,7 @@ internal fun LpNeighborhood.rebindExact(state: LpExactState, token: ExecutionCon
         if (source.rhs(original) != previous.model.rhs(local) ||
             source.row(original) != previous.model.row(local) ||
             state.rows.row(original).active != previous.rows.row(local).active
-        ) {
-            changed = true
-        }
+        ) changed = true
     }
     if (!changed) return this
     val identities = LpScopedRows(

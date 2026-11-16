@@ -136,12 +136,8 @@ class SourceResultEvidenceTest {
         val supported = SourceEvidence(scope, SourceClaim.Refutation, SourceDerivation.Premise("conflict"))
         val result = SourceResultEvidence(scope, List(20) { missing } + supported)
 
-        val checked = result.verify(
-            SourceClaim.Refutation,
-            context,
-            ExecutionControl.Never,
-            SourceProofAllowance(8, 128),
-        )
+        val checked = result.verify(SourceClaim.Refutation, context, ExecutionControl.Never,
+            SourceProofAllowance(8, 128))
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }

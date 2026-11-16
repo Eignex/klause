@@ -241,40 +241,37 @@ class EncoderRoutingTest {
         )
         for (polynomialOwner in listOf(true, false)) {
             for (allowance in listOf(0L, 3L)) {
-                var installations = 0
-                var charged = 0L
-                val caller = object : ExecutionControl() {
-                    override fun isCancelled(): Boolean = false
-                    override val accounting: WorkMeter get() = WorkMeter { charged += it }
-                }
-                val providers = FactorProjectionProviders(
-                    encoder = EncoderProvider { factor, target ->
-                        val selected = BuiltInEncoderProvider.select(factor, target)
-                        if (target != EncodingTarget.POLYNOMIAL) {
-                            selected
-                        } else {
-                            Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
-                                installations++
-                                selected.install(view, encoding)
-                            }
-                        }
-                    },
-                )
-
-                val result = BacktrackSolver.source(source).withProjectionProviders(providers)
-                    .solve(
-                        PolynomialTheoryParams(
-                            maximumWork = allowance,
-                            cancellation = if (polynomialOwner) caller else ExecutionControl.Never,
-                        ),
-                        TheoryParams(cancellation = if (polynomialOwner) ExecutionControl.Never else caller),
-                    )
-
-                assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
-                assertEquals(if (allowance == 0L) 0 else 1, installations)
-                assertEquals(allowance, charged)
+            var installations = 0
+            var charged = 0L
+            val caller = object : ExecutionControl() {
+                override fun isCancelled(): Boolean = false
+                override val accounting: WorkMeter get() = WorkMeter { charged += it }
             }
+            val providers = FactorProjectionProviders(
+                encoder = EncoderProvider { factor, target ->
+                    val selected = BuiltInEncoderProvider.select(factor, target)
+                    if (target != EncodingTarget.POLYNOMIAL) {
+                        selected
+                    } else {
+                        Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                            installations++
+                            selected.install(view, encoding)
+                        }
+                    }
+                },
+            )
+
+            val result = BacktrackSolver.source(source).withProjectionProviders(providers)
+                .solve(PolynomialTheoryParams(maximumWork = allowance, cancellation =
+                    if (polynomialOwner) caller else ExecutionControl.Never,
+                        ),
+                        TheoryParams(cancellation = if (polynomialOwner) ExecutionControl.Never else caller))
+
+            assertEquals(TerminationReason.BudgetExhausted, assertIs<OpenTheoryResult.Unknown>(result).reason)
+            assertEquals(if (allowance == 0L) 0 else 1, installations)
+            assertEquals(allowance, charged)
         }
+    }
     }
 
     @Test
@@ -387,13 +384,10 @@ class EncoderRoutingTest {
 
     @Test
     fun `relaxation only encoders should not authorize open source enforcement`() {
-        val input = assertIs<Problem>(
-            (
-                SmtLib.parse(
-                    "(declare-const x Real) (assert (> x 0))",
-                )
-                ).source.originalSource,
-        )
+        val input = assertIs<Problem>((
+            SmtLib.parse(
+                "(declare-const x Real) (assert (> x 0))",
+            )).source.originalSource)
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { _, _ ->
                 Encoder(EncoderSupport.RELAXATION_ONLY)
@@ -440,14 +434,11 @@ class EncoderRoutingTest {
 
     @Test
     fun `difference provider replacement should combine factors in one graph`() {
-        val input = assertIs<Problem>(
-            (
-                SmtLib.parse(
-                    "(declare-const x Int) (declare-const y Int) " +
-                        "(assert (<= (- x y) 0)) (assert (<= (- y x) (- 1)))",
-                )
-                ).source.originalSource,
-        )
+        val input = assertIs<Problem>((
+            SmtLib.parse(
+                "(declare-const x Int) (declare-const y Int) " +
+                    "(assert (<= (- x y) 0)) (assert (<= (- y x) (- 1)))",
+            )).source.originalSource)
         val providers = FactorProjectionProviders(
             encoder = EncoderProvider { factor, target ->
                 if (target != EncodingTarget.DIFFERENCE) {
@@ -678,10 +669,8 @@ class EncoderRoutingTest {
         assertEquals(IntVariableOwner.CP, ownership.intOwner(0))
         assertEquals(
             listOf(BigFraction.ofLong(3), BigFraction.ONE),
-            assertNotNull(
-                assertNotNull(parsed.toLinearSourceProblem(exact))
-                    .checkMpsWitness(listOf(BigFraction.ofLong(3), BigFraction.ONE)),
-            ).values,
+            assertNotNull(assertNotNull(parsed.toLinearSourceProblem(exact))
+                .checkMpsWitness(listOf(BigFraction.ofLong(3), BigFraction.ONE))).values,
         )
     }
 
@@ -707,8 +696,7 @@ class EncoderRoutingTest {
             val source = (
                 SmtLib.parse(
                     "(declare-const x Real) (assert (= x 1))",
-                )
-                ).model
+                )).model
             var cancelled = false
             var installations = 0
             var charged = 0L

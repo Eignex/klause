@@ -79,25 +79,23 @@ internal class LocalSearchBuffers(
                 for (i in from until end) confNeighbours[i] = problem.factors[i] !is ObjectiveBoundFactor
                 yield(null)
             }
-            yield(
-                LocalSearchBuffers(
-                    checkNotNull(assignment),
-                    checkNotNull(violated),
-                    factorDegree,
-                    intPayload,
-                    longPayload,
-                    refPayload,
-                    doublePayload,
-                    checkNotNull(tabu),
-                    cachedBoolBreakCount,
-                    cachedBoolMakeCount,
-                    boolConfChange,
-                    intConfChange,
-                    confNeighbours,
-                    probeTouched,
-                    probeWasViolated,
-                ),
-            )
+            yield(LocalSearchBuffers(
+                checkNotNull(assignment),
+                checkNotNull(violated),
+                factorDegree,
+                intPayload,
+                longPayload,
+                refPayload,
+                doublePayload,
+                checkNotNull(tabu),
+                cachedBoolBreakCount,
+                cachedBoolMakeCount,
+                boolConfChange,
+                intConfChange,
+                confNeighbours,
+                probeTouched,
+                probeWasViolated,
+            ))
         }
     }
 }

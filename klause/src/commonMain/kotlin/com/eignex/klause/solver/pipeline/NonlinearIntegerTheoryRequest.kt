@@ -100,11 +100,11 @@ fun OpenTheoryPipeline.execute(
     require(cores > 0)
     return (
         if (engine == FiniteEngine.MIXED || (engine != FiniteEngine.FIXED && cores > 1)) {
-            NonlinearIntegerPortfolio(request, params, cores, engine).execute()
-        } else {
-            NonlinearIntegerInvocation(request, params, engine).execute()
-        }
-        )
+        NonlinearIntegerPortfolio(request, params, cores, engine).execute()
+    } else {
+        NonlinearIntegerInvocation(request, params, engine).execute()
+    }
+    )
         .withSourceSemantics(request.preparedPlan.sourceSemantics)
 }
 
@@ -212,19 +212,19 @@ internal class NonlinearIntegerInvocation(
         }
         val stats = searchStats.mergedWith(heuristicStats).copy(
             run = RunStats(
-                "nonlinear-integer-${engine.id}",
-                started.elapsedNow().inWholeMilliseconds,
-                external(),
-            ),
+            "nonlinear-integer-${engine.id}",
+            started.elapsedNow().inWholeMilliseconds,
+            external(),
+        )
         )
         val published = if (stop()) {
             OpenTheoryResult.Unknown(incompleteReason(), stats)
         } else {
             when (val solved = result) {
-                is OpenTheoryResult.Sat -> solved.copy(stats = stats)
-                is OpenTheoryResult.Unsat -> solved.copy(stats = stats)
-                else -> OpenTheoryResult.Unknown(incompleteReason(), stats)
-            }
+            is OpenTheoryResult.Sat -> solved.copy(stats = stats)
+            is OpenTheoryResult.Unsat -> solved.copy(stats = stats)
+            else -> OpenTheoryResult.Unknown(incompleteReason(), stats)
+        }
         }
         return PolynomialTheoryExecution(
             published,
@@ -248,11 +248,11 @@ internal class NonlinearIntegerInvocation(
         val identity = ModelIdentity.of(source)
         if (arm == 0) {
             return PortfolioWorker.ofSolve(
-                "bt+exact-nia",
-                arm,
-                resumable = { retainedSearch(slot) },
-            ) { _, _ -> error("nonlinear traversal runs by slice") }
-                .bindEvidence(identity)
+            "bt+exact-nia",
+            arm,
+            resumable = { retainedSearch(slot) },
+        ) { _, _ -> error("nonlinear traversal runs by slice") }
+            .bindEvidence(identity)
         }
         val adaptive = arm == 2
         return exactNeighborhoodWorker(
@@ -289,8 +289,7 @@ internal class NonlinearIntegerInvocation(
             source,
             NonlinearIntegerParams(
                 arithmetic = QfNraParams(
-                    stop,
-                    polynomial.maximumWork,
+                    stop, polynomial.maximumWork,
                     PolynomialLimits(polynomial.maximumDenseCoefficients, polynomial.maximumMatrixCells),
                     cellRefinement = params.cellRefinement,
                 ),
@@ -333,7 +332,7 @@ internal class NonlinearIntegerInvocation(
             searchStats = searchStats.copy(search = SearchStats(nodes = SumResult(cursor.stats.candidates.toDouble())))
             var charged = cursor.stats.candidates - before
             while (charged > 0) {
-                nodeBudget?.allowance?.spend()
+                nodeBudget?.allowance?.spend();
                 charged--
             }
             (checked?.result as? QfNraResult.Unknown)?.resource?.let { declined ->
@@ -412,8 +411,7 @@ internal class NonlinearIntegerInvocation(
             source,
             NonlinearIntegerParams(
                 arithmetic = QfNraParams(
-                    stop or cancellation,
-                    remaining,
+                    stop or cancellation, remaining,
                     PolynomialLimits(polynomial.maximumDenseCoefficients, polynomial.maximumMatrixCells),
                     cellRefinement = params.cellRefinement,
                 ),
@@ -482,9 +480,9 @@ internal class NonlinearIntegerInvocation(
             searchStats = searchStats.copy(
                 search = SearchStats(
                     nodes = SumResult(
-                        searchStats.search.nodes.sum + execution.stats.candidates,
-                    ),
-                ),
+                searchStats.search.nodes.sum + execution.stats.candidates,
+            )
+                )
             )
             if (nodeBudget != null) {
                 var decisions = execution.stats.candidates

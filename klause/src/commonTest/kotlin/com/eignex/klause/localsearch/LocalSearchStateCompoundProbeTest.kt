@@ -115,8 +115,7 @@ class LocalSearchStateCompoundProbeTest {
             var polls = 0
             var probing = false
 
-            val interrupted = state.scoringPick(
-                ExecutionControl {
+            val interrupted = state.scoringPick(ExecutionControl {
                 if (!probing) return@ExecutionControl false
                 assertEquals(best, state.bestCostSeen)
                 assertEquals(step, state.step)
@@ -125,8 +124,7 @@ class LocalSearchStateCompoundProbeTest {
                 assertContentEquals(boolConf, state.boolConfChange)
                 assertContentEquals(intConf, state.intConfChange)
                 ++polls == boundary
-            }
-            ) {
+            }) {
                 probing = true
                 state.weightedNetDelta(move)
                 probing = false

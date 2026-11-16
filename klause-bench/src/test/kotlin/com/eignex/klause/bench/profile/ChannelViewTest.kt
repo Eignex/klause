@@ -22,12 +22,8 @@ class ChannelViewTest {
     @ParameterizedTest
     @ValueSource(booleans = [false, true])
     fun `inverse role views expose the same small source swap neighborhood`(transpose: Boolean) {
-        val source = Problem.of(
-            0,
-            6,
-            Array(6) { IntDomain(0, 2) },
-            arrayOf(Inverse(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5))),
-        )
+        val source = Problem.of(0, 6, Array(6) { IntDomain(0, 2) },
+            arrayOf(Inverse(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5))))
         val problem = if (transpose) assertNotNull(inverseAssignmentView(source, ExecutionControl.Never)) else source
         val model = LocalSearchModel.open(problem)
         val neighbors = HashSet<List<Long>>()
@@ -43,22 +39,17 @@ class ChannelViewTest {
             for (move in sink.list) neighbors += state.inspectMove(move).assignment.ints.toList()
         }
 
-        assertEquals(
-            setOf(
-                listOf(0L, 2L, 1L, 0L, 2L, 1L),
-                listOf(1L, 0L, 2L, 1L, 0L, 2L),
-                listOf(2L, 1L, 0L, 2L, 1L, 0L),
-            ),
-            neighbors,
-        )
+        assertEquals(setOf(
+            listOf(0L, 2L, 1L, 0L, 2L, 1L),
+            listOf(1L, 0L, 2L, 1L, 0L, 2L),
+            listOf(2L, 1L, 0L, 2L, 1L, 0L),
+        ), neighbors)
     }
 
     @Test
     fun `searched channel factories use the admitted definition network`() {
-        val program = parseFlatZinc(
-            "var bool: b; var 0..1: y; " +
-                "constraint bool2int(b, y) :: defines_var(y); solve satisfy;",
-        )
+        val program = parseFlatZinc("var bool: b; var 0..1: y; " +
+            "constraint bool2int(b, y) :: defines_var(y); solve satisfy;")
         val maintained = assertNotNull(DefinitionalSweep.fromSource(program.problem, program.definitionHints))
 
         val searched = ChannelView.SearchedValues.sweep(maintained, ExecutionControl.Never)
@@ -70,12 +61,8 @@ class ChannelViewTest {
     @ParameterizedTest
     @ValueSource(ints = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
     fun `inverse role transposition preserves the grade at every source assignment`(bits: Int) {
-        val source = Problem.of(
-            0,
-            4,
-            Array(4) { IntDomain(1, 2) },
-            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3), 1, 1)),
-        )
+        val source = Problem.of(0, 4, Array(4) { IntDomain(1, 2) },
+            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3), 1, 1)))
         val view = assertNotNull(inverseAssignmentView(source, ExecutionControl.Never))
         val primal = LocalSearchState(LocalSearchModel.open(source), Random(0))
         val inverse = LocalSearchState(LocalSearchModel.open(view), Random(0))
@@ -93,13 +80,9 @@ class ChannelViewTest {
 
     @Test
     fun `inverse role transposition retains source holes semantics and implied roles`() {
-        val source = Problem.of(
-            0,
-            6,
-            Array(6) { IntDomain(4, 6).excludeValue(5) },
+        val source = Problem.of(0, 6, Array(6) { IntDomain(4, 6).excludeValue(5) },
             arrayOf(Inverse(intArrayOf(0, 1, 2), intArrayOf(3, 4, 5), 4, 4)),
-            impliedFactorMask = booleanArrayOf(true),
-        )
+            impliedFactorMask = booleanArrayOf(true))
 
         val view = assertNotNull(inverseAssignmentView(source, ExecutionControl.Never))
 
@@ -110,17 +93,9 @@ class ChannelViewTest {
 
     @Test
     fun `inverse role transposition accepts a source permutation with unequal offsets`() {
-        val source = Problem.of(
-            0,
-            4,
-            arrayOf(
-                IntDomain(4, 5),
-                IntDomain(4, 5),
-                IntDomain(-2, -1),
-                IntDomain(-2, -1),
-            ),
-            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3), -2, 4)),
-        )
+        val source = Problem.of(0, 4, arrayOf(IntDomain(4, 5), IntDomain(4, 5),
+            IntDomain(-2, -1), IntDomain(-2, -1)),
+            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3), -2, 4)))
         val view = assertNotNull(inverseAssignmentView(source, ExecutionControl.Never))
         val state = LocalSearchState(LocalSearchModel.open(view), Random(0))
         for ((variable, value) in longArrayOf(5, 4, -1, -2).withIndex()) {
@@ -134,49 +109,33 @@ class ChannelViewTest {
 
     @Test
     fun `aliased inverse channels decline without a partial view`() {
-        val source = Problem.of(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
-            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(0, 1))),
-        )
+        val source = Problem.of(0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(0, 1))))
 
         assertNull(inverseAssignmentView(source, ExecutionControl.Never))
     }
 
     @Test
     fun `competing inverse channels decline without a partial view`() {
-        val source = Problem.of(
-            0,
-            6,
-            Array(6) { IntDomain(0, 1) },
-            arrayOf(
-                Inverse(intArrayOf(0, 1), intArrayOf(2, 3)),
-                Inverse(intArrayOf(2, 3), intArrayOf(4, 5)),
-            ),
-        )
+        val source = Problem.of(0, 6, Array(6) { IntDomain(0, 1) },
+            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3)),
+                Inverse(intArrayOf(2, 3), intArrayOf(4, 5))))
 
         assertNull(inverseAssignmentView(source, ExecutionControl.Never))
     }
 
     @Test
     fun `many to one value channels do not supply an inverse assignment view`() {
-        val source = parseFlatZinc(
-            "var 1..2: x; var 7..7: y; " +
-                "constraint array_int_element(x, [7, 7], y) :: defines_var(y); solve satisfy;",
-        )
+        val source = parseFlatZinc("var 1..2: x; var 7..7: y; " +
+            "constraint array_int_element(x, [7, 7], y) :: defines_var(y); solve satisfy;")
 
         assertNull(inverseAssignmentView(source.problem, ExecutionControl.Never))
     }
 
     @Test
     fun `cancelled inverse role transposition publishes no view`() {
-        val source = Problem.of(
-            0,
-            4,
-            Array(4) { IntDomain(0, 1) },
-            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3))),
-        )
+        val source = Problem.of(0, 4, Array(4) { IntDomain(0, 1) },
+            arrayOf(Inverse(intArrayOf(0, 1), intArrayOf(2, 3))))
 
         assertNull(inverseAssignmentView(source, ExecutionControl { true }))
     }

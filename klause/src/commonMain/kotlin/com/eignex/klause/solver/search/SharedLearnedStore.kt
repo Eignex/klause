@@ -23,19 +23,9 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         var recheckNext: Row? = null
         val rank: Long get() = (lbd.toLong() shl Int.SIZE_BITS) or index.toLong()
     }
-    class SignatureBucket(val key: Int) {
-        var first: Row? = null
-        var last: Row? = null
-    }
-    class Posting(val literal: Int) {
-        var first: Watch? = null
-        var last: Watch? = null
-        var size = 0
-    }
-    class Watch(val row: Row, val posting: Posting) {
-        var previous: Watch? = null
-        var next: Watch? = null
-    }
+    class SignatureBucket(val key: Int) { var first: Row? = null; var last: Row? = null }
+    class Posting(val literal: Int) { var first: Watch? = null; var last: Watch? = null; var size = 0 }
+    class Watch(val row: Row, val posting: Posting) { var previous: Watch? = null; var next: Watch? = null }
     private val rows = LearnedIndex<Row>()
     private val ranks = LearnedIndex<Row>()
     private val signatures = LearnedIndex<SignatureBucket>()
@@ -63,10 +53,8 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
     val ownedRows: Int get() = objects
     val hasRetirement: Boolean get() = retiring != null
     val readWork: Long get() = maxOf(rows.readWork, ranks.readWork)
-    val scratchBytes: Long get() = maxOf(
-        maxOf(rows.scratchBytes, ranks.scratchBytes),
-        maxOf(signatures.scratchBytes, watches.scratchBytes),
-    ) + 64L
+    val scratchBytes: Long get() = maxOf(maxOf(rows.scratchBytes, ranks.scratchBytes),
+        maxOf(signatures.scratchBytes, watches.scratchBytes)) + 64L
     val ownedBytes: Long get() = payloadLiterals * Int.SIZE_BYTES + objects * 130L + watchNodes * 32L +
         signatures.size * 20L + watches.size * 24L + rows.ownedBytes + ranks.ownedBytes +
         signatures.ownedBytes + watches.ownedBytes + 72L
@@ -85,10 +73,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
     fun add(literals: IntArray, lbd: Int): Row? {
         if (literals.isEmpty()) return null
         var hash = 0
-        for (literal in literals) {
-            charge(5L)
-            hash += mix(literal)
-        }
+        for (literal in literals) { charge(5L); hash += mix(literal) }
         hash = hash * 31 + literals.size
         charge(signatures.readWork)
         var bucket = signatures[hash.toLong()]
@@ -140,9 +125,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         while (true) {
             when (retirementPhase) {
                 0 -> removeWatch(row.firstWatch, budget).also { row.firstWatch = null }
-
                 1 -> removeWatch(row.secondWatch, budget).also { row.secondWatch = null }
-
                 2 -> {
                     val bucket = checkNotNull(row.signature)
                     val lastInBucket = bucket.first === row && bucket.last === row
@@ -156,17 +139,14 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
                     row.signaturePrevious = null
                     row.signatureNext = null
                 }
-
                 3 -> {
                     budget.pay(ranks.mutationWork, scratchBytes)
                     ranks.remove(row.rank)
                 }
-
                 4 -> {
                     budget.pay(rows.mutationWork, scratchBytes)
                     rows.remove(row.index.toLong())
                 }
-
                 else -> {
                     budget.pay(32L, scratchBytes)
                     payloadLiterals -= checkNotNull(row.literals).size
@@ -189,10 +169,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
     }
 
     private fun removeWatch(watch: Watch?, budget: SharedReclamationBudget) {
-        if (watch == null) {
-            budget.pay(1L)
-            return
-        }
+        if (watch == null) { budget.pay(1L); return }
         val posting = watch.posting
         budget.pay(32L + if (posting.size == 1) watches.mutationWork else 0L, scratchBytes)
         unlink(watch)
@@ -235,9 +212,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
             if (firstUnit == null) firstUnit = row
             lastUnit = row
             unitCount++
-        } else {
-            row.secondWatch = addWatch(row, literals[1])
-        }
+        } else row.secondWatch = addWatch(row, literals[1])
         row.attached = true
         val truth = host.truth(literals[0])
         if (truth == true) return ComponentResult.Consistent
@@ -301,10 +276,7 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
             var replacement = -1
             for (position in 2 until literals.size) {
                 charge(1L)
-                if (host.truth(literals[position]) != false) {
-                    replacement = position
-                    break
-                }
+                if (host.truth(literals[position]) != false) { replacement = position; break }
             }
             if (replacement >= 0) {
                 // The old posting remains a valid owner until its replacement is fully funded.
@@ -357,14 +329,8 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         for (literal in left) {
             var leftCount = 0
             var rightCount = 0
-            for (value in left) {
-                charge(1L)
-                if (value == literal) leftCount++
-            }
-            for (value in right) {
-                charge(1L)
-                if (value == literal) rightCount++
-            }
+            for (value in left) { charge(1L); if (value == literal) leftCount++ }
+            for (value in right) { charge(1L); if (value == literal) rightCount++ }
             if (leftCount != rightCount) return false
         }
         return true
@@ -409,29 +375,21 @@ internal class SharedLearnedStore(private val charge: (Long) -> Unit) {
         watches.memory(sample) { posting ->
             var retained = false
             var entry = posting.first
-            while (entry != null) {
-                sample.step()
-                retained = protected(entry.row) || retained
-                entry = entry.next
-            }
+            while (entry != null) { sample.step(); retained = protected(entry.row) || retained; entry = entry.next }
             sample.owned(posting, 8L, retained)
             sample.ownedReferences(posting, 2L, retained)
             retained
         }
         sample.ownedReferences(this, 9L, anyProtected)
-        sample.record(
-            mapOf(
-                "sharedLearnedObjects" to size.toLong(),
-                "sharedLearnedRetiredObjects" to (objects - size).toLong(),
-                "sharedLearnedPayloadBytes" to payloadLiterals * Int.SIZE_BYTES,
-                "sharedLearnedIndexCapacityBytes" to (ownedBytes - payloadLiterals * Int.SIZE_BYTES),
-                "sharedLearnedReferenceSlots" to (
-                    objects * 13L + watchNodes * 4L +
-                        signatures.size * 2L + watches.size * 2L +
-                        (rows.size + ranks.size + signatures.size + watches.size) * 3L + 13L
-                    ),
-            ),
-        )
+        sample.record(mapOf(
+            "sharedLearnedObjects" to size.toLong(),
+            "sharedLearnedRetiredObjects" to (objects - size).toLong(),
+            "sharedLearnedPayloadBytes" to payloadLiterals * Int.SIZE_BYTES,
+            "sharedLearnedIndexCapacityBytes" to (ownedBytes - payloadLiterals * Int.SIZE_BYTES),
+            "sharedLearnedReferenceSlots" to (objects * 13L + watchNodes * 4L +
+                signatures.size * 2L + watches.size * 2L +
+                (rows.size + ranks.size + signatures.size + watches.size) * 3L + 13L),
+        ))
         return anyProtected
     }
 }

@@ -55,10 +55,7 @@ internal fun extremumDefinitions(
             if (!needed[f.vars[j]] && f.vars.none {
                     if (cancellation.definitionStopped()) return emptyList()
                     known[it]
-                }
-            ) {
-                continue
-            }
+                }) continue
             definitions.add(ExtremumDefinition(f.vars[j], f, j))
             used[i] = true
             known[f.vars[j]] = true

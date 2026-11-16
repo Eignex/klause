@@ -42,13 +42,8 @@ class ExactLinearTest {
         for (relation in LinearOp.entries) {
             for (bound in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
                 for ((activator, indicator) in listOf(-1 to true, 0 to false, 0 to true)) {
-                    val row = ExactLinear.of(
-                        intArrayOf(),
-                        emptyList(),
-                        relation,
-                        BigFraction.ofLong(bound),
-                        activator = activator,
-                    )
+                    val row = ExactLinear.of(intArrayOf(), emptyList(), relation,
+                        BigFraction.ofLong(bound), activator = activator)
                     val source = Problem(activator + 1, 0, emptyArray(), arrayOf(row))
                     val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
                     if (activator >= 0) state.assignment.setBool(activator, indicator)
@@ -73,21 +68,10 @@ class ExactLinearTest {
             for (relation in listOf(LinearOp.LE, LinearOp.GE)) {
                 val positiveActivity = relation == LinearOp.LE
                 val value = if (positiveActivity == (coefficient > 0L)) Long.MAX_VALUE else Long.MIN_VALUE
-                val row = ExactLinear.of(
-                    IntArray(4) { Term.ofIntVar(it) },
-                    List(4) { BigFraction.ofLong(coefficient) },
-                    relation,
-                    BigFraction.ZERO,
-                )
-                val state = PropagationState(
-                    Problem(
-                        0,
-                        4,
-                        Array(4) { IntDomain(value, value) },
-                        arrayOf(row),
-                    ),
-                    Assumptions.None,
-                )
+                val row = ExactLinear.of(IntArray(4) { Term.ofIntVar(it) },
+                    List(4) { BigFraction.ofLong(coefficient) }, relation, BigFraction.ZERO)
+                val state = PropagationState(Problem(0, 4,
+                    Array(4) { IntDomain(value, value) }, arrayOf(row)), Assumptions.None)
 
                 val consistent = state.factorAt(0).propagate(state, 0)
 
@@ -98,33 +82,16 @@ class ExactLinearTest {
 
     @Test
     fun `reified word endpoint comparisons should enforce either truth direction exactly`() {
-        val comparisons = listOf(
-            LinearOp.LE to Long.MIN_VALUE,
-            LinearOp.LE to Long.MAX_VALUE,
-            LinearOp.GE to Long.MIN_VALUE,
-            LinearOp.GE to Long.MAX_VALUE,
-        )
+        val comparisons = listOf(LinearOp.LE to Long.MIN_VALUE, LinearOp.LE to Long.MAX_VALUE,
+            LinearOp.GE to Long.MIN_VALUE, LinearOp.GE to Long.MAX_VALUE)
         val truthDirections = listOf(false to false, false to true, true to false, true to true)
         for ((relation, bound) in comparisons) {
             for (value in listOf(Long.MIN_VALUE, Long.MAX_VALUE)) {
                 for ((strict, indicator) in truthDirections) {
-                    val row = ExactLinear.of(
-                        IntArray(2) { Term.ofIntVar(it) },
-                        List(2) { BigFraction.ONE },
-                        relation,
-                        BigFraction.ofLong(bound),
-                        strict,
-                        activator = 0,
-                    )
-                    val state = PropagationState(
-                        Problem(
-                            1,
-                            2,
-                            Array(2) { IntDomain(value, value) },
-                            arrayOf(row),
-                        ),
-                        Assumptions.None,
-                    )
+                    val row = ExactLinear.of(IntArray(2) { Term.ofIntVar(it) },
+                        List(2) { BigFraction.ONE }, relation, BigFraction.ofLong(bound), strict, activator = 0)
+                    val state = PropagationState(Problem(1, 2,
+                        Array(2) { IntDomain(value, value) }, arrayOf(row)), Assumptions.None)
                     state.pinBool(0, indicator)
                     val holds = (relation == LinearOp.GE) == (value == Long.MAX_VALUE)
 
@@ -138,12 +105,8 @@ class ExactLinearTest {
 
     @Test
     fun `integer source row repairs should cross holes toward a satisfying point`() {
-        val row = ExactLinear.of(
-            intArrayOf(Term.ofIntVar(0)),
-            listOf(BigFraction.ONE),
-            LinearOp.LE,
-            BigFraction.ofLong(2),
-        )
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ofLong(2))
         val domain = IntDomain(0, 3).excludeValue(1).excludeValue(2)
         val state = LocalSearchState(LocalSearchModel.open(Problem(0, 1, arrayOf(domain), arrayOf(row))), Random(3))
         state.assignment.setInt(0, 3)
@@ -162,13 +125,8 @@ class ExactLinearTest {
 
     @Test
     fun `reified integer source row move scores should match fresh grading`() {
-        val row = ExactLinear.of(
-            intArrayOf(Term.ofIntVar(0)),
-            listOf(BigFraction.ONE),
-            LinearOp.LE,
-            BigFraction.ONE,
-            activator = 0,
-        )
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ONE, activator = 0)
         val source = Problem(1, 1, arrayOf(IntDomain(0, 3)), arrayOf(row))
         val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
         state.assignment.setBool(0, true)
@@ -188,12 +146,9 @@ class ExactLinearTest {
 
     @Test
     fun `word sized coefficients should retain exact scores over overflowing move domains`() {
-        val row = ExactLinear.of(
-            intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
             listOf(BigFraction.ofLong(1L shl 33), BigFraction.ofLong(-(1L shl 33))),
-            LinearOp.EQ,
-            BigFraction.ZERO,
-        )
+            LinearOp.EQ, BigFraction.ZERO)
         val source = Problem(0, 2, Array(2) { IntDomain(0, 1L shl 34) }, arrayOf(row))
         val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
         state.assignment.setInt(0, 1L shl 33)
@@ -219,9 +174,7 @@ class ExactLinearTest {
             for (relation in listOf(LinearOp.LE, LinearOp.EQ, LinearOp.NE)) {
                 val row = ExactLinear.of(
                     intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
-                    listOf(BigFraction.ONE, BigFraction.ofLong(-2)),
-                    relation,
-                    BigFraction.ZERO,
+                    listOf(BigFraction.ONE, BigFraction.ofLong(-2)), relation, BigFraction.ZERO,
                     activator = activator,
                 )
                 val source = Problem(activator + 1, 2, Array(2) { IntDomain(0, 3) }, arrayOf(row))
@@ -236,20 +189,10 @@ class ExactLinearTest {
     @Test
     fun `integer source rows should reject overflowing activity at a pinned point`() {
         val coefficient = BigFraction.ofLong(1L shl 33)
-        val row = ExactLinear.of(
-            intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
-            listOf(coefficient, coefficient),
-            LinearOp.LE,
-            BigFraction.ofLong(10),
-        )
-        val session = PropagationSession(
-            Problem(
-                0,
-                2,
-                Array(2) { IntDomain(-(1L shl 62), 1L shl 62) },
-                arrayOf(row),
-            ),
-        )
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
+            listOf(coefficient, coefficient), LinearOp.LE, BigFraction.ofLong(10))
+        val session = PropagationSession(Problem(0, 2,
+            Array(2) { IntDomain(-(1L shl 62), 1L shl 62) }, arrayOf(row)))
 
         session.pinInt(0, 1L shl 33)
         val result = session.pinInt(1, 1L shl 33)
@@ -357,13 +300,8 @@ class ExactLinearTest {
     @Test
     fun `strict integer rows should retain exact lattice thresholds after denominator clearing`() {
         for ((relation, expected) in listOf(LinearOp.LE to listOf(0L, 1L), LinearOp.GE to listOf(2L, 3L))) {
-            val row = ExactLinear.of(
-                intArrayOf(Term.ofIntVar(0)),
-                listOf(BigFraction.ONE),
-                relation,
-                BigFraction.of(bigIntOf(3), bigIntOf(2)),
-                strict = true,
-            )
+            val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE), relation,
+                BigFraction.of(bigIntOf(3), bigIntOf(2)), strict = true)
             val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf(row))
 
             val values = BacktrackSolver(source.bake()).enumerate().map { it.intValue(0) }.sorted().toList()
@@ -374,14 +312,8 @@ class ExactLinearTest {
 
     @Test
     fun `reified exact integer rows should enforce both truth directions`() {
-        val row = ExactLinear.of(
-            intArrayOf(Term.ofIntVar(0)),
-            listOf(BigFraction.ONE),
-            LinearOp.LE,
-            BigFraction.of(bigIntOf(3), bigIntOf(2)),
-            strict = true,
-            activator = 0,
-        )
+        val row = ExactLinear.of(intArrayOf(Term.ofIntVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+            BigFraction.of(bigIntOf(3), bigIntOf(2)), strict = true, activator = 0)
         val source = Problem(1, 1, arrayOf(IntDomain(0, 2)), arrayOf(row))
 
         val points = BacktrackSolver(source.bake()).enumerate().map { it.intValue(0) to it.boolValue(0) }.toSet()
@@ -392,24 +324,13 @@ class ExactLinearTest {
     @Test
     fun `strict exact real rows should exclude a pinned boundary`() {
         val rows = arrayOf<Factor>(
-            ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0)),
-                listOf(BigFraction.ONE),
-                LinearOp.LE,
-                BigFraction.ONE,
-                strict = true,
-            ),
+            ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ONE, strict = true),
             ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.EQ, BigFraction.ONE),
         )
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            rows,
-            numRealVars = 1,
+        val source = Problem(0, 0, emptyArray(), rows, numRealVars = 1,
             realLower = doubleArrayOf(Double.NEGATIVE_INFINITY),
-            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY),
-        )
+            realUpper = doubleArrayOf(Double.POSITIVE_INFINITY))
 
         val result = BacktrackSolver.source(source).solve()
 
@@ -419,23 +340,10 @@ class ExactLinearTest {
     @Test
     fun `false reified exact real rows should complement strictness`() {
         for (strict in listOf(false, true)) {
-            val row = ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0)),
-                listOf(BigFraction.ONE),
-                LinearOp.LE,
-                BigFraction.ONE,
-                strict = strict,
-                activator = 0,
-            )
-            val source = Problem(
-                1,
-                0,
-                emptyArray(),
-                arrayOf(row, Clause(intArrayOf(Lit.make(0, false)))),
-                numRealVars = 1,
-                realLower = doubleArrayOf(1.0),
-                realUpper = doubleArrayOf(1.0),
-            )
+            val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+                BigFraction.ONE, strict = strict, activator = 0)
+            val source = Problem(1, 0, emptyArray(), arrayOf(row, Clause(intArrayOf(Lit.make(0, false)))),
+                numRealVars = 1, realLower = doubleArrayOf(1.0), realUpper = doubleArrayOf(1.0))
 
             val result = BacktrackSolver.source(source).solve()
 
@@ -445,23 +353,10 @@ class ExactLinearTest {
 
     @Test
     fun `strict reified real score changes should agree with fresh grading`() {
-        val row = ExactLinear.of(
-            intArrayOf(Term.ofRealVar(0)),
-            listOf(BigFraction.ONE),
-            LinearOp.LE,
-            BigFraction.ONE,
-            strict = true,
-            activator = 0,
-        )
-        val source = Problem(
-            1,
-            0,
-            emptyArray(),
-            arrayOf(row),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(2.0),
-        )
+        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+            BigFraction.ONE, strict = true, activator = 0)
+        val source = Problem(1, 0, emptyArray(), arrayOf(row), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(2.0))
         val state = LocalSearchState(LocalSearchModel.open(source), Random(3))
         state.assignment.setReal(0, 1.0)
         state.assignment.setBool(0, false)
@@ -480,14 +375,8 @@ class ExactLinearTest {
 
     @Test
     fun `exact row keys and remapping should retain strictness and reifying identity`() {
-        val row = ExactLinear.of(
-            intArrayOf(Term.ofRealVar(0)),
-            listOf(BigFraction.ONE),
-            LinearOp.LE,
-            BigFraction.ONE,
-            strict = true,
-            activator = 0,
-        )
+        val row = ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE), LinearOp.LE,
+            BigFraction.ONE, strict = true, activator = 0)
         val mapping = VarRemap(intArrayOf(1), intArrayOf(), intArrayOf(2))
 
         val image = row.remap(mapping)
@@ -496,15 +385,7 @@ class ExactLinearTest {
         assertTrue(image.strict)
         assertEquals(Term.ofRealVar(2), image.ref(0))
         assertEquals(image.structuralKey().hashCode(), row.remapStructuralHash(mapping))
-        assertNotEquals(
-            row.structuralKey(),
-            ExactLinear.of(
-                intArrayOf(Term.ofRealVar(0)),
-                listOf(BigFraction.ONE),
-                LinearOp.LE,
-                BigFraction.ONE,
-                activator = 0,
-            ).structuralKey(),
-        )
+        assertNotEquals(row.structuralKey(), ExactLinear.of(intArrayOf(Term.ofRealVar(0)), listOf(BigFraction.ONE),
+            LinearOp.LE, BigFraction.ONE, activator = 0).structuralKey())
     }
 }

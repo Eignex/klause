@@ -64,12 +64,7 @@ object SmtLib {
         cancellation: ExecutionControl = ExecutionControl.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibProblem = parse(
-        { StringCharSource(text) },
-        unboundedIntLo,
-        unboundedIntHi,
-        settings,
-        cancellation,
-        semanticOverrides,
+        { StringCharSource(text) }, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
     )
 
     /** Admit [source], closing it once when closeable, including refusal before the first read. */
@@ -88,11 +83,7 @@ object SmtLib {
                     transferred = true
                     source
                 },
-                unboundedIntLo,
-                unboundedIntHi,
-                settings,
-                cancellation,
-                semanticOverrides,
+                unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
             )
         } finally {
             if (!transferred && source is AutoCloseable) source.close()
@@ -112,11 +103,6 @@ object SmtLib {
         cancellation: ExecutionControl = ExecutionControl.Never,
         semanticOverrides: SemanticOverrides = SemanticOverrides(),
     ): SmtLibProblem = parseSmtLibSource(
-        openSource,
-        unboundedIntLo,
-        unboundedIntHi,
-        settings,
-        cancellation,
-        semanticOverrides,
+        openSource, unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
     ) ?: throw CancellationException("SMT source admission interrupted")
 }

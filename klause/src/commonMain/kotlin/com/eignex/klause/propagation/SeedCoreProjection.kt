@@ -32,9 +32,7 @@ internal fun PropagationSession.projectSeedCore(
         if (antecedents == null) {
             return if (roots?.boolValueOrNull(variable) == assigned) {
                 intArrayOf(Lit.make(variable, assigned))
-            } else {
-                null
-            }
+            } else null
         }
         // Lazy and integer reasons retain the certified prefix rather than materialize an unbounded proof.
         if (isLazyReason(antecedents) || antecedents.size >= 128 || !spend(antecedents.size + 1)) return null

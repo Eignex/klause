@@ -1,4 +1,5 @@
 package com.eignex.klause.formats.smtlib
+
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.ExactLinear
 import com.eignex.klause.ir.LinearOp
@@ -42,12 +43,8 @@ class SmtLibAffineRealTablesTest {
 
     @Test
     fun `every original affine table branch retains its witness`() {
-        for ((a, b, expected) in listOf(
-            Triple(false, false, "5"),
-            Triple(true, false, "7"),
-            Triple(false, true, "8"),
-            Triple(true, true, "10"),
-        )) {
+        for ((a, b, expected) in listOf(Triple(false, false, "5"), Triple(true, false, "7"),
+            Triple(false, true, "8"), Triple(true, true, "10"))) {
             val source = SmtLib.parse(
                 """
                 (declare-const a Bool) (declare-const b Bool)
@@ -64,21 +61,15 @@ class SmtLibAffineRealTablesTest {
 
             val result = BacktrackSolver.source(source.model).solve()
 
-            assertEquals(
-                expected,
-                assertIs<OpenTheoryResult.Sat>(result).assignment
-                    .realValue(source.realVarNames.getValue("t")),
-            )
+            assertEquals(expected, assertIs<OpenTheoryResult.Sat>(result).assignment
+                .realValue(source.realVarNames.getValue("t")))
         }
     }
 
     @Test
     fun `a missing conflicting or nonlinear table entry withholds the affine relation`() {
-        for (last in listOf(
-            "",
-            "(assert (=> (and a b) (= t 11)))",
-            "(assert (=> (and a b) (= t 10))) (assert (=> (and a b) (= t 12)))",
-        )) {
+        for (last in listOf("", "(assert (=> (and a b) (= t 11)))",
+            "(assert (=> (and a b) (= t 10))) (assert (=> (and a b) (= t 12)))")) {
             val source = SmtLib.parse(
                 """
                 (declare-const a Bool) (declare-const b Bool)
@@ -196,15 +187,14 @@ class SmtLibAffineRealTablesTest {
         assertFailsWith<PolynomialSourceInterrupted> { capture.infer() }
     }
 
+
     @Test
     fun `a completed table survives exhaustion while a later table is still being prepared`() {
         val capture = SmtLibAffineRealTables(ExecutionControl.Never, entryLimit = 20_000)
         capture.declarations((0 until 8).toList())
         for (value in 0..2) {
-            capture.equality(
-                200 + 2 * value,
-                RealComb(emptyMap(), mapOf(8 to BigFraction.ONE), BigFraction.ofLong(-value.toLong())),
-            )
+            capture.equality(200 + 2 * value,
+                RealComb(emptyMap(), mapOf(8 to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
         }
         for (assignment in 0 until 4) {
             val cube = (0 until 2).map { variable ->
@@ -213,15 +203,11 @@ class SmtLibAffineRealTablesTest {
             capture.conjunction(1000 + 2 * assignment, cube, trueLiteral = -1)
             capture.implication(intArrayOf(1000 + 2 * assignment, 200 + 2 * assignment.countOneBits()), -1)
         }
-        for (variable in 0 until 8) {
-            for (value in 0..1) {
-                val equality = 400 + 4 * variable + 2 * value
-                capture.equality(
-                    equality,
-                    RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())),
-                )
-                capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
-            }
+        for (variable in 0 until 8) for (value in 0..1) {
+            val equality = 400 + 4 * variable + 2 * value
+            capture.equality(equality,
+                RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
+            capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
         }
         capture.equality(900, RealComb(emptyMap(), mapOf(9 to BigFraction.ONE), BigFraction.ZERO))
         for (assignment in 0 until 256) {
@@ -243,21 +229,15 @@ class SmtLibAffineRealTablesTest {
     fun `a small capture allowance still completes a unit coefficient table`() {
         val capture = SmtLibAffineRealTables(ExecutionControl.Never, entryLimit = 512)
         capture.declarations(listOf(0, 1))
-        for (variable in 0 until 2) {
-            for (value in 0..1) {
-                val equality = 100 + 4 * variable + 2 * value
-                capture.equality(
-                    equality,
-                    RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())),
-                )
-                capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
-            }
+        for (variable in 0 until 2) for (value in 0..1) {
+            val equality = 100 + 4 * variable + 2 * value
+            capture.equality(equality,
+                RealComb(emptyMap(), mapOf(variable to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
+            capture.implication(intArrayOf(2 * variable + 1 - value, equality), trueLiteral = -1)
         }
         for (value in 0..2) {
-            capture.equality(
-                200 + 2 * value,
-                RealComb(emptyMap(), mapOf(2 to BigFraction.ONE), BigFraction.ofLong(-value.toLong())),
-            )
+            capture.equality(200 + 2 * value,
+                RealComb(emptyMap(), mapOf(2 to BigFraction.ONE), BigFraction.ofLong(-value.toLong())))
         }
         for (assignment in 0 until 4) {
             val cube = (0 until 2).map { variable ->
@@ -293,10 +273,8 @@ class SmtLibAffineRealTablesTest {
         val row = source.model.factors.filterIsInstance<ExactLinear>()
             .single { it.activator == LinearRow.ALWAYS && it.size == 3 }
 
-        assertEquals(
-            listOf("36893488147419103230", "-2", "-18446744073709551615"),
-            (0 until row.size).map { row.constants.exactCoeff(it).toString() },
-        )
+        assertEquals(listOf("36893488147419103230", "-2", "-18446744073709551615"),
+            (0 until row.size).map { row.constants.exactCoeff(it).toString() })
         assertEquals("18446744073709551616", row.constants.exactBound.toString())
     }
 }

@@ -18,13 +18,9 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class SourceNumericalCutoff(val value: BigFraction, val premise: String) {
-    init {
-        require(premise.isNotBlank())
-    }
+    init { require(premise.isNotBlank()) }
     fun applyTo(
-        source: SourceProofContext,
-        funding: SourceLpFunding,
-        cancellation: ExecutionControl = ExecutionControl.Never,
+        source: SourceProofContext, funding: SourceLpFunding, cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceProofContext? {
         if (cancellation() || funding.paused || source.scope.objective == null || !source.affineObjectiveAvailable) {
             return null
@@ -37,10 +33,7 @@ internal data class SourceNumericalCutoff(val value: BigFraction, val premise: S
         if (entries > 250_000L || cancellation() || funding.exhausted ||
             value.num.magnitudeBitLength() > 4096 || value.den.magnitudeBitLength() > 4096 ||
             source.objectiveConstant.num.magnitudeBitLength() > 4096 ||
-            source.objectiveConstant.den.magnitudeBitLength() > 4096
-        ) {
-            return null
-        }
+            source.objectiveConstant.den.magnitudeBitLength() > 4096) return null
         for (row in premises.values) {
             val count = row.inequality.supportSize.toLong() + row.guards.size + row.integerPins.size
             entries += count
@@ -53,33 +46,16 @@ internal data class SourceNumericalCutoff(val value: BigFraction, val premise: S
             funding.charge(1L, 64L + (numerator.toLong() + denominator + 7L) / 8L)
             if (numerator > 4096 || denominator > 4096 || cancellation() || funding.paused) return null
         }
-        funding.charge(
-            1L,
-            256L + (
-                value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() +
-                    source.objectiveConstant.num.magnitudeBitLength() + source.objectiveConstant.den
-                        .magnitudeBitLength()
-                ) / 4L,
-        )
+        funding.charge(1L, 256L + (value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength() +
+            source.objectiveConstant.num.magnitudeBitLength() + source.objectiveConstant.den.magnitudeBitLength()) / 4L)
         if (cancellation() || funding.paused) return null
         if (premise in premises) return source.takeIf(::enforcedBy)
         val minimize = source.scope.objective.sense == ObjectiveSense.MINIMIZE
-        val row = SourceInequality(
-            objective.mapValues { (_, coefficient) ->
-                if (minimize) coefficient else coefficient.negated()
-            },
-            if (minimize) value - source.objectiveConstant else source.objectiveConstant - value,
-            strict = true,
-        )
-        return SourceProofContext(
-            source.scope,
-            coordinates,
-            premises + (premise to SourcePremise(row)),
-            objective,
-            source.objectiveConstant,
-            source.semanticsChecker,
-            source.semantics,
-        )
+        val row = SourceInequality(objective.mapValues { (_, coefficient) ->
+            if (minimize) coefficient else coefficient.negated()
+        }, if (minimize) value - source.objectiveConstant else source.objectiveConstant - value, strict = true)
+        return SourceProofContext(source.scope, coordinates, premises + (premise to SourcePremise(row)),
+            objective, source.objectiveConstant, source.semanticsChecker, source.semantics)
     }
 
     fun enforcedBy(source: SourceProofContext): Boolean {
@@ -94,8 +70,10 @@ internal data class SourceNumericalCutoff(val value: BigFraction, val premise: S
 }
 
 internal sealed interface SourceNumericalFeedbackResult {
-    data class Available(val query: LinearAuthorityCapturedQuery, val cutoff: SourceNumericalCutoff?) :
-        SourceNumericalFeedbackResult {
+    data class Available(
+        val query: LinearAuthorityCapturedQuery,
+        val cutoff: SourceNumericalCutoff?,
+    ) : SourceNumericalFeedbackResult {
         val scope: SourceScope get() = query.context.scope
 
         fun compatible(source: SourceProofContext, cutoff: SourceNumericalCutoff?): Boolean =
@@ -109,8 +87,11 @@ internal sealed interface SourceNumericalFeedbackResult {
                 query.context.semanticsChecker === source.semanticsChecker
     }
 
-    data class Unavailable(val source: SourceProofContext, val cutoff: SourceNumericalCutoff?, val reason: Reason) :
-        SourceNumericalFeedbackResult
+    data class Unavailable(
+        val source: SourceProofContext,
+        val cutoff: SourceNumericalCutoff?,
+        val reason: Reason,
+    ) : SourceNumericalFeedbackResult
 
     enum class Reason { Cancelled, Funding, Retention, Paused, MissingQuery, Incompatible, Oversized }
 }
@@ -131,12 +112,8 @@ internal class SourceNumericalFeedback(
     val request: LinearAuthorityFeedbackRequest = LinearAuthorityFeedbackRequest.Full,
 ) {
     // A private prefix would construct full inspection records that latest delivery never reads.
-    private var journal = LinearAuthorityCapture(
-        if (latest) 0 else 64,
-        250_000L,
-        8L * 1024 * 1024,
-        cancellation,
-    )
+    private var journal = LinearAuthorityCapture(if (latest) 0 else 64, 250_000L,
+        8L * 1024 * 1024, cancellation)
     private val owned = journal
     private var chargedEntries = 0L
     private var chargedBytes = 0L
@@ -153,9 +130,8 @@ internal class SourceNumericalFeedback(
     fun attach(authority: LinearAuthority) {
         require(authority.funding === funding)
         val existing = authority.capture
-        if (existing == null) {
-            authority.capture = journal
-        } else if (existing !== journal) {
+        if (existing == null) authority.capture = journal
+        else if (existing !== journal) {
             settle()
             if (latest) journal.stopDelivery()
             journal = existing

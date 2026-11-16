@@ -41,14 +41,8 @@ internal class FloatGridPublication(
             // The finite engine checks rounded grid relations, which can violate exact source equations.
             if (toleranceCheck?.invoke(sample) == false || cancellation()) return null
         } else {
-            val verdict = verifyProjectedSourceWitness(
-                binding.projection.mapping.source,
-                binding.sourceChecker,
-                sample,
-                cancellation,
-                sourcePoints,
-                toleranceCheck,
-            )
+            val verdict = verifyProjectedSourceWitness(binding.projection.mapping.source, binding.sourceChecker, sample,
+                cancellation, sourcePoints, toleranceCheck)
             if (verdict !is Verification.Accepted || cancellation()) return null
         }
         val objective = binding.objective?.let {
@@ -61,9 +55,7 @@ internal class FloatGridPublication(
         lastChecked = native
         if (previous != null && objective != null &&
             (if (binding.metadata.maximize) objective <= previous else objective >= previous)
-        ) {
-            return null
-        }
+        ) return null
         if (cancellation()) return null
         best = sample
         bestObjective = objective
@@ -79,36 +71,24 @@ internal class FloatGridPublication(
         nativeSourceMinimum: MinimizeResult? = null,
     ): FiniteSolveResult {
         // A checked native best already stands or failed to improve, so checking it again publishes nothing.
-        if (native is FiniteSolveOutcome.Completed) {
-            native.bestSample
-                ?.takeUnless { it === lastChecked && binding.objective != null }?.let(::onSample)
-        }
+        if (native is FiniteSolveOutcome.Completed) native.bestSample
+            ?.takeUnless { it === lastChecked && binding.objective != null }?.let(::onSample)
         val qualified = if (native is FiniteSolveOutcome.Completed) {
             FiniteSolveOutcome.Completed(
                 when {
                     binding.consumer.declaredGridSemantics && native.verdict == FiniteSolveVerdict.UNSAT ->
                         FiniteSolveVerdict.UNSAT
-
                     accepted == 0L -> FiniteSolveVerdict.UNKNOWN
-
                     binding.consumer.declaredGridSemantics && native.verdict == FiniteSolveVerdict.OPTIMAL &&
                         native.bestSample != null && lastChecked === native.bestSample -> FiniteSolveVerdict.OPTIMAL
-
                     binding.consumer.declaredGridSemantics && native.verdict != FiniteSolveVerdict.OPTIMAL ->
                         native.verdict
-
                     binding.objective != null -> FiniteSolveVerdict.BEST_FOUND
-
                     else -> FiniteSolveVerdict.SAT
                 },
-                native.stats,
-                accepted,
-                best,
-                native.elapsedMs,
+                native.stats, accepted, best, native.elapsedMs,
             )
-        } else {
-            native
-        }
+        } else native
         return FiniteSolveResult(preparation, elapsed, qualified, nativeSourceResult, nativeSourceMinimum).also {
             it.bindNativeGridOutcome(NativeGridOutcome(binding.metadata, native))
         }

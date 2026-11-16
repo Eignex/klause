@@ -19,11 +19,9 @@ class LinearPrimalRecoveryTest {
     fun `an exhausted recovery allowance should retire a preceding component pause`() {
         val progress = LinearPrimalRecoveryProgress().apply { pending = true }
 
-        val point = recoverLinearPrimal(
-            listOf(real), listOf(BigFraction.ZERO), emptyList(), emptySet(),
+        val point = recoverLinearPrimal(listOf(real), listOf(BigFraction.ZERO), emptyList(), emptySet(),
             ExecutionControl.Never, complete = { _, _, _ -> error("exhausted recovery") }, observe = { _, _ -> },
-            limits = LinearPrimalRecoveryLimits(work = 0L), progress = progress,
-        )
+            limits = LinearPrimalRecoveryLimits(work = 0L), progress = progress)
 
         assertNull(point)
         assertFalse(progress.pending)
@@ -39,33 +37,18 @@ class LinearPrimalRecoveryTest {
         )
 
         val guess = listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3)), wide)
-        val point = recoverLinearPrimal(
-            listOf(real, integer),
-            guess,
-            rows,
-            emptySet(),
-            ExecutionControl.Never,
+        val point = recoverLinearPrimal(listOf(real, integer), guess, rows, emptySet(), ExecutionControl.Never,
             complete = { _, _, _ -> error("completion unnecessary") },
-            observe = { _, _ -> },
-        )
+            observe = { _, _ -> })
 
         assertEquals(listOf(third, wide), point)
     }
 
     @Test
     fun `fractional integers should not be rounded by residual recovery`() {
-        val point = recoverLinearPrimal(
-            listOf(real, integer),
-            listOf(
-                BigFraction.ZERO,
-                BigFraction.ofLong(2).reciprocal(),
-            ),
-            emptyList(),
-            emptySet(),
-            ExecutionControl.Never,
-            complete = { _, _, _ -> error("fractional assignment") },
-            observe = { _, _ -> },
-        )
+        val point = recoverLinearPrimal(listOf(real, integer), listOf(BigFraction.ZERO,
+            BigFraction.ofLong(2).reciprocal()), emptyList(), emptySet(), ExecutionControl.Never,
+            complete = { _, _, _ -> error("fractional assignment") }, observe = { _, _ -> })
 
         assertNull(point)
     }
@@ -76,23 +59,14 @@ class LinearPrimalRecoveryTest {
         val third = BigFraction.ofLong(3).reciprocal()
         val wide = BigFraction.ofLong(9007199254740993L)
         val dyadic = checkNotNull(BigFraction.ofDouble(0.1))
-        val rows = listOf(third, wide, dyadic).flatMapIndexed { id, value ->
-            listOf(
-                ExactRationalInequality(intArrayOf(id), listOf(BigFraction.ONE), value),
-                ExactRationalInequality(intArrayOf(id), listOf(BigFraction.MINUS_ONE), value.negated()),
-            )
-        }
+        val rows = listOf(third, wide, dyadic).flatMapIndexed { id, value -> listOf(
+            ExactRationalInequality(intArrayOf(id), listOf(BigFraction.ONE), value),
+            ExactRationalInequality(intArrayOf(id), listOf(BigFraction.MINUS_ONE), value.negated()),
+        ) }
 
         val guess = listOf(checkNotNull(BigFraction.ofDouble(1.0 / 3)), wide, dyadic)
-        val point = recoverLinearPrimal(
-            coordinates,
-            guess,
-            rows,
-            emptySet(),
-            ExecutionControl.Never,
-            complete = { _, _, _ -> null },
-            observe = { _, _ -> },
-        )
+        val point = recoverLinearPrimal(coordinates, guess, rows, emptySet(), ExecutionControl.Never,
+            complete = { _, _, _ -> null }, observe = { _, _ -> })
 
         assertEquals(listOf(third, wide, dyadic), point)
     }
@@ -103,15 +77,8 @@ class LinearPrimalRecoveryTest {
             ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.MINUS_ONE),
         )
 
-        val point = recoverLinearPrimal(
-            listOf(real),
-            listOf(BigFraction.ZERO),
-            rows,
-            setOf(0),
-            ExecutionControl.Never,
-            complete = { _, _, _ -> error("inactive row") },
-            observe = { _, _ -> },
-        )
+        val point = recoverLinearPrimal(listOf(real), listOf(BigFraction.ZERO), rows, setOf(0), ExecutionControl.Never,
+            complete = { _, _, _ -> error("inactive row") }, observe = { _, _ -> })
 
         assertEquals(listOf(BigFraction.ZERO), point)
     }
@@ -123,16 +90,8 @@ class LinearPrimalRecoveryTest {
             LinearPrimalRecoveryLimits(allocation = 0L) to ExecutionControl.Never,
             LinearPrimalRecoveryLimits() to ExecutionControl { true },
         )) {
-            val point = recoverLinearPrimal(
-                listOf(real),
-                listOf(BigFraction.ZERO),
-                emptyList(),
-                emptySet(),
-                token,
-                complete = { _, _, _ -> error("stopped recovery") },
-                observe = { _, _ -> },
-                limits = limits,
-            )
+            val point = recoverLinearPrimal(listOf(real), listOf(BigFraction.ZERO), emptyList(), emptySet(), token,
+                complete = { _, _, _ -> error("stopped recovery") }, observe = { _, _ -> }, limits = limits)
 
             assertNull(point)
         }
@@ -145,15 +104,9 @@ class LinearPrimalRecoveryTest {
         )
 
         for (value in listOf(BigFraction.ZERO, BigFraction.ONE)) {
-            val point = recoverLinearPrimal(
-                listOf(real),
-                listOf(BigFraction.ZERO),
-                rows,
-                emptySet(),
+            val point = recoverLinearPrimal(listOf(real), listOf(BigFraction.ZERO), rows, emptySet(),
                 ExecutionControl.Never,
-                complete = { _, _, _ -> listOf(value) },
-                observe = { _, _ -> },
-            )
+                complete = { _, _, _ -> listOf(value) }, observe = { _, _ -> })
 
             if (value.isZero) assertNull(point) else assertEquals(listOf(value), assertNotNull(point))
         }
@@ -175,26 +128,10 @@ class LinearPrimalRecoveryTest {
             }
         val observe: (String, Long) -> Unit = { stage, count -> stages[stage] = (stages[stage] ?: 0L) + count }
 
-        val first = recoverLinearPrimal(
-            listOf(real, other),
-            List(2) { BigFraction.ZERO },
-            rows,
-            emptySet(),
-            ExecutionControl.Never,
-            complete,
-            observe,
-            progress = progress,
-        )
-        val resumed = recoverLinearPrimal(
-            listOf(real, other),
-            List(2) { BigFraction.ZERO },
-            rows,
-            emptySet(),
-            ExecutionControl.Never,
-            complete,
-            observe,
-            progress = progress,
-        )
+        val first = recoverLinearPrimal(listOf(real, other), List(2) { BigFraction.ZERO }, rows, emptySet(),
+            ExecutionControl.Never, complete, observe, progress = progress)
+        val resumed = recoverLinearPrimal(listOf(real, other), List(2) { BigFraction.ZERO }, rows, emptySet(),
+            ExecutionControl.Never, complete, observe, progress = progress)
 
         assertNull(first)
         assertEquals(listOf(BigFraction.ONE, BigFraction.ONE), resumed)
@@ -207,23 +144,13 @@ class LinearPrimalRecoveryTest {
     fun `connected residual rows should preserve source column order`() {
         val coordinates = (0..2).map { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val rows = listOf(2, 1).map {
-            ExactRationalInequality(
-                intArrayOf(0, it),
-                List(2) { BigFraction.MINUS_ONE },
-                BigFraction.ZERO,
-                strict = true,
-            )
+            ExactRationalInequality(intArrayOf(0, it), List(2) { BigFraction.MINUS_ONE },
+                BigFraction.ZERO, strict = true)
         }
 
-        val point = recoverLinearPrimal(
-            coordinates,
-            List(3) { BigFraction.ZERO },
-            rows,
-            emptySet(),
+        val point = recoverLinearPrimal(coordinates, List(3) { BigFraction.ZERO }, rows, emptySet(),
             ExecutionControl.Never,
-            complete = { _, columns, _ -> List(columns.size) { BigFraction.ofLong(it + 1L) } },
-            observe = { _, _ -> },
-        )
+            complete = { _, columns, _ -> List(columns.size) { BigFraction.ofLong(it + 1L) } }, observe = { _, _ -> })
 
         assertEquals(List(3) { BigFraction.ofLong(it + 1L) }, point)
     }

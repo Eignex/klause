@@ -25,20 +25,17 @@ internal fun BakedProblem.countingScope(assumptions: Assumptions): BakedProblem 
 }
 
 internal fun BakedProblem.scopedApproximateCount(config: ApproxCountConfig): Count =
-    if (rootDeductions is PropagationResult.Unsat) {
-        zeroCount.copy(semantics = semantics)
-    } else {
-        ApproxMC.run(this, config)
-    }
+    if (rootDeductions is PropagationResult.Unsat) zeroCount.copy(semantics = semantics)
+    else ApproxMC.run(this, config)
 
 internal fun BakedProblem.scopedExactCount(config: ExactCountConfig): Sequence<Count> =
-    if (rootDeductions is PropagationResult.Unsat) {
-        sequenceOf(zeroCount.copy(semantics = semantics))
-    } else {
-        AnytimeCounter.run(this, config)
-    }
+    if (rootDeductions is PropagationResult.Unsat) sequenceOf(zeroCount.copy(semantics = semantics))
+    else AnytimeCounter.run(this, config)
 
-internal fun BakedProblem.accurateSamples(config: SamplingConfig, fallback: () -> Sequence<Sample>): Sequence<Sample> =
+internal fun BakedProblem.accurateSamples(
+    config: SamplingConfig,
+    fallback: () -> Sequence<Sample>,
+): Sequence<Sample> =
     if (rootDeductions is PropagationResult.Unsat) emptySequence() else UniGen.samples(this, config, fallback)
 
 private val zeroCount = Count(0L, 0L, 0L, exact = true, confidence = 1.0)
@@ -49,9 +46,8 @@ internal fun combineCounts(proven: Count, approximate: () -> Count): Count {
     val provenPolicy = proven.semantics
     val approximatePolicy = approx.semantics
     if (provenPolicy != null && approximatePolicy != null) {
-        require(
-            provenPolicy.declared == approximatePolicy.declared &&
-                provenPolicy.effective == approximatePolicy.effective,
+        require(provenPolicy.declared == approximatePolicy.declared &&
+            provenPolicy.effective == approximatePolicy.effective
         ) { "count bounds belong to different source interpretations" }
     }
     val semantics = provenPolicy?.takeIf { approximatePolicy != null }

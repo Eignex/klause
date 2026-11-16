@@ -12,17 +12,11 @@ import kotlin.test.assertIs
 class NonlinearIntegerResidueReductionTest {
     @Test
     fun `repeated source atoms should share one completed exclusion`() {
-        val atom = PolynomialRealFormula.Atom(
-            PolynomialExpression.Variable(SourceRealId(0)),
-            PolynomialRelation.EQ,
-            PolynomialExpression.Constant.of(BIG_ONE),
-        )
+        val atom = PolynomialRealFormula.Atom(PolynomialExpression.Variable(SourceRealId(0)),
+            PolynomialRelation.EQ, PolynomialExpression.Constant.of(BIG_ONE))
         val source = PolynomialRealFormula.Or(List(16) { atom })
         var checks = 0
-        val reduction = NonlinearIntegerResidueReduction({}, {}) {
-            checks++
-            true
-        }
+        val reduction = NonlinearIntegerResidueReduction({}, {}) { checks++; true }
 
         val reduced = reduction.reduce(source)
 

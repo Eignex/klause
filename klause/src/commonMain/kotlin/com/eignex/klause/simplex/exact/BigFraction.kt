@@ -53,11 +53,8 @@ class BigFraction private constructor(
         if (exponent > 1024) return Double.fromBits(sign or 0x7ff0000000000000L)
         if (exponent < -1075) return Double.fromBits(sign)
         val magnitude = num.abs()
-        val belowPower = if (exponent >= 0) {
-            magnitude < (den shl exponent)
-        } else {
-            (magnitude shl -exponent) < den
-        }
+        val belowPower = if (exponent >= 0) magnitude < (den shl exponent)
+        else (magnitude shl -exponent) < den
         if (belowPower) exponent--
         if (exponent > 1023) return Double.fromBits(sign or 0x7ff0000000000000L)
         if (exponent < -1075) return Double.fromBits(sign)

@@ -68,23 +68,18 @@ internal class LocalSearchRunControl(private val lifetime: ExecutionControl) : L
     }
 
     fun offer(
-        global: ExecutionControl,
-        millis: Long,
-        instructions: Long,
-        available: Long,
-        sliceNodes: Long = -1L,
+        global: ExecutionControl, millis: Long, instructions: Long, available: Long, sliceNodes: Long = -1L,
         instructionsPerWork: Double = LS_INSTRUCTIONS_PER_WORK,
     ) {
         slice.noteOverspend()
         this.instructionsPerWork = instructionsPerWork
         hasSliceAllowance = slice.begin(millis, sliceNodes)
-        token = (
-            if (millis == Long.MAX_VALUE) {
-                lifetime.lifetimeCancellation() or global
-            } else {
-                lifetime.lifetimeCancellation() or global or
-                    ExecutionControl.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
-            }
+        token = ( if (millis == Long.MAX_VALUE) {
+            lifetime.lifetimeCancellation() or global
+        } else {
+            lifetime.lifetimeCancellation() or global or
+                ExecutionControl.until(TimeSource.Monotonic.markNow() + millis.milliseconds)
+        }
             ).bindStopControl()
         limit = this.instructions + minOf(instructions, available, Long.MAX_VALUE - this.instructions)
     }
@@ -100,11 +95,8 @@ internal class LocalSearchRunControl(private val lifetime: ExecutionControl) : L
     }
 
     companion object {
-        fun instructionAllowance(nodes: Long): Long = if (nodes < 0L) {
-            Long.MAX_VALUE
-        } else {
-            ceil(nodes * LS_INSTRUCTIONS_PER_WORK).toLong()
-        }
+        fun instructionAllowance(nodes: Long): Long = if (nodes < 0L) Long.MAX_VALUE
+        else ceil(nodes * LS_INSTRUCTIONS_PER_WORK).toLong()
     }
 }
 

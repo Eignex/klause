@@ -10,10 +10,8 @@ object Reports {
         for (character in name) {
             when {
                 character == '/' -> append('_')
-
                 character in "\\:%" || character.isISOControl() ->
                     append('%').append(character.code.toString(16).padStart(2, '0'))
-
                 else -> append(character)
             }
         }

@@ -30,10 +30,8 @@ class LearnedMemoryMaintenanceTest {
         var limited = false
         var sliceStart = 0L
         lateinit var session: PropagationSession
-        session = PropagationSession(
-            Problem(2, 0, emptyArray(), emptyList()),
-            ExecutionControl { limited && session.work - sliceStart >= 1L },
-        )
+        session = PropagationSession(Problem(2, 0, emptyArray(), emptyList()),
+            ExecutionControl { limited && session.work - sliceStart >= 1L })
         val maintenance = LearnedMemoryMaintenance()
         val params = BacktrackParams(learnedMemoryBytes = 0L, learnedMemoryWork = 100_000L)
         limited = true

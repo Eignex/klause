@@ -25,11 +25,9 @@ class ComponentLpSolverTest {
         assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()))).use { owner ->
             var polls = 0
             owner.openSolve().use { cursor ->
-                assertIs<LpSolveStep.Paused>(
-                    cursor.advance(shouldPause = {
-                        owner.lastMetrics.componentSolves >= 2 && ++polls >= 2
-                    }),
-                )
+                assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = {
+                    owner.lastMetrics.componentSolves >= 2 && ++polls >= 2
+                }))
                 val paid = owner.lastMetrics
 
                 val guidance = assertNotNull(owner.partialPrimalGuidance())
@@ -49,18 +47,12 @@ class ComponentLpSolverTest {
             builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
         }
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        assertIs<ComponentLpSolver>(
-            newRetainedLpSolver(
-                assertNotNull(state.ownerWorkingModel()),
-                factory = RecordingLpEngineFactory(),
-            ),
-        ).use { owner ->
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = RecordingLpEngineFactory())).use { owner ->
             var observed = false
             owner.openSolve().use { cursor ->
                 val step = cursor.advance(shouldPause = {
-                    if (owner.lastMetrics.componentSolves < 2) {
-                        false
-                    } else {
+                    if (owner.lastMetrics.componentSolves < 2) false else {
                         observed = true
                         assertNull(owner.partialPrimalGuidance())
                         true
@@ -82,12 +74,8 @@ class ComponentLpSolverTest {
             builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
         }
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-        assertIs<ComponentLpSolver>(
-            newRetainedLpSolver(
-                assertNotNull(state.ownerWorkingModel()),
-                factory = RecordingLpEngineFactory(),
-            ),
-        ).use { owner ->
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = RecordingLpEngineFactory())).use { owner ->
             owner.openSolve().use { cursor ->
                 assertIs<LpSolveStep.Paused>(cursor.advance(shouldPause = { owner.lastMetrics.componentSolves >= 2 }))
                 val first = assertNotNull(owner.partialPrimalGuidance())
@@ -114,12 +102,8 @@ class ComponentLpSolverTest {
         builder.addRow(intArrayOf(2), longArrayOf(2L), Relation.GE, 1L)
         val state = LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
         val factory = RecordingLpEngineFactory()
-        assertIs<ComponentLpSolver>(
-            newRetainedLpSolver(
-                assertNotNull(state.ownerWorkingModel()),
-                factory = factory,
-            ),
-        ).use { owner ->
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            factory = factory)).use { owner ->
             val point = assertNotNull(owner.resolveBounds())
             val queries = factory.floatAllowances.size
 
@@ -164,23 +148,11 @@ class ComponentLpSolverTest {
             var queries = 0
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
-                    model: LpModel,
-                    cancellation: ExecutionControl,
-                    refactorUpdateLimit: Int,
-                    iterationLimit: Int,
-                    workLimit: Long,
-                    trackDegeneracy: Boolean,
-                    pricing: LpPricingOptions,
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                    workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
                 ): PersistentLpSolver {
-                    val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                        model,
-                        cancellation,
-                        refactorUpdateLimit,
-                        iterationLimit,
-                        workLimit,
-                        trackDegeneracy,
-                        pricing,
-                    )
+                    val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                        refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
                     return object : PersistentLpSolver by delegate {
                         private var bounded = false
                         override val lastTermination: LpFloatTermination?
@@ -191,26 +163,14 @@ class ComponentLpSolverTest {
                             val result = delegate.resolveBounds(allowance) ?: return null
                             if (completed) return result
                             bounded = true
-                            return FloatLpResult(
-                                result.basis,
-                                result.objective,
-                                result.duals,
-                                result.primal,
-                                pivots = result.pivots,
-                                optimal = false,
-                                exactState = result.exactState,
-                            )
+                            return FloatLpResult(result.basis, result.objective, result.duals, result.primal,
+                                pivots = result.pivots, optimal = false, exactState = result.exactState)
                         }
                     }
                 }
             }
-            assertIs<ComponentLpSolver>(
-                newRetainedLpSolver(
-                    assertNotNull(state.ownerWorkingModel()),
-                    ExecutionControl { queryCancelled },
-                    factory = factory,
-                ),
-            ).use { owner ->
+            assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+                ExecutionControl { queryCancelled }, factory = factory)).use { owner ->
                 assertNull(owner.resolveBounds())
                 assertEquals(LpFloatTermination.CANCELLED, owner.lastTermination)
                 assertNull(owner.partialPrimalGuidance(ExecutionControl { true }))
@@ -238,23 +198,11 @@ class ComponentLpSolverTest {
         var queries = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: ExecutionControl,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int, iterationLimit: Int,
+                workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
-                val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
-                )
+                val delegate = ProductionLpEngineFactory.newPersistentSolver(model, cancellation,
+                    refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing)
                 return object : PersistentLpSolver by delegate {
                     private var cancelledResult = false
                     override val lastTermination: LpFloatTermination?
@@ -266,26 +214,14 @@ class ComponentLpSolverTest {
                         val result = delegate.resolveBounds(allowance) ?: return null
                         if (ordinal != 1) return result
                         cancelledResult = true
-                        return FloatLpResult(
-                            result.basis,
-                            result.objective,
-                            result.duals,
-                            result.primal,
-                            pivots = result.pivots,
-                            optimal = false,
-                            exactState = result.exactState,
-                        )
+                        return FloatLpResult(result.basis, result.objective, result.duals, result.primal,
+                            pivots = result.pivots, optimal = false, exactState = result.exactState)
                     }
                 }
             }
         }
-        assertIs<ComponentLpSolver>(
-            newRetainedLpSolver(
-                assertNotNull(state.ownerWorkingModel()),
-                ExecutionControl { queryCancelled },
-                factory = factory,
-            ),
-        ).use { owner ->
+        assertIs<ComponentLpSolver>(newRetainedLpSolver(assertNotNull(state.ownerWorkingModel()),
+            ExecutionControl { queryCancelled }, factory = factory)).use { owner ->
             assertNull(owner.resolveBounds())
             assertEquals(LpFloatTermination.CANCELLED, owner.lastTermination)
 
@@ -548,23 +484,12 @@ class ComponentLpSolverTest {
         var acquired = 0
         val factory = object : LpEngineFactory by ProductionLpEngineFactory {
             override fun newPersistentSolver(
-                model: LpModel,
-                cancellation: ExecutionControl,
-                refactorUpdateLimit: Int,
-                iterationLimit: Int,
-                workLimit: Long,
-                trackDegeneracy: Boolean,
-                pricing: LpPricingOptions,
+                model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
             ): PersistentLpSolver {
                 val index = acquired++
                 val delegate = ProductionLpEngineFactory.newPersistentSolver(
-                    model,
-                    cancellation,
-                    refactorUpdateLimit,
-                    iterationLimit,
-                    workLimit,
-                    trackDegeneracy,
-                    pricing,
+                    model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
                 )
                 return object : PersistentLpSolver by delegate {
                     override fun solve(warm: Basis?): FloatLpResult? {
@@ -586,12 +511,9 @@ class ComponentLpSolverTest {
             val raw = assertNotNull(owner.resolveBounds())
 
             assertEquals(listOf(2, 1), solves.toList())
-            assertEquals(
-                BigFraction.ofLong(4L),
-                assertNotNull(
-                    (owner as ComponentLpSolverCapability).exactBound(),
-                ).value,
-            )
+            assertEquals(BigFraction.ofLong(4L), assertNotNull(
+                (owner as ComponentLpSolverCapability).exactBound(),
+            ).value)
             assertEquals(listOf(3.0, 1.0), raw.primal.toList())
         }
     }
@@ -610,9 +532,7 @@ class ComponentLpSolverTest {
             val expected = assertNotNull(it.exactBound()).value
             var checks = 0
             val observer = object : LpCertificationObserver {
-                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
-                    checks++
-                }
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) { checks++ }
                 override fun observeExactInput(accepted: Boolean) = Unit
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
             }

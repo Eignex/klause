@@ -39,67 +39,43 @@ import kotlin.test.assertTrue
 class CpSearchComponentTest {
     @Test
     fun `known shared bounds should avoid reconstructing native proofs`() {
-        for (lower in listOf(false, true)) {
-            for (stronger in listOf(false, true)) {
-                val mapping = intArrayOf(4, 7, 9, 12, 14, 17, 20, 23)
-                val native = PropagationSession(
-                    Problem(
-                        0,
-                        8,
-                        Array(8) { IntDomain(0, 10) },
-                        Array(7) { Linear(intArrayOf(1, -1), intArrayOf(it, it + 1), LinearOp.LE, 0) },
-                    ),
-                )
-                val cp = CpSearchComponent(native, mapping)
-                var observed: PropagationResult.Implied? = null
-                cp.propagationObserver = {
-                    if (it.intMinKeys.isNotEmpty() || it.intMaxKeys.isNotEmpty()) observed = it
-                }
-                val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
-                assertIs<ComponentResult.Consistent>(shared.initialize())
-                observed = null
-                assertIs<ComponentResult.Consistent>(
-                    shared.push(
-                        if (lower) {
-                            SearchDecision.IntAtLeast(mapping.first(), 3)
-                        } else {
-                            SearchDecision.IntAtMost(mapping.last(), 7)
-                        },
-                    ),
-                )
-                val result = assertNotNull(observed)
-                if (stronger) {
-                    val bound = if (lower) {
-                        SearchDecision.IntAtLeast(mapping[1], 4)
-                    } else {
-                        SearchDecision.IntAtMost(mapping[6], 6)
-                    }
-                    assertIs<ComponentResult.Consistent>(shared.publish(bound, SearchAtomPremise.Unavailable))
-                }
-                val budget = result.boolKeys.size + result.intKeys.size +
-                    result.intMinKeys.size + result.intMaxKeys.size
-                val before = native.work
-
-                val publication = cp.publish(result, shared)
-
-                assertIs<ComponentResult.Consistent>(publication)
-                assertTrue(native.work - before <= budget, "work=${native.work - before} budget=$budget")
-                assertIs<ComponentResult.Consistent>(shared.propagate())
+        for (lower in listOf(false, true)) for (stronger in listOf(false, true)) {
+            val mapping = intArrayOf(4, 7, 9, 12, 14, 17, 20, 23)
+            val native = PropagationSession(Problem(0, 8, Array(8) { IntDomain(0, 10) },
+                Array(7) { Linear(intArrayOf(1, -1), intArrayOf(it, it + 1), LinearOp.LE, 0) }))
+            val cp = CpSearchComponent(native, mapping)
+            var observed: PropagationResult.Implied? = null
+            cp.propagationObserver = {
+                if (it.intMinKeys.isNotEmpty() || it.intMaxKeys.isNotEmpty()) observed = it
             }
+            val shared = SearchSession(listOf(cp), atoms = SearchAtomRegistry(0))
+            assertIs<ComponentResult.Consistent>(shared.initialize())
+            observed = null
+            assertIs<ComponentResult.Consistent>(shared.push(if (lower)
+                SearchDecision.IntAtLeast(mapping.first(), 3) else SearchDecision.IntAtMost(mapping.last(), 7)))
+            val result = assertNotNull(observed)
+            if (stronger) {
+                val bound = if (lower) SearchDecision.IntAtLeast(mapping[1], 4)
+                    else SearchDecision.IntAtMost(mapping[6], 6)
+                assertIs<ComponentResult.Consistent>(shared.publish(bound, SearchAtomPremise.Unavailable))
+            }
+            val budget = result.boolKeys.size + result.intKeys.size +
+                result.intMinKeys.size + result.intMaxKeys.size
+            val before = native.work
+
+            val publication = cp.publish(result, shared)
+
+            assertIs<ComponentResult.Consistent>(publication)
+            assertTrue(native.work - before <= budget, "work=${native.work - before} budget=$budget")
+            assertIs<ComponentResult.Consistent>(shared.propagate())
         }
     }
 
     @Test
     fun `known shared equalities should avoid reconstructing native proofs`() {
-        val native = PropagationSession(
-            Problem(
-                1,
-                8,
-                Array(8) { IntDomain(0, 10) },
-                List(7) { Linear(intArrayOf(1, -1), intArrayOf(it, it + 1), LinearOp.EQ, 0) } +
-                    ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3),
-            ),
-        )
+        val native = PropagationSession(Problem(1, 8, Array(8) { IntDomain(0, 10) },
+            List(7) { Linear(intArrayOf(1, -1), intArrayOf(it, it + 1), LinearOp.EQ, 0) } +
+                ReifiedLinear(0, intArrayOf(1), intArrayOf(0), LinearOp.EQ, 3)))
         val cp = CpSearchComponent(native)
         var observed: PropagationResult.Implied? = null
         cp.propagationObserver = { if (it.intKeys.isNotEmpty()) observed = it }
@@ -153,18 +129,10 @@ class CpSearchComponentTest {
                 }
                 val observed = when (mode) {
                     "initial" -> cp.initialize(context)
-
                     "prepared" -> cp.prepareInitialization(context).asSequence().filterNotNull().first()
-
-                    else -> cp.publish(
-                        PropagationResult.Implied(
-                            intArrayOf(0, 1, 2),
-                            booleanArrayOf(true, true, true),
-                            intArrayOf(),
-                            longArrayOf(),
-                        ),
-                        context,
-                    )
+                    else -> cp.publish(PropagationResult.Implied(
+                        intArrayOf(0, 1, 2), booleanArrayOf(true, true, true), intArrayOf(), longArrayOf(),
+                    ), context)
                 }
 
                 assertSame(rejection, observed)
@@ -180,12 +148,9 @@ class CpSearchComponentTest {
         val thresholds = IntArray(128) { state.atomVarGe(0, it.toLong() + 1) }
         var armed = false
         val cp = CpSearchComponent(native)
-        val shared = SearchSession(
-            listOf(cp),
-            cancellation = ExecutionControl {
-                armed && state.atoms.truth[state.atomIdOf(thresholds[15])] == 1
-            },
-        )
+        val shared = SearchSession(listOf(cp), cancellation = ExecutionControl {
+            armed && state.atoms.truth[state.atomIdOf(thresholds[15])] == 1
+        })
         assertIs<ComponentResult.Consistent>(shared.initialize())
         armed = true
 
@@ -204,9 +169,7 @@ class CpSearchComponentTest {
     fun `a shared assertion allowance should interrupt native filtering and allow a retry after retraction`() {
         val native = PropagationSession(
             Problem(
-                0,
-                2,
-                Array(2) { IntDomain(0, 255) },
+                0, 2, Array(2) { IntDomain(0, 255) },
                 arrayOf(Table(intArrayOf(0, 1), LongArray(512) { (it / 2).toLong() })),
             ),
         )
@@ -252,10 +215,7 @@ class CpSearchComponentTest {
                 }
             }
             val result = PropagationResult.Implied(
-                IntArray(512) { it },
-                BooleanArray(512) { true },
-                intArrayOf(),
-                longArrayOf(),
+                IntArray(512) { it }, BooleanArray(512) { true }, intArrayOf(), longArrayOf(),
             )
             val before = native.work
             cancelled = true

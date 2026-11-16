@@ -314,14 +314,11 @@ internal fun tableBuildTupleMove(
                 if (current !in lo..upper || current !in domain) return null
                 current
             }
-
             randomize && first < upper -> {
                 val last = domain.floorOrNull(upper) ?: return null
                 domain.withMinAtLeast(first).withMaxAtMost(last).randomValue(state.rng)
             }
-
             current in lo..upper && current in domain -> current
-
             else -> first
         }
         if (current != target) parts.add(Move.IntSet(v, target))

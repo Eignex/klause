@@ -23,12 +23,8 @@ internal fun trajectorySourceBytes(
         val encoded = checkNotNull(source64 ?: sourceGzip64)
         require(encoded.length <= 96 * 1024)
         val decoded = Base64.getDecoder().decode(encoded)
-        if (sourceGzip64 == null) {
-            decoded
-        } else {
-            GZIPInputStream(ByteArrayInputStream(decoded)).use {
-                it.readNBytes(64 * 1024 * 1024 + 1)
-            }
+        if (sourceGzip64 == null) decoded else GZIPInputStream(ByteArrayInputStream(decoded)).use {
+            it.readNBytes(64 * 1024 * 1024 + 1)
         }
     }
     require(bytes.size <= 64 * 1024 * 1024 && sha256(bytes) == expectedSha256)

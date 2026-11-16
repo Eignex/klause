@@ -27,7 +27,6 @@ internal class LearnedPolicyRows(
 
     private val directory = MutableIntObjectIndex<Page>()
     private var primary: Page? = Page(INITIAL_CAPACITY, columns, objectColumns)
-
     // Every installed page after the first is reachable by its index, so a read never walks the directory.
     // The first chunk is the fixed reservation; a later chunk exists while one of its pages does and is the
     // shared empty chunk otherwise. Every read takes the same path, whatever the store has grown to.
@@ -118,10 +117,8 @@ internal class LearnedPolicyRows(
 
     private fun allocationWork(page: Page?, required: Int): Long = when {
         page == null -> capacityFor(required) * rowWork * 2L + 8L
-
         required > page.capacity -> capacityFor(required) * rowWork * 2L + page.bytes / Int.SIZE_BYTES +
             (if (objectColumns) page.capacity * 2L else 0L) + 8L
-
         else -> 0L
     }
 
@@ -129,12 +126,8 @@ internal class LearnedPolicyRows(
         get() {
             val index = size ushr PAGE_SHIFT
             val page = pageAt(index)
-            val insertion = if (index == 0 || page != null) {
-                0L
-            } else {
-                tableInstallWork(index) +
-                    if (directory.size == 0) 8L else (Int.SIZE_BITS - index.countLeadingZeroBits()) * 2L + 18L
-            }
+            val insertion = if (index == 0 || page != null) 0L else tableInstallWork(index) +
+                if (directory.size == 0) 8L else (Int.SIZE_BITS - index.countLeadingZeroBits()) * 2L + 18L
             return (if (objectColumns) 9L else 7L) + insertion + allocationWork(page, (size and PAGE_MASK) + 1)
         }
 
@@ -143,9 +136,7 @@ internal class LearnedPolicyRows(
         allocated(allocationWork(page, required))
         if (page == null) {
             val created = Page(capacityFor(required), columns, objectColumns)
-            if (index == 0) {
-                primary = created
-            } else {
+            if (index == 0) primary = created else {
                 created.slot = directory.getOrPutSlot(index) { created }
                 allocated(directory.lastWork + tableInstallWork(index))
                 directoryIdentity = Any()
@@ -175,12 +166,10 @@ internal class LearnedPolicyRows(
     operator fun get(index: Int, column: Int): Int {
         val page = pageAt(index ushr PAGE_SHIFT)
         val slot = index and PAGE_MASK
-        if (page == null || page.retained and (1 shl slot) == 0) {
-            return when (column) {
-                STAGES -> retiredFlag
-                ORIGIN -> OWN_ORIGIN
-                else -> 0
-            }
+        if (page == null || page.retained and (1 shl slot) == 0) return when (column) {
+            STAGES -> retiredFlag
+            ORIGIN -> OWN_ORIGIN
+            else -> 0
         }
         return page.values[slot * columns + column]
     }
@@ -261,11 +250,7 @@ internal class LearnedPolicyRows(
 
     fun resetRetirements(): Long {
         var work = 2L
-        fun clear(page: Page) {
-            page.pending = 0
-            page.nextRetired = null
-            work += 2L
-        }
+        fun clear(page: Page) { page.pending = 0; page.nextRetired = null; work += 2L }
         primary?.let(::clear)
         directory.forEach({ work += it }) { _, page -> clear(page) }
         retiredHead = null
@@ -299,10 +284,7 @@ internal class LearnedPolicyRows(
         allocatedBytes -= page.bytes
         page.values = emptyIntArray()
         page.admissions = longArrayOf()
-        if (objectColumns) {
-            page.propagators = emptyArray()
-            page.payloads = emptyArray()
-        }
+        if (objectColumns) { page.propagators = emptyArray(); page.payloads = emptyArray() }
         page.retained = 0
         page.pending = 0
         allocationIdentity = Any()
@@ -336,10 +318,7 @@ internal class LearnedPolicyRows(
         page.queued = 0
         if (page.retained != 0) return
         val slot = page.slot
-        if (slot == null) {
-            check(primary === page)
-            primary = null
-        } else {
+        if (slot == null) { check(primary === page); primary = null } else {
             check(directory.remove(slot, {}, {}))
             directoryIdentity = Any()
         }
@@ -370,32 +349,21 @@ internal class LearnedPolicyRows(
         require(count in 0..size)
         var work = 4L
         val retained = ((count.toLong() + PAGE_MASK) ushr PAGE_SHIFT).toInt()
-        if (count == 0) {
-            primary?.let {
-                discard(it)
-                work += 8L
-            }
-        }
+        if (count == 0) primary?.let { discard(it); work += 8L }
         if (count > 0 && count and PAGE_MASK != 0) {
             val last = pageAt((count - 1) ushr PAGE_SHIFT)
             if (last != null) {
                 val required = count and PAGE_MASK
                 last.retained = last.retained and ((1 shl required) - 1)
                 last.pending = last.pending and ((1 shl required) - 1)
-                if (last.retained == 0) {
-                    discard(last)
-                    work += 8L
-                } else {
+                if (last.retained == 0) { discard(last); work += 8L } else {
                     resize(last, required)
                     work += required * rowWork * 2L + 8L
                 }
             }
         }
         directory.forEach({ work += it }) { index, page ->
-            if (index >= retained) {
-                discard(page)
-                work += 8L
-            }
+            if (index >= retained) { discard(page); work += 8L }
         }
         var pending = retiredHead
         retiredHead = null
@@ -422,18 +390,10 @@ internal class LearnedPolicyRows(
     fun prepareRemap(active: ReclamationPreparation) {
         val pages = ((size.toLong() + PAGE_MASK) ushr PAGE_SHIFT).coerceAtLeast(1L)
         val pageBytes = PAGE_SIZE * rowBytes + 12L
-        if (objectColumns) {
-            active.atomic(
-                size * 4L + (directory.size + 1L) * 2L,
-                pages * (pageBytes + PAGE_SIZE * Long.SIZE_BYTES * 2L) * 4L + (directory.size + 1L) * Long.SIZE_BYTES,
-            )
-        } else {
-            active.atomic(
-                size * (columns * 2L + 12L) + pages * pageBytes / Int.SIZE_BYTES * 2L +
-                    (directory.size + 1L) * 8L,
-                pages * pageBytes * 4L + (directory.size + 1L) * Long.SIZE_BYTES,
-            )
-        }
+        if (objectColumns) active.atomic(size * 4L + (directory.size + 1L) * 2L,
+            pages * (pageBytes + PAGE_SIZE * Long.SIZE_BYTES * 2L) * 4L + (directory.size + 1L) * Long.SIZE_BYTES)
+        else active.atomic(size * (columns * 2L + 12L) + pages * pageBytes / Int.SIZE_BYTES * 2L +
+            (directory.size + 1L) * 8L, pages * pageBytes * 4L + (directory.size + 1L) * Long.SIZE_BYTES)
     }
 
     fun sharingMemory(sample: SharingMemoryObservation, protectedRows: Boolean, protected: (Int) -> Boolean) {
@@ -452,10 +412,7 @@ internal class LearnedPolicyRows(
         }
         primary?.let { observe(0, it) }
         val retained = directory.protectedCapacity({ units -> repeat(units.toInt()) { sample.step() } }) {
-                index,
-                page,
-            ->
-            observe(index, page)
+            index, page, -> observe(index, page)
         }
         sample.owned(this, 25L, protectedRows)
         sample.ownedReferences(this, 12L + chunkSize, protectedRows)
@@ -464,22 +421,12 @@ internal class LearnedPolicyRows(
         sample.ownedPool(tableIdentity, tableBytes, if (protectedRows) tableBytes else 0L)
         sample.ownedReferencesPool(tableIdentity, laterSlots, if (protectedRows) laterSlots else 0L)
         sample.ownedPool(allocationIdentity, allocatedBytes + pageCount * 12L, protectedBytes)
-        sample.ownedReferencesPool(
-            allocationIdentity,
-            pageCount * 7L +
-                (if (objectColumns) allocatedBytes / rowBytes * 2L else 0L),
-            protectedReferences,
-        )
-        sample.ownedPool(
-            directoryIdentity,
-            directory.primitiveCapacityBytes,
-            retained.first + if (protectedRows) 12L else 0L,
-        )
-        sample.ownedReferencesPool(
-            directoryIdentity,
-            directory.referenceCapacity,
-            retained.second + if (protectedRows) 1L else 0L,
-        )
+        sample.ownedReferencesPool(allocationIdentity, pageCount * 7L +
+            (if (objectColumns) allocatedBytes / rowBytes * 2L else 0L), protectedReferences)
+        sample.ownedPool(directoryIdentity, directory.primitiveCapacityBytes,
+            retained.first + if (protectedRows) 12L else 0L)
+        sample.ownedReferencesPool(directoryIdentity, directory.referenceCapacity,
+            retained.second + if (protectedRows) 1L else 0L)
     }
 
     private companion object {

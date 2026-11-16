@@ -74,22 +74,14 @@ class BacktrackSolverTest {
                     return InputOrder.pick(session, rng)
                 }
             }
-            val problem = Problem(
-                0,
-                2,
-                Array(2) { IntDomain(0, 2) },
-                arrayOf(
-                    Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
-                ),
-            )
+            val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) }, arrayOf(
+                Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1),
+            ))
             val solver = BacktrackSolver(problem.bake())
             val params = BacktrackParams(variableSelector = selector, valueSelector = IndomainMin, randomSeed = 3L)
 
-            if (optimize) {
-                assertIs<MinimizeResult.Optimal>(solver.minimize(problem.minimizeInt(0), params))
-            } else {
-                assertIs<SolveResult.Sat>(solver.solve(params))
-            }
+            if (optimize) assertIs<MinimizeResult.Optimal>(solver.minimize(problem.minimizeInt(0), params))
+            else assertIs<SolveResult.Sat>(solver.solve(params))
 
             assertEquals(1, attached.size)
             assertEquals("attach", events.first())
@@ -99,24 +91,11 @@ class BacktrackSolverTest {
 
     @Test
     fun `LP free satisfaction should consume a cumulative subset conflict before deciding`() {
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(100, 100),
-            ),
-            arrayOf<Factor>(
-                Cumulative(
-                    intArrayOf(0, 1, 2, 3),
-                    longArrayOf(2, 2, 2, 1),
-                    longArrayOf(2, 2, 2, 1),
-                    3,
-                ),
-            ),
-        )
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(100, 100),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3), longArrayOf(2, 2, 2, 1), longArrayOf(2, 2, 2, 1), 3,
+        )))
 
         val result = BacktrackSolver(problem.bake()).solve(BacktrackParams(maxDecisions = 0))
 
@@ -125,28 +104,14 @@ class BacktrackSolverTest {
 
     @Test
     fun `LP free minimization should consume a cumulative subset conflict before deciding`() {
-        val problem = Problem(
-            0,
-            4,
-            arrayOf(
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(0, 2),
-                IntDomain(100, 100),
-            ),
-            arrayOf<Factor>(
-                Cumulative(
-                    intArrayOf(0, 1, 2, 3),
-                    longArrayOf(2, 2, 2, 1),
-                    longArrayOf(2, 2, 2, 1),
-                    3,
-                ),
-            ),
-        )
+        val problem = Problem(0, 4, arrayOf(
+            IntDomain(0, 2), IntDomain(0, 2), IntDomain(0, 2), IntDomain(100, 100),
+        ), arrayOf<Factor>(Cumulative(
+            intArrayOf(0, 1, 2, 3), longArrayOf(2, 2, 2, 1), longArrayOf(2, 2, 2, 1), 3,
+        )))
 
         val result = BacktrackSolver(problem.bake()).minimize(
-            problem.minimizeInt(0),
-            BacktrackParams(maxDecisions = 0),
+            problem.minimizeInt(0), BacktrackParams(maxDecisions = 0),
         )
 
         assertIs<MinimizeResult.Infeasible>(result)

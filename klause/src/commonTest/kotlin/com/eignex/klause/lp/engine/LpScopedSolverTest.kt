@@ -64,13 +64,8 @@ class LpScopedSolverTest {
     @Test
     fun `unprojectable assertions should remain available for a later contradictory batch`() {
         val zero = ExactLpNumber.of(0L)
-        val source = ExactLpModel(
-            listOf(emptyList()),
-            emptyList(),
-            listOf(ExactLpColumn(ExactLpBounds())),
-            emptyList(),
-            ExactLpObjective(listOf(zero)),
-        )
+        val source = ExactLpModel(listOf(emptyList()), emptyList(), listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(), ExactLpObjective(listOf(zero)))
         val huge = ExactLpNumber.of(BigFraction.of(BIG_ONE shl 2048, BIG_ONE))
         LpScopedSolver(LpExactState(source)).use { owner ->
             assertNotNull(owner.solve())
@@ -78,11 +73,9 @@ class LpScopedSolverTest {
             assertTrue(owner.assertBound(0, false, ExactLpSide(huge), 17L))
             assertNull(owner.state.conflict)
 
-            val applied = owner.assertBounds(
-                listOf(
-                    LpBoundAssertion(0, true, ExactLpSide(zero), 18L, 1),
-                ),
-            )
+            val applied = owner.assertBounds(listOf(
+                LpBoundAssertion(0, true, ExactLpSide(zero), 18L, 1),
+            ))
 
             assertEquals(1, applied.count)
             val result = assertNotNull(owner.solve())
@@ -101,13 +94,8 @@ class LpScopedSolverTest {
             observed = query
             bytes = query.captureExactWithin("scoped", 4096, 65_536, 64, ExecutionControl.Never)
         })
-        LpScopedSolver(
-            LpExactState(lowerBoundModel()),
-            context = context,
-            refactorUpdateLimit = 7,
-            trackDegeneracy = true,
-            pricing = LpPricingOptions(tieSeed = 43L),
-        ).use { owner ->
+        LpScopedSolver(LpExactState(lowerBoundModel()), context = context,
+            refactorUpdateLimit = 7, trackDegeneracy = true, pricing = LpPricingOptions(tieSeed = 43L)).use { owner ->
             assertTrue(owner.assertBound(0, false, ExactLpSide(ExactLpNumber.of(2L)), 17L))
 
             assertNotNull(owner.solveFloat(allowance = LpFloatAllowance(100_000L, 31))?.second)
@@ -173,13 +161,8 @@ class LpScopedSolverTest {
                 var seeded = false
                 var decline: LpProbeDecline? = null
 
-                val gains = owner.directionalGains(
-                    point,
-                    intArrayOf(0, 1),
-                    longArrayOf(0, 0),
-                    1_000_000L,
-                    ExecutionControl.Never,
-                ) {
+                val gains = owner.directionalGains(point, intArrayOf(0, 1), longArrayOf(0, 0),
+                    1_000_000L, ExecutionControl.Never) {
                     work += it.work
                     completed += it.completed
                     decline = it.decline
@@ -215,20 +198,12 @@ class LpScopedSolverTest {
             var work = 0L
             var decline: LpProbeDecline? = null
 
-            val gains = owner.directionalGains(
-                point,
-                intArrayOf(0),
-                longArrayOf(0),
-                1_000_000L,
-                ExecutionControl.Never,
-            ) {
+            val gains = owner.directionalGains(point, intArrayOf(0), longArrayOf(0), 1_000_000L,
+                ExecutionControl.Never) {
                 completed += it.completed
                 work += it.work
                 decline = it.decline
-                if (it.numerical?.parentValues == true) {
-                    seeded = true
-                    owner.close()
-                }
+                if (it.numerical?.parentValues == true) { seeded = true; owner.close() }
             }
 
             assertNull(gains)
@@ -250,22 +225,10 @@ class LpScopedSolverTest {
 
                     val source = LpProbeSource(point, Basis(IntArray(0), emptyArray()))
                     val gains = if (valueMode) {
-                        owner.directionalValues(
-                            source,
-                            intArrayOf(0),
-                            longArrayOf(0),
-                            1000L,
-                            ExecutionControl { cancelled },
-                        ) { metrics = it }
-                    } else {
-                        owner.directionalGains(
-                            point,
-                            intArrayOf(0),
-                            longArrayOf(0),
-                            1000L,
-                            ExecutionControl { cancelled },
-                        ) { metrics = it }
-                    }
+                        owner.directionalValues(source, intArrayOf(0), longArrayOf(0), 1000L,
+                            ExecutionControl { cancelled }) { metrics = it }
+                    } else owner.directionalGains(point, intArrayOf(0), longArrayOf(0), 1000L,
+                        ExecutionControl { cancelled }) { metrics = it }
 
                     assertNull(gains)
                     assertTrue(factory.calls.isEmpty())
@@ -307,11 +270,8 @@ class LpScopedSolverTest {
             val first = assertNotNull(proposal)
             val paid = owner.lastMetrics
 
-            val checked = certifyLpBoundOnly(
-                assertNotNull(owner.state.ownerWorkingModel()),
-                first,
-                ReconstructionLimits(),
-            )
+            val checked = certifyLpBoundOnly(assertNotNull(owner.state.ownerWorkingModel()), first,
+                ReconstructionLimits())
 
             val bound = assertNotNull(checked.bound)
             assertTrue(bound.value > BigFraction.ZERO)
@@ -434,11 +394,8 @@ class LpScopedSolverTest {
             builder.addRow(intArrayOf(column), longArrayOf(2L), Relation.GE, 1L)
         }
         val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
-        LpScopedSolver(
-            LpExactState(source),
-            context = LpSolveContext(RecordingLpEngineFactory()),
-            componentSplit = true,
-        ).use { owner ->
+        LpScopedSolver(LpExactState(source), context = LpSolveContext(RecordingLpEngineFactory()),
+            componentSplit = true).use { owner ->
             assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
             assertNotNull(owner.partialPrimalGuidance(ExecutionControl.Never))
 
@@ -460,21 +417,15 @@ class LpScopedSolverTest {
         val pointModel = assertNotNull(state.ownerWorkingModel())
         LpScopedSolver(state).use { owner ->
             assertNotNull(owner.solveFloat()?.second)
-            assertNotNull(
-                owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, ExecutionControl.Never) {
-                    assertTrue(it > 0L)
-                },
-            )
+            assertNotNull(owner.directionalCosts(pointModel, intArrayOf(x), 100_000L, ExecutionControl.Never) {
+                assertTrue(it > 0L)
+            })
             assertTrue(owner.push())
             assertTrue(owner.assertBound(x, true, ExactLpSide(ExactLpNumber.of(0L)), 1L))
             var work = 0L
 
-            val costs = owner.directionalCosts(
-                pointModel,
-                intArrayOf(x),
-                100_000L,
-                ExecutionControl.Never,
-            ) { work += it }
+            val costs = owner.directionalCosts(pointModel, intArrayOf(x), 100_000L,
+                ExecutionControl.Never) { work += it }
 
             assertNull(costs)
             assertEquals(0L, work)
@@ -496,9 +447,7 @@ class LpScopedSolverTest {
 
                 val guidance = if (directional) {
                     owner.directionalCosts(point, intArrayOf(column), 100_000L, ExecutionControl.Never) { work += it }
-                } else {
-                    owner.partialPrimalGuidance(ExecutionControl.Never)
-                }
+                } else owner.partialPrimalGuidance(ExecutionControl.Never)
 
                 assertNull(guidance)
                 assertTrue(factory.calls.isEmpty())
@@ -579,17 +528,8 @@ class LpScopedSolverTest {
         }
         val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         val trail = LpBoundTrail(source)
-        assertTrue(
-            trail.append(
-                LpScopedRow(
-                    2L,
-                    listOf(0 to ExactLpNumber.of(-1L)),
-                    ExactLpNumber.of(-2L),
-                    ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
-                ),
-                false,
-            ),
-        )
+        assertTrue(trail.append(LpScopedRow(2L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+            ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), false))
         LpScopedSolver(trail.state, componentSplit = true).use { owner ->
             val result = assertNotNull(owner.solve())
 
@@ -610,33 +550,18 @@ class LpScopedSolverTest {
             val limits = ArrayList<Long>()
             val factory = object : LpEngineFactory by ProductionLpEngineFactory {
                 override fun newPersistentSolver(
-                    model: LpModel,
-                    cancellation: ExecutionControl,
-                    refactorUpdateLimit: Int,
-                    iterationLimit: Int,
-                    workLimit: Long,
-                    trackDegeneracy: Boolean,
-                    pricing: LpPricingOptions,
+                    model: LpModel, cancellation: ExecutionControl, refactorUpdateLimit: Int,
+                    iterationLimit: Int, workLimit: Long, trackDegeneracy: Boolean, pricing: LpPricingOptions,
                 ): PersistentLpSolver {
                     limits += pricing.basisEntryLimit
                     return ProductionLpEngineFactory.newPersistentSolver(
-                        model,
-                        cancellation,
-                        refactorUpdateLimit,
-                        iterationLimit,
-                        workLimit,
-                        trackDegeneracy,
-                        pricing,
+                        model, cancellation, refactorUpdateLimit, iterationLimit, workLimit, trackDegeneracy, pricing,
                     )
                 }
             }
             val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
-            LpScopedSolver(
-                LpExactState(source),
-                context = LpSolveContext(factory),
-                pricing = LpPricingOptions(basisEntryLimit = 64L),
-                componentSplit = true,
-            ).use { owner ->
+            LpScopedSolver(LpExactState(source), context = LpSolveContext(factory),
+                pricing = LpPricingOptions(basisEntryLimit = 64L), componentSplit = true).use { owner ->
                 assertTrue(owner.prepare())
             }
 
@@ -659,17 +584,8 @@ class LpScopedSolverTest {
             assertNotNull(owner.solve())
             assertTrue(owner.push())
             val zero = ExactLpNumber.of(0L)
-            assertTrue(
-                owner.append(
-                    LpScopedRow(
-                        2L,
-                        listOf(0 to ExactLpNumber.of(-1L)),
-                        ExactLpNumber.of(-3L),
-                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                    ),
-                    true,
-                ),
-            )
+            assertTrue(owner.append(LpScopedRow(2L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), true))
 
             val result = assertNotNull(owner.solve())
 
@@ -696,17 +612,8 @@ class LpScopedSolverTest {
             val zero = ExactLpNumber.of(0L)
             val minus = ExactLpNumber.of(-1L)
 
-            assertTrue(
-                owner.append(
-                    LpScopedRow(
-                        2L,
-                        listOf(0 to minus, 1 to minus),
-                        ExactLpNumber.of(-3L),
-                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                    ),
-                    false,
-                ),
-            )
+            assertTrue(owner.append(LpScopedRow(2L, listOf(0 to minus, 1 to minus), ExactLpNumber.of(-3L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false))
             val result = assertNotNull(owner.solve())
 
             assertEquals(BigFraction.ofLong(3L), result.lowerBound)
@@ -720,14 +627,8 @@ class LpScopedSolverTest {
         val x = builder.addVar(0L, 5L)
         val y = builder.addVar(0L, 5L)
         builder.addRow(intArrayOf(x), longArrayOf(1L), Relation.GE, 1L)
-        builder.addRow(
-            intArrayOf(y),
-            longArrayOf(1L),
-            Relation.GE,
-            3L,
-            global = false,
-            premises = LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(7)),
-        )
+        builder.addRow(intArrayOf(y), longArrayOf(1L), Relation.GE, 3L, global = false,
+            premises = LpRowPremises(intArrayOf(), booleanArrayOf(), longArrayOf(), intArrayOf(7)))
         val source = assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel())
         LpScopedSolver(LpExactState(source), componentSplit = true).use { owner ->
             assertTrue(owner.assertBound(y, true, ExactLpSide(ExactLpNumber.of(2L)), 8L))
@@ -780,13 +681,8 @@ class LpScopedSolverTest {
             assertEquals(LpFloatTermination.PIVOTS, first.termination)
             assertNull(first.primal)
             assertNull(first.bound)
-            val resumed = assertNotNull(
-                owner.advanceFloat(
-                    100_000L,
-                    LpFloatAllowance(200_000L, 100),
-                    retainFundingStop = true,
-                ),
-            ).second
+            val resumed = assertNotNull(owner.advanceFloat(100_000L, LpFloatAllowance(200_000L, 100),
+                retainFundingStop = true)).second
             val total = paid + owner.lastMetrics
 
             assertEquals(assertNotNull(expected.first).objective, assertNotNull(resumed).objective)
@@ -808,12 +704,8 @@ class LpScopedSolverTest {
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
         }
         LpScopedSolver(LpExactState(lowerBoundModel()), ExecutionControl { cancelled }).use { owner ->
-            val guide = owner.advanceRootGuidance(
-                100_000L,
-                LpFloatAllowance(100_000L, 100),
-                ReconstructionLimits(),
-                observer = observer,
-            )
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100), ReconstructionLimits(),
+                observer = observer)
 
             assertNull(guide.primal)
             assertNull(guide.bound)
@@ -824,11 +716,8 @@ class LpScopedSolverTest {
     @Test
     fun `root guidance should retain heuristic coordinates when bound certification is exhausted`() {
         LpScopedSolver(LpExactState(lowerBoundModel())).use { owner ->
-            val guide = owner.advanceRootGuidance(
-                100_000L,
-                LpFloatAllowance(100_000L, 100),
-                ReconstructionLimits(maxWork = 0L),
-            )
+            val guide = owner.advanceRootGuidance(100_000L, LpFloatAllowance(100_000L, 100),
+                ReconstructionLimits(maxWork = 0L))
 
             assertEquals(1.0, assertNotNull(guide.primal).single())
             assertNull(guide.bound)
@@ -877,10 +766,8 @@ class LpScopedSolverTest {
 
     @Test
     fun `paused numerical progress is observable without advancing the cursor`() {
-        LpScopedSolver(
-            LpExactState(lowerBoundModel()),
-            pricing = LpPricingOptions(basisEntryLimit = 100_000L),
-        ).use { owner ->
+        LpScopedSolver(LpExactState(lowerBoundModel()),
+            pricing = LpPricingOptions(basisEntryLimit = 100_000L)).use { owner ->
             val allowance = LpFloatAllowance(100_000L, 100)
             assertNull(owner.advanceFloat(1L, allowance))
             assertNull(owner.advanceFloat(1L, allowance))
@@ -898,10 +785,8 @@ class LpScopedSolverTest {
 
     @Test
     fun `completed numerical solves withhold paused progress`() {
-        LpScopedSolver(
-            LpExactState(lowerBoundModel()),
-            pricing = LpPricingOptions(basisEntryLimit = 100_000L),
-        ).use { owner ->
+        LpScopedSolver(LpExactState(lowerBoundModel()),
+            pricing = LpPricingOptions(basisEntryLimit = 100_000L)).use { owner ->
             assertNotNull(owner.solveFloat())
 
             val progress = owner.pausedTrialProgress
@@ -1018,23 +903,12 @@ class LpScopedSolverTest {
                 assertNull(owner.advanceFloat(1L, LpFloatAllowance(100_000L, 100)))
 
                 if (objectiveEdit) {
-                    assertTrue(
-                        owner.replaceObjective(
-                            ExactLpObjective(listOf(ExactLpNumber.of(2L), ExactLpNumber.of(0L))),
-                        ),
-                    )
+                    assertTrue(owner.replaceObjective(
+                        ExactLpObjective(listOf(ExactLpNumber.of(2L), ExactLpNumber.of(0L))),
+                    ))
                 } else {
-                    assertTrue(
-                        owner.append(
-                            LpScopedRow(
-                                1L,
-                                listOf(0 to ExactLpNumber.of(-1L)),
-                                ExactLpNumber.of(-2L),
-                                ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L)))),
-                            ),
-                            false,
-                        ),
-                    )
+                    assertTrue(owner.append(LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)),
+                        ExactLpNumber.of(-2L), ExactLpColumn(ExactLpBounds(ExactLpSide(ExactLpNumber.of(0L))))), false))
                 }
                 val result = owner.solve()
 

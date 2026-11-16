@@ -15,9 +15,7 @@ internal fun trajectoryBatch(args: Array<String>): List<List<String>>? {
         GZIPInputStream(bytes.inputStream()).use { it.readNBytes(8 * 1024 * 1024 + 1) }.also {
             require(it.size <= 8 * 1024 * 1024)
         }
-    } else {
-        bytes
-    }
+    } else bytes
     return Json.decodeFromString<List<List<String>>>(json.decodeToString()).also {
         require(it.size in 1..8)
     }

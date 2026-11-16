@@ -33,11 +33,8 @@ class LpClaimTest {
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
         val sink = LpStatsSink(LpRoute.STANDALONE)
 
-        val result = solveAndCertify(
-            builder.build(Sense.MINIMIZE),
-            claim = LpClaim.BOUND,
-            observer = sink.certificationObserver(),
-        )
+        val result = solveAndCertify(builder.build(Sense.MINIMIZE), claim = LpClaim.BOUND,
+            observer = sink.certificationObserver())
 
         assertEquals(LpVerdict.CERTIFIED_BOUND, result.verdict)
         assertEquals(BigFraction.ONE, result.lowerBound)
@@ -55,19 +52,14 @@ class LpClaimTest {
         val builder = LpBuilder()
         val x = builder.addRealVar(0.0, 3.0, cost = 1.0)
         builder.addRealRow(intArrayOf(x), doubleArrayOf(1.0), Relation.GE, 1.0)
-        val model = assertNotNull(
-            LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-                .ownerWorkingModel(),
-        )
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
         val sink = LpStatsSink(LpRoute.STANDALONE)
 
         LpSolveSession().use { owner ->
             assertNull(owner.solve(model, claim = LpClaim.BOUND).witness)
-            val optimum = owner.solve(
-                model,
-                claim = LpClaim.ATTAINED_OPTIMUM,
-                observer = sink.certificationObserver(),
-            )
+            val optimum = owner.solve(model, claim = LpClaim.ATTAINED_OPTIMUM,
+                observer = sink.certificationObserver())
             val bound = owner.solve(model, claim = LpClaim.BOUND, observer = sink.certificationObserver())
 
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, optimum.verdict)
@@ -88,17 +80,8 @@ class LpClaimTest {
             { it.deactivate(0L) },
             { it.push() },
             { it.assertBound(0, false, ExactLpSide(ExactLpNumber.of(1L), strict = true), 1L) },
-            {
-                it.append(
-                    LpScopedRow(
-                        1L,
-                        listOf(0 to ExactLpNumber.of(-1L)),
-                        ExactLpNumber.of(-2L),
-                        ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                    ),
-                    false,
-                )
-            },
+            { it.append(LpScopedRow(1L, listOf(0 to ExactLpNumber.of(-1L)), ExactLpNumber.of(-2L),
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))), false) },
         )
         for (edit in edits) {
             val builder = LpBuilder()
@@ -167,20 +150,14 @@ class LpClaimTest {
     fun `checked packages should remain unavailable under another acceptance policy`() {
         val builder = LpBuilder()
         builder.addVar(0L, 3L, cost = 1L)
-        val model = assertNotNull(
-            LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
-                .ownerWorkingModel(),
-        )
+        val model = assertNotNull(LpExactState(assertNotNull(builder.build(Sense.MINIMIZE).authoritativeModel()))
+            .ownerWorkingModel())
         val cache = LpCounterResults()
         assertNotNull(solveAndCertify(model, claim = LpClaim.BOUND, counterResults = cache).bound)
         val refused = LpCertificationPolicy { _, _ -> false }
 
-        val result = solveAndCertify(
-            model,
-            claim = LpClaim.BOUND,
-            counterResults = cache,
-            context = LpSolveContext(certificationPolicy = refused),
-        )
+        val result = solveAndCertify(model, claim = LpClaim.BOUND, counterResults = cache,
+            context = LpSolveContext(certificationPolicy = refused))
 
         assertNull(result.bound)
         assertFalse(result.certificationReused)
@@ -192,12 +169,8 @@ class LpClaimTest {
         builder.addRealVar(0.0, 3.0, cost = 1.0)
         val sink = LpStatsSink(LpRoute.STANDALONE)
 
-        val result = certifyLpBoundOnly(
-            builder.build(Sense.MINIMIZE),
-            doubleArrayOf(),
-            ReconstructionLimits(maxWork = 1L),
-            observer = sink.certificationObserver(),
-        )
+        val result = certifyLpBoundOnly(builder.build(Sense.MINIMIZE), doubleArrayOf(),
+            ReconstructionLimits(maxWork = 1L), observer = sink.certificationObserver())
 
         assertNull(result.bound)
         assertEquals(ReconstructionDecline.WORK, result.metrics.decline)
@@ -215,12 +188,8 @@ class LpClaimTest {
             val sink = LpStatsSink(LpRoute.STANDALONE)
             val limits = if (limited) ReconstructionLimits(maxBits = 24) else ReconstructionLimits()
 
-            val result = certifyLpBoundOnly(
-                builder.build(Sense.MINIMIZE),
-                doubleArrayOf(),
-                limits,
-                observer = sink.certificationObserver(),
-            )
+            val result = certifyLpBoundOnly(builder.build(Sense.MINIMIZE), doubleArrayOf(), limits,
+                observer = sink.certificationObserver())
 
             assertNull(result.bound)
             val request = assertNotNull(sink.snapshot().phases["CLAIM_BOUND_STANDALONE"])
@@ -249,11 +218,8 @@ class LpClaimTest {
         )
         val sink = LpStatsSink(LpRoute.ROOT)
 
-        val refuted = openLpInfeasible(
-            arrayOf(OpenIntBounds(null, null)),
-            rows,
-            observer = sink.certificationObserver(LpRoute.ROOT),
-        )
+        val refuted = openLpInfeasible(arrayOf(OpenIntBounds(null, null)), rows,
+            observer = sink.certificationObserver(LpRoute.ROOT))
 
         assertTrue(refuted)
         val phases = sink.snapshot().phases
@@ -281,20 +247,16 @@ class LpClaimTest {
                     val result = owner.solve(sample)
                     assertEquals(LpVerdict.ATTAINED_OPTIMUM, result.verdict)
                     val reals = assertNotNull(result.exactReals)
-                    assertEquals(
-                        BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(),
+                    assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(),
                         assertNotNull(source.checkMpsWitness(listOf(reals[compiled.columns.single().id])))
-                            .values.single(),
-                    )
+                            .values.single())
                 }
             }
 
             val phases = sink.snapshot().phases
             assertEquals(1L, assertNotNull(phases["CLAIM_ATTAINED_OPTIMUM_STANDALONE"]).outcomes["REUSED"])
-            assertEquals(
-                mapOf("ATTAINED_OPTIMUM" to 2L),
-                assertNotNull(phases["CLAIM_CONSUMPTION_STANDALONE"]).outcomes,
-            )
+            assertEquals(mapOf("ATTAINED_OPTIMUM" to 2L),
+                assertNotNull(phases["CLAIM_CONSUMPTION_STANDALONE"]).outcomes)
         }
     }
 
@@ -302,28 +264,18 @@ class LpClaimTest {
     fun `real leaf consumers should request completion or attainment explicitly`() {
         for (objective in listOf(null, LinearObjective(realCoefficients = doubleArrayOf(1.0)))) {
             val row = Linear(longArrayOf(), intArrayOf(), doubleArrayOf(2.0), intArrayOf(0), LinearOp.EQ, 3L)
-            val problem = Problem(
-                numBoolVars = 0,
-                numIntVars = 0,
-                intDomains = emptyArray(),
-                factors = arrayOf<Factor>(row),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0),
-                realUpper = doubleArrayOf(10.0),
-            )
+            val problem = Problem(numBoolVars = 0, numIntVars = 0, intDomains = emptyArray(),
+                factors = arrayOf<Factor>(row), numRealVars = 1,
+                realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(10.0))
             val sink = LpStatsSink(LpRoute.STANDALONE)
             val claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM
 
             val result = leafRealFeasibility(problem, objective, Sample(booleanArrayOf(), longArrayOf()), sink = sink)
 
-            assertEquals(
-                BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(),
-                assertNotNull(result.exactReals).single(),
-            )
-            assertEquals(
-                mapOf("SATISFIED" to 1L),
-                assertNotNull(sink.snapshot().phases["${claim.phase}_STANDALONE"]).outcomes,
-            )
+            assertEquals(BigFraction.ofLong(3L) * BigFraction.ofLong(2L).reciprocal(),
+                assertNotNull(result.exactReals).single())
+            assertEquals(mapOf("SATISFIED" to 1L),
+                assertNotNull(sink.snapshot().phases["${claim.phase}_STANDALONE"]).outcomes)
             assertNotNull(sink.snapshot().phases["CLAIM_CONSUMPTION_STANDALONE"])
         }
     }

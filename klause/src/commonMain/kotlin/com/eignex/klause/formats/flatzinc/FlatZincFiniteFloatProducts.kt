@@ -26,12 +26,8 @@ internal fun FlatZincCompiler.emitFiniteFloatProduct(a: FloatRef, b: FloatRef, r
     fun coordinate(ref: FloatRef): FloatBucketing = when (ref) {
         is FloatRef.Var -> ref.bk.takeIf { it.lpOnly }
             ?: unsupportedHere("`float_times` cannot mix exact real and grid coordinates")
-
-        is FloatRef.Const -> resolveFloatElement(
-            FznExpr.FloatLit(ref.value),
-            "__finite_product_${floatVars.size}",
-            lpOnly = true,
-        )
+        is FloatRef.Const -> resolveFloatElement(FznExpr.FloatLit(ref.value),
+            "__finite_product_${floatVars.size}", lpOnly = true)
     }
     val first = FloatRef.Var(coordinate(a))
     val second = FloatRef.Var(coordinate(b))

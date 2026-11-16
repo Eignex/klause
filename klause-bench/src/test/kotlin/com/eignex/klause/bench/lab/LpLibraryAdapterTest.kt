@@ -16,13 +16,8 @@ import kotlin.test.assertFailsWith
 class LpLibraryAdapterTest {
     @Test
     fun `library plans should reject SMT sources before selecting the MPS caller`() {
-        val request = BenchRequest(
-            parameters = mapOf(
-                "suite" to "smtlib-qfnra-core-v1",
-                "name" to "exact/wide-exact-rational",
-                "exact" to "true",
-            ),
-        )
+        val request = BenchRequest(parameters = mapOf(
+            "suite" to "smtlib-qfnra-core-v1", "name" to "exact/wide-exact-rational", "exact" to "true"))
 
         assertFailsWith<IllegalArgumentException> { LpLibrarySuite.plan(request) }
     }
@@ -41,15 +36,8 @@ class LpLibraryAdapterTest {
             invokeLibrarySource(input, Budget(10_000), 3L) { arguments, _ ->
                 val encoded = arguments.single { it.startsWith("source64=") }.substringAfter('=')
                 observed = Base64.getDecoder().decode(encoded).toString(Charsets.UTF_8)
-                SolverInvocation.Result(
-                    null,
-                    null,
-                    null,
-                    proven = false,
-                    stats = emptyMap(),
-                    rawOutput = "",
-                    command = "fixture",
-                )
+                SolverInvocation.Result(null, null, null, proven = false,
+                    stats = emptyMap(), rawOutput = "", command = "fixture")
             }
 
             assertEquals(body, observed)

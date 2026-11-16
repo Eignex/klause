@@ -100,11 +100,8 @@ internal fun Problem.linearAuthorityContext(
             cancellation: ExecutionControl,
         ): SourceEvidenceCheck = affine.objectiveEquals(sample, value, scope, cancellation)
 
-        override fun ray(
-            claim: SourceClaim.Ray,
-            scope: SourceScope,
-            cancellation: ExecutionControl,
-        ): SourceEvidenceCheck {
+        override fun ray(claim: SourceClaim.Ray, scope: SourceScope,
+            cancellation: ExecutionControl): SourceEvidenceCheck {
             val checked = witness(claim.sample, scope, cancellation)
             return if (checked == SourceEvidenceCheck.Checked) affine.ray(claim, scope, cancellation) else checked
         }

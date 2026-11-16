@@ -154,12 +154,8 @@ class PolynomialQuadraticRefutationTest {
                 "(= x2 (+ (* 2 x0) x1)) (>= x2 3)))",
         )
 
-        val result = solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(maximumWork = 100_000),
-        )
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 100_000))
 
         val refuted = assertIs<QfNraResult.Unsatisfiable>(result)
         assertEquals(0L, refuted.stats.projectedPolynomials)
@@ -172,12 +168,8 @@ class PolynomialQuadraticRefutationTest {
             "$declarations (assert (or (and (<= (+ (* x0 x0) (* x1 x1)) 1) (>= x0 2)) (= x0 0)))",
         )
 
-        val result = solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(maximumWork = 100_000),
-        )
+        val result = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = 100_000))
 
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment
         assertEquals(BigFraction.ZERO, witness.realValue(0).rational)

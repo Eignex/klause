@@ -46,7 +46,5 @@ internal fun lowerGridFiniteValues(
     if (cancellation()) return null
     return if (admitted.isEmpty()) {
         listOf(Linear(longArrayOf(1L), intArrayOf(column.coordinate.variable), LinearOp.LE, -1L))
-    } else {
-        listOf(Table(intArrayOf(column.coordinate.variable), admitted.toLongArray()))
-    }
+    } else listOf(Table(intArrayOf(column.coordinate.variable), admitted.toLongArray()))
 }

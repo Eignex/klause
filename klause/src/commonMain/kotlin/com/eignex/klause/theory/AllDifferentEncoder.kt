@@ -14,11 +14,8 @@ internal object AllDifferentEncoder {
     }
 
     val polynomial = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
-        val formula = allDifferentPolynomialFormula(
-            factor as AllDifferent,
-            { encoding.integer(SourceIntId(it)) },
-            encoding.cancellation,
-        )
+        val formula = allDifferentPolynomialFormula(factor as AllDifferent,
+            { encoding.integer(SourceIntId(it)) }, encoding.cancellation)
             ?: return@Encoder EncoderDecline.RESOURCE
         encoding.polynomial(formula)
         null

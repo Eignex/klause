@@ -38,13 +38,9 @@ import kotlin.test.assertTrue
 class CliModeVerdictTest {
     @Test
     fun `source-qualified output should retain rational policy and the selected protocol terminal`() {
-        val semantics = smtLibSemantics.resolve(
-            SemanticOverrides(
-                undeclaredReals = BoundsOverride(
+        val semantics = smtLibSemantics.resolve(SemanticOverrides(undeclaredReals = BoundsOverride(
             upper = BoundOverride.Value(SemanticRational.of(bigIntOf(1), bigIntOf(3))),
-        )
-            )
-        )
+        )))
 
         val out = captureStdout {
             SmtLibOutput().sourceQualified(semantics, ";").apply {
@@ -84,11 +80,9 @@ class CliModeVerdictTest {
             SemanticRational.ofLong(-20) to "-20",
             SemanticRational.of(bigIntOf(-1), bigIntOf(2)) to "-1/2",
         )) {
-            val semantics = flatZincSemantics.resolve(
-                SemanticOverrides(
+            val semantics = flatZincSemantics.resolve(SemanticOverrides(
                 undeclaredReals = BoundsOverride(lower = BoundOverride.Value(lower)),
-            )
-            )
+            ))
             for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED, Verdict.OPTIMAL)) {
                 val out = captureStdout {
                     MiniZincOutput(sourceSemantics = semantics).apply {
@@ -133,15 +127,12 @@ class CliModeVerdictTest {
     @Test
     fun `the exact flag should refute a FlatZinc float bound that only tolerance admits`() {
         val source = File.createTempFile("rounded-bound", ".fzn").apply {
-            writeText(
-                "var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; " +
-                    "constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); solve satisfy;",
-            )
+            writeText("var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; " +
+                "constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); solve satisfy;")
         }
         try {
             for ((args, terminal) in listOf(
-                emptyArray<String>() to "==========",
-                arrayOf("--exact") to "=====UNSATISFIABLE=====",
+                emptyArray<String>() to "==========", arrayOf("--exact") to "=====UNSATISFIABLE=====",
             )) {
                 val common = CommonOptions().apply {
                     engine = "cp"
@@ -164,10 +155,8 @@ class CliModeVerdictTest {
     @Test
     fun `incomplete engines should accept a FlatZinc float bound that tolerance admits`() {
         val source = File.createTempFile("rounded-bound", ".fzn").apply {
-            writeText(
-                "var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; " +
-                    "constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); solve satisfy;",
-            )
+            writeText("var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; " +
+                "constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); solve satisfy;")
         }
         try {
             for (name in listOf("localsearch", "alns")) {
@@ -190,18 +179,10 @@ class CliModeVerdictTest {
 
     @Test
     fun `a declared grid solution should report completed search within grid scope`() {
-        val program = parseFlatZinc(
-            "var 0.0..1.0: x :: output_var; " +
-                "constraint float_le(x,0.5); solve satisfy;",
-            floatBuckets = 3,
-        )
-        val invocation = program.prepareFiniteCompatibility(
-            SourceSetupRequest(
-            program.sourceAttachment(),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
-        )
+        val program = parseFlatZinc("var 0.0..1.0: x :: output_var; " +
+            "constraint float_le(x,0.5); solve satisfy;", floatBuckets = 3)
+        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
         assertNotNull(invocation.floatProjection)
         val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it) }, null)
         val common = CommonOptions().apply {
@@ -220,18 +201,10 @@ class CliModeVerdictTest {
 
     @Test
     fun `a rounded grid witness should publish under declared semantics`() {
-        val program = parseFlatZinc(
-            "var 0.0..1.0: x; var 0.0..1.0: y; " +
-                "constraint float_eq(x,0.5); constraint float_times(x,x,y); solve satisfy;",
-            floatBuckets = 3,
-        )
-        val invocation = program.prepareFiniteCompatibility(
-            SourceSetupRequest(
-            program.sourceAttachment(),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
-        )
+        val program = parseFlatZinc("var 0.0..1.0: x; var 0.0..1.0: y; " +
+            "constraint float_eq(x,0.5); constraint float_times(x,x,y); solve satisfy;", floatBuckets = 3)
+        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
         assertNotNull(invocation.floatProjection)
         val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it) }, null)
         val common = CommonOptions().apply {
@@ -250,18 +223,10 @@ class CliModeVerdictTest {
 
     @Test
     fun `declared grid refutation should report unsatisfiable within grid scope`() {
-        val program = parseFlatZinc(
-            "var 0.0..1.0: x; var 0.0..1.0: y; " +
-                "constraint float_eq(x,0.25); constraint float_times(x,x,y); solve satisfy;",
-            floatBuckets = 3,
-        )
-        val invocation = program.prepareFiniteCompatibility(
-            SourceSetupRequest(
-            program.sourceAttachment(),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.FIXED,
-        )
-        )
+        val program = parseFlatZinc("var 0.0..1.0: x; var 0.0..1.0: y; " +
+            "constraint float_eq(x,0.25); constraint float_times(x,x,y); solve satisfy;", floatBuckets = 3)
+        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.SATISFY, FiniteEngine.FIXED))
         assertTrue(assertNotNull(invocation.floatProjection).declaredGridSemantics)
         val solvable = Solvable(invocation.finiteShape(), { "unexpected grid point" }, null)
         val common = CommonOptions().apply {

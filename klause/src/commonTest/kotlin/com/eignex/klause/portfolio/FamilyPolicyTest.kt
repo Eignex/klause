@@ -53,21 +53,11 @@ class FamilyPolicyTest {
                 repeat(4) { policy.record(ArmFamily.Backtrack, progressed = true, plateau = true) }
             }
 
-            whole.record(
-                ArmFamily.LocalSearch,
-                progressed = reward > 0.0,
-                plateau = true,
-                reward = reward,
-                weight = 2.0,
-            )
+            whole.record(ArmFamily.LocalSearch, progressed = reward > 0.0, plateau = true,
+                reward = reward, weight = 2.0)
             repeat(16) {
-                split.record(
-                    ArmFamily.LocalSearch,
-                    progressed = reward > 0.0,
-                    plateau = true,
-                    reward = reward,
-                    weight = 0.125,
-                )
+                split.record(ArmFamily.LocalSearch, progressed = reward > 0.0, plateau = true,
+                    reward = reward, weight = 0.125)
             }
 
             assertEquals(List(1_000) { whole.choose(pair) }, List(1_000) { split.choose(pair) })

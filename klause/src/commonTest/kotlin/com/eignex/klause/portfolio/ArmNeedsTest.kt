@@ -47,9 +47,7 @@ class ArmNeedsTest {
     @Test
     fun `small ground tables should offer support ordering`() {
         val model = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            0, 2, Array(2) { IntDomain(0, 1) },
             arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))),
         ).bake()
 
@@ -61,9 +59,7 @@ class ArmNeedsTest {
     @Test
     fun `interval tables should decline automatic support ordering`() {
         val model = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 64) },
+            0, 2, Array(2) { IntDomain(0, 64) },
             arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0), longArrayOf(64, 64))),
         ).bake()
 
@@ -76,9 +72,7 @@ class ArmNeedsTest {
     fun `wide table scopes or domains should decline automatic support ordering`() {
         for ((arity, values) in listOf(33 to 2, 2 to 33)) {
             val model = Problem(
-                0,
-                arity,
-                Array(arity) { IntDomain(0, (values - 1).toLong()) },
+                0, arity, Array(arity) { IntDomain(0, (values - 1).toLong()) },
                 arrayOf<Factor>(Table(IntArray(arity) { it }, LongArray(arity * values) { (it / arity).toLong() })),
             ).bake()
 
@@ -97,12 +91,10 @@ class ArmNeedsTest {
             Linear(LongArray(side) { 1L }, IntArray(side) { it * side + column }, LinearOp.EQ, 2L)
         }
         val source = Problem(0, side * side, Array(side * side) { IntDomain(0, 1) }, rows)
-        val objective = LinearObjective(
-            intCoefficients = LongArray(side * side) {
-                val distance = it / side - it % side
-                (distance * distance).toLong()
-            },
-        )
+        val objective = LinearObjective(intCoefficients = LongArray(side * side) {
+            val distance = it / side - it % side
+            (distance * distance).toLong()
+        })
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective))
         val model = prepared.executableProblem()
         val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE, prepared.objective)
@@ -119,20 +111,16 @@ class ArmNeedsTest {
     @Test
     fun `binary cost channels should retain the linear companion beside difference propagation`() {
         val source = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
+            0, 3, arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 2)),
             listOf(
                 Linear(longArrayOf(2, 3, 1), intArrayOf(0, 1, 2), LinearOp.GE, 4),
                 Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.LE, 0),
             ),
         )
         val objective = LinearObjective(intCoefficients = longArrayOf(3, 5))
-        val config = PresolveConfig(
-            overrides = PresolvePass.entries.associateWith {
-                it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS || it == PresolvePass.POST_DIFFERENCE_SYSTEM
-            },
-        )
+        val config = PresolveConfig(overrides = PresolvePass.entries.associateWith {
+            it == PresolvePass.SUBSTITUTE_BINARY_COLUMNS || it == PresolvePass.POST_DIFFERENCE_SYSTEM
+        })
         val prepared = FinitePipeline.prepare(FinitePipelineRequest(source, FiniteEngine.MIXED, objective, config))
         val model = prepared.executableProblem()
         val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AGGRESSIVE, prepared.objective)
@@ -147,9 +135,7 @@ class ArmNeedsTest {
     @Test
     fun `Boolean source costs should not change integer linear recipe admission`() {
         val model = Problem(
-            2,
-            1,
-            arrayOf(IntDomain(0, 1)),
+            2, 1, arrayOf(IntDomain(0, 1)),
             listOf(Cardinality(intArrayOf(Lit.make(0, true), Lit.make(1, true)), 1, 2)),
         ).bake()
         val objective = LinearObjective(longArrayOf(1, 2))
@@ -227,24 +213,17 @@ class ArmNeedsTest {
         val rows = listOf(
             Linear(longArrayOf(1, -2), intArrayOf(0, 1), LinearOp.LE, -1),
             ExactLinear.of(
-                refs,
-                listOf(BigFraction.ONE, BigFraction.ofLong(-2)),
-                LinearOp.LE,
-                BigFraction.ofLong(-1),
+                refs, listOf(BigFraction.ONE, BigFraction.ofLong(-2)), LinearOp.LE, BigFraction.ofLong(-1),
             ),
             ExactLinear.of(
-                refs,
-                listOf(BigFraction.ofLong(2).reciprocal(), BigFraction.ofLong(-1)),
-                LinearOp.LE,
-                BigFraction.ofLong(-2).reciprocal(),
+                refs, listOf(BigFraction.ofLong(2).reciprocal(), BigFraction.ofLong(-1)),
+                LinearOp.LE, BigFraction.ofLong(-2).reciprocal(),
             ),
         )
         for ((row, symmetry) in rows.flatMap { row -> listOf(row to false, row to true) }) {
             val factors = if (symmetry) {
                 listOf(row, SymmetryHandling(listOf(intArrayOf(0, 1, 3, 2) to intArrayOf())))
-            } else {
-                listOf(row)
-            }
+            } else listOf(row)
             val model = Problem(0, 4, Array(4) { IntDomain(0, 1) }, factors).bake()
             val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO)
 
@@ -257,9 +236,7 @@ class ArmNeedsTest {
     @Test
     fun `symmetry alone should not admit an integer linear recipe`() {
         val model = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
+            0, 2, Array(2) { IntDomain(0, 1) },
             listOf(SymmetryHandling(listOf(intArrayOf(1, 0) to intArrayOf()))),
         ).bake()
 
@@ -274,29 +251,18 @@ class ArmNeedsTest {
         val wide = BigFraction.of(parseBigInt("18446744073709551617"), BIG_ONE)
         val rows = listOf(
             ExactLinear.of(
-                refs,
-                listOf(BigFraction.ONE, BigFraction.ONE),
-                LinearOp.LE,
-                BigFraction.ONE,
-                activator = 0,
+                refs, listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE, activator = 0,
             ),
             ExactLinear.of(
                 intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                listOf(BigFraction.ONE, BigFraction.ONE),
-                LinearOp.LE,
-                BigFraction.ONE,
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.LE, BigFraction.ONE,
             ),
             ExactLinear.of(refs, listOf(wide, BigFraction.ONE), LinearOp.LE, BigFraction.ONE),
         )
         for (row in rows) {
             val model = Problem(
-                1,
-                2,
-                Array(2) { IntDomain(0, 1) },
-                listOf(row),
-                numRealVars = 1,
-                realLower = doubleArrayOf(0.0),
-                realUpper = doubleArrayOf(1.0),
+                1, 2, Array(2) { IntDomain(0, 1) }, listOf(row),
+                numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
             ).bake()
 
             val facts = ProblemFacts.of(model, ProblemProfile.of(model, true), LpConfig.AUTO)
@@ -324,22 +290,17 @@ class ArmNeedsTest {
             Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1),
             ExactLinear.of(
                 intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
-                listOf(BigFraction.ONE, BigFraction.ONE),
-                LinearOp.EQ,
-                BigFraction.ONE,
+                listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE,
             ),
             ExactLinear.of(
                 intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
                 List(2) { BigFraction.ofLong(2).reciprocal() },
-                LinearOp.EQ,
-                BigFraction.ofLong(2).reciprocal(),
+                LinearOp.EQ, BigFraction.ofLong(2).reciprocal(),
             ),
         )
         for (row in rows) {
             val model = Problem(
-                0,
-                3,
-                Array(3) { IntDomain(0, 1) },
+                0, 3, Array(3) { IntDomain(0, 1) },
                 listOf(row, Linear(longArrayOf(1, -1), intArrayOf(1, 2), LinearOp.EQ, 0)),
             ).bake()
             val objective = LinearObjective(intCoefficients = longArrayOf(2, 3, 4))
@@ -362,9 +323,7 @@ class ArmNeedsTest {
             Triple(1L, null, false),
         )) {
             val model = Problem(
-                0,
-                2,
-                Array(2) { IntDomain(0, upper) },
+                0, 2, Array(2) { IntDomain(0, upper) },
                 listOf(Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.EQ, 1)),
             ).bake()
 
@@ -386,32 +345,22 @@ class ArmNeedsTest {
             Triple(ExactLinear.of(refs, listOf(wide, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE), 0, 0),
             Triple(
                 ExactLinear.of(
-                    refs,
-                    listOf(BigFraction.ONE, BigFraction.ONE),
-                    LinearOp.EQ,
-                    BigFraction.ONE,
-                    activator = 0,
+                    refs, listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ,
+                    BigFraction.ONE, activator = 0,
                 ),
-                1,
-                0,
+                1, 0,
             ),
             Triple(
                 ExactLinear.of(
                     intArrayOf(Term.ofIntVar(0), Term.ofRealVar(0)),
-                    listOf(BigFraction.ONE, BigFraction.ONE),
-                    LinearOp.EQ,
-                    BigFraction.ONE,
+                    listOf(BigFraction.ONE, BigFraction.ONE), LinearOp.EQ, BigFraction.ONE,
                 ),
-                0,
-                1,
+                0, 1,
             ),
         )
         for ((row, bools, reals) in cases) {
             val model = Problem(
-                bools,
-                2,
-                Array(2) { IntDomain(0, 1) },
-                listOfNotNull(row),
+                bools, 2, Array(2) { IntDomain(0, 1) }, listOfNotNull(row),
                 numRealVars = reals,
                 realLower = DoubleArray(reals),
                 realUpper = DoubleArray(reals) { 1.0 },
@@ -427,21 +376,15 @@ class ArmNeedsTest {
     @Test
     fun `binary equality eligibility should cover every factor`() {
         val model = Problem(
-            0,
-            3,
-            Array(3) { IntDomain(0, 1) },
+            0, 3, Array(3) { IntDomain(0, 1) },
             listOf(
                 ExactLinear.of(
                     intArrayOf(Term.ofIntVar(0), Term.ofIntVar(1)),
-                    List(2) { BigFraction.ONE },
-                    LinearOp.EQ,
-                    BigFraction.ONE,
+                    List(2) { BigFraction.ONE }, LinearOp.EQ, BigFraction.ONE,
                 ),
                 ExactLinear.of(
                     intArrayOf(Term.ofIntVar(1), Term.ofIntVar(2)),
-                    List(2) { BigFraction.ONE },
-                    LinearOp.GE,
-                    BigFraction.ONE,
+                    List(2) { BigFraction.ONE }, LinearOp.GE, BigFraction.ONE,
                 ),
             ),
         ).bake()

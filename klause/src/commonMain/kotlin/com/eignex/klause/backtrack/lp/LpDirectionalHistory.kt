@@ -4,7 +4,10 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import kotlin.math.floor
 
-internal class LpDirectionalHistory(private val observe: (String) -> Unit, private val maxAge: Long = 256L) {
+internal class LpDirectionalHistory(
+    private val observe: (String) -> Unit,
+    private val maxAge: Long = 256L,
+) {
     private class Direction {
         var count = 0
         var mean = 0.0
@@ -63,11 +66,8 @@ internal class LpDirectionalHistory(private val observe: (String) -> Unit, priva
         direction.count = minOf(direction.count + 1, 8)
         direction.mean += (normalized - direction.mean) / direction.count
         direction.stamp = stamp
-        if (child.up) {
-            upSamples = minOf(upSamples + 1, RELIABILITY)
-        } else {
-            downSamples = minOf(downSamples + 1, RELIABILITY)
-        }
+        if (child.up) upSamples = minOf(upSamples + 1, RELIABILITY)
+        else downSamples = minOf(downSamples + 1, RELIABILITY)
         observe(if (child.up) "UP" else "DOWN")
     }
 
@@ -105,21 +105,16 @@ internal class LpDirectionalHistory(private val observe: (String) -> Unit, priva
                 if (parent.variable != VarRef.Bool(decision.literal ushr 1)) return
                 decision.literal and 1 == 0
             }
-
             is SearchDecision.IntAtMost -> {
                 if (parent.variable != VarRef.IntVar(decision.variable) || decision.upper.toDouble() != floor) return
                 false
             }
-
             is SearchDecision.IntAtLeast -> {
                 if (parent.variable != VarRef.IntVar(decision.variable) ||
                     decision.lower.toDouble() != floor + 1.0
-                ) {
-                    return
-                }
+                ) return
                 true
             }
-
             else -> return
         }
         val distance = if (up) floor + 1.0 - parent.value else parent.value - floor

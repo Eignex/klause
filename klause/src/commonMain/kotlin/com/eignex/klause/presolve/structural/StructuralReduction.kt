@@ -41,15 +41,11 @@ internal object StructuralReduction {
             if (!visit(cancellation)) break
             // Clause is final and inherits the unchanged hook.
             if (f is Clause || (preserveStructure && f.retainsStructure(problem, cancellation))) continue
-            for (v in f.intVars) {
-                if (!visit(cancellation)) {
-                    return PassDelta(dropped.toIntArray(), added, domains)
-                }
+            for (v in f.intVars) if (!visit(cancellation)) {
+                return PassDelta(dropped.toIntArray(), added, domains)
             }
-            for (v in f.boolVars) {
-                if (!visit(cancellation)) {
-                    return PassDelta(dropped.toIntArray(), added, domains)
-                }
+            for (v in f.boolVars) if (!visit(cancellation)) {
+                return PassDelta(dropped.toIntArray(), added, domains)
             }
             when (val reduction = f.structuralReduce(root)) {
                 FactorReduction.Unchanged -> {}
@@ -114,10 +110,8 @@ internal object StructuralReduction {
                 if (!visit(cancellation)) return SourceDelta(dropped.toIntArray(), added, tightening.build())
                 if (!closed[v]) allClosed = false
             }
-            for (v in f.boolVars) {
-                if (!visit(cancellation)) {
-                    return SourceDelta(dropped.toIntArray(), added, tightening.build())
-                }
+            for (v in f.boolVars) if (!visit(cancellation)) {
+                return SourceDelta(dropped.toIntArray(), added, tightening.build())
             }
             if (!allClosed) continue
             val reduction = f.structuralReduce(domains) as? FactorReduction.Rewrite ?: continue

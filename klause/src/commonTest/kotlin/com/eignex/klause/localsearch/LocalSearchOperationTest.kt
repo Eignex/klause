@@ -23,12 +23,8 @@ import kotlin.test.assertTrue
 class LocalSearchOperationTest {
     @Test
     fun `interrupted definition scoring should restore outputs and invalidate their cached values`() {
-        val problem = Problem(
-            0,
-            3,
-            arrayOf(IntDomain(0, 2), IntDomain(2, 2), IntDomain(0, 4)),
-            arrayOf<Factor>(Product(0, 1, 2), Table(intArrayOf(2), longArrayOf(0))),
-        )
+        val problem = Problem(0, 3, arrayOf(IntDomain(0, 2), IntDomain(2, 2), IntDomain(0, 4)),
+            arrayOf<Factor>(Product(0, 1, 2), Table(intArrayOf(2), longArrayOf(0))))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         val timer = LocalSearchPhaseTimer { 0L }
         state.phaseTimer = timer
@@ -58,12 +54,8 @@ class LocalSearchOperationTest {
 
     @Test
     fun `interrupted compound scoring should restore completed primitive edits before returning`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1) },
-            arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))),
-        )
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), longArrayOf(0, 0, 1, 1))))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         state.assignment.setInt(0, 0)
         state.assignment.setInt(1, 0)
@@ -92,15 +84,8 @@ class LocalSearchOperationTest {
         val relations = listOf(
             Table(sequence, tuples),
             Table(sequence, tuples, tuples.copyOf()),
-            Mdd(
-                sequence,
-                IntArray(length + 1) { 1 },
-                IntArray(length + 1) { it * 6 },
-                LongArray(length * 6) { if (it % 6 == 4) 1L else 0L },
-                0,
-                intArrayOf(0),
-                3,
-            ),
+            Mdd(sequence, IntArray(length + 1) { 1 }, IntArray(length + 1) { it * 6 },
+                LongArray(length * 6) { if (it % 6 == 4) 1L else 0L }, 0, intArrayOf(0), 3),
         )
         for (factor in relations) {
             val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), arrayOf<Factor>(factor))
@@ -130,25 +115,12 @@ class LocalSearchOperationTest {
 
     @Test
     fun `stepped compound edits should reconcile definitions and retain one tabu step`() {
-        val problem = Problem(
-            0,
-            4,
-            Array(4) { IntDomain(0, 4) },
-            arrayOf<Factor>(
-                Product(0, 1, 2),
-                Table(intArrayOf(0, 2, 0), longArrayOf(0, 0, 0, 1, 2, 1, 2, 4, 2)),
-                Mdd(
-                    intArrayOf(2),
-                    intArrayOf(1, 1),
-                    intArrayOf(0, 12),
-                    longArrayOf(0, 0, 0, 1, 0, 2, 0, 2, 0, 4, 0, 3),
-                    0,
-                    intArrayOf(0),
-                    4,
-                    3,
-                ),
-            ),
-        )
+        val problem = Problem(0, 4, Array(4) { IntDomain(0, 4) }, arrayOf<Factor>(
+            Product(0, 1, 2),
+            Table(intArrayOf(0, 2, 0), longArrayOf(0, 0, 0, 1, 2, 1, 2, 4, 2)),
+            Mdd(intArrayOf(2), intArrayOf(1, 1), intArrayOf(0, 12),
+                longArrayOf(0, 0, 0, 1, 0, 2, 0, 2, 0, 4, 0, 3), 0, intArrayOf(0), 4, 3),
+        ))
         val ordinary = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         val stepped = LocalSearchState(LocalSearchModel.open(problem), Random(0))
         for (state in listOf(ordinary, stepped)) {
@@ -180,34 +152,22 @@ class LocalSearchOperationTest {
     @Test
     fun `satisfaction should retain a selected compound through a suspended table update`() {
         val tuples = LongArray(2048) { (it / 2 % 2).toLong() }
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 2) },
-            arrayOf<Factor>(Table(intArrayOf(0, 1), tuples)),
-        )
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 2) },
+            arrayOf<Factor>(Table(intArrayOf(0, 1), tuples)))
         var selected = false
         var picks = 0
         var polls = 0
-        val strategy = SourceDrivenStrategy(
-            emptyList(),
-            feasibleDescent = FeasibleDescent.SelfOwned,
+        val strategy = SourceDrivenStrategy(emptyList(), feasibleDescent = FeasibleDescent.SelfOwned,
             perturbation = {
                 picks++
                 selected = picks == 2
-                if (picks == 1) {
-                    Move.IntSet(0, 1)
-                } else {
+                if (picks == 1) Move.IntSet(0, 1) else {
                     Move.Compound(listOf(Move.IntSet(0, 1), Move.IntSet(1, 1)))
                 }
-            },
-        )
+            })
         val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy, greedyRepairOnRestart = false)
-        val params = LocalSearchParams(
-            maxFlips = 3L,
-            randomSeed = 0L,
-            initialAssignment = Sample(booleanArrayOf(), longArrayOf(2, 2)),
-        )
+        val params = LocalSearchParams(maxFlips = 3L, randomSeed = 0L,
+            initialAssignment = Sample(booleanArrayOf(), longArrayOf(2, 2)))
         engine.resumableSolve(params).use { handle ->
             assertNull(handle.runSlice(ExecutionControl { selected && ++polls >= 2 }, Long.MAX_VALUE, -1L))
             assertEquals(2, picks)

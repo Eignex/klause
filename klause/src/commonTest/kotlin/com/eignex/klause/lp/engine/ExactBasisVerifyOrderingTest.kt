@@ -148,12 +148,8 @@ class ExactBasisVerifyOrderingTest {
             cancelled = true
             RationalBasisOrder(intArrayOf(0), intArrayOf(0))
         }
-        val stopped = verifyExactBasis(
-            model,
-            basis,
-            cache = cancelledCache,
-            cancellation = ExecutionControl { cancelled },
-        )
+        val stopped = verifyExactBasis(model, basis, cache = cancelledCache, cancellation =
+            ExecutionControl { cancelled })
         assertEquals(ExactBasisDecline.CANCELLED, stopped.metrics.decline)
         assertEquals(0, stopped.metrics.factoryCalls)
         assertNull(stopped.witness)

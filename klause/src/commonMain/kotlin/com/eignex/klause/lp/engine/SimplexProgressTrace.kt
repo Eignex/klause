@@ -1,15 +1,7 @@
 package com.eignex.klause.lp.engine
 
 internal enum class SimplexProfilePhase {
-    SOLVE,
-    PRICING,
-    FTRAN,
-    BTRAN,
-    UPDATE,
-    REFACTOR,
-    FEASIBILITY_REPAIR,
-    FEASIBILITY_SCAN,
-    OUTPUT,
+    SOLVE, PRICING, FTRAN, BTRAN, UPDATE, REFACTOR, FEASIBILITY_REPAIR, FEASIBILITY_SCAN, OUTPUT,
 }
 
 internal enum class SimplexPhase { DUAL, BOXED_DUAL, PRIMAL_FEASIBILITY, PRIMAL_OBJECTIVE }

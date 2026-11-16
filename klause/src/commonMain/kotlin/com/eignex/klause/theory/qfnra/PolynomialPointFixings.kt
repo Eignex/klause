@@ -5,7 +5,10 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.simplex.exact.BigFraction
 
-internal fun polynomialPointFixings(formula: PolynomialRealFormula, step: () -> Unit): Map<Int, BigFraction> {
+internal fun polynomialPointFixings(
+    formula: PolynomialRealFormula,
+    step: () -> Unit,
+): Map<Int, BigFraction> {
     val pending = ArrayDeque<PolynomialRealFormula>()
     val fixed = LinkedHashMap<Int, BigFraction>()
     pending.addLast(formula)
@@ -13,7 +16,6 @@ internal fun polynomialPointFixings(formula: PolynomialRealFormula, step: () -> 
         step()
         when (val node = pending.removeLast()) {
             is PolynomialRealFormula.And -> pending.addAll(node.operands)
-
             is PolynomialRealFormula.Atom -> {
                 if (node.relation != PolynomialRelation.EQ) continue
                 val variable = (node.left as? PolynomialExpression.Variable)
@@ -22,7 +24,6 @@ internal fun polynomialPointFixings(formula: PolynomialRealFormula, step: () -> 
                     ?: (node.left as? PolynomialExpression.Constant) ?: continue
                 fixed.getOrPut(variable.id.index) { BigFraction.of(constant.numerator, constant.denominator) }
             }
-
             else -> Unit
         }
     }

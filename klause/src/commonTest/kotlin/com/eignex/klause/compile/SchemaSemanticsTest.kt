@@ -124,11 +124,9 @@ class SchemaSemanticsTest {
         val source = SchemaDef<SchemaEntry>(emptyMap())
 
         val error = assertFailsWith<IllegalArgumentException> {
-            source.compile(
-                semanticOverrides = SemanticOverrides(
-                    undeclaredIntegers = BoundsOverride(upper = BoundOverride.Value(7)),
-                ),
-            )
+            source.compile(semanticOverrides = SemanticOverrides(
+                undeclaredIntegers = BoundsOverride(upper = BoundOverride.Value(7)),
+            ))
         }
 
         assertTrue("undeclared integer bounds do not apply" in error.message.orEmpty())
@@ -136,15 +134,13 @@ class SchemaSemanticsTest {
 
     @Test
     fun `float linear precision should change the interpreted grid assignments`() {
-        val source = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(0.0, 1.0, buckets = 2),
-                "grid" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -0.5)),
-                "limited" to NamedConstraint(
-                    FloatLinearConstraint(doubleArrayOf(2.49e-7), listOf("x"), IntCmpOp.LE, 1e-7),
-                ),
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, buckets = 2),
+            "grid" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -0.5)),
+            "limited" to NamedConstraint(
+                FloatLinearConstraint(doubleArrayOf(2.49e-7), listOf("x"), IntCmpOp.LE, 1e-7),
             ),
-        )
+        ))
         for (scale in listOf(1_000_000L, 10_000_000L)) {
             val compiled = source.compile(
                 semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(2, scale)),
@@ -159,20 +155,16 @@ class SchemaSemanticsTest {
 
     @Test
     fun `grid affine equalities should use the effective float linear scale`() {
-        val source = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(0.0, 1.0, buckets = 2),
-                "z" to FloatSpec(0.0, 1.0, buckets = 2),
-                "grid" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -0.5)),
-                "zero" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("z"), IntCmpOp.EQ, 0.0)),
-                "affine" to NamedConstraint(
-                    ContinuousRealEquality(
-                        ContinuousRealExpr.Affine(mapOf("z" to 1.0)),
-                        ContinuousRealExpr.Affine(mapOf("x" to 2.49e-7)),
-                    ),
-                ),
-            ),
-        )
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, buckets = 2),
+            "z" to FloatSpec(0.0, 1.0, buckets = 2),
+            "grid" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -0.5)),
+            "zero" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("z"), IntCmpOp.EQ, 0.0)),
+            "affine" to NamedConstraint(ContinuousRealEquality(
+                ContinuousRealExpr.Affine(mapOf("z" to 1.0)),
+                ContinuousRealExpr.Affine(mapOf("x" to 2.49e-7)),
+            )),
+        ))
         for (scale in listOf(1_000_000L, 10_000_000L)) {
             val compiled = source.compile(
                 semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(2, scale)),
@@ -187,12 +179,10 @@ class SchemaSemanticsTest {
 
     @Test
     fun `wide float linear scales should preserve a feasible grid row`() {
-        val source = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(0.0, 1.0, buckets = 2),
-                "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, 0.5)),
-            ),
-        )
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, buckets = 2),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, 0.5)),
+        ))
         val compiled = source.compile(
             semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(2, 3_000_000_000L)),
         )
@@ -204,12 +194,10 @@ class SchemaSemanticsTest {
 
     @Test
     fun `a rounded private grid scale should retain original source declarations`() {
-        val source = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(0.0, 1.0),
-                "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, 0.0)),
-            ),
-        )
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, 0.0)),
+        ))
 
         val compiled = source.compile(
             semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(7, 9_007_199_254_740_993L)),
@@ -222,21 +210,11 @@ class SchemaSemanticsTest {
 
     @Test
     fun `legacy float rows should preserve truncation of scaled coefficients`() {
-        val source = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(0.0, 1.0, 2),
-                "grid" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -0.5)),
-                "limited" to NamedConstraint(
-                    FloatLinearConstraint(
-                        doubleArrayOf(6e-7),
-                        listOf("x"),
-                        IntCmpOp
-                            .LE,
-                        4e-8,
-                    ),
-                ),
-            ),
-        )
+        val source = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(0.0, 1.0, 2),
+            "grid" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.GT, -0.5)),
+            "limited" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(6e-7), listOf("x"), IntCmpOp.LE, 4e-8)),
+        ))
         val compiled = source.compile(semanticOverrides = SemanticOverrides(floats = FloatSemantics.Grid(2, 1_000_000)))
 
         val values = BacktrackSolver(compiled.problem.bake()).enumerate()
@@ -247,12 +225,10 @@ class SchemaSemanticsTest {
 
     @Test
     fun `a declared singleton range should retain its requested compatibility bucket count`() {
-        val compiled = SchemaDef<SchemaEntry>(
-            mapOf(
-                "x" to FloatSpec(3.5, 3.5, 5),
-                "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.LT, 4.0)),
-            ),
-        ).compile()
+        val compiled = SchemaDef<SchemaEntry>(mapOf(
+            "x" to FloatSpec(3.5, 3.5, 5),
+            "strict" to NamedConstraint(FloatLinearConstraint(doubleArrayOf(1.0), listOf("x"), IntCmpOp.LT, 4.0)),
+        )).compile()
 
         val values = BacktrackSolver(compiled.problem.bake()).enumerate()
             .map { it.intValue(compiled.intVarIdByName.getValue("x")) }.toSet()

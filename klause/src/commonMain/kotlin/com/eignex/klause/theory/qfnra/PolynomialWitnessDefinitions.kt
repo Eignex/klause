@@ -10,13 +10,22 @@ import com.eignex.klause.simplex.exact.BigFraction
 internal class PolynomialWitnessDefinitions(
     private val arithmetic: PolynomialArithmetic,
     private val maximumTerms: Int,
-    private val maximumDegree: Int, maximumBits: Int,
+    private val maximumDegree: Int,
+    maximumBits: Int,
 ) {
     private val rationals = BoundedWitnessRationals(arithmetic, maximumBits)
-    fun point(atoms: List<PolynomialAtom>, realCount: Int, fixed: Map<Int, BigFraction>): Map<Int, BigFraction>? =
-        prepare(atoms, realCount, fixed)?.point()
 
-    fun prepare(atoms: List<PolynomialAtom>, realCount: Int, fixed: Map<Int, BigFraction>): Plan? {
+    fun point(
+        atoms: List<PolynomialAtom>,
+        realCount: Int,
+        fixed: Map<Int, BigFraction>,
+    ): Map<Int, BigFraction>? = prepare(atoms, realCount, fixed)?.point()
+
+    fun prepare(
+        atoms: List<PolynomialAtom>,
+        realCount: Int,
+        fixed: Map<Int, BigFraction>,
+    ): Plan? {
         repeat(atoms.size + 1) { arithmetic.step() }
         var residual = atoms.toList()
         val definitions = ArrayList<Pair<Int, Polynomial>>()
@@ -34,25 +43,15 @@ internal class PolynomialWitnessDefinitions(
             for ((index, atom) in residual.withIndex()) {
                 arithmetic.step()
                 if (index != pivot.atom) {
-                    updated.add(
-                        PolynomialAtom(
-                            arithmetic.substitute(atom.polynomial, pivot.variable, replacement),
-                            atom.relation,
-                        ),
-                    )
+                    updated.add(PolynomialAtom(arithmetic.substitute(atom.polynomial, pivot.variable, replacement),
+                        atom.relation))
                 }
             }
             val retained = buildList {
-                for (definition in definitions) {
-                    arithmetic.step()
-                    add(definition.second)
-                }
+                for (definition in definitions) { arithmetic.step(); add(definition.second) }
                 arithmetic.step()
                 add(replacement)
-                for (atom in updated) {
-                    arithmetic.step()
-                    add(atom.polynomial)
-                }
+                for (atom in updated) { arithmetic.step(); add(atom.polynomial) }
             }
             if (!admitted(retained)) return null
             arithmetic.step()
@@ -61,12 +60,10 @@ internal class PolynomialWitnessDefinitions(
         }
         if (definitions.isEmpty()) return null
         val referenced = HashSet<Int>()
-        for (atom in atoms) {
-            for (variable in atom.polynomial.variables) {
-                arithmetic.step()
-                require(variable in 0 until realCount)
-                referenced.add(variable)
-            }
+        for (atom in atoms) for (variable in atom.polynomial.variables) {
+            arithmetic.step()
+            require(variable in 0 until realCount)
+            referenced.add(variable)
         }
         val point = LinkedHashMap<Int, BigFraction>()
         for (id in 0 until realCount) {
@@ -77,14 +74,8 @@ internal class PolynomialWitnessDefinitions(
         }
         if (!hint(residual, point, fixed)) return null
         val protectedVariables = HashSet<Int>()
-        for (id in fixed.keys) {
-            arithmetic.step()
-            protectedVariables.add(id)
-        }
-        for ((id, _) in definitions) {
-            arithmetic.step()
-            protectedVariables.add(id)
-        }
+        for (id in fixed.keys) { arithmetic.step(); protectedVariables.add(id) }
+        for ((id, _) in definitions) { arithmetic.step(); protectedVariables.add(id) }
         arithmetic.step()
         return Plan(point, residual, definitions, protectedVariables)
     }
@@ -140,10 +131,7 @@ internal class PolynomialWitnessDefinitions(
         for (atom in atoms) {
             arithmetic.step()
             val terms = atom.polynomial.terms
-            val linear = terms.filter {
-                arithmetic.step()
-                it.monomial != Monomial.ONE
-            }.singleOrNull() ?: continue
+            val linear = terms.filter { arithmetic.step(); it.monomial != Monomial.ONE }.singleOrNull() ?: continue
             val variable = linear.monomial.variables.singleOrNull() ?: continue
             if (variable in fixed || linear.monomial.exponent(variable) != 1) continue
             arithmetic.step()
@@ -181,9 +169,7 @@ internal class PolynomialWitnessDefinitions(
                         arithmetic.step()
                         it.monomial == term.monomial || it.monomial.exponent(variable) == 0
                     }
-                ) {
-                    return Pivot(index, variable, term.coefficient)
-                }
+                ) return Pivot(index, variable, term.coefficient)
             }
         }
         return null
@@ -214,7 +200,7 @@ internal class PolynomialWitnessDefinitions(
             var product = term.coefficient
             for (variable in term.monomial.variables) {
                 arithmetic.step()
-                val factor = rationals. power(point.getValue(variable), term.monomial.exponent(variable)) ?: return null
+                val factor = rationals.power(point.getValue(variable), term.monomial.exponent(variable)) ?: return null
                 arithmetic.step()
                 product *= factor
                 if (!rationals.admitted(product)) return null

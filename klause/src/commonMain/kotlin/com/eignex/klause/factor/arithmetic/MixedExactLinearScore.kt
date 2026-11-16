@@ -46,11 +46,8 @@ internal class MixedExactLinearScore(
         }
         for (k in 0 until row.size) {
             val ref = row.ref(k)
-            val value = if (Term.isInt(ref)) {
-                state.assignment.intValue(Term.intVar(ref)).toDouble()
-            } else {
-                state.assignment.realValue(Term.realVar(ref))
-            }
+            val value = if (Term.isInt(ref)) state.assignment.intValue(Term.intVar(ref)).toDouble()
+            else state.assignment.realValue(Term.realVar(ref))
             tree[leaves + k] = coefficients[k] * value
         }
         for (k in leaves - 1 downTo 1) tree[k] = tree[2 * k] + tree[2 * k + 1]
@@ -106,11 +103,8 @@ internal class MixedExactLinearScore(
             LinearOp.EQ -> difference == 0.0
             LinearOp.NE -> difference != 0.0
         }
-        fun bodyDegree(): Int = if (!residual.isFinite()) {
-            state.violationSoftCap
-        } else {
+        fun bodyDegree(): Int = if (!residual.isFinite()) state.violationSoftCap else
             maxOf(1, compressViolation(ceil(residual * 1_000_000.0).toLong(), state.violationSoftCap))
-        }
         if (row.activator == LinearRow.ALWAYS) return if (holds) 0 else bodyDegree()
         val actual = state.assignment.boolValue(row.activator)
         val wanted = if (row.activator == flippedBool) !actual else actual
@@ -129,11 +123,8 @@ internal class MixedExactLinearScore(
     override fun deltaIfRealSet(state: LocalSearchState, factorId: Int, realVar: Int, newValue: Double): Int =
         score(state, activity(state, factorId, Term.ofRealVar(realVar), newValue)) - state.factorDegree[factorId]
 
-    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int = score(
-        state,
-        (state.refPayload[factorId] as DoubleArray)[1],
-        flippedBool = boolVar,
-    ) - state.factorDegree[factorId]
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        score(state, (state.refPayload[factorId] as DoubleArray)[1], flippedBool = boolVar) - state.factorDegree[factorId]
 
     override fun applyIntSet(state: LocalSearchState, factorId: Int, intVar: Int, oldValue: Long): Int {
         update(state, factorId, Term.ofIntVar(intVar), state.assignment.intValue(intVar).toDouble())

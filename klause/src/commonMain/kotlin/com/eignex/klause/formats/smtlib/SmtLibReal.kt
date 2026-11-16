@@ -63,10 +63,8 @@ internal fun Compiler.Builder.isRealExpr(t: SExpr): Boolean {
                 if (binding != null) {
                     if (binding.isReal) return true
                 } else if (node.text in realNames || macros[node.text]?.isReal == true ||
-                    (
-                        node.text !in intNames && node.text !in boolNames && node.text !in macros &&
-                            isRealLiteral(node.text)
-                        )
+                    (node.text !in intNames && node.text !in boolNames && node.text !in macros &&
+                        isRealLiteral(node.text))
                 ) {
                     return true
                 }
@@ -154,15 +152,15 @@ private fun Compiler.Builder.assertRealRelation(op: String, a: RealComb, b: Real
 internal fun Compiler.Builder.realRow(d: RealComb, op: LinearOp, strict: Boolean = false): ExactLinear =
     exactRealRow(d, op, strict)
 
-private fun exactRealRow(d: RealComb, op: LinearOp, strict: Boolean, activator: Int = LinearRow.ALWAYS): ExactLinear =
-    ExactLinear.of(
-        (d.intCoeffs.keys.map(Term::ofIntVar) + d.realCoeffs.keys.map(Term::ofRealVar)).toIntArray(),
-        d.intCoeffs.values.toList() + d.realCoeffs.values.toList(),
-        op,
-        d.constant.negated(),
-        strict,
-        activator,
-    )
+private fun exactRealRow(
+    d: RealComb,
+    op: LinearOp,
+    strict: Boolean,
+    activator: Int = LinearRow.ALWAYS,
+): ExactLinear = ExactLinear.of(
+    (d.intCoeffs.keys.map(Term::ofIntVar) + d.realCoeffs.keys.map(Term::ofRealVar)).toIntArray(),
+    d.intCoeffs.values.toList() + d.realCoeffs.values.toList(), op, d.constant.negated(), strict, activator,
+)
 
 /**
  * Reify a real relation `(op a b)` as a Boolean literal: an inequality atom becomes one
@@ -227,9 +225,7 @@ internal class SmtRealPredicates(private val cancellation: ExecutionControl, pri
         val key = Predicate(
             term.intCoeffs.filterValues { !it.isZero },
             term.realCoeffs.filterValues { !it.isZero },
-            term.constant,
-            relation,
-            strict,
+            term.constant, relation, strict,
         )
         literals[key]?.let { return it }
         val literal = create()

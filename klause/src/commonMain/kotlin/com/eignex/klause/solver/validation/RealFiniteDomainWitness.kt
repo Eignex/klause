@@ -13,10 +13,10 @@ internal fun checkRealFiniteDomains(
     sample: Sample,
     cancellation: ExecutionControl,
 ): Verification<List<BigFraction>, Unit> = if (sample.numRealVars != source.numRealVars) {
-    Verification.Rejected("assignment does not cover the real variables")
-} else {
-    finiteDomainCoordinates(source, sample, cancellation)
-}
+        Verification.Rejected("assignment does not cover the real variables")
+    } else {
+        finiteDomainCoordinates(source, sample, cancellation)
+    }
 
 private fun finiteDomainCoordinates(
     source: Problem,
@@ -45,17 +45,10 @@ private fun finiteDomainCoordinates(
             cancellation.charge(1)
             if (cancellation()) return Verification.Indeterminate("finite real membership check cancelled")
             val value = requireNotNull(BigFraction.ofDouble(factor.valueAt(index)))
-            val matches = if (exact != null) {
-                exact == value
-            } else {
+            val matches = if (exact != null) exact == value else {
                 val root = requireNotNull(algebraic)
-                root.rational?.let { it == value } ?: isolatedRationalRoot(
-                    root.definingCoefficients,
-                    root.lowerBound,
-                    root.upperBound,
-                    value,
-                    cancellation,
-                )
+                root.rational?.let { it == value } ?: isolatedRationalRoot(root.definingCoefficients,
+                    root.lowerBound, root.upperBound, value, cancellation)
                     ?: return Verification.Indeterminate("finite real membership check cancelled")
             }
             if (matches) {

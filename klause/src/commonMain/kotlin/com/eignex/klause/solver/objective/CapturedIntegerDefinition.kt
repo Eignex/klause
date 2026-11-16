@@ -24,11 +24,8 @@ internal class CapturedIntegerDefinition(
             is DefinitionHint.Abs -> return inputs[0].value(valOf).let {
                 if (it == Long.MIN_VALUE) Long.MAX_VALUE else kotlin.math.abs(it)
             }
-
             is DefinitionHint.Product -> bigIntOf(inputs[0].value(valOf)) * bigIntOf(inputs[1].value(valOf))
-
             is DefinitionHint.Plus -> bigIntOf(inputs[0].value(valOf)) + bigIntOf(inputs[1].value(valOf))
-
             is DefinitionHint.Linear -> {
                 var numerator = bigIntOf(source.bound)
                 for (k in inputs.indices) {
@@ -37,7 +34,6 @@ internal class CapturedIntegerDefinition(
                 }
                 numerator / bigIntOf(source.coefficients[outputSlot])
             }
-
             else -> error("a wide integer definition is required")
         }
         return value.saturatedDefinitionValue()

@@ -32,9 +32,7 @@ object ClausePrimalBuffersProfile {
         val thread = Thread.currentThread().threadId()
         check(bean.getThreadAllocatedBytes(thread) >= 0L)
         val until = System.nanoTime() + 1_000_000_000L
-        do {
-            fixture.run(1, bean, thread)
-        } while (System.nanoTime() < until)
+        do { fixture.run(1, bean, thread) } while (System.nanoTime() < until)
         val sessions = (524_288 / (groups * 3)).coerceIn(8, 8192)
         val samples = List(7) { fixture.run(sessions, bean, thread) }
         fun median(field: (Observation) -> Double) = samples.map(field).sorted()[samples.size / 2]
@@ -52,23 +50,16 @@ object ClausePrimalBuffersProfile {
             put("trialBytes", median { it.trialBytes.toDouble() / it.trials })
             put("constructionNs", median { it.constructionNs.toDouble() / sessions })
             put("trialNs", median { it.trialNs.toDouble() / it.trials })
-            put(
-                "samples",
-                JsonArray(
-                    samples.map { row ->
-                        buildJsonObject {
-                            put("sessions", sessions)
-                            put("trials", row.trials)
-                            put("constructionBytes", row.constructionBytes)
-                            put("trialBytes", row.trialBytes)
-                            put("constructionNs", row.constructionNs)
-                            put("trialNs", row.trialNs)
-                            put("work", row.work)
-                            put("checksum", row.checksum)
-                        }
-                    },
-                ),
-            )
+            put("samples", JsonArray(samples.map { row -> buildJsonObject {
+                put("sessions", sessions)
+                put("trials", row.trials)
+                put("constructionBytes", row.constructionBytes)
+                put("trialBytes", row.trialBytes)
+                put("constructionNs", row.constructionNs)
+                put("trialNs", row.trialNs)
+                put("work", row.work)
+                put("checksum", row.checksum)
+            } }))
         }
         Files.createDirectories(output.toAbsolutePath().parent)
         Files.writeString(output, "$result\n")
@@ -90,10 +81,8 @@ object ClausePrimalBuffersProfile {
         private val trialVariables = costs.take(32)
         val clauses = (0 until groups).flatMap { group ->
             val a = group * 3
-            listOf(
-                Clause(intArrayOf(Lit.make(a, true), Lit.make(a + 1, true), Lit.make(a + 2, true))),
-                Clause(intArrayOf(Lit.make(a + 1, false), Lit.make(a + 2, false))),
-            )
+            listOf(Clause(intArrayOf(Lit.make(a, true), Lit.make(a + 1, true), Lit.make(a + 2, true))),
+                Clause(intArrayOf(Lit.make(a + 1, false), Lit.make(a + 2, false))))
         }
 
         fun run(sessions: Int, bean: ThreadMXBean, thread: Long): Observation {
@@ -101,14 +90,8 @@ object ClausePrimalBuffersProfile {
             repeat(sessions) { _ ->
                 var bytes = bean.getThreadAllocatedBytes(thread)
                 var started = System.nanoTime()
-                val walk = ClausePrimalWalk(
-                    Sample(BooleanArray(groups * 3) { it % 3 == 0 }, longArrayOf()),
-                    clauses,
-                    costs,
-                    Assumptions.None,
-                    seed,
-                    null,
-                )
+                val walk = ClausePrimalWalk(Sample(BooleanArray(groups * 3) { it % 3 == 0 }, longArrayOf()),
+                    clauses, costs, Assumptions.None, seed, null)
                 result.constructionNs += System.nanoTime() - started
                 result.constructionBytes += bean.getThreadAllocatedBytes(thread) - bytes
                 val work = walk.work
@@ -124,11 +107,9 @@ object ClausePrimalBuffersProfile {
                 result.work += walk.work - work
                 val sample = walk.sample()
                 check(trialVariables.all { !sample.bools[it] })
-                check(
-                    clauses.all { clause ->
-                        clause.literals.any { Lit.evaluate(it, sample.bools[Lit.variable(it)]) }
-                    },
-                )
+                check(clauses.all { clause ->
+                    clause.literals.any { Lit.evaluate(it, sample.bools[Lit.variable(it)]) }
+                })
                 result.checksum = 31 * result.checksum + sample.bools.contentHashCode()
                 consumed = result.checksum
             }

@@ -100,23 +100,11 @@ internal class SourceClauseGuidance private constructor(
                 if (!consultation.visit()) return null
                 val truth = truth(Lit.variable(literal)) ?: return null
                 point = point || truth.point
-                if (truth.value == null) {
-                    unresolved = true
-                } else if (truth.value == Lit.isPositive(literal)) {
-                    satisfied = true
-                }
+                if (truth.value == null) unresolved = true
+                else if (truth.value == Lit.isPositive(literal)) satisfied = true
             }
             if (!consultation.reserve()) return null
-            return Truth(
-                if (satisfied) {
-                    true
-                } else if (unresolved) {
-                    null
-                } else {
-                    false
-                },
-                point,
-            )
+            return Truth(if (satisfied) true else if (unresolved) null else false, point)
         }
 
         private fun truth(variable: Int): Truth? {
@@ -166,19 +154,10 @@ internal class SourceClauseGuidance private constructor(
                     if (!consultation.visit()) return null
                     val truth = values.getValue(Lit.variable(input))
                     point = point || truth.point
-                    if (truth.value == null) {
-                        unknownInput = true
-                    } else if (truth.value != Lit.isPositive(input)) {
-                        falseInput = true
-                    }
+                    if (truth.value == null) unknownInput = true
+                    else if (truth.value != Lit.isPositive(input)) falseInput = true
                 }
-                val conjunction = if (falseInput) {
-                    false
-                } else if (unknownInput) {
-                    null
-                } else {
-                    true
-                }
+                val conjunction = if (falseInput) false else if (unknownInput) null else true
                 val output = conjunction?.let { it == Lit.isPositive(gate.target) }
                 if (!consultation.reserve(2)) return null
                 values[current] = Truth(if (current == selected) value else output, point)
@@ -223,33 +202,18 @@ internal class SourceClauseGuidance private constructor(
                     }
                     completedClauses++
                 }
-                return SourceClauseGuidance(
-                    clauses,
-                    booleanArrayOf(),
-                    emptyMap(),
-                    emptySet(),
-                    HashSet(),
-                    HashMap(),
-                    occurrences,
-                ).takeUnless { budget.stopped() }
+                return SourceClauseGuidance(clauses, booleanArrayOf(), emptyMap(), emptySet(),
+                    HashSet(), HashMap(), occurrences).takeUnless { budget.stopped() }
             } finally {
-                usage?.rawConstruction(
-                    completedClauses,
-                    validatedLiterals,
-                    incidences,
-                    variables,
-                    initialVisits - budget.remainingVisits,
-                )
+                usage?.rawConstruction(completedClauses, validatedLiterals, incidences, variables,
+                    initialVisits - budget.remainingVisits)
             }
         }
 
         private fun searchWork(size: Int): Int {
             var width = size
             var levels = 1
-            while (width > 0) {
-                width = width ushr 1
-                levels++
-            }
+            while (width > 0) { width = width ushr 1; levels++ }
             return levels + minOf(size, 16)
         }
     }
@@ -327,9 +291,7 @@ internal class SourceClauseGuidance private constructor(
         fun stopped(): Boolean = outcome == HintIndexOutcome.STOPPED ||
             stop().also { if (it) outcome = HintIndexOutcome.STOPPED }
 
-        fun invalidSource() {
-            outcome = HintIndexOutcome.INVALID_PRIMITIVE
-        }
+        fun invalidSource() { outcome = HintIndexOutcome.INVALID_PRIMITIVE }
 
         fun visit(count: Int = 1): Boolean {
             if (count > visits) {

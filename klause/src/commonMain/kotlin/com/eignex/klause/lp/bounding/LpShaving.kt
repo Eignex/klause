@@ -80,14 +80,10 @@ internal fun LpEngine.shaveVariableBounds(token: ExecutionControl): List<ShavedB
         if (lo >= hi) continue
         while (lo < hi && probes++ < SHAVE_MAX_ITERS && !token() &&
             infeasibleUnder(v, lo, atMost = true, token = token)
-        ) {
-            lo += 1
-        }
+        ) lo += 1
         while (hi > lo && probes++ < SHAVE_MAX_ITERS && !token() &&
             infeasibleUnder(v, hi, atMost = false, token = token)
-        ) {
-            hi -= 1
-        }
+        ) hi -= 1
         if (lo != d.min || hi != d.max) out.add(ShavedBound(v, lo, hi))
     }
     return out
@@ -189,13 +185,8 @@ internal fun LpEngine.impliedEqualities(token: ExecutionControl): List<Linear> {
  *  start). */
 private fun LpEngine.safeMin(prob: Problem, coeffs: LongArray, token: ExecutionControl): Double? {
     val selected = projections?.forEngineView(prob)
-    val session = PropagationSession(
-        if (selected == null) {
-            PropagationProblem(prob)
-        } else {
-            PropagationProblem(prob, selected)
-        },
-    )
+    val session = PropagationSession(if (selected == null) PropagationProblem(prob)
+        else PropagationProblem(prob, selected))
     if (session.isUnsatAtRoot) return null
     val relaxation = try {
         primalRelaxer(LinearObjective(intCoefficients = coeffs), prob, selected)

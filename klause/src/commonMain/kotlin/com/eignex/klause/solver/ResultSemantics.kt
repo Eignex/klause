@@ -6,9 +6,8 @@ import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SatisfyResult
 
 private fun requireMatchingSemantics(previous: EffectiveSourceSemantics?, semantics: EffectiveSourceSemantics) {
-    require(
-        previous == null ||
-            (previous.declared == semantics.declared && previous.effective == semantics.effective),
+    require(previous == null ||
+        (previous.declared == semantics.declared && previous.effective == semantics.effective)
     ) {
         "result belongs to a different source interpretation"
     }

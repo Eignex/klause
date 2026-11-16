@@ -49,4 +49,5 @@ internal class MixedPointArithmetic(private val stop: ExecutionControl) {
     }
 }
 
+
 private const val MAX_POINT_BITS = 4096

@@ -7,7 +7,11 @@ import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.lowering.PolynomialRealLowering
 
 internal object PolynomialBooleanCondition {
-    fun apply(formula: PolynomialRealFormula, bools: Map<Int, Boolean>, step: () -> Unit): PolynomialRealFormula {
+    fun apply(
+        formula: PolynomialRealFormula,
+        bools: Map<Int, Boolean>,
+        step: () -> Unit,
+    ): PolynomialRealFormula {
         if (bools.isEmpty()) return formula
         val values = HashMap<PolynomialRealFormula, PolynomialRealFormula>()
         val work = ArrayDeque<Pair<PolynomialRealFormula, Boolean>>()
@@ -31,26 +35,16 @@ internal object PolynomialBooleanCondition {
             values[node] = when (node) {
                 is PolynomialRealFormula.BooleanVariable -> bools[node.id.index]
                     ?.let { PolynomialRealFormula.Constant(it) } ?: node
-
                 is PolynomialRealFormula.Not -> PolynomialRealLowering.not(values.getValue(node.operand))
-
                 is PolynomialRealFormula.And -> PolynomialRealLowering.and(children.map(values::getValue))
-
                 is PolynomialRealFormula.Or -> PolynomialRealLowering.or(children.map(values::getValue))
-
                 is PolynomialSelection -> {
                     val condition = values.getValue(node.condition)
-                    if (condition is PolynomialRealFormula.Constant) {
-                        PolynomialRealFormula.Atom(
-                            PolynomialExpression.Variable(node.result),
-                            PolynomialRelation.EQ,
-                            if (condition.value) node.whenTrue else node.whenFalse,
-                        )
-                    } else {
-                        PolynomialSelection(node.result, condition, node.whenTrue, node.whenFalse)
-                    }
+                    if (condition is PolynomialRealFormula.Constant) PolynomialRealFormula.Atom(
+                        PolynomialExpression.Variable(node.result), PolynomialRelation.EQ,
+                        if (condition.value) node.whenTrue else node.whenFalse,
+                    ) else PolynomialSelection(node.result, condition, node.whenTrue, node.whenFalse)
                 }
-
                 else -> node
             }
         }

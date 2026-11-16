@@ -31,13 +31,10 @@ internal class QuadraticTraversalCursor(
     }, { traversal.lpWork() }, { traversal.propagationWork() })
     private val traversal: CpSatisfactionTraversal = CpSatisfactionTraversal(
         problem,
-        params.copy(
-            cancellation = cancelledWhen({
-                listOfNotNull(global.deadline(), slice.deadline).minOrNull()
-            }) { global() || slice.expired() },
-        ),
-        sink,
-        LpSolveContext.Production,
+        params.copy(cancellation = cancelledWhen({
+            listOfNotNull(global.deadline(), slice.deadline).minOrNull()
+        }) { global() || slice.expired() }),
+        sink, LpSolveContext.Production,
         propagationCancellation = ExecutionControl { global() },
         slice = TraversalSlice(pauses = { !global() }, beforeBranch = {
             slice.charge()
@@ -77,12 +74,10 @@ internal class QuadraticTraversalCursor(
             }
             when (val event = traversal.next()) {
                 is SearchOutcome.Found -> pending = event.sample
-
                 is SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> {
                     terminal = event
                     return event
                 }
-
                 null -> {
                     slice.noteOverspend()
                     return null

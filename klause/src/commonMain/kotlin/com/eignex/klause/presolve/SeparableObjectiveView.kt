@@ -26,15 +26,9 @@ internal class SeparableObjectiveView private constructor(
                 problem.numIntVars > 4096 || objective.intCoefficientValues.size > problem.numIntVars ||
                 objective.boolWeightValues.size > minOf(4096, problem.numBoolVars) ||
                 objective.realCoefficientValues.size > 4096 || objective.intCoefficientValues.isEmpty()
-            ) {
-                return null
-            }
-            cancellation.charge(
-                (
-                    objective.boolWeightValues.size + objective.intCoefficientValues.size +
-                        objective.realCoefficientValues.size
-                    ).toLong(),
-            )
+            ) return null
+            cancellation.charge((objective.boolWeightValues.size + objective.intCoefficientValues.size +
+                objective.realCoefficientValues.size).toLong())
             if (cancellation() || objective.singleIntObjective() == null) return null
             return try {
                 val expanded = Expansion(problem, objective, cancellation).expand() ?: return null
@@ -123,9 +117,7 @@ private class Expansion(
         if (variable !in 0 until problem.numIntVars ||
             !problem.intBounds.hasLower(variable) || !problem.intBounds.hasUpper(variable) ||
             coefficient == Long.MIN_VALUE || !active.add(variable)
-        ) {
-            stop()
-        }
+        ) stop()
         val definition = selected[variable]
         if (definition == null) {
             val merged = addExact(coefficients.getOrDefault(variable, 0L), coefficient)

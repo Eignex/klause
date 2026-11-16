@@ -90,12 +90,8 @@ class ResumableMinimizeRealLeafTest {
         })
 
         fixture.solver.openRepair(fixture.objective, params).use { repair ->
-            repair.beginExact(
-                Assumptions.None.withInt(0, 0L),
-                100L,
-                BigFraction.ofLong(2L),
-                ExecutionControl { cancelled },
-            )
+            repair.beginExact(Assumptions.None.withInt(0, 0L), 100L, BigFraction.ofLong(2L),
+                ExecutionControl { cancelled })
             val interrupted = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
             assertNull(interrupted.sample)
             assertEquals(TerminationReason.Cancelled, interrupted.reason)
@@ -114,40 +110,28 @@ class ResumableMinimizeRealLeafTest {
     @Test
     fun `primal repair should compare the authoritative scaled source objective across rounded ties`() {
         val epsilon = BigFraction.ofLong(1L shl 60).reciprocal()
-        for (sign in listOf(-1L, 1L)) {
-            for (offset in listOf(0L, 1L)) {
-                val fixture = UnresolvedRealLeafFixture(false)
-                fixture.acceptProof = { _, _ -> false }
-                val objective = LinearObjective(realCoefficients = doubleArrayOf(10.0 * sign))
-                val sourceValue = BigFraction.ofLong(5L * sign) + epsilon
-                val params = fixture.params.copy(
-                    toleranceCheck = FiniteSourceAcceptance(
-                        { it.reals.single() == 0.5 },
-                        false,
-                        { sourceValue },
-                    ),
-                )
+        for (sign in listOf(-1L, 1L)) for (offset in listOf(0L, 1L)) {
+            val fixture = UnresolvedRealLeafFixture(false)
+            fixture.acceptProof = { _, _ -> false }
+            val objective = LinearObjective(realCoefficients = doubleArrayOf(10.0 * sign))
+            val sourceValue = BigFraction.ofLong(5L * sign) + epsilon
+            val params = fixture.params.copy(toleranceCheck = FiniteSourceAcceptance(
+                { it.reals.single() == 0.5 }, false, { sourceValue },
+            ))
 
-                fixture.solver.openRepair(objective, params).use { repair ->
-                    repair.beginExact(
-                        Assumptions.None,
-                        100L,
-                        sourceValue + epsilon * BigFraction.ofLong(offset),
-                        ExecutionControl.Never,
-                    )
-                    val result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
+            fixture.solver.openRepair(objective, params).use { repair ->
+                repair.beginExact(Assumptions.None, 100L,
+                    sourceValue + epsilon * BigFraction.ofLong(offset), ExecutionControl.Never)
+                val result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L)
 
-                    assertEquals(TerminationReason.Unsupported, result.reason)
-                    if (offset > 0L) {
-                        val sample = assertNotNull(result.sample)
-                        assertEquals(sourceValue, exactSourceObjective(objective, sample, params.toleranceCheck))
-                        assertNull(sample.exactReals)
-                    } else {
-                        assertNull(result.sample)
-                    }
-                }
-                assertEquals(fixture.opened, fixture.closed)
+                assertEquals(TerminationReason.Unsupported, result.reason)
+                if (offset > 0L) {
+                    val sample = assertNotNull(result.sample)
+                    assertEquals(sourceValue, exactSourceObjective(objective, sample, params.toleranceCheck))
+                    assertNull(sample.exactReals)
+                } else assertNull(result.sample)
             }
+            assertEquals(fixture.opened, fixture.closed)
         }
     }
 
@@ -169,9 +153,7 @@ class ResumableMinimizeRealLeafTest {
                     val sample = assertNotNull(result.sample)
                     assertEquals(0.5, sample.reals.single())
                     assertNull(sample.exactReals)
-                } else {
-                    assertNull(result.sample)
-                }
+                } else assertNull(result.sample)
             }
             assertEquals(fixture.opened, fixture.closed)
         }
@@ -201,12 +183,8 @@ class ResumableMinimizeRealLeafTest {
 
         fixture.solver.openRepair(fixture.objective, params).use { repair ->
             for (pin in listOf(0L, 1L, 0L)) {
-                repair.beginExact(
-                    Assumptions.None.withInt(0, pin),
-                    100L,
-                    BigFraction.ofLong(2L),
-                    ExecutionControl.Never,
-                )
+                repair.beginExact(Assumptions.None.withInt(0, pin), 100L,
+                    BigFraction.ofLong(2L), ExecutionControl.Never)
                 var slices = 0
                 var result = repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 1L)
                 while (result.reason == null && slices++ < 128) {
@@ -227,18 +205,10 @@ class ResumableMinimizeRealLeafTest {
     fun `continuous completion should retain its discrete leaf across work slices`() {
         val n = 24
         val problem = Problem(
-            0,
-            1,
-            arrayOf(IntDomain(0L, 1L)),
+            0, 1, arrayOf(IntDomain(0L, 1L)),
             Array<Factor>(n) { row ->
-                Linear(
-                    intArrayOf(0),
-                    doubleArrayOf(1.0),
-                    intArrayOf(row, (row + 1) % n),
-                    doubleArrayOf(1.0, 1.0),
-                    LinearOp.GE,
-                    1.0,
-                )
+                Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(row, (row + 1) % n),
+                    doubleArrayOf(1.0, 1.0), LinearOp.GE, 1.0)
             },
             numRealVars = n,
             realLower = DoubleArray(n),
@@ -795,10 +765,8 @@ class ResumableMinimizeRealLeafTest {
                 fixture.assertVisitedLeaves()
                 assertTrue(search.isDone)
                 assertSame(result, search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
-                assertEquals(
-                    SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf,
-                    events.filterIsInstance<SearchEvent.BacktrackIncomplete>().single().path,
-                )
+                assertEquals(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf,
+                    events.filterIsInstance<SearchEvent.BacktrackIncomplete>().single().path)
             }
         }
     }
@@ -831,18 +799,11 @@ class ResumableMinimizeRealLeafTest {
                     events.filterIsInstance<SearchEvent.BacktrackIncomplete>(),
                 )
                 assertEquals(
-                    listOf(
-                        SearchEvent.BacktrackComponentStop(
-                            SearchComponentStop(
-                                SearchComponentStop.Site.Coverage,
-                                cause,
-                                cancelled = false,
-                                unresolvedCoverage = true,
-                                decisionLevel = 0,
-                            ),
-                            replayed = false,
-                        ),
-                    ),
+                    listOf(SearchEvent.BacktrackComponentStop(
+                        SearchComponentStop(SearchComponentStop.Site.Coverage, cause,
+                            cancelled = false, unresolvedCoverage = true, decisionLevel = 0),
+                        replayed = false,
+                    )),
                     events.filterIsInstance<SearchEvent.BacktrackComponentStop>(),
                 )
             }
@@ -869,10 +830,8 @@ class ResumableMinimizeRealLeafTest {
                 assertEquals(TerminationReason.Unsupported, result.reason)
                 fixture.assertIncumbent(result.sample)
                 fixture.assertVisitedLeaves()
-                assertEquals(
-                    SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf,
-                    events.filterIsInstance<SearchEvent.BacktrackIncomplete>().single().path,
-                )
+                assertEquals(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf,
+                    events.filterIsInstance<SearchEvent.BacktrackIncomplete>().single().path)
             }
         }
     }
@@ -920,13 +879,9 @@ class ResumableMinimizeRealLeafTest {
 
                 val sample = offered.single()
                 val reals = sample.exactReals ?: sample.reals.map { assertNotNull(BigFraction.ofDouble(it)) }
-                val witness = assertNotNull(
-                    linear.checkMpsWitness(
-                        compiled.columns.map {
-                            if (it.real) reals[it.id] else BigFraction.ofLong(sample.ints[it.id])
-                        },
-                    ),
-                )
+                val witness = assertNotNull(linear.checkMpsWitness(compiled.columns.map {
+                    if (it.real) reals[it.id] else BigFraction.ofLong(sample.ints[it.id])
+                }))
                 assertEquals(if (compiled.maximize) "13" else "9", witness.objective.toString())
                 assertEquals(
                     if (compiled.maximize) listOf("0", "1") else listOf("1", "1/2"),

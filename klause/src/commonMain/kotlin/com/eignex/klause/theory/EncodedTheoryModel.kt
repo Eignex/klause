@@ -9,23 +9,20 @@ internal class EncodedTheoryModel(
     implied: BooleanArray?,
     realCount: Int,
     val sourceRealCount: Int = source.encodingSourceRealCount,
-    lower : DoubleArray =
-    DoubleArray(realCount) { if (it < source.numRealVars) source.realLower[it] else Double.NEGATIVE_INFINITY },
-    upper: DoubleArray =
-    DoubleArray(realCount) { if (it < source.numRealVars) source.realUpper[it] else Double.POSITIVE_INFINITY },
+    lower: DoubleArray = DoubleArray(realCount) {
+        if (it < source.numRealVars) source.realLower[it] else Double.NEGATIVE_INFINITY
+    },
+    upper: DoubleArray = DoubleArray(realCount) {
+        if (it < source.numRealVars) source.realUpper[it] else Double.POSITIVE_INFINITY
+    },
 ) : Problem(source.numBoolVars, source.numIntVars, source.declaredIntDomains, factors,
-    implied, source.hasSymmetryBreaking, realCount, lower, upper,
-    source.settings, source.semantics,
-)
+    implied, source.hasSymmetryBreaking, realCount, lower, upper, source.settings, source.semantics)
 
 internal val Problem.encodingSourceRealCount: Int get() = (this as? EncodedTheoryModel)?.sourceRealCount ?: numRealVars
 
 internal fun Problem.rebindEncoding(source: Problem, factors: Array<Factor>, implied: BooleanArray?): Problem =
-    if (this is EncodedTheoryModel) {
-        EncodedTheoryModel(source, factors, implied, numRealVars, sourceRealCount)
-    } else {
-        source.withFactors(factors, implied)
-    }
+    if (this is EncodedTheoryModel) EncodedTheoryModel(source, factors, implied, numRealVars, sourceRealCount)
+    else source.withFactors(factors, implied)
 
 internal class EncodingRealAllocator(first: Int) {
     var count: Int = first

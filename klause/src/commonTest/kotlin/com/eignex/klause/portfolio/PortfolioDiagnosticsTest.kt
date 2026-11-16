@@ -26,13 +26,9 @@ class PortfolioDiagnosticsTest {
                     if (arm == 0) it.family = ArmFamily.LocalSearch
                 }
             }
-            Portfolio.thompson(
-                workers,
-                baseSliceWork = 2,
-                maxSliceWork = 8,
+            Portfolio.thompson(workers, baseSliceWork = 2, maxSliceWork = 8,
                 minShares = doubleArrayOf(0.1, 0.0, 0.0),
-                diagnostics = PortfolioDiagnostics(80, 17, trace::add),
-            ).use {
+                diagnostics = PortfolioDiagnostics(80, 17, trace::add)).use {
                 it.runTimeSource = clock
                 it.minimize(ExecutionControl.Never)
             }
@@ -50,12 +46,8 @@ class PortfolioDiagnosticsTest {
         var stopped = false
         val handle = TrackingResumableSearch(null, onRun = { stopped = true })
         val search = object : ResumableSearch by handle {
-            override fun runSlice(
-                global: ExecutionControl,
-                sliceMillis: Long,
-                sliceNodes: Long,
-                onIncumbent: (MinimizeResult.WithSample) -> Unit,
-            ): MinimizeResult? {
+            override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+                onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                 assertNull(global.deadline())
                 assertEquals(Long.MAX_VALUE, sliceMillis)
                 return handle.runSlice(global, sliceMillis, sliceNodes, onIncumbent)
@@ -67,11 +59,8 @@ class PortfolioDiagnosticsTest {
             override fun deadline() = kotlin.time.TimeSource.Monotonic.markNow() + 100.milliseconds
         }
 
-        Portfolio.thompson(
-            listOf(worker),
-            baseSliceWork = 1,
-            diagnostics = PortfolioDiagnostics(100, onEvent = trace::add),
-        ).use {
+        Portfolio.thompson(listOf(worker), baseSliceWork = 1,
+            diagnostics = PortfolioDiagnostics(100, onEvent = trace::add)).use {
             it.minimize(token)
         }
 

@@ -12,9 +12,7 @@ internal fun takeAllowanceSetting(params: MutableList<String>, key: String): All
         val raw = entry.substringAfter('=')
         when (raw.lowercase()) {
             "auto" -> AllowanceSetting.Automatic
-
             "unlimited" -> AllowanceSetting.Unlimited
-
             else -> {
                 val units = raw.toLongOrNull()
                 if (units == null || units < 0L) {

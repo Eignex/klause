@@ -30,9 +30,7 @@ class MddPropagatorTest {
     fun `interrupted cold mdd preparation should rebuild before completing its root`() {
         for (limit in listOf(2, 4, 8)) {
             val diagram = Mdd(
-                intArrayOf(0, 1),
-                intArrayOf(1, 128, 1),
-                intArrayOf(0, 384, 768),
+                intArrayOf(0, 1), intArrayOf(1, 128, 1), intArrayOf(0, 384, 768),
                 LongArray(768) { cell ->
                     val row = (cell % 384 / 3).toLong()
                     when (cell % 3) {
@@ -41,9 +39,7 @@ class MddPropagatorTest {
                         else -> if (cell < 384) row else 0
                     }
                 },
-                0,
-                intArrayOf(0),
-                3,
+                0, intArrayOf(0), 3,
             )
             val problem = Problem(0, 2, Array(2) { IntDomain(0, 255) }, arrayOf<Factor>(diagram))
             val state = PropagationState(problem, Assumptions.None)
@@ -170,10 +166,7 @@ class MddPropagatorTest {
     @Test
     fun `root snapshots should neither publish nor reuse reachability through a hole`() {
         val index = MddTransitionIndex.build(
-            diagonal.transitions,
-            diagonal.layerStarts,
-            diagonal.numStatesPerLayer,
-            diagonal.recordStride,
+            diagonal.transitions, diagonal.layerStarts, diagonal.numStatesPerLayer, diagonal.recordStride,
         )
         for ((step, hole) in listOf(true, false, true, false).withIndex()) {
             val domains = Array(2) {

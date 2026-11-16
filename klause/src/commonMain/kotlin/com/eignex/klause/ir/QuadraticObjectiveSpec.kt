@@ -86,8 +86,7 @@ class QuadraticObjectiveSpec(
 
     /** Renumber source coordinates, rejecting removal of an objective coordinate. */
     fun remap(remap: VarRemap): QuadraticObjectiveSpec = QuadraticObjectiveSpec(
-        captured.map { it.copy(first = it.first.remap(remap), second = it.second?.remap(remap)) },
-        constant,
+        captured.map { it.copy(first = it.first.remap(remap), second = it.second?.remap(remap)) }, constant,
     )
 
     override fun equals(other: Any?): Boolean =

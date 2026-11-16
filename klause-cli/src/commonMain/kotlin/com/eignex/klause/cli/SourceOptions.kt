@@ -40,49 +40,37 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
         require(!exact) { "float grid controls conflict with --exact" }
         val grid = if (fields.floatMode == SourceFloatMode.GRID) {
             resolved.floats as? FloatSemantics.Grid ?: declared.floats as? FloatSemantics.Grid
-        } else {
-            (resolved.floats ?: declared.floats) as? FloatSemantics.Grid
-        }
+        } else (resolved.floats ?: declared.floats) as? FloatSemantics.Grid
         require(grid != null) { "float grid controls do not apply to ${declared.format}" }
-        resolved = resolved.copy(
-            floats = grid.copy(
-                buckets = fields.floatBuckets ?: grid.buckets,
-                linearScale = fields.floatScale ?: grid.linearScale,
-                unrangedBounds = UndeclaredRealBounds(
-                    fields.gridLower ?: grid.unrangedBounds.lower,
-                    fields.gridUpper ?: grid.unrangedBounds.upper,
-                ),
+        resolved = resolved.copy(floats = grid.copy(
+            buckets = fields.floatBuckets ?: grid.buckets,
+            linearScale = fields.floatScale ?: grid.linearScale,
+            unrangedBounds = UndeclaredRealBounds(
+                fields.gridLower ?: grid.unrangedBounds.lower,
+                fields.gridUpper ?: grid.unrangedBounds.upper,
             ),
-        )
+        ))
     }
     if (fields.absoluteTolerance != null || fields.relativeTolerance != null) {
         val tolerance = resolved.feasibilityTolerance ?: if (exact && declared.feasibilityTolerance != null) {
             SourceTolerance()
-        } else {
-            declared.feasibilityTolerance
-        }
+        } else declared.feasibilityTolerance
         require(tolerance != null) { "source feasibility tolerance does not apply to ${declared.format}" }
-        resolved = resolved.copy(
-            feasibilityTolerance = SourceTolerance(
-                fields.absoluteTolerance ?: tolerance.absolute,
-                fields.relativeTolerance ?: tolerance.relative,
-            ),
-        )
+        resolved = resolved.copy(feasibilityTolerance = SourceTolerance(
+            fields.absoluteTolerance ?: tolerance.absolute,
+            fields.relativeTolerance ?: tolerance.relative,
+        ))
     }
     if (exact) {
-        require(
-            (fields.absoluteTolerance == null || fields.absoluteTolerance == SemanticRational.ZERO) &&
-                (fields.relativeTolerance == null || fields.relativeTolerance == SemanticRational.ZERO),
+        require((fields.absoluteTolerance == null || fields.absoluteTolerance == SemanticRational.ZERO) &&
+            (fields.relativeTolerance == null || fields.relativeTolerance == SemanticRational.ZERO)
         ) {
             "positive source feasibility tolerance conflicts with --exact"
         }
         resolved = resolved.copy(
             floats = if (declared.floats == null) resolved.floats else FloatSemantics.Continuous,
-            feasibilityTolerance = if (declared.feasibilityTolerance == null) {
-                resolved.feasibilityTolerance
-            } else {
-                SourceTolerance()
-            },
+            feasibilityTolerance = if (declared.feasibilityTolerance == null) resolved.feasibilityTolerance
+                else SourceTolerance(),
         )
     }
     sourceSemantics = declared.resolve(resolved)
@@ -92,35 +80,27 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
 internal fun sourceFlagSpecs(options: CommonOptions): List<FlagSpec> = listOf(
     sourceFlag("--unbounded-int-lo", "integer|open", "default lower bound for undeclared integers") {
         val bounds = options.semanticOverrides.undeclaredIntegers ?: BoundsOverride()
-        options.semanticOverrides = options.semanticOverrides.copy(
-            undeclaredIntegers = bounds.copy(
-                lower = integerBound(it),
-            ),
-        )
+        options.semanticOverrides = options.semanticOverrides.copy(undeclaredIntegers = bounds.copy(
+            lower = integerBound(it),
+        ))
     },
     sourceFlag("--unbounded-int-hi", "integer|open", "default upper bound for undeclared integers") {
         val bounds = options.semanticOverrides.undeclaredIntegers ?: BoundsOverride()
-        options.semanticOverrides = options.semanticOverrides.copy(
-            undeclaredIntegers = bounds.copy(
-                upper = integerBound(it),
-            ),
-        )
+        options.semanticOverrides = options.semanticOverrides.copy(undeclaredIntegers = bounds.copy(
+            upper = integerBound(it),
+        ))
     },
     sourceFlag("--unbounded-real-lo", "number|open", "default lower bound for undeclared reals") {
         val bounds = options.semanticOverrides.undeclaredReals ?: BoundsOverride()
-        options.semanticOverrides = options.semanticOverrides.copy(
-            undeclaredReals = bounds.copy(
-                lower = realBound(it),
-            ),
-        )
+        options.semanticOverrides = options.semanticOverrides.copy(undeclaredReals = bounds.copy(
+            lower = realBound(it),
+        ))
     },
     sourceFlag("--unbounded-real-hi", "number|open", "default upper bound for undeclared reals") {
         val bounds = options.semanticOverrides.undeclaredReals ?: BoundsOverride()
-        options.semanticOverrides = options.semanticOverrides.copy(
-            undeclaredReals = bounds.copy(
-                upper = realBound(it),
-            ),
-        )
+        options.semanticOverrides = options.semanticOverrides.copy(undeclaredReals = bounds.copy(
+            upper = realBound(it),
+        ))
     },
     sourceFlag("--float-semantics", "continuous|grid", "float declaration interpretation") {
         when (it.lowercase()) {
@@ -157,15 +137,21 @@ internal fun sourceFlagSpecs(options: CommonOptions): List<FlagSpec> = listOf(
     },
 )
 
-private fun sourceFlag(name: String, value: String, help: String, apply: (String) -> Unit): FlagSpec =
-    sourceFlag(listOf(name), value, help, apply)
+private fun sourceFlag(
+    name: String,
+    value: String,
+    help: String,
+    apply: (String) -> Unit,
+): FlagSpec = sourceFlag(listOf(name), value, help, apply)
 
-private fun sourceFlag(names: List<String>, value: String, help: String, apply: (String) -> Unit): FlagSpec =
-    FlagSpec(names, true, FlagGroup.KLAUSE, valueLabel = value, help = help) { apply(requireNotNull(it)) }
+private fun sourceFlag(
+    names: List<String>,
+    value: String,
+    help: String,
+    apply: (String) -> Unit,
+): FlagSpec = FlagSpec(names, true, FlagGroup.KLAUSE, valueLabel = value, help = help) { apply(requireNotNull(it)) }
 
-private fun integerBound(raw: String): BoundOverride<Long> = if (raw == "open") {
-    BoundOverride.Open
-} else {
+private fun integerBound(raw: String): BoundOverride<Long> = if (raw == "open") BoundOverride.Open else {
     BoundOverride.Value(raw.toLongOrNull() ?: usageError("integer declaration bounds expect a Long or open"))
 }
 

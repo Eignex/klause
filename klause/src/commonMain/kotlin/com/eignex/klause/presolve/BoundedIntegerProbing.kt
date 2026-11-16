@@ -51,11 +51,8 @@ internal object BoundedIntegerProbing {
             if (result is PropagationResult.Unsat) return result
             accounting.charge(problem.numBoolVars.toLong() + problem.numIntVars)
             val extra = state.rootDeductions(base.toAssumptions())
-            if (extra.isEmpty && extra.toAssumptions().deductions.isEmpty) {
-                result
-            } else {
-                (result as PropagationResult.Implied).merge(extra)
-            }
+            if (extra.isEmpty && extra.toAssumptions().deductions.isEmpty) result
+            else (result as PropagationResult.Implied).merge(extra)
         } finally {
             accounting.flush()
         }

@@ -2,6 +2,7 @@ package com.eignex.klause.ir
 
 import com.eignex.util.arrays.emptyIntArray
 
+
 /**
  * The variables one factor reads, and what it needs from them.
  *

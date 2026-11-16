@@ -48,10 +48,8 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
         val unchecked = when {
             sample.numBoolVars < problem.numBoolVars || sample.numIntVars < problem.numIntVars ->
                 Verification.Rejected("assignment does not cover the model's discrete variables")
-
             sample.exactInts?.any { !it.fitsLong() } == true ->
                 Verification.Indeterminate("a finite checker cannot verify wide integer coordinates")
-
             // Unary pins and restrictions add nothing a point covering every discrete coordinate does not fix.
             else -> checkPointRestrictions(sample, assumptions, cancellation)
         }
@@ -66,14 +64,9 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
                 onWork(0L)
                 return Verification.Indeterminate("point preparation cancelled")
             }
-        } else {
-            null
-        }
-        val session = if (point != null) {
-            PropagationSession.forPointCheck(projection(), point, cancellation)
-        } else {
-            PropagationSession(projection(), cancellation)
-        }
+        } else null
+        val session = if (point != null) PropagationSession.forPointCheck(projection(), point, cancellation)
+        else PropagationSession(projection(), cancellation)
         try {
             if (session.isUnsatAtRoot) return Verification.Rejected("root propagation refutes the assignment")
             if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
@@ -82,9 +75,7 @@ internal class FinitePointCheck(private val problem: Problem, private val enforc
             if (session.fixpointCancelled || cancellation()) return Verification.Indeterminate("propagation cancelled")
             return when (session.checkSelectedProjection(checks = checks)) {
                 ComponentCheck.Feasible -> Verification.Accepted(candidate)
-
                 is ComponentCheck.Infeasible -> Verification.Rejected("original source check refutes the assignment")
-
                 ComponentCheck.Indeterminate ->
                     Verification.Indeterminate("original source check is unavailable or cancelled")
             }
@@ -138,14 +129,14 @@ private fun pointPins(sample: Sample, cancellation: ExecutionControl): Assumptio
     val boolKeys = IntArray(sample.numBoolVars)
     val boolValues = BooleanArray(sample.numBoolVars)
     for (id in boolKeys.indices) {
-        if (stride.due() && cancellation()) return null
+        if (stride.due() &&cancellation()) return null
         boolKeys[id] = id
         boolValues[id] = sample.boolValue(id)
     }
     val intKeys = IntArray(sample.numIntVars)
     val intValues = LongArray(sample.numIntVars)
     for (id in intKeys.indices) {
-        if (stride.due() && cancellation()) return null
+        if (stride.due() &&cancellation()) return null
         intKeys[id] = id
         intValues[id] = sample.intValue(id)
     }

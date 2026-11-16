@@ -26,12 +26,8 @@ import kotlin.test.assertNotNull
 class FloatGridFiniteDomainTest {
     @Test
     fun `finite grid values should keep their first occurrence order without duplicates`() {
-        val column = FloatGridColumn(
-            SourceRealId(0),
-            GridCoordinate(0, 0.0, 4.0, 5),
-            BigFraction.ZERO,
-            BigFraction.ONE,
-        )
+        val column = FloatGridColumn(SourceRealId(0), GridCoordinate(0, 0.0, 4.0, 5),
+            BigFraction.ZERO, BigFraction.ONE)
         val values = doubleArrayOf(3.0, 1.0, 3.0, 0.0, 1.0)
 
         val lowered = assertNotNull(lowerGridFiniteValues(values.size, { values[it] }, column, ExecutionControl.Never))
@@ -41,25 +37,11 @@ class FloatGridFiniteDomainTest {
 
     @Test
     fun `constant private grids should retain their original membership attribution`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(RealFiniteDomain(0, doubleArrayOf(0.125))),
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.125),
-            realUpper = doubleArrayOf(0.125),
-            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve(),
-        )
-        val prepared = assertIs<FloatGridPreparation.Prepared>(
-            prepareFloatGrid(
-                FloatGridRequest(
-                    source,
-                    listOf(FloatGridVariable(SourceRealId(0), buckets = 3, preserveBuckets = true)),
-                ),
-                ExecutionControl.Never,
-            ),
-        )
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf(0.125))),
+            numRealVars = 1, realLower = doubleArrayOf(0.125), realUpper = doubleArrayOf(0.125),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(3, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
+            listOf(FloatGridVariable(SourceRealId(0), buckets = 3, preserveBuckets = true))), ExecutionControl.Never))
 
         val point = BacktrackSolver(prepared.problem.bake()).enumerate().first()
         val original = assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, ExecutionControl.Never))
@@ -71,66 +53,37 @@ class FloatGridFiniteDomainTest {
 
     @Test
     fun `a private product view should retain its unguarded operand membership`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(
-                ContinuousProduct(0, 0, 1, 0, doubleArrayOf(-1.0, 0.125, 0.5)),
-            ),
-            numRealVars = 2,
-            realLower = doubleArrayOf(-1.0, 0.0),
-            realUpper = doubleArrayOf(1.0, 1.0),
-            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(5, 1000)).resolve(),
-        )
-        val prepared = assertIs<FloatGridPreparation.Prepared>(
-            prepareFloatGrid(
-                FloatGridRequest(
-                    source,
-                    listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1))),
-                ),
-                ExecutionControl.Never,
-            ),
-        )
+        val source = Problem(0, 0, emptyArray(), arrayOf(
+            ContinuousProduct(0, 0, 1, 0, doubleArrayOf(-1.0, 0.125, 0.5)),
+        ), numRealVars = 2, realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(5, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(FloatGridRequest(source,
+            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1)))), ExecutionControl.Never))
 
         val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { point ->
             assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, ExecutionControl.Never))
         }.toList()
 
-        assertEquals(
-            setOf(BigFraction.ofLong(-1), BigFraction.ofLong(2).reciprocal()),
-            points.map { assertNotNull(it.exactReals)[0] }.toSet(),
-        )
+        assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ofLong(2).reciprocal()),
+            points.map { assertNotNull(it.exactReals)[0] }.toSet())
         for (point in points) assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point))
     }
 
     @Test
     fun `a selected grid should exclude nonmembers without rounding declared values`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
+        val source = Problem(0, 0, emptyArray(),
             arrayOf(RealFiniteDomain(0, doubleArrayOf(-1.0, 0.125, 0.5))),
-            numRealVars = 1,
-            realLower = doubleArrayOf(-1.0),
-            realUpper = doubleArrayOf(1.0),
-            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(5, 1000)).resolve(),
-        )
-        val prepared = assertIs<FloatGridPreparation.Prepared>(
-            prepareFloatGrid(
-                FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))),
-                ExecutionControl.Never,
-            ),
-        )
+            numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(5, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(
+            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
 
         val points = BacktrackSolver(prepared.problem.bake()).enumerate().map { point ->
             assertNotNull(prepared.mapping.reconstruct(prepared.problem, point, ExecutionControl.Never))
         }.toList()
 
-        assertEquals(
-            setOf(BigFraction.ofLong(-1), BigFraction.ofLong(2).reciprocal()),
-            points.map { assertNotNull(it.exactReals).single() }.toSet(),
-        )
+        assertEquals(setOf(BigFraction.ofLong(-1), BigFraction.ofLong(2).reciprocal()),
+            points.map { assertNotNull(it.exactReals).single() }.toSet())
         for (point in points) assertIs<Verification.Accepted<*, *>>(verifyRealCoordinates(source, point))
         assertEquals(1, source.numRealVars)
         assertEquals(0, source.numIntVars)
@@ -138,22 +91,11 @@ class FloatGridFiniteDomainTest {
 
     @Test
     fun `private grid exhaustion should preserve the nonempty original membership`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf(RealFiniteDomain(0, doubleArrayOf(0.125))),
-            numRealVars = 1,
-            realLower = doubleArrayOf(-1.0),
-            realUpper = doubleArrayOf(1.0),
-            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve(),
-        )
-        val prepared = assertIs<FloatGridPreparation.Prepared>(
-            prepareFloatGrid(
-                FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))),
-                ExecutionControl.Never,
-            ),
-        )
+        val source = Problem(0, 0, emptyArray(), arrayOf(RealFiniteDomain(0, doubleArrayOf(0.125))),
+            numRealVars = 1, realLower = doubleArrayOf(-1.0), realUpper = doubleArrayOf(1.0),
+            semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Grid(2, 1000)).resolve())
+        val prepared = assertIs<FloatGridPreparation.Prepared>(prepareFloatGrid(
+            FloatGridRequest(source, listOf(FloatGridVariable(SourceRealId(0)))), ExecutionControl.Never))
 
         val privateResult = prepared.problem.baked
 

@@ -100,7 +100,11 @@ internal object ImplicationGraph {
     private class Reduction(val factors: List<Factor>, val merges: List<BoolMerge>)
 
     /** The implication edges the clean binary clauses among [factors] encode, both directions of each. */
-    private fun binaryClauseImplications(problem: Problem, factors: List<Factor>, work: GraphWork): Adjacency? {
+    private fun binaryClauseImplications(
+        problem: Problem,
+        factors: List<Factor>,
+        work: GraphWork,
+    ): Adjacency? {
         if (!work.check()) return null
         val adj = Adjacency(2 * problem.numBoolVars)
         for (f in factors) {
@@ -150,13 +154,8 @@ internal object ImplicationGraph {
 
     /** Pin `v = [value]`, propagate, and record `pinned -> forced` for every other Boolean the
      *  propagation forces. A self-edge (the pin itself) is never emitted. */
-    private fun recordPolarity(
-        problem: Problem,
-        v: Int,
-        value: Boolean,
-        adj: Adjacency,
-        cancellation: ExecutionControl,
-    ) {
+    private fun recordPolarity(problem: Problem, v: Int, value: Boolean, adj: Adjacency,
+        cancellation: ExecutionControl) {
         if (cancellation()) return
         val result = problem.propagate(Assumptions.None.withBool(v, value), cancellation)
         if (result !is PropagationResult.Implied) return
@@ -252,7 +251,11 @@ internal object ImplicationGraph {
 
     /** [candidates] minus any merge that would rename a [ReifiedPseudoBoolean]'s auxiliary and one of its
      *  body variables onto the same variable; both are kept as themselves instead. */
-    private fun compatibleMerges(problem: Problem, candidates: List<BoolMerge>, work: GraphWork): List<BoolMerge>? {
+    private fun compatibleMerges(
+        problem: Problem,
+        candidates: List<BoolMerge>,
+        work: GraphWork,
+    ): List<BoolMerge>? {
         if (candidates.isEmpty()) return candidates
         val boolMap = IntArray(problem.numBoolVars)
         for (v in boolMap.indices) {

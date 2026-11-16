@@ -174,10 +174,8 @@ class CircuitPropagatorTest {
         }
         assertEquals(
             setOf(
-                Triple(0, AtomKind.EQ, 1L),
-                Triple(1, AtomKind.EQ, 2L),
-                Triple(2, AtomKind.EQ, 1L),
-                Triple(2, AtomKind.EQ, 2L),
+                Triple(0, AtomKind.EQ, 1L), Triple(1, AtomKind.EQ, 2L),
+                Triple(2, AtomKind.EQ, 1L), Triple(2, AtomKind.EQ, 2L),
             ),
             cited.toSet(),
         )

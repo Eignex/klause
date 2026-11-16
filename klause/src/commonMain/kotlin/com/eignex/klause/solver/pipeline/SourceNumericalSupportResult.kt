@@ -34,51 +34,31 @@ internal fun sourceNumericalRefutationSupport(
 ): SourceNumericalSupportResult {
     val query = feedback.query
     funding.charge(1L, 64L)
-    if (cancellation()) {
-        return SourceNumericalSupportResult.Unavailable(
-            feedback,
-            SourceNumericalSupportResult.Reason.Cancelled,
-        )
-    }
-    if (funding.paused) {
-        return SourceNumericalSupportResult.Unavailable(
-            feedback,
-            SourceNumericalSupportResult.Reason.Funding,
-        )
-    }
-    if (!query.projection.refutation) {
-        return SourceNumericalSupportResult.Unavailable(
-            feedback,
-            SourceNumericalSupportResult.Reason.Unrequested,
-        )
-    }
-    val evidence = query.refutation ?: return SourceNumericalSupportResult.Unavailable(
-        feedback,
-        SourceNumericalSupportResult.Reason.NoRefutation,
-    )
+    if (cancellation()) return SourceNumericalSupportResult.Unavailable(feedback,
+        SourceNumericalSupportResult.Reason.Cancelled)
+    if (funding.paused) return SourceNumericalSupportResult.Unavailable(feedback,
+        SourceNumericalSupportResult.Reason.Funding)
+    if (!query.projection.refutation) return SourceNumericalSupportResult.Unavailable(feedback,
+        SourceNumericalSupportResult.Reason.Unrequested)
+    val evidence = query.refutation ?: return SourceNumericalSupportResult.Unavailable(feedback,
+        SourceNumericalSupportResult.Reason.NoRefutation)
     val coordinates = linkedSetOf<SourceCoordinate>()
     val premises = linkedSetOf<String>()
     val assumptions = linkedSetOf<SourceDerivation.Assumption>()
     var remaining = 4096
     var failure = SourceNumericalSupportResult.Reason.Unsupported
     var limitStage: SourceNumericalSupportResult.LimitStage? = null
-    fun spend(
-        entries: Int,
-        stage: SourceNumericalSupportResult.LimitStage =
-            SourceNumericalSupportResult.LimitStage.Traversal,
-    ): Boolean {
+    fun spend(entries: Int, stage: SourceNumericalSupportResult.LimitStage =
+        SourceNumericalSupportResult.LimitStage.Traversal): Boolean {
         funding.charge(entries.toLong(), entries * 64L)
         remaining -= entries
         failure = when {
             cancellation() -> SourceNumericalSupportResult.Reason.Cancelled
-
             funding.paused -> SourceNumericalSupportResult.Reason.Funding
-
             remaining < 0 -> {
                 limitStage = stage
                 SourceNumericalSupportResult.Reason.Limit
             }
-
             else -> return true
         }
         return false
@@ -97,9 +77,7 @@ internal fun sourceNumericalRefutationSupport(
         }
         return when (proof) {
             is LinearPinnedRefutation -> visit(proof.conflict, depth + 1)
-
             is LinearActiveRefutation -> visit(proof.conflict, depth + 1)
-
             is SourceDerivation.Premise -> {
                 if (!spend(1, SourceNumericalSupportResult.LimitStage.Context)) return false
                 val row = query.context.premise(proof.id) ?: run {
@@ -107,46 +85,30 @@ internal fun sourceNumericalRefutationSupport(
                     query.numeric.premise(proof.id)
                 } ?: return false
                 if (!add(row.inequality.coefficients.keys) || !add(row.integerPins.keys) ||
-                    !add(row.guards.keys.map { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) })
-                ) {
-                    return false
-                }
+                    !add(row.guards.keys.map { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) })) return false
                 premises += proof.id
                 true
             }
-
             is SourceDerivation.Assumption -> {
                 if (!spend(1, SourceNumericalSupportResult.LimitStage.Context) ||
                     feedback.scope.condition.boundValue(proof.coordinate, proof.upper) == null ||
-                    !add(listOf(proof.coordinate))
-                ) {
-                    return false
-                }
+                    !add(listOf(proof.coordinate))) return false
                 assumptions += proof
                 true
             }
-
-            is SourceDerivation.Combination -> proof.terms.let { terms ->
-                spend(terms.size) && terms.all {
-                    it.weight.isZero || visit(it.derivation, depth + 1)
-                }
-            }
-
+            is SourceDerivation.Combination -> proof.terms.let { terms -> spend(terms.size) && terms.all {
+                it.weight.isZero || visit(it.derivation, depth + 1)
+            } }
             is SourceDerivation.IntegerRounding -> visit(proof.inequality, depth + 1)
-
             is SourceDerivation.MixedIntegerRounding -> visit(proof.inequality, depth + 1) &&
                 proof.bounds.let { bounds -> spend(bounds.size) && bounds.all { visit(it, depth + 1) } }
-
             else -> false
         }
     }
     if (evidence.claim != SourceClaim.Refutation || evidence.scope != feedback.scope || !spend(1) ||
         !add(feedback.scope.condition.bools.keys.map { SourceCoordinate(SourceCoordinate.Kind.Boolean, it) }) ||
-        !visit(evidence.derivation, 0) || !spend(
-            coordinates.size + premises.size + assumptions.size,
-            SourceNumericalSupportResult.LimitStage.Result,
-        )
-    ) {
+        !visit(evidence.derivation, 0) || !spend(coordinates.size + premises.size + assumptions.size,
+            SourceNumericalSupportResult.LimitStage.Result)) {
         return SourceNumericalSupportResult.Unavailable(feedback, failure, limitStage)
     }
     return SourceNumericalSupportResult.Available(feedback, coordinates.toSet(), premises.toSet(), assumptions.toSet())

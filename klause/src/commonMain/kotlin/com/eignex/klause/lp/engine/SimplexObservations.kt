@@ -118,4 +118,5 @@ internal class SimplexObservations {
         basisBuildUnmeasured = basisBuildUnmeasured,
         factorEntriesBuilt = factorEntriesBuilt,
     )
+
 }

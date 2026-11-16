@@ -48,12 +48,9 @@ class SourcePresolveOptionsTest {
 
     @Test
     fun `rewrite controls should survive local search and pivot adaptations`() {
-        val options = ExecutionOptions.parse(
-            listOf(
-                "presolve-preserve-structure=true",
-                "presolve-structural-impact=128",
-            ),
-        )
+        val options = ExecutionOptions.parse(listOf(
+            "presolve-preserve-structure=true", "presolve-structural-impact=128",
+        ))
 
         val config = options.reader().presolve(PresolveConfig.DEFAULT).config
             .forLocalSearch().withAffinePivotOrder(AffinePivotOrder.STABLE_ID).withEffort(maxRounds = 2)

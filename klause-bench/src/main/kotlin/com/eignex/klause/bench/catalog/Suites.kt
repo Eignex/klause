@@ -699,24 +699,15 @@ internal object Suites {
     private val wcnfCore = suite("wcnf-core", "Curated DIMACS WCNF (MaxSAT)") {
         format = Format.WCNF
         license = "internal"
-        vendored(
-            "conditional-cost",
-            Category.OPTIMIZATION,
-            Expected.Opt(1L),
-            relPath = "conditional-symmetry/conditional-cost.wcnf",
-        )
+        vendored("conditional-cost", Category.OPTIMIZATION, Expected.Opt(1L),
+            relPath = "conditional-symmetry/conditional-cost.wcnf")
         vendored("maxsat-tiny", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("cover-dominated", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("cover-tied", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("cover-other-reader", Category.OPTIMIZATION, Expected.Opt(1L))
         vendored("weighted-penalty-complements", Category.OPTIMIZATION, Expected.Opt(5L))
-        vendored(
-            "signed-cost-symmetry",
-            Category.OPTIMIZATION,
-            Expected.Opt(2L),
-            relPath = "cost-symmetry/signed-cost.wcnf",
-            license = "Apache-2.0",
-        )
+        vendored("signed-cost-symmetry", Category.OPTIMIZATION, Expected.Opt(2L),
+            relPath = "cost-symmetry/signed-cost.wcnf", license = "Apache-2.0")
     }
 
     private val opbCore = suite("opb-core", "Curated pseudo-Boolean OPB") {
@@ -792,110 +783,48 @@ internal object Suites {
         vendored("magic-series-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-series-tiny.xml")
         vendored("sum-opt-tiny", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/sum-opt-tiny.xml")
         vendored("pair-cover-costs", Category.OPTIMIZATION, Expected.Unknown, relPath = "xcsp3/pair-cover-costs.xml")
-        vendored(
-            "pair-cover-alias-costs",
-            Category.OPTIMIZATION,
-            Expected.Unknown,
-            relPath = "xcsp3/pair-cover-alias-costs.xml",
-        )
-        vendored(
-            "pair-cover-alias-replaced",
-            Category.OPTIMIZATION,
-            Expected.Unknown,
-            relPath = "xcsp3/pair-cover-alias-replaced.xml",
-        )
-        vendored(
-            "evidence-latin4",
-            Category.OPTIMIZATION,
-            Expected.Unknown,
-            relPath = "finite-repair-evidence/latin4.xml",
-        )
-        vendored(
-            "equality-cost-symmetry",
-            Category.OPTIMIZATION,
-            Expected.Opt(90L),
-            relPath = "cost-symmetry/equality-cost.xml",
-            license = "Apache-2.0",
-        )
-        for (name in listOf(
-            "linear-exchange",
-            "linear-three-cycle",
-            "linear-four-cycle",
-            "linear-knapsack",
-            "linear-transport",
-            "linear-kernel-weighted",
-            "linear-kernel-ring33",
-        )) {
-            vendored(
-                "evidence-$name",
-                Category.OPTIMIZATION,
-                Expected.Unknown,
-                relPath = "finite-repair-evidence/$name.xml",
-            )
+        vendored("pair-cover-alias-costs", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "xcsp3/pair-cover-alias-costs.xml")
+        vendored("pair-cover-alias-replaced", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "xcsp3/pair-cover-alias-replaced.xml")
+        vendored("evidence-latin4", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "finite-repair-evidence/latin4.xml")
+        vendored("equality-cost-symmetry", Category.OPTIMIZATION, Expected.Opt(90L),
+            relPath = "cost-symmetry/equality-cost.xml", license = "Apache-2.0")
+        for (name in listOf("linear-exchange", "linear-three-cycle", "linear-four-cycle", "linear-knapsack",
+            "linear-transport", "linear-kernel-weighted", "linear-kernel-ring33")) {
+            vendored("evidence-$name", Category.OPTIMIZATION, Expected.Unknown,
+                relPath = "finite-repair-evidence/$name.xml")
         }
         vendored("magic-square-3", Category.CSP, Expected.Sat, relPath = "xcsp3/magic-square-3.xml")
         vendored("graph-coloring-tiny", Category.CSP, Expected.Sat, relPath = "xcsp3/graph-coloring-tiny.xml")
         vendored("coupled-cost-k4", Category.OPTIMIZATION, Expected.Opt(136), relPath = "coupled-cost/k4.xml")
-        vendored(
-            "assignment-exchange",
-            Category.OPTIMIZATION,
-            Expected.Unknown,
-            relPath = "finite-repair/assignment-exchange.xml",
-        )
-        for (name in listOf(
-            "resource-exchange",
-            "placement-exchange",
-            "assignment-cycle",
-            "resource-cycle",
-            "placement-cycle",
-            "assignment-four-cycle",
-            "assignment-unused",
-        )) {
+        vendored("assignment-exchange", Category.OPTIMIZATION, Expected.Unknown,
+            relPath = "finite-repair/assignment-exchange.xml")
+        for (name in listOf("resource-exchange", "placement-exchange", "assignment-cycle", "resource-cycle",
+            "placement-cycle", "assignment-four-cycle", "assignment-unused")) {
             vendored(name, Category.OPTIMIZATION, Expected.Unknown, relPath = "finite-repair/$name.xml")
         }
         for (name in listOf("overlap-tables-unsat", "overlap-mdd-unsat", "overlap-mdd-sat")) {
-            vendored(
-                name,
-                Category.CSP,
-                if (name.endsWith("unsat")) Expected.Unsat else Expected.Sat,
-                relPath = "extensional-overlap/$name.xml",
-            )
+            vendored(name, Category.CSP, if (name.endsWith("unsat")) Expected.Unsat else Expected.Sat,
+                relPath = "extensional-overlap/$name.xml")
         }
-        vendored(
-            "cyclic-mod3-unsat",
-            Category.OPTIMIZATION,
-            Expected.Unsat,
-            relPath = "extensional-overlap/cyclic-mod3-unsat.xml",
-            license = "Apache-2.0",
-        )
-        vendored(
-            "cyclic-mod3-sat",
-            Category.OPTIMIZATION,
-            Expected.Opt(4L),
-            relPath = "extensional-overlap/cyclic-mod3-sat.xml",
-            license = "Apache-2.0",
-        )
+        vendored("cyclic-mod3-unsat", Category.OPTIMIZATION, Expected.Unsat,
+            relPath = "extensional-overlap/cyclic-mod3-unsat.xml", license = "Apache-2.0")
+        vendored("cyclic-mod3-sat", Category.OPTIMIZATION, Expected.Opt(4L),
+            relPath = "extensional-overlap/cyclic-mod3-sat.xml", license = "Apache-2.0")
         for (name in listOf("interior", "hole", "outside-reader")) {
-            vendored(
-                "table-substitution-$name",
-                Category.OPTIMIZATION,
+            vendored("table-substitution-$name", Category.OPTIMIZATION,
                 Expected.Opt(if (name == "hole") 36L else 35L),
-                relPath = "table-substitution/$name.xml",
-                license = "Apache-2.0",
-            )
+                relPath = "table-substitution/$name.xml", license = "Apache-2.0")
         }
     }
 
     private val lpComponentSplit = suite("lp-component-split", "Targeted separable and linked dense LP models") {
         license = "internal"
         for ((name, optimum) in listOf("cover-2x3" to 4L, "cover-3x3" to 6L)) {
-            vendored(
-                "mps-$name",
-                Category.OPTIMIZATION,
-                Expected.Opt(optimum),
-                relPath = "lp-component-split/$name.mps",
-                format = Format.MPS,
-            )
+            vendored("mps-$name", Category.OPTIMIZATION, Expected.Opt(optimum),
+                relPath = "lp-component-split/$name.mps", format = Format.MPS)
         }
         for (name in listOf("dense-2x12", "dense-8x24", "linked-8x24")) {
             vendoredMzn("mzn-$name", Category.OPTIMIZATION, Expected.Opt(1), model = "lp-component-split/$name.mzn")

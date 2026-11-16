@@ -12,10 +12,8 @@ private class ExactRealSourceUnavailable : RuntimeException()
 
 private fun unavailable(): Nothing = throw ExactRealSourceUnavailable()
 
-internal fun prepareExactRealSource(
-    request: SourceSetupRequest,
-    stop: ExecutionControl,
-): SourceProblemRoute.NativeFormula {
+internal fun prepareExactRealSource(request: SourceSetupRequest,
+    stop: ExecutionControl): SourceProblemRoute.NativeFormula {
     if (request.operation != ExecutionOperation.SATISFY) {
         return SourceProblemRoute.NativeFormula(
             null,

@@ -43,9 +43,7 @@ class SearchTest {
     fun `branch observers receive accepted decisions at their committed depth`() {
         val attempts = ArrayList<SearchDecision>()
         val commits = ArrayList<Pair<SearchDecision, Int>>()
-        val params = BacktrackParams(
-            variableSelector = InputOrder,
-            valueSelector = IndomainMin,
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
             componentFactory = { listOf(object : SearchComponent {}) },
             branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
@@ -54,8 +52,7 @@ class SearchTest {
                 override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                     commits.add(decision to decisionLevel)
                 }
-            },
-        )
+            })
 
         val result = BacktrackSolver(problemOf(IntDomain(0, 1), IntDomain(0, 1)).bake()).solve(params)
 
@@ -68,15 +65,11 @@ class SearchTest {
     fun `refuted branch attempts supply no commit callback`() {
         val attempts = ArrayList<SearchDecision>()
         val commits = ArrayList<SearchDecision>()
-        val params = BacktrackParams(
-            variableSelector = InputOrder,
-            valueSelector = IndomainMin,
-            componentFactory = {
-                listOf(object : SearchComponent {
-                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
-                        if (context.decisionLevel > 0) ComponentResult.Conflict() else ComponentResult.Consistent
-                })
-            },
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            componentFactory = { listOf(object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                    if (context.decisionLevel > 0) ComponentResult.Conflict() else ComponentResult.Consistent
+            }) },
             branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     attempts.add(decision)
@@ -84,8 +77,7 @@ class SearchTest {
                 override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                     commits.add(decision)
                 }
-            },
-        )
+            })
 
         val result = BacktrackSolver(problemOf(IntDomain(0, 1)).bake()).solve(params)
 
@@ -98,25 +90,19 @@ class SearchTest {
     fun `an interrupted branch assertion supplies no commit callback`() {
         var cancelled = false
         val commits = ArrayList<SearchDecision>()
-        val params = BacktrackParams(
-            variableSelector = InputOrder,
-            valueSelector = IndomainMin,
-            componentFactory = {
-                listOf(object : SearchComponent {
-                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
-                        if (cancelled) ComponentResult.Indeterminate else ComponentResult.Consistent
-                })
-            },
-            cancellation = ExecutionControl { cancelled },
-            branchObserver = object : SearchBranchAttemptObserver {
+        val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
+            componentFactory = { listOf(object : SearchComponent {
+                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                    if (cancelled) ComponentResult.Indeterminate else ComponentResult.Consistent
+            }) },
+            cancellation = ExecutionControl { cancelled }, branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     cancelled = true
                 }
                 override fun onCommit(decision: SearchDecision, decisionLevel: Int) {
                     commits.add(decision)
                 }
-            },
-        )
+            })
 
         val result = BacktrackSolver(problemOf(IntDomain(0, 1)).bake()).solve(params)
 
@@ -130,12 +116,8 @@ class SearchTest {
         val events = mutableListOf<String>()
         val exchange = object : ClauseExchange {
             override fun onRestart(session: PropagationSession) = Unit
-            override fun onSearchEnd(session: PropagationSession) {
-                events += "end"
-            }
-            override fun onSearchPause(session: PropagationSession) {
-                events += "pause"
-            }
+            override fun onSearchEnd(session: PropagationSession) { events += "end" }
+            override fun onSearchPause(session: PropagationSession) { events += "pause" }
         }
 
         CpSatisfactionTraversal(
@@ -275,11 +257,7 @@ class SearchTest {
 
     private fun minFirstBrancher(problem: Problem): BacktrackBrancher {
         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin, randomSeed = 0L)
-        return BacktrackBrancher(
-            PropagationSession(problem),
-            params,
-            sink = null,
-            restart = RestartSchedule.from(params),
-        )
+        return BacktrackBrancher(PropagationSession(problem), params, sink = null,
+            restart = RestartSchedule.from(params))
     }
 }

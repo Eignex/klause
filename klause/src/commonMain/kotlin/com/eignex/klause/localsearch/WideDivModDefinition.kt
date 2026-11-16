@@ -31,22 +31,17 @@ internal class WideDivModDefinition(
     override val intInputs: IntArray = relation.dividend.coefficients.keys.toIntArray()
 
     override fun eval(assignment: Assignment, domains: Array<IntDomain>): Long {
-        val outputs = integerDivMod(
-            relation.dividend.evaluate(assignment::intValue),
-            relation.divisor,
-            relation.convention,
-        ) ?: return SweepNode.NO_WRITE
+        val outputs = integerDivMod(relation.dividend.evaluate(assignment::intValue), relation.divisor,
+            relation.convention) ?: return SweepNode.NO_WRITE
         val value = (if (quotient) outputs.first else outputs.second) - expression.constant
         var digit = checkNotNull(integerDivMod(value, weight, relation.convention)).first
         if (radix != null) digit = checkNotNull(integerDivMod(digit, radix, relation.convention)).second
         val domain = domains[out]
-        return domain.clamp(
-            when {
-                digit < bigIntOf(domain.min) -> domain.min
-                digit > bigIntOf(domain.max) -> domain.max
-                else -> digit.toLongExact()
-            },
-        )
+        return domain.clamp(when {
+            digit < bigIntOf(domain.min) -> domain.min
+            digit > bigIntOf(domain.max) -> domain.max
+            else -> digit.toLongExact()
+        })
     }
 }
 
@@ -87,10 +82,7 @@ internal fun wideDivModDefinitions(
                 val validRadix = radix == null || (radix > BIG_ONE && radix * weight == next)
                 if (!validRadix || output in relation.dividend.coefficients ||
                     (output in relation.quotient.coefficients && output in relation.remainder.coefficients) ||
-                    !problem.intBounds.hasLower(output) || problem.intBounds.lower(output) == Long.MIN_VALUE
-                ) {
-                    continue
-                }
+                    !problem.intBounds.hasLower(output) || problem.intBounds.lower(output) == Long.MIN_VALUE) continue
                 definitions += WideDivModDefinition(relation, output, quotient, expression, weight, radix)
             }
         }

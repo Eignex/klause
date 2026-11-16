@@ -41,16 +41,10 @@ class PolynomialWitnessSupportsTest {
             var axes = 0
             var proposals = 0
 
-            val point = assertNotNull(
-                PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-                    atoms,
-                    atoms.map { it.polynomial.terms },
-                    source.realCount,
-                    emptyMap(),
-                    takeAxis = { ++axes <= 32 },
-                    takeProposal = { ++proposals <= 63 },
-                ),
-            )
+            val point = assertNotNull(PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
+                atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(),
+                takeAxis = { ++axes <= 32 }, takeProposal = { ++proposals <= 63 },
+            ))
 
             val coordinates = point.mapValues { algebraic.rational(it.value) }
             for (atom in atoms) {
@@ -73,16 +67,9 @@ class PolynomialWitnessSupportsTest {
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)
         val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
 
-        val point = assertNotNull(
-            PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                emptyMap(),
-                { true },
-                { true },
-            ),
-        )
+        val point = assertNotNull(PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
+        ))
 
         val coordinates = point.mapValues { algebraic.rational(it.value) }
         for (atom in atoms) {
@@ -100,21 +87,13 @@ class PolynomialWitnessSupportsTest {
             """.trimIndent(),
         )
         val arithmetic = PolynomialArithmetic()
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, arithmetic)
-                .conjunctiveAtoms(arithmetic, 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
 
-        val point = assertNotNull(
-            PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                mapOf(0 to BigFraction.ONE),
-                { true },
-                { true },
-            ),
-        )
+        val point = assertNotNull(PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, mapOf(0 to BigFraction.ONE),
+            { true }, { true },
+        ))
 
         assertEquals(BigFraction.ONE, point.getValue(0))
     }
@@ -128,21 +107,12 @@ class PolynomialWitnessSupportsTest {
             """.trimIndent(),
         )
         val arithmetic = PolynomialArithmetic()
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, arithmetic)
-                .conjunctiveAtoms(arithmetic, 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
 
-        val point = assertNotNull(
-            PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                emptyMap(),
-                { true },
-                { true },
-            ),
-        )
+        val point = assertNotNull(PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
+        ))
 
         assertEquals(BigFraction.ZERO, point.getValue(2))
     }
@@ -160,16 +130,9 @@ class PolynomialWitnessSupportsTest {
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)
         val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
 
-        val point = assertNotNull(
-            PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                emptyMap(),
-                { true },
-                { true },
-            ),
-        )
+        val point = assertNotNull(PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
+        ))
 
         val coordinates = point.mapValues { algebraic.rational(it.value) }
         for (atom in atoms) {
@@ -186,18 +149,11 @@ class PolynomialWitnessSupportsTest {
             """.trimIndent(),
         )
         val arithmetic = PolynomialArithmetic()
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, arithmetic)
-                .conjunctiveAtoms(arithmetic, 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
 
         val point = PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            emptyMap(),
-            { true },
-            { true },
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
         )
 
         assertNull(point)
@@ -212,18 +168,11 @@ class PolynomialWitnessSupportsTest {
             """.trimIndent(),
         )
         val arithmetic = PolynomialArithmetic()
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, arithmetic)
-                .conjunctiveAtoms(arithmetic, 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
 
         val point = PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            emptyMap(),
-            { true },
-            { true },
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
         )
 
         assertNull(point)
@@ -236,18 +185,11 @@ class PolynomialWitnessSupportsTest {
             "(declare-const a Real) (declare-const b Real) (assert (and (= (* a a) 2) (= (* b b) 3)))",
         )
         val arithmetic = PolynomialArithmetic()
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, arithmetic)
-                .conjunctiveAtoms(arithmetic, 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
 
         val point = PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            emptyMap(),
-            { true },
-            { true },
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
         )
 
         assertNull(point)
@@ -262,18 +204,11 @@ class PolynomialWitnessSupportsTest {
             """.trimIndent(),
         )
         val arithmetic = PolynomialArithmetic()
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, arithmetic)
-                .conjunctiveAtoms(arithmetic, 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
 
         val point = PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            emptyMap(),
-            { true },
-            { true },
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
         )
 
         assertNull(point)
@@ -291,19 +226,14 @@ class PolynomialWitnessSupportsTest {
         val algebraic = AlgebraicArithmetic(arithmetic)
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)
 
-        val point = assertNotNull(
-            WitnessProbe(formula, source.boolCount, arithmetic, algebraic)
-                .probeWitness(source.realCount, emptyMap()) { null },
-        )
+        val point = assertNotNull(WitnessProbe(formula, source.boolCount, arithmetic, algebraic)
+            .probeWitness(source.realCount, emptyMap()) { null })
 
         val coordinates = (0 until source.realCount).associateWith { point.realValue(it) }
         val values = IntArray(formula.atoms.size) { index ->
             val atom = formula.atoms[index]
-            if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates)))) {
-                PolynomialFormula.TRUE
-            } else {
-                PolynomialFormula.FALSE
-            }
+            if (atom.holds(algebraic.sign(algebraic.evaluate(atom.polynomial, coordinates))))
+                PolynomialFormula.TRUE else PolynomialFormula.FALSE
         }
         assertEquals(PolynomialFormula.TRUE, formula.truth(IntArray(source.boolCount), values, arithmetic))
     }
@@ -314,18 +244,11 @@ class PolynomialWitnessSupportsTest {
             "(declare-const a Real) (declare-const b Real) (assert (and (= (* a a) 4) (= (* b b) 9)))",
         )
         val arithmetic = PolynomialArithmetic()
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, arithmetic)
-                .conjunctiveAtoms(arithmetic, 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
         for ((terms, degree, bits) in listOf(Triple(1, 8, 4096), Triple(2048, 1, 4096), Triple(2048, 8, 2))) {
             val point = PolynomialWitnessSupports(arithmetic, terms, degree, bits, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                emptyMap(),
-                { true },
-                { true },
+                atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
             )
 
             assertNull(point)
@@ -338,21 +261,15 @@ class PolynomialWitnessSupportsTest {
             "(declare-const a Real) (declare-const b Real) (assert (and (= (* a a) 4) (= (* b b) 9)))",
         )
         val arithmetic = PolynomialArithmetic()
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, arithmetic)
-                .conjunctiveAtoms(arithmetic, 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
         for ((axisLimit, proposalLimit) in listOf(0 to 64, 1 to 64, 32 to 0, 32 to 2)) {
             var axes = 0
             var proposals = 0
 
             val point = PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                emptyMap(),
-                { ++axes <= axisLimit },
-                { ++proposals <= proposalLimit },
+                atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(),
+                { ++axes <= axisLimit }, { ++proposals <= proposalLimit },
             )
 
             assertNull(point)
@@ -368,18 +285,12 @@ class PolynomialWitnessSupportsTest {
             """.trimIndent(),
         )
         val arithmetic = PolynomialArithmetic()
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, arithmetic)
-                .conjunctiveAtoms(arithmetic, 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, arithmetic)
+            .conjunctiveAtoms(arithmetic, 128))
 
         val point = PolynomialWitnessSupports(arithmetic, 2048, 8, 3, 4).point(
-            atoms,
-            atoms.map { it.polynomial.terms },
-            source.realCount,
-            mapOf(2 to BigFraction.ofLong(3)),
-            { true },
-            { true },
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, mapOf(2 to BigFraction.ofLong(3)),
+            { true }, { true },
         )
 
         assertNull(point)
@@ -398,16 +309,10 @@ class PolynomialWitnessSupportsTest {
         val formula = PolynomialFormula.normalize(source.formula, arithmetic)
         val atoms = assertNotNull(formula.conjunctiveAtoms(arithmetic, 128))
 
-        val point = assertNotNull(
-            PolynomialWitnessSupports(arithmetic, 2048, 8, 3, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                mapOf(2 to BigFraction.ofLong(3)),
-                { true },
-                { true },
-            ),
-        )
+        val point = assertNotNull(PolynomialWitnessSupports(arithmetic, 2048, 8, 3, 4).point(
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, mapOf(2 to BigFraction.ofLong(3)),
+            { true }, { true },
+        ))
 
         val coordinates = point.mapValues { algebraic.rational(it.value) }
         for (atom in atoms) {
@@ -420,20 +325,13 @@ class PolynomialWitnessSupportsTest {
         val source = SmtLibPolynomial.parse(
             "(declare-const a Real) (declare-const b Real) (assert (and (= (* a a) 4) (= (* b b) 9)))",
         )
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .conjunctiveAtoms(PolynomialArithmetic(), 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .conjunctiveAtoms(PolynomialArithmetic(), 128))
         val arithmetic = PolynomialArithmetic(limits = PolynomialLimits(maxDenseCoefficients = 1))
 
         assertFailsWith<PolynomialResourceLimit> {
             PolynomialWitnessSupports(arithmetic, 2048, 8, 4096, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                emptyMap(),
-                { true },
-                { true },
+                atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
             )
         }
     }
@@ -443,25 +341,16 @@ class PolynomialWitnessSupportsTest {
         val source = SmtLibPolynomial.parse(
             "(declare-const a Real) (declare-const b Real) (assert (and (= (* a a) 4) (= (* b b) 9)))",
         )
-        val atoms = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .conjunctiveAtoms(PolynomialArithmetic(), 128),
-        )
+        val atoms = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .conjunctiveAtoms(PolynomialArithmetic(), 128))
         var completed = 0L
         val counter = object : ExecutionControl() {
             override fun isCancelled(): Boolean = false
             override val accounting: WorkMeter get() = WorkMeter { completed += it }
         }
-        assertNotNull(
-            PolynomialWitnessSupports(PolynomialArithmetic(counter), 2048, 8, 4096, 4).point(
-                atoms,
-                atoms.map { it.polynomial.terms },
-                source.realCount,
-                emptyMap(),
-                { true },
-                { true },
-            ),
-        )
+        assertNotNull(PolynomialWitnessSupports(PolynomialArithmetic(counter), 2048, 8, 4096, 4).point(
+            atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
+        ))
         for (limit in listOf(1L, completed / 2, completed - 1)) {
             var spent = 0L
             val cancellation = object : ExecutionControl() {
@@ -471,12 +360,7 @@ class PolynomialWitnessSupportsTest {
 
             assertFailsWith<PolynomialInterrupted> {
                 PolynomialWitnessSupports(PolynomialArithmetic(cancellation), 2048, 8, 4096, 4).point(
-                    atoms,
-                    atoms.map { it.polynomial.terms },
-                    source.realCount,
-                    emptyMap(),
-                    { true },
-                    { true },
+                    atoms, atoms.map { it.polynomial.terms }, source.realCount, emptyMap(), { true }, { true },
                 )
             }
         }
@@ -490,20 +374,12 @@ class PolynomialWitnessSupportsTest {
             (assert (and (= (* a a) 4) (= (* b b) 9) (< (* a b) 0)))
             """.trimIndent(),
         )
-        val completed = assertIs<QfNraResult.Satisfiable>(
-            solveQfNra(
-                source.formula,
-                source.boolCount,
-                source.realCount,
-            ),
-        )
+        val completed = assertIs<QfNraResult.Satisfiable>(solveQfNra(
+            source.formula, source.boolCount, source.realCount,
+        ))
 
-        val stopped = solveQfNra(
-            source.formula,
-            source.boolCount,
-            source.realCount,
-            QfNraParams(maximumWork = completed.stats.workSpent - 1),
-        )
+        val stopped = solveQfNra(source.formula, source.boolCount, source.realCount,
+            QfNraParams(maximumWork = completed.stats.workSpent - 1))
 
         assertEquals(QfNraReason.WorkLimit, assertIs<QfNraResult.Unknown>(stopped).reason)
     }

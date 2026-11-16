@@ -38,6 +38,7 @@ import kotlin.math.max
 internal class FlowCoverSeparator : CutSeparator {
     override val family: CutFamily = CutFamily.FLOW_COVER
 
+
     /** One flow arc over LP columns: the flow contributes `flowCoeff · primal(flowCol)` (so the cut term
      *  is `flowCoeff·flowCol`), gated by the `{0,1}` indicator column, with effective capacity [cap]. For
      *  an implicit knapsack arc the flow and indicator are the same column (`flowCoeff = cap = wⱼ`). */

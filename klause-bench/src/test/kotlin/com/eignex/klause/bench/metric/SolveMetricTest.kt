@@ -35,13 +35,9 @@ class SolveMetricTest {
             installedBuild = { null },
             invoke = { _, _, _, _ ->
                 SolverInvocation.Result(
-                    true,
-                    null,
-                    null,
-                    proven = false,
+                    true, null, null, proven = false,
                     stats = text?.let { mapOf("numericalSemantics" to it) }.orEmpty(),
-                    rawOutput = "v X=1\n",
-                    command = "cli",
+                    rawOutput = "v X=1\n", command = "cli",
                 )
             },
         )
@@ -67,25 +63,13 @@ class SolveMetricTest {
     @ValueSource(booleans = [false, true])
     fun `rational attribution should retain the best source timing beyond double precision`(maximize: Boolean) {
         val smaller = Attribution(
-            "smaller",
-            exactObjective = "27021597764222977/3",
-            elapsedMs = 20,
-            processElapsedMs = 120,
+            "smaller", exactObjective = "27021597764222977/3", elapsedMs = 20, processElapsedMs = 120,
         )
         val larger = Attribution(
-            "larger",
-            exactObjective = "27021597764222978/3",
-            elapsedMs = 10,
-            processElapsedMs = 110,
+            "larger", exactObjective = "27021597764222978/3", elapsedMs = 10, processElapsedMs = 110,
         )
         val result = SolverInvocation.Result(
-            true,
-            null,
-            null,
-            proven = false,
-            stats = emptyMap(),
-            rawOutput = "",
-            command = "cli",
+            true, null, null, proven = false, stats = emptyMap(), rawOutput = "", command = "cli",
             attribution = listOf(larger, smaller),
         )
 
@@ -135,13 +119,8 @@ class SolveMetricTest {
         )
 
         val record = SolveMetric.loadFailureRecord(
-            ref,
-            SolverInvocation.Settings(),
-            Budget(),
-            "now",
-            null,
-            MiniZincIdentityFailure(evidence),
-            sourceHashes = mapOf("model" to "captured"),
+            ref, SolverInvocation.Settings(), Budget(), "now", null,
+            MiniZincIdentityFailure(evidence), sourceHashes = mapOf("model" to "captured"),
         )
 
         assertEquals(evidence, record.compilerDiscovery)
@@ -258,26 +237,13 @@ class SolveMetricTest {
         val settings = SolverInvocation.Settings(seed = 17)
         val budget = Budget(10000)
         val invocation = SolverInvocation.Result(
-            true,
-            null,
-            null,
-            proven = false,
-            stats = mapOf("sourceInvocationMs" to "7"),
-            rawOutput = "v X=1\n",
-            command = "cli",
-            elapsedMs = 7,
+            true, null, null, proven = false,
+            stats = mapOf("sourceInvocationMs" to "7"), rawOutput = "v X=1\n", command = "cli", elapsedMs = 7,
         )
 
         val (record, raw) = SolveMetric.solve(
-            entry(),
-            settings,
-            budget,
-            "now",
-            "fixture",
-            installedBuild = {
-                nanos += 30_000_000
-                null
-            },
+            entry(), settings, budget, "now", "fixture",
+            installedBuild = { nanos += 30_000_000; null },
             invoke = { _, supplied, allowance, _ ->
                 assertEquals(settings, supplied)
                 assertEquals(budget, allowance)

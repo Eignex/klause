@@ -9,8 +9,10 @@ internal interface RootWorkMeter : WorkMeter {
     fun propagation(units: Long)
 }
 
-internal class RootWorkAccounting(private val outer: ExecutionControl, private val state: PropagationState) :
-    ExecutionControl() {
+internal class RootWorkAccounting(
+    private val outer: ExecutionControl,
+    private val state: PropagationState,
+) : ExecutionControl() {
     private val meter = outer.accounting as? RootWorkMeter
     private var reported = 0L
 

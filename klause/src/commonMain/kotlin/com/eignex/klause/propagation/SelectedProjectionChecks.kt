@@ -8,7 +8,10 @@ import com.eignex.klause.solver.defaultExecutionCapabilities
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.util.ExecutionControl
 
-internal class SelectedProjectionChecks(selection: PreparedFactorProjections, enforcingPeers: Set<Int> = emptySet()) {
+internal class SelectedProjectionChecks(
+    selection: PreparedFactorProjections,
+    enforcingPeers: Set<Int> = emptySet(),
+) {
     private val source = selection.problem
     private val factors = source.factors.indices.filter { id ->
         id !in enforcingPeers && selection.requiresOriginalCheck(id) && source.factors[id].variables.reals.isEmpty() &&
@@ -17,22 +20,17 @@ internal class SelectedProjectionChecks(selection: PreparedFactorProjections, en
     private val available = factors.all {
         source.factors[it].defaultExecutionCapabilities().propagationCheck == AssignmentCheckCapability.EXACT
     }
-    private val original = if (factors.isEmpty() || !available) {
-        null
-    } else {
+    private val original = if (factors.isEmpty() || !available) null else
         source.withFactors(Array(factors.size) { source.factors[factors[it]] })
-    }
 
     fun check(session: PropagationSession, cancellation: ExecutionControl): ComponentCheck {
         if (!available) return ComponentCheck.Indeterminate
         val model = original ?: return ComponentCheck.Feasible
         if (cancellation()) return ComponentCheck.Indeterminate
-        val point = model.withIntDomains(
-            Array(model.numIntVars) {
-                val value = session.intDomain(it).min
-                IntDomain(value, value)
-            },
-        )
+        val point = model.withIntDomains(Array(model.numIntVars) {
+            val value = session.intDomain(it).min
+            IntDomain(value, value)
+        })
         val checker = PropagationSession(point, cancellation)
         val result = try {
             checkPoint(model.numBoolVars, session, checker, cancellation)
@@ -41,9 +39,7 @@ internal class SelectedProjectionChecks(selection: PreparedFactorProjections, en
         }
         return if (result == ComponentCheck.Feasible && (checker.fixpointCancelled || cancellation())) {
             ComponentCheck.Indeterminate
-        } else {
-            result
-        }
+        } else result
     }
 
     private fun checkPoint(

@@ -15,12 +15,7 @@ internal class FactorProjectionPreparation {
 
     fun mddIndex(mdd: Mdd): MddTransitionIndex = diagrams.getOrPut(
         DiagramRelation(
-            mdd.transitions,
-            mdd.layerStarts,
-            mdd.numStatesPerLayer,
-            mdd.recordStride,
-            mdd.initial,
-            mdd.accepting,
+            mdd.transitions, mdd.layerStarts, mdd.numStatesPerLayer, mdd.recordStride, mdd.initial, mdd.accepting,
         ),
     ) {
         MddTransitionIndex.build(mdd.transitions, mdd.layerStarts, mdd.numStatesPerLayer, mdd.recordStride)

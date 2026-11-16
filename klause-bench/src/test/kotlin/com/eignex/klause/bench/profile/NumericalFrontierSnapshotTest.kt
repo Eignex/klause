@@ -28,25 +28,17 @@ class NumericalFrontierSnapshotTest {
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
     private val half = BigFraction.ofLong(2).reciprocal()
     private val context = SourceProofContext(
-        SourceScope(
-            SourceRevision("frontier", "exact"),
-            objective = SourceObjective("x", ObjectiveSense.MINIMIZE)
-        ),
+        SourceScope(SourceRevision("frontier", "exact"),
+            objective = SourceObjective("x", ObjectiveSense.MINIMIZE)),
         setOf(integer),
-        mapOf(
-            "half" to SourcePremise(
-                SourceInequality(
-                    mapOf(integer to BigFraction.ofLong(-2)),
-                    BigFraction.MINUS_ONE
-                )
-            )
-        ),
-        mapOf(integer to BigFraction.ONE)
+        mapOf("half" to SourcePremise(SourceInequality(
+            mapOf(integer to BigFraction.ofLong(-2)), BigFraction.MINUS_ONE))),
+        mapOf(integer to BigFraction.ONE),
     )
     private val evidence = SourceEvidence(
         context.scope.copy(condition = SourceCondition(lower = mapOf(integer to BigFraction.ZERO))),
         SourceClaim.Bound(SourceValue.Rational(half)),
-        SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half"))))
+        SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half")))),
     )
 
     @Test
@@ -68,16 +60,8 @@ class NumericalFrontierSnapshotTest {
 
     @Test
     fun `selection inspection should check sibling evidence in its original scope`() {
-        val current = SourceProofContext(
-            context.scope.copy(
-                condition = SourceCondition(
-                    lower = mapOf(integer to BigFraction.ONE)
-                )
-            ),
-            context.coordinates,
-            context.premises,
-            context.objective
-        )
+        val current = SourceProofContext(context.scope.copy(condition = SourceCondition(
+            lower = mapOf(integer to BigFraction.ONE))), context.coordinates, context.premises, context.objective)
         val sibling = evidence.copy(derivation = LinearPinnedObjective(evidence.derivation))
 
         val inspected = NumericalSelectionSnapshot(ExecutionControl.Never).evidence(current, sibling)
@@ -112,11 +96,8 @@ class NumericalFrontierSnapshotTest {
     @Test
     fun `a stronger captured claim should fail its certificate check`() {
         val snapshot = NumericalFrontierSnapshot(context, ExecutionControl.Never)
-        val forged = SourceEvidence(
-            evidence.scope,
-            SourceClaim.Bound(SourceValue.Rational(BigFraction.ONE)),
-            evidence.derivation
-        )
+        val forged = SourceEvidence(evidence.scope, SourceClaim.Bound(SourceValue.Rational(BigFraction.ONE)),
+            evidence.derivation)
 
         assertFailsWith<IllegalStateException> { snapshot.bound(forged) }
     }
@@ -124,12 +105,10 @@ class NumericalFrontierSnapshotTest {
     @Test
     fun `a foreign captured revision should fail before certificate reuse`() {
         val snapshot = NumericalFrontierSnapshot(context, ExecutionControl.Never)
-        val foreign = SourceEvidence(
-            evidence.scope.copy(revision = SourceRevision("foreign", "exact")),
-            evidence.claim,
-            evidence.derivation
-        )
+        val foreign = SourceEvidence(evidence.scope.copy(revision = SourceRevision("foreign", "exact")),
+            evidence.claim, evidence.derivation)
 
         assertFailsWith<IllegalStateException> { snapshot.bound(foreign) }
     }
+
 }

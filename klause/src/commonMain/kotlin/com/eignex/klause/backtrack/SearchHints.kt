@@ -23,11 +23,12 @@ import com.eignex.klause.ir.ValueSelection
 import com.eignex.klause.ir.VariableSelection
 
 /** Convert neutral search intent into backtrack-ready parameters. */
-fun SearchHints.toBacktrackParams(numBoolVars: Int, numIntVars: Int): BacktrackParams = BacktrackParams(
-    variableSelector = fallbackVarSelector.toVariableSelector()
-        .let { fallback -> TieredVariableSelector(this.tiers.map { it.toSearchTier() }, fallback = fallback) },
-    valueSelector = toValueSelector(numBoolVars, numIntVars),
-)
+fun SearchHints.toBacktrackParams(numBoolVars: Int, numIntVars: Int): BacktrackParams =
+    BacktrackParams(
+        variableSelector = fallbackVarSelector.toVariableSelector()
+            .let { fallback -> TieredVariableSelector(this.tiers.map { it.toSearchTier() }, fallback = fallback) },
+        valueSelector = toValueSelector(numBoolVars, numIntVars),
+    )
 
 private fun SearchHints.toValueSelector(numBoolVars: Int, numIntVars: Int): ValueSelector {
     val tiers = tiers.map { it.toSearchTier() }

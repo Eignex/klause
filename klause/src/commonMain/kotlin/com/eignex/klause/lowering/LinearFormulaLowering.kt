@@ -8,15 +8,11 @@ import com.eignex.klause.util.pollStop
 internal class LinearFormulaLowering(private val cancellation: ExecutionControl) {
     private val accounting = cancellation.accounting
     private val admission = cancellation.admission
-
     fun relation(form: LinearForm): List<List<LinearRow>> {
         require(form !is LinearForm.Relaxation) { "a relaxation cannot enforce a source factor" }
         checkpoint(form.rows.size.toLong() + 1)
-        return if (form is LinearForm.Disjunction) {
-            listOf(form.rows.toList())
-        } else {
-            form.rows.map { listOf(it) }
-        }
+        return if (form is LinearForm.Disjunction) listOf(form.rows.toList())
+        else form.rows.map { listOf(it) }
     }
 
     fun and(operands: List<List<List<LinearRow>>>): List<List<LinearRow>> {
@@ -28,11 +24,9 @@ internal class LinearFormulaLowering(private val cancellation: ExecutionControl)
         var clauses: List<List<LinearRow>> = listOf(emptyList())
         for (operand in operands) {
             val next = ArrayList<List<LinearRow>>()
-            for (left in clauses) {
-                for (right in operand) {
-                    checkpoint(left.size.toLong() + right.size + 1)
-                    next += left + right
-                }
+            for (left in clauses) for (right in operand) {
+                checkpoint(left.size.toLong() + right.size + 1)
+                next += left + right
             }
             clauses = next
         }
@@ -42,20 +36,15 @@ internal class LinearFormulaLowering(private val cancellation: ExecutionControl)
     fun forms(clauses: List<List<LinearRow>>): List<LinearForm> {
         checkpoint(clauses.size.toLong() + 1)
         val singletons = clauses.filter { it.size == 1 }.map { it.single() }
-        return (
-            if (singletons.isNotEmpty() || clauses.isEmpty()) {
-                listOf(LinearForm.Conjunction(singletons))
-            } else {
-                emptyList()
-            }
-            ) +
+        return (if (singletons.isNotEmpty() || clauses.isEmpty()) listOf(LinearForm.Conjunction(singletons))
+        else emptyList()) +
             clauses.filter { it.size != 1 }.map { LinearForm.Disjunction(it) }
     }
 
     fun checkpoint(units: Long = 1) {
         if (cancellation.pollStop()) throw LinearEncodingInterrupted()
         accounting?.charge(units)
-        if (admission?.exhausted == true || cancellation.pollStop()) throw LinearEncodingInterrupted()
+        if (admission?.exhausted == true ||cancellation.pollStop()) throw LinearEncodingInterrupted()
     }
 }
 

@@ -17,12 +17,10 @@ internal fun SourceProofContext.linearValue(sample: Sample, cancellation: Execut
                 if (coordinate.id !in 0 until sample.numBoolVars) return null
                 if (sample.boolValue(coordinate.id)) BigFraction.ONE else BigFraction.ZERO
             }
-
             SourceCoordinate.Kind.Integer -> {
                 if (coordinate.id !in 0 until sample.numIntVars) return null
                 BigFraction.of(sample.exactIntValue(coordinate.id), BIG_ONE)
             }
-
             SourceCoordinate.Kind.Real -> sample.exactReals?.getOrNull(coordinate.id) ?: return null
         }
         value += weight * scalar

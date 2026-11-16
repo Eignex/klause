@@ -41,8 +41,11 @@ internal fun cliInvocationStats(common: CommonOptions, rendering: SourceRenderin
         common.frontendRouting,
         when (rendering) {
             is SourceRendering.LinearSource -> "linear-source"
+
             is SourceRendering.ExactSource -> rendering.nativePipelineName(requireNotNull(kind))
+
             SourceRendering.FiniteCp -> "finite-cp"
+
             is SourceRendering.Interrupted -> "interrupted"
         },
         when (rendering) {

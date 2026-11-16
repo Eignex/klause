@@ -162,9 +162,11 @@ internal class QuadraticWorkerAdapter(
         if (proofScope == null || native.stopped) { terminal = partial(); return }
         prepare()
         readIncumbent()?.let { accept(it) }
-        val stop = params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native.polynomial or global
+        val stop = params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native
+            .polynomial or global
         val cursor = traversal ?: QuadraticTraversalCursor(finite, params.strategy.backtrack.copy(
-            assumptions = assumptions, cancellation = params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native.polynomial,
+            assumptions = assumptions, cancellation =
+                params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native.polynomial,
             minHammingDistance = 0, recentWindow = 0,
         ), sink, { native.work }) { sample, cancellation ->
             completion.check(sample, condition(sample), cancellation)
@@ -305,7 +307,8 @@ internal class QuadraticWorkerAdapter(
 
     private fun heuristic(adaptive: Boolean): QuadraticOptimizationResult {
         val cursor = neighborhood(adaptive)
-        cursor.advance(params.strategy.localSearch.cancellation.withAccounting(native.polynomial) or native.polynomial, Long.MAX_VALUE)
+        cursor.advance(params.strategy.localSearch.cancellation.withAccounting(native.polynomial) or native
+            .polynomial, Long.MAX_VALUE)
         return partial()
     }
 

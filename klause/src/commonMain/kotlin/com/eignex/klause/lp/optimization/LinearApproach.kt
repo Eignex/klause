@@ -42,32 +42,20 @@ class LinearPinnedRefutation(
 
 /** Checks linear optimization evidence against complete, consumer-owned exact affine source semantics. */
 class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceSemanticsChecker {
-    private val exact = LinearSourceSemanticsChecker(
-        source.coordinates,
-        source.premises.values.toList(),
-        source.objective,
-        source.objectiveConstant,
-    )
+    private val exact = LinearSourceSemanticsChecker(source.coordinates, source.premises.values.toList(),
+        source.objective, source.objectiveConstant)
 
     override fun witness(sample: Sample, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck =
         exact.witness(sample, scope, cancellation).let { checked ->
-            if (checked != SourceEvidenceCheck.Checked) {
-                checked
-            } else {
-                source.semanticsChecker?.witness(sample, scope, cancellation) ?: checked
-            }
+            if (checked != SourceEvidenceCheck.Checked) checked
+            else source.semanticsChecker?.witness(sample, scope, cancellation) ?: checked
         }
 
     override fun objectiveEquals(
-        sample: Sample,
-        value: SourceValue,
-        scope: SourceScope,
-        cancellation: ExecutionControl,
+        sample: Sample, value: SourceValue, scope: SourceScope, cancellation: ExecutionControl,
     ): SourceEvidenceCheck = if (source.affineObjectiveAvailable) {
         exact.objectiveEquals(sample, value, scope, cancellation)
-    } else {
-        SourceEvidenceCheck.Unavailable("exact affine objective unavailable")
-    }
+    } else SourceEvidenceCheck.Unavailable("exact affine objective unavailable")
 
     override fun ray(claim: SourceClaim.Ray, scope: SourceScope, cancellation: ExecutionControl): SourceEvidenceCheck {
         val base = witness(claim.sample, scope, cancellation)
@@ -75,26 +63,18 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
     }
 
     override fun derivation(
-        claim: SourceClaim,
-        derivation: SourceDerivation.Extension,
-        scope: SourceScope,
-        cancellation: ExecutionControl,
+        claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope, cancellation: ExecutionControl,
     ): SourceEvidenceCheck {
         if (derivation is LinearActiveRefutation) {
             if (!compatible(scope) || (claim != SourceClaim.Refutation && claim !is SourceClaim.Bound) ||
-                (claim is SourceClaim.Bound && scope.objective == null)
-            ) {
+                (claim is SourceClaim.Bound && scope.objective == null)) {
                 return SourceEvidenceCheck.Rejected("active rows establish only a scoped contradiction")
             }
-            val numeric = source.atScope(scope).activeNumericContext(
-                cancellation,
-                retainGuardedRows = derivation.alternatives,
-            )
+            val numeric = source.atScope(scope).activeNumericContext(cancellation,
+                retainGuardedRows = derivation.alternatives)
                 ?: return SourceEvidenceCheck.Unavailable("active row capture incomplete")
             return SourceEvidenceVerifier(numeric).verify(
-                SourceEvidence(scope, SourceClaim.Refutation, derivation.conflict),
-                cancellation,
-            )
+                SourceEvidence(scope, SourceClaim.Refutation, derivation.conflict), cancellation)
         }
         if (claim != SourceClaim.Refutation && !source.affineObjectiveAvailable) {
             return SourceEvidenceCheck.Unavailable("exact affine objective unavailable")
@@ -105,25 +85,17 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
             if (!compatible(scope) || source.coordinates.any {
                     it.kind == SourceCoordinate.Kind.Boolean && it.id !in scope.condition.bools
                 }
-            ) {
-                return SourceEvidenceCheck.Rejected("linear refutation requires complete Boolean scope")
-            }
+            ) return SourceEvidenceCheck.Rejected("linear refutation requires complete Boolean scope")
             return SourceEvidenceVerifier(source.atScope(scope).numericContext()).verify(
-                SourceEvidence(scope, claim, derivation.conflict),
-                cancellation,
-            )
+                SourceEvidence(scope, claim, derivation.conflict), cancellation)
         }
         if (claim is SourceClaim.Bound && derivation is LinearPinnedObjective) {
             if (!compatible(scope) || source.coordinates.any {
                     it.kind == SourceCoordinate.Kind.Boolean && it.id !in scope.condition.bools
                 }
-            ) {
-                return SourceEvidenceCheck.Rejected("linear bound requires complete Boolean scope")
-            }
+            ) return SourceEvidenceCheck.Rejected("linear bound requires complete Boolean scope")
             return SourceEvidenceVerifier(source.atScope(scope).numericContext()).verify(
-                SourceEvidence(scope, claim, derivation.bound),
-                cancellation,
-            )
+                SourceEvidence(scope, claim, derivation.bound), cancellation)
         }
         if (claim !is SourceClaim.Limit || derivation !is LinearApproach) {
             return SourceEvidenceCheck.Unavailable("unsupported linear authority derivation")
@@ -134,21 +106,13 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
         val base = derivation.base ?: claim.sample
         val feasible = witness(base, scope, cancellation)
         if (feasible != SourceEvidenceCheck.Checked) return feasible
-        val bound = SourceEvidenceVerifier(source.atScope(scope).withLinearAuthority()).verify(
-            SourceEvidence(
-                scope,
-                SourceClaim.Bound(claim.value, strict = true),
-                derivation.strictBound,
-            ),
-            cancellation,
-        )
+        val bound = SourceEvidenceVerifier(source.atScope(scope).withLinearAuthority()).verify(SourceEvidence(scope,
+            SourceClaim.Bound(claim.value, strict = true), derivation.strictBound), cancellation)
         if (bound != SourceEvidenceCheck.Checked) return bound
         val endpoint = derivation.endpoint
         if (endpoint.numBoolVars != base.numBoolVars || endpoint.numIntVars != base.numIntVars ||
             endpoint.numRealVars != base.numRealVars
-        ) {
-            return SourceEvidenceCheck.Rejected("linear approach coordinates are incomplete")
-        }
+        ) return SourceEvidenceCheck.Rejected("linear approach coordinates are incomplete")
         for (id in 0 until endpoint.numBoolVars) {
             if (cancellation()) return SourceEvidenceCheck.Unavailable("linear approach check cancelled")
             if (endpoint.boolValue(id) != base.boolValue(id)) {
@@ -161,19 +125,9 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
                 return SourceEvidenceCheck.Rejected("linear approach changes an integer coordinate")
             }
         }
-        val closure = LinearSourceSemanticsChecker(
-            source.coordinates,
-            source.premises.values.map {
-                SourcePremise(
-                    SourceInequality(it.inequality.coefficients, it.inequality.rhs),
-                    it.guards,
-                    it
-                        .integerPins,
-                )
-            },
-            source.objective,
-            source.objectiveConstant,
-        )
+        val closure = LinearSourceSemanticsChecker(source.coordinates, source.premises.values.map {
+            SourcePremise(SourceInequality(it.inequality.coefficients, it.inequality.rhs), it.guards, it.integerPins)
+        }, source.objective, source.objectiveConstant)
         // Positive mixtures preserve strict affine rows. Fixed discrete coordinates preserve the source lattice.
         return closure.objectiveEquals(endpoint, claim.value, scope, cancellation)
     }
@@ -188,26 +142,15 @@ class LinearAuthoritySemantics(private val source: SourceProofContext) : SourceS
  * omitted nonlinear constraints or rounded source correspondence do not acquire authority here.
  */
 fun SourceProofContext.withLinearAuthority(): SourceProofContext = SourceProofContext(
-    scope,
-    coordinates,
-    premises,
-    objective.takeIf { affineObjectiveAvailable },
-    objectiveConstant,
-    LinearAggregateAuthoritySemantics(LinearAuthoritySemantics(this)),
-    semantics,
+    scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant,
+    LinearAggregateAuthoritySemantics(LinearAuthoritySemantics(this)), semantics,
 )
 
 private class LinearAggregateAuthoritySemantics(delegate: SourceSemanticsChecker) :
-    SourceSemanticsChecker by delegate,
-    SourceIntegerAggregateSemantics
+    SourceSemanticsChecker by delegate, SourceIntegerAggregateSemantics
 
 internal fun SourceProofContext.atScope(scope: SourceScope): SourceProofContext = SourceProofContext(
-    scope,
-    coordinates,
-    premises,
-    objective.takeIf { affineObjectiveAvailable },
-    objectiveConstant,
-    semanticsChecker,
+    scope, coordinates, premises, objective.takeIf { affineObjectiveAvailable }, objectiveConstant, semanticsChecker,
     semantics,
 )
 
@@ -219,53 +162,28 @@ internal fun SourceProofContext.numericCoordinates(): List<SourceCoordinate> = c
     .filter { it.kind != SourceCoordinate.Kind.Boolean }.sortedWith(compareBy({ it.kind.ordinal }, { it.id }))
 
 internal fun SourceProofContext.pinnedConstant(): BigFraction = objective.entries.fold(objectiveConstant) {
-        sum,
-        (id, value),
-    ->
+        sum, (id, value), ->
     if (id.kind == SourceCoordinate.Kind.Boolean) {
         sum + if (scope.condition.bools.getValue(id.id)) value else BigFraction.ZERO
-    } else {
-        sum
-    }
+    } else sum
 }
 
 internal fun SourceProofContext.numericContext(): SourceProofContext {
     val sourceCoordinates = coordinates
     if (sourceCoordinates.none { it.kind == SourceCoordinate.Kind.Boolean }) {
-        return SourceProofContext(
-            scope,
-            sourceCoordinates,
-            premises,
-            objective,
-            objectiveConstant,
-            semantics = semantics,
-        )
+        return SourceProofContext(scope, sourceCoordinates, premises, objective, objectiveConstant,
+            semantics = semantics)
     }
     val rows = premises.mapValues { (_, premise) ->
         val boolTerms = premise.inequality.coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Boolean }
         val offset = boolTerms.entries.fold(BigFraction.ZERO) { sum, (id, value) ->
             sum + if (scope.condition.bools.getValue(id.id)) value else BigFraction.ZERO
         }
-        SourcePremise(
-            SourceInequality(
-                premise.inequality.coefficients.filterKeys {
-                    it.kind != SourceCoordinate.Kind.Boolean
-                },
-                premise.inequality.rhs - offset,
-                premise.inequality.strict,
-            ),
-            premise.guards,
-            premise.integerPins,
-        )
-    }
-    return SourceProofContext(
-        scope,
-        sourceCoordinates,
-        rows,
-        objective.filterKeys {
+        SourcePremise(SourceInequality(premise.inequality.coefficients.filterKeys {
             it.kind != SourceCoordinate.Kind.Boolean
-        },
-        pinnedConstant(),
-        semantics = semantics,
-    )
+        }, premise.inequality.rhs - offset, premise.inequality.strict), premise.guards, premise.integerPins)
+    }
+    return SourceProofContext(scope, sourceCoordinates, rows, objective.filterKeys {
+        it.kind != SourceCoordinate.Kind.Boolean
+    }, pinnedConstant(), semantics = semantics)
 }

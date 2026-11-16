@@ -15,29 +15,17 @@ import kotlin.test.assertSame
 class PolynomialSourcePreparationTest {
     @Test
     fun `factor backed polynomial preparation should rebuild after removing a dependent real equality`() {
-        val source = Problem(
-            0,
-            0,
-            emptyArray(),
-            arrayOf<Factor>(
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 1.0),
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1, 2), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 2.0),
-                Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 2), doubleArrayOf(1.0, -1.0), LinearOp.EQ, -1.0),
-                ContinuousProduct(0, 0, 1),
-            ),
-            numRealVars = 3,
-            realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
-            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY },
-        )
+        val source = Problem(0, 0, emptyArray(), arrayOf<Factor>(
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 1.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(1, 2), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 2.0),
+            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 2), doubleArrayOf(1.0, -1.0), LinearOp.EQ, -1.0),
+            ContinuousProduct(0, 0, 1),
+        ), numRealVars = 3, realLower = DoubleArray(3) { Double.NEGATIVE_INFINITY },
+            realUpper = DoubleArray(3) { Double.POSITIVE_INFINITY })
         val request = source.pipelineRequest()
 
-        val prepared = request.prepareSource(
-            PresolveConfig.parse("off,+dependent-rows"),
-            null,
-            ExecutionControl.Never,
-            ExecutionControl.Never,
-            null,
-        )
+        val prepared = request.prepareSource(PresolveConfig.parse("off,+dependent-rows"), null,
+            ExecutionControl.Never, ExecutionControl.Never, null)
         val rebuilt = assertNotNull(request.afterSourcePreparation(prepared, ExecutionControl.Never))
 
         assertEquals(3, prepared.problem.factors.size)

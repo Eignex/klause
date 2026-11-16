@@ -23,12 +23,8 @@ class BooleanCoverageAttributionTest {
     fun `real finite replicas should attribute exact duplicate branch regions`() {
         val model = Problem(3, 0, emptyArray(), arrayOf(Clause(intArrayOf(0, 2, 4)))).bake()
         val capture = BooleanCoverageAttribution(context)
-        val params = BacktrackParams(
-            randomSeed = 17,
-            nativeSat = false,
-            variableSelector = InputOrder,
-            valueSelector = IndomainMin,
-        )
+        val params = BacktrackParams(randomSeed = 17, nativeSat = false,
+            variableSelector = InputOrder, valueSelector = IndomainMin)
 
         for (worker in 0..1) {
             val result = BacktrackSolver(model).solve(params.copy(branchObserver = capture.observer(worker, 3)))
@@ -42,17 +38,10 @@ class BooleanCoverageAttributionTest {
 
     @Test
     fun `actual refuted replicas should attribute completed native coverage separately from visits`() {
-        val model = Problem(
-            2,
-            0,
-            emptyArray(),
-            arrayOf(
-                Clause(intArrayOf(0, 2)),
-                Clause(intArrayOf(0, 3)),
-                Clause(intArrayOf(1, 2)),
-                Clause(intArrayOf(1, 3)),
-            ),
-        ).bake()
+        val model = Problem(2, 0, emptyArray(), arrayOf(
+            Clause(intArrayOf(0, 2)), Clause(intArrayOf(0, 3)),
+            Clause(intArrayOf(1, 2)), Clause(intArrayOf(1, 3)),
+        )).bake()
         val capture = BooleanCoverageAttribution(context)
 
         for (worker in 0..1) {

@@ -24,29 +24,21 @@ internal class PolynomialPredicateSharing(
     private val definitionPredicates = HashMap<PolynomialAtom, Int>()
 
     fun rewrite(root: Int): Int {
-        val predicates = if (definitions.isEmpty()) {
-            null
-        } else {
-            IntArray(originalAtoms.size) { index ->
-                arithmetic.step()
-                val atom = originalAtoms[index]
-                val nodeIndex = predicate(atom)
-                if (atom !in definitionPredicates) definitionPredicates[atom] = nodeIndex
-                nodeIndex
-            }
+        val predicates = if (definitions.isEmpty()) null else IntArray(originalAtoms.size) { index ->
+            arithmetic.step()
+            val atom = originalAtoms[index]
+            val nodeIndex = predicate(atom)
+            if (atom !in definitionPredicates) definitionPredicates[atom] = nodeIndex
+            nodeIndex
         }
         val indices = IntArray(originalNodes.size)
         for ((index, node) in originalNodes.withIndex()) {
             arithmetic.step()
             indices[index] = when (node) {
                 is FormulaNode.Atom -> predicates?.get(node.atom) ?: predicate(originalAtoms[node.atom])
-
                 is FormulaNode.Not -> negate(indices[node.child])
-
                 is FormulaNode.Constant -> constant(node.value)
-
                 is FormulaNode.BooleanVariable -> boolean(node)
-
                 is FormulaNode.Junction -> {
                     val children = IntArray(node.children.size) {
                         arithmetic.step()
@@ -102,12 +94,10 @@ internal class PolynomialPredicateSharing(
             used[index] = true
             when (val node = nodes[index]) {
                 is FormulaNode.Not -> pending.addLast(node.child)
-
                 is FormulaNode.Junction -> for (child in node.children) {
                     arithmetic.step()
                     pending.addLast(child)
                 }
-
                 else -> Unit
             }
         }
@@ -118,26 +108,18 @@ internal class PolynomialPredicateSharing(
             arithmetic.step()
             if (!used[index]) continue
             indices[index] = retainedNodes.size
-            retainedNodes.add(
-                when (node) {
-                    is FormulaNode.Atom -> {
-                        retainedAtoms.add(atoms[node.atom])
-                        FormulaNode.Atom(retainedAtoms.lastIndex)
-                    }
-
-                    is FormulaNode.Not -> FormulaNode.Not(indices[node.child])
-
-                    is FormulaNode.Junction -> FormulaNode.Junction(
-                        IntArray(node.children.size) {
-                            arithmetic.step()
-                            indices[node.children[it]]
-                        },
-                        node.conjunction,
-                    )
-
-                    else -> node
-                },
-            )
+            retainedNodes.add(when (node) {
+                is FormulaNode.Atom -> {
+                    retainedAtoms.add(atoms[node.atom])
+                    FormulaNode.Atom(retainedAtoms.lastIndex)
+                }
+                is FormulaNode.Not -> FormulaNode.Not(indices[node.child])
+                is FormulaNode.Junction -> FormulaNode.Junction(IntArray(node.children.size) {
+                    arithmetic.step()
+                    indices[node.children[it]]
+                }, node.conjunction)
+                else -> node
+            })
         }
         arithmetic.step()
         nodes.clear()
@@ -153,12 +135,7 @@ internal class PolynomialPredicateSharing(
             arithmetic.step()
             if (node is FormulaNode.BooleanVariable) variables.add(node.variable)
         }
-        return variables.sortedWith(
-            Comparator { left, right ->
-                arithmetic.step()
-                left.compareTo(right)
-            },
-        )
+        return variables.sortedWith(Comparator { left, right -> arithmetic.step(); left.compareTo(right) })
     }
 
     private fun predicate(atom: PolynomialAtom): Int {

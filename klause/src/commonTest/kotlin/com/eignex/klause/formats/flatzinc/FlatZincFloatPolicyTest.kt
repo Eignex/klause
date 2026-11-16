@@ -147,12 +147,8 @@ class FlatZincFloatPolicyTest {
             solve satisfy;
         """.trimIndent()
 
-        val program = parseFlatZinc(
-            source,
-            exactFloats = true,
-            unboundedFloatLo = 0.5,
-            unboundedFloatHi = 0.5,
-        ).sourceProgram
+        val program = parseFlatZinc(source, exactFloats = true,
+            unboundedFloatLo = 0.5, unboundedFloatHi = 0.5).sourceProgram
 
         assertEquals(0, program.problem.numIntVars)
         assertTrue(program.problem.realLower.all { it == Double.NEGATIVE_INFINITY })

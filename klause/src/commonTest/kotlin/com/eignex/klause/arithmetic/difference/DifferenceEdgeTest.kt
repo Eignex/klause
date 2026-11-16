@@ -11,13 +11,8 @@ class DifferenceEdgeTest {
         val edges = ArrayList<DifferenceEdge>()
 
         val appended = appendDifferenceEdges(
-            intArrayOf(0),
-            { Long.MIN_VALUE },
-            LinearOp.LE,
-            0L,
-            DifferenceFragment.ZERO,
-            DifferenceEdge.ALWAYS,
-            edges,
+            intArrayOf(0), { Long.MIN_VALUE }, LinearOp.LE, 0L,
+            DifferenceFragment.ZERO, DifferenceEdge.ALWAYS, edges,
         )
 
         assertFalse(appended)
@@ -30,13 +25,8 @@ class DifferenceEdgeTest {
             val edges = ArrayList<DifferenceEdge>()
 
             val appended = appendDifferenceEdges(
-                intArrayOf(0),
-                { 1L },
-                relation,
-                Long.MIN_VALUE,
-                DifferenceFragment.ZERO,
-                DifferenceEdge.ALWAYS,
-                edges,
+                intArrayOf(0), { 1L }, relation, Long.MIN_VALUE,
+                DifferenceFragment.ZERO, DifferenceEdge.ALWAYS, edges,
             )
 
             assertFalse(appended, relation.toString())

@@ -159,23 +159,14 @@ internal class LpHints(
         val point = passivePoint
         val state = passiveState
         val stamp = solveStamp
-        val current = {
-            !cancelled() && passivePoint === point && passiveState === state &&
-                stamp == solveStamp && passivePointCurrent()
-        }
+        val current = { !cancelled() && passivePoint === point && passiveState === state &&
+            stamp == solveStamp && passivePointCurrent() }
         val proposed = LpPassiveVariableChoice.Candidate(proposal, value(proposal))
-        val reference = if (proposal == baseline) {
-            proposed
-        } else {
-            LpPassiveVariableChoice.Candidate(baseline, value(baseline))
-        }
-        val selected = choice.select(
-            proposed,
-            reference,
-            stamp,
+        val reference = if (proposal == baseline) proposed
+            else LpPassiveVariableChoice.Candidate(baseline, value(baseline))
+        val selected = choice.select(proposed, reference, stamp,
             fresh = current,
-            reliable = { history.hasTwoSidedSamples && history.score(proposal, value(proposal)).isFinite() },
-        )
+            reliable = { history.hasTwoSidedSamples && history.score(proposal, value(proposal)).isFinite() })
         if (choice.nominatedVariable != null && !current()) {
             choice.clear()
             directionalChoice = null
@@ -196,22 +187,13 @@ internal class LpHints(
         passiveState = null
     }
 
-    private fun value(variable: VarRef): Double = if (!freshRecord) {
-        Double.NaN
-    } else {
-        when (variable) {
-            is VarRef.IntVar -> if (intStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
-                intVal.getOrElse(variable.varId) { Double.NaN }
-            } else {
-                Double.NaN
-            }
-
-            is VarRef.Bool -> if (boolStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
-                boolVal.getOrElse(variable.varId) { Double.NaN }
-            } else {
-                Double.NaN
-            }
-        }
+    private fun value(variable: VarRef): Double = if (!freshRecord) Double.NaN else when (variable) {
+        is VarRef.IntVar -> if (intStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
+            intVal.getOrElse(variable.varId) { Double.NaN }
+        } else Double.NaN
+        is VarRef.Bool -> if (boolStamp.getOrElse(variable.varId) { -1 } == solveStamp) {
+            boolVal.getOrElse(variable.varId) { Double.NaN }
+        } else Double.NaN
     }
 
     private val intVal by lazy(LazyThreadSafetyMode.NONE) { DoubleArray(numIntVars) { Double.NaN } }

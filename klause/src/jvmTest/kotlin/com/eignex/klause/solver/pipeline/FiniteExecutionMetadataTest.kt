@@ -26,22 +26,12 @@ class FiniteExecutionMetadataTest(
             arrayOf(FiniteEngine.BACKTRACK, ExecutionOptions(), true),
             arrayOf(FiniteEngine.LOCAL_SEARCH, ExecutionOptions(), false),
             arrayOf(FiniteEngine.ALNS, ExecutionOptions(), false),
-            arrayOf(
-                FiniteEngine.MIXED,
-                ExecutionOptions(
-                ExecutionOption.backtrackArms(1),
-                ExecutionOption.localSearchArms(1),
-            ),
-                true
-            ),
-            arrayOf(
-                FiniteEngine.MIXED,
-                ExecutionOptions(
-                ExecutionOption.backtrackArms(0),
-                ExecutionOption.localSearchArms(1),
-            ),
-                false
-            ),
+            arrayOf(FiniteEngine.MIXED, ExecutionOptions(
+                ExecutionOption.backtrackArms(1), ExecutionOption.localSearchArms(1),
+            ), true),
+            arrayOf(FiniteEngine.MIXED, ExecutionOptions(
+                ExecutionOption.backtrackArms(0), ExecutionOption.localSearchArms(1),
+            ), false),
         )
     }
 
@@ -49,11 +39,8 @@ class FiniteExecutionMetadataTest(
     fun `finite satisfaction metadata should follow the selected worker mix`() {
         val shape = FiniteSolveShape(Problem(1, 0, emptyArray(), emptyArray()), false, false, null, null, null, null)
         val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioArms = 1).finiteRequest(
-            shape,
-            engine,
-            presolveConfig = PresolveConfig.NONE,
-            executionOptions = options,
-            nodeBudget = NodeBudget(4),
+            shape, engine, presolveConfig = PresolveConfig.NONE,
+            executionOptions = options, nodeBudget = NodeBudget(4),
         )
 
         val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -68,11 +55,8 @@ class FiniteExecutionMetadataTest(
         val objective = LinearObjective(intCoefficients = longArrayOf(1))
         val shape = FiniteSolveShape(problem, true, false, null, objective, 0, null)
         val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioArms = 1).finiteRequest(
-            shape,
-            engine,
-            presolveConfig = PresolveConfig.NONE,
-            executionOptions = options,
-            nodeBudget = NodeBudget(4),
+            shape, engine, presolveConfig = PresolveConfig.NONE,
+            executionOptions = options, nodeBudget = NodeBudget(4),
         )
 
         val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))

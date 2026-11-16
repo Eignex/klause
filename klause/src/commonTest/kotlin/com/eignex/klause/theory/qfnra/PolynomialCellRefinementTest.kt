@@ -24,15 +24,8 @@ class PolynomialCellRefinementTest {
         val algebraic = AlgebraicArithmetic(arithmetic)
         val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
 
-        val cell = assertNotNull(
-            CheckedPolynomialCell.rejected(
-                scope.predicates.single(),
-                scope,
-                algebraic.rational(BigFraction.ZERO),
-                arithmetic,
-                algebraic,
-            ),
-        )
+        val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+            algebraic.rational(BigFraction.ZERO), arithmetic, algebraic))
 
         assertFalse(cell.lowerClosed)
         assertFalse(cell.upperClosed)
@@ -50,15 +43,8 @@ class PolynomialCellRefinementTest {
             val algebraic = AlgebraicArithmetic(arithmetic)
             val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
 
-            val cell = assertNotNull(
-                CheckedPolynomialCell.rejected(
-                    scope.predicates.single(),
-                    scope,
-                    algebraic.rational(BigFraction.ZERO),
-                    arithmetic,
-                    algebraic,
-                ),
-            )
+            val cell = assertNotNull(CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+                algebraic.rational(BigFraction.ZERO), arithmetic, algebraic))
 
             assertTrue(cell.lowerClosed)
             assertTrue(cell.upperClosed)
@@ -76,13 +62,8 @@ class PolynomialCellRefinementTest {
         val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
         val predicate = PolynomialFormula.normalize(other.formula, arithmetic).atoms.single()
 
-        val cell = CheckedPolynomialCell.rejected(
-            predicate,
-            scope,
-            algebraic.rational(BigFraction.ZERO),
-            arithmetic,
-            algebraic,
-        )
+        val cell = CheckedPolynomialCell.rejected(predicate, scope, algebraic.rational(BigFraction.ZERO),
+            arithmetic, algebraic)
 
         assertNull(cell)
     }
@@ -96,13 +77,8 @@ class PolynomialCellRefinementTest {
         val algebraic = AlgebraicArithmetic(arithmetic)
         val scope = PolynomialCellScope.Source.prepare(source.formula, arithmetic)
 
-        val cell = CheckedPolynomialCell.rejected(
-            scope.predicates.single(),
-            scope,
-            algebraic.rational(BigFraction.ZERO),
-            arithmetic,
-            algebraic,
-        )
+        val cell = CheckedPolynomialCell.rejected(scope.predicates.single(), scope,
+            algebraic.rational(BigFraction.ZERO), arithmetic, algebraic)
 
         assertNull(cell)
     }
@@ -118,14 +94,8 @@ class PolynomialCellRefinementTest {
         val witness = assertIs<QfNraResult.Satisfiable>(result).assignment.realValue(0)
         val algebraic = AlgebraicArithmetic()
         assertTrue(algebraic.sign(witness) > 0)
-        assertEquals(
-            0,
-            algebraic.signAt(
-                PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                    .atoms.first().polynomial,
-                mapOf(0 to witness),
-            ),
-        )
+        assertEquals(0, algebraic.signAt(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .atoms.first().polynomial, mapOf(0 to witness)))
         assertTrue(query.checkedCells.isNotEmpty())
         assertTrue(query.checkedCells.size <= 8)
         assertTrue(assertNotNull(query.cellStats).work <= 16_384)
@@ -137,10 +107,8 @@ class PolynomialCellRefinementTest {
         val source = SmtLibPolynomial.parse(
             "(declare-const n Real) (declare-const x Real) (assert (= (* n n x x) 8))",
         )
-        val condition = PolynomialCondition(
-            lower = mapOf(0 to BigFraction.ofLong(2)),
-            upper = mapOf(0 to BigFraction.ofLong(2)),
-        )
+        val condition = PolynomialCondition(lower = mapOf(0 to BigFraction.ofLong(2)),
+            upper = mapOf(0 to BigFraction.ofLong(2)))
         val query = QfNraQuery(source.formula, 0, 2, QfNraParams(cellRefinement = true), condition)
 
         var result: QfNraResult? = null
@@ -156,12 +124,8 @@ class PolynomialCellRefinementTest {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         var cancelled = false
         val work = QfNraWork(QfNraParams(ExecutionControl { cancelled }))
-        val refinement = PolynomialCellRefinement(
-            source.formula,
-            PolynomialCondition(),
-            work,
-            PolynomialLimits(),
-        ) {}
+        val refinement = PolynomialCellRefinement(source.formula, PolynomialCondition(), work,
+            PolynomialLimits()) {}
         val normalized = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
         cancelled = true
 
@@ -202,13 +166,8 @@ class PolynomialCellRefinementTest {
     @Test
     fun `zero containing work prevents the optional producer from entering`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
-        val query = QfNraQuery(
-            source.formula,
-            0,
-            1,
-            QfNraParams(maximumWork = 0, cellRefinement = true),
-            PolynomialCondition(),
-        )
+        val query = QfNraQuery(source.formula, 0, 1,
+            QfNraParams(maximumWork = 0, cellRefinement = true), PolynomialCondition())
 
         val result = query.next()
 
@@ -221,13 +180,8 @@ class PolynomialCellRefinementTest {
     fun `cancellation after a completed cell preserves only that completed certificate`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         var stopped = false
-        val query = QfNraQuery(
-            source.formula,
-            0,
-            1,
-            QfNraParams(ExecutionControl { stopped }, cellRefinement = true),
-            PolynomialCondition(),
-        )
+        val query = QfNraQuery(source.formula, 0, 1,
+            QfNraParams(ExecutionControl { stopped }, cellRefinement = true), PolynomialCondition())
         query.checkedCellObserver = { stopped = true }
 
         var result: QfNraResult? = null
@@ -242,12 +196,8 @@ class PolynomialCellRefinementTest {
     fun `statistics snapshots remain stable while the producer advances`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
         val work = QfNraWork(QfNraParams())
-        val refinement = PolynomialCellRefinement(
-            source.formula,
-            PolynomialCondition(),
-            work,
-            PolynomialLimits(),
-        ) {}
+        val refinement = PolynomialCellRefinement(source.formula, PolynomialCondition(), work,
+            PolynomialLimits()) {}
         val before = refinement.stats
         val normalized = PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
 
@@ -260,13 +210,9 @@ class PolynomialCellRefinementTest {
     @Test
     fun `a dense representation refusal publishes no checked cell`() {
         val source = SmtLibPolynomial.parse("(declare-const x Real) (assert (= (* x x) 2))")
-        val query = QfNraQuery(
-            source.formula,
-            0,
-            1,
+        val query = QfNraQuery(source.formula, 0, 1,
             QfNraParams(polynomialLimits = PolynomialLimits(maxDenseCoefficients = 2), cellRefinement = true),
-            PolynomialCondition(),
-        )
+            PolynomialCondition())
 
         var result: QfNraResult? = null
         while (result == null) result = query.next()
@@ -320,12 +266,8 @@ class PolynomialCellRefinementTest {
         val reduction = PolynomialAffineReduction.prepare(normalized, premises, 2, arithmetic)
             .asSequence().filterNotNull().first()
         val variable = reduction.atoms.first { it.polynomial.variables.isNotEmpty() }.polynomial.variables.single()
-        val refinement = PolynomialCellRefinement(
-            source.formula,
-            PolynomialCondition(),
-            QfNraWork(QfNraParams()),
-            PolynomialLimits(),
-        ) {}
+        val refinement = PolynomialCellRefinement(source.formula, PolynomialCondition(), QfNraWork(QfNraParams()),
+            PolynomialLimits()) {}
         refinement.prepare(normalized)
         val first = assertNotNull(refinement.region(normalized, premises, reduction))
         assertNotNull(first.repair(variable, AlgebraicArithmetic().rational(BigFraction.ZERO)))

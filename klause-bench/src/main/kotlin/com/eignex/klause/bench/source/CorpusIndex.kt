@@ -123,8 +123,7 @@ internal object CommittedCorpusIndexes {
                 }
                 CorpusIndex.Entry(
                     CorpusFiles.plainPath(file.relativeTo(collection).invariantSeparatorsPath),
-                    HexFormat.of().formatHex(digest.digest()),
-                    bytes,
+                    HexFormat.of().formatHex(digest.digest()), bytes,
                 )
             }.toList()
         return CorpusIndex(id, files)

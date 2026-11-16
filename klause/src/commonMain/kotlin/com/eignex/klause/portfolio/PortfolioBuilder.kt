@@ -104,26 +104,15 @@ object PortfolioBuilder {
         onGuidance: ((String, PooledGuidanceObservation) -> Unit)? = null,
     ): List<FinitePortfolioFactory> {
         val facts = ProblemFacts.of(problem, profile, scenario.lpCeiling, objective) { recipe, eligibility ->
-            onEvent?.invoke(
-                "portfolio",
-                SearchEvent.WorkerAdmission(
-                    recipe,
-                    eligibility.admitted,
-                    eligibility.requirements.toString(),
-                    eligibility.declines,
-                ),
-            )
+            onEvent?.invoke("portfolio", SearchEvent.WorkerAdmission(recipe, eligibility.admitted,
+                eligibility.requirements.toString(), eligibility.declines))
         }
         val plan = PortfolioComposition.plan(scenario, facts)
         val residuals = if (scenario.reportLsResiduals) plan.arms.map { it.withLsResiduals() } else plan.arms
         val timed = if (scenario.reportLsPhaseTimes) residuals.map { it.withLsPhaseTimes() } else residuals
-        val configs = if (bufferedPublications) {
-            timed.map {
-                if (it is LocalSearchWorkerConfig) it.withBufferedPublications() else it
-            }
-        } else {
-            timed
-        }
+        val configs = if (bufferedPublications) timed.map {
+            if (it is LocalSearchWorkerConfig) it.withBufferedPublications() else it
+        } else timed
         require(!scenario.earlyCoreAdmission || configs.any { it is CoreGuidedWorkerConfig }) {
             "core-early requires a roster that seats an eligible Boolean objective core worker"
         }
@@ -154,23 +143,15 @@ object PortfolioBuilder {
                 is AlnsWorkerConfig -> ArmFamily.Lns
             }
             FinitePortfolioFactory(armId, family) { index, seed, budget ->
-                val observed = if (config is AlnsWorkerConfig) {
-                    config.withSharingMemory(
-                        scenario.sharingMemory,
-                        scenario.sharingMemoryWork,
-                        scenario.sharingMemoryScratch,
-                        scenario.sharingMemoryBytes,
-                    )
-                } else {
-                    config
-                }
+                val observed = if (config is AlnsWorkerConfig) config.withSharingMemory(
+                    scenario.sharingMemory, scenario.sharingMemoryWork,
+                    scenario.sharingMemoryScratch, scenario.sharingMemoryBytes,
+                ) else config
                 val admitted = when {
                     config is CoreGuidedWorkerConfig && deferCore ->
                         scenario.diagnosticWorkLimit?.let { config.withWorkLimit(it) } ?: config.withActiveTimeLimit()
-
                     observed is AlnsWorkerConfig && scenario.diagnosticWorkLimit != null ->
                         observed.withWorkScheduling()
-
                     else -> observed
                 }
                 val completion = if (numericalCompletion) {
@@ -184,44 +165,29 @@ object PortfolioBuilder {
                 }
                 val tuned = (budget?.let(completion::withNodeBudget) ?: completion)
                     .withCoreRefinement(scenario.coreRefinement)
-                val queried = if (onLpQuery != null && tuned is BacktrackWorkerConfig) {
-                    tuned.withLpQueryObserver(onLpQuery)
-                } else {
-                    tuned
-                }
-                val bounded = if (onGuidance != null && queried is BacktrackWorkerConfig) {
-                    queried.withGuidanceObserver(onGuidance)
-                } else {
-                    queried
-                }
+                val queried = if (onLpQuery != null && tuned is BacktrackWorkerConfig)
+                    tuned.withLpQueryObserver(onLpQuery) else tuned
+                val bounded = if (onGuidance != null && queried is BacktrackWorkerConfig)
+                    queried.withGuidanceObserver(onGuidance) else queried
                 val privateCoordinates = objectiveCoordinates != null && bounded is LocalSearchWorkerConfig &&
                     config.label == LocalSearchArm.CblsPlateauIlsBasin.label &&
                     scenario.cores == 1 && scenario.engine == EngineMix.MIXED &&
                     scenario.lsPool == null && scenario.btPool == null
                 val worker = if (privateCoordinates) {
                     bounded.materializeObjectiveCoordinates(
-                        objectiveCoordinates,
-                        index,
-                        armId,
-                        seed,
-                        scenario.lsLambda,
-                        onEvent,
+                        objectiveCoordinates, index, armId, seed, scenario.lsLambda, onEvent,
                     )
-                } else {
-                    bounded.materialize(
-                        problem, index, armId, seed, scenario.lsLambda, objective, selectedObjective,
-                        selectedSweep, onEvent, pools,
-                    )
-                }
+                } else bounded.materialize(
+                    problem, index, armId, seed, scenario.lsLambda, objective, selectedObjective,
+                    selectedSweep, onEvent, pools,
+                )
                 worker.bindEvidence(ModelIdentity.of(problem, objective)).also {
                     it.role = plan.seats[armId]
                     it.earlyCoreTrial = config is CoreGuidedWorkerConfig && deferCore && scenario.earlyCoreAdmission
                     it.retainInitialProofCoverage = config is CoreGuidedWorkerConfig && deferCore
                     it.improvementOnly = if (config is CoreGuidedWorkerConfig && deferCore) {
                         !scenario.earlyCoreAdmission
-                    } else {
-                        armId >= plan.firstSolutionCount
-                    }
+                    } else armId >= plan.firstSolutionCount
                 }
                 onEvent?.let { observe ->
                     val authority = when {
@@ -229,32 +195,14 @@ object PortfolioBuilder {
                         worker.auxiliaryProof || worker.improvementOnly -> WorkerProofAuthority.CONDITIONED_TERMINALS
                         else -> WorkerProofAuthority.CHECKED_TERMINALS
                     }
-                    val requirements = WorkerRequirements(
-                        WorkerFragment.FINITE,
-                        if (family == ArmFamily.Backtrack) {
-                            WorkerObjectiveView.CANONICAL
-                        } else {
-                            WorkerObjectiveView.CANONICAL_WITH_GUIDANCE
-                        },
-                        authority,
-                        facts.construction,
-                        sourceMapping = if (privateCoordinates) {
-                            WorkerSourceMapping.CHECKED_RECONSTRUCTION
-                        } else {
-                            WorkerSourceMapping.WORKING_COORDINATES
-                        },
-                    )
-                    observe(
-                        "portfolio",
-                        SearchEvent.WorkerAdmission(
-                            config.label,
-                            true,
-                            requirements.toString(),
-                            emptyList(),
-                            selected = true,
-                            role = plan.seats[armId],
-                        ),
-                    )
+                    val requirements = WorkerRequirements(WorkerFragment.FINITE,
+                        if (family == ArmFamily.Backtrack) WorkerObjectiveView.CANONICAL
+                        else WorkerObjectiveView.CANONICAL_WITH_GUIDANCE,
+                        authority, facts.construction,
+                        sourceMapping = if (privateCoordinates) WorkerSourceMapping.CHECKED_RECONSTRUCTION
+                        else WorkerSourceMapping.WORKING_COORDINATES)
+                    observe("portfolio", SearchEvent.WorkerAdmission(config.label, true,
+                        requirements.toString(), emptyList(), selected = true, role = plan.seats[armId]))
                 }
                 worker
             }

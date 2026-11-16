@@ -58,21 +58,12 @@ import kotlin.time.TestTimeSource
 class CoreGuidedSearchTest {
     @Test
     fun `wide integer cost frontiers should exhaust their allowance without claiming attainment`() {
-        val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1_000_000_000L) },
-            arrayOf(
-                Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1_000_000_000L),
-            ),
-        ).bake()
+        val problem = Problem(0, 2, Array(2) { IntDomain(0, 1_000_000_000L) }, arrayOf(
+            Linear(longArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 1_000_000_000L),
+        )).bake()
         val objective = LinearObjective(intCoefficients = longArrayOf(Long.MAX_VALUE, Long.MAX_VALUE))
-        val search = CoreGuidedSearch(
-            problem,
-            objective,
-            BacktrackParams(nativeSat = false, randomSeed = 3L),
-            maximumWork = 2L,
-        )
+        val search = CoreGuidedSearch(problem, objective, BacktrackParams(nativeSat = false, randomSeed = 3L),
+            maximumWork = 2L)
 
         val stopped = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { error("unattained objective") }
         val charged = search.work
@@ -103,12 +94,8 @@ class CoreGuidedSearchTest {
             })
         })
         val objective = LinearObjective(longArrayOf(1))
-        val search = CoreGuidedSearch(
-            Problem(1, 0, emptyArray(), emptyArray()).bake(),
-            objective,
-            params,
-            timeSource = clock,
-        )
+        val search = CoreGuidedSearch(Problem(1, 0, emptyArray(), emptyArray()).bake(), objective,
+            params, timeSource = clock)
 
         val result = search.runSlice(token, 1_000L, -1L) {}
 
@@ -189,11 +176,8 @@ class CoreGuidedSearchTest {
 
         val stopped = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L) { error("unchecked candidate") }
         val charged = search.work
-        val resumed = search.runSlice(
-            ExecutionControl.Never,
-            Long.MAX_VALUE,
-            -1L,
-        ) { error("renewed unsupported query") }
+        val resumed = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE,
+            -1L) { error("renewed unsupported query") }
 
         assertEquals(TerminationReason.Unsupported, assertIs<MinimizeResult.Unknown>(stopped).reason)
         assertTrue(search.isDone)
@@ -433,11 +417,8 @@ class CoreGuidedSearchTest {
         val search = CoreGuidedSearch(source.bake(providers.prepare(source)), objective, BacktrackParams())
         val initialPreparation = search.preparationWork
 
-        val paused = search.runSlice(
-            ExecutionControl { cancelled },
-            Long.MAX_VALUE,
-            -1,
-        ) { error("interrupted opening") }
+        val paused = search.runSlice(ExecutionControl { cancelled }, Long.MAX_VALUE,
+            -1) { error("interrupted opening") }
         val charged = search.work
         val chargedPreparation = search.preparationWork
         cancelled = false

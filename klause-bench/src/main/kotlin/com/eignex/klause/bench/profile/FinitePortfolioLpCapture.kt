@@ -53,15 +53,11 @@ internal object FinitePortfolioLpCapture {
 
     internal fun parameters(options: Map<String, String>): List<String> {
         val required = setOf("suite", "problem", "sha256", "seed", "handoff")
-        require(
-            options.keys.containsAll(required) && (options.keys - required).all {
-                it in setOf(
-                    "timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
-                    "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
-                    "source-refutation-center-step",
-                )
-            },
-        )
+        require(options.keys.containsAll(required) && (options.keys - required).all {
+            it in setOf("timeout-ms", "captures", "cutoff-bits", "capture-worker", "capture-route", "capture-guidance",
+                "portfolio-policy", "portfolio-progress", "capture-mode", "inspect-rays",
+                "source-refutation-center-step")
+        })
         val mode = options["capture-mode"] ?: "portfolio"
         require(mode in setOf("portfolio", "joint-before", "joint-ordinary"))
         val centerStep = options["source-refutation-center-step"]?.let {
@@ -77,36 +73,24 @@ internal object FinitePortfolioLpCapture {
         val progress = options["portfolio-progress"]?.toBooleanStrict() ?: (mode == "portfolio")
         if (mode in setOf("joint-before", "joint-ordinary")) {
             require(handoff && preset == "complete" && !progress)
-            require(
-                options.keys.none {
-                    it in setOf(
-                        "cutoff-bits",
-                        "capture-worker",
-                        "capture-route",
-                        "capture-guidance",
-                    )
-                },
-            )
+            require(options.keys.none { it in setOf("cutoff-bits", "capture-worker", "capture-route",
+                "capture-guidance") })
             if (mode == "joint-ordinary") require((options["captures"]?.toInt() ?: 0) == 0)
-            return listOf(
-                "companion-integers=true", "companion-active-ms=4000",
+            return listOf("companion-integers=true", "companion-active-ms=4000",
                 "companion-after-incumbent=false", "companion-admission=ordinary", "companion-repair=fixed",
                 "source-incumbent-completion=true", "portfolio-progress=false",
-                "portfolio-proof-workers=complete", "portfolio-proof-share=0.5",
-            ) +
+                "portfolio-proof-workers=complete", "portfolio-proof-share=0.5") +
                 listOfNotNull(centerStep?.let { "source-refutation-center-step=$it" })
         }
         if (preset == "ordinary") {
             require(!handoff) { "ordinary portfolio policy requires handoff=false" }
             return listOf("portfolio-progress=$progress")
         }
-        return listOf(
-            "companion-integers=true", "companion-active-ms=4000",
+        return listOf("companion-integers=true", "companion-active-ms=4000",
             "companion-after-incumbent=true", "companion-admission=progress-funded", "companion-repair=fixed",
             "source-incumbent-completion=$handoff", "portfolio-progress=$progress", "portfolio-reward=ordinary",
             "phase-retention=0.25", "reseed-stale-threshold=3", "portfolio-probes=ordinary",
-            "portfolio-proof-workers=$preset", "portfolio-proof-share=0.5",
-        )
+            "portfolio-proof-workers=$preset", "portfolio-proof-share=0.5")
     }
 
     internal fun inspect(options: Map<String, String>, bytes: ByteArray, out: File) {
@@ -134,31 +118,23 @@ internal object FinitePortfolioLpCapture {
         val stop = ExecutionControl.after(timeout.milliseconds)
         val original = requireNotNull(Mps.parse(bytes.decodeToString()).toLinearSourceProblem(cancellation = stop))
         require(original.variables.size <= 4096 && original.rows.size <= 4096)
-        val invocation = SourceSetup.prepare(
-            SourceSetupRequest(
-                SourceAttachment(original, ProblemSettings()),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.MIXED,
-                maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE,
-                cancellation = stop,
-            ),
-        )
+        val invocation = SourceSetup.prepare(SourceSetupRequest(SourceAttachment(original, ProblemSettings()),
+            ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED,
+            maximize = original.objective?.sense == ObjectiveSense.MAXIMIZE, cancellation = stop))
         if (SourceSetup.executionKind(invocation) != SourceExecutionKind.FINITE) {
-            out.resolve("result.json").writeText(
-                buildJsonObject {
-                    put("captureDeclined", "finite source route unavailable after preparation")
-                    put("executionKind", SourceSetup.executionKind(invocation).name)
-                    put("portfolioPolicy", options["portfolio-policy"] ?: "retained")
-                    put("finiteEngine", FiniteEngine.MIXED.id)
-                    put("parameters", JsonArray(pairs.map(::JsonPrimitive)))
-                    put("executionNs", System.nanoTime() - executionStarted)
-                    put("containingTimeoutMs", timeout)
-                    put("cancelled", stop())
-                    put("sourceVerdictClaim", false)
-                    put("fullWarmReplayQualified", false)
-                    put("queryScope", "solve sessions and scoped floating queries; other LP calls omitted")
-                }.toString(),
-            )
+            out.resolve("result.json").writeText(buildJsonObject {
+                put("captureDeclined", "finite source route unavailable after preparation")
+                put("executionKind", SourceSetup.executionKind(invocation).name)
+                put("portfolioPolicy", options["portfolio-policy"] ?: "retained")
+                put("finiteEngine", FiniteEngine.MIXED.id)
+                put("parameters", JsonArray(pairs.map(::JsonPrimitive)))
+                put("executionNs", System.nanoTime() - executionStarted)
+                put("containingTimeoutMs", timeout)
+                put("cancelled", stop())
+                put("sourceVerdictClaim", false)
+                put("fullWarmReplayQualified", false)
+                put("queryScope", "solve sessions and scoped floating queries; other LP calls omitted")
+            }.toString())
             return
         }
         val policy = SourceExecutionPolicy()
@@ -178,42 +154,18 @@ internal object FinitePortfolioLpCapture {
             out.resolve("guidance.jsonl").bufferedWriter().use { guidance ->
                 out.resolve("queries.jsonl").bufferedWriter().use { records ->
                     out.resolve("events.jsonl").bufferedWriter().use { events ->
-                        val request = SourceExecutionRequest(
-                            invocation,
-                            policy,
-                            ExecutionOptions.parse(pairs),
-                            finiteRequest = { shape ->
-                                policy.finiteRequest(
-                                    shape,
-                                    FiniteEngine.MIXED,
-                                    cancellation = stop,
-                                    randomSeed = seed,
-                                    onPortfolioEvent = { worker, event ->
-                                        if (event.javaClass.simpleName in setOf(
-                                                "PortfolioDiagnostic",
-                                                "CompanionComparison",
-                                                "WorkerAdmission",
-                                            )
-                                        ) {
-                                            if (eventCount++ < 1024) {
-                                                events.appendLine(
-                                                    buildJsonObject {
-                                                        put("worker", worker)
-                                                        put("event", event.toString().take(4096))
-                                                    }.toString(),
-                                                )
-                                            } else {
-                                                eventsDropped++
-                                            }
-                                        }
-                                    },
-                                )
-                            },
-                            cores = 1,
-                            randomSeed = seed,
-                            timeout = stop,
-                            cancellation = stop,
-                        )
+                        val request = SourceExecutionRequest(invocation, policy, ExecutionOptions.parse(pairs),
+                            finiteRequest = { shape -> policy.finiteRequest(shape, FiniteEngine.MIXED,
+                                cancellation = stop, randomSeed = seed,
+                                onPortfolioEvent = { worker, event ->
+                                    if (event.javaClass.simpleName in setOf(
+                                            "PortfolioDiagnostic", "CompanionComparison", "WorkerAdmission")) {
+                                        if (eventCount++ < 1024) events.appendLine(buildJsonObject {
+                                            put("worker", worker)
+                                            put("event", event.toString().take(4096))
+                                        }.toString()) else eventsDropped++
+                                    }
+                                }) }, cores = 1, randomSeed = seed, timeout = stop, cancellation = stop)
                         val observer: (String, Double?, Any) -> Unit = { worker, cutoff, query ->
                             val started = System.nanoTime()
                             try {
@@ -234,62 +186,44 @@ internal object FinitePortfolioLpCapture {
                                             retained++
                                         }
                                     }
-                                    val basisHash = if (selected) {
-                                        writeBasis(
-                                            query,
-                                            file?.let { out.resolve("$it-basis.json") },
-                                        )
-                                    } else {
-                                        null
-                                    }
-                                    records.appendLine(
-                                        buildJsonObject {
-                                            put("worker", worker)
-                                            put("owner", owner)
-                                            put("sequence", get(query, "Sequence").toString())
-                                            put("sourceSha256", sourceHash)
-                                            put("latestCheckedSourcePointVersion", pointVersion)
-                                            put("latestPointProducer", producer)
-                                            put("lastObservedExternalCutoffBits", cutoff?.toBits()?.toString())
-                                            put("lastObservedExternalCutoff", cutoff?.toString())
-                                            put("route", get(query, "Route").toString())
-                                            put("claim", call(query, "getClaim")?.toString())
-                                            put("workLimit", get(query, "WorkLimit").toString())
-                                            put("explicitAllowance", get(query, "ExplicitAllowance") as Boolean)
-                                            put("iterationLimit", get(query, "IterationLimit").toString())
-                                            put("initialQuantum", call(query, "getInitialQuantum")?.toString())
-                                            put("retainFundingStop", get(query, "RetainFundingStop") as Boolean)
-                                            put("refactorUpdateLimit", get(query, "RefactorUpdateLimit").toString())
-                                            put("trackDegeneracy", get(query, "TrackDegeneracy") as Boolean)
-                                            put("retained", get(query, "Retained") as Boolean)
-                                            put("componentSplit", get(query, "ComponentSplit") as Boolean)
-                                            put("floatOffset", get(query, "FloatOffset").toString())
-                                            put("opaqueFloatAcceptance", get(query, "HasFloatAcceptance") as Boolean)
-                                            put("pricing", NumericalResidualProfile.json(get(query, "Pricing")))
-                                            put(
-                                                "refinementLimits",
-                                                NumericalResidualProfile.json(call(query, "getRefinementLimits")),
-                                            )
-                                            put("selected", selected)
-                                            put("capture", file)
-                                            put("captureSha256", payload?.let(::sha256))
-                                            put("basisSha256", basisHash)
-                                            put(
-                                                "sourcePointFile",
-                                                file?.takeIf { point != null }?.let {
-                                                    "$it-point.json"
-                                                },
-                                            )
-                                            put(
-                                                "sourcePointSha256",
-                                                point?.takeIf { file != null }?.let {
-                                                    sha256(it.toString().encodeToByteArray())
-                                                },
-                                            )
-                                            put("captureDeclined", selected && payload == null)
-                                            put("sourceVerdictClaim", false)
-                                        }.toString(),
-                                    )
+                                    val basisHash = if (selected) writeBasis(query,
+                                        file?.let { out.resolve("$it-basis.json") }) else null
+                                    records.appendLine(buildJsonObject {
+                                        put("worker", worker)
+                                        put("owner", owner)
+                                        put("sequence", get(query, "Sequence").toString())
+                                        put("sourceSha256", sourceHash)
+                                        put("latestCheckedSourcePointVersion", pointVersion)
+                                        put("latestPointProducer", producer)
+                                        put("lastObservedExternalCutoffBits", cutoff?.toBits()?.toString())
+                                        put("lastObservedExternalCutoff", cutoff?.toString())
+                                        put("route", get(query, "Route").toString())
+                                        put("claim", call(query, "getClaim")?.toString())
+                                        put("workLimit", get(query, "WorkLimit").toString())
+                                        put("explicitAllowance", get(query, "ExplicitAllowance") as Boolean)
+                                        put("iterationLimit", get(query, "IterationLimit").toString())
+                                        put("initialQuantum", call(query, "getInitialQuantum")?.toString())
+                                        put("retainFundingStop", get(query, "RetainFundingStop") as Boolean)
+                                        put("refactorUpdateLimit", get(query, "RefactorUpdateLimit").toString())
+                                        put("trackDegeneracy", get(query, "TrackDegeneracy") as Boolean)
+                                        put("retained", get(query, "Retained") as Boolean)
+                                        put("componentSplit", get(query, "ComponentSplit") as Boolean)
+                                        put("floatOffset", get(query, "FloatOffset").toString())
+                                        put("opaqueFloatAcceptance", get(query, "HasFloatAcceptance") as Boolean)
+                                        put("pricing", NumericalResidualProfile.json(get(query, "Pricing")))
+                                        put("refinementLimits",
+                                            NumericalResidualProfile.json(call(query, "getRefinementLimits")))
+                                        put("selected", selected)
+                                        put("capture", file)
+                                        put("captureSha256", payload?.let(::sha256))
+                                        put("basisSha256", basisHash)
+                                        put("sourcePointFile", file?.takeIf { point != null }?.let { "$it-point.json" })
+                                        put("sourcePointSha256", point?.takeIf { file != null }?.let {
+                                            sha256(it.toString().encodeToByteArray())
+                                        })
+                                        put("captureDeclined", selected && payload == null)
+                                        put("sourceVerdictClaim", false)
+                                    }.toString())
                                     records.flush()
                                 }
                             } finally {
@@ -309,28 +243,21 @@ internal object FinitePortfolioLpCapture {
                                 try {
                                     if (captureWorker == "any" || worker == captureWorker) {
                                         guidanceEvents++
-                                        guidance.appendLine(
-                                            buildJsonObject {
-                                                put("worker", worker)
-                                                put("elapsedNs", started - executionStarted)
-                                                put("latestCheckedSourcePointVersion", pointVersion)
-                                                put("latestPointProducer", producer)
-                                                if (get(observation, "Kind").toString() == "IMPORT") {
-                                                    put("latestCheckedSourcePoint", point ?: JsonNull)
-                                                }
-                                                for (name in listOf(
-                                                    "Kind", "Preferred", "Site", "Version", "Objective",
-                                                    "LocalObjective", "LocalExactObjective", "LastCutoff",
-                                                    "RootPending",
-                                                    "Decision", "Level",
-                                                )) {
-                                                    put(
-                                                        name.replaceFirstChar { it.lowercaseChar() },
-                                                        call(observation, "get$name")?.toString(),
-                                                    )
-                                                }
-                                            }.toString(),
-                                        )
+                                        guidance.appendLine(buildJsonObject {
+                                            put("worker", worker)
+                                            put("elapsedNs", started - executionStarted)
+                                            put("latestCheckedSourcePointVersion", pointVersion)
+                                            put("latestPointProducer", producer)
+                                            if (get(observation, "Kind").toString() == "IMPORT") {
+                                                put("latestCheckedSourcePoint", point ?: JsonNull)
+                                            }
+                                            for (name in listOf("Kind", "Preferred", "Site", "Version", "Objective",
+                                                "LocalObjective", "LocalExactObjective", "LastCutoff", "RootPending",
+                                                "Decision", "Level")) {
+                                                put(name.replaceFirstChar { it.lowercaseChar() },
+                                                    call(observation, "get$name")?.toString())
+                                            }
+                                        }.toString())
                                         guidance.flush()
                                     }
                                 } finally {
@@ -359,116 +286,83 @@ internal object FinitePortfolioLpCapture {
                             }
                             observed = attach.invoke(observed, jointObserver) as SourceExecutionRequest
                         }
-                        val result = SourceSetup.execute(
-                            observed,
-                            SourceExecutionCallbacks(
-                                onLinearSourceIncumbent = { witness ->
-                                    pointVersion++
-                                    val text = buildJsonObject {
-                                        put("version", pointVersion)
-                                        put("objective", witness.objective?.toString())
-                                        put("exact", witness.exact)
-                                        put("values", JsonArray(witness.values.map { JsonPrimitive(it.toString()) }))
-                                    }.toString()
-                                    point = if (text.length <= 65_536) {
-                                        Reports.json.parseToJsonElement(text) as JsonObject
-                                    } else {
-                                        null
-                                    }
-                                },
-                                finite = FiniteSolveCallbacks({}, { producer = it.workerLabel }),
-                            ),
-                        )
-                        out.resolve("result.json").writeText(
-                            buildJsonObject {
-                                put("nativeResultKind", result.javaClass.simpleName)
-                                put("sourceSemantics", original.semantics.toString())
-                                put("portfolioPolicy", options["portfolio-policy"] ?: "retained")
-                                put("finiteEngine", FiniteEngine.MIXED.id)
-                                put("parameters", JsonArray(pairs.map(::JsonPrimitive)))
-                                put("seed", seed)
-                                put("containingTimeoutMs", timeout)
-                                put("queryMetadataLimit", 128)
-                                put("captureValueLimit", 65_536)
-                                put("captureByteLimit", 1_048_576)
-                                put("queries", window.queries)
-                                put("workerQueries", window.workerQueries)
-                                put("unselectedWorkerQueries", window.unselectedWorkerQueries)
-                                put("captureAttempts", window.captureAttempts)
-                                put("retainedCaptures", retained)
-                                put("metadataDropped", window.metadataDropped)
-                                put("metadataScope", "capture-worker; unselected callbacks counted separately")
-                                put("eventsDropped", eventsDropped)
-                                put("jointCapture", captureJoint)
-                                put("jointRecords", jointRecords)
-                                put("jointObserverNs", jointObserverNs)
-                                put(
-                                    "jointCaptureLimits",
-                                    "64 records, 16384 entries, 1048576 modeled bytes, 4096 scalar bits",
-                                )
-                                val finite = (result as? SourceExecutionResult.Finite)?.result?.outcome
-                                    as? FiniteSolveOutcome.Completed
-                                if (captureJoint) {
-                                    put("sourceSha256", sourceHash)
-                                    put("captureMode", "ordinary-finite-joint")
-                                    put(
-                                        "completeSearchAdmitted",
-                                        (result as? SourceExecutionResult.Finite)
-                                            ?.result?.completeSearchAdmitted,
-                                    )
-                                    put(
-                                        "stages",
-                                        buildJsonObject {
-                                            finite?.stats?.smt?.completeSearchStages.orEmpty()
-                                                .forEach { (key, value) -> put(key, value) }
-                                        },
-                                    )
-                                    put("portfolio", NumericalResidualProfile.json(finite?.stats?.portfolio))
-                                }
-                                put(
-                                    "jointCaptureCounters",
-                                    buildJsonObject {
-                                        finite?.stats?.smt?.completeSearchStages.orEmpty()
-                                            .filterKeys { "Observation" in it }.forEach { (key, value) ->
-                                                put(
-                                                    key,
-                                                    value,
-                                                )
-                                            }
-                                    },
-                                )
-                                put("queryObserverNs", queryObserverNs)
-                                put("guidanceObserverNs", guidanceObserverNs)
-                                put("guidanceEvents", guidanceEvents)
-                                put("captureGuidance", captureGuidance)
-                                put("captureQueries", limit > 0)
-                                put("guidanceObjectiveUnits", "native-minimized")
-                                put("guidanceExactLocalBitsPerPart", 2048)
-                                put("guidanceImportAndLocalLimitPerWorker", 16)
-                                put("guidanceAttemptAndCommitLimitPerWorker", 128)
-                                put("guidanceBranchWindow", 8)
-                                put(
-                                    "guidancePreferenceScope",
-                                    "configured preference; no counterfactual ordering evaluated",
-                                )
-                                put("guidanceCutoffScope", "last scalar read; exact cutoff not captured")
-                                put("executionNs", System.nanoTime() - executionStarted)
-                                put(
-                                    "executionScope",
-                                    "parse, source setup, execution and retirement; " +
-                                        "excludes input fetch and final output",
-                                )
-                                put(
-                                    "queryObserverCostScope",
-                                    "subset of containing execution; " +
-                                        "other observation costs are also inside execution",
-                                )
-                                put("sourceVerdictClaim", false)
-                                put("fullWarmReplayQualified", false)
-                                put("queryScope", "solve sessions and scoped floating queries; other LP calls omitted")
-                                put("cancelled", stop())
-                            }.toString(),
-                        )
+                        val result = SourceSetup.execute(observed, SourceExecutionCallbacks(
+                            onLinearSourceIncumbent = { witness ->
+                                pointVersion++
+                                val text = buildJsonObject {
+                                    put("version", pointVersion)
+                                    put("objective", witness.objective?.toString())
+                                    put("exact", witness.exact)
+                                    put("values", JsonArray(witness.values.map { JsonPrimitive(it.toString()) }))
+                                }.toString()
+                                point = if (text.length <= 65_536) {
+                                    Reports.json.parseToJsonElement(text) as JsonObject
+                                } else null
+                            }, finite = FiniteSolveCallbacks({}, { producer = it.workerLabel })))
+                        out.resolve("result.json").writeText(buildJsonObject {
+                            put("nativeResultKind", result.javaClass.simpleName)
+                            put("sourceSemantics", original.semantics.toString())
+                            put("portfolioPolicy", options["portfolio-policy"] ?: "retained")
+                            put("finiteEngine", FiniteEngine.MIXED.id)
+                            put("parameters", JsonArray(pairs.map(::JsonPrimitive)))
+                            put("seed", seed)
+                            put("containingTimeoutMs", timeout)
+                            put("queryMetadataLimit", 128)
+                            put("captureValueLimit", 65_536)
+                            put("captureByteLimit", 1_048_576)
+                            put("queries", window.queries)
+                            put("workerQueries", window.workerQueries)
+                            put("unselectedWorkerQueries", window.unselectedWorkerQueries)
+                            put("captureAttempts", window.captureAttempts)
+                            put("retainedCaptures", retained)
+                            put("metadataDropped", window.metadataDropped)
+                            put("metadataScope", "capture-worker; unselected callbacks counted separately")
+                            put("eventsDropped", eventsDropped)
+                            put("jointCapture", captureJoint)
+                            put("jointRecords", jointRecords)
+                            put("jointObserverNs", jointObserverNs)
+                            put("jointCaptureLimits",
+                                "64 records, 16384 entries, 1048576 modeled bytes, 4096 scalar bits")
+                            val finite = (result as? SourceExecutionResult.Finite)?.result?.outcome
+                                as? FiniteSolveOutcome.Completed
+                            if (captureJoint) {
+                                put("sourceSha256", sourceHash)
+                                put("captureMode", "ordinary-finite-joint")
+                                put("completeSearchAdmitted", (result as? SourceExecutionResult.Finite)
+                                    ?.result?.completeSearchAdmitted)
+                                put("stages", buildJsonObject {
+                                    finite?.stats?.smt?.completeSearchStages.orEmpty()
+                                        .forEach { (key, value) -> put(key, value) }
+                                })
+                                put("portfolio", NumericalResidualProfile.json(finite?.stats?.portfolio))
+                            }
+                            put("jointCaptureCounters", buildJsonObject {
+                                finite?.stats?.smt?.completeSearchStages.orEmpty()
+                                    .filterKeys { "Observation" in it }.forEach { (key, value) -> put(key, value) }
+                            })
+                            put("queryObserverNs", queryObserverNs)
+                            put("guidanceObserverNs", guidanceObserverNs)
+                            put("guidanceEvents", guidanceEvents)
+                            put("captureGuidance", captureGuidance)
+                            put("captureQueries", limit > 0)
+                            put("guidanceObjectiveUnits", "native-minimized")
+                            put("guidanceExactLocalBitsPerPart", 2048)
+                            put("guidanceImportAndLocalLimitPerWorker", 16)
+                            put("guidanceAttemptAndCommitLimitPerWorker", 128)
+                            put("guidanceBranchWindow", 8)
+                            put("guidancePreferenceScope",
+                                "configured preference; no counterfactual ordering evaluated")
+                            put("guidanceCutoffScope", "last scalar read; exact cutoff not captured")
+                            put("executionNs", System.nanoTime() - executionStarted)
+                            put("executionScope", "parse, source setup, execution and retirement; " +
+                                "excludes input fetch and final output")
+                            put("queryObserverCostScope", "subset of containing execution; " +
+                                "other observation costs are also inside execution")
+                            put("sourceVerdictClaim", false)
+                            put("fullWarmReplayQualified", false)
+                            put("queryScope", "solve sessions and scoped floating queries; other LP calls omitted")
+                            put("cancelled", stop())
+                        }.toString())
                     }
                 }
             }
@@ -481,44 +375,32 @@ internal object FinitePortfolioLpCapture {
             put("workerSeed", seed)
             put("coordinateSpace", "finite-companion-working-model")
             put("sourceSha256", sourceHash)
-            for (name in listOf(
-                "Proposal", "Query", "Phase", "Disposition", "Operator", "SchedulingRound",
+            for (name in listOf("Proposal", "Query", "Phase", "Disposition", "Operator", "SchedulingRound",
                 "ProposalRound", "RequestedCount", "EffectiveCount", "CenterKind", "Cutoff",
-                "IntegerCount", "RealCount", "BooleanCount",
-            )) {
+                "IntegerCount", "RealCount", "BooleanCount")) {
                 put(name.replaceFirstChar { it.lowercaseChar() }, call(observation, "get$name")?.toString())
             }
             for (name in listOf("Centers", "Bools", "Lower", "Upper")) {
-                put(
-                    name.replaceFirstChar { it.lowercaseChar() },
-                    buildJsonObject {
-                        (get(observation, name) as Map<*, *>).forEach { (key, value) ->
-                            put(key.toString(), value.toString())
-                        }
-                    },
-                )
+                put(name.replaceFirstChar { it.lowercaseChar() }, buildJsonObject {
+                    (get(observation, name) as Map<*, *>).forEach { (key, value) ->
+                        put(key.toString(), value.toString())
+                    }
+                })
             }
             for (name in listOf("Freed", "RefutationRoots")) {
-                put(
-                    name.replaceFirstChar { it.lowercaseChar() },
-                    JsonArray((get(observation, name) as List<*>).map { JsonPrimitive(it as Int) }),
-                )
+                put(name.replaceFirstChar { it.lowercaseChar() },
+                    JsonArray((get(observation, name) as List<*>).map { JsonPrimitive(it as Int) }))
             }
-            put(
-                "support",
-                JsonArray(
-                    (get(observation, "Support") as List<*>).map { bound ->
-                        val value = requireNotNull(bound)
-                        val coordinate = get(value, "Coordinate")
-                        buildJsonObject {
-                            put("kind", get(coordinate, "Kind").toString())
-                            put("id", get(coordinate, "Id") as Int)
-                            put("upper", get(value, "Upper") as Boolean)
-                            put("value", call(value, "getValue")?.toString())
-                        }
-                    },
-                ),
-            )
+            put("support", JsonArray((get(observation, "Support") as List<*>).map { bound ->
+                val value = requireNotNull(bound)
+                val coordinate = get(value, "Coordinate")
+                buildJsonObject {
+                    put("kind", get(coordinate, "Kind").toString())
+                    put("id", get(coordinate, "Id") as Int)
+                    put("upper", get(value, "Upper") as Boolean)
+                    put("value", call(value, "getValue")?.toString())
+                }
+            }))
             put("sourceVerdictClaim", false)
         }
 
@@ -567,10 +449,7 @@ internal object FinitePortfolioLpCapture {
     internal fun capture(query: Any, stop: ExecutionControl): ByteArray? {
         val model = get(query, "Model")
         if ((get(model, "M") as Int) > 4096 ||
-            (get(model, "N") as Int).toLong() + (get(model, "M") as Int) > 8192
-        ) {
-            return null
-        }
+            (get(model, "N") as Int).toLong() + (get(model, "M") as Int) > 8192) return null
         return call(query, "captureExactWithin", "finite-portfolio-query", 65_536, 1_048_576, 4096, stop) as ByteArray?
     }
 

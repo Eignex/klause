@@ -28,11 +28,7 @@ internal fun PolynomialTheoryRequest.prepareSource(
     budget: PresolveBudget?,
     solutionSetSensitive: Boolean = false,
 ): PreparedSource = PresolvePipeline.prepareSource(
-    resolvedModel().source,
-    config,
-    objective,
-    solutionSetSensitive,
-    preparationStop or containingStop,
+    resolvedModel().source, config, objective, solutionSetSensitive, preparationStop or containingStop,
     presolveBudget = budget,
 )
 
@@ -44,10 +40,7 @@ internal fun PolynomialTheoryRequest.afterSourcePreparation(
     val mark = TimeSource.Monotonic.markNow()
     val selected = if (prepared.changed) {
         val plan = prepared.budget.observePreparation(
-            PresolvePreparationStage.SOURCE_ENCODER,
-            PresolveLane.SOURCE,
-            prepared.problem,
-            cancellation,
+            PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, prepared.problem, cancellation,
         ) { token, observation ->
             prepared.problem.preparePolynomialExecutionPlan(
                 projections = requireNotNull(preparedPlan.factorProjections).forEngineView(prepared.problem),
@@ -59,9 +52,7 @@ internal fun PolynomialTheoryRequest.afterSourcePreparation(
             return null
         }
         plan.polynomialRequest()
-    } else {
-        this
-    }
+    } else this
     prepared.elapsed += mark.elapsedNow()
     return PolynomialTheoryRequest(selected.problem, selected.preparedPlan, prepared, preparedPlan)
 }
@@ -106,12 +97,8 @@ internal fun PolynomialTheoryRequest.reconstructSource(
 ): Sample? {
     val preparation = sourcePreparation?.takeIf { it.changed } ?: return sample
     val lifted = preparation.mapping.reconstructFrom(preparation.problem, sample)
-    val checked = checkQuadraticSourceWitness(
-        originalPlan,
-        lifted,
-        verification,
-        PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells),
-    )
+    val checked = checkQuadraticSourceWitness(originalPlan, lifted, verification,
+        PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells))
     return lifted.takeIf { checked == SourceEvidenceCheck.Checked }
 }
 

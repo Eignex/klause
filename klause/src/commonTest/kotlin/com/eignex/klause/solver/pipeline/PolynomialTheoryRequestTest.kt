@@ -97,7 +97,7 @@ class PolynomialTheoryRequestTest {
     @Test
     fun `source assumptions should publish original coordinates without numeric ite auxiliaries`() {
         val input = SmtLibPolynomial.parse(
-            """
+                """
                 (declare-const b Bool)
                 (declare-const x Real)
                 (declare-const unused Real)
@@ -105,7 +105,7 @@ class PolynomialTheoryRequestTest {
                 (assert (= (ite b x (- x)) 1))
                 (check-sat-assuming (b))
             """.trimIndent(),
-        ).realSource()
+            ).realSource()
 
         val execution = OpenTheoryPipeline.execute(input.pipelineRequest())
 
@@ -127,9 +127,9 @@ class PolynomialTheoryRequestTest {
             "(define-fun f () Real x)" to "(= f 7)",
         )) {
             val input = SmtLibPolynomial.parse(
-                "(declare-const x Real) $definition (assert (= x 1)) " +
-                    "(assert (let ((x 7)) $call)) (check-sat)",
-            ).realSource()
+                    "(declare-const x Real) $definition (assert (= x 1)) " +
+                        "(assert (let ((x 7)) $call)) (check-sat)",
+                ).realSource()
 
             val execution = OpenTheoryPipeline.execute(input.pipelineRequest())
 
@@ -140,9 +140,9 @@ class PolynomialTheoryRequestTest {
     @Test
     fun `helper arguments should read caller bindings before entering definition scope`() {
         val input = SmtLibPolynomial.parse(
-            "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) (assert (= x 1)) " +
-                "(assert (let ((x 7)) (= (f x) 7))) (check-sat)",
-        ).realSource()
+                "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) (assert (= x 1)) " +
+                    "(assert (let ((x 7)) (= (f x) 7))) (check-sat)",
+            ).realSource()
 
         val execution = OpenTheoryPipeline.execute(input.pipelineRequest())
 
@@ -155,8 +155,8 @@ class PolynomialTheoryRequestTest {
     @Test
     fun `complete route should refute a strict irrational boundary`() {
         val input = SmtLibPolynomial.parse(
-            "(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (assert (< (* x x) 2))",
-        ).realSource()
+                "(declare-const x Real) (assert (= (* x x) 2)) (assert (> x 0)) (assert (< (* x x) 2))",
+            ).realSource()
 
         val execution = OpenTheoryPipeline.execute(input.pipelineRequest())
 

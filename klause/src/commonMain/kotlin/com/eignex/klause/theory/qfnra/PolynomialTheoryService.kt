@@ -38,8 +38,7 @@ internal class PolynomialCondition(
                 step()
                 require(id in 0 until realCount) { "conditioned real id out of range" }
                 terms += PolynomialRealFormula.Atom(
-                    PolynomialExpression.Variable(SourceRealId(id)),
-                    relation,
+                    PolynomialExpression.Variable(SourceRealId(id)), relation,
                     PolynomialExpression.Constant.of(value.num, value.den),
                 )
             }
@@ -58,19 +57,14 @@ internal class PolynomialTheoryService(
     fixedReals: Map<Int, BigFraction> = emptyMap(),
 ) {
     private val fixedReals = fixedReals.toMap()
-    val formula: PolynomialRealFormula = if (fixedReals.isEmpty()) {
-        formula
-    } else {
-        PolynomialRealFormula.And(
-            listOf(formula) + fixedReals.map { (id, value) ->
-                PolynomialRealFormula.Atom(
-                    PolynomialExpression.Variable(SourceRealId(id)),
-                    PolynomialRelation.EQ,
-                    PolynomialExpression.Constant.of(value.num, value.den),
-                )
-            },
-        )
-    }
+    val formula: PolynomialRealFormula = if (fixedReals.isEmpty()) formula else PolynomialRealFormula.And(
+        listOf(formula) + fixedReals.map { (id, value) ->
+            PolynomialRealFormula.Atom(
+                PolynomialExpression.Variable(SourceRealId(id)), PolynomialRelation.EQ,
+                PolynomialExpression.Constant.of(value.num, value.den),
+            )
+        },
+    )
     fun invocation(params: QfNraParams = QfNraParams()): PolynomialTheoryInvocation =
         PolynomialTheoryInvocation(formula, boolCount, realCount, params, fixedReals)
 }
@@ -111,21 +105,15 @@ internal class PolynomialTheoryInvocation(
         check(!active) { "polynomial invocation has an active query" }
         active = true
         val remaining = params.maximumWork?.let { (it - completedStats.workSpent).coerceAtLeast(0) }
-        val query = PolynomialRetainedQuery(
-            formula,
-            boolCount,
-            realCount,
-            params.copy(cancellation = queryControls(cancellation), maximumWork = remaining),
+        val query = PolynomialRetainedQuery(formula, boolCount, realCount,
+            params.copy(cancellation = queryControls( cancellation), maximumWork = remaining),
             PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper),
-            witness.takeIf { condition.lower.isEmpty() && condition.upper.isEmpty() },
-            checkedCellObserver,
-        )
+            witness.takeIf { condition.lower.isEmpty() && condition.upper.isEmpty() }, checkedCellObserver)
         pending = query
         queries = sum(queries, 1)
         return object : Iterator<QfNraResult?> {
             private var finished = false
             override fun hasNext(): Boolean = !closed && !finished
-
             @Suppress("TooGenericExceptionCaught") // query failures retain their spent native allowance
             override fun next(): QfNraResult? {
                 check(!closed) { "polynomial query is closed" }
@@ -156,7 +144,7 @@ internal class PolynomialTheoryInvocation(
         if (closed || active || variable !in 0 until boolCount) return null
         val point = witness ?: return null
         val remaining = params.maximumWork?.let { (it - completedStats.workSpent).coerceAtLeast(0) }
-        val work = QfNraWork(params.copy(cancellation = queryControls(cancellation), maximumWork = remaining))
+        val work = QfNraWork(params.copy(cancellation = queryControls( cancellation), maximumWork = remaining))
         return try {
             PolynomialArithmetic(work, params.polynomialLimits).step()
             point.boolValue(variable)
@@ -184,57 +172,27 @@ internal class PolynomialTheoryInvocation(
 private fun combine(left: QfNraStats, right: QfNraStats): QfNraStats = QfNraStats(
     sum(left.projectedPolynomials, right.projectedPolynomials),
     sum(left.liftedCells, right.liftedCells), sum(left.workSpent, right.workSpent),
-    if (left.dyadicAttempts == null && right.dyadicAttempts == null) {
-        null
-    } else {
-        sum(left.dyadicAttempts ?: 0, right.dyadicAttempts ?: 0)
-    },
-    if (left.dyadicBases == null && right.dyadicBases == null) {
-        null
-    } else {
-        sum(left.dyadicBases ?: 0, right.dyadicBases ?: 0)
-    },
-    if (left.coupledWorkDeclines == null && right.coupledWorkDeclines == null) {
-        null
-    } else {
-        sum(left.coupledWorkDeclines ?: 0, right.coupledWorkDeclines ?: 0)
-    },
-    if (left.dyadicPreExtractionDeclines == null && right.dyadicPreExtractionDeclines == null) {
-        null
-    } else {
-        sum(left.dyadicPreExtractionDeclines ?: 0, right.dyadicPreExtractionDeclines ?: 0)
-    },
-    if (left.booleanTheoryRegions == null && right.booleanTheoryRegions == null) {
-        null
-    } else {
-        sum(left.booleanTheoryRegions ?: 0, right.booleanTheoryRegions ?: 0)
-    },
-    if (left.booleanTheoryAtoms == null && right.booleanTheoryAtoms == null) {
-        null
-    } else {
-        sum(left.booleanTheoryAtoms ?: 0, right.booleanTheoryAtoms ?: 0)
-    },
-    if (left.booleanTheoryConstantRefutations == null && right.booleanTheoryConstantRefutations == null) {
-        null
-    } else {
-        sum(left.booleanTheoryConstantRefutations ?: 0, right.booleanTheoryConstantRefutations ?: 0)
-    },
-    if (left.booleanTheoryResourceRefusals == null && right.booleanTheoryResourceRefusals == null) {
-        null
-    } else {
-        sum(left.booleanTheoryResourceRefusals ?: 0, right.booleanTheoryResourceRefusals ?: 0)
-    },
+    if (left.dyadicAttempts == null && right.dyadicAttempts == null) null
+    else sum(left.dyadicAttempts ?: 0, right.dyadicAttempts ?: 0),
+    if (left.dyadicBases == null && right.dyadicBases == null) null
+    else sum(left.dyadicBases ?: 0, right.dyadicBases ?: 0),
+    if (left.coupledWorkDeclines == null && right.coupledWorkDeclines == null) null
+    else sum(left.coupledWorkDeclines ?: 0, right.coupledWorkDeclines ?: 0),
+    if (left.dyadicPreExtractionDeclines == null && right.dyadicPreExtractionDeclines == null) null
+    else sum(left.dyadicPreExtractionDeclines ?: 0, right.dyadicPreExtractionDeclines ?: 0),
+    if (left.booleanTheoryRegions == null && right.booleanTheoryRegions == null) null
+    else sum(left.booleanTheoryRegions ?: 0, right.booleanTheoryRegions ?: 0),
+    if (left.booleanTheoryAtoms == null && right.booleanTheoryAtoms == null) null
+    else sum(left.booleanTheoryAtoms ?: 0, right.booleanTheoryAtoms ?: 0),
+    if (left.booleanTheoryConstantRefutations == null && right.booleanTheoryConstantRefutations == null) null
+    else sum(left.booleanTheoryConstantRefutations ?: 0, right.booleanTheoryConstantRefutations ?: 0),
+    if (left.booleanTheoryResourceRefusals == null && right.booleanTheoryResourceRefusals == null) null
+    else sum(left.booleanTheoryResourceRefusals ?: 0, right.booleanTheoryResourceRefusals ?: 0),
     right.lastBooleanTheoryResource ?: left.lastBooleanTheoryResource,
-    if (left.equationalSections == null && right.equationalSections == null) {
-        null
-    } else {
-        sum(left.equationalSections ?: 0, right.equationalSections ?: 0)
-    },
-    if (left.equationalRootLevels == null && right.equationalRootLevels == null) {
-        null
-    } else {
-        sum(left.equationalRootLevels ?: 0, right.equationalRootLevels ?: 0)
-    },
+    if (left.equationalSections == null && right.equationalSections == null) null
+    else sum(left.equationalSections ?: 0, right.equationalSections ?: 0),
+    if (left.equationalRootLevels == null && right.equationalRootLevels == null) null
+    else sum(left.equationalRootLevels ?: 0, right.equationalRootLevels ?: 0),
 )
 
 private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
@@ -280,17 +238,14 @@ private class PolynomialRetainedQuery(
         while (true) {
             when (val result = native.next()) {
                 null -> yield(null)
-
                 is QfNraResult.Satisfiable -> {
                     yield(result.copy(stats = stats))
                     return@sequence
                 }
-
                 is QfNraResult.Unsatisfiable -> {
                     yield(result.copy(stats = stats))
                     return@sequence
                 }
-
                 is QfNraResult.Unknown -> {
                     yield(result.copy(stats = stats))
                     return@sequence

@@ -23,12 +23,8 @@ private val finiteLinearDomain = Encoder(EncoderSupport.EQUIVALENT) { view, enco
     for (index in 0 until view.size) {
         encoding.cancellation.charge(1)
         if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
-        alternatives += ExactSearchRow.of(
-            intArrayOf(Term.ofRealVar(view.variable)),
-            listOf(BigFraction.ONE),
-            LinearOp.EQ,
-            requireNotNull(BigFraction.ofDouble(view.valueAt(index))),
-        )
+        alternatives += ExactSearchRow.of(intArrayOf(Term.ofRealVar(view.variable)), listOf(BigFraction.ONE),
+            LinearOp.EQ, requireNotNull(BigFraction.ofDouble(view.valueAt(index))))
     }
     if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
     encoding.linear(LinearForm.Disjunction(alternatives))
@@ -42,11 +38,8 @@ private val finitePolynomialDomain = Encoder(EncoderSupport.EQUIVALENT) { view, 
         encoding.cancellation.charge(1)
         if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
         val value = requireNotNull(BigFraction.ofDouble(view.valueAt(index)))
-        alternatives += PolynomialRealFormula.Atom(
-            encoding.real(SourceRealId(view.variable)),
-            PolynomialRelation.EQ,
-            PolynomialExpression.Constant.of(value.num, value.den),
-        )
+        alternatives += PolynomialRealFormula.Atom(encoding.real(SourceRealId(view.variable)),
+            PolynomialRelation.EQ, PolynomialExpression.Constant.of(value.num, value.den))
     }
     if (encoding.cancellation()) return@Encoder EncoderDecline.RESOURCE
     encoding.polynomial(PolynomialRealFormula.Or(alternatives))

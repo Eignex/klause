@@ -104,35 +104,22 @@ internal fun FinitePipeline.portfolioExecutor(
     val curatedFiniteInteger = curatedPortfolio && profile.problemClass == ProblemClass.FiniteCp &&
         problem.numBoolVars == 0 && scenario.annotationArm == null
     val supportedProbeSource = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND) {
-        curatedPortfolio && profile.problemClass in setOf(
-            ProblemClass.Sat,
-            ProblemClass.PseudoBoolean,
-            ProblemClass.FiniteCp,
-        )
-    } else {
-        curatedFiniteInteger
-    }
+        curatedPortfolio && profile.problemClass in setOf(ProblemClass.Sat, ProblemClass.PseudoBoolean,
+            ProblemClass.FiniteCp)
+    } else curatedFiniteInteger
     if (deferLpProbes && !curatedFiniteInteger) {
         pipelineConfigError("portfolio-lp-start requires a curated single-core mixed finite integer optimization")
     }
-    if (bufferedPublications && (
-            !curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
-                cancellation.deadline() == null || problem.numRealVars != 0
-            )
-    ) {
+    if (bufferedPublications && (!curatedFiniteInteger || scenario.diagnosticWorkLimit != null ||
+            cancellation.deadline() == null || problem.numRealVars != 0)) {
         pipelineConfigError(
             "portfolio-publications requires curated elapsed single-core mixed finite integer optimization",
         )
     }
-    if (probePolicy != InitialProbePolicy.ORDINARY && (
-            !supportedProbeSource || scenario.diagnosticWorkLimit != null ||
-                cancellation.deadline() == null
-            )
-    ) {
-        pipelineConfigError(
-            "portfolio-probes requires curated elapsed single-core mixed finite optimization " +
-                "within the selected policy's source scope",
-        )
+    if (probePolicy != InitialProbePolicy.ORDINARY && (!supportedProbeSource || scenario.diagnosticWorkLimit != null ||
+            cancellation.deadline() == null)) {
+        pipelineConfigError("portfolio-probes requires curated elapsed single-core mixed finite optimization " +
+            "within the selected policy's source scope")
     }
     val identity = ModelIdentity.of(problem, objective)
     val binding = EngineInvocation(preparedPlan, identity, objective)
@@ -179,13 +166,9 @@ internal fun FinitePipeline.portfolioExecutor(
             improvementProofShare = improvementProofShare,
             includeRestartingProof = includeRestartingProof,
             booleanProofTasks = booleanProofTasks,
-            onProgress = if (scenario.reportPortfolioProgress) {
-                { event ->
-                    onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
-                }
-            } else {
-                null
-            },
+            onProgress = if (scenario.reportPortfolioProgress) { event ->
+                onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
+            } else null,
             diagnostics = scenario.diagnosticWorkLimit?.let { limit ->
                 PortfolioDiagnostics(limit, scenario.seed) { event ->
                     onEvent?.invoke("portfolio", SearchEvent.PortfolioDiagnostic(event))
@@ -227,40 +210,28 @@ internal fun FinitePipeline.portfolioExecutor(
         val deferred = if (deferLpProbes) deferredLpProbes(workers) else null
         val probeWeights = when {
             probePolicy == InitialProbePolicy.LEADER_HALF -> leadingProbeWeights(workers)
-
             probePolicy == InitialProbePolicy.LP_TRANSFER -> lpTransferredProbeWeights(workers)
             else -> companionArms.probeWeights(workers) ?: intArrayOf()
         }
-        PortfolioInvocationPolicy(
-            profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
+        PortfolioInvocationPolicy(profile, reserved, reserveBeforeIncumbentOnly = true, probes = probes,
             probeWeights = probeWeights,
-            probeRanks = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND) {
-                heuristicSecondProbeRanks(workers)
-            } else {
-                intArrayOf()
-            },
+            probeRanks = if (probePolicy == InitialProbePolicy.HEURISTIC_SECOND)
+                heuristicSecondProbeRanks(workers) else intArrayOf(),
             initialHeuristics = when (probePolicy) {
                 InitialProbePolicy.FAMILY_WORK, InitialProbePolicy.ALNS_WORK -> workers.indices.filter { arm ->
                     arm < scenario.arms && workers[arm].family == ArmFamily.LocalSearch &&
                         !workers[arm].startAfterIncumbent && !workers[arm].improvementOnly &&
                         !workers[arm].auxiliaryProof
                 }.toSet()
-
                 InitialProbePolicy.HEURISTIC_WORK -> workers.indices.filter { arm ->
                     workers[arm].family in setOf(ArmFamily.LocalSearch, ArmFamily.Lns) && !workers[arm].auxiliaryProof
                 }.toSet()
-
                 else -> emptySet()
             },
-            heuristicTargets = if (probePolicy == InitialProbePolicy.ALNS_WORK) {
-                workers.indices.filter { arm ->
-                    workers[arm].family == ArmFamily.Lns && !workers[arm].auxiliaryProof
-                }.toSet()
-            } else {
-                null
-            },
-            onProgress = deferred,
-        )
+            heuristicTargets = if (probePolicy == InitialProbePolicy.ALNS_WORK) workers.indices.filter { arm ->
+                workers[arm].family == ArmFamily.Lns && !workers[arm].auxiliaryProof
+            }.toSet() else null,
+            onProgress = deferred)
     }
 }
 

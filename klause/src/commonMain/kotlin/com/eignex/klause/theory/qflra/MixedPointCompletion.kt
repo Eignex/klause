@@ -42,9 +42,7 @@ internal fun completeMixedPoint(
         if (stop()) return declined("RECOVERY_STOPPED")
         if (row.columns.any { it !in 0 until columns } ||
             !row.coefficients.admittedSourcePoint() || !listOf(row.rhs).admittedSourcePoint()
-        ) {
-            return declined("RECOVERY_SOURCE_INPUT")
-        }
+        ) return declined("RECOVERY_SOURCE_INPUT")
     }
     val arithmetic = MixedPointArithmetic(stop)
     var realGuess: List<BigFraction>? = null

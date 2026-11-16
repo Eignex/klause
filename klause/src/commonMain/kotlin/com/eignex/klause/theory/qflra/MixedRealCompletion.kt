@@ -54,12 +54,8 @@ internal fun completeMixedRealComponents(
         for (row in selected) {
             stop.charge(row.columns.size.toLong() + 1L)
             if (stop()) return null
-            localRows += ExactRationalInequality(
-                row.columns.map { local.getValue(it) }.toIntArray(),
-                row.coefficients,
-                row.rhs,
-                row.strict,
-            )
+            localRows += ExactRationalInequality(row.columns.map { local.getValue(it) }.toIntArray(),
+                row.coefficients, row.rhs, row.strict)
         }
         val graph = RealDifferenceSystem.prepareRows(component.size, localRows, stop)
         if (stop()) return null

@@ -40,8 +40,7 @@ internal class TablePropagator(
      *  nothing" verdict so later rows with the same column bounds skip re-sweeping the shared table.
      *  Null for a lone table — then every fire sweeps. */
     private val groupCache: TableGroupCache? = null,
-) : InterruptiblePropagator,
-    ExtensionalSupportProvider {
+) : InterruptiblePropagator, ExtensionalSupportProvider {
 
     private val unarySupports = boundedUnarySupports()
     private val supportCache = groupCache ?: TableGroupCache(arity, tuples, hi)
@@ -170,20 +169,8 @@ internal class TablePropagator(
 
     private fun visitRemovedRows(state: PropagationState, col: Int, kind: Int, value: Long, visit: (Int) -> Unit) {
         if ((kind == LOWER && value == Long.MIN_VALUE) || (kind == UPPER && value == Long.MAX_VALUE)) return
-        val lower = if (kind == LOWER) {
-            Long.MIN_VALUE
-        } else if (kind == UPPER) {
-            value + 1
-        } else {
-            value
-        }
-        val upper = if (kind == UPPER) {
-            Long.MAX_VALUE
-        } else if (kind == LOWER) {
-            value - 1
-        } else {
-            value
-        }
+        val lower = if (kind == LOWER) Long.MIN_VALUE else if (kind == UPPER) value + 1 else value
+        val upper = if (kind == UPPER) Long.MAX_VALUE else if (kind == LOWER) value - 1 else value
         val column = supportCache.supports { state.checkFiniteWork() }?.columns?.get(col)
         if (column != null) {
             column.forEachRow(lower, upper, visit) { state.checkFiniteWork() }
@@ -203,9 +190,7 @@ internal class TablePropagator(
     ): IntArray? {
         if (hi != null || payload.size != 4 || numTuples > 256 || arity > 64 ||
             numTuples.toLong() * arity > 4096
-        ) {
-            return null
-        }
+        ) return null
         val col = payload[0]
         val kind = payload[1]
         val value = (payload[2].toLong() shl 32) or (payload[3].toLong() and 0xFFFFFFFFL)
@@ -219,14 +204,7 @@ internal class TablePropagator(
         for (row in 0 until numTuples) {
             state.checkFiniteWork()
             val target = cellLo(row, col)
-            if (when (kind) {
-                    LOWER -> target >= value
-                    UPPER -> target <= value
-                    else -> target != value
-                }
-            ) {
-                continue
-            }
+            if (when (kind) { LOWER -> target >= value; UPPER -> target <= value; else -> target != value }) continue
             if (kind != VALUE && cellAt(state, row, col, snapshot, null) == Cell.KILLED) continue
             var chosen = Lit.NONE
             var killed = false
@@ -364,10 +342,7 @@ internal class TablePropagator(
         val a = maxOf(lo, d.min)
         val b = minOf(hiC, d.max)
         var holes = 0L
-        d.forEachHoleInRange(a, b) {
-            state.checkFiniteWork()
-            holes++
-        }
+        d.forEachHoleInRange(a, b) { state.checkFiniteWork(); holes++ }
         if (b - a >= holes) return Cell.LIVE
         var carvedLater = false
         d.forEachHoleInRange(a, b) { k ->
@@ -415,10 +390,7 @@ internal class TablePropagator(
         private val xs: IntArray,
         val atTrail: Int,
     ) {
-        val domains = Array(xs.size) {
-            state.checkFiniteWork()
-            state.domainAt(xs[it], atTrail)
-        }
+        val domains = Array(xs.size) { state.checkFiniteWork(); state.domainAt(xs[it], atTrail) }
         private val carves = Array(xs.size) { MutableLongIntMap() }
         private val holes = Array(xs.size) { MutableLongIntMap() }
         private val lower = IntArray(xs.size) { -1 }
@@ -556,14 +528,7 @@ internal class TablePropagator(
     private fun newLiveSet(state: PropagationState, factorId: Int): TableStr2State {
         val index = if (hi == null && numTuples >= 128) supportCache.supports { state.checkFiniteWork() } else null
         val fresh = TableStr2State(
-            IntArray(numTuples) {
-                state.checkFiniteWork()
-                it
-            },
-            numTuples,
-            state,
-            xs,
-            index,
+            IntArray(numTuples) { state.checkFiniteWork(); it }, numTuples, state, xs, index,
         )
         state.refPayload[factorId] = fresh
         return fresh
@@ -917,10 +882,7 @@ internal class TablePropagator(
             if (a > b) return false
             if (d.holeCount == 0L) return true
             var holes = 0L
-            d.forEachHoleInRange(a, b) {
-                state.checkFiniteWork()
-                holes++
-            }
+            d.forEachHoleInRange(a, b) { state.checkFiniteWork(); holes++ }
             return b - a + 1 > holes
         }
     }

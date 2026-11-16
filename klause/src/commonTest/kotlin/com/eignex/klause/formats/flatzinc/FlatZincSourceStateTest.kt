@@ -29,20 +29,12 @@ class FlatZincSourceStateTest {
     @Test
     fun `automatic original or stopped preparation should not force legacy grid geometry`() {
         for (stopped in listOf(false, true)) {
-            val program = parseFlatZinc(
-                "var 0.0..1.0: x; constraint float_eq(x,0.25); solve satisfy;",
-                floatBuckets = 2,
-            )
+            val program = parseFlatZinc("var 0.0..1.0: x; constraint float_eq(x,0.25); solve satisfy;",
+                floatBuckets = 2)
             val original = program.sourceProgram.problem
 
-            val invocation = program.prepareSourceExecution(
-                SourceSetupRequest(
-                    program.sourceAttachment(),
-                    ExecutionOperation.SATISFY,
-                    FiniteEngine.BACKTRACK,
-                    cancellation = ExecutionControl { stopped },
-                ),
-            )
+            val invocation = program.prepareSourceExecution(SourceSetupRequest(program.sourceAttachment(),
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK, cancellation = ExecutionControl { stopped }))
 
             assertSame(original, invocation.source.originalSource)
             assertNull(invocation.floatProjection)
@@ -52,15 +44,12 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `a copied private search group should retain only original integer hints on source attachment`() {
-        val program = parseFlatZinc(
-            """
+        val program = parseFlatZinc("""
             var 1..2: i;
             var 0.0..1.0: grid;
             constraint float_le(grid, 0.5);
             solve :: int_search([i, grid], input_order, indomain_max, complete) satisfy;
-            """.trimIndent(),
-            floatBuckets = 3,
-        )
+            """.trimIndent(), floatBuckets = 3)
 
         val copied = program.copy()
 
@@ -72,19 +61,11 @@ class FlatZincSourceStateTest {
     @Test
     fun `finite declarations should not acquire an unrepresentable unrelated grid window`() {
         val lower = BIG_ONE shl 2048
-        val policy = FloatSemantics.Grid(
-            3,
-            1000,
-            UndeclaredRealBounds(
-                SemanticRational.of(lower),
-                SemanticRational.of(lower + BIG_ONE),
-            ),
-        )
+        val policy = FloatSemantics.Grid(3, 1000, UndeclaredRealBounds(SemanticRational.of(lower),
+            SemanticRational.of(lower + BIG_ONE)))
 
-        val program = parseFlatZinc(
-            "var 100.0..102.0: x; constraint float_le(x,101.0); solve satisfy;",
-            semanticOverrides = SemanticOverrides(floats = policy),
-        )
+        val program = parseFlatZinc("var 100.0..102.0: x; constraint float_le(x,101.0); solve satisfy;",
+            semanticOverrides = SemanticOverrides(floats = policy))
 
         assertEquals(100.0, program.sourceProgram.problem.realLower[0])
         assertEquals(102.0, program.sourceProgram.problem.realUpper[0])
@@ -95,15 +76,12 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `source capture should retain original real products without materializing private buckets`() {
-        val program = parseFlatZinc(
-            """
+        val program = parseFlatZinc("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-            """.trimIndent(),
-            floatBuckets = 3,
-        )
+            """.trimIndent(), floatBuckets = 3)
 
         val source = program.sourceProgram
         val attachment = program.sourceAttachment()
@@ -118,15 +96,12 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `a requested legacy view should retain its original source across ordinary copies`() {
-        val program = parseFlatZinc(
-            """
+        val program = parseFlatZinc("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-            """.trimIndent(),
-            floatBuckets = 3,
-        )
+            """.trimIndent(), floatBuckets = 3)
         val source = program.sourceProgram.problem
         val legacy = program.problem
 
@@ -148,15 +123,12 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `a foreign problem copy should drop its original float correspondence`() {
-        val program = parseFlatZinc(
-            """
+        val program = parseFlatZinc("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-            """.trimIndent(),
-            floatBuckets = 3,
-        )
+            """.trimIndent(), floatBuckets = 3)
         val foreign = Problem(0, 2, arrayOf(IntDomain(0, 2), IntDomain(0, 2)), emptyArray())
 
         val copied = program.copy(problem = foreign)
@@ -168,15 +140,12 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `an explicit finite compatibility helper should bind its actual private problem to the original source`() {
-        val execution = parseFlatZincExecution(
-            """
+        val execution = parseFlatZincExecution("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-            """.trimIndent(),
-            floatBuckets = 3,
-        )
+            """.trimIndent(), floatBuckets = 3)
 
         val invocation = assertNotNull(execution.sourceInvocation)
         val projection = assertNotNull(invocation.floatProjection)
@@ -190,24 +159,15 @@ class FlatZincSourceStateTest {
 
     @Test
     fun `a stopped compatibility request should not force the unbounded legacy getter`() {
-        val program = parseFlatZinc(
-            """
+        val program = parseFlatZinc("""
             var 0.0..1.0: x;
             var 0.0..1.0: y;
             constraint float_times(x, x, y);
             solve satisfy;
-            """.trimIndent(),
-            floatBuckets = 3,
-        )
+            """.trimIndent(), floatBuckets = 3)
 
-        val invocation = program.prepareFiniteCompatibility(
-            SourceSetupRequest(
-                program.sourceAttachment(),
-                ExecutionOperation.SATISFY,
-                FiniteEngine.LOCAL_SEARCH,
-                cancellation = ExecutionControl { true },
-            ),
-        )
+        val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
+            ExecutionOperation.SATISFY, FiniteEngine.LOCAL_SEARCH, cancellation = ExecutionControl { true }))
 
         assertNull(invocation.floatProjection)
         assertFalse(assertNotNull(program.retainedSource).materialized)

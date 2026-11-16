@@ -63,16 +63,10 @@ class AlnsTest {
         val best = selectOptimum()
         val worse = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0))
         val trace = RepairTrace("ALNS accepted nonbest centers")
-        val alns = Alns(
-            inner = bootstrapAt(problem, best),
-            destroyOperators = listOf(DestroyOperator.Random),
-            repairOperators = listOf(RepairOperator { worse }),
-            acceptance = AcceptanceCriterion.RandomWalk,
-            minDestroyFraction = 1.0,
-            maxDestroyFraction = 1.0,
-            maxIterations = 2,
-            flipsPerIteration = 1,
-        )
+        val alns = Alns(inner = bootstrapAt(problem, best),
+            destroyOperators = listOf(DestroyOperator.Random), repairOperators = listOf(RepairOperator { worse }),
+            acceptance = AcceptanceCriterion.RandomWalk, minDestroyFraction = 1.0, maxDestroyFraction = 1.0,
+            maxIterations = 2, flipsPerIteration = 1)
         alns.repairTrace = trace
 
         alns.minimize(selectObjective, LocalSearchParams(initialAssignment = best, randomSeed = 7))
@@ -837,13 +831,8 @@ class AlnsTest {
         val handle = assertIs<InstructionSlicedSearch>(alns.resumable(selectObjective, LocalSearchParams()))
 
         repeat(2) {
-            assertNull(
-                handle.runInstructionSlice(
-                    ExecutionControl.Never,
-                    Long.MAX_VALUE,
-                    50,
-                ) { callbacks += it.sample },
-            )
+            assertNull(handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE,
+                50) { callbacks += it.sample })
         }
         val result = assertNotNull(
             handle.runInstructionSlice(ExecutionControl.Never, Long.MAX_VALUE, 50) { callbacks += it.sample },
@@ -1190,25 +1179,14 @@ class AlnsTest {
         for (sample in listOf(null, incumbent)) {
             var observed: MinimizeResult? = null
             val retained = object : RepairSearch {
-                override fun begin(
-                    assumptions: Assumptions,
-                    decisionBudget: Long,
-                    cutoff: Double,
-                    cancellation: ExecutionControl,
-                ) = Unit
+                override fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double,
+                    cancellation: ExecutionControl) = Unit
                 override fun runSlice(cancellation: ExecutionControl, millis: Long, work: Long) =
                     RepairSearchStep(sample, TerminationReason.SearchExhausted)
             }
-            val context = RepairContext(
-                NoFeasibleLs(problem),
-                LocalSearchParams(),
-                selectObjective,
-                Assumptions.None,
-                incumbent,
-                FreedVars(intArrayOf(0), IntArray(0)),
-                repairSearch = retained,
-                recordRepairResult = { observed = it },
-            )
+            val context = RepairContext(NoFeasibleLs(problem), LocalSearchParams(), selectObjective,
+                Assumptions.None, incumbent, FreedVars(intArrayOf(0), IntArray(0)), repairSearch = retained,
+                recordRepairResult = { observed = it })
 
             val repaired = BacktrackRepair().repair(context)
 

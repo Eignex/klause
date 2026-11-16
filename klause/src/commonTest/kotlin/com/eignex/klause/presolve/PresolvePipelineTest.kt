@@ -45,9 +45,7 @@ class PresolvePipelineTest {
     fun `wide prebake LP work should remain attributed with the harvest disabled`() {
         val budget = PresolveBudget(Long.MAX_VALUE)
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1_000_000_000) },
+            0, 2, Array(2) { IntDomain(0, 1_000_000_000) },
             listOf(
                 Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 10),
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, 0),
@@ -69,9 +67,7 @@ class PresolvePipelineTest {
     @Test
     fun `automatic clausal satisfaction harvest should skip before LP construction`() {
         val problem = Problem(
-            3,
-            0,
-            emptyArray(),
+            3, 0, emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
@@ -128,9 +124,7 @@ class PresolvePipelineTest {
     @Test
     fun `propagator only symmetry should retain the automatic clausal harvest skip`() {
         val problem = Problem(
-            3,
-            0,
-            emptyArray(),
+            3, 0, emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
@@ -156,9 +150,7 @@ class PresolvePipelineTest {
     @Test
     fun `clause conversion should retain an opportunity for LP refutation`() {
         val problem = Problem(
-            3,
-            0,
-            emptyArray(),
+            3, 0, emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(1, false))),
                 Clause(intArrayOf(Lit.make(0, false), Lit.make(2, false))),
@@ -191,9 +183,7 @@ class PresolvePipelineTest {
     fun `automatic nonclausal harvest should retain certified root refutations`() {
         val problems = listOf(
             Problem(
-                0,
-                3,
-                Array(3) { IntDomain(0, 10) },
+                0, 3, Array(3) { IntDomain(0, 10) },
                 listOf(
                     Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.GE, 3),
                     Linear(intArrayOf(1, 1), intArrayOf(1, 2), LinearOp.GE, 3),
@@ -202,9 +192,7 @@ class PresolvePipelineTest {
                 ),
             ),
             Problem(
-                3,
-                0,
-                emptyArray(),
+                3, 0, emptyArray(),
                 listOf(
                     Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                     Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
@@ -232,9 +220,7 @@ class PresolvePipelineTest {
     @Test
     fun `automatic clausal optimization harvest should remain eligible`() {
         val problem = Problem(
-            3,
-            0,
-            emptyArray(),
+            3, 0, emptyArray(),
             listOf(
                 Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
                 Clause(intArrayOf(Lit.make(1, true), Lit.make(2, true))),
@@ -252,19 +238,15 @@ class PresolvePipelineTest {
 
         assertEquals(PresolveInvocationOutcome.COMPLETE_MISS, budget.invocations.single().outcome)
         assertTrue(outcome.stats.lpStats.rootPasses.sum > 0.0)
-        assertEquals(
-            2,
-            BacktrackSolver(outcome.problem.bake()).enumerate().minOf {
-                outcome.reconstruct(it).bools.count { value -> value }
-            },
-        )
+        assertEquals(2, BacktrackSolver(outcome.problem.bake()).enumerate().minOf {
+            outcome.reconstruct(it).bools.count { value -> value }
+        })
     }
 
     @Test
     fun `automatic integer optimization harvest should retain objective bound tightening`() {
         val problem = Problem(
-            0,
-            4,
+            0, 4,
             arrayOf(IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 1), IntDomain(0, 3)),
             listOf(
                 Linear(intArrayOf(1, -1, -1, -1), intArrayOf(3, 0, 1, 2), LinearOp.GE, 0),
@@ -289,9 +271,7 @@ class PresolvePipelineTest {
     @Test
     fun `disabled elective harvest should retain wide integer prebake refutations`() {
         val problem = Problem(
-            0,
-            2,
-            Array(2) { IntDomain(0, 1_000_000_000) },
+            0, 2, Array(2) { IntDomain(0, 1_000_000_000) },
             listOf(
                 Linear(intArrayOf(1, -1), intArrayOf(0, 1), LinearOp.LE, -1),
                 Linear(intArrayOf(1, -1), intArrayOf(1, 0), LinearOp.LE, -1),
@@ -299,10 +279,7 @@ class PresolvePipelineTest {
         )
 
         val outcome = PresolvePipeline.run(
-            problem,
-            null,
-            PresolveConfig.parse("off,-lp-harvest"),
-            solutionSetSensitive = false,
+            problem, null, PresolveConfig.parse("off,-lp-harvest"), solutionSetSensitive = false,
         )
 
         assertTrue(outcome.stats.infeasible)

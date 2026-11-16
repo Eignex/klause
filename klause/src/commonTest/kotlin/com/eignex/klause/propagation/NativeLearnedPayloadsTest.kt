@@ -90,19 +90,15 @@ class NativeLearnedPayloadsTest {
         val payloads = NativeLearnedPayloads()
         val sample = SharingMemoryObservation(10_000L, 4096, { false }, {})
 
-        val values = assertNotNull(
-            sample.snapshot {
-                payloads.sharingMemory(sample, true, false) { false }
-            }.completeValues,
-        )
+        val values = assertNotNull(sample.snapshot {
+            payloads.sharingMemory(sample, true, false) { false }
+        }.completeValues)
 
         assertEquals(0L, payloads.referenceCapacity)
         assertTrue(payloads.cacheReferenceCapacity > 0L)
         assertEquals(payloads.primitiveBytes, values["ownedPrimitiveBytes"])
-        assertEquals(
-            payloads.referenceCapacity + payloads.cacheReferenceCapacity + payloads.directoryCapacity + 8L,
-            values["ownedReferenceSlots"],
-        )
+        assertEquals(payloads.referenceCapacity + payloads.cacheReferenceCapacity + payloads.directoryCapacity + 8L,
+            values["ownedReferenceSlots"])
         assertEquals(values["ownedPrimitiveBytes"], values["protectedPrimitiveBytes"])
         assertEquals(values["ownedReferenceSlots"], values["protectedReferenceSlots"])
     }
@@ -121,9 +117,7 @@ class NativeLearnedPayloadsTest {
 
         repeat(512) {
             val budget = ReclamationPreparation(40L, 256L, { false }, {})
-            try {
-                payloads.sweepDirectory(budget)
-            } catch (_: ReclamationPreparation.Deferred) { }
+            try { payloads.sweepDirectory(budget) } catch (_: ReclamationPreparation.Deferred) { }
             assertTrue(budget.work <= 40L)
         }
 
@@ -210,17 +204,13 @@ class NativeLearnedPayloadsTest {
         repeat(128) { payloads.add(intArrayOf(0, 2)) }
         val sample = SharingMemoryObservation(10_000L, 4096, { false }, {})
 
-        val values = assertNotNull(
-            sample.snapshot {
-                payloads.sharingMemory(sample, true, false) { it == 0 }
-            }.completeValues,
-        )
+        val values = assertNotNull(sample.snapshot {
+            payloads.sharingMemory(sample, true, false) { it == 0 }
+        }.completeValues)
 
         assertEquals(payloads.primitiveBytes + payloads.capacityBytes, values["ownedPrimitiveBytes"])
-        assertEquals(
-            payloads.referenceCapacity + payloads.cacheReferenceCapacity + payloads.directoryCapacity + 16L,
-            values["ownedReferenceSlots"],
-        )
+        assertEquals(payloads.referenceCapacity + payloads.cacheReferenceCapacity + payloads.directoryCapacity + 16L,
+            values["ownedReferenceSlots"])
         assertTrue(values.getValue("protectedPrimitiveBytes") < values.getValue("ownedPrimitiveBytes"))
         assertTrue(values.getValue("protectedReferenceSlots") < values.getValue("ownedReferenceSlots"))
     }

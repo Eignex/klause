@@ -55,18 +55,15 @@ internal class SearchComponentOpening(
     private fun graphSelectionGuidance(source: Problem): Boolean? {
         if (source.numBoolVars == 0 || source.numIntVars != 0 || source.numRealVars == 0 ||
             source.factors.size > SourceConjunctionHints.MAX_INDEX_ENTRIES
-        ) {
-            return false
-        }
-        ScanMeter(cancellation).use { scan ->
+        ) return false
+        ScanMeter (cancellation).use { scan ->
             if (!scan.check()) return null
-            for (factor in source.factors) {
-                if (!scan.visit(1L)) return null
-                if (factor is Cardinality && factor.max == 1 && factor.literals.size > 2) {
-                    return if (scan.check()) true else null
-                }
-            }
-            return if (scan.check()) false else null
+        for (factor in source.factors) {
+            if (!scan.visit(1L)) return null
+            if (factor is Cardinality && factor.max == 1 &&
+                factor.literals.size > 2) return if (scan.check()) true else null
+        }
+        return if (scan.check()) false else null
         }
     }
 
@@ -86,16 +83,11 @@ internal class SearchComponentOpening(
                         outcome(HintIndexOutcome.STOPPED)
                         return SearchCandidateHints.None
                     }
-                    component.partialPointHints(
-                        cancellation,
-                        defaultOpening = true,
-                        defaultGraphSelections = selections,
-                    )?.second.also {
+                    component.partialPointHints(cancellation, defaultOpening = true,
+                        defaultGraphSelections = selections)?.second.also {
                         if (it != null) component.useDefaultDisjunctionHints()
                     }
-                } else {
-                    null
-                }
+                } else null
                 if (direct == null) outcome(HintIndexOutcome.NO_PROVIDER) else accounted = true
                 return direct ?: SearchCandidateHints.None
             }
@@ -121,16 +113,8 @@ internal class SearchComponentOpening(
                 if (factor is Clause) clauses += factor
             }
             accounted = true
-            val compiled = SourceConjunctionHints.create(
-                clauses,
-                source.numBoolVars,
-                variables,
-                hints,
-                cancellation,
-                usage = smtStats?.hintUsage,
-                available = pointAvailable,
-                knownBool = knownBool,
-            )
+            val compiled = SourceConjunctionHints.create(clauses, source.numBoolVars, variables, hints, cancellation,
+                usage = smtStats?.hintUsage, available = pointAvailable, knownBool = knownBool)
             if (compiled != null) {
                 own(compiled)
                 return if (primitiveHintFlips == 0L) SearchCandidateHints.None else compiled
@@ -211,14 +195,9 @@ internal class PreparedSearchRegistrations(
                     groups[index].isNotEmpty() && groups[index].all { it is SourceCoordinateAgreement }
                 }
                 components + SourceCoordinateAgreementComponent(participants, { session.model() }, supported)
-            } else {
-                components
-            }
+            } else components
             session = SearchComponentSet(installed, proposals = opening.branchProposals()).session(
-                maxChecks,
-                cancellation,
-                learnedDb,
-                SearchAtomRegistry(boolCount),
+                maxChecks, cancellation, learnedDb, SearchAtomRegistry(boolCount),
             )
             if (arithmetic.size > 1) {
                 val owners = registrations.indices.flatMap { index ->
@@ -235,12 +214,9 @@ internal class PreparedSearchRegistrations(
                 cp,
                 theory,
                 resources,
-                opening.candidateHints(
-                    source,
-                    theory.takeIf {
-                        arithmetic.size == 1 && (source.numRealVars > 0 || source.numIntVars > 0)
-                    },
-                ),
+                opening.candidateHints(source, theory.takeIf {
+                    arithmetic.size == 1 && (source.numRealVars > 0 || source.numIntVars > 0)
+                }),
             )
         } catch (failure: Throwable) {
             resources.closeAfter(failure)

@@ -153,11 +153,8 @@ class ReconstructedCertificateTest {
             repeat(64) { addRow(intArrayOf(0), longArrayOf(1L), Relation.LE, 1L) }
         }.build(Sense.MINIMIZE)
 
-        val result = certifyLpBoundOnly(
-            model,
-            DoubleArray(64),
-            ReconstructionLimits(maxWork = 4_000L, maxAttempts = 0),
-        )
+        val result = certifyLpBoundOnly(model, DoubleArray(64),
+            ReconstructionLimits(maxWork = 4_000L, maxAttempts = 0))
 
         assertEquals(BigFraction.ZERO, assertNotNull(result.bound).value)
     }
@@ -174,11 +171,8 @@ class ReconstructedCertificateTest {
             ExactLpObjective(listOf(zero, zero)),
         )
 
-        val result = certifyLpBoundOnly(
-            assertNotNull(LpExactState(source).toWorkingModel()),
-            doubleArrayOf(0.0),
-            ReconstructionLimits(maxBits = 128, maxAttempts = 0),
-        )
+        val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()), doubleArrayOf(0.0),
+            ReconstructionLimits(maxBits = 128, maxAttempts = 0))
 
         assertNull(result.bound)
         assertEquals(ReconstructionDecline.BITS, result.metrics.decline)
@@ -196,11 +190,8 @@ class ReconstructedCertificateTest {
                 ExactLpObjective(listOf(ExactLpNumber.of(cost), zero)),
             )
 
-            val result = certifyLpBoundOnly(
-                assertNotNull(LpExactState(source).toWorkingModel()),
-                doubleArrayOf(0.0),
-                ReconstructionLimits(maxAttempts = 0),
-            )
+            val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                doubleArrayOf(0.0), ReconstructionLimits(maxAttempts = 0))
 
             assertNull(result.bound)
             assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
@@ -222,11 +213,8 @@ class ReconstructedCertificateTest {
                     ExactLpObjective(List(33) { zero }),
                 )
 
-                val result = certifyLpBoundOnly(
-                    assertNotNull(LpExactState(source).toWorkingModel()),
-                    DoubleArray(32) { -weight.toDouble() },
-                    ReconstructionLimits(maxAttempts = 0),
-                )
+                val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                    DoubleArray(32) { -weight.toDouble() }, ReconstructionLimits(maxAttempts = 0))
 
                 val bound = assertNotNull(result.bound)
                 assertEquals(weight * BigFraction.ofLong(-32L * rhs), bound.value)
@@ -250,11 +238,8 @@ class ReconstructedCertificateTest {
                     ExactLpObjective(listOf(ExactLpNumber.of(cost))),
                 )
 
-                val result = certifyLpBoundOnly(
-                    assertNotNull(LpExactState(source).toWorkingModel()),
-                    doubleArrayOf(),
-                    ReconstructionLimits(maxAttempts = 0),
-                )
+                val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                    doubleArrayOf(), ReconstructionLimits(maxAttempts = 0))
 
                 val bound = assertNotNull(result.bound)
                 assertEquals(cost * lower, bound.value)
@@ -277,11 +262,8 @@ class ReconstructedCertificateTest {
                 ExactLpObjective(listOf(ExactLpNumber.of(cost))),
             )
 
-            val result = certifyLpBoundOnly(
-                assertNotNull(LpExactState(source).toWorkingModel()),
-                doubleArrayOf(),
-                ReconstructionLimits(maxAttempts = 0),
-            )
+            val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                doubleArrayOf(), ReconstructionLimits(maxAttempts = 0))
 
             val bound = assertNotNull(result.bound)
             assertEquals(BigFraction.ZERO, bound.value)
@@ -301,11 +283,8 @@ class ReconstructedCertificateTest {
                 ExactLpObjective(listOf(ExactLpNumber.of(weight.negated()), zero)),
             )
 
-            val result = certifyLpBoundOnly(
-                assertNotNull(LpExactState(source).toWorkingModel()),
-                doubleArrayOf(-weight.toDouble() / 2.0),
-                ReconstructionLimits(maxAttempts = 0),
-            )
+            val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()),
+                doubleArrayOf(-weight.toDouble() / 2.0), ReconstructionLimits(maxAttempts = 0))
 
             assertNull(result.bound)
             assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
@@ -323,19 +302,14 @@ class ReconstructedCertificateTest {
             val source = ExactLpModel(
                 List(2) { emptyList() },
                 emptyList(),
-                listOf(
-                    ExactLpColumn(ExactLpBounds(ExactLpSide(weight), ExactLpSide(weight))),
-                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero))),
-                ),
+                listOf(ExactLpColumn(ExactLpBounds(ExactLpSide(weight), ExactLpSide(weight))),
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero)))),
                 emptyList(),
                 ExactLpObjective(listOf(weight, ExactLpNumber.of(-1L))),
             )
 
-            val result = certifyLpBoundOnly(
-                assertNotNull(LpExactState(source).toWorkingModel()),
-                doubleArrayOf(),
-                ReconstructionLimits(maxBits = limit, maxAttempts = 0),
-            )
+            val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()), doubleArrayOf(),
+                ReconstructionLimits(maxBits = limit, maxAttempts = 0))
 
             assertNull(result.bound)
             assertEquals(ReconstructionDecline.CANDIDATE, result.metrics.decline)
@@ -358,11 +332,8 @@ class ReconstructedCertificateTest {
             ExactLpObjective(listOf(ExactLpNumber.of(1L))),
         )
 
-        val result = certifyLpBoundOnly(
-            assertNotNull(LpExactState(source).toWorkingModel()),
-            doubleArrayOf(),
-            ReconstructionLimits(maxBits = 128, maxAttempts = 0),
-        )
+        val result = certifyLpBoundOnly(assertNotNull(LpExactState(source).toWorkingModel()), doubleArrayOf(),
+            ReconstructionLimits(maxBits = 128, maxAttempts = 0))
 
         assertNull(result.bound)
         assertEquals(ReconstructionDecline.BITS, result.metrics.decline)
@@ -438,12 +409,8 @@ class ReconstructedCertificateTest {
     fun `independent ray denominators should recover a checked contradiction`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(
-                listOf(
-                    ExactLpEntry(0, ExactLpNumber.of(-65521L)),
-                    ExactLpEntry(1, ExactLpNumber.of(65497L)),
-                ),
-            ),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-65521L)),
+                ExactLpEntry(1, ExactLpNumber.of(65497L)))),
             listOf(ExactLpNumber.of(-65521L), zero),
             listOf(ExactLpColumn(ExactLpBounds())) +
                 List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
@@ -460,13 +427,8 @@ class ReconstructedCertificateTest {
             assertNull(binary.conflict)
             val proof = assertNotNull(result.conflict)
             assertEquals(listOf(0, 1), proof.rows.toList())
-            assertEquals(
-                listOf(
-                    BigFraction.of(BIG_ONE, bigIntOf(65521)),
-                    BigFraction.of(BIG_ONE, bigIntOf(65497)),
-                ),
-                proof.multipliers,
-            )
+            assertEquals(listOf(BigFraction.of(BIG_ONE, bigIntOf(65521)),
+                BigFraction.of(BIG_ONE, bigIntOf(65497))), proof.multipliers)
             assertNotNull(result.conflictSupport)
             assertNotNull(result.metrics.vectorRejection)
             assertNull(result.metrics.decline)
@@ -477,12 +439,8 @@ class ReconstructedCertificateTest {
     fun `reconstructed ray entries should not refute a feasible boundary`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(
-                listOf(
-                    ExactLpEntry(0, ExactLpNumber.of(-65521L)),
-                    ExactLpEntry(1, ExactLpNumber.of(65497L)),
-                ),
-            ),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-65521L)),
+                ExactLpEntry(1, ExactLpNumber.of(65497L)))),
             listOf(ExactLpNumber.of(-65521L), ExactLpNumber.of(65497L)),
             listOf(ExactLpColumn(ExactLpBounds())) +
                 List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
@@ -490,11 +448,9 @@ class ReconstructedCertificateTest {
             ExactLpObjective(List(3) { zero }),
         )
 
-        val result = reconstructCertificate(
-            assertNotNull(LpExactState(source).toWorkingModel()),
+        val result = reconstructCertificate(assertNotNull(LpExactState(source).toWorkingModel()),
             ray = doubleArrayOf(-1.0 / 65521.0, -1.0 / 65497.0),
-            limits = ReconstructionLimits(maxAttempts = 1),
-        )
+            limits = ReconstructionLimits(maxAttempts = 1))
 
         assertNull(result.conflict)
         assertNotNull(result.metrics.vectorRejection)
@@ -505,12 +461,8 @@ class ReconstructedCertificateTest {
     fun `ray reconstruction should retain the containing work allowance`() {
         val zero = ExactLpNumber.of(0L)
         val source = ExactLpModel(
-            listOf(
-                listOf(
-                    ExactLpEntry(0, ExactLpNumber.of(-65521L)),
-                    ExactLpEntry(1, ExactLpNumber.of(65497L)),
-                ),
-            ),
+            listOf(listOf(ExactLpEntry(0, ExactLpNumber.of(-65521L)),
+                ExactLpEntry(1, ExactLpNumber.of(65497L)))),
             listOf(ExactLpNumber.of(-65521L), zero),
             listOf(ExactLpColumn(ExactLpBounds())) +
                 List(2) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
@@ -521,11 +473,8 @@ class ReconstructedCertificateTest {
         val ray = doubleArrayOf(-1.0 / 65521.0, -1.0 / 65497.0)
         val binary = reconstructCertificate(model, ray = ray, limits = ReconstructionLimits(maxAttempts = 0))
 
-        val result = reconstructCertificate(
-            model,
-            ray = ray,
-            limits = ReconstructionLimits(maxWork = binary.metrics.work, maxAttempts = 1),
-        )
+        val result = reconstructCertificate(model, ray = ray,
+            limits = ReconstructionLimits(maxWork = binary.metrics.work, maxAttempts = 1))
 
         assertNull(result.conflict)
         assertEquals(ReconstructionDecline.WORK, result.metrics.decline)

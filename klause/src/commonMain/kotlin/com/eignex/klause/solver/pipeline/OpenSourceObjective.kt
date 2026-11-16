@@ -53,24 +53,11 @@ internal class OpenSourceObjective(
     ): OpenTheoryOptimum {
         val ray = authority.terminal?.claim as? SourceClaim.Ray ?: return authority.openOptimum()
         val pointValue = context?.linearValue(ray.sample, stop)
-        if (pointValue != null) {
-            return OpenTheoryOptimum.Unbounded(
-                OpenTheoryAssignment.Sampled(ray.sample),
-                minimizedSource(pointValue),
-                authority.stats,
-                authority,
-            )
-        }
-        val partial = LinearOptimizationResult(
-            authority.scope,
-            null,
-            authority.bound,
-            authority.incumbent,
-            authority.value,
-            if (stop()) stoppedReason else TerminationReason.Unsupported,
-            authority.stats,
-            authority.semantics,
-        )
+        if (pointValue != null) return OpenTheoryOptimum.Unbounded(OpenTheoryAssignment.Sampled(ray.sample),
+            minimizedSource(pointValue), authority.stats, authority)
+        val partial = LinearOptimizationResult(authority.scope, null, authority.bound, authority.incumbent,
+            authority.value, if (stop()) stoppedReason else TerminationReason.Unsupported, authority.stats,
+            authority.semantics)
         return partial.openOptimum()
     }
 
@@ -81,25 +68,10 @@ internal class OpenSourceObjective(
             is MinimizeResult.Unknown -> result.reason
             else -> TerminationReason.BudgetExhausted
         }
-        val authority = context?.let {
-            LinearOptimizationResult(
-                it.scope,
-                null,
-                null,
-                pooled?.assignment,
-                pooled?.objective?.source,
-                reason,
-                result.stats,
-                it.semantics,
-            )
-        }
-        return OpenTheoryOptimum.Bounded(
-            pooled?.assignment?.let { OpenTheoryAssignment.Sampled(it) },
-            pooled?.objective?.source?.let(::minimizedSource),
-            reason,
-            result.stats,
-            authority,
-        )
+        val authority = context?.let { LinearOptimizationResult(it.scope, null, null,
+            pooled?.assignment, pooled?.objective?.source, reason, result.stats, it.semantics) }
+        return OpenTheoryOptimum.Bounded(pooled?.assignment?.let { OpenTheoryAssignment.Sampled(it) },
+            pooled?.objective?.source?.let(::minimizedSource), reason, result.stats, authority)
     }
 
     fun publish(sample: Sample, observer: SourcePublicationObserver) {

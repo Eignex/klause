@@ -48,22 +48,9 @@ internal fun lowerGridRow(
     truncate: Boolean = false,
 ): List<Factor>? {
     val constants = factor.realConstants ?: return null
-    return lowerGridRow(
-        FloatGridRow(
-            factor.vars,
-            DoubleArray(factor.vars.size) { constants.intCoefficients.at(it) },
-            factor.realVars,
-            DoubleArray(factor.realVars.size) { constants.realCoefficients.at(it) },
-            factor.op,
-            constants.bound,
-            constants.strict,
-            null,
-        ),
-        columns,
-        scale,
-        cancellation,
-        truncate,
-    )
+    return lowerGridRow(FloatGridRow(factor.vars, DoubleArray(factor.vars.size) { constants.intCoefficients.at(it) },
+        factor.realVars, DoubleArray(factor.realVars.size) { constants.realCoefficients.at(it) },
+        factor.op, constants.bound, constants.strict, null), columns, scale, cancellation, truncate)
 }
 
 internal fun lowerGridRow(
@@ -72,22 +59,8 @@ internal fun lowerGridRow(
     scale: Long,
     cancellation: ExecutionControl,
     truncate: Boolean = false,
-): List<Factor>? = lowerGridRow(
-    FloatGridRow(
-        factor.vars,
-        factor.intCoeffs,
-        factor.realVars,
-        factor.realCoeffs,
-        factor.op,
-        factor.bound,
-        factor.strict,
-        factor.aux,
-    ),
-    columns,
-    scale,
-    cancellation,
-    truncate,
-)
+): List<Factor>? = lowerGridRow(FloatGridRow(factor.vars, factor.intCoeffs, factor.realVars, factor.realCoeffs,
+    factor.op, factor.bound, factor.strict, factor.aux), columns, scale, cancellation, truncate)
 
 private fun lowerGridRow(
     row: FloatGridRow,
@@ -131,20 +104,11 @@ private fun lowerGridRow(
             LinearOp.GE -> -scaled.negated().ceilInteger() + BIG_ONE
             else -> return null
         }
-    } else if (truncate) {
-        scaled.num / scaled.den
-    } else {
-        nearestInteger(scaled)
-    }
+    } else if (truncate) scaled.num / scaled.den else nearestInteger(scaled)
     val loweredBound = integerBound.word() ?: return null
     if (cancellation()) return null
-    return listOf(
-        if (reifier == null) {
-            Linear(coefficients, variables, operation, loweredBound)
-        } else {
-            ReifiedLinear(reifier, coefficients, variables, operation, loweredBound)
-        },
-    )
+    return listOf(if (reifier == null) Linear(coefficients, variables, operation, loweredBound)
+        else ReifiedLinear(reifier, coefficients, variables, operation, loweredBound))
 }
 
 private fun nearestInteger(value: BigFraction): BigInt {
@@ -175,16 +139,11 @@ internal fun prepareGridAbsImage(
         val magnitude = abs(input.value(index.toLong()))
         image[index] = if (magnitude < output.lower - outputStep * 0.5 ||
             magnitude > output.upper + outputStep * 0.5
-        ) {
-            -1
-        } else {
+        ) -1 else {
             val position = if (outputStep == 0.0) 0.0 else (magnitude - output.lower) / outputStep
             val rounded = round(position)
-            if (!rounded.isFinite() || abs(position - rounded) > 0.5 || rounded < 0 || rounded >= output.buckets) {
-                -1
-            } else {
-                rounded.toInt()
-            }
+            if (!rounded.isFinite() || abs(position - rounded) > 0.5 || rounded < 0 || rounded >= output.buckets) -1
+            else rounded.toInt()
         }
     }
     return if (cancellation()) null else image
@@ -207,23 +166,10 @@ internal fun lowerGridElement(
                 return null
             }
             input.variable.toLong()
-        } else {
-            output.index(factor.constants[index]) ?: return null
-        }
+        } else output.index(factor.constants[index]) ?: return null
     }
-    return if (cancellation()) {
-        null
-    } else {
-        listOf(
-            Element(
-                factor.idx,
-                output.variable,
-                entries,
-                factor.arrIsVars,
-                factor.indexOffset,
-            ),
-        )
-    }
+    return if (cancellation()) null else listOf(Element(factor.idx, output.variable, entries,
+        factor.arrIsVars, factor.indexOffset))
 }
 
 internal fun lowerGridMinMax(
@@ -242,11 +188,8 @@ internal fun lowerGridMinMax(
         if (cancellation()) return null
         val coordinate = columns.getValue(roles[index]).coordinate
         coordinates[index] = coordinate.variable
-        steps[index] = if (coordinate.buckets > 1) {
-            (coordinate.upper - coordinate.lower) / (coordinate.buckets - 1)
-        } else {
-            0.0
-        }
+        steps[index] = if (coordinate.buckets > 1) (coordinate.upper - coordinate.lower) / (coordinate.buckets - 1)
+            else 0.0
         origins[index] = coordinate.lower
         constants[index] = coordinate.buckets == 1
     }
@@ -260,9 +203,7 @@ internal fun lowerGridMinMax(
             if (!origin.isFinite() || !step.isFinite() ||
                 origin <= Long.MIN_VALUE.toDouble() || origin >= Long.MAX_VALUE.toDouble() ||
                 step >= Long.MAX_VALUE.toDouble()
-            ) {
-                return null
-            }
+            ) return null
             scaledOrigins[index] = origin.roundToLong()
         }
         for (origin in scaledOrigins) {

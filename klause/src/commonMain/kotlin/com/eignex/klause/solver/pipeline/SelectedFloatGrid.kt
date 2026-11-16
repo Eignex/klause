@@ -15,9 +15,7 @@ import com.eignex.klause.solver.validation.hasCapturedLinearTolerance
 import com.eignex.klause.util.ExecutionControl
 
 internal enum class FloatGridConsumerPurpose {
-    FINITE_COMPATIBILITY,
-    HEURISTIC_VIEW,
-    AUTOMATIC_FINITE_COMPATIBILITY,
+    FINITE_COMPATIBILITY, HEURISTIC_VIEW, AUTOMATIC_FINITE_COMPATIBILITY,
 }
 
 internal class SelectedFloatGridConsumer(
@@ -45,11 +43,8 @@ internal enum class SelectedGridDecline { SOURCE_REFUTED, CONSUMER, PROJECTION, 
 
 internal sealed interface SelectedFloatGridPreparation {
     class Prepared(val invocation: PreparedSourceInvocation) : SelectedFloatGridPreparation
-    class Declined(
-        val cause: SelectedGridDecline,
-        val projectionCause: FloatGridDecline? = null,
-        val sourceFactor: Int? = null,
-    ) : SelectedFloatGridPreparation
+    class Declined(val cause: SelectedGridDecline, val projectionCause: FloatGridDecline? = null,
+        val sourceFactor: Int? = null) : SelectedFloatGridPreparation
 }
 
 internal fun SourceSetup.prepareSelectedFloatGrid(
@@ -88,26 +83,17 @@ private fun selectFloatGrid(
     }
     if (purpose == FloatGridConsumerPurpose.AUTOMATIC_FINITE_COMPATIBILITY &&
         SourceSetup.preservesOriginalCompleteArm(selection)
-    ) {
-        return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
-    }
-    if (selection.operation !in setOf(
-            ExecutionOperation.SATISFY,
-            ExecutionOperation.OPTIMIZE,
-            ExecutionOperation.ENUMERATE,
-        ) ||
+    ) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
+    if (selection.operation !in setOf(ExecutionOperation.SATISFY, ExecutionOperation.OPTIMIZE,
+            ExecutionOperation.ENUMERATE) ||
         (purpose == FloatGridConsumerPurpose.HEURISTIC_VIEW && !selection.request.engine.pureLocalSearch)
-    ) {
-        return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
-    }
+    ) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.CONSUMER)
     val consumer = SelectedFloatGridConsumer(selection, purpose, declaredGridSemantics)
     val projection = when (val result = prepare(consumer, stop)) {
         is FloatGridPreparation.Prepared -> result
-
         is FloatGridPreparation.Declined -> return SelectedFloatGridPreparation.Declined(
             if (stop()) SelectedGridDecline.RESOURCE else SelectedGridDecline.PROJECTION,
-            result.cause,
-            result.sourceFactor,
+            result.cause, result.sourceFactor,
         )
     }
     val originalObjective = selection.request.objective
@@ -121,12 +107,8 @@ private fun selectFloatGrid(
     if (objective != null && nativeObjective == null) {
         return SelectedFloatGridPreparation.Declined(SelectedGridDecline.OBJECTIVE)
     }
-    val plan = projection.problem.prepareExecutionPlan(
-        consumer.providers,
-        nativeObjective,
-        preferFinite = true,
-        cancellation = stop,
-    )
+    val plan = projection.problem.prepareExecutionPlan(consumer.providers, nativeObjective,
+        preferFinite = true, cancellation = stop)
     if (stop() || plan.decline == PreparedPlanDecline.RESOURCE) {
         return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
     }
@@ -147,18 +129,14 @@ private fun selectFloatGrid(
             checkedIntegers += id
         }
     }
-    val integerView = source.withFactors(
-        checkedIntegers.map { source.factors[it] }.toTypedArray(),
-        source.impliedFactorMask?.let { mask -> BooleanArray(checkedIntegers.size) { mask[checkedIntegers[it]] } },
-    )
+    val integerView = source.withFactors(checkedIntegers.map { source.factors[it] }.toTypedArray(),
+        source.impliedFactorMask?.let { mask -> BooleanArray(checkedIntegers.size) { mask[checkedIntegers[it]] } })
     val captured = selection.preparedPlan?.factorProjections?.takeIf { it.problem === source }
         ?: consumer.providers.prepare(source)
     val checker = integerView.bake(captured.projected(integerView, checkedIntegers.toIntArray()), stop)
     if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
-    stop.charge(
-        projection.problem.numIntVars.toLong() - selection.source.problem.numIntVars +
-            projection.problem.numFactors,
-    )
+    stop.charge(projection.problem.numIntVars.toLong() - selection.source.problem.numIntVars +
+        projection.problem.numFactors)
     if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
     val binding = SelectedFloatGridBinding(consumer, projection, route, objective, nativeObjective, checker)
     if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
@@ -169,8 +147,6 @@ private fun normalizeGridObjective(objective: LinearObjective?, maximize: Boolea
     if (!maximize || objective == null) return objective
     if (objective.constant == Long.MIN_VALUE || objective.boolWeightValues.any { it == Long.MIN_VALUE } ||
         objective.intCoefficientValues.any { it == Long.MIN_VALUE }
-    ) {
-        return null
-    }
+    ) return null
     return objective.negated()
 }

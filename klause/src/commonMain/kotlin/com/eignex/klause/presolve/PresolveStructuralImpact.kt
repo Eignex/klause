@@ -40,9 +40,7 @@ private fun Factor.isBinaryPartition(problem: Problem, token: ExecutionControl):
         val variable = row.vars[k]
         if (constants.coeff(k) != constants.bound || !bounds.hasLower(variable) || !bounds.hasUpper(variable) ||
             bounds.lower(variable) < 0L || bounds.upper(variable) > 1L
-        ) {
-            return false
-        }
+        ) return false
     }
     return true
 }
@@ -60,10 +58,8 @@ internal fun PresolveInvocation?.recordStructuralImpact(
     for (id in dropped) {
         if (!view.factor("Removed", problem.factors[id], problem)) break
     }
-    if (!view.stopped) {
-        for (factor in added) {
-            if (!view.factor("Added", factor, problem)) break
-        }
+    if (!view.stopped) for (factor in added) {
+        if (!view.factor("Added", factor, problem)) break
     }
     if (!view.stopped) view.reconstruction(rebuild)
     structuralImpact = view.snapshot()
@@ -134,9 +130,7 @@ private class StructuralImpactView(private val limit: Int, private val token: Ex
                     val bounds = problem.intBounds
                     if (constants.coeff(k) != constants.bound || !bounds.hasLower(variable) ||
                         !bounds.hasUpper(variable) || bounds.lower(variable) < 0L || bounds.upper(variable) > 1L
-                    ) {
-                        partition = false
-                    }
+                    ) partition = false
                 }
                 if (partition) add(prefix + "PartitionRows")
             }

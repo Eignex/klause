@@ -31,11 +31,8 @@ class SolveMetricFailureTest {
 
     private fun persisted(failure: Throwable): SolveRecord {
         val (record, raw) = SolveMetric.solve(
-            entry,
-            settings,
-            Budget(1000),
-            "timestamp",
-            "revision",
+            entry, settings, Budget(1000),
+            "timestamp", "revision",
             installedBuild = { build },
             invoke = { _, _, _, _ -> throw failure },
         )
@@ -156,11 +153,7 @@ class SolveMetricFailureTest {
     @Test
     fun `an unavailable build capture should not mask its exception or invent an identity`() {
         val (record, _) = SolveMetric.solve(
-            entry,
-            settings,
-            Budget(1000),
-            "timestamp",
-            "revision",
+            entry, settings, Budget(1000), "timestamp", "revision",
             installedBuild = { throw IOException("missing installation") },
             invoke = { _, _, _, _ -> error("must not launch") },
         )
@@ -176,22 +169,12 @@ class SolveMetricFailureTest {
     fun `ordinary outcomes should not acquire caught exception diagnostics`(outcome: String) {
         val result = SolverInvocation.Result(
             feasible = if (outcome == "success") true else null,
-            objective = null,
-            timeToBestMs = null,
-            proven = false,
-            stats = emptyMap(),
-            rawOutput = "",
-            command = "cli",
-            buildProvenance = build,
+            objective = null, timeToBestMs = null, proven = false, stats = emptyMap(), rawOutput = "",
+            command = "cli", buildProvenance = build,
         )
         val (record, _) = SolveMetric.solve(
-            entry,
-            settings,
-            Budget(1000),
-            "timestamp",
-            "revision",
-            installedBuild = { build },
-            invoke = { _, _, _, _ -> result },
+            entry, settings, Budget(1000), "timestamp", "revision",
+            installedBuild = { build }, invoke = { _, _, _, _ -> result },
         )
 
         assertEquals(result.feasible, record.feasible)

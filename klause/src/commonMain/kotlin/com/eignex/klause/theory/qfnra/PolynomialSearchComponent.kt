@@ -21,9 +21,7 @@ internal class PolynomialSearchComponent(
     private val invocation: PolynomialTheoryInvocation,
     integerColumns: Map<Int, Int> = emptyMap(),
     private val capture: ((QfNraAssignment, SearchContext) -> Sample)? = null,
-) : SearchComponent,
-    PreparingSearchComponent,
-    FiniteFactorEnforcer {
+) : SearchComponent, PreparingSearchComponent, FiniteFactorEnforcer {
     private val integerColumns = integerColumns.toMap()
     val witnessKey = SearchModelKey(QfNraAssignment::class)
     private var signature: PolynomialSignature? = null
@@ -66,13 +64,11 @@ internal class PolynomialSearchComponent(
             if (result == null) yield(null)
         }
         retain(current, result)
-        yield(
-            when (result) {
-                is QfNraResult.Satisfiable -> ComponentResult.Consistent
-                is QfNraResult.Unsatisfiable -> ComponentResult.Conflict()
-                is QfNraResult.Unknown -> ComponentResult.Indeterminate
-            },
-        )
+        yield(when (result) {
+            is QfNraResult.Satisfiable -> ComponentResult.Consistent
+            is QfNraResult.Unsatisfiable -> ComponentResult.Conflict()
+            is QfNraResult.Unknown -> ComponentResult.Indeterminate
+        })
     }.iterator()
 
     override fun propagate(context: SearchContext): ComponentResult = when (evaluate(context)) {
@@ -88,9 +84,7 @@ internal class PolynomialSearchComponent(
                 val lower = context.intLowerBound(variable)
                 lower == null || lower != context.intUpperBound(variable)
             }
-        ) {
-            return ComponentCheck.Indeterminate
-        }
+        ) return ComponentCheck.Indeterminate
         return when (evaluate(context)) {
             is QfNraResult.Satisfiable -> ComponentCheck.Feasible
             is QfNraResult.Unsatisfiable -> ComponentCheck.Infeasible()
@@ -121,8 +115,7 @@ internal class PolynomialSearchComponent(
     )
 
     private fun conditionOf(current: PolynomialSignature): PolynomialCondition = PolynomialCondition(
-        current.bools,
-        current.lower.mapValues { BigFraction.ofLong(it.value) },
+        current.bools, current.lower.mapValues { BigFraction.ofLong(it.value) },
         current.upper.mapValues { BigFraction.ofLong(it.value) },
     )
 

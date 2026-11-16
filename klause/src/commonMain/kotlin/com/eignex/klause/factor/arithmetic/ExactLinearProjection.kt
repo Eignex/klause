@@ -31,34 +31,15 @@ internal fun ExactLinear.propagationView(): Propagator {
     return when {
         integer != null && activator == LinearRow.ALWAYS ->
             LinearPropagator(variables.boolVars, intVars, integer.coeffs, vars, relation, integer.bound)
-
         integer != null -> ReifiedLinearPropagator(
-            activator,
-            variables.boolVars,
-            intVars,
-            integer.coeffs,
-            vars,
-            relation,
-            integer.bound,
+            activator, variables.boolVars, intVars, integer.coeffs, vars, relation, integer.bound,
         )
-
         activator != LinearRow.ALWAYS -> WideReifiedLinearPropagator(
-            activator,
-            variables.boolVars,
-            intVars,
-            Array(size) { constants.exactCoeff(it) },
-            vars,
-            relation,
-            constants.exactBound,
+            activator, variables.boolVars, intVars, Array(size) { constants.exactCoeff(it) },
+            vars, relation, constants.exactBound,
         )
-
-        else -> WideLinearPropagator(
-            intVars,
-            vars,
-            Array(size) { constants.exactCoeff(it) },
-            relation,
-            constants.exactBound,
-        )
+        else -> WideLinearPropagator(intVars, vars, Array(size) { constants.exactCoeff(it) },
+            relation, constants.exactBound)
     }
 }
 
@@ -77,18 +58,14 @@ private fun IntegerConstants.permitsCompactPropagation(reified: Boolean): Boolea
     return true
 }
 
-internal fun LinearIndicator.propagationView(): Propagator = if (variables.reals.isNotEmpty()) {
-    NoPropagator
-} else {
+internal fun LinearIndicator.propagationView(): Propagator = if (variables.reals.isNotEmpty()) NoPropagator else
     object : Propagator {
         override fun propagate(state: PropagationState, factorId: Int): Boolean {
             val trigger = if (whenOne) 1L else 0L
             val domain = state.intDomains[indicator]
             if (domain.min != domain.max || domain.min != trigger ||
                 row.intVars.any { state.intDomains[it].min != state.intDomains[it].max }
-            ) {
-                return true
-            }
+            ) return true
             var activity = BIG_ZERO
             for (k in 0 until row.size) {
                 activity += row.constants.exactCoeff(k) * bigIntOf(state.intDomains[Term.intVar(row.ref(k))].min)
@@ -96,28 +73,20 @@ internal fun LinearIndicator.propagationView(): Propagator = if (variables.reals
             return exactLinearResidual(activity - row.constants.exactBound, row.relation) == BIG_ZERO
         }
     }
-}
 
 internal fun ExactLinear.scoringView(domains: Array<IntDomain>? = null): Invariant {
     if (variables.reals.isNotEmpty()) return MixedExactLinearScore(this)
     val vars = IntArray(size) { Term.intVar(ref(it)) }
     val integer = constants as? IntegerConstants
     return if (integer != null && domains != null && !needsExactSum(integer, vars, domains)) {
-        if (activator == LinearRow.ALWAYS) {
-            LinearInvariant(integer.coeffs, vars, relation, integer.bound)
-        } else {
-            ReifiedLinearInvariant(activator, integer.coeffs, vars, relation, integer.bound)
-        }
-    } else {
-        ExactLinearInvariant(constants, vars, relation, activator)
-    }
+        if (activator == LinearRow.ALWAYS) LinearInvariant(integer.coeffs, vars, relation, integer.bound)
+        else ReifiedLinearInvariant(activator, integer.coeffs, vars, relation, integer.bound)
+    } else ExactLinearInvariant(constants, vars, relation, activator)
 }
 
 internal fun LinearIndicator.scoringView(): Invariant = if (row.variables.reals.isEmpty()) {
     IntegerIndicatorScore(row, indicator, whenOne)
-} else {
-    MixedExactLinearScore(row, indicator, whenOne)
-}
+} else MixedExactLinearScore(row, indicator, whenOne)
 
 private class IntegerIndicatorScore(
     private val row: ExactLinear,

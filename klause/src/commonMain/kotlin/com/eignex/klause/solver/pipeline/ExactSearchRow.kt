@@ -25,8 +25,7 @@ internal class ExactSearchRow private constructor(
     private val rhs: BigInt,
     override val relation: LinearOp,
     override val strict: Boolean,
-) : Factor,
-    LinearRow {
+) : Factor, LinearRow {
     override val size: Int get() = refs.size
     override fun ref(k: Int): Int = refs[k]
     override val constants = WideConstants(WideConsts(coefficients), rhs)
@@ -45,11 +44,7 @@ internal class ExactSearchRow private constructor(
                 Term.isReal(ref) -> Term.ofRealVar(mapping.real(Term.realVar(ref)))
                 else -> Term.ofLit(mapping.lit(Term.lit(ref)))
             }
-        },
-        coefficients,
-        rhs,
-        relation,
-        strict,
+        }, coefficients, rhs, relation, strict,
     )
 
     override fun structuralKey(): StructuralKey = StructuralKey.of(FactorKind.EXACT_SEARCH_ROW) {
@@ -72,11 +67,8 @@ internal class ExactSearchRow private constructor(
                 if (value.den.magnitudeBitLength() == 1) multiple else multiple / multiple.gcd(value.den) * value.den
             }
             return ExactSearchRow(
-                refs.copyOf(),
-                Array(refs.size) { (coefficients[it] * BigFraction.of(denominator, BIG_ONE)).num },
-                (rhs * BigFraction.of(denominator, BIG_ONE)).num,
-                relation,
-                strict,
+                refs.copyOf(), Array(refs.size) { (coefficients[it] * BigFraction.of(denominator, BIG_ONE)).num },
+                (rhs * BigFraction.of(denominator, BIG_ONE)).num, relation, strict,
             )
         }
     }

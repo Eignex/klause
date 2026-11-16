@@ -17,33 +17,25 @@ class BooleanCoverageAttribution(
     private val firstOwner = HashMap<BooleanCube, Int>()
     private val firstRefutation = HashMap<BooleanCube, Int>()
     private var retainedLiterals = 0
-
     /** Number of admitted branch entries, including repeat entries. */
     var entries: Long = 0
         private set
-
     /** Entries whose exact region was already entered by another worker. */
     var duplicateEntries: Long = 0
         private set
-
     /** Entries repeated by the region's first worker, including restarts and retries. */
     var repeatedEntries: Long = 0
         private set
-
     /** Observations refused by the capture bounds. Refusals make the capture partial. */
     var declinedEntries: Long = 0
         private set
-
     /** Scoped native refutations whose exact region was already refuted by another worker. */
     var duplicateRefutations: Long = 0
         private set
-
     /** Distinct regions with reported native refutations; independent proof checking is separate. */
     val refutedRegions: Int get() = firstRefutation.size
-
     /** Number of retained distinct regions. */
     val regions: Int get() = firstOwner.size
-
     /** Retained literal payload bytes; excludes collections, object headers and solver state. */
     val literalBytes: Long get() = retainedLiterals * Int.SIZE_BYTES.toLong()
 
@@ -102,9 +94,7 @@ class BooleanCoverageAttribution(
      * every attempt when objective authority can change. Incompatible epochs are refused.
      */
     fun observer(
-        worker: Int,
-        numBoolVars: Int,
-        currentContext: () -> BooleanProofContext = { context },
+        worker: Int, numBoolVars: Int, currentContext: () -> BooleanProofContext = { context },
     ): SearchBranchAttemptObserver {
         require(worker >= 0 && numBoolVars in 0..4096)
         return object : SearchBranchAttemptObserver {

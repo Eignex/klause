@@ -129,7 +129,8 @@ internal fun MpsModel.compileMpsView(
     val declarations = source.variables
     // Rational zero has one value; the fresh compatibility view retains explicit binary64 bound signs.
     val negativeZero = (-0.0).toRawBits()
-    val view = checkNotNull(lowerLinearSource(source, settings, allowProjection, ExecutionControl.Never) { index, upper ->
+    val view = checkNotNull(lowerLinearSource(source, settings, allowProjection,
+        ExecutionControl.Never) { index, upper ->
         val declaration = declarations[index]
         val literal = variables[index]
         if (upper) declaration.upper == SemanticRational.ZERO && literal.upper?.toRawBits() == negativeZero

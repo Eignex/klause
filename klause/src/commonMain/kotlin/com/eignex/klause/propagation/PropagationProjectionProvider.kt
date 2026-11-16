@@ -23,10 +23,8 @@ class PropagationProjection internal constructor(
     internal val builtIn: Boolean,
 ) {
     init {
-        require(
-            capability != PropagationCapability.INERT ||
-                (assignmentCheck != AssignmentCheckCapability.EXACT && !inertReason.isNullOrBlank()),
-        ) {
+        require(capability != PropagationCapability.INERT ||
+            (assignmentCheck != AssignmentCheckCapability.EXACT && !inertReason.isNullOrBlank())) {
             "inert deduction requires an enforcing peer or source certification, with an explicit reason"
         }
     }
@@ -67,11 +65,8 @@ object BuiltInPropagationProjectionProvider : PropagationProjectionProvider {
         val capabilities = factor.defaultExecutionCapabilities()
         if (capabilities.propagation == PropagationCapability.UNSUPPORTED) return null
         return PropagationProjection(
-            capabilities.propagation,
-            capabilities.propagationCheck,
-            capabilities.inertReason,
-            { view, preparation -> view.buildPropagatorProjection(preparation) },
-            true,
+            capabilities.propagation, capabilities.propagationCheck, capabilities.inertReason,
+            { view, preparation -> view.buildPropagatorProjection(preparation) }, true,
         )
     }
 }

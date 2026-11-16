@@ -18,26 +18,15 @@ class PolynomialCoupledSectionsTest {
     fun `joint root choices refute an inconsistent cycle that each predicate satisfies`() {
         for (closing in listOf(-1, 1)) {
             val numeral = if (closing < 0) "(- 1)" else "1"
-            val source = SmtLibPolynomial.parse(
-                "(declare-const x Real) (declare-const y Real) " +
-                    "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
-                    "(= (* x y) 1) (= (* y z) 1) (= (* x z) $numeral)))",
-            )
-            val required = assertNotNull(
-                PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                    .forcedAtoms(PolynomialArithmetic()),
-            )
-            val single = PolynomialCoupledSections(
-                QfNraWork(QfNraParams()),
-                PolynomialLimits(),
-                prepareSupports = false,
-                joint = false,
-            )
-            val joint = PolynomialCoupledSections(
-                QfNraWork(QfNraParams()),
-                PolynomialLimits(),
-                prepareSupports = false,
-            )
+            val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
+                "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
+                "(= (* x y) 1) (= (* y z) 1) (= (* x z) $numeral)))")
+            val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+                .forcedAtoms(PolynomialArithmetic()))
+            val single = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(),
+                prepareSupports = false, joint = false)
+            val joint = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(),
+                prepareSupports = false)
             val identities = required.indices.map { it.toLong() }
 
             assertNull(single.refute(required, identities, HashSet()))
@@ -51,30 +40,18 @@ class PolynomialCoupledSectionsTest {
 
     @Test
     fun `an unfinished joint check learns nothing within the containing allowance`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x Real) (declare-const y Real) " +
-                "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
-                "(= (* x y) 1) (= (* y z) 1) (= (* x z) (- 1))))",
-        )
-        val required = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .forcedAtoms(PolynomialArithmetic()),
-        )
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
+            "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) (= (* z z) 1) " +
+            "(= (* x y) 1) (= (* y z) 1) (= (* x z) (- 1))))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
         val identities = required.indices.map { it.toLong() }
-        val single = PolynomialCoupledSections(
-            QfNraWork(QfNraParams()),
-            PolynomialLimits(),
-            prepareSupports = false,
-            joint = false,
-        )
+        val single = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(),
+            prepareSupports = false, joint = false)
         assertNull(single.refute(required, identities, HashSet()))
         val parent = QfNraWork(QfNraParams())
-        val joint = PolynomialCoupledSections(
-            parent,
-            PolynomialLimits(),
-            maximumWork = single.stats.work + 1,
-            prepareSupports = false,
-        )
+        val joint = PolynomialCoupledSections(parent, PolynomialLimits(), maximumWork = single.stats.work + 1,
+            prepareSupports = false)
 
         val support = joint.refute(required, identities, HashSet())
 
@@ -90,24 +67,15 @@ class PolynomialCoupledSectionsTest {
         for (weak in listOf(false, true)) {
             fun equality(variable: String, value: Int): String = if (weak) {
                 "(and (<= $variable $value) (<= (- $variable) (- $value)))"
-            } else {
-                "(= $variable $value)"
-            }
-            val source = SmtLibPolynomial.parse(
-                "(declare-const x Real) (declare-const y Real) " +
-                    "(declare-const u Real) (declare-const v Real) (declare-const w Real) " +
-                    "(assert (and (= u (* x x)) ${equality("u", 2)} (= v (* y y)) ${equality("v", 3)} " +
-                    "(= w (+ (* x y) x y)) ${equality("w", 1)}))",
-            )
-            val required = assertNotNull(
-                PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                    .forcedAtoms(PolynomialArithmetic()),
-            )
-            val direct = PolynomialCoupledSections(
-                QfNraWork(QfNraParams()),
-                PolynomialLimits(),
-                prepareSupports = false,
-            )
+            } else "(= $variable $value)"
+            val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
+                "(declare-const u Real) (declare-const v Real) (declare-const w Real) " +
+                "(assert (and (= u (* x x)) ${equality("u", 2)} (= v (* y y)) ${equality("v", 3)} " +
+                "(= w (+ (* x y) x y)) ${equality("w", 1)}))")
+            val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+                .forcedAtoms(PolynomialArithmetic()))
+            val direct = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits(),
+                prepareSupports = false)
             val prepared = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
             val identities = required.indices.map { it.toLong() }
 
@@ -121,15 +89,11 @@ class PolynomialCoupledSectionsTest {
 
     @Test
     fun `a variable coefficient cannot supply a total substitution at its zero fibre`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x Real) (declare-const y Real) " +
-                "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) " +
-                "(= (* z (- (* x y) 2)) 0)))",
-        )
-        val required = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .forcedAtoms(PolynomialArithmetic()),
-        )
+        val source = SmtLibPolynomial.parse("(declare-const x Real) (declare-const y Real) " +
+            "(declare-const z Real) (assert (and (= (* x x) 1) (= (* y y) 1) " +
+            "(= (* z (- (* x y) 2)) 0)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
         val sections = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
 
         val support = sections.refute(required, required.indices.map { it.toLong() }, HashSet())
@@ -140,14 +104,10 @@ class PolynomialCoupledSectionsTest {
 
     @Test
     fun `a coupled equation failing at every root combination refutes its whole support`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x1 Real) (declare-const x2 Real) " +
-                "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))",
-        )
-        val required = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .forcedAtoms(PolynomialArithmetic()),
-        )
+        val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
+            "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
         val sections = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
 
         val support = sections.refute(required, required.indices.map { it.toLong() }, HashSet())
@@ -165,14 +125,10 @@ class PolynomialCoupledSectionsTest {
             "(distinct (* x1 x2) 2)" to false,
             "(= (* x1 x2) 0)" to true,
         )) {
-            val source = SmtLibPolynomial.parse(
-                "(declare-const x1 Real) (declare-const x2 Real) " +
-                    "(assert (and (= (* x1 x1) 4) (= (* x2 x2) 1) $predicate))",
-            )
-            val required = assertNotNull(
-                PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                    .forcedAtoms(PolynomialArithmetic()),
-            )
+            val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
+                "(assert (and (= (* x1 x1) 4) (= (* x2 x2) 1) $predicate))")
+            val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+                .forcedAtoms(PolynomialArithmetic()))
             val sections = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
 
             val support = sections.refute(required, required.indices.map { it.toLong() }, HashSet())
@@ -185,14 +141,10 @@ class PolynomialCoupledSectionsTest {
     @Test
     fun `a repeated univariate root contributes its single section`() {
         for ((product, refuted) in listOf(2 to false, 1 to true)) {
-            val source = SmtLibPolynomial.parse(
-                "(declare-const x1 Real) (declare-const x2 Real) " +
-                    "(assert (and (= (+ (* x1 x1) (* (- 2) x1) 1) 0) (= (* x2 x2) 4) (= (* x1 x2) $product)))",
-            )
-            val required = assertNotNull(
-                PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                    .forcedAtoms(PolynomialArithmetic()),
-            )
+            val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
+                "(assert (and (= (+ (* x1 x1) (* (- 2) x1) 1) 0) (= (* x2 x2) 4) (= (* x1 x2) $product)))")
+            val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+                .forcedAtoms(PolynomialArithmetic()))
             val sections = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
 
             val support = sections.refute(required, required.indices.map { it.toLong() }, HashSet())
@@ -204,35 +156,25 @@ class PolynomialCoupledSectionsTest {
 
     @Test
     fun `an equation without real roots refutes without its coupled predicate`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x1 Real) (declare-const x2 Real) " +
-                "(assert (and (> (* x1 x2) 0) (= (* x1 x1) (- 1)) (= (* x2 x2) 1)))",
-        )
-        val required = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .forcedAtoms(PolynomialArithmetic()),
-        )
+        val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
+            "(assert (and (> (* x1 x2) 0) (= (* x1 x1) (- 1)) (= (* x2 x2) 1)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
         val sections = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
 
         val support = assertNotNull(sections.refute(required, required.indices.map { it.toLong() }, HashSet()))
 
-        assertEquals(
-            listOf(listOf(source.realVarNames.getValue("x1"))),
-            support.map { required[it].polynomial.variables },
-        )
+        assertEquals(listOf(listOf(source.realVarNames.getValue("x1"))),
+            support.map { required[it].polynomial.variables })
         assertEquals(0L, sections.stats.combinations)
     }
 
     @Test
     fun `an uncovered coupled coordinate learns nothing`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x1 Real) (declare-const x2 Real) " +
-                "(assert (and (= (* x1 x1) 2) (= (* x1 x2) 1)))",
-        )
-        val required = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .forcedAtoms(PolynomialArithmetic()),
-        )
+        val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
+            "(assert (and (= (* x1 x1) 2) (= (* x1 x2) 1)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
         val sections = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
 
         val support = sections.refute(required, required.indices.map { it.toLong() }, HashSet())
@@ -243,14 +185,10 @@ class PolynomialCoupledSectionsTest {
 
     @Test
     fun `an attempted support is not evaluated again in the same scope`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x1 Real) (declare-const x2 Real) " +
-                "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (> (* x1 x2) 0)))",
-        )
-        val required = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .forcedAtoms(PolynomialArithmetic()),
-        )
+        val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
+            "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (> (* x1 x2) 0)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
         val sections = PolynomialCoupledSections(QfNraWork(QfNraParams()), PolynomialLimits())
         val checked = HashSet<List<Long>>()
         val identities = required.indices.map { it.toLong() }
@@ -265,14 +203,10 @@ class PolynomialCoupledSectionsTest {
 
     @Test
     fun `exhausting the private allowance declines while the containing query continues`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x1 Real) (declare-const x2 Real) " +
-                "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))",
-        )
-        val required = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .forcedAtoms(PolynomialArithmetic()),
-        )
+        val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
+            "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
         val parent = QfNraWork(QfNraParams())
         val sections = PolynomialCoupledSections(parent, PolynomialLimits(), maximumWork = 16)
 
@@ -287,19 +221,13 @@ class PolynomialCoupledSectionsTest {
 
     @Test
     fun `an enclosing stop interrupts the check without a support`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x1 Real) (declare-const x2 Real) " +
-                "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))",
-        )
-        val required = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .forcedAtoms(PolynomialArithmetic()),
-        )
+        val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
+            "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 3) (= (+ (* x1 x2) x1 x2) 1)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
         var cancelled = false
-        val sections = PolynomialCoupledSections(
-            QfNraWork(QfNraParams(ExecutionControl { cancelled })),
-            PolynomialLimits(),
-        )
+        val sections = PolynomialCoupledSections(QfNraWork(QfNraParams(ExecutionControl { cancelled })),
+            PolynomialLimits())
         cancelled = true
 
         assertFailsWith<PolynomialInterrupted> {
@@ -310,18 +238,12 @@ class PolynomialCoupledSectionsTest {
 
     @Test
     fun `a dense representation refusal declines the support`() {
-        val source = SmtLibPolynomial.parse(
-            "(declare-const x1 Real) (declare-const x2 Real) " +
-                "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 2) (= (* x1 x2) 2)))",
-        )
-        val required = assertNotNull(
-            PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
-                .forcedAtoms(PolynomialArithmetic()),
-        )
-        val sections = PolynomialCoupledSections(
-            QfNraWork(QfNraParams()),
-            PolynomialLimits(maxDenseCoefficients = 1),
-        )
+        val source = SmtLibPolynomial.parse("(declare-const x1 Real) (declare-const x2 Real) " +
+            "(assert (and (= (* x1 x1) 2) (= (* x2 x2) 2) (= (* x1 x2) 2)))")
+        val required = assertNotNull(PolynomialFormula.normalize(source.formula, PolynomialArithmetic())
+            .forcedAtoms(PolynomialArithmetic()))
+        val sections = PolynomialCoupledSections(QfNraWork(QfNraParams()),
+            PolynomialLimits(maxDenseCoefficients = 1))
 
         val support = sections.refute(required, required.indices.map { it.toLong() }, HashSet())
 

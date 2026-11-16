@@ -84,10 +84,9 @@ private const val CLIQUE_MERGE_WORK_BUDGET = 20_000_000L
 private const val CLIQUE_MERGE_CANCEL_POLL_MASK = 0x3F
 
 /** The [amoCliques] of [factors], grown into maximal cliques by [mergeCliques]. */
-internal fun maximalAmoCliques(
-    factors: List<Factor>,
-    cancellation: ExecutionControl = ExecutionControl.Never,
-): List<Set<Int>> = mergeCliques(amoCliques(factors), cancellation)
+internal fun maximalAmoCliques(factors: List<Factor>, cancellation: ExecutionControl =
+    ExecutionControl.Never): List<Set<Int>> =
+    mergeCliques(amoCliques(factors), cancellation)
 
 /** The [persistentAmoCliques] of [factors], grown into maximal cliques by [mergeCliques]. */
 internal fun maximalPersistentAmoCliques(
@@ -110,10 +109,8 @@ internal fun maximalPersistentAmoCliques(
  * growth — every returned clique is still a valid at-most-one — so the result degrades in strength,
  * never in soundness.
  */
-internal fun mergeCliques(
-    cliques: List<Set<Int>>,
-    cancellation: ExecutionControl = ExecutionControl.Never,
-): List<Set<Int>> {
+internal fun mergeCliques(cliques: List<Set<Int>>, cancellation: ExecutionControl =
+    ExecutionControl.Never): List<Set<Int>> {
     if (cliques.size < 2) return cliques
     var budget = CLIQUE_MERGE_WORK_BUDGET
     val graph = ConflictGraph(cliques)

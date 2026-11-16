@@ -8,15 +8,7 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 
 internal enum class RepairBlockDecline {
-    NoShape,
-    Unavailable,
-    UnsupportedShape,
-    InvalidFrame,
-    BlockedPin,
-    Oversized,
-    WorkLimit,
-    Cancelled,
-    Arithmetic,
+    NoShape, Unavailable, UnsupportedShape, InvalidFrame, BlockedPin, Oversized, WorkLimit, Cancelled, Arithmetic,
 }
 
 internal object RepairBlockInterrupted : RuntimeException()
@@ -90,11 +82,8 @@ internal object RepairBlockClosure {
         while (position < upstream.size) {
             val slot = upstream[position++]
             val movable = free(slot)
-            val writer = if (slot < bools) {
-                definitions?.boolWriter(slot) ?: -1
-            } else {
-                definitions?.intWriter(slot - bools) ?: -1
-            }
+            val writer = if (slot < bools) definitions?.boolWriter(slot) ?: -1
+            else definitions?.intWriter(slot - bools) ?: -1
             if (writer < 0) {
                 if (movable) {
                     leaves.add(slot)
@@ -126,12 +115,7 @@ internal object RepairBlockClosure {
             }
         }
         val slots = mutable.toIntArray().also { it.sort() }
-        return ClosedRepairBlock(
-            FreedVars(
-                slots.filter { it < bools }.toIntArray(),
-                slots.filter { it >= bools }.map { it - bools }.toIntArray(),
-            ),
-            leaves.size,
-        )
+        return ClosedRepairBlock(FreedVars(slots.filter { it < bools }.toIntArray(),
+            slots.filter { it >= bools }.map { it - bools }.toIntArray()), leaves.size)
     }
 }

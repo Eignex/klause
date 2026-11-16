@@ -70,8 +70,7 @@ private class FloatChoicePlanner(
             declarations.locateConstraint(c)
             if (ids.any { it in roundedBounds }) {
                 decline(
-                    root,
-                    c,
+                    root, c,
                     "finite float bounds require rounded arithmetic; " +
                         "exact FlatZinc uses binary64 rational literals and preserves declared bounds",
                 )
@@ -130,12 +129,7 @@ private class FloatChoicePlanner(
         c.name in setOf("float_pow", "klause_float_pow") && c.args.size == 3 -> {
             val exponent = declarations.resolveFloatVarOrConst(c.args[1]) as? FloatRef.Const
             if (exponent != null && exponent.value >= 0 && exponent.value <= Int.MAX_VALUE.toDouble() &&
-                exponent.value == exponent.value.toInt().toDouble()
-            ) {
-                0
-            } else {
-                null
-            }
+                exponent.value == exponent.value.toInt().toDouble()) 0 else null
         }
 
         else -> null

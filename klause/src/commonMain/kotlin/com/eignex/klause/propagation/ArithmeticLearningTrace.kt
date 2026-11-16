@@ -5,7 +5,10 @@ import com.eignex.klause.ir.Lit
 private const val DECLINE_CENSUS_KINDS = 64
 private const val DECLINE_CENSUS_NAME_LENGTH = 96
 
-internal class ArithmeticLearningTrace(private val maxEvents: Int = 128, private val maxWords: Int = 8192) {
+internal class ArithmeticLearningTrace(
+    private val maxEvents: Int = 128,
+    private val maxWords: Int = 8192,
+) {
     class Event(val kind: String, val data: LongArray)
 
     val events = ArrayList<Event>()
@@ -76,14 +79,10 @@ internal class ArithmeticLearningTrace(private val maxEvents: Int = 128, private
     private fun countDecline(kind: String) {
         if (!collectDeclines) return
         if (!kind.startsWith("integer.decline.") && !kind.startsWith("integer.source-decline.") &&
-            !kind.startsWith("integer.endpoint-decline.")
-        ) {
-            return
-        }
+            !kind.startsWith("integer.endpoint-decline.")) return
         val existing = if (kind.length <= DECLINE_CENSUS_NAME_LENGTH) declineIndices[kind] else null
         val index = existing ?: if (kind.length <= DECLINE_CENSUS_NAME_LENGTH &&
-            declineNames.size < DECLINE_CENSUS_KINDS - 1
-        ) {
+            declineNames.size < DECLINE_CENSUS_KINDS - 1) {
             declineNames.size.also {
                 declineIndices[kind] = it
                 declineNames.add(kind)
@@ -92,20 +91,16 @@ internal class ArithmeticLearningTrace(private val maxEvents: Int = 128, private
             declineCensusTruncated = true
             declineTotals.lastIndex
         }
-        if (declineTotals[index] == Long.MAX_VALUE) {
-            declineCensusSaturated = true
-        } else {
-            declineTotals[index]++
-        }
+        if (declineTotals[index] == Long.MAX_VALUE) declineCensusSaturated = true
+        else declineTotals[index]++
     }
 
     fun record(kind: String, vararg data: Long) {
         countDecline(kind)
         if (!accepting) return
         if (focusedIntegerId != null) {
-            if ((kind == "traversal.pick" || kind == "traversal.attempt") && pendingPick) {
-                pendingPick = false
-            } else if (!kind.startsWith("consumer.") && kind != "store.remap" &&
+            if ((kind == "traversal.pick" || kind == "traversal.attempt") && pendingPick) pendingPick = false
+            else if (!kind.startsWith("consumer.") && kind != "store.remap" &&
                 kind != "traversal.finished" && kind != "traversal.retirement-checked"
             ) {
                 omittedObservations++
@@ -128,34 +123,27 @@ internal class ArithmeticLearningTrace(private val maxEvents: Int = 128, private
             record("$kind.omitted", literals.size.toLong())
             return
         }
-        record(
-            kind,
-            *LongArray(literals.size * 5) { index ->
-                val literal = literals[index / 5]
-                val variable = Lit.variable(literal)
-                val atom = variable - state.problem.numBoolVars
-                val knownAtom = atom in 0 until state.atoms.intVar.size
-                when (index % 5) {
-                    0 -> literal.toLong()
-
-                    1 -> when {
-                        atom < 0 -> state.boolLevel[variable].toLong()
-                        knownAtom -> state.atoms.lvl[atom].toLong()
-                        else -> -1L
-                    }
-
-                    2 -> if (knownAtom) state.atoms.intVar[atom].toLong() else -1L
-
-                    3 -> if (knownAtom) state.atoms.kind[atom].ordinal.toLong() else -1L
-
-                    else -> when {
-                        atom < 0 -> state.boolReason[variable].toLong()
-                        knownAtom -> state.atoms.threshold[atom]
-                        else -> -1L
-                    }
+        record(kind, *LongArray(literals.size * 5) { index ->
+            val literal = literals[index / 5]
+            val variable = Lit.variable(literal)
+            val atom = variable - state.problem.numBoolVars
+            val knownAtom = atom in 0 until state.atoms.intVar.size
+            when (index % 5) {
+                0 -> literal.toLong()
+                1 -> when {
+                    atom < 0 -> state.boolLevel[variable].toLong()
+                    knownAtom -> state.atoms.lvl[atom].toLong()
+                    else -> -1L
                 }
-            },
-        )
+                2 -> if (knownAtom) state.atoms.intVar[atom].toLong() else -1L
+                3 -> if (knownAtom) state.atoms.kind[atom].ordinal.toLong() else -1L
+                else -> when {
+                    atom < 0 -> state.boolReason[variable].toLong()
+                    knownAtom -> state.atoms.threshold[atom]
+                    else -> -1L
+                }
+            }
+        })
     }
 
     fun row(kind: String, row: IntegerConflictRow, state: PropagationState, trail: Int? = null) {
@@ -179,16 +167,8 @@ internal class ArithmeticLearningTrace(private val maxEvents: Int = 128, private
                     holes.add(it)
                 }
             }
-            record(
-                "$kind.endpoint",
-                variable.toLong(),
-                row.coefficients[index],
-                domain.min,
-                domain.max,
-                holes.size.toLong(),
-                state.intMinReason[variable].toLong(),
-                state.intMaxReason[variable].toLong(),
-            )
+            record("$kind.endpoint", variable.toLong(), row.coefficients[index], domain.min, domain.max,
+                holes.size.toLong(), state.intMinReason[variable].toLong(), state.intMaxReason[variable].toLong())
             for (hole in holes) record("$kind.hole", variable.toLong(), hole)
         }
     }
@@ -214,14 +194,8 @@ internal class ArithmeticLearningTrace(private val maxEvents: Int = 128, private
         for (variable in variables) {
             if (!accepting) return
             val domain = state.intDomains[variable]
-            record(
-                "analysis.seed-endpoint",
-                variable.toLong(),
-                domain.min,
-                domain.max,
-                state.intMinReason[variable].toLong(),
-                state.intMaxReason[variable].toLong(),
-            )
+            record("analysis.seed-endpoint", variable.toLong(), domain.min, domain.max,
+                state.intMinReason[variable].toLong(), state.intMaxReason[variable].toLong())
         }
     }
 

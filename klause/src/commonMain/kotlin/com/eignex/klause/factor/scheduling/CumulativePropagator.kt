@@ -66,26 +66,20 @@ internal class CumulativePropagator(
     override fun explain(state: PropagationState, factorId: Int, payload: IntArray, atTrail: Int, atLevel: Int) =
         if (payload[0] == HighDemandUnarySubset.REASON_TAG) {
             requireNotNull(unarySubset).explain(state, factorId, payload, atTrail, atLevel)
-        } else {
-            View(state, atTrail, atLevel).run {
-                explainPayload(payload)
-                literals()
-            }
+        } else View(state, atTrail, atLevel).run {
+            explainPayload(payload)
+            literals()
         }
 
     private fun View.explainPayload(p: IntArray) {
         when (p[0]) {
             TIME_TABLE -> shaveReason(p[1], lower = p[2] == 1, unpack(p, 3))
-
             EDGE -> edgeReason(p[1], tau = unpack(p, 2))
-
             REVERSE_EDGE -> {
                 for (v in intVars) domainOf(v)
                 for (i in 0 until n) if (present(i)) task(i)
             }
-
             ENERGY -> energyReason(p[1], kind = p[2], xMin = unpack(p, 3), xMax = unpack(p, 5))
-
             else -> heightReason(p[1])
         }
     }
@@ -435,14 +429,12 @@ internal class CumulativePropagator(
                 k++
             }
             val envTheta = tree.envOfTheta()
-            if (envTheta > effCap * tau) {
-                return fail(state) {
-                    if (reverse) {
-                        for (v in intVars) domainOf(v)
-                        for (i in 0 until n) if (present(i)) task(i)
-                    } else {
-                        thetaOverload(tau)
-                    }
+            if (envTheta > effCap * tau) return fail(state) {
+                if (reverse) {
+                    for (v in intVars) domainOf(v)
+                    for (i in 0 until n) if (present(i)) task(i)
+                } else {
+                    thetaOverload(tau)
                 }
             }
             for (ki in k until m) {

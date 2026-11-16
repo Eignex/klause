@@ -38,14 +38,13 @@ object Presolve {
 
     /** GCD plus bounded-integer coefficient strengthening for
      *  [com.eignex.klause.factor.arithmetic.Linear] and pseudo-Boolean constraints. */
-    fun strengthenCoefficients(
-        problem: BakedProblem,
-        cancellation: ExecutionControl = ExecutionControl.Never,
-    ): PassDelta = CoefficientStrengthening.strengthenCoefficients(
-        problem,
-        cancellation,
-        ColumnRanges.of(problem.rootIntDomainsInPlace),
-    )
+    fun strengthenCoefficients(problem: BakedProblem, cancellation: ExecutionControl =
+        ExecutionControl.Never): PassDelta =
+        CoefficientStrengthening.strengthenCoefficients(
+            problem,
+            cancellation,
+            ColumnRanges.of(problem.rootIntDomainsInPlace),
+        )
 
     /** Coefficient strengthening over what a source model states: the GCD reduction on every row, and the
      *  bounded-integer lift on the rows whose columns the model bounds on both sides. */
@@ -226,13 +225,10 @@ object Presolve {
         sharedIntOcc: SharedIntOccurrence?,
         incrementalTouchedVars: IntArray?,
         cancellation: ExecutionControl,
-    ): PassDelta = DuplicateColumns.mergeDuplicateColumns(
-        problem,
-        objectiveIntVars,
-        sharedIntOcc,
-        incrementalTouchedVars,
-        cancellation,
-    )
+    ): PassDelta =
+        DuplicateColumns.mergeDuplicateColumns(
+            problem, objectiveIntVars, sharedIntOcc, incrementalTouchedVars, cancellation,
+        )
 
     /** Duplicate-column aggregation over declared ranges, into a representative the aggregate fits. */
     internal fun mergeSourceDuplicateColumns(
@@ -280,10 +276,7 @@ object Presolve {
         objectiveBoolCoeffs: Map<Int, Long>,
         cancellation: ExecutionControl,
     ): PassDelta = DominatedVariables.fixDominatedVariables(
-        problem,
-        objectiveIntCoeffs,
-        objectiveBoolCoeffs,
-        cancellation,
+        problem, objectiveIntCoeffs, objectiveBoolCoeffs, cancellation,
     )
 
     /** Dual fixing over a canonical source model. See [DominatedVariables.fixDominatedSourceVariables]. */
@@ -293,18 +286,13 @@ object Presolve {
         objectiveBoolCoeffs: Map<Int, Long> = emptyMap(),
         cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceDelta = DominatedVariables.fixDominatedSourceVariables(
-        problem,
-        objectiveIntCoeffs,
-        objectiveBoolCoeffs,
-        cancellation,
+        problem, objectiveIntCoeffs, objectiveBoolCoeffs, cancellation,
     )
 
     /** Failed-literal and common-bound probing to fixpoint. See [Probing]. */
-    fun probe(
-        problem: BakedProblem,
-        maxCandidates: Int,
-        cancellation: ExecutionControl = ExecutionControl.Never,
-    ): PassDelta = Probing.probe(problem, maxCandidates, cancellation)
+    fun probe(problem: BakedProblem, maxCandidates: Int, cancellation: ExecutionControl =
+        ExecutionControl.Never): PassDelta =
+        Probing.probe(problem, maxCandidates, cancellation)
 
     /** Failed-literal and common-bound probing over a canonical source model. See [Probing.probeSource]. */
     internal fun probeSource(problem: Problem, maxCandidates: Int, cancellation: ExecutionControl): SourceDelta =

@@ -27,12 +27,8 @@ class DeferredCompanionSearchTest {
             object : ResumableSearch {
                 override val isDone: Boolean get() = false
                 override val stats: SolveStats get() = SolveStats.EMPTY
-                override fun runSlice(
-                    global: ExecutionControl,
-                    sliceMillis: Long,
-                    sliceNodes: Long,
-                    onIncumbent: (MinimizeResult.WithSample) -> Unit,
-                ): MinimizeResult? {
+                override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+                    onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                     assertEquals(100L, sliceMillis)
                     queries++
                     return null
@@ -62,38 +58,27 @@ class DeferredCompanionSearchTest {
                     override val isDone: Boolean get() = false
                     override val stats: SolveStats get() = SolveStats.EMPTY
                     override val chargedInstructions: Long get() = 17L
-                    override fun runInstructionSlice(
-                        global: ExecutionControl,
-                        sliceMillis: Long,
+                    override fun runInstructionSlice(global: ExecutionControl, sliceMillis: Long,
                         sliceInstructions: Long,
-                        onIncumbent: (MinimizeResult.WithSample) -> Unit,
-                    ): MinimizeResult? = runSlice(global, sliceMillis, sliceInstructions, onIncumbent)
-                    override fun runSlice(
-                        global: ExecutionControl,
-                        sliceMillis: Long,
-                        sliceNodes: Long,
-                        onIncumbent: (MinimizeResult.WithSample) -> Unit,
-                    ): MinimizeResult? {
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? =
+                        runSlice(global, sliceMillis, sliceInstructions, onIncumbent)
+                    override fun runSlice(global: ExecutionControl, sliceMillis: Long, sliceNodes: Long,
+                        onIncumbent: (MinimizeResult.WithSample) -> Unit): MinimizeResult? {
                         assertEquals(60L, sliceMillis)
                         assertEquals(7L, sliceNodes)
                         queries++
                         clock += 60.milliseconds
                         return null
                     }
-                    override fun close() {
-                        closed++
-                    }
+                    override fun close() { closed++ }
                 }
             }
             val bounded = BoundedCompanionSearch(deferred, "funded", activeLimit = 100.milliseconds, clock = clock)
 
             assertEquals(0, opened)
             assertTrue(bounded.incumbentTrialPending)
-            val first = if (instruction) {
-                bounded.runInstructionSlice(ExecutionControl.Never, 100, 7) {}
-            } else {
-                bounded.runSlice(ExecutionControl.Never, 100, 7) {}
-            }
+            val first = if (instruction) bounded.runInstructionSlice(ExecutionControl.Never, 100, 7) {}
+            else bounded.runSlice(ExecutionControl.Never, 100, 7) {}
             assertNull(first)
             val terminal = bounded.runSlice(ExecutionControl.Never, 100, 7) {}
             bounded.close()
@@ -111,10 +96,7 @@ class DeferredCompanionSearchTest {
     @Test
     fun `an unfunded start should retire without creating a native worker`() {
         var opened = 0
-        val search = DeferredCompanionSearch({ TerminationReason.BudgetExhausted }) { _, _ ->
-            opened++
-            null
-        }
+        val search = DeferredCompanionSearch({ TerminationReason.BudgetExhausted }) { _, _ -> opened++; null }
 
         val result = search.runSlice(ExecutionControl.Never, 100, 7) {}
         search.runSlice(ExecutionControl.Never, 100, 7) {}

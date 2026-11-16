@@ -203,19 +203,11 @@ internal class FlatZincCompiler(
             numRealVars = realLo.size,
             realLower = realLo.toDoubleArray(),
             realUpper = realHi.toDoubleArray(),
-            openIntLo = if (openIntegerLower.isEmpty()) {
-                null
-            } else {
-                BooleanArray(intDomains.size) {
-                    it in openIntegerLower
-                }
+            openIntLo = if (openIntegerLower.isEmpty()) null else BooleanArray(intDomains.size) {
+                it in openIntegerLower
             },
-            openIntHi = if (openIntegerUpper.isEmpty()) {
-                null
-            } else {
-                BooleanArray(intDomains.size) {
-                    it in openIntegerUpper
-                }
+            openIntHi = if (openIntegerUpper.isEmpty()) null else BooleanArray(intDomains.size) {
+                it in openIntegerUpper
             },
         )
         return FlatZincProgram(
@@ -233,14 +225,8 @@ internal class FlatZincCompiler(
             semantics = sourceSemantics,
             definitionHints = definitionHints,
         ).also { program ->
-            program.retainSource(
-                FlatZincSourceState(
-                    program.suppliedCopy(),
-                    declaredRealCount,
-                selectRepresentations = { finiteRepresentations },
-                    projectSearch = { compileSearchAnnotation(it) },
-                ),
-            )
+            program.retainSource(FlatZincSourceState(program.suppliedCopy(), declaredRealCount,
+                selectRepresentations = { finiteRepresentations }, projectSearch = { compileSearchAnnotation(it) }))
         }
     }
 
@@ -262,12 +248,19 @@ internal class FlatZincCompiler(
         }
         when (val t = d.type) {
             FznType.Bool -> allocBool(d.name)
+
             FznType.IntAny -> allocUndeclaredInt(d.name)
+
             is FznType.IntRange -> allocInt(d.name, t.lo, t.hi)
+
             is FznType.IntSet -> allocIntSet(d.name, t)
+
             FznType.FloatAny -> allocOpenFloat(d.name)
+
             is FznType.FloatRange -> allocFloat(d.name, t.lo, t.hi)
+
             is FznType.SetOfInt -> allocSetVar(d.name, t, d.value)
+
             is FznType.Array -> processArrayDecl(d.name, t, d.value, d.isVar)
         }
         recordEnumLabels(d)

@@ -159,7 +159,6 @@ internal sealed interface FloatSemanticsDocument {
     companion object {
         fun of(semantics: FloatSemantics): FloatSemanticsDocument = when (semantics) {
             FloatSemantics.Continuous -> ContinuousFloatsDocument
-
             is FloatSemantics.Grid -> GridFloatsDocument(
                 semantics.buckets,
                 semantics.linearScale,
@@ -175,8 +174,11 @@ internal data object ContinuousFloatsDocument : FloatSemanticsDocument {
 }
 
 @Serializable
-internal class GridFloatsDocument(val buckets: Int, val linearScale: Long, val unrangedBounds: RationalRangeDocument) :
-    FloatSemanticsDocument {
+internal class GridFloatsDocument(
+    val buckets: Int,
+    val linearScale: Long,
+    val unrangedBounds: RationalRangeDocument,
+) : FloatSemanticsDocument {
     override fun toSemantics(): FloatSemantics =
         FloatSemantics.Grid(buckets, linearScale, UndeclaredRealBounds(unrangedBounds.lower, unrangedBounds.upper))
 }

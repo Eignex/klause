@@ -23,13 +23,10 @@ internal class LinearAuthorityModel private constructor(
     val rows: List<ExactRationalInequality> = rowIds.map { original[it] }
     val inactiveRows: Set<Int> = rowIds.indices.filterTo(HashSet()) { rowIds[it] in inactive }
     val columns: List<ExactLpColumn> = lower.indices.map { id ->
-        ExactLpColumn(
-            ExactLpBounds(
-                lower[id]?.let { ExactLpSide(ExactLpNumber.of(it.value)) },
-                upper[id]?.let { ExactLpSide(ExactLpNumber.of(it.value)) },
-            ),
-            integral = false,
-        )
+        ExactLpColumn(ExactLpBounds(
+            lower[id]?.let { ExactLpSide(ExactLpNumber.of(it.value)) },
+            upper[id]?.let { ExactLpSide(ExactLpNumber.of(it.value)) },
+        ), integral = false)
     }
 
     fun input(costs: List<BigFraction>, constant: BigFraction): SourceLpInput {
@@ -57,10 +54,7 @@ internal class LinearAuthorityModel private constructor(
         cancellation: ExecutionControl,
     ): List<BigFraction>? {
         if (multipliers.size != rows.size || target.size != columns.size ||
-            !multipliers.admittedSourcePoint() || !target.admittedSourcePoint()
-        ) {
-            return null
-        }
+            !multipliers.admittedSourcePoint() || !target.admittedSourcePoint()) return null
         val weights = MutableList(original.size) { BigFraction.ZERO }
         val residual = target.toMutableList()
         for (id in rows.indices) {
@@ -95,13 +89,7 @@ internal class LinearAuthorityModel private constructor(
             inactive: Set<Int> = emptySet(),
         ): LinearAuthorityModel? {
             fun identity(conflict: List<BigFraction>? = null) = LinearAuthorityModel(
-                rows,
-                rows.indices.toList(),
-                List(variables) { null },
-                List(variables) { null },
-                inactive,
-                conflict,
-            )
+                rows, rows.indices.toList(), List(variables) { null }, List(variables) { null }, inactive, conflict)
             val lower = MutableList<Side?>(variables) { null }
             val upper = MutableList<Side?>(variables) { null }
             val retained = ArrayList<Int>()
@@ -122,14 +110,8 @@ internal class LinearAuthorityModel private constructor(
                 if (!listOf(value).admittedSourcePoint()) return identity()
                 val bounds = if (coefficient < BigFraction.ZERO) lower else upper
                 val previous = bounds[column]
-                if (previous == null || if (coefficient < BigFraction.ZERO) {
-                        value > previous.value
-                    } else {
-                        value < previous.value
-                    }
-                ) {
-                    bounds[column] = Side(id, value)
-                }
+                if (previous == null || if (coefficient < BigFraction.ZERO) value > previous.value
+                    else value < previous.value) bounds[column] = Side(id, value)
             }
             for (column in lower.indices) {
                 if (cancellation()) return null

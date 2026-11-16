@@ -278,9 +278,8 @@ class MpsModel(
 ) {
     init {
         require(semantics.format == SourceFormat.MPS) { "MPS requires MPS source semantics" }
-        require(
-            semantics.numericAuthority == NumericAuthority.DECIMAL_LITERALS ||
-                semantics.numericAuthority == NumericAuthority.BINARY64_LITERALS,
+        require(semantics.numericAuthority == NumericAuthority.DECIMAL_LITERALS ||
+            semantics.numericAuthority == NumericAuthority.BINARY64_LITERALS
         ) { "MPS requires decimal or binary64 literal authority" }
         require(semantics.feasibilityTolerance != null) { "MPS requires an explicit feasibility tolerance" }
         require(semantics.undeclaredIntegers != null && semantics.undeclaredReals != null) {
