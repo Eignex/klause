@@ -368,8 +368,10 @@ sign conditional.
 
 The standard integer operator `**` retains an integer output and its full integer
 semantics. Zero exponents give one, including `0**0`; negative exponents give zero
-except at bases one and minus one. Positive exponents at other bases use the
-existing exact exponential and logarithm expressions for the absolute magnitude,
+except at bases one and minus one. Fixed negative exponents use integer conditions
+on those two unit bases and retain the independent power witness check.
+Positive exponents at other bases use the existing exact exponential and logarithm
+expressions for the absolute magnitude,
 with Euclidean parity controlling the sign. The logarithm's argument is positive
 on every branch. The `^` extension keeps fixed nonnegative powers. Original
 operation checks independently validate retained quotient, floor and power values

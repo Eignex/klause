@@ -2,10 +2,12 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.remainderOf
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 
@@ -325,6 +327,13 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
         check(SmtArithmeticCheck(SmtArithmeticOperation.POWER,
             listOf(retain(base, "Int"), retain(exponent, "Int"), result).map(::name)))
         val fixed = integerLiteral(exponent)
+        if (fixed != null && fixed < BIG_ZERO) {
+            step()
+            val negativeUnit = if (fixed.remainderOf(BIG_TWO) == BIG_ZERO) one else minusOne
+            oblige(form("=", result, form("ite", form("=", base, one), one,
+                form("ite", form("=", base, minusOne), negativeUnit, zero))))
+            return result
+        }
         if (fixed != null && fixed >= BIG_ZERO && fixed <= bigIntOf(Int.MAX_VALUE)) {
             oblige(form("=", result, form("^", base, SExpr.Atom(fixed.toLongExact().toString()))))
             return result

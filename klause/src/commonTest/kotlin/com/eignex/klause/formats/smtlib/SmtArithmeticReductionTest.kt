@@ -180,6 +180,60 @@ class SmtArithmeticReductionTest {
     }
 
     @Test
+    fun `fixed negative powers should preserve unit signs and zero nonunit values`() {
+        val powers = listOf(
+            "(** (- 2) (- 3))" to "0", "(** (- 2) (- 2))" to "0",
+            "(** (- 1) (- 3))" to "(- 1)", "(** (- 1) (- 2))" to "1",
+            "(** 0 (- 3))" to "0", "(** 0 (- 2))" to "0",
+            "(** 1 (- 3))" to "1", "(** 1 (- 2))" to "1",
+            "(** 2 (- 3))" to "0", "(** 2 (- 2))" to "0")
+        val input = SmtLib.parse("(assert (and " + powers.joinToString(" ") { (power, expected) ->
+            "(= $power $expected)"
+        } + "))")
+
+        val result = solve(input)
+
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
+    }
+
+    @Test
+    fun `fixed negative powers should refute incorrect unit and nonunit values`() {
+        val powers = listOf(
+            "(** (- 2) (- 3))" to "0", "(** (- 2) (- 2))" to "0",
+            "(** (- 1) (- 3))" to "(- 1)", "(** (- 1) (- 2))" to "1",
+            "(** 0 (- 3))" to "0", "(** 0 (- 2))" to "0",
+            "(** 1 (- 3))" to "1", "(** 1 (- 2))" to "1",
+            "(** 2 (- 3))" to "0", "(** 2 (- 2))" to "0")
+        val input = SmtLib.parse("(assert (or " + powers.joinToString(" ") { (power, expected) ->
+            "(distinct $power $expected)"
+        } + "))")
+
+        val result = solve(input)
+
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
+    }
+
+    @Test
+    fun `fixed wide negative powers should preserve an open symbolic integer base`() {
+        val input = SmtLib.parse("(declare-const b Int) (assert (< b (- 1))) " +
+            "(assert (= (** b (- 18446744073709551618)) 0))")
+
+        val result = solve(input)
+
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
+    }
+
+    @Test
+    fun `fixed wide negative powers should refute a nonzero result for an open nonunit base`() {
+        val input = SmtLib.parse("(declare-const b Int) (assert (< b (- 1))) " +
+            "(assert (distinct (** b (- 18446744073709551618)) 0))")
+
+        val result = solve(input)
+
+        assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
+    }
+
+    @Test
     fun `symbolic integer powers should refute an incorrect value`() {
         val input = SmtLib.parse("(declare-const b Int) (declare-const e Int) " +
             "(assert (= b 2)) (assert (= e 3)) (assert (= (** b e) 9))")
