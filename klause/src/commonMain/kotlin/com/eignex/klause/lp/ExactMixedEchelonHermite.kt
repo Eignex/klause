@@ -7,16 +7,15 @@ import com.eignex.klause.lp.lattice.sparseIntRow
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
-import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
+import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.remainderOf
 import com.eignex.util.numbers.times
 
 /** One exact double-bounded row over real columns followed by integer columns. */
@@ -138,8 +137,8 @@ internal fun exactMixedTriangularBounds(system: ExactMixedEchelonHermite): Exact
         } else {
             val (lower, upper) = divideRange(productLower, productUpper, coefficient)
             val integer = pivot - system.realColumns
-            integerLower[integer] = lower?.ceil()
-            integerUpper[integer] = upper?.floor()
+            integerLower[integer] = lower?.ceilInteger()
+            integerUpper[integer] = upper?.let { floorDiv(it.num, it.den) }
         }
     }
     return ExactMixedTriangularBounds(realLower, realUpper, integerLower, integerUpper)
@@ -153,16 +152,6 @@ private fun divideRange(
     lower?.times(coefficient.reciprocal()) to upper?.times(coefficient.reciprocal())
 } else {
     upper?.times(coefficient.reciprocal()) to lower?.times(coefficient.reciprocal())
-}
-
-private fun BigFraction.floor(): BigInt {
-    val quotient = num / den
-    return if (num < BIG_ZERO && num.remainderOf(den) != BIG_ZERO) quotient - BIG_ONE else quotient
-}
-
-private fun BigFraction.ceil(): BigInt {
-    val quotient = num / den
-    return if (num > BIG_ZERO && num.remainderOf(den) != BIG_ZERO) quotient + BIG_ONE else quotient
 }
 
 /**

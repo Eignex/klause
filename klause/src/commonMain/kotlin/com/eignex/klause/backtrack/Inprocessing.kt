@@ -9,6 +9,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
+import com.eignex.util.numbers.saturatedAdd
 import kotlin.time.TimeSource
 
 /**
@@ -112,7 +113,7 @@ internal class Inprocessing(
             return operation()
         } finally {
             val used = (session.work - start).coerceAtLeast(0L)
-            spent = saturatedWork(spent, used)
+            spent = saturatedAdd(spent, used)
             addDebt((used - remaining).coerceAtLeast(0L))
             remaining = (remaining - used).coerceAtLeast(0L)
             stats?.noteInprocessing("inprocessPublicationWork", used)
@@ -165,7 +166,7 @@ internal class Inprocessing(
             }
             val used = (session.work - beforeResume).coerceAtLeast(0L)
             remaining = (limit - used).coerceAtLeast(0L)
-            spent = saturatedWork(spent, used)
+            spent = saturatedAdd(spent, used)
             addDebt((used - limit).coerceAtLeast(0L))
             stats?.noteInprocessing("inprocessContinuationWork", used)
             stats.noteInprocessingDuration("inprocessContinuation", elapsed.elapsedNow().inWholeNanoseconds)
@@ -245,7 +246,7 @@ internal class Inprocessing(
         } finally {
             val used = (session.work - start).coerceAtLeast(0L)
             remaining = (offered - used).coerceAtLeast(0L)
-            spent = saturatedWork(spent, used)
+            spent = saturatedAdd(spent, used)
             addDebt((used - offered).coerceAtLeast(0L))
             lastCount = session.learnedClauseCount
             stats.noteInprocessingDuration("inprocessSlice", duration.elapsedNow().inWholeNanoseconds)
@@ -264,7 +265,7 @@ internal class Inprocessing(
     }
 
     private fun addDebt(amount: Long) {
-        debt = saturatedWork(debt, amount)
+        debt = saturatedAdd(debt, amount)
         if (amount > 0L) stats?.noteInprocessing("inprocessDebtAdded", amount)
     }
 

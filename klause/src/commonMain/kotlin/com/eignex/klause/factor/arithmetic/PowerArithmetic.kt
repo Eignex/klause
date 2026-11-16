@@ -1,21 +1,17 @@
 package com.eignex.klause.factor.arithmetic
 
+import com.eignex.util.numbers.mulExactOrNull
+
 internal fun integerPowerOrNull(base: Long, exponent: Int): Long? {
     var remaining = exponent
     var value = 1L
     var factor = base
     while (remaining > 0) {
-        if (remaining and 1 != 0) value = multiplyOrNull(value, factor) ?: return null
+        if (remaining and 1 != 0) value = mulExactOrNull(value, factor) ?: return null
         remaining = remaining ushr 1
-        if (remaining > 0) factor = multiplyOrNull(factor, factor) ?: return null
+        if (remaining > 0) factor = mulExactOrNull(factor, factor) ?: return null
     }
     return value
-}
-
-private fun multiplyOrNull(a: Long, b: Long): Long? {
-    if (a == 0L || b == 0L) return 0L
-    val value = a * b
-    return value.takeIf { value / a == b && !(a == -1L && b == Long.MIN_VALUE) }
 }
 
 internal fun compareIntegerPower(base: Long, exponent: Int, value: Long): Int =

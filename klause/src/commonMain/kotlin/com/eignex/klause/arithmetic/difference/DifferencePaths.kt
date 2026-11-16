@@ -3,6 +3,8 @@ package com.eignex.klause.arithmetic.difference
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.addExactOrNull
+import com.eignex.util.numbers.subExactOrNull
 
 internal enum class DifferencePathCompletion { Completed, Abandoned, Declined }
 
@@ -117,12 +119,12 @@ internal fun differenceShortestPaths(
             if (edges.weight[edge] == Long.MIN_VALUE) return DifferencePathCompletion.Declined
             val target = edges.target[edge]
             if (scratch.settled(target)) continue
-            val first = checkedDifferenceSum(potential[source], edges.weight[edge])
+            val first = addExactOrNull(potential[source], edges.weight[edge])
                 ?: return DifferencePathCompletion.Declined
-            val reduced = checkedDifferenceSubtract(first, potential[target])
+            val reduced = subExactOrNull(first, potential[target])
                 ?: return DifferencePathCompletion.Declined
             if (reduced < 0L) return DifferencePathCompletion.Declined
-            val candidate = checkedDifferenceSum(scratch.distance[source], reduced)
+            val candidate = addExactOrNull(scratch.distance[source], reduced)
                 ?: return DifferencePathCompletion.Declined
             if (scratch.reached(target) && candidate >= scratch.distance[target]) continue
             scratch.reach(target)
@@ -134,16 +136,6 @@ internal fun differenceShortestPaths(
     val result = if (stop()) DifferencePathCompletion.Abandoned else DifferencePathCompletion.Completed
     scratch.completion = result
     return result
-}
-
-internal fun checkedDifferenceSum(a: Long, b: Long): Long? {
-    val sum = a + b
-    return if (((a xor sum) and (b xor sum)) < 0L) null else sum
-}
-
-internal fun checkedDifferenceSubtract(a: Long, b: Long): Long? {
-    val difference = a - b
-    return if (((a xor b) and (a xor difference)) < 0L) null else difference
 }
 
 /** Indexed binary min-heap over [Long] keys; `decrease-key` in place so a vertex is queued once. */

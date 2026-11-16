@@ -9,6 +9,7 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.saturatedAdd
 
 internal class PolynomialCondition(
     bools: Map<Int, Boolean> = emptyMap(),
@@ -110,7 +111,7 @@ internal class PolynomialTheoryInvocation(
             PolynomialCondition(condition.bools, fixedReals + condition.lower, fixedReals + condition.upper),
             witness.takeIf { condition.lower.isEmpty() && condition.upper.isEmpty() }, checkedCellObserver)
         pending = query
-        queries = sum(queries, 1)
+        queries = saturatedAdd(queries, 1)
         return object : Iterator<QfNraResult?> {
             private var finished = false
             override fun hasNext(): Boolean = !closed && !finished
@@ -170,32 +171,30 @@ internal class PolynomialTheoryInvocation(
 }
 
 private fun combine(left: QfNraStats, right: QfNraStats): QfNraStats = QfNraStats(
-    sum(left.projectedPolynomials, right.projectedPolynomials),
-    sum(left.liftedCells, right.liftedCells), sum(left.workSpent, right.workSpent),
+    saturatedAdd(left.projectedPolynomials, right.projectedPolynomials),
+    saturatedAdd(left.liftedCells, right.liftedCells), saturatedAdd(left.workSpent, right.workSpent),
     if (left.dyadicAttempts == null && right.dyadicAttempts == null) null
-    else sum(left.dyadicAttempts ?: 0, right.dyadicAttempts ?: 0),
+    else saturatedAdd(left.dyadicAttempts ?: 0, right.dyadicAttempts ?: 0),
     if (left.dyadicBases == null && right.dyadicBases == null) null
-    else sum(left.dyadicBases ?: 0, right.dyadicBases ?: 0),
+    else saturatedAdd(left.dyadicBases ?: 0, right.dyadicBases ?: 0),
     if (left.coupledWorkDeclines == null && right.coupledWorkDeclines == null) null
-    else sum(left.coupledWorkDeclines ?: 0, right.coupledWorkDeclines ?: 0),
+    else saturatedAdd(left.coupledWorkDeclines ?: 0, right.coupledWorkDeclines ?: 0),
     if (left.dyadicPreExtractionDeclines == null && right.dyadicPreExtractionDeclines == null) null
-    else sum(left.dyadicPreExtractionDeclines ?: 0, right.dyadicPreExtractionDeclines ?: 0),
+    else saturatedAdd(left.dyadicPreExtractionDeclines ?: 0, right.dyadicPreExtractionDeclines ?: 0),
     if (left.booleanTheoryRegions == null && right.booleanTheoryRegions == null) null
-    else sum(left.booleanTheoryRegions ?: 0, right.booleanTheoryRegions ?: 0),
+    else saturatedAdd(left.booleanTheoryRegions ?: 0, right.booleanTheoryRegions ?: 0),
     if (left.booleanTheoryAtoms == null && right.booleanTheoryAtoms == null) null
-    else sum(left.booleanTheoryAtoms ?: 0, right.booleanTheoryAtoms ?: 0),
+    else saturatedAdd(left.booleanTheoryAtoms ?: 0, right.booleanTheoryAtoms ?: 0),
     if (left.booleanTheoryConstantRefutations == null && right.booleanTheoryConstantRefutations == null) null
-    else sum(left.booleanTheoryConstantRefutations ?: 0, right.booleanTheoryConstantRefutations ?: 0),
+    else saturatedAdd(left.booleanTheoryConstantRefutations ?: 0, right.booleanTheoryConstantRefutations ?: 0),
     if (left.booleanTheoryResourceRefusals == null && right.booleanTheoryResourceRefusals == null) null
-    else sum(left.booleanTheoryResourceRefusals ?: 0, right.booleanTheoryResourceRefusals ?: 0),
+    else saturatedAdd(left.booleanTheoryResourceRefusals ?: 0, right.booleanTheoryResourceRefusals ?: 0),
     right.lastBooleanTheoryResource ?: left.lastBooleanTheoryResource,
     if (left.equationalSections == null && right.equationalSections == null) null
-    else sum(left.equationalSections ?: 0, right.equationalSections ?: 0),
+    else saturatedAdd(left.equationalSections ?: 0, right.equationalSections ?: 0),
     if (left.equationalRootLevels == null && right.equationalRootLevels == null) null
-    else sum(left.equationalRootLevels ?: 0, right.equationalRootLevels ?: 0),
+    else saturatedAdd(left.equationalRootLevels ?: 0, right.equationalRootLevels ?: 0),
 )
-
-private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
 
 private class PolynomialRetainedQuery(
     formula: PolynomialRealFormula,

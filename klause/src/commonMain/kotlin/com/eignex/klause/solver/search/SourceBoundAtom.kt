@@ -1,13 +1,9 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.util.numbers.BIG_ONE
-import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigFraction
-import com.eignex.util.numbers.compareTo
-import com.eignex.util.numbers.div
+import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.magnitudeBitLength
-import com.eignex.util.numbers.minus
-import com.eignex.util.numbers.remainderOf
 
 /** One exact coefficient over an existing source integer or real variable id. */
 data class SourceBoundTerm(
@@ -90,12 +86,7 @@ class SourceBoundAtom private constructor(
             if (!value.fits(limits) || !constant.fits(limits) || constant.den != BIG_ONE) return null
             val normalized = normalize(terms, limits) ?: return null
             if (normalized.any { it.source !is SearchIntValue || it.coefficient.den != BIG_ONE }) return null
-            val quotient = value.num / value.den
-            val floor = if (value.num < BIG_ZERO && value.num.remainderOf(value.den) != BIG_ZERO) {
-                quotient - BIG_ONE
-            } else {
-                quotient
-            }
+            val floor = floorDiv(value.num, value.den)
             val upper = BigFraction.of(floor, BIG_ONE) - constant
             val lower = upper + BigFraction.ONE
             if (!upper.fits(limits) || !lower.fits(limits)) return null

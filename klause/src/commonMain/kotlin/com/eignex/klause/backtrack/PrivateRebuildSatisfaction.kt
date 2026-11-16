@@ -18,6 +18,7 @@ import com.eignex.klause.solver.result.UnsoundnessException
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.saturatedAdd
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -64,7 +65,7 @@ internal class PrivateRebuildSatisfaction(
 
     override val isDone: Boolean get() = done != null
     override val initialWork: Long = canonical.initialWork
-    override val work: Long get() = saturatedWork(canonical.work,
+    override val work: Long get() = saturatedAdd(canonical.work,
         trialSpent() / PROPAGATION_WORK_PER_NODE)
     override val stats: SolveStats
         get() {
@@ -77,14 +78,14 @@ internal class PrivateRebuildSatisfaction(
             val learning = (total.search.learning + observations).toMutableMap()
             for ((key, value) in joint) {
                 val name = "privateRebuildParityJoint$key"
-                learning[name] = saturatedWork(learning[name] ?: 0L, value)
+                learning[name] = saturatedAdd(learning[name] ?: 0L, value)
             }
             return total.copy(search = total.search.copy(learning = learning))
         }
 
     private fun note(key: String, value: Long = 1L) {
         val name = "privateRebuild$key"
-        observations[name] = saturatedWork(observations[name] ?: 0L, value)
+        observations[name] = saturatedAdd(observations[name] ?: 0L, value)
     }
 
     private fun atRoot(session: PropagationSession): Boolean {
@@ -285,15 +286,15 @@ internal class PrivateRebuildSatisfaction(
             }
             throw failure
         } finally {
-            if (allowance >= 0L) debt = saturatedWork(debt, (work - start - allowance).coerceAtLeast(0L))
+            if (allowance >= 0L) debt = saturatedAdd(debt, (work - start - allowance).coerceAtLeast(0L))
         }
     }
 
-    private fun trialSpent(): Long = saturatedWork(chargedPrivateWork,
-        saturatedWork(retiredClauseWork, consumer?.clauseWork ?: openingPropagationWork?.invoke() ?: 0L))
+    private fun trialSpent(): Long = saturatedAdd(chargedPrivateWork,
+        saturatedAdd(retiredClauseWork, consumer?.clauseWork ?: openingPropagationWork?.invoke() ?: 0L))
 
     private fun charge(work: Long) {
-        chargedPrivateWork = saturatedWork(chargedPrivateWork, work)
+        chargedPrivateWork = saturatedAdd(chargedPrivateWork, work)
     }
 
     private fun prepare(session: PropagationSession, containing: ExecutionControl) {
@@ -390,8 +391,8 @@ internal class PrivateRebuildSatisfaction(
         } catch (stopped: SearchInitializationCancelled) {
             val decisions = stopped.stats.search.nodes.sum.toLong()
                 .coerceAtMost(Long.MAX_VALUE / PROPAGATION_WORK_PER_NODE) * PROPAGATION_WORK_PER_NODE
-            val stoppedWork = saturatedWork(decisions, stopped.stats.search.propagationWork.sum.toLong())
-            retiredClauseWork = saturatedWork(retiredClauseWork, stoppedWork)
+            val stoppedWork = saturatedAdd(decisions, stopped.stats.search.propagationWork.sum.toLong())
+            retiredClauseWork = saturatedAdd(retiredClauseWork, stoppedWork)
             note("TrialWork", stoppedWork)
             openingRecorded = true
             retiredStats = retiredStats.mergedWith(stopped.stats)
@@ -405,7 +406,7 @@ internal class PrivateRebuildSatisfaction(
             val propagationWork = readOpeningWork?.invoke() ?: 0L
             note("OpeningPropagationWork", propagationWork)
             if (consumer == null && !openingRecorded) {
-                retiredClauseWork = saturatedWork(retiredClauseWork, propagationWork)
+                retiredClauseWork = saturatedAdd(retiredClauseWork, propagationWork)
                 note("TrialWork", propagationWork)
             }
             note("OpeningNanos", openingStart.elapsedNow().inWholeNanoseconds)
@@ -439,7 +440,7 @@ internal class PrivateRebuildSatisfaction(
         } finally {
             for ((key, value) in search.affineParityStatistics()) note("ParityJoint$key", value)
             note("TrialWork", search.clauseWork)
-            retiredClauseWork = saturatedWork(retiredClauseWork, search.clauseWork)
+            retiredClauseWork = saturatedAdd(retiredClauseWork, search.clauseWork)
             retiredStats = retiredStats.mergedWith(search.stats)
             consumer = null
             generation = null

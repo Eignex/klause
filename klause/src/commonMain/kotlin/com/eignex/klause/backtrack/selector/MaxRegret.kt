@@ -5,7 +5,9 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.VarRef
-import kotlin.math.abs
+import com.eignex.util.numbers.saturatedDistance
+import com.eignex.util.numbers.saturatedMul
+import com.eignex.util.numbers.saturatedSub
 import kotlin.random.Random
 
 /**
@@ -35,7 +37,7 @@ internal class MaxRegret(private val objective: LinearObjective, private val bas
         for (v in 0 until problem.numBoolVars) {
             if (!session.needsBoolDecision(v)) continue
             val w = if (v < objective.boolWeightValues.size) objective.boolWeightValues[v] else 0L
-            val r = abs(w)
+            val r = saturatedDistance(w, 0L)
             if (r > bestRegret) {
                 bestRegret = r
                 best = VarRef.Bool(v)
@@ -45,7 +47,7 @@ internal class MaxRegret(private val objective: LinearObjective, private val bas
             val d = session.intDomain(v)
             if (!session.needsIntDecision(v)) continue
             val c = if (v < objective.intCoefficientValues.size) objective.intCoefficientValues[v] else 0L
-            val r = saturatingMul(abs(c), saturatingSpan(d))
+            val r = saturatedMul(saturatedDistance(c, 0L), saturatedSub(d.max, d.min))
             if (r > bestRegret) {
                 bestRegret = r
                 best = VarRef.IntVar(v)

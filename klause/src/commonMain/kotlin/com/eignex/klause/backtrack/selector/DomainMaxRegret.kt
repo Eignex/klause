@@ -2,6 +2,7 @@ package com.eignex.klause.backtrack.selector
 
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.solver.search.VarRef
+import com.eignex.util.numbers.saturatedSub
 import kotlin.random.Random
 
 /**
@@ -29,7 +30,7 @@ object DomainMaxRegret : VariableSelector {
         for (v in 0 until problem.numIntVars) {
             val d = session.intDomain(v)
             if (!session.needsIntDecision(v)) continue
-            val regret = (d.higher(d.min) - d.min).let { if (it < 0L) Long.MAX_VALUE else it }
+            val regret = saturatedSub(d.higher(d.min), d.min)
             if (regret > bestRegret) {
                 best = VarRef.IntVar(v)
                 bestRegret = regret

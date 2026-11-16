@@ -73,16 +73,6 @@ internal fun centeredDomainValues(d: IntDomain, center: Long): Sequence<Long> = 
     }
 }
 
-/** `max(d) - min(d)`, saturated at `Long.MAX_VALUE` instead of wrapping on a full-`Long` span. */
-internal fun saturatingSpan(d: IntDomain): Long = (d.max - d.min).let { if (it < 0L) Long.MAX_VALUE else it }
-
-/** `a * b` for non-negative operands, saturated at `Long.MAX_VALUE` instead of wrapping. */
-internal fun saturatingMul(a: Long, b: Long): Long = when {
-    a == 0L || b == 0L -> 0L
-    a > Long.MAX_VALUE / b -> Long.MAX_VALUE
-    else -> a * b
-}
-
 /**
  * Shared probing core for [Impact] and [MaxSd]. For each candidate value of `varRef`:
  *   - push a real propagation pin via [PropagationSession.probeBool] / `probeInt`;

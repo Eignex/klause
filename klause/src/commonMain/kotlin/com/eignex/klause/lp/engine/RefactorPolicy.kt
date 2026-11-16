@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisSolveQuality
+import com.eignex.util.numbers.saturatedAdd
 
 internal enum class EngineRefactorTrigger {
     BACKEND_SINGULAR,
@@ -97,24 +98,24 @@ internal class RefactorPolicy(private val config: RefactorPolicyConfig = Refacto
         accumulatedSolveWork = 0L
         latestSolveWork = 0L
         if (basisChanged) {
-            generation = saturatingIncrement(generation)
+            generation = saturatedAdd(generation, 1L)
             consumedGeneration = -1L
         }
     }
 
     fun recordBasisSolve(work: Long?, boundUpdateFtran: Boolean = false) {
-        successfulBasisSolves = saturatingIncrement(successfulBasisSolves)
-        basisSolvesSinceFactorization = saturatingIncrement(basisSolvesSinceFactorization)
+        successfulBasisSolves = saturatedAdd(successfulBasisSolves, 1L)
+        basisSolvesSinceFactorization = saturatedAdd(basisSolvesSinceFactorization, 1L)
         latestSolveWork = recordWork(work)
-        accumulatedSolveWork = saturatingAdd(accumulatedSolveWork, latestSolveWork)
-        if (boundUpdateFtran) boundUpdateFtranWork = saturatingAdd(boundUpdateFtranWork, latestSolveWork)
+        accumulatedSolveWork = saturatedAdd(accumulatedSolveWork, latestSolveWork)
+        if (boundUpdateFtran) boundUpdateFtranWork = saturatedAdd(boundUpdateFtranWork, latestSolveWork)
     }
 
     fun recordAcceptedUpdate(work: Long?) {
-        acceptedUpdates = saturatingIncrement(acceptedUpdates)
+        acceptedUpdates = saturatedAdd(acceptedUpdates, 1L)
         if (updatesSinceFactorization < Int.MAX_VALUE) updatesSinceFactorization++
-        accumulatedSolveWork = saturatingAdd(accumulatedSolveWork, recordWork(work))
-        generation = saturatingIncrement(generation)
+        accumulatedSolveWork = saturatedAdd(accumulatedSolveWork, recordWork(work))
+        generation = saturatedAdd(generation, 1L)
         consumedGeneration = -1L
     }
 
@@ -129,7 +130,7 @@ internal class RefactorPolicy(private val config: RefactorPolicyConfig = Refacto
         quality: BasisSolveQuality? = null,
     ): EngineRefactorTrigger? {
         require(updateCount >= 0 && factorNnz >= 0)
-        if (quality != null) qualitySamples = saturatingIncrement(qualitySamples)
+        if (quality != null) qualitySamples = saturatedAdd(qualitySamples, 1L)
         val residualBad = quality != null &&
             (!quality.relativeResidual.isFinite() || quality.relativeResidual > config.relativeResidualTolerance)
         val trigger = when {
@@ -158,12 +159,12 @@ internal class RefactorPolicy(private val config: RefactorPolicyConfig = Refacto
             EngineRefactorTrigger.HARD_UPDATE_CAP,
         )
         if (cooldownApplies && consumedGeneration == generation) {
-            cooldownDeclines = saturatingIncrement(cooldownDeclines)
+            cooldownDeclines = saturatedAdd(cooldownDeclines, 1L)
             return null
         }
         if (cooldownApplies) consumedGeneration = generation
-        triggers[trigger] = saturatingIncrement(triggers[trigger] ?: 0L)
-        if (trigger == EngineRefactorTrigger.RESIDUAL) residualTriggers = saturatingIncrement(residualTriggers)
+        triggers[trigger] = saturatedAdd(triggers[trigger] ?: 0L, 1L)
+        if (trigger == EngineRefactorTrigger.RESIDUAL) residualTriggers = saturatedAdd(residualTriggers, 1L)
         return trigger
     }
 
@@ -187,18 +188,18 @@ internal class RefactorPolicy(private val config: RefactorPolicyConfig = Refacto
 
     private fun recordWork(work: Long?): Long {
         if (work == null) {
-            unknownWorkEvents = saturatingIncrement(unknownWorkEvents)
+            unknownWorkEvents = saturatedAdd(unknownWorkEvents, 1L)
             adaptiveWorkUsable = false
             return 0L
         }
         if (work == Long.MAX_VALUE) {
-            saturatedWorkEvents = saturatingIncrement(saturatedWorkEvents)
+            saturatedWorkEvents = saturatedAdd(saturatedWorkEvents, 1L)
             adaptiveWorkUsable = false
             knownWork = Long.MAX_VALUE
             return 0L
         }
         if (knownWork > Long.MAX_VALUE - work) {
-            saturatedWorkEvents = saturatingIncrement(saturatedWorkEvents)
+            saturatedWorkEvents = saturatedAdd(saturatedWorkEvents, 1L)
             adaptiveWorkUsable = false
             knownWork = Long.MAX_VALUE
             return 0L
@@ -207,8 +208,3 @@ internal class RefactorPolicy(private val config: RefactorPolicyConfig = Refacto
         return work
     }
 }
-
-private fun saturatingAdd(left: Long, right: Long): Long =
-    if (left > Long.MAX_VALUE - right) Long.MAX_VALUE else left + right
-
-private fun saturatingIncrement(value: Long): Long = if (value == Long.MAX_VALUE) value else value + 1L

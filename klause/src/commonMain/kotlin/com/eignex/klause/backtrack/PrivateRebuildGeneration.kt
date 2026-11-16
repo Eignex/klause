@@ -16,6 +16,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.arrays.emptyIntArray
+import com.eignex.util.numbers.saturatedAdd
 import kotlin.time.TimeSource
 
 internal class PrivateRebuildGeneration private constructor(
@@ -236,7 +237,7 @@ internal class PrivateRebuildGeneration private constructor(
             var spent = 0L
             val allowance = passWork().coerceAtLeast(0L)
             val meter = WorkMeter {
-                spent = saturatedWork(spent, it)
+                spent = saturatedAdd(spent, it)
                 cancellation.charge(it)
             }
             val passToken = object : ExecutionControl() {

@@ -15,6 +15,7 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
+import com.eignex.util.numbers.addExactOrNull
 
 /**
  * Substitute an integer column whose domain is exactly `{0, 1}` for a Boolean literal, so the rows over
@@ -315,7 +316,7 @@ internal object BinaryColumnSubstitution {
         for (i in f.vars.indices) {
             val raw = row.coeff(i)
             val a = if (flip) negateOrNull(raw) ?: return null else raw
-            if (a < 0L) bound = addOrNull(bound, negateOrNull(a) ?: return null) ?: return null
+            if (a < 0L) bound = addExactOrNull(bound, negateOrNull(a) ?: return null) ?: return null
         }
         return bound
     }
@@ -340,9 +341,4 @@ internal object BinaryColumnSubstitution {
     }
 
     private fun negateOrNull(a: Long): Long? = if (a == Long.MIN_VALUE) null else -a
-
-    private fun addOrNull(a: Long, b: Long): Long? {
-        val r = a + b
-        return if (((a xor r) and (b xor r)) < 0L) null else r
-    }
 }

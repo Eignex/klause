@@ -19,6 +19,7 @@ import com.eignex.klause.util.ScanMeter
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.numbers.addExactOrNull
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.maxOf
@@ -451,12 +452,6 @@ internal object DuplicateColumns {
             visit(scan)
             entries[it]?.takeIf { e -> e.isNotEmpty() }
         }
-    }
-
-    /** `a + b`, or null when it overflows [Long]. */
-    private fun addExactOrNull(a: Long, b: Long): Long? {
-        val r = a + b
-        return if (((a xor r) and (b xor r)) < 0L) null else r
     }
 
     private fun IntDomain.isContiguous(): Boolean = holeCount == 0L

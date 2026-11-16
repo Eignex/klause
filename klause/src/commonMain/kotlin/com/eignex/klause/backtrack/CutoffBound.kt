@@ -3,6 +3,7 @@ package com.eignex.klause.backtrack
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.util.numbers.Int128
+import com.eignex.util.numbers.addExactOrNull
 
 /** A bound the objective cutoff proves on an integer variable: `varId ≤ hi`. */
 internal class CutoffBound(val varId: Int, val hi: Long)
@@ -67,14 +68,8 @@ internal fun objectiveCutoffBounds(
         if (c <= 0L || !problem.intBounds.isOpenUpper(i) || problem.intBounds.isOpenLower(i)) continue
         val d = problem.rootIntDomain(i)
         val steps = slack.floorDivPositive(c) ?: continue
-        val hi = addOrNull(d.min, steps) ?: continue
+        val hi = addExactOrNull(d.min, steps) ?: continue
         if (hi < d.max) out.add(CutoffBound(i, hi))
     }
     return out
-}
-
-/** `a + b`, or null when it would wrap — a wrapped bound is one the arithmetic never proved. */
-private fun addOrNull(a: Long, b: Long): Long? {
-    val sum = a + b
-    return if (((a xor sum) and (b xor sum)) < 0L) null else sum
 }

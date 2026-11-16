@@ -1,5 +1,7 @@
 package com.eignex.klause.solver.result
 
+import com.eignex.util.numbers.saturatedAdd
+
 /**
  * What the unverified Boolean hints of one open-model solve produced, cost, and steered.
  *
@@ -382,28 +384,28 @@ data class OpenHintUsageStats(
 
     /** Merge events and observed ledger debits by saturating sum, and observed construction maxima by maximum. */
     fun mergedWith(other: OpenHintUsageStats): OpenHintUsageStats = OpenHintUsageStats(
-        noProvider = sumHintUsage(noProvider, other.noProvider),
-        indexesAdmitted = sumHintUsage(indexesAdmitted, other.indexesAdmitted),
-        sourceLimitDeclines = sumHintUsage(sourceLimitDeclines, other.sourceLimitDeclines),
-        storageDeclines = sumHintUsage(storageDeclines, other.storageDeclines),
-        visitDeclines = sumHintUsage(visitDeclines, other.visitDeclines),
-        invalidPrimitiveDeclines = sumHintUsage(invalidPrimitiveDeclines, other.invalidPrimitiveDeclines),
-        stoppedIndexes = sumHintUsage(stoppedIndexes, other.stoppedIndexes),
-        abortedIndexes = sumHintUsage(abortedIndexes, other.abortedIndexes),
-        callerConsultations = sumHintUsage(callerConsultations, other.callerConsultations),
-        callerSelections = sumHintUsage(callerSelections, other.callerSelections),
-        componentConsultations = sumHintUsage(componentConsultations, other.componentConsultations),
-        componentSelections = sumHintUsage(componentSelections, other.componentSelections),
-        primitiveSelections = sumHintUsage(primitiveSelections, other.primitiveSelections),
-        gateSelections = sumHintUsage(gateSelections, other.gateSelections),
-        clauseIndexesAdmitted = sumHintUsage(clauseIndexesAdmitted, other.clauseIndexesAdmitted),
-        clauseIndexesDeclined = sumHintUsage(clauseIndexesDeclined, other.clauseIndexesDeclined),
-        clauseConsultations = sumHintUsage(clauseConsultations, other.clauseConsultations),
-        clauseSelections = sumHintUsage(clauseSelections, other.clauseSelections),
-        clauseDeclines = sumHintUsage(clauseDeclines, other.clauseDeclines),
-        earlyPointUnavailable = sumHintUsage(earlyPointUnavailable, other.earlyPointUnavailable),
-        forwardUncovered = sumHintUsage(forwardUncovered, other.forwardUncovered),
-        primitiveProviderNone = sumHintUsage(primitiveProviderNone, other.primitiveProviderNone),
+        noProvider = saturatedAdd(noProvider, other.noProvider),
+        indexesAdmitted = saturatedAdd(indexesAdmitted, other.indexesAdmitted),
+        sourceLimitDeclines = saturatedAdd(sourceLimitDeclines, other.sourceLimitDeclines),
+        storageDeclines = saturatedAdd(storageDeclines, other.storageDeclines),
+        visitDeclines = saturatedAdd(visitDeclines, other.visitDeclines),
+        invalidPrimitiveDeclines = saturatedAdd(invalidPrimitiveDeclines, other.invalidPrimitiveDeclines),
+        stoppedIndexes = saturatedAdd(stoppedIndexes, other.stoppedIndexes),
+        abortedIndexes = saturatedAdd(abortedIndexes, other.abortedIndexes),
+        callerConsultations = saturatedAdd(callerConsultations, other.callerConsultations),
+        callerSelections = saturatedAdd(callerSelections, other.callerSelections),
+        componentConsultations = saturatedAdd(componentConsultations, other.componentConsultations),
+        componentSelections = saturatedAdd(componentSelections, other.componentSelections),
+        primitiveSelections = saturatedAdd(primitiveSelections, other.primitiveSelections),
+        gateSelections = saturatedAdd(gateSelections, other.gateSelections),
+        clauseIndexesAdmitted = saturatedAdd(clauseIndexesAdmitted, other.clauseIndexesAdmitted),
+        clauseIndexesDeclined = saturatedAdd(clauseIndexesDeclined, other.clauseIndexesDeclined),
+        clauseConsultations = saturatedAdd(clauseConsultations, other.clauseConsultations),
+        clauseSelections = saturatedAdd(clauseSelections, other.clauseSelections),
+        clauseDeclines = saturatedAdd(clauseDeclines, other.clauseDeclines),
+        earlyPointUnavailable = saturatedAdd(earlyPointUnavailable, other.earlyPointUnavailable),
+        forwardUncovered = saturatedAdd(forwardUncovered, other.forwardUncovered),
+        primitiveProviderNone = saturatedAdd(primitiveProviderNone, other.primitiveProviderNone),
         sourceBooleansMax = maxHintObservation(sourceBooleansMax, other.sourceBooleansMax),
         sourceClausesMax = maxHintObservation(sourceClausesMax, other.sourceClausesMax),
         sourcePrimitiveEntriesMax = maxHintObservation(sourcePrimitiveEntriesMax, other.sourcePrimitiveEntriesMax),
@@ -517,8 +519,6 @@ internal class OpenHintUsageSink {
     )
 }
 
-private fun sumHintUsage(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
-
 private fun maxHintObservation(left: Long?, right: Long?): Long? = when {
     left == null -> right
     right == null -> left
@@ -528,5 +528,5 @@ private fun maxHintObservation(left: Long?, right: Long?): Long? = when {
 private fun sumHintObservation(left: Long?, right: Long?): Long? = when {
     left == null -> right
     right == null -> left
-    else -> sumHintUsage(left, right)
+    else -> saturatedAdd(left, right)
 }

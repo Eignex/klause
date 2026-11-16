@@ -13,6 +13,7 @@ import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.saturatedAdd
 import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.times
 import kotlin.time.Duration
@@ -241,8 +242,8 @@ internal class RefinementMeter(
         if ( stride.due(work)) poll()
         if (work > remainingWork) stop(LpRefinementDecline.WORK)
         if (bytes > remainingAllocation) stop(LpRefinementDecline.ALLOCATION)
-        cache.work = addSaturated(cache.work, work)
-        cache.allocation = addSaturated(cache.allocation, bytes)
+        cache.work = saturatedAdd(cache.work, work)
+        cache.allocation = saturatedAdd(cache.allocation, bytes)
     }
 
     fun prior(work: Long, allocation: Long, elapsed: Duration) {
@@ -253,8 +254,8 @@ internal class RefinementMeter(
     }
 
     fun completed(work: Long, bytes: Long = 0L, pivots: Int = 0) {
-        cache.work = addSaturated(cache.work, work)
-        cache.allocation = addSaturated(cache.allocation, bytes)
+        cache.work = saturatedAdd(cache.work, work)
+        cache.allocation = saturatedAdd(cache.allocation, bytes)
         cache.pivots = (cache.pivots.toLong() + pivots).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
     }
 
@@ -391,14 +392,14 @@ internal class RefinementMeter(
         completed(checked.metrics.work, checked.metrics.allocation)
         metrics = metrics.copy(
             reconstructions = metrics.reconstructions + 1,
-            reconstructionWork = addSaturated(metrics.reconstructionWork, checked.metrics.work),
+            reconstructionWork = saturatedAdd(metrics.reconstructionWork, checked.metrics.work),
         )
     }
 
     fun record(checked: ExactBasisMetrics) {
         completed(checked.work, checked.allocation)
         metrics = metrics.copy(
-            luWork = addSaturated(metrics.luWork, checked.work),
+            luWork = saturatedAdd(metrics.luWork, checked.work),
             luFactories = metrics.luFactories + checked.factoryCalls,
             luBuilds = metrics.luBuilds + checked.builds,
             luReuse = metrics.luReuse + checked.reuse,
@@ -421,8 +422,6 @@ internal class RefinementMeter(
 
     fun stop(reason: LpRefinementDecline): Nothing = throw RefinementStop(reason)
 }
-
-private fun addSaturated(a: Long, b: Long): Long = if (b > Long.MAX_VALUE - a) Long.MAX_VALUE else a + b
 
 internal class RefinementAuthority(val state: LpExactState, val meter: RefinementMeter) {
     val source = state.model
@@ -898,10 +897,10 @@ private class RefinementRun(
             val preparation = after.owners.preparationWork - before.owners.preparationWork
             val work = after.solves.workOps - before.solves.workOps
             val pivots = after.solves.pivots - before.solves.pivots
-            meter.completed(addSaturated(preparation, work), pivots = pivots)
+            meter.completed(saturatedAdd(preparation, work), pivots = pivots)
             meter.metrics = meter.metrics.copy(
-                floatWork = addSaturated(meter.metrics.floatWork, work),
-                preparationWork = addSaturated(meter.metrics.preparationWork, preparation),
+                floatWork = saturatedAdd(meter.metrics.floatWork, work),
+                preparationWork = saturatedAdd(meter.metrics.preparationWork, preparation),
                 floatFactors = meter.metrics.floatFactors + floatFactorCount(
                     after.solves,
                 ) - floatFactorCount(before.solves),
@@ -1138,7 +1137,7 @@ private class RefinementRun(
             meter.metrics = meter.metrics.copy(
                 strictWitnesses = if (candidate.point != null) 1 else 0,
                 strictConflicts = if (candidate.conflict != null) 1 else 0,
-                strictWork = addSaturated(meter.metrics.strictWork, meter.spentWork - before),
+                strictWork = saturatedAdd(meter.metrics.strictWork, meter.spentWork - before),
                 strictElapsed = meter.metrics.strictElapsed + started.elapsedNow(),
             )
         }

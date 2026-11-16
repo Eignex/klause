@@ -2,7 +2,6 @@ package com.eignex.klause.theory.difference
 
 import com.eignex.klause.arithmetic.difference.DifferenceEdge
 import com.eignex.klause.arithmetic.difference.DifferenceFragment
-import com.eignex.klause.arithmetic.difference.checkedDifferenceSum
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.solver.search.SearchBranchKind
 import com.eignex.klause.solver.search.SearchBranchProposal
@@ -11,6 +10,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchTheoryAtom
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.addExactOrNull
 
 @Suppress("ReturnCount")
 internal class DifferenceRelativeBranches private constructor(
@@ -129,7 +129,7 @@ internal class DifferenceRelativeBranches private constructor(
                 val (from, to) = pair
                 if (from >= to) continue
                 val opposite = bounds[to to from] ?: continue
-                val width = checkedDifferenceSum(upper, opposite) ?: continue
+                val width = addExactOrNull(upper, opposite) ?: continue
                 if (width !in 1..MAX_INTERVAL_WIDTH || opposite == Long.MIN_VALUE) continue
                 intervals += Interval(from, to, -opposite, upper)
             }

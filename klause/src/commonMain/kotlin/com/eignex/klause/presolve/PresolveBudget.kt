@@ -10,6 +10,8 @@ import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.WorkReservation
 import com.eignex.klause.util.withQuota
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.saturatedAdd
+import com.eignex.util.numbers.saturatedMul
 
 private const val ROOT_CONSTRUCTION_WEIGHT = 53L
 private const val ROOT_PROPAGATION_WEIGHT = 53L
@@ -102,14 +104,14 @@ class PresolveBudget(
 
     internal fun recordConstruction(entries: Long) {
         rootConstructionEntries = saturatedSum(rootConstructionEntries, entries)
-        val units = weighted(entries, ROOT_CONSTRUCTION_WEIGHT)
+        val units = saturatedMul(entries, ROOT_CONSTRUCTION_WEIGHT)
         activeInvocation?.let { it.rebuildWork = saturatedSum(it.rebuildWork, minOf(units, Long.MAX_VALUE - spent)) }
         charge(units)
     }
 
     internal fun recordPropagation(units: Long) {
         rootPropagationWork = saturatedSum(rootPropagationWork, units)
-        val work = weighted(units, ROOT_PROPAGATION_WEIGHT)
+        val work = saturatedMul(units, ROOT_PROPAGATION_WEIGHT)
         activeInvocation?.let { it.rebuildWork = saturatedSum(it.rebuildWork, minOf(work, Long.MAX_VALUE - spent)) }
         charge(work)
     }
@@ -245,10 +247,7 @@ internal fun ExecutionControl.recordPresolveProbe() {
 }
 
 private fun saturatedSum(total: Long, units: Long): Long =
-    if (units <= 0L) total else if (units > Long.MAX_VALUE - total) Long.MAX_VALUE else total + units
-
-private fun weighted(units: Long, weight: Long): Long =
-    if (units > Long.MAX_VALUE / weight) Long.MAX_VALUE else units * weight
+    saturatedAdd(total, units.coerceAtLeast(0L))
 
 internal fun ExecutionControl.presolveBudget(): PresolveBudget? = when (val meter = accounting) {
     is PresolveRootWorkMeter -> meter.budget

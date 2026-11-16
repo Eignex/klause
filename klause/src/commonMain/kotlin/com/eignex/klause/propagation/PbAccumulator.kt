@@ -3,9 +3,9 @@ package com.eignex.klause.propagation
 import com.eignex.klause.ir.Lit
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntLongMap
-import com.eignex.util.numbers.addExact
-import com.eignex.util.numbers.mulExact
-import com.eignex.util.numbers.subExact
+import com.eignex.util.numbers.addExactOrNull
+import com.eignex.util.numbers.mulExactOrNull
+import com.eignex.util.numbers.subExactOrNull
 
 /**
  * A pseudo-Boolean constraint in signed-per-variable cutting-planes form, used as the accumulating
@@ -61,10 +61,10 @@ internal class PbAccumulator {
                     safe = false
                 } else {
                     val magnitude = if (c < 0L) -c else c
-                    val next = addExact(total, magnitude)
+                    val next = addExactOrNull(total, magnitude)
                     if (next == null) safe = false else total = next
                     if (c < 0L) {
-                        val nextDegree = addExact(degree, magnitude)
+                        val nextDegree = addExactOrNull(degree, magnitude)
                         if (nextDegree == null) safe = false else degree = nextDegree
                     }
                 }
@@ -105,7 +105,7 @@ internal class PbAccumulator {
             } else {
                 // w·¬x = w − w·x  ⇒ −w on x, and +w moves to the rhs constant (degree drops by w).
                 if (!addCoef(v, -w)) return false
-                rhs = subExact(rhs, w) ?: return false
+                rhs = subExactOrNull(rhs, w) ?: return false
             }
         }
         return true
@@ -119,7 +119,7 @@ internal class PbAccumulator {
 
     private fun addCoef(v: Int, delta: Long): Boolean {
         val cur = coef.getOrDefault(v, 0L)
-        val next = addExact(cur, delta) ?: return false
+        val next = addExactOrNull(cur, delta) ?: return false
         put(v, next)
         return true
     }
@@ -135,18 +135,18 @@ internal class PbAccumulator {
             // Rewriting a stored value never rehashes, so this updates in place rather than over a
             // snapshot of the keys.
             coef.forEach { v, c ->
-                val scaled = mulExact(c, mulSelf)
+                val scaled = mulExactOrNull(c, mulSelf)
                 if (scaled == null) overflowed = true else coef.put(v, scaled)
             }
             if (overflowed) return false
         }
-        val scaledRhsSelf = mulExact(rhs, mulSelf) ?: return false
-        val scaledRhsOther = mulExact(other.rhs, mulOther) ?: return false
-        rhs = addExact(scaledRhsSelf, scaledRhsOther) ?: return false
+        val scaledRhsSelf = mulExactOrNull(rhs, mulSelf) ?: return false
+        val scaledRhsOther = mulExactOrNull(other.rhs, mulOther) ?: return false
+        rhs = addExactOrNull(scaledRhsSelf, scaledRhsOther) ?: return false
         var failed = false
         other.coef.forEach { v, c ->
             if (!failed) {
-                val add = mulExact(c, mulOther)
+                val add = mulExactOrNull(c, mulOther)
                 if (add == null || !addCoef(v, add)) failed = true
             }
         }
@@ -261,26 +261,6 @@ internal class PbAccumulator {
         fun ceilDiv(a: Long, b: Long): Long {
             val q = a / b
             return if (a % b != 0L && (a xor b) >= 0L) q + 1 else q
-        }
-
-        fun addExact(a: Long, b: Long): Long? {
-            val r = a + b
-            // Overflow iff a and b share a sign that differs from the result's.
-            return if (((a xor r) and (b xor r)) < 0L) null else r
-        }
-
-        fun subExact(a: Long, b: Long): Long? {
-            val r = a - b
-            return if (((a xor b) and (a xor r)) < 0L) null else r
-        }
-
-        fun mulExact(a: Long, b: Long): Long? {
-            if (a == 0L || b == 0L) return 0L
-            val r = a * b
-            // Verify by reversing; also guard the MIN_VALUE/-1 corner.
-            if (a == Long.MIN_VALUE && b == -1L) return null
-            if (b == Long.MIN_VALUE && a == -1L) return null
-            return if (r / b != a) null else r
         }
     }
 }

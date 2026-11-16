@@ -105,14 +105,13 @@ import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
-import com.eignex.util.numbers.div
 import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.maxOf
 import com.eignex.util.numbers.minOf
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.negate
-import com.eignex.util.numbers.remainderOf
 import com.eignex.util.numbers.toLongExact
 import kotlin.time.TimeSource
 
@@ -957,7 +956,7 @@ class ExactLiraSearchComponent private constructor(
 
             LinearOp.GE -> {
                 val split = if (integral) {
-                    val ceiling = comparison.bound.negated().floor().negate()
+                    val ceiling = comparison.bound.ceilInteger()
                     SourceBoundAtom.integerSplit(context, terms, (ceiling - BIG_ONE).asFraction())
                 } else {
                     SourceBoundAtom.rationalSplit(context, terms, comparison.bound, !comparison.strict)
@@ -1818,8 +1817,7 @@ class ExactLiraSearchComponent private constructor(
             val value = point[model.numRealVars + integer]
             if (value.isInteger()) continue
             if (integer in finiteIntVars) {
-                val floor = value.num / value.den -
-                    if (value.num < BIG_ZERO && value.num.remainderOf(value.den) != BIG_ZERO) BIG_ONE else BIG_ZERO
+                val floor = floorDiv(value.num, value.den)
                 if (!floor.fitsLong() || floor >= bigIntOf(Long.MAX_VALUE)) return null
                 val threshold = floor.toLongExact()
                 val lower = context.intLowerBound(integer) ?: return null
@@ -2463,10 +2461,11 @@ private class ExactReducedLiraSystem(private val reduction: ExactLiraReduction.B
             val values = outcome.exactPrimal?.take(columns) ?: return@run ExactReducedSearchResult.Interrupted
             val integer = fractionalInteger(values)
             if (integer != null) {
+                val value = values[realColumns + integer]
                 return@run ExactReducedSearchResult.Split(
                     rooted,
                     integer,
-                    values[realColumns + integer].floor(),
+                    floorDiv(value.num, value.den),
                 )
             }
             reduction.extend(values, token)?.takeIf { source ->
@@ -2541,7 +2540,10 @@ private fun ExactLiraReduction.Bounded.extend(
         val point = owner.solve(token, rhs = shifted.map { it.rhs })?.exactPrimal?.take(free.size) ?: return@run null
         val extension = point.mapIndexed { index, value ->
             if (token()) return@run null
-            if (index < realFree.size) value else (value + half).floor().asFraction()
+            if (index < realFree.size) value else {
+                val shiftedValue = value + half
+                floorDiv(shiftedValue.num, shiftedValue.den).asFraction()
+            }
         }
         if (!extension.satisfiesSourceRows(extensionRows, token)) return@run null
         val completed = transformed.toMutableList()
@@ -2802,11 +2804,6 @@ private fun SourceBoundAtom.sourceRows(realColumns: Int): List<ExactRationalIneq
 }
 
 private fun BigFraction.isInteger(): Boolean = den == BIG_ONE
-
-private fun BigFraction.floor(): BigInt {
-    val quotient = num / den
-    return if (num < BIG_ZERO && num.remainderOf(den) != BIG_ZERO) quotient - BIG_ONE else quotient
-}
 
 private fun maxOfNullable(a: BigInt?, b: BigInt?): BigInt? = if (a == null || b == null) a ?: b else maxOf(a, b)
 

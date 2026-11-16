@@ -36,6 +36,7 @@ import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.saturatedAdd
 import com.eignex.util.numbers.toLongExact
 import kotlin.time.TimeSource
 
@@ -186,7 +187,7 @@ internal class NonlinearIntegerInvocation(
         fun walk(adaptive: Boolean, cap: Long) {
             if (result != null || stop()) return
             val centers = source.integerSeeds(stop) {
-                native = native.copy(workSpent = sum(native.workSpent, 1))
+                native = native.copy(workSpent = saturatedAdd(native.workSpent, 1))
                 external.charge(1)
             }.mapIndexed { id, value ->
                 pins.lower[source.integerCoordinates[id]] ?: value
@@ -264,7 +265,7 @@ internal class NonlinearIntegerInvocation(
             exhausted = { stop() },
             open = {
                 val centers = source.integerSeeds(stop) {
-                    native = native.copy(workSpent = sum(native.workSpent, 1))
+                    native = native.copy(workSpent = saturatedAdd(native.workSpent, 1))
                     external.charge(1)
                 }.mapIndexed { id, value -> pins.lower[plan.integerCoordinate(id)] ?: value }
                 ExactNeighborhood(
@@ -309,7 +310,7 @@ internal class NonlinearIntegerInvocation(
             roots,
         )
         private val slice: SliceBudget = SliceBudget({
-            sum(cursor.stats.candidates, cursor.stats.polynomial.workSpent)
+            saturatedAdd(cursor.stats.candidates, cursor.stats.polynomial.workSpent)
         }, { 0L }, { 0L })
         private var result: SolveResult? = null
         override val isDone: Boolean get() = result != null
@@ -439,28 +440,28 @@ internal class NonlinearIntegerInvocation(
         completedResidues += execution.stats.residues
         completedChecks += execution.stats.checks
         native = QfNraStats(
-            sum(native.projectedPolynomials, observed.projectedPolynomials),
-            sum(native.liftedCells, observed.liftedCells),
-            sum(native.workSpent, observed.workSpent),
+            saturatedAdd(native.projectedPolynomials, observed.projectedPolynomials),
+            saturatedAdd(native.liftedCells, observed.liftedCells),
+            saturatedAdd(native.workSpent, observed.workSpent),
             if (native.dyadicAttempts == null && observed.dyadicAttempts == null) {
                 null
             } else {
-                sum(native.dyadicAttempts ?: 0, observed.dyadicAttempts ?: 0)
+                saturatedAdd(native.dyadicAttempts ?: 0, observed.dyadicAttempts ?: 0)
             },
             if (native.dyadicBases == null && observed.dyadicBases == null) {
                 null
             } else {
-                sum(native.dyadicBases ?: 0, observed.dyadicBases ?: 0)
+                saturatedAdd(native.dyadicBases ?: 0, observed.dyadicBases ?: 0)
             },
             if (native.coupledWorkDeclines == null && observed.coupledWorkDeclines == null) {
                 null
             } else {
-                sum(native.coupledWorkDeclines ?: 0, observed.coupledWorkDeclines ?: 0)
+                saturatedAdd(native.coupledWorkDeclines ?: 0, observed.coupledWorkDeclines ?: 0)
             },
             if (native.dyadicPreExtractionDeclines == null && observed.dyadicPreExtractionDeclines == null) {
                 null
             } else {
-                sum(native.dyadicPreExtractionDeclines ?: 0, observed.dyadicPreExtractionDeclines ?: 0)
+                saturatedAdd(native.dyadicPreExtractionDeclines ?: 0, observed.dyadicPreExtractionDeclines ?: 0)
             },
         )
         val declined = execution.result as? QfNraResult.Unknown
@@ -526,7 +527,6 @@ internal class NonlinearIntegerInvocation(
         polynomial.cancellation() -> TerminationReason.Cancelled
         else -> TerminationReason.BudgetExhausted
     }
-    private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)
 }
 
 internal fun nonlinearIntegerAssignment(sample: Sample): OpenTheoryAssignment = OpenTheoryAssignment.Rebuilt(

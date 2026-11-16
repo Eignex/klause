@@ -15,6 +15,7 @@ import com.eignex.klause.ir.remap
 import com.eignex.klause.ir.requireVariableCounts
 import com.eignex.klause.util.ArithmeticBudget
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.saturatedAdd
 
 internal class PolynomialObjectiveEvidence(
     val formula: PolynomialRealFormula,
@@ -122,16 +123,16 @@ internal fun solvePolynomialObjectiveImage(
             val checked = solveQfNra(query, boolCount, realCount + 1, params.copy(
                 cancellation = work, maximumWork = null,
             ), fixing)
-            work.projected = sum(work.projected, checked.stats.projectedPolynomials)
+            work.projected = saturatedAdd(work.projected, checked.stats.projectedPolynomials)
             when (checked) {
                 is QfNraResult.Unknown -> {
-                    work.lifted = sum(work.lifted, checked.stats.liftedCells)
+                    work.lifted = saturatedAdd(work.lifted, checked.stats.liftedCells)
                     result = PolynomialObjectiveResult.Unknown(checked.reason, work.snapshot(), checked.resource)
                     break
                 }
-                is QfNraResult.Unsatisfiable -> work.lifted = sum(work.lifted, checked.stats.liftedCells)
+                is QfNraResult.Unsatisfiable -> work.lifted = saturatedAdd(work.lifted, checked.stats.liftedCells)
                 is QfNraResult.Satisfiable -> {
-                    work.lifted = sum(work.lifted, checked.stats.liftedCells)
+                    work.lifted = saturatedAdd(work.lifted, checked.stats.liftedCells)
                     check(algebraic.compare(checked.assignment.realValue(0), value) == 0)
                     val assignment = QfNraAssignment(checked.assignment.bools, checked.assignment.reals.drop(1))
                     val coordinates = (0 until realCount).associateWith {
@@ -233,5 +234,3 @@ private class ObjectiveImageWork(params: QfNraParams) : ArithmeticBudget(params.
     var lifted: Long = 0
     fun snapshot(): QfNraStats = QfNraStats(projected, lifted, spent)
 }
-
-private fun sum(left: Long, right: Long): Long = left + minOf(right, Long.MAX_VALUE - left)

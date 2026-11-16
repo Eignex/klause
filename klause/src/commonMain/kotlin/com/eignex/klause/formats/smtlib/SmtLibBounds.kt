@@ -13,6 +13,8 @@ import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.addExactOrNull
+import com.eignex.util.numbers.mulExactOrNull
 
 /**
  * Single-scan integer bounds from conjunctive relations mentioning one variable.
@@ -200,19 +202,8 @@ internal fun Compiler.Builder.applyCtBound(
 /** `acc + c·x`, or null if either the multiply or the add overflows (treated as an infinite bound).
  *  Shared with the aux-variable range arithmetic in `SmtLibEval.kt` — infinity is `null`, never a sentinel. */
 internal fun mulAdd(acc: Long, c: Long, x: Long): Long? {
-    if (c != 0L) {
-        val p = c * x
-        if (p / c != x) return null
-        val s = acc + p
-        return if (((acc xor s) and (p xor s)) < 0) null else s
-    }
-    return acc
-}
-
-/** `a + b`, or null on overflow. */
-internal fun addOrNull(a: Long, b: Long): Long? {
-    val s = a + b
-    return if (((a xor s) and (b xor s)) < 0) null else s
+    val product = mulExactOrNull(c, x) ?: return null
+    return addExactOrNull(acc, product)
 }
 
 internal fun Compiler.Builder.collectConjunctiveRelations(top: SExpr, out: ArrayList<Rel>) {
