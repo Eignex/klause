@@ -139,7 +139,8 @@ class CliModeVerdictTest {
         }
     }
 
-    // The CLI output of a FlatZinc [model] solved by the single-threaded backtrack engine under [args].
+    // The CLI output of a FlatZinc [model] solved single-threaded under [args], by the backtrack engine unless `-e`
+    // names another.
     private fun solveFlatZinc(model: String, vararg args: String): String {
         val source = File.createTempFile("float-relation", ".fzn").apply { writeText(model) }
         try {
@@ -213,56 +214,57 @@ class CliModeVerdictTest {
         }
     }
 
+    private val gridProduct = "var 0.0..2.0: x; var 0.0..2.0: w; var 0.0..4.0: z; " +
+        "constraint float_times(x,w,z); constraint float_eq(z,0.3);"
+
     @Test
     fun `incomplete engines should not refute a satisfiable float product through the grid`() {
-        val source = File.createTempFile("grid-product", ".fzn").apply {
-            writeText("var 0.0..2.0: x; var 0.0..2.0: w; var 0.0..4.0: z; " +
-                "constraint float_times(x,w,z); constraint float_eq(z,0.3); solve satisfy;")
+        val outputs = listOf("localsearch", "alns").associateWith {
+            solveFlatZinc("$gridProduct solve satisfy;", "-e", it)
         }
-        try {
-            for (name in listOf("localsearch", "alns")) {
-                val common = CommonOptions().apply {
-                    engine = name
-                    parallel = 1
-                    randomSeed = 17
-                }
-                val session = MiniZincMode.newSession()
-                val solvable = session.load(source.absolutePath, common)
 
-                val out = captureStdout { SolveCore.solve(solvable, common, session.output(common)) }
-
-                assertTrue("=====UNSATISFIABLE=====" !in out && "klause-float-claim" in out, "$name: $out")
-            }
-        } finally {
-            source.delete()
-        }
+        assertTrue(outputs.values.all { "=====UNKNOWN=====" in it.lines() && "klause-float-claim" in it }, "$outputs")
     }
 
     @Test
-    fun `the default engine should decide float product models without the grid`() {
-        for ((bounds, terminal) in listOf(
-            "" to "==========",
-            "constraint float_le(x,0.2); constraint float_le(w,0.5); " to "=====UNSATISFIABLE=====",
-        )) {
-            val source = File.createTempFile("grid-product", ".fzn").apply {
-                writeText("var 0.0..2.0: x; var 0.0..2.0: w; var 0.0..4.0: z; $bounds" +
-                    "constraint float_times(x,w,z); constraint float_eq(z,0.3); solve satisfy;")
-            }
-            try {
-                val common = CommonOptions().apply {
-                    parallel = 1
-                    randomSeed = 17
-                }
-                val session = MiniZincMode.newSession()
-                val solvable = session.load(source.absolutePath, common)
+    fun `local search should not refute satisfiable float models through the grid`() {
+        val models = listOf("$gridProduct solve minimize x;",
+            "var 0.0..1.0: x; constraint float_lin_eq([3.0],[x],1.0); solve satisfy;")
 
-                val out = captureStdout { SolveCore.solve(solvable, common, session.output(common)) }
+        val outputs = models.map { solveFlatZinc(it, "-e", "localsearch") }
 
-                assertTrue(terminal in out.lines() && "klause-float-claim" !in out, out)
-            } finally {
-                source.delete()
-            }
-        }
+        assertTrue(outputs.all { "=====UNKNOWN=====" in it.lines() && "=====UNSATISFIABLE=====" !in it }, "$outputs")
+    }
+
+    @Test
+    fun `local search should refute a float model whose integer relations alone are infeasible`() {
+        val out = solveFlatZinc("var 1..1: a; var 1..1: b; var 0.0..1.0: x; constraint int_ne(a,b); " +
+            "constraint float_le(x,0.5); solve satisfy;", "-e", "localsearch")
+
+        assertTrue("=====UNSATISFIABLE=====" in out.lines() && "klause-float-claim" in out, out)
+    }
+
+    @Test
+    fun `the default engine should satisfy a float product without the grid`() {
+        val out = solveFlatZinc("$gridProduct solve satisfy;", "-e", "mixed")
+
+        assertTrue("==========" in out.lines() && "klause-float-claim" !in out, out)
+    }
+
+    @Test
+    fun `the default engine should refute an infeasible float product without the grid`() {
+        val out = solveFlatZinc("$gridProduct constraint float_le(z,0.2); solve satisfy;", "-e", "mixed")
+
+        assertTrue("=====UNSATISFIABLE=====" in out.lines() && "klause-float-claim" !in out, out)
+    }
+
+    @Test
+    fun `a grid enumeration should list accepted points without a completeness marker`() {
+        val out = solveFlatZinc("var 0.0..1.0: x :: output_var; constraint float_le(x,0.5); solve satisfy;",
+            "-e", "localsearch", "-n", "2")
+
+        assertTrue("----------" in out.lines() && "klause-float-claim" in out, out)
+        assertTrue("==========" !in out.lines() && "=====UNKNOWN=====" !in out.lines(), out)
     }
 
     @Test
@@ -327,14 +329,6 @@ class CliModeVerdictTest {
         assertTrue("=====UNSATISFIABLE=====" !in out, out)
         assertTrue("klause-grid-verdict: UNSAT" in out, out)
         assertTrue("unexpected grid point" !in out, out)
-    }
-
-    @Test
-    fun `a finite grid should withhold an unboundedness claim`() {
-        val out = captureStdout { MiniZincOutput(floatApproximation = true).onComplete(Verdict.UNBOUNDED) }
-
-        assertTrue("=====UNKNOWN=====" in out.lines(), out)
-        assertTrue("=====UNBOUNDED=====" !in out, out)
     }
 
     @Test

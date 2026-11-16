@@ -45,6 +45,7 @@ internal object MiniZincMode : CliMode {
         private var outputObjective = false
         private var completeAssignment = false
         private var floatApproximation = false
+        private var gridEnumeration = false
         private var sourceSemantics: EffectiveSourceSemantics? = null
 
         override fun flags(): List<FlagSpec> = listOf(
@@ -120,6 +121,7 @@ internal object MiniZincMode : CliMode {
             val elapsed = start.elapsedNow().inWholeMilliseconds
             common.logRoute(invocation.route, elapsed)
             floatApproximation = invocation.floatProjection != null
+            gridEnumeration = floatApproximation && operation == ExecutionOperation.ENUMERATE
             if (invocation.floatProjection != null) {
                 val realObjective = sourceObjective?.takeIf {
                     it.realCoefficients.any { coefficient -> coefficient != 0.0 }
@@ -173,7 +175,8 @@ internal object MiniZincMode : CliMode {
             return rendered.removeSuffix("----------\n") + evidence + "----------\n"
         }
 
-        override fun output(common: CommonOptions): OutputProtocol = MiniZincOutput(floatApproximation, sourceSemantics)
+        override fun output(common: CommonOptions): OutputProtocol =
+            MiniZincOutput(floatApproximation, sourceSemantics, gridEnumeration)
     }
 }
 
@@ -181,6 +184,7 @@ internal object MiniZincMode : CliMode {
 internal class MiniZincOutput(
     private val floatApproximation: Boolean = false,
     private val sourceSemantics: EffectiveSourceSemantics? = null,
+    private val gridEnumeration: Boolean = false,
 ) : OutputProtocol {
     private var context: VerdictContext = VerdictContext()
     private val integerScopeChanged = sourceSemantics?.let {
@@ -264,10 +268,9 @@ internal class MiniZincOutput(
         if (realScopeChanged) {
             println("% klause-source-claim: caller real bounds; no default-source proof")
         }
-        val qualified = flatZincSourceVerdict(verdict, declarationScopeChanged ||
-            (floatApproximation && verdict == Verdict.UNBOUNDED))
-        when (qualified) {
-            Verdict.SATISFIABLE, Verdict.OPTIMAL -> println("==========")
+        when (flatZincSourceVerdict(verdict, declarationScopeChanged)) {
+            // Grid solutions skip the source points between buckets, so they never complete an enumeration.
+            Verdict.SATISFIABLE, Verdict.OPTIMAL -> if (!gridEnumeration) println("==========")
 
             // Incumbents already streamed; printing `==========` would falsely claim optimality.
             Verdict.BEST_FOUND -> Unit

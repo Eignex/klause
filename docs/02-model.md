@@ -260,7 +260,9 @@ Publication reconstructs engine coordinates into the private grid, then into
 original real coordinates, and only points the original model accepts are
 published. Grid exhaustion and optimization prove only grid claims, kept in
 `FiniteSolveResult.nativeGridOutcome`; `outcome` reports unknown, or the accepted
-point as satisfiable or best-found. See [source checking](07-presolve.md#source-witness-validation) and
+point as satisfiable or best-found. A satisfiable grid enumeration claims no
+complete list of solutions. `outcome` is unsatisfiable only when root propagation
+refutes the source's integer and Boolean relations alone. See [source checking](07-presolve.md#source-witness-validation) and
 [reconstruction](07-presolve.md#guarantees-and-source-mappings).
 
 ## Engine projections and factor capabilities

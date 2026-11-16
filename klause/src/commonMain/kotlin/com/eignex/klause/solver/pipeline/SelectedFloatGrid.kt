@@ -118,12 +118,14 @@ private fun selectFloatGrid(
     val route = SourceProblemRoute.Finite(projection.problem, ownership, plan)
     val source = selection.source.problem
     val checkedIntegers = ArrayList<Int>()
-    val tolerant = source.semantics.effective.feasibilityTolerance?.isExact == false
+    // A format that types its floats states its integer and Boolean relations exactly; an untyped one reads
+    // its integer rows within the slack, so only the tolerance check may judge them.
+    val relaxesIntegerRows = source.semantics.relaxesRows(0)
     for (id in source.factors.indices) {
         stop.charge(1)
         if (stop()) return SelectedFloatGridPreparation.Declined(SelectedGridDecline.RESOURCE)
         val factor = source.factors[id]
-        if (factor.variables.reals.isEmpty() && !(tolerant && factor.hasCapturedLinearTolerance())) {
+        if (factor.variables.reals.isEmpty() && !(relaxesIntegerRows && factor.hasCapturedLinearTolerance())) {
             checkedIntegers += id
         }
     }

@@ -232,7 +232,7 @@ internal object SolveMetric {
                 null
             }
             val r = timings.measure("harnessInvocationMs") { invoke(entry, settings, budget, optimize) }
-            // A float model Klause solves on a grid is marked, so a reader knows its claims are approximations.
+            // A float model Klause searches on a grid is marked: its points are checked, its grid proves nothing.
             val approximation = if (entry.hasFloats) {
                 mapOf("floatApproximation" to entry.floatApproximation.toString())
             } else {
