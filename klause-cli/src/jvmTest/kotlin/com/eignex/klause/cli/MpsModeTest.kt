@@ -665,7 +665,9 @@ class MpsModeTest {
         assertFalse(Mps.parse(source.readText()).toProblem().sourceExact)
         val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { exact = true })
 
-        val text = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--exact", source.absolutePath))) }
+        val text = captureStdout {
+            assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--exact", source.absolutePath)))
+        }
 
         val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
         assertEquals(SourceExecutionKind.FINITE, SourceSetup.executionKind(invocation))
@@ -795,7 +797,9 @@ class MpsModeTest {
         }
 
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
-            val text = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1") + flags + source.absolutePath)) }
+            val text = captureStdout {
+                assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1") + flags + source.absolutePath))
+            }
 
             assertTrue("s UNSATISFIABLE" in text.lines(), text)
         }

@@ -333,7 +333,9 @@ class CliModeOpenTheoryTest {
     @Test
     fun `alns should search an open model with exact source completion`() {
         var code = -1
-        val out = captureStdout { code = runCli(arrayOf("-e", "alns", "--param", "max-flips=30", openSmt().absolutePath)) }
+        val out = captureStdout {
+            code = runCli(arrayOf("-e", "alns", "--param", "max-flips=30", openSmt().absolutePath))
+        }
 
         assertEquals(0, code, out)
         assertEquals("sat", out.lines().first(), out)

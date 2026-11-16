@@ -52,7 +52,9 @@ class WcnfModeTest {
 
     @Test
     fun `an old-format p wcnf instance should route and prove its optimum`() {
-        val out = captureStdout { main(arrayOf("-e", "bt", wcnf("p wcnf 3 4 10\n10 1 2 3 0\n1 -1 0\n2 -2 0\n3 -3 0\n"))) }
+        val out = captureStdout {
+            main(arrayOf("-e", "bt", wcnf("p wcnf 3 4 10\n10 1 2 3 0\n1 -1 0\n2 -2 0\n3 -3 0\n")))
+        }
         assertTrue("s OPTIMUM FOUND" in out, out)
         assertTrue("o 1" in out.lines().map { it.trim() }, "expected optimum cost 1: $out")
     }

@@ -125,7 +125,9 @@ class CliModePresolveTest {
         }
 
         var out = ""
-        val err = captureStderr { out = captureStdout { runCli(arrayOf("--param", "dry-run-presolve=true", smt.absolutePath)) } }
+        val err = captureStderr {
+            out = captureStdout { runCli(arrayOf("--param", "dry-run-presolve=true", smt.absolutePath)) }
+        }
 
         assertTrue("presolve dry-run:" in err, err)
         assertTrue("open columns: 2 of 2" in err, err)

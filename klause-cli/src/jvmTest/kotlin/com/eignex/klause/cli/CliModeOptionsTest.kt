@@ -464,7 +464,9 @@ class CliModeOptionsTest {
         }
         assertTrue("ls dry-run: 1 arm(s)" in dry, dry)
         assertTrue("cbls-plateau/ils-basin" in dry, dry)
-        val out = captureStdout { main(arrayOf("-e", "ls", "--param", "arm=cbls/fixed", "-t", "5000", fzn.absolutePath)) }
+        val out = captureStdout {
+            main(arrayOf("-e", "ls", "--param", "arm=cbls/fixed", "-t", "5000", fzn.absolutePath))
+        }
         assertTrue("x = " in out, out)
         assertTrue("----------" in out, out)
     }

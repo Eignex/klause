@@ -77,7 +77,10 @@ private fun boolHeavyCase(): LocalSearchStateCase {
             bound = 4L,
         ),
     )
-    return LocalSearchStateCase("boolHeavy", Problem(numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(), factors = factors))
+    return LocalSearchStateCase(
+        "boolHeavy",
+        Problem(numBoolVars = 5, numIntVars = 0, intDomains = emptyArray(), factors = factors),
+    )
 }
 
 private fun intHeavyCase(): LocalSearchStateCase {
@@ -88,7 +91,10 @@ private fun intHeavyCase(): LocalSearchStateCase {
         Linear(intArrayOf(1), intArrayOf(2), LinearOp.LE, 4),
         Linear(intArrayOf(1), intArrayOf(0), LinearOp.NE, 0),
     )
-    return LocalSearchStateCase("intHeavy", Problem(numBoolVars = 0, numIntVars = 3, intDomains = intDomains, factors = factors))
+    return LocalSearchStateCase(
+        "intHeavy",
+        Problem(numBoolVars = 0, numIntVars = 3, intDomains = intDomains, factors = factors),
+    )
 }
 
 private fun mixedReifiedCase(): LocalSearchStateCase {
@@ -123,5 +129,8 @@ private fun permutationCase(): LocalSearchStateCase {
         Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2),
         Linear(intArrayOf(1), intArrayOf(3), LinearOp.GE, 1),
     )
-    return LocalSearchStateCase("permutation", Problem(numBoolVars = 0, numIntVars = 4, intDomains = intDomains, factors = factors))
+    return LocalSearchStateCase(
+        "permutation",
+        Problem(numBoolVars = 0, numIntVars = 4, intDomains = intDomains, factors = factors),
+    )
 }
