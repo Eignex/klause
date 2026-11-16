@@ -192,6 +192,59 @@ class SmtGroundFunctionsTest {
     }
 
     @Test
+    fun `sort aliases substitute their parameters simultaneously`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort U 0)
+            (declare-sort V 0)
+            (define-sort First (A B) A)
+            (define-sort Other (U) (First U V))
+            (declare-const a (Other Int))
+            (declare-fun f ((First Int Real)) Int)
+            (assert (= a 7))
+            (assert (distinct (f a) (f 7)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `sort aliases preserve interpreted scalar declarations`() {
+        val parsed = SmtLib.parse("""
+            (define-sort Count () Int)
+            (declare-const n Count)
+            (assert (= n 1000000000000000000000000000000))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        assertEquals("1000000000000000000000000000000", assignment.intValue(parsed.intVarNames.getValue("n")))
+    }
+
+    @Test
+    fun `sort aliases cannot refer to themselves or later declarations`() {
+        val cases = listOf("(define-sort A () A)", "(define-sort A () B) (declare-sort B 0)")
+
+        for (text in cases) assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
+    }
+
+    @Test
+    fun `result qualifications check source types without coercion`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort U 0)
+            (declare-const a U)
+            (declare-fun f (U) U)
+            (assert (distinct ((as f U) a) (f a)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
     fun `function expansion observes the source cancellation allowance`() {
         var work = 0L
         val cancellation = object : Cancellation {

@@ -6,7 +6,7 @@ import com.eignex.klause.util.Cancellation
 internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: Cancellation): SmtReduction {
     val needed = input.commands.any { command ->
         cancellation.polynomialSourceCheckpoint(1)
-        command is SExpr.SList && (command.polynomialHead() == "declare-sort" ||
+        command is SExpr.SList && (command.polynomialHead() in setOf("declare-sort", "define-sort") ||
             command.polynomialHead() == "declare-fun" &&
             (command.items.getOrNull(2) as? SExpr.SList)?.items?.isNotEmpty() == true)
     }
@@ -96,7 +96,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
             val upper = atom((names.size - 1).toString()).expression
             for (name in names) {
                 step()
-                bounds += command("assert", expression("and", expression("<=", SExpr.Atom("0"), SExpr.Atom(name)),
+                bounds += groundCommand("assert", expression("and", expression("<=", SExpr.Atom("0"), SExpr.Atom(name)),
                     expression("<=", SExpr.Atom(name), upper)))
             }
         }
@@ -142,14 +142,14 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         }
         val term = if (encodeUninterpreted && declaration.result is SmtSort.Uninterpreted) {
             val sort = declaration.result
-            output += command("declare-const", SExpr.Atom(declaration.name), SExpr.Atom("Int"))
+            output += groundCommand("declare-const", SExpr.Atom(declaration.name), SExpr.Atom("Int"))
             identities.getOrPut(sort) { ArrayList() } += declaration.name
             val recipe = FreeSortReconstruction(sort, declaration.name)
             privateBindings[declaration.name] = recipe
             sourceBindings[name]?.let { sourceBindings[name] = it.copy(reconstruction = recipe) }
             atom(declaration.name)
         } else {
-            output += command("declare-const", SExpr.Atom(declaration.name), sortExpression(declaration.result))
+            output += groundCommand("declare-const", SExpr.Atom(declaration.name), sortExpression(declaration.result))
             atom(declaration.name)
         }
         bindings[name] = Binding(bindings.size, term = term)
@@ -263,7 +263,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         val argumentNames = args.mapIndexed { index, argument ->
             step()
             val captured = freshValue(function.declaration.parameters[index])
-            output += command("assert", expression("=", captured.expression, argument.expression))
+            output += groundCommand("assert", expression("=", captured.expression, argument.expression))
             (captured.expression as SExpr.Atom).text
         }
         val result = freshValue(function.declaration.result)
@@ -274,7 +274,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                 step()
                 expression("=", SExpr.Atom(previous.arguments[index]), SExpr.Atom(argumentNames[index]))
             }
-            output += command("assert", expression("=>", expression("and", *equalArguments.toTypedArray()),
+            output += groundCommand("assert", expression("=>", expression("and", *equalArguments.toTypedArray()),
                 expression("=", SExpr.Atom(previous.result), result.expression)))
         }
         function.applications += Application(argumentNames, resultName)
@@ -289,7 +289,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
             name = "@klause.uf.${nextName++}"
         } while (!usedNames.add(name))
         val encodedSort = if (encodeUninterpreted && sort is SmtSort.Uninterpreted) SmtSort.Int else sort
-        output += command("declare-const", SExpr.Atom(name), sortExpression(encodedSort))
+        output += groundCommand("declare-const", SExpr.Atom(name), sortExpression(encodedSort))
         privateBindings[name] = if (encodeUninterpreted && sort is SmtSort.Uninterpreted) {
             val names = identities.getOrPut(sort) { ArrayList() }
             names += name
@@ -341,7 +341,7 @@ private data class GroundFunctionReconstruction(val parameters: List<SmtSort>,
 private fun expression(head: String, vararg args: SExpr): SExpr.SList =
     SExpr.SList(listOf(SExpr.Atom(head)) + args)
 
-private fun command(head: String, vararg args: SExpr): SExpr.SList = expression(head, *args)
+private fun groundCommand(head: String, vararg args: SExpr): SExpr.SList = expression(head, *args)
 
 private fun sortExpression(sort: SmtSort): SExpr = SExprReader(sort.toSmtLib()).readAll().single()
 
