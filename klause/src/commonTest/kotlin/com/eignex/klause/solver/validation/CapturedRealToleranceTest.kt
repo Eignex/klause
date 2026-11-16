@@ -79,12 +79,27 @@ class CapturedRealToleranceTest {
     }
 
     @Test
-    fun `a strict row should hold exactly at the accepted point`() {
+    fun `a strict row should keep the absolute slack as its gap without reading the slack`() {
         val accepts = assertNotNull(
             capturedRealAcceptance(source(row(LinearOp.LE, 0.25, strict = true)), ExecutionControl.Never),
         )
+        val points = listOf(0.25, 0.2, 0.15, 0.1)
 
-        assertFalse(accepts(point(0.25)))
+        val accepted = points.associateWith { accepts(point(it)) }
+
+        assertEquals(mapOf(0.25 to false, 0.2 to false, 0.15 to true, 0.1 to true), accepted)
+    }
+
+    @Test
+    fun `a strict row should hold exactly without an absolute slack`() {
+        val relative = SourceTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10)))
+        val accepts = assertNotNull(capturedRealAcceptance(
+            source(row(LinearOp.LE, 0.25, strict = true), tolerance = relative), ExecutionControl.Never))
+        val points = listOf(0.25, 0.2)
+
+        val accepted = points.associateWith { accepts(point(it)) }
+
+        assertEquals(mapOf(0.25 to false, 0.2 to true), accepted)
     }
 
     @Test

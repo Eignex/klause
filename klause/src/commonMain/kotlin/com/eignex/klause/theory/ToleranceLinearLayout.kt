@@ -28,6 +28,9 @@ import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.solver.validation.RealToleranceScope
 import com.eignex.klause.solver.validation.capturedSourceSlack
+import com.eignex.klause.solver.validation.statesStrictMargin
+import com.eignex.klause.solver.validation.strictMargin
+import com.eignex.klause.solver.validation.withMargin
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
@@ -41,7 +44,8 @@ import com.eignex.util.numbers.toLongExact
 // relation. Each such region lies inside the one the point check accepts, so an exact witness of [model] is a point
 // within tolerance, and a refutation shows that no point holds every relation within that slack.
 //
-// A component that holds exactly keeps its exact encodings and declarations. A source with a real product without
+// An unconditional strict row states its closed margin row in every component. A component that holds exactly keeps
+// its exact encodings and declarations for its other relations. A source with a real product without
 // finite choices or a power above one, which no linear model states once the discrete coordinates are fixed, or with
 // a kept relation no linear encoder enforces, is not [searchable].
 internal class ToleranceLinearLayout(private val problem: Problem, policy: SourceTolerance) {
@@ -58,7 +62,9 @@ internal class ToleranceLinearLayout(private val problem: Problem, policy: Sourc
     init {
         for ((index, factor) in problem.factors.withIndex()) {
             if (factor.variables.reals.isEmpty()) continue
-            if (factor is Distinct || !relaxes(factor.variables.reals[0])) kept += index else {
+            val encoded = factor is Distinct ||
+                (!relaxes(factor.variables.reals[0]) && !factor.statesStrictMargin(rows.margin))
+            if (encoded) kept += index else {
                 relaxed += index
                 rows.fixedForms(factor)?.let { fixedForms[index] = it }
             }
@@ -121,6 +127,9 @@ private class ToleranceRows(
     private val policy: SourceTolerance,
 ) {
     private val residual = capturedSourceSlack(policy, BigFraction.ZERO)
+
+    // The gap an unconditional strict row keeps, read without slack.
+    val margin = policy.strictMargin()
 
     fun slack(bound: BigFraction): BigFraction = capturedSourceSlack(policy, bound)
 
@@ -188,7 +197,10 @@ private class ToleranceRows(
             listOf(conjunction(statedRow(factor.row, sample)))
         } else emptyList()
         else -> when (val form = factor.linearForm) {
-            is LinearForm.Conjunction -> listOf(conjunction(form.rows.flatMap { statedRow(it, sample) }))
+            is LinearForm.Conjunction -> {
+                val margined = factor.statesStrictMargin(margin)
+                listOf(conjunction(form.rows.flatMap { statedRow(it, sample, margined) }))
+            }
             is LinearForm.Disjunction -> clauses(form.rows.map { statedRow(it, sample) })
             else -> null
         }
@@ -262,11 +274,13 @@ private class ToleranceRows(
         return forms
     }
 
-    // The rows one source row states at this point: an active non-strict row widened by the slack of its bound,
-    // and a strict row, a disequality or the complement under a false activator exactly.
-    private fun statedRow(row: LinearRow, sample: Sample): List<LinearRow> {
+    // The rows one source row states at this point: an active non-strict row widened by the slack of its bound, a
+    // [margined] strict row as its closed margin row, and any other strict row, a disequality or the complement under
+    // a false activator exactly.
+    private fun statedRow(row: LinearRow, sample: Sample, margined: Boolean = false): List<LinearRow> {
         val active = row.activator == LinearRow.ALWAYS || sample.boolValue(row.activator)
-        val comparison = row.exactForm(realColumns).comparison(active) { sample.boolValue(it) }
+        val stated = row.exactForm(realColumns).comparison(active) { sample.boolValue(it) }
+        val comparison = if (margined) stated.withMargin(margin) else stated
         var bound = comparison.bound
         val terms = ArrayList<Pair<Int, BigFraction>>()
         for ((column, coefficient) in comparison.terms) {

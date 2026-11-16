@@ -178,16 +178,24 @@ class SourceSetupTest {
     }
 
     @Test
-    fun `a FlatZinc source without integer columns should take the lane its tolerance and rows admit`() {
+    fun `a FlatZinc source with real columns should take the lane its tolerance and rows admit`() {
         val rows = "var 0.0..2.0: y; constraint float_lin_le([3.0], [y], 6.0); solve satisfy;"
+        val strict = "var 0.0..2.0: x; var 0.0..2.0: y; constraint float_lt(x, y); solve satisfy;"
+        val mixedStrict = "var 0..2: k; var 0.0..2.0: x; var 0.0..2.0: y; " +
+            "constraint float_lin_le([1.0], [y], 1.5); constraint float_lt(x, y); " +
+            "constraint int_le(k, 1); solve satisfy;"
         val numerical = SemanticOverrides()
         val sources = mapOf(
             "numerical rows" to Triple(rows, numerical, ExecutionOperation.SATISFY),
             "exact rows" to Triple(rows, SemanticOverrides(feasibilityTolerance = SourceTolerance()),
                 ExecutionOperation.SATISFY),
             "all solutions" to Triple(rows, numerical, ExecutionOperation.ENUMERATE),
-            "numerical strict row" to Triple("var 0.0..2.0: y; constraint float_lt(y, 1.0); solve satisfy;",
-                numerical, ExecutionOperation.SATISFY),
+            "numerical strict row" to Triple(strict, numerical, ExecutionOperation.SATISFY),
+            "exact strict row" to Triple(strict, SemanticOverrides(feasibilityTolerance = SourceTolerance()),
+                ExecutionOperation.SATISFY),
+            "numerical strict row with integers" to Triple(mixedStrict, numerical, ExecutionOperation.SATISFY),
+            "exact strict row with integers" to Triple(mixedStrict,
+                SemanticOverrides(feasibilityTolerance = SourceTolerance()), ExecutionOperation.SATISFY),
             "numerical disequality" to Triple("var 0.0..1.0: y; constraint float_ne(y, 1.0); solve satisfy;",
                 numerical, ExecutionOperation.SATISFY),
             "numerical reified row" to Triple("var bool: p; var 0.0..2.0: y; " +
@@ -202,7 +210,9 @@ class SourceSetupTest {
         }
 
         assertEquals(mapOf("numerical rows" to "Finite", "exact rows" to "OpenTheory", "all solutions" to "OpenTheory",
-            "numerical strict row" to "OpenTheory", "numerical disequality" to "OpenTheory",
+            "numerical strict row" to "Finite", "exact strict row" to "OpenTheory",
+            "numerical strict row with integers" to "Finite", "exact strict row with integers" to "OpenTheory",
+            "numerical disequality" to "OpenTheory",
             "numerical reified row" to "OpenTheory"), routes)
     }
 

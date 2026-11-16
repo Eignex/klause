@@ -290,6 +290,18 @@ class SourceStrategyTest {
     }
 
     @Test
+    fun `affine optimization over a strict row should attain the bound less the absolute slack`() {
+        val program = parseFlatZinc("var 0.0..1.0: x; var 0.0..0.5: y; constraint float_lt(x, y); solve maximize x;")
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0, 0.0))
+
+        val execution = BacktrackSolver.source(program.sourceProgram.problem).optimizeOpen(objective,
+            sense = ObjectiveSense.MAXIMIZE)
+
+        val result = assertIs<OpenTheoryOptimum.Optimal>(assertIs<OpenTheoryExecution.Optimize>(execution).result)
+        assertEquals(-0.4999999, result.value.toDouble(), 1e-12)
+    }
+
+    @Test
     fun `affine optimization should retain a source preparation refutation`() {
         val source = Problem(
             0, 1, arrayOf(IntDomain(-3, 3)),

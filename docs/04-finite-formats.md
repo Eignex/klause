@@ -355,8 +355,12 @@ The original arm is numerical under the declared tolerance. Finite LP deductions
 [numerical](17-linear-programming.md#numerical-and-exact-deductions), and a real
 completion needs no exact certificate when every real declaration and every relation
 over a real coordinate holds within the slack. Rows measure it as
-[MPS rows do](05-arithmetic-formats.md#tolerance-publication); strict rows,
-disequalities and rows whose reifying Boolean is false hold exactly. A finite
+[MPS rows do](05-arithmetic-formats.md#tolerance-publication). On the finite lane and
+the polynomial route an unconditional strict row `a·x < b` is the closed row `a·x <= b - absolute`, which reads
+no slack: a point on its boundary `a·x = b` is refused, and a zero absolute slack keeps
+the row strict. The gap is measured in the units of the row as written, so
+`2x - 2y < 0` keeps `y - x >= absolute / 2`. A reified strict row, a disequality and a
+row whose reifying Boolean is false hold exactly. A finite
 membership admits a value within the slack of a member, measured as a bound. Absolute
 value, minimum, maximum, selection, an integer times a real, a real product and a power
 state `r = f(x)` and read the slack as the row `r - f(x) = 0`: the residual
@@ -376,8 +380,9 @@ A backtrack leaf offers its float completion first. A refused point is decided b
 search over the source relations at the leaf's discrete point, in which every relation
 of the tolerance components holds within the slack its bound alone admits:
 `max(absolute, relative * abs(bound))` for a row, declaration or member, and the
-absolute slack for a residual row. Components that hold exactly keep their exact
-encodings. A witness of the search lies within what acceptance admits, and a refutation
+absolute slack for a residual row. An unconditional strict row states its closed row in
+every component, and components that hold exactly keep their exact encodings for their
+other relations. A witness of the search lies within what acceptance admits, and a refutation
 shows that no point holds every relation within that slack, so the leaf verdict stays
 feasible or infeasible. A source with a real product without finite choices, a power
 above one, or a kept relation no linear encoder enforces has no such search, and its
@@ -398,12 +403,18 @@ A source without integer columns takes the finite lane under a positive toleranc
 the [linear theory](15-linear-arithmetic.md) at zero tolerance; an MPS source takes the
 finite lane in both modes. On the finite lane its Booleans and clauses are searched by
 Boolean backtracking with a real completion at each leaf. Such a source stays with the
-linear theory when it states an open set over reals (a strict row, a disequality or a
-reified row, whose false side is a strict complement), since leaf completion attains
-no supremum, and when all solutions are requested. A source the finite lane cannot
-complete, such as one with an extremum or an open integer, routes to the linear theory
-and is decided exactly. A real product without finite choices or a power above one
-routes to the polynomial theory, which decides the exact formula first: its witness,
+linear theory when it states an open set over reals (a disequality, a reified row,
+whose false side is a strict complement, or a strict row without an absolute slack),
+since leaf completion attains no supremum, and when all solutions are requested. The
+finite lane, for sources with integer columns too, states each unconditional strict row
+as its closed row, so every engine decides the row acceptance reads and an optimum
+against it is attained. In a source with integer columns, a reified non-strict row
+takes the finite lane and its false side holds exactly there. A source the finite lane
+cannot complete, such as one with an extremum or an open integer, routes to the linear
+theory and is decided exactly, its strict rows included. A real product without finite
+choices or a power above one routes to the polynomial theory, which states each
+unconditional strict row as its closed row in both of its formulas and decides the
+exact formula first: its witness,
 optimum or unboundedness stands. Only an exact refutation hands the remaining budget to a
 [widened formula](16-nonlinear-arithmetic.md#tolerance-widened-formulas), which reads the
 slack where acceptance does with the slack acceptance grants at a zero bound; a relation

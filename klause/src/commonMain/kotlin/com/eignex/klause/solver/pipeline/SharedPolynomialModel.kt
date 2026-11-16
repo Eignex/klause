@@ -2,20 +2,26 @@
 
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.lowering.polynomialRow
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.validation.FinitePointCheck
+import com.eignex.klause.solver.validation.marginRow
+import com.eignex.klause.solver.validation.statesStrictMargin
+import com.eignex.klause.solver.validation.strictMargin
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
@@ -142,6 +148,11 @@ internal class SharedPolynomialModel private constructor(
             val attributions = ArrayList<EncodingAttribution>()
             val installationStop = request.cancellation
             val tolerance = widening?.takeIf { sourceFormula == null }
+            // Both the exact and the widened formula state an unconditional strict real row as its closed margin row,
+            // the row acceptance and the finite lane read.
+            val margin = if (sourceFormula == null) {
+                source.semantics.effective.feasibilityTolerance.strictMargin()
+            } else BigFraction.ZERO
             var selectedIndex = 0
             for ((index, factor) in source.factors.withIndex()) {
                 if (stopped()) return null
@@ -158,6 +169,11 @@ internal class SharedPolynomialModel private constructor(
                     realCoordinate = { substituted[it] ?: it })
                 val decline = try {
                     when {
+                        factor.statesStrictMargin(margin) -> null.also {
+                            encoding.polynomial(polynomialRow((factor as Linear).marginRow(margin),
+                                { id -> encoding.integer(SourceIntId(id)) }, { id -> encoding.real(SourceRealId(id)) },
+                                encoding::conditional))
+                        }
                         widened == null -> selected.install(factor, encoding)
                         widened.readsRows(factor) -> null.also { encoding.polynomial(widened.rows(factor, encoding)) }
                         else -> {
