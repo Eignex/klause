@@ -25,6 +25,7 @@ class SourceAttachment private constructor(
     /** Immutable source storage and preparation policy captured by the caller. */
     val settings: ProblemSettings,
     internal val definitionReferences: SourceDefinitionReferences? = null,
+    internal val witnessValidators: List<SourceWitnessValidator> = emptyList(),
 ) : SourceSemanticsOwner {
     /** Attach the canonical factor model and its neutral construction hints. */
     constructor(
@@ -98,6 +99,11 @@ class SourceAttachment private constructor(
 
     /** Independent branching-intent containers in original source coordinates. */
     val searchHints: SearchHints? get() = search?.captured()
+
+    /** Add an original-source witness check, preserving this attachment and its source identity. */
+    fun withWitnessValidator(validator: SourceWitnessValidator): SourceAttachment = SourceAttachment(
+        factorSource, formula, definitions, search, settings, definitionReferences, witnessValidators + validator,
+    ).also { it.floats = floats }
 }
 
 private fun SearchHints.captured(): SearchHints = copy(

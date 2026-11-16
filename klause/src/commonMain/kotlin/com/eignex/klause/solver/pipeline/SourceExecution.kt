@@ -126,6 +126,18 @@ class SourceExecutionRequest private constructor(
             prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, observer)
     }
 
+    internal fun withValidationCancellation(stop: Cancellation): SourceExecutionRequest {
+        val boundedPolynomial = polynomial.copy(cancellation = polynomial.cancellation or stop)
+        return SourceExecutionRequest(invocation, finiteRequest,
+            theory.copy(cancellation = theory.cancellation or stop), boundedPolynomial,
+            cores, presolveConfig, presolveCancellation, presolveBudget,
+            nonlinearInteger?.let {
+                it.copy(polynomial = it.polynomial.copy(cancellation = it.polynomial.cancellation or stop))
+            },
+            transcendental?.let { it.copy(cancellation = it.cancellation or stop) }, nodeBudget, policy,
+            prepareOnly, onPortfolioLpQuery, onPortfolioGuidance, onPortfolioJointRepair)
+    }
+
     /**
      * Resolve common options once for the captured route. Omitted native limits use their parameter
      * types' defaults. The finite factory supplies optional application hooks and policy defaults.
@@ -398,9 +410,28 @@ fun SourceSetup.execute(
 ): SourceExecutionResult {
     val kind = validateSourceExecution(request)
     if (request.prepareOnly && kind == SourceExecutionKind.LINEAR) return prepareSourceExecution(request)
+    val validation = request.invocation.source.takeIf {
+        kind != SourceExecutionKind.FINITE && it.witnessValidators.isNotEmpty()
+    }?.let {
+        SourceWitnessPublication(it, request.invocation.cancellation or request.theory.cancellation or
+            request.theory.timeout or request.polynomial.cancellation or request.polynomial.timeout or
+            (request.transcendental?.cancellation ?: Cancellation.Never) or
+            (request.transcendental?.timeout ?: Cancellation.Never) or
+            (request.nonlinearInteger?.polynomial?.cancellation ?: Cancellation.Never) or
+            (request.nonlinearInteger?.polynomial?.timeout ?: Cancellation.Never))
+    }
+    val executionRequest = validation?.let { request.withValidationCancellation(it.stop) } ?: request
+    fun executeValidated(
+        bound: SourceExecutionRequest,
+        observed: SourceExecutionCallbacks,
+        bindScope: ((Cancellation, Boolean) -> Unit)?,
+    ): SourceExecutionResult {
+        val result = executeCapturedSource(bound, validation?.callbacks(observed) ?: observed, bindScope)
+        return validation?.qualify(result) ?: result
+    }
     val result = if (request.invocation.linearSource != null) {
-        executeLinearSource(request, callbacks, ::executeCapturedSource)
-    } else executeCapturedSource(request, callbacks)
+        executeLinearSource(executionRequest, callbacks, ::executeValidated)
+    } else executeValidated(executionRequest, callbacks, null)
     if (kind != SourceExecutionKind.FINITE) {
         val observed = result.preparationStats ?: when (result) {
             is SourceExecutionResult.Linear -> when (val execution = result.result) {
