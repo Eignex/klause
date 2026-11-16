@@ -33,6 +33,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     private data class Frame(val expression: SExpr, val combine: Boolean)
 
     private val output = ArrayList<SExpr>()
+    private val sortScope = SmtLibScope(cancellation)
     private val axioms = ArrayList<SExpr>()
     private val symbols = LinkedHashMap<String, Term>()
     private val nodes = HashMap<Node, Term>()
@@ -61,6 +62,10 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
             step()
             val command = expression as SExpr.SList
             when (command.polynomialHead()) {
+                "declare-sort", "define-sort" -> {
+                    sortScope.command(command)
+                    append(expression)
+                }
                 "declare-const", "declare-fun" -> declare(command)
                 "assert", "minimize", "maximize" ->
                     output += form(command.items[0], rewrite(command.items[1]).expression)
@@ -109,7 +114,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         val args = if (command.polynomialHead() == "declare-fun") (command.items[2] as SExpr.SList).items
             else emptyList()
         if (args.isNotEmpty()) smtUnsupported("array reduction requires eliminated ground function applications")
-        val sort = parseSort(command.items.last(), cancellation)
+        val sort = sortScope.sourceSort(command.items.last())
         val term = atom((command.items[1] as SExpr.Atom).text, sort)
         symbols[name] = term
         if (sort is SmtSort.Array) {
@@ -127,7 +132,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
             when (val expression = frame.expression) {
                 is SExpr.Atom -> values.addLast(if (arrayLexicalLiteral(expression.text)) literal(expression)
                     else symbols[polynomialSymbol(expression.text)] ?: literal(expression))
-                is SExpr.SList -> if (expression.polynomialHead() == "_") {
+                is SExpr.SList -> if ((expression.items.firstOrNull() as? SExpr.Atom)?.text == "_") {
                     val normalized = arrayBuiltinIdentifier(expression) as SExpr.SList
                     val sort = smtIndexedBitVectorSort(normalized, emptyList())
                         ?: smtUnsupported("invalid indexed bitvector literal")
@@ -368,35 +373,6 @@ private data class SmtArrayOperationCheck(val result: String, val operator: Stri
     }
 }
 
-private fun parseSort(expression: SExpr, cancellation: ExecutionControl): SmtSort {
-    val work = ArrayDeque<Pair<SExpr, Boolean>>()
-    val sorts = ArrayDeque<SmtSort>()
-    work.addLast(expression to false)
-    while (work.isNotEmpty()) {
-        cancellation.polynomialSourceCheckpoint(1)
-        val (node, combine) = work.removeLast()
-        when (node) {
-            is SExpr.Atom -> sorts.addLast(when (node.text) {
-                "Bool" -> SmtSort.Bool
-                "Int" -> SmtSort.Int
-                "Real" -> SmtSort.Real
-                else -> SmtSort.Uninterpreted(node.text)
-            })
-            is SExpr.SList -> if (node.polynomialHead() == "_") {
-                sorts.addLast(SmtSort.BitVector(node.polynomialAtom(2).toInt()))
-            } else if (combine) {
-                val arguments = List(node.items.size - 1) { sorts.removeLast() }.reversed()
-                sorts.addLast(if (node.polynomialHead() == "Array") SmtSort.Array(arguments[0], arguments[1])
-                    else SmtSort.Uninterpreted(node.polynomialHead(), arguments))
-            } else {
-                work.addLast(node to true)
-                for (argument in node.items.drop(1).asReversed()) work.addLast(argument to false)
-            }
-        }
-    }
-    return sorts.single()
-}
-
 private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
     smtBitVectorBuiltinSort(head, args)?.let { return it }
     val name = (head as? SExpr.Atom)?.text
@@ -421,7 +397,8 @@ private fun arrayLexicalLiteral(text: String): Boolean {
 
 private fun arrayBuiltinIdentifier(head: SExpr): SExpr = when (head) {
     is SExpr.Atom -> SExpr.Atom(polynomialSymbol(head.text))
-    is SExpr.SList -> if (head.polynomialHead() == "as") arrayBuiltinIdentifier(head.items[1])
+    is SExpr.SList -> if ((head.items.firstOrNull() as? SExpr.Atom)?.text == "as")
+        arrayBuiltinIdentifier(head.items[1])
         else SExpr.SList(head.items.mapIndexed { index, part ->
             if (index <= 1 && part is SExpr.Atom) SExpr.Atom(polynomialSymbol(part.text)) else part
         })
