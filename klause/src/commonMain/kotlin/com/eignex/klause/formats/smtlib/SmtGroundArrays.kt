@@ -269,8 +269,9 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     }
 
     private fun capture(term: Term): Term {
-        if (term.sort is SmtSort.Array || term.expression is SExpr.Atom &&
-            !arrayLexicalLiteral(term.expression.text) && polynomialSymbol(term.expression.text) in symbols) return term
+        if (term.sort is SmtSort.Array) return term
+        val atom = term.expression as? SExpr.Atom
+        if (atom != null && !arrayLexicalLiteral(atom.text) && polynomialSymbol(atom.text) in symbols) return term
         return captures.getOrPut(term.id) {
             fresh(term.sort).also { axioms += assertion(form("=", it.expression, term.expression)) }
         }
@@ -412,8 +413,11 @@ private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
     }
 }
 
-private fun arrayLexicalLiteral(text: String): Boolean = text in setOf("true", "false") ||
-    text.isNotEmpty() && text[0] in '0'..'9' || text.startsWith('#')
+private fun arrayLexicalLiteral(text: String): Boolean {
+    if (text in setOf("true", "false")) return true
+    if (text.startsWith('#')) return true
+    return text.isNotEmpty() && text[0] in '0'..'9'
+}
 
 private fun arrayBuiltinIdentifier(head: SExpr): SExpr = when (head) {
     is SExpr.Atom -> SExpr.Atom(polynomialSymbol(head.text))

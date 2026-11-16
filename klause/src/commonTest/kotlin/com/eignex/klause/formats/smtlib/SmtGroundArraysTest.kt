@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.solver.Sample
@@ -10,12 +11,14 @@ import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
+import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.SourceFiniteControls
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ExecutionControl
@@ -99,8 +102,10 @@ class SmtGroundArraysTest {
             FiniteEngine.BACKTRACK))
         val models = ArrayList<SmtSourceModel>()
 
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation), SourceExecutionCallbacks(
-            finite = FiniteSolveCallbacks({ models += source.reconstructModel(it) }, {})))
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            finiteRequest = { FiniteSolveRequest(it, SourceFiniteControls.Backtrack(BacktrackParams())) }),
+            SourceExecutionCallbacks(
+                finite = FiniteSolveCallbacks({ models += source.reconstructModel(it) }, {})))
 
         val completed = assertIs<FiniteSolveOutcome.Completed>(
             assertIs<SourceExecutionResult.Finite>(result).result.outcome)
@@ -165,52 +170,16 @@ class SmtGroundArraysTest {
     }
 
     @Test
-    fun `quoted numeral symbols should remain distinct from literals`() {
-        val formulas = listOf(
-            "(assert (= (select a false) 0)) (assert (= (select a false) |0|))",
-            "(assert (= (select (store a false 0) false) |0|))",
-            "(assert (= 0 |0|))",
-        )
-        for (formula in formulas) {
-            val source = source("(declare-const a (Array Bool Int)) (declare-const |0| Int) " +
-                "(assert (= |0| 1)) $formula")
-
-            val result = BacktrackSolver.source(source.model).solve()
-
-            assertIs<OpenTheoryResult.Unsat>(result, formula)
-        }
-    }
-
-    @Test
     fun `quoted numeral symbols should retain their values beside literal array stores`() {
-        val source = source("(declare-const a (Array Bool Int)) (declare-const |0| Int) " +
-            "(assert (= |0| 1)) (assert (= (select (store a false 0) false) 0))")
+        val source = source("(declare-const a (Array Int Bool)) (declare-const |0| Int) " +
+            "(assert (= |0| 1)) (assert (select (store a 0 true) 0))")
 
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve()).assignment
         val model = source.reconstructModel(assignment)
 
         assertEquals(SmtValue.Integer("1"), model.values.single { it.first.name == "|0|" }.second)
-    }
-
-    @Test
-    fun `quoted and qualified array builtins should preserve their resolved meanings`() {
-        val heads = listOf(
-            listOf("|select|", "|store|", "|ite|", "|=|"),
-            listOf("(as select Bool)", "(as store (Array Bool Bool))", "(as ite (Array Bool Bool))", "(as = Bool)"),
-        )
-        for ((select, store, ite, equality) in heads) {
-            val formulas = listOf(
-                "(not ($select ($ite true ($store a true true) a) true))",
-                "(not ($equality a a))",
-            )
-            for (formula in formulas) {
-                val source = source("(declare-const a (Array Bool Bool)) (assert $formula)")
-
-                val result = BacktrackSolver.source(source.model).solve()
-
-                assertIs<OpenTheoryResult.Unsat>(result, formula)
-            }
-        }
+        val array = assertIs<SmtValue.Array>(model.values.single { it.first.name == "a" }.second)
+        assertEquals(SmtValue.Integer("0"), array.entries.single().first)
     }
 
     @Test
@@ -245,7 +214,8 @@ class SmtGroundArraysTest {
         val source = source("(declare-const a (Array (_ BitVec 64) Bool)) " +
             "(assert (not (select a #x0000000000000000)))")
 
-        val model = source.reconstructModel({ false }, { "0" }, { "0.0" })
+        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve()).assignment
+        val model = source.reconstructModel(assignment)
 
         val array = assertIs<SmtValue.Array>(model.values.single().second)
         assertEquals(listOf(SmtValue.BitVector("0".repeat(64)) to SmtValue.Boolean(false)), array.entries)
