@@ -202,17 +202,16 @@ internal class SmtFixedModel(
             when (val frame = work.removeLast()) {
                 is FixedFrame.Evaluate -> when (val expression = frame.expression) {
                     is SExpr.Atom -> {
+                        val literal = literalValue(expression.text)
+                        if (literal != null) {
+                            stack += literal
+                            continue
+                        }
                         val name = symbol(expression.text)
                         val local = frame.locals[name]
                         when {
                             local != null -> stack += local
                             name in definitions -> apply(expression, emptyList())
-                            name == "true" -> stack += SmtValue.Boolean(true)
-                            name == "false" -> stack += SmtValue.Boolean(false)
-                            expression.text.matches(INTEGER) -> stack += SmtValue.Integer(expression.text)
-                            expression.text.matches(DECIMAL) -> stack += real(exactLiteral(expression.text))
-                            expression.text.startsWith("#b") -> stack += SmtValue.BitVector(expression.text.drop(2))
-                            expression.text.startsWith("#x") -> stack += hex(expression.text.drop(2))
                             name in constructors -> stack += constructorValue(name, emptyList(), null)
                             name in declaredNames -> stack += function(name, emptyList(), null)
                             name == "pi" -> stack += real(arithmetic.pi())
@@ -522,7 +521,8 @@ internal class SmtFixedModel(
         val selected = expression.items[1]
         val sort = sourceScope.sourceSort(expression.items[2])
         if (selected is SExpr.SList) return indexed(selected, emptyList())
-        val name = symbol((selected as SExpr.Atom).text)
+        literalValue((selected as SExpr.Atom).text)?.let { return it }
+        val name = symbol(selected.text)
         if (name.startsWith('@')) return SmtValue.Uninterpreted(sort, selected.text)
         if (name in constructors) return constructorValue(name, emptyList(), sort)
         return function(name, emptyList(), sort)
@@ -591,6 +591,13 @@ internal class SmtFixedModel(
     }
     private fun exactLiteral(text: String): ExactRealValue = smtRationalValue(text, control)
         ?: unavailable("invalid exact real literal")
+    private fun literalValue(text: String): SmtValue? = when (sourceScope.literalSort(text)) {
+        SmtSort.Bool -> SmtValue.Boolean(symbol(text) == "true")
+        SmtSort.Int -> SmtValue.Integer(text)
+        SmtSort.Real -> real(exactLiteral(text))
+        is SmtSort.BitVector -> if (text.startsWith("#b")) SmtValue.BitVector(text.drop(2)) else hex(text.drop(2))
+        else -> null
+    }
     private fun real(value: ExactRealValue): SmtValue.Real = SmtValue.Real(smtSymbolicTerm(value, control)).also {
         authorities[it] = value
     }
@@ -692,10 +699,6 @@ internal class SmtFixedModel(
         queryWork += units
         if (queryWork > 100_000) unavailable("model evaluation resource limit")
         retained.checkpoint(units)
-    }
-    private companion object {
-        val INTEGER = Regex("0|[1-9][0-9]*")
-        val DECIMAL = Regex("(0|[1-9][0-9]*)\\.[0-9]+")
     }
 }
 

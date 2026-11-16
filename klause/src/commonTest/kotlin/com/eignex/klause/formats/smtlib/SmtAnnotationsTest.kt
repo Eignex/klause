@@ -56,6 +56,27 @@ class SmtAnnotationsTest {
     }
 
     @Test
+    fun `numeric symbol binders cannot capture literal tokens in named terms`() {
+        val commands = SExprReader("(assert (let ((|1| 9)) (= (! 1 :named one) 1)))").readAll()
+
+        val result = captureSmtSource(commands, ExecutionControl.Never)
+
+        assertEquals("(define-fun one () Int 1)", result.commands.first().smtText())
+    }
+
+    @Test
+    fun `qualified names and sort syntax cannot capture term binders`() {
+        val commands = SExprReader("""
+            (declare-const x Int)
+            (assert (let ((Int 9) (|as| 8) (x 7)) (= (! (as x Int) :named label) x)))
+        """.trimIndent()).readAll()
+
+        val result = captureSmtSource(commands, ExecutionControl.Never)
+
+        assertEquals("(define-fun label () Int (as x Int))", result.commands[1].smtText())
+    }
+
+    @Test
     fun `named terms can contain their own closed let bindings`() {
         val commands = SExprReader("(assert (= (! (let ((x 1)) x) :named one) one))").readAll()
 

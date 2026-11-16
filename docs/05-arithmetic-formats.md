@@ -274,6 +274,8 @@ nullary definitions in postorder, while other metadata leaves the term unchanged
 Explicit binding entry and exit frames share counted lexical names, keeping live
 scope storage linear in nested bindings; annotation and closedness walks charge
 the same execution control.
+Literal tokens are classified before canonical term-name lookup. Qualified
+function names, sorts and indexes do not capture surrounding term binders.
 `define-const` abbreviates a nullary `define-fun`. Named definitions share the
 declaration lifetime, including names introduced by assumptions and value queries.
 

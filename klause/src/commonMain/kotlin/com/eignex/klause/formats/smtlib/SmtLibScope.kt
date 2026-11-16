@@ -354,7 +354,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                 is Frame.Evaluate -> when (val node = frame.expression) {
                     is SExpr.Atom -> {
                         val name = polynomialSymbol(node.text)
-                        val result = literal(node.text)?.let {
+                        val result = literalSort(node.text)?.let {
                             term("literal:${if (it == SmtSort.Bool) name else node.text}", emptyList(), it)
                         }
                             ?: frame.locals?.get(name) ?: globals[name]?.takeIf { it.parameters.isEmpty() }
@@ -405,7 +405,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                                 instantiateSmtRank(it.parameters, it.result, globalSortParameters, emptyList(),
                                     sourceSort(node.items[2]), cancellation)?.second
                             }
-                                ?: literal(name)?.takeIf { name in setOf("true", "false") }
+                                ?: literalSort(name)?.takeIf { name in setOf("true", "false") }
                                 ?: datatypes.resolve(name, emptyList(), sourceSort(node.items[2]))?.result
                                 ?: if (name == "pi") SmtSort.Real else return null
                             if (result != sourceSort(node.items[2])) return null
@@ -521,7 +521,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
         return values.single()
     }
 
-    private fun literal(text: String): SmtSort? {
+    internal fun literalSort(text: String): SmtSort? {
         if (polynomialSymbol(text) in setOf("true", "false")) return SmtSort.Bool
         smtBitVectorLiteralSort(text)?.let { return it }
         if (text.isNotEmpty() && text.all { it in '0'..'9' }) return SmtSort.Int

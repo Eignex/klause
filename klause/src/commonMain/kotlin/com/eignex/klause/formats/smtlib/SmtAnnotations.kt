@@ -53,7 +53,7 @@ internal fun normalizeSmtSourceCommands(
                             if (value != null) index++
                             if (keyword == ":named") {
                                 val label = value as? SExpr.Atom ?: smtUnsupported(":named requires a symbol")
-                                if (freeAnnotationSymbols(body, scope.datatypes.operatorNames, cancellation)
+                                if (freeAnnotationSymbols(body, scope, cancellation)
                                         .any { it in bound }) {
                                     smtUnsupported(":named requires a closed term")
                                 }
@@ -134,10 +134,11 @@ private fun annotationBindingNames(expression: SExpr?): Set<String> =
 
 private fun freeAnnotationSymbols(
     root: SExpr,
-    constructors: Set<String>,
+    scope: SmtLibScope,
     cancellation: ExecutionControl,
 ): Set<String> {
     val symbols = HashSet<String>()
+    val constructors = scope.datatypes.operatorNames
     val bound = AnnotationBindings(cancellation)
     val work = ArrayDeque<AnnotationWork>()
     work += AnnotationFrame(root, false)
@@ -155,9 +156,12 @@ private fun freeAnnotationSymbols(
         }
         val node = frame.node
         when (node) {
-            is SExpr.Atom -> smtSessionSymbol(node.text).takeUnless { it in bound }?.let(symbols::add)
+            is SExpr.Atom -> if (scope.literalSort(node.text) == null) {
+                smtSessionSymbol(node.text).takeUnless { it in bound }?.let(symbols::add)
+            }
             is SExpr.SList -> {
-                if ((node.items.firstOrNull() as? SExpr.Atom)?.text == "let" && node.items.size == 3) {
+                val head = (node.items.firstOrNull() as? SExpr.Atom)?.text
+                if (head == "let" && node.items.size == 3) {
                     val bindings = (node.items[1] as? SExpr.SList)?.items.orEmpty().mapNotNull { it as? SExpr.SList }
                     val names = bindings.mapNotNull {
                         (it.items.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol)
@@ -166,7 +170,7 @@ private fun freeAnnotationSymbols(
                     for (binding in bindings.asReversed()) {
                         binding.items.getOrNull(1)?.let { work += AnnotationFrame(it, false) }
                     }
-                } else if ((node.items.firstOrNull() as? SExpr.Atom)?.text == "match" && node.items.size == 3) {
+                } else if (head == "match" && node.items.size == 3) {
                     for (case in (node.items[2] as? SExpr.SList)?.items.orEmpty().asReversed()) {
                         val pair = case as? SExpr.SList ?: continue
                         if (pair.items.size == 2) {
@@ -175,6 +179,10 @@ private fun freeAnnotationSymbols(
                         }
                     }
                     work += AnnotationFrame(node.items[1], false)
+                } else if (head == "!") {
+                    node.items.getOrNull(1)?.let { work += AnnotationFrame(it, false) }
+                } else if (head == "as" || head == "_") {
+                    continue
                 } else node.items.asReversed().forEach { work += AnnotationFrame(it, false) }
             }
         }

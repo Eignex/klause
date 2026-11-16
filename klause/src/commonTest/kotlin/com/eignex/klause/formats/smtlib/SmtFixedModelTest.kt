@@ -77,6 +77,53 @@ class SmtFixedModelTest {
     }
 
     @Test
+    fun `numeric symbol binders keep numeral literals distinct from quoted identifiers`() {
+        val parsed = SmtLib.parse("")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+        val terms = listOf("(let ((|1| 9)) 1)", "(let ((|1| 9)) |1|)")
+
+        val results = terms.map { model.evaluate(SExprReader(it).readAll().single()) }
+
+        assertEquals(listOf("1", "9"), results)
+    }
+
+    @Test
+    fun `decimal symbol binders keep decimal literals distinct from quoted identifiers`() {
+        val parsed = SmtLib.parse("")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+        val terms = listOf("(let ((|1.0| 9.0)) 1.0)", "(let ((|1.0| 9.0)) |1.0|)")
+
+        val results = terms.map { model.evaluate(SExprReader(it).readAll().single()) }
+
+        assertEquals(listOf("1.0", "9.0"), results)
+    }
+
+    @Test
+    fun `bitvector symbol binders keep binary literals distinct from quoted identifiers`() {
+        val parsed = SmtLib.parse("")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+        val terms = listOf("(let ((|#b1| #b0)) #b1)", "(let ((|#b1| #b0)) |#b1|)")
+
+        val results = terms.map { model.evaluate(SExprReader(it).readAll().single()) }
+
+        assertEquals(listOf("#b1", "#b0"), results)
+    }
+
+    @Test
+    fun `Boolean constants retain quoted and qualified builtin identity`() {
+        val parsed = SmtLib.parse("")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+        val terms = listOf("true", "|true|", "(as |true| Bool)")
+
+        val results = terms.map { model.evaluate(SExprReader(it).readAll().single()) }
+
+        assertEquals(listOf("true", "true", "true"), results)
+        assertFailsWith<UnsupportedSmtException> {
+            model.evaluate(SExprReader("(let ((|true| false)) true)").readAll().single())
+        }
+    }
+
+    @Test
     fun `qualified helper calls retain quoted grammar-word identities`() {
         val parsed = SmtLib.parse("(define-fun |let| ((x Int)) Int (+ x 1))")
         val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
