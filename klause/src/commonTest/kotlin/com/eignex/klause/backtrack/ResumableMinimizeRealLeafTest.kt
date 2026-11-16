@@ -654,7 +654,7 @@ class ResumableMinimizeRealLeafTest {
                     offered += it.objectiveValue
                 },
             )
-            assertEquals(TerminationReason.Unsupported, result.reason)
+            assertEquals(TerminationReason.RepresentationDeclined, result.reason)
             assertEquals(listOf(0.5), offered)
             assertEquals(0.5, result.sample.reals.single())
             fixture.assertVisitedLeaves(ownersReleased = false)
@@ -691,6 +691,18 @@ class ResumableMinimizeRealLeafTest {
             assertEquals(1, fixture.opened)
             assertEquals(0, fixture.closed)
         }
+        assertEquals(fixture.opened, fixture.closed)
+    }
+
+    @Test
+    fun `an unresolved real leaf should preserve later decision exhaustion`() {
+        val fixture = UnresolvedRealLeafFixture(true)
+        fixture.acceptProof = { _, _ -> false }
+
+        val result = fixture.solver.minimize(fixture.objective, fixture.params.copy(maxDecisions = 1L))
+
+        assertEquals(TerminationReason.BudgetExhausted, assertIs<MinimizeResult.Unknown>(result).reason)
+        assertEquals(1, fixture.visited)
         assertEquals(fixture.opened, fixture.closed)
     }
 
