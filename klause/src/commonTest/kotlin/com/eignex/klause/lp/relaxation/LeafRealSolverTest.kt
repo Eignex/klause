@@ -33,6 +33,39 @@ import kotlin.test.assertTrue
 
 class LeafRealSolverTest {
     @Test
+    fun `numerical leaves should refute a checked float ray without exact evidence`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.GE, 4L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        val context = LpSolveContext(
+            certificationPolicy = LpCertificationPolicy { _, _ -> false },
+            numericalDeductions = true,
+        )
+        val sample = Sample(booleanArrayOf(), longArrayOf())
+        val objectives = listOf(null, LinearObjective(realCoefficients = doubleArrayOf(1.0)))
+
+        for (objective in objectives) {
+            val fresh = leafRealFeasibility(problem, objective, sample, context = context, toleranceCheck = { true })
+            assertEquals(LpVerdict.INFEASIBLE, fresh.verdict)
+            LeafRealSolver(problem, objective, context = context).use { owner ->
+                assertEquals(LpVerdict.INFEASIBLE, owner.solve(sample, toleranceCheck = { true }).verdict)
+                owner.openSolve(sample, toleranceCheck = { true }).use { cursor ->
+                    var step = cursor.advance(1L)
+                    while (step is LpSolveStep.Paused) step = cursor.advance(1L)
+                    assertEquals(LpVerdict.INFEASIBLE,
+                        assertIs<LpSolveStep.Completed<LeafRealResult>>(step).value.verdict)
+                }
+            }
+        }
+    }
+
+    @Test
     fun `releasing pending completion should permit fresh pins without stale coordinates`() {
         val problem = Problem(
             0, 1, arrayOf(IntDomain(0L, 1L)),
