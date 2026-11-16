@@ -12,8 +12,8 @@ internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: Executi
         val expression = pending.removeLast()
         if (expression is SExpr.SList) {
             val head = (expression.items.firstOrNull() as? SExpr.Atom)?.text
-            needed = head in setOf("declare-sort", "define-sort", "as") || head == "declare-fun" &&
-                (expression.items.getOrNull(2) as? SExpr.SList)?.items?.isNotEmpty() == true
+            needed = head in setOf("declare-sort", "define-sort", "as") || (head == "declare-fun" &&
+                (expression.items.getOrNull(2) as? SExpr.SList)?.items?.isNotEmpty() == true)
             for (item in expression.items) pending.addLast(item)
         }
     }
@@ -346,7 +346,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
 }
 
 private fun lexicalLiteral(text: String): Boolean = text in setOf("true", "false") ||
-    text.isNotEmpty() && text[0] in '0'..'9' || text.startsWith('#')
+    (text.isNotEmpty() && text[0] in '0'..'9') || text.startsWith('#')
 
 private data class FreeSortReconstruction(val sort: SmtSort.Uninterpreted, val name: String) : SmtReconstruction {
     override fun reconstruct(values: SmtModelValues): SmtValue =

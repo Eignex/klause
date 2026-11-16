@@ -3,7 +3,8 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
 
-internal class SmtLibScope(private val cancellation: ExecutionControl, private val allowSolverSymbols: Boolean = false) {
+internal class SmtLibScope(private val cancellation: ExecutionControl,
+    private val allowSolverSymbols: Boolean = false) {
     private class Signature(val parameters: List<SmtSort>, val result: SmtSort, val identity: Int)
     private class Locals(val values: Map<String, Int>, val parent: Locals?) {
         fun get(name: String): Int? {
@@ -216,7 +217,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                         val name = polynomialSymbol(node.text)
                         val alias = sortAliases[name]
                         when {
-                            name in localParameters || allowGlobalParameters && name in globalSortParameters ->
+                            name in localParameters || (allowGlobalParameters && name in globalSortParameters) ->
                                 SmtSort.Uninterpreted(name)
                             alias != null && alias.parameters.isEmpty() -> alias.body
                             freeSorts[name] == 0 -> SmtSort.Uninterpreted(freeSortNames.getValue(name))

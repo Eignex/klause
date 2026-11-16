@@ -72,7 +72,7 @@ internal fun instantiateSmtRank(parameters: List<SmtSort>, result: SmtSort, type
             val previous = substitutions[name]
             if (previous == null) substitutions[name] = actual else if (previous != actual) return null
         } else when {
-            expected == actual || expected == SmtSort.Real && actual == SmtSort.Int -> Unit
+            expected == actual || (expected == SmtSort.Real && actual == SmtSort.Int) -> Unit
             expected is SmtSort.Array && actual is SmtSort.Array -> {
                 pending.addLast(expected.index to actual.index)
                 pending.addLast(expected.element to actual.element)

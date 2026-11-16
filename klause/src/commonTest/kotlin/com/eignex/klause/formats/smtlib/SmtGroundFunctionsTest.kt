@@ -2,11 +2,15 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.ProblemSettings
-import com.eignex.klause.ir.TranscendentalProblem
+import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.SourceExecutionRequest
+import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceSetup
+import com.eignex.klause.solver.pipeline.SourceSetupRequest
+import com.eignex.klause.solver.pipeline.TranscendentalTheoryParams
+import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -369,9 +373,11 @@ class SmtGroundFunctionsTest {
 
         for (body in cases) {
             val parsed = SmtLib.parse("(define-sort R () Real) $body")
-            val source = assertIs<TranscendentalProblem>(parsed.source.originalSource)
+            val invocation = SourceSetup.prepare(SourceSetupRequest(parsed.source,
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
 
-            val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+            val completed = SourceSetup.execute(SourceExecutionRequest(invocation, TranscendentalTheoryParams()))
+            val result = assertIs<SourceExecutionResult.Transcendental>(completed).result
 
             assertIs<OpenTheoryResult.Unsat>(result.result, body)
         }
@@ -385,9 +391,11 @@ class SmtGroundFunctionsTest {
             (assert b)
             (assert (ite b true (let ((x (log 0))) true)))
         """.trimIndent())
-        val source = assertIs<TranscendentalProblem>(parsed.source.originalSource)
+        val invocation = SourceSetup.prepare(SourceSetupRequest(parsed.source,
+            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
 
-        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+        val completed = SourceSetup.execute(SourceExecutionRequest(invocation, TranscendentalTheoryParams()))
+        val result = assertIs<SourceExecutionResult.Transcendental>(completed).result
 
         assertIs<OpenTheoryResult.Sat>(result.result)
     }

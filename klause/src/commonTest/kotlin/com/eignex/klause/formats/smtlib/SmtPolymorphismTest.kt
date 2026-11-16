@@ -61,7 +61,8 @@ class SmtPolymorphismTest {
             (declare-const b A)
             (assert (= a b))
         """.trimIndent()).readAll()
-        val reduction = reduceSmtPolymorphism(captureSmtSource(commands, ExecutionControl.Never), ExecutionControl.Never)
+        val reduction = reduceSmtPolymorphism(captureSmtSource(commands, ExecutionControl.Never),
+            ExecutionControl.Never)
         val values = object : SmtModelValues {
             override fun checkpoint(units: Long) = Unit
             override fun boolean(name: String): Boolean = false

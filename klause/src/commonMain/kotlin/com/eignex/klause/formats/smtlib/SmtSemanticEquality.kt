@@ -16,8 +16,6 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.coroutines.cancellation.CancellationException
 
-internal class SmtSourceCheckingUnavailable : RuntimeException("SMT source equality is not certified")
-
 internal fun smtExactArithmetic(cancellation: ExecutionControl): ExactRealArithmetic =
     ExactRealArithmetic(TranscendentalArithmetic(cancellation = cancellation),
         AlgebraicArithmetic(PolynomialArithmetic(cancellation = cancellation)))
@@ -113,7 +111,7 @@ internal fun smtRationalValue(term: String, cancellation: ExecutionControl): Exa
             is SExpr.SList -> {
                 val head = (node.items.firstOrNull() as? SExpr.Atom)?.text ?: return@smtEqualityAttempt null
                 val count = node.items.size - 1
-                if (head != "-" && head != "/" || head == "-" && count != 1 || head == "/" && count != 2) {
+                if ((head != "-" && head != "/") || (head == "-" && count != 1) || (head == "/" && count != 2)) {
                     return@smtEqualityAttempt null
                 }
                 if (combine) {
