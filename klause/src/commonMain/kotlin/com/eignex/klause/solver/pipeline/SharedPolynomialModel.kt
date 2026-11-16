@@ -2,14 +2,11 @@
 
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
-import com.eignex.klause.ir.SourceBoolId
-import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
@@ -23,12 +20,9 @@ import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
-import com.eignex.klause.theory.TheoryEncoding
-import com.eignex.klause.theory.TheoryRealId
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.util.Cancellation
-import com.eignex.util.numbers.BigInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
@@ -135,9 +129,6 @@ internal class SharedPolynomialModel private constructor(
                 ?: return null
             val lowering = PolynomialRealLowering(source.numRealVars)
             val integerIds = LinkedHashMap<Int, Int>()
-            fun integer(id: Int): PolynomialExpression = PolynomialExpression.Variable(
-                SourceRealId(integerIds.getOrPut(id) { lowering.opaqueReal().id.index }),
-            )
             fun real(id: Int): PolynomialExpression = PolynomialExpression.Variable(SourceRealId(id))
             val formulas = ArrayList<PolynomialRealFormula>()
             sourceFormula?.let(formulas::add)
@@ -153,64 +144,20 @@ internal class SharedPolynomialModel private constructor(
                 if (finite) kept += index
                 if (!participating[index]) continue
                 val selected = request.encoders[selectedIndex++]
-                val emitted = ArrayList<PolynomialRealFormula>()
-                val integerMapping = LinkedHashMap<SourceIntId, TheoryRealId>()
-                val realMapping = LinkedHashMap<SourceRealId, TheoryRealId>()
-                val auxiliaries = ArrayList<TheoryRealId>()
-                val encoding = object : TheoryEncoding {
-                    override val target = EncodingTarget.POLYNOMIAL
-                    override val sourceFactorIndex = index
-                    override val cancellation = installationStop
-                    override fun fixedInteger(id: SourceIntId): BigInt? = null
-                    override fun fixedBoolean(id: SourceBoolId): Boolean? = null
-                    override fun linear(form: LinearForm): Unit = error("polynomial target requires a formula")
-                    private fun coordinates(): Set<Int> =
-                        (integerMapping.values + realMapping.values + auxiliaries).map { it.index }.toSet()
-                    override fun polynomial(formula: PolynomialRealFormula) {
-                        validatePolynomialEncodingCoordinates(formula, null, coordinates(), factor.boolVars.toSet(),
-                            cancellation)
-                        emitted += formula
-                    }
-                    override fun integer(id: SourceIntId): PolynomialExpression {
-                        require(id.index in factor.intVars)
-                        return integer(id.index).also {
-                            integerMapping[id] = TheoryRealId(integerIds.getValue(id.index))
-                        }
-                    }
-                    override fun real(id: SourceRealId): PolynomialExpression {
-                        require(id.index in factor.variables.reals)
-                        realMapping[id] = TheoryRealId(id.index)
-                        return real(id.index)
-                    }
-                    override fun conditional(
-                        condition: PolynomialRealFormula,
-                        whenTrue: PolynomialExpression,
-                        whenFalse: PolynomialExpression,
-                    ): PolynomialExpression {
-                        val coordinates = coordinates()
-                        val booleans = factor.boolVars.toSet()
-                        validatePolynomialEncodingCoordinates(condition, null, coordinates, booleans, cancellation)
-                        validatePolynomialEncodingCoordinates(null, whenTrue, coordinates, booleans, cancellation)
-                        validatePolynomialEncodingCoordinates(null, whenFalse, coordinates, booleans, cancellation)
-                        val before = lowering.realCount
-                        return lowering.conditional(condition, whenTrue, whenFalse).also {
-                            for (id in before until lowering.realCount) auxiliaries += TheoryRealId(id)
-                        }
-                    }
-                }
+                val encoding = PolynomialEncodingContext(index, factor, lowering, installationStop,
+                    integerCoordinate = { integerIds.getOrPut(it) { lowering.opaqueReal().id.index } },
+                    realCoordinate = { it })
                 val decline = try {
                     selected.install(factor, encoding)
                 } catch (_: PolynomialSourceInterrupted) {
                     EncoderDecline.RESOURCE
                 }
-                if (decline != null || emitted.isEmpty()) {
+                if (decline != null || encoding.formulas.isEmpty()) {
                     onDecline(decline ?: EncoderDecline.UNSUPPORTED)
                     return null
                 }
-                formulas += emitted
-                attributions += EncodingAttribution(index, factor.boolVars.map(::SourceBoolId),
-                    factor.intVars.map(::SourceIntId), factor.variables.reals.map(::SourceRealId),
-                    integerMapping, realMapping, auxiliaries)
+                formulas += encoding.formulas
+                attributions += encoding.attribution()
             }
             for (id in 0 until source.numRealVars) {
                 val lower = source.realLower[id]
