@@ -37,10 +37,10 @@ MPS defaults to `SourceTolerance(absolute=1/10000000)`: an absolute slack with n
 relative component. Each component can be replaced independently. Zero in both requires
 exact checks and certificates, including exact finite LP certification; a positive
 component makes finite LP deductions numerical. MPS also declares
-`OptimalityTolerance(absolute=1/10000000, relative=1/10000)`: a relative gap of
-`1e-4`, the customary MIP gap, with the feasibility slack as its absolute floor,
-since an accepted point is uncertain by that slack already. `--exact` sets both
-tolerances to zero.
+`OptimalityTolerance(absolute=1/10000000, relative=1/10000)`. Its absolute floor
+is a separate constant equal to the default absolute slack, the amount by which an
+accepted point is already uncertain; replacing the feasibility slack does not move
+it. An exact feasibility tolerance, including `--exact`, makes the gap zero.
 The CLI captures one
 [linear source snapshot](#source-correspondence) and registers it with the common
 invocation, which owns preparation, validation and result qualification. Slack and
@@ -91,12 +91,17 @@ float witness is kept. This changes no search or optimization authority.
 With positive feasibility tolerance, completed native optimization and refutation
 report `OPTIMUM FOUND` and `UNSATISFIABLE` under numerical certification policy.
 They do not require a separate proof over the feasible set enlarged by tolerance.
-The final optimizing point must pass original-source checks, its objective must
-agree with the native optimal value within the optimality gap, and the native
-terminal must cover the unrestricted model. The gap judges only that agreement, so
-two evaluations of one optimum that differ by rounding at a large objective
-magnitude still report the optimum; it never ends search or accepts an unproved
-bound. Interrupted search, rejected terminal witnesses
+The final optimizing point must pass original-source checks and the native
+terminal must cover the unrestricted model. The native optimal point's source
+objective must agree with the native optimal value within the optimality gap,
+scaled by its objective term magnitudes, so two evaluations of one optimum that
+differ by rounding still report the optimum. A different accepted point that
+improves on it must agree with the native value within the feasibility slack; when
+it does not, the result prints `SATISFIABLE` with that point as the incumbent. An
+objective over integer columns alone is evaluated exactly on both sides and must
+agree exactly. The gap never ends search or accepts an unproved bound, and a zero
+gap does not make a float-certified leaf optimum exact: that certificate keeps its
+own fixed float tolerance. Interrupted search, rejected terminal witnesses
 and restricted acceptance filters cannot supply these native completion claims.
 
 `optimizationStatus=tolerance-optimum` identifies numerical optimality. An exact

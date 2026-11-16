@@ -25,5 +25,5 @@ private fun mpsPolicy(policy: SourceSemantics): String {
         "\"optimalityTolerance\":$gap," +
         "\"undeclaredIntegers\":{\"lower\":${integer(integers.lower)},\"upper\":${integer(integers.upper)}}," +
         "\"undeclaredReals\":{\"lower\":${rational(reals.lower)},\"upper\":${rational(reals.upper)}}," +
-        "\"integrality\":\"exact\",\"objective\":\"exact\"}"
+        "\"integrality\":\"exact\",\"objectiveEvaluation\":\"exact\"}"
 }

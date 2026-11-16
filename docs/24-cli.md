@@ -367,10 +367,11 @@ be represented is rejected rather than rounded. Tolerance uses
 [typed source semantics](02-model.md#typed-source-semantics). MPS and FlatZinc declare
 an absolute slack of `1/10000000` and a zero relative component, so the slack does not
 depend on the magnitude of a row; `--source-relative-tolerance` adds a slack that
-grows with it, and setting both components to zero checks exactly. The optimality
-gap `max(absolute, relative * max(abs(v), abs(p)))` decides whether an incumbent value
-`v` agrees with a proved optimum `p`; MPS and FlatZinc declare `1/10000000` absolute
-and `1/10000` relative, and zero in both requires equal values. A nondefault effective
+grows with it, and setting both components to zero checks exactly. The MPS optimality
+gap `max(absolute, relative * scale)` decides whether two evaluations of the native
+optimal point's objective agree, `scale` being its objective term magnitudes; MPS
+declares `1/10000000` absolute and `1/10000` relative, zero in both requires equal
+values, and a zero feasibility tolerance makes the gap zero. A nondefault effective
 interpretation is printed as a protocol comment before results; it adds no proof
 authority. [FlatZinc floats](04-finite-formats.md#flatzinc-floats) define the grid contract.
 

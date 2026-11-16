@@ -122,15 +122,16 @@ data class SourceTolerance(
 }
 
 /**
- * Optimality gap within which two evaluations of an objective agree: an incumbent value `v` and a proved optimum
- * `p` agree when `abs(v - p) <= max(absolute, relative * max(abs(v), abs(p)))`. It decides whether an incumbent is
- * reported as the optimum the solver proved; it bounds no search and makes no unproved bound an optimum. Zero in
- * both components requires equal values.
+ * Optimality gap within which two evaluations of one point's objective agree: a source value `v` and a native
+ * value `p` agree when `abs(v - p) <= max(absolute, relative * scale)`, where `scale` is the sum of the absolute
+ * objective term activities at that point, constant excluded. It decides whether a point is reported as the optimum
+ * the solver proved there; it bounds no search, makes no unproved bound an optimum and makes no other point optimal.
+ * Zero in both components requires equal values, and a zero feasibility tolerance makes the effective gap zero.
  */
 data class OptimalityTolerance(
     /** Minimum permitted objective difference in source units. */
     val absolute: SemanticRational = SemanticRational.ZERO,
-    /** Permitted objective difference relative to the larger objective magnitude. */
+    /** Permitted objective difference relative to the objective term magnitudes at the point. */
     val relative: SemanticRational = SemanticRational.ZERO,
 ) {
     init {
@@ -148,8 +149,8 @@ internal val numericalSourceTolerance: SourceTolerance = SourceTolerance(
     absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000L)),
 )
 
-// Optimality gap of the same formats: the customary relative MIP gap. Its absolute floor is the feasibility slack,
-// the amount by which an accepted point's rows, and so a small objective, are already uncertain.
+// Optimality gap of the same formats. Its absolute floor is a separate constant equal to the default absolute
+// feasibility slack, the amount by which an accepted point's rows, and so a small objective, are already uncertain.
 internal val numericalOptimalityTolerance: OptimalityTolerance = OptimalityTolerance(
     absolute = numericalSourceTolerance.absolute,
     relative = SemanticRational.of(BIG_ONE, bigIntOf(10_000L)),
@@ -214,9 +215,21 @@ data class SourceSemantics(
                 } ?: undeclaredReals,
                 feasibilityTolerance = overrides.feasibilityTolerance ?: feasibilityTolerance,
                 pinAbsentOptionalValues = overrides.pinAbsentOptionalValues ?: pinAbsentOptionalValues,
-                optimalityTolerance = overrides.optimalityTolerance ?: optimalityTolerance,
+                optimalityTolerance = effectiveOptimality(overrides),
             ),
         )
+    }
+
+    // Exact feasibility certifies exactly, so its objective values must agree exactly too: the declared gap becomes
+    // zero, and a caller's positive gap beside exact feasibility is a contradiction.
+    private fun effectiveOptimality(overrides: SemanticOverrides): OptimalityTolerance? {
+        val feasibility = overrides.feasibilityTolerance ?: feasibilityTolerance
+        val gap = overrides.optimalityTolerance ?: optimalityTolerance ?: return null
+        if (feasibility != null && !feasibility.isExact) return gap
+        require(overrides.optimalityTolerance?.isExact != false) {
+            "a positive optimality tolerance requires a positive feasibility tolerance"
+        }
+        return OptimalityTolerance()
     }
 }
 
