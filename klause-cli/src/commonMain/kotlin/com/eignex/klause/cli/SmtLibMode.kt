@@ -33,9 +33,8 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeSource
 
 /**
- * SMT-LIB 2 front-end (`.smt2` / `.smt`; linear arithmetic and polynomial reals). Emits the SMT-LIB convention: a
- * `sat` / `unsat` / `unknown` status line, followed (when sat) by a `(get-model)`-style
- * `(define-fun …)` block. `-s` statistics are emitted as `;` comment lines.
+ * SMT-LIB command sessions (`.smt2` / `.smt`). Models require an explicit query;
+ * solver statistics and objective observations use SMT-LIB comments.
  */
 internal object SmtLibMode : CliMode {
     override val names = listOf("smtlib", "smt", "smt2")
@@ -61,11 +60,12 @@ internal object SmtLibMode : CliMode {
                         val started = nowMillis()
                         val solvable = loadSource({ StringCharSource(snapshot) }, path, common)
                         common.loadElapsedMs = nowMillis() - started
-                        val captured = SmtSessionOutput({ latestInterpretation }, session::comment,
+                        val observations = ArrayList<String>()
+                        val captured = SmtSessionOutput({ latestInterpretation }, observations::add,
                             { latestSourceObjective })
                         SolveCore.solve(solvable, common,
-                            captured.sourceQualified(common.sourceSemantics, ";", session::comment))
-                        captured.result()
+                            captured.sourceQualified(common.sourceSemantics, ";", observations::add))
+                        captured.result().copy(observations = observations)
                     }, cancellation = stop) },
                     respond = ::println,
                     cancellation = stop,

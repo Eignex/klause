@@ -11,6 +11,8 @@ interface SmtSessionModel {
     fun evaluate(term: SExpr): String
     /** Abstract domain elements available to later queries on this interpretation. */
     fun abstractValues(): Map<String, SmtSort> = emptyMap()
+    /** Reuse this fixed interpretation with a universally certified recursive source definition. */
+    fun withRecursiveDefinitions(source: List<SExpr>): SmtSessionModel? = null
 }
 
 /** The result of one independent assertion snapshot. */
@@ -21,6 +23,8 @@ data class SmtSessionResult(
     val model: SmtSessionModel? = null,
     /** A solver-defined reason for an inconclusive query. */
     val reasonUnknown: String? = null,
+    /** Solver observations emitted after the status response. */
+    val observations: List<String> = emptyList(),
 ) {
     init { require(status in setOf("sat", "unsat", "unknown")) }
 }
@@ -272,6 +276,7 @@ class SmtLibSession(
         queryDefinitions.clear()
         started = true
         channels.regular(solved.status)
+        solved.observations.forEach(::comment)
     }
 
     private fun getValue(command: SExpr.SList) {

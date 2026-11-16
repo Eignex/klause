@@ -64,7 +64,7 @@ private fun retainSmtSessionModel(
         checkpoint()
         require(check.check(values)) { "SMT retained interpretation failed original-source checking" }
     }
-    val snapshot = object : SmtModelValues {
+    val snapshot = object : SmtModelValues, SmtSortCardinalities {
         override val cancellation: ExecutionControl = control
         override fun checkpoint(units: Long) {
             control.charge(units)
@@ -79,6 +79,8 @@ private fun retainSmtSessionModel(
         override fun real(name: String): String = (value(name) as SmtValue.Real).term
         override fun exactReal(value: SmtValue.Real): ExactRealValue? =
             authorities[value] ?: smtRationalValue(value.term, control)
+        override fun cardinality(sort: SmtSort, cap: Int): Int? =
+            problem.originalSource?.typed?.datatypes?.cardinality(sort, cap, control)
     }
     val source = problem.originalSource?.typed?.commands ?: emptyList()
     SmtFixedModel(source, SmtSourceModel(declarations), snapshot, control)

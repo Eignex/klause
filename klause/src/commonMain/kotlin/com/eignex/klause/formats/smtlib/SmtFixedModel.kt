@@ -30,21 +30,25 @@ internal class SmtFixedModel(
     private val constructors = HashSet<String>()
     private val selectors = HashMap<String, List<Pair<String, Int>>>()
     private val authorities = HashMap<SmtValue.Real, ExactRealValue>()
+    private var queryWork = 0L
     private val arithmetic by lazy { smtExactArithmetic(control) }
-    private val values = object : SmtModelValues by retained {
+    private val values = object : SmtModelValues by retained, SmtSortCardinalities {
         override val cancellation: ExecutionControl get() = control
+        override fun checkpoint(units: Long) = this@SmtFixedModel.checkpoint(units)
         override fun exactReal(value: SmtValue.Real): ExactRealValue? =
             authorities[value] ?: retained.exactReal(value)
         override fun equal(left: SmtValue, right: SmtValue): Boolean? =
             if (numeric(left) && numeric(right)) arithmetic.compare(exact(left), exact(right))?.let { it == 0 }
             else smtValuesEqual(this, left, right)
+        override fun cardinality(sort: SmtSort, cap: Int): Int? =
+            (retained as? SmtSortCardinalities)?.cardinality(sort, cap)
     }
 
     init {
         for (expression in source) {
             val command = expression as? SExpr.SList ?: continue
             when (command.head()) {
-                "define-fun", "define-const" -> {
+                "define-fun", "define-fun-rec", "define-const" -> {
                     val constant = command.head() == "define-const"
                     val parameters = if (constant) emptyList() else
                         (command.items[2] as SExpr.SList).items.map {
@@ -53,13 +57,56 @@ internal class SmtFixedModel(
                     definitions[symbol((command.items[1] as SExpr.Atom).text)] =
                         Definition(parameters, command.items[if (constant) 3 else 4])
                 }
+                "define-funs-rec" -> {
+                    val signatures = (command.items[1] as SExpr.SList).items
+                    val bodies = (command.items[2] as SExpr.SList).items
+                    signatures.forEachIndexed { index, expression ->
+                        val signature = expression as SExpr.SList
+                        val parameters = (signature.items[1] as SExpr.SList).items.map {
+                            symbol(((it as SExpr.SList).items[0] as SExpr.Atom).text)
+                        }
+                        definitions[symbol((signature.items[0] as SExpr.Atom).text)] =
+                            Definition(parameters, bodies[index])
+                    }
+                }
                 "declare-datatype" -> datatype(command.items[2])
                 "declare-datatypes" -> (command.items[2] as SExpr.SList).items.forEach(::datatype)
             }
         }
     }
 
-    override fun render(): String = model.toSmtLib()
+    override fun withRecursiveDefinitions(source: List<SExpr>): SmtSessionModel =
+        SmtFixedModel(source, model, retained, control)
+
+    override fun render(): String {
+        val response = SExprReader(model.toSmtLib()).readAll().single() as SExpr.SList
+        val parameters = source.mapNotNull { expression ->
+            val command = expression as? SExpr.SList
+            if (command?.head() == "declare-sort-parameter") command.items[1] as? SExpr.Atom else null
+        }.map { symbol(it.text) }.toSet()
+        val additions = source.mapNotNull { expression ->
+            val command = expression as? SExpr.SList ?: return@mapNotNull null
+            val definition = when (command.head()) {
+                "define-fun", "define-fun-rec", "define-funs-rec" -> command
+                "define-const" -> SExpr.SList(listOf(SExpr.Atom("define-fun"), command.items[1],
+                    SExpr.SList(emptyList()), command.items[2], command.items[3]))
+                else -> return@mapNotNull null
+            }
+            val pending = ArrayDeque<SExpr>()
+            if (definition.head() == "define-funs-rec") pending += definition.items[1]
+            else {
+                pending += definition.items[2]
+                pending += definition.items[3]
+            }
+            var polymorphic = false
+            while (pending.isNotEmpty()) when (val term = pending.removeLast()) {
+                is SExpr.Atom -> if (symbol(term.text) in parameters) polymorphic = true
+                is SExpr.SList -> pending.addAll(term.items)
+            }
+            definition.takeUnless { polymorphic }
+        }
+        return SExpr.SList(response.items + additions).smtText()
+    }
 
     override fun abstractValues(): Map<String, SmtSort> = buildMap {
         val work = ArrayDeque<SmtValue>()
@@ -80,6 +127,7 @@ internal class SmtFixedModel(
     }
 
     override fun evaluate(term: SExpr): String {
+        queryWork = 0
         val query = prepareSmtSessionQueries(source, listOf(term), control, abstractValues())
         var expanded = query.terms.single()
         for (definition in query.definitions.asReversed()) {
@@ -106,7 +154,7 @@ internal class SmtFixedModel(
         }
         work += FixedFrame.Evaluate(term, emptyMap())
         while (work.isNotEmpty()) {
-            retained.checkpoint()
+            checkpoint()
             when (val frame = work.removeLast()) {
                 is FixedFrame.Evaluate -> when (val expression = frame.expression) {
                     is SExpr.Atom -> {
@@ -291,7 +339,7 @@ internal class SmtFixedModel(
 
     private fun table(table: SmtValue.Function, args: List<SmtValue>): SmtValue {
         for ((arguments, result) in table.entries) {
-            retained.checkpoint()
+            checkpoint()
             var matches = true
             for (index in arguments.indices) {
                 val same = values.equal(arguments[index], args[index])
@@ -341,7 +389,7 @@ internal class SmtFixedModel(
             val bits = CharArray(width)
             val two = BIG_ONE + BIG_ONE
             for (index in 0 until width) {
-                retained.checkpoint()
+                checkpoint()
                 bits[width - index - 1] = if (value.remainderOf(two).isZero()) '0' else '1'
                 value /= two
             }
@@ -367,7 +415,7 @@ internal class SmtFixedModel(
             is SmtValue.Integer -> SmtBitVectorValue.Integer(parseBigInt(value.value))
             else -> unavailable("bitvector operand has the wrong sort")
         } }
-        return when (val value = evaluateSmtBitVector(name, indices, converted, retained::checkpoint)) {
+        return when (val value = evaluateSmtBitVector(name, indices, converted, ::checkpoint)) {
             is SmtBitVectorValue.Bits -> SmtValue.BitVector(value.bits.asReversed().joinToString("") {
                 if (it) "1" else "0"
             })
@@ -410,7 +458,7 @@ internal class SmtFixedModel(
         value.rational?.let { return rationalFloor(it) }
         var terms = 4
         while (true) {
-            retained.checkpoint()
+            checkpoint()
             val interval = arithmetic.enclose(value, terms)
             val low = rationalFloor(interval.lower)
             val high = rationalFloor(interval.upper)
@@ -438,7 +486,7 @@ internal class SmtFixedModel(
             var result = BIG_ONE
             val two = BIG_ONE + BIG_ONE
             while (exponent > BIG_ZERO) {
-                retained.checkpoint()
+                checkpoint()
                 if (!exponent.remainderOf(two).isZero()) result *= base
                 exponent /= two
                 if (exponent > BIG_ZERO) base *= base
@@ -481,6 +529,11 @@ internal class SmtFixedModel(
     private fun SExpr.SList.head(): String = (items.firstOrNull() as? SExpr.Atom)?.text?.let(::symbol).orEmpty()
     private fun list(head: String, vararg args: SExpr): SExpr = SExpr.SList(listOf(SExpr.Atom(head)) + args)
     private fun unavailable(message: String): Nothing = throw UnsupportedSmtException(message)
+    private fun checkpoint(units: Long = 1) {
+        queryWork += units
+        if (queryWork > 100_000) unavailable("model evaluation resource limit")
+        retained.checkpoint(units)
+    }
     private companion object {
         val INTEGER = Regex("0|[1-9][0-9]*")
         val DECIMAL = Regex("(0|[1-9][0-9]*)\\.[0-9]+")
