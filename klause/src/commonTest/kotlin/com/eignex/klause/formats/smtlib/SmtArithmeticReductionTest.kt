@@ -30,6 +30,16 @@ class SmtArithmeticReductionTest {
     }
 
     @Test
+    fun `variable integer division should refute a wrong quotient`() {
+        val input = SmtLib.parse("(declare-const n Int) (declare-const d Int) " +
+            "(assert (= n (- 7))) (assert (= d 3)) (assert (= (div n d) (- 2)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
     fun `zero integer division should preserve evaluated argument congruence`() {
         val input = SmtLib.parse("(declare-const x Int) (declare-const y Int) " +
             "(assert (= x y)) (assert (distinct (div (+ x 1) 0) (div (+ 1 y) 0)))")
@@ -69,6 +79,16 @@ class SmtArithmeticReductionTest {
     }
 
     @Test
+    fun `variable real division should refute an incorrect quotient`() {
+        val input = SmtLib.parse("(declare-const n Real) (declare-const d Real) " +
+            "(assert (= n 1.0)) (assert (= d 2.0)) (assert (= (/ n d) 0.6))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
     fun `nonlinear floor should round negative arguments down`() {
         val input = SmtLib.parse("(declare-const x Real) (assert (= x 1.5)) " +
             "(assert (= (to_int (- (* x x))) (- 3)))")
@@ -88,6 +108,25 @@ class SmtArithmeticReductionTest {
     }
 
     @Test
+    fun `nonlinear floor should refute rounding toward zero`() {
+        val input = SmtLib.parse("(declare-const x Real) (assert (= x 1.5)) " +
+            "(assert (= (to_int (- (* x x))) (- 2)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `nonlinear integrality should accept an integer square`() {
+        val input = SmtLib.parse("(declare-const x Real) (assert (= x 2.0)) (assert (is_int (* x x)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
     fun `indexed divisibility should accept arbitrary width indices`() {
         val input = SmtLib.parse("(declare-const x Int) (assert (= x 18446744073709551618)) " +
             "(assert ((_ divisible 18446744073709551618) x))")
@@ -95,6 +134,15 @@ class SmtArithmeticReductionTest {
         val result = BacktrackSolver.source(input.source).solve()
 
         assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `indexed divisibility should refute a nonmultiple`() {
+        val input = SmtLib.parse("(declare-const x Int) (assert (= x 7)) (assert ((_ divisible 3) x))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
     }
 
     @Test
@@ -115,6 +163,16 @@ class SmtArithmeticReductionTest {
         val result = BacktrackSolver.source(input.source).solve()
 
         assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `symbolic integer powers should refute an incorrect value`() {
+        val input = SmtLib.parse("(declare-const b Int) (declare-const e Int) " +
+            "(assert (= b 2)) (assert (= e 3)) (assert (= (** b e) 9))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
     }
 
     @Test

@@ -10,7 +10,6 @@ import com.eignex.klause.arithmetic.real.RealCertificationUnavailable
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
-import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
@@ -25,6 +24,7 @@ import com.eignex.util.numbers.remainderOf
 import com.eignex.util.numbers.shr
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.unaryMinus
+import kotlin.coroutines.cancellation.CancellationException
 
 internal enum class SmtArithmeticOperation { DIV_MOD, REAL_DIV, FLOOR, POWER }
 
@@ -61,7 +61,7 @@ internal class SmtArithmeticCheck(private val operation: SmtArithmeticOperation,
         var factor = BigFraction.of(base, BIG_ONE)
         var result = BigFraction.ONE
         while (remaining > BIG_ZERO) {
-            values.cancellation.polynomialSourceCheckpoint(1)
+            values.arithmeticCheckpoint()
             if (remaining.remainderOf(BIG_TWO) == BIG_ONE) result = arithmetic.multiply(result, factor)
             remaining = remaining shr 1
             if (remaining > BIG_ZERO) factor = arithmetic.multiply(factor, factor)
@@ -97,7 +97,7 @@ internal class SmtArithmeticCongruenceCheck(private val applications: List<List<
     private val real: Boolean) : SmtSourceCheck {
     override fun check(values: SmtModelValues): Boolean {
         for (first in applications.indices) for (second in first + 1 until applications.size) {
-            values.cancellation.polynomialSourceCheckpoint(1)
+            values.arithmeticCheckpoint()
             val a = applications[first]
             val b = applications[second]
             if (real) {
@@ -114,4 +114,9 @@ internal class SmtArithmeticCongruenceCheck(private val applications: List<List<
         }
         return true
     }
+}
+
+private fun SmtModelValues.arithmeticCheckpoint() {
+    cancellation.charge(1)
+    if (cancellation()) throw CancellationException("SMT arithmetic source checking interrupted")
 }
