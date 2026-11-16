@@ -749,7 +749,7 @@ files; it adds no corpus, solver-result or MiniZinc identity-query cache.
 WBO and haplotyping MaxSAT tails, and the weighted `mprime` incumbent control.
 
 The scoped automatic weighted-core source policy is described in
-[portfolios](../docs/12-portfolio.md#boolean-objective-core-search). Compare the
+[portfolios](../docs/15-portfolio-scheduling.md#boolean-objective-core-search). Compare the
 default run against `param.core-early=false` and `param.core-refinement=none` at
 the same source revision, seeds, resources and containing allowance. That control
 retains delayed, unrefined core search. Keep actual admission/refinement consumption,

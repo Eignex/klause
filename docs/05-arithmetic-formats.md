@@ -134,7 +134,7 @@ See [PreparedLinearSource](../klause/src/commonMain/kotlin/com/eignex/klause/sol
 and [MpsMode](../klause-cli/src/commonMain/kotlin/com/eignex/klause/cli/MpsMode.kt).
 
 Sequential mixed optimization pools over a linear source append bounded numerical
-frontier and joint-repair workers; [portfolios](12-portfolio.md) defines their
+frontier and joint-repair workers; [portfolios](14-portfolio.md) defines their
 admission and proof transport.
 
 ## SMT-LIB source semantics
@@ -148,7 +148,7 @@ arithmetic mechanism.
 
 `SmtLib.parse` returns one `SmtLibProblem` with a `SourceAttachment`, declared name
 maps and the original objective and direction. Callers pass
-`SmtLibProblem.source` to [source setup](19-api.md#source-setup), as the CLI does;
+`SmtLibProblem.source` to [source setup](23-api.md#source-setup), as the CLI does;
 the frontend never classifies a source by the solver it will need. Interruption
 throws `CancellationException` before any source is published.
 
@@ -418,7 +418,7 @@ For up to eight Boolean inputs, a scalar defined by consistent, complete cases a
 supplies a verified affine row beside the source factors.
 
 The exact real component can certify supported difference fragments with a graph;
-see [real graph admission](14-theories.md#real-graph-admission-and-checks).
+see [real graph admission](17-theories.md#real-graph-admission-and-checks).
 
 ### Integer division
 
@@ -470,8 +470,8 @@ integer operands receive exact defining equalities, and bounded fixed powers abo
 one retain `Power`. Scalar multiplication stays linear. Refuted integer premises
 retain an explicit contradiction for shared routing after full source validation;
 they do not trigger nonlinear fallback. Open or overflowing integers keep typed arbitrary-precision
-coordinates for [nonlinear integer execution](16-nonlinear-arithmetic.md), and finite
-mixed products compose through [exact polynomial completion](16-nonlinear-arithmetic.md#shared-model-composition).
+coordinates for [nonlinear integer execution](19-nonlinear-arithmetic.md), and finite
+mixed products compose through [exact polynomial completion](19-nonlinear-arithmetic.md#shared-model-composition).
 A source outside the factor representation keeps an exact expression snapshot with
 its original names; the same attachment carries factor sources and the exact real,
 integer-polynomial and function snapshots.
@@ -495,7 +495,7 @@ negation cannot make an invalid `log` term satisfiable, and domain obligations s
 inside their conditional branch. There is no delta or tolerance mode. Function
 constraints run through traversal, LS, ALNS and portfolios with original-source
 checks; function objectives return UNKNOWN. See the
-[transcendental theory](16-nonlinear-arithmetic.md#transcendental-real-arithmetic).
+[transcendental theory](19-nonlinear-arithmetic.md#transcendental-real-arithmetic).
 
 ### Results and objectives
 

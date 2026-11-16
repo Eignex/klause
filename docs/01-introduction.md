@@ -35,21 +35,21 @@ numeric authority, undeclared ranges and approximation policies. Caller override
 replace applicable defaults before lowering; results retain the effective policy.
 These semantics select no engine.
 
-[Source setup](19-api.md#source-setup) binds the operation, strategy and resources,
+[Source setup](23-api.md#source-setup) binds the operation, strategy and resources,
 then prepares ownership and execution projections. A factor can participate in
 finite propagation, local scoring, relaxation and arithmetic encoding together.
 Only a complete enforcing mechanism owns its relation; a relaxation provides no
 feasibility authority. [Model representation](02-model.md) defines these roles.
 
 Finite propagation owns Boolean and finite integer domains. Arithmetic components
-own real values and open integer state. [Shared search](08-search.md) coordinates
+own real values and open integer state. [Shared search](09-search.md) coordinates
 decisions, retraction and model assembly without inventing finite bounds for open
 coordinates. Frontends parse, lower and render; they never invoke concrete theories.
 
 ## Independently checkable proof files
 
-Klause [certifies LP results](17-linear-programming.md#lp-certification) and checks
-captured [source derivations](13-evidence.md) in memory, but exports no proof of a
+Klause [certifies LP results](21-lp-engine.md#lp-certification) and checks
+captured [source derivations](16-evidence.md) in memory, but exports no proof of a
 whole solve for a separate checker. Engine attestations and checked derivations have
 distinct authority, and no witness supplies a missing refutation or bound derivation.
 
@@ -81,7 +81,7 @@ the numerical mechanisms beneath them.
 | `klause-bench` | Non-published JVM tooling; workflow and evidence live in its [README](../klause-bench/README.md) |
 
 The CLI depends on the library and adds no solving behavior of its own: every
-route it runs is reachable through the [library API](19-api.md).
+route it runs is reachable through the [library API](23-api.md).
 
 ### Package boundaries
 
@@ -124,8 +124,8 @@ Packages below are under `com.eignex.klause` in
 Numerical kernels own arithmetic and private storage, while model-facing adapters
 assemble relations, interpret certificates and preserve source scope. The closed
 dependency lists keep those kernels independently replaceable. See
-[linear programming](17-linear-programming.md) and
-[exact arithmetic](18-exact-arithmetic.md).
+[linear programming](20-linear-programming.md) and
+[exact arithmetic](22-exact-arithmetic.md).
 
 ---
 

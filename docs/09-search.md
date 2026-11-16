@@ -1,10 +1,10 @@
-# 8. Search and propagation
+# 9. Search and propagation
 
 Complete search explores alternatives, restores failed branches and checks leaves.
 Its shared loop establishes a fixpoint, checks or chooses a decision, applies it and
 retracts after conflict. Finite propagation narrows Boolean/integer domains;
 arithmetic components enforce their owned relations. Exhaustion proves a result
-only when every required check completed. [Learning](09-learning.md) reuses the
+only when every required check completed. [Learning](10-learning.md) reuses the
 reasons those mechanisms supply.
 
 ## Boolean task coverage
@@ -85,7 +85,7 @@ same `SearchComponent` lifecycle. Batch `Theory` services participate through
 `TheorySearchComponent`; directly incremental arithmetic components use the lifecycle
 without a batch service. Participation supplies no completeness guarantee:
 indeterminate required checks prevent exhaustion from becoming a source refutation.
-See [theory roles](14-theories.md#extension-roles-and-completeness). The session
+See [theory roles](17-theories.md#extension-roles-and-completeness). The session
 exchanges Boolean literals, semantic integer bounds and opaque theory decisions
 rather than native CP domains.
 
@@ -150,7 +150,7 @@ puts its values first under any value selector until a decision it led conflicts
 a solution is found.
 The search and its preparation wrapper report an unfinished root
 layout as pending private preparation. Construction completion, cancellation and retirement follow the
-[LP ownership contract](17-linear-programming.md#root-preparation).
+[LP ownership contract](20-linear-programming.md#root-preparation).
 Eligible retained LP root coordinates can pass directly to the ordinary finite
 traversal as value preferences. Integer guides with known fractional coordinates
 can first fund a private component-rounding trial; its progress survives a slice
@@ -230,7 +230,7 @@ accounting and stop diagnostics from `SearchContext.executionControls`; see
 [resource allowances](06-sessions.md#component-execution-controls). Components with
 retained root preparation implement `PreparingSearchComponent` and return no verdict
 until it completes; see
-[portfolio preparation](12-portfolio.md#polynomial-root-preparation).
+[portfolio preparation](15-portfolio-scheduling.md#polynomial-root-preparation).
 
 ## Traversal and branching
 
@@ -267,7 +267,7 @@ exhaustion is conditional (see [sessions](06-sessions.md)).
 For an entirely theory-owned integer difference graph, source-proved relative
 interval proposals precede Boolean choices through arithmetic category priority,
 registering exact complementary difference predicates; see
-[difference logic](14-theories.md#difference-logic).
+[difference logic](17-theories.md#difference-logic).
 
 ### Polarity hints
 
@@ -407,17 +407,17 @@ source ray can finish existentially. A checked node bound that excludes improvem
 over the invocation's checked incumbent closes that unexpanded subtree. Its scoped
 derivation remains in the coverage tree; global optimality rechecks the composed
 bound with the original-source witness after every alternative is covered. See
-[linear certification](17-linear-programming.md#refinement-and-strict-inequalities).
+[linear certification](21-lp-engine.md#refinement-and-strict-inequalities).
 
 Complete assignments use typed source-keyed values from each owner, assembled only
 after all required checks finish. Missing or multiply represented coordinates leave
-publication unavailable. [Theory completion](09-learning.md#theory-completion) describes
+publication unavailable. [Theory completion](11-search-policies.md#theory-completion) describes
 how those values are contributed.
 
 ## Finite propagation
 
 The finite-domain fixpoint runs watched propagators until no domain changes or a
-conflict appears. [Explanation lifetime](09-learning.md#explanation-lifetime)
+conflict appears. [Explanation lifetime](10-learning.md#explanation-lifetime)
 defines the reasons retained for its deductions.
 
 A cost-aware worklist retains FIFO order when the oldest factor's measured
@@ -560,7 +560,7 @@ coordinates rather than finite real domains. Source guards and table index atoms
 the graph directly, so a contradictory selection is excluded before all discrete
 columns are fixed. A consistent graph supplies no model; all original factors and
 source checks remain. See
-[real graph admission](14-theories.md#real-graph-admission-and-checks).
+[real graph admission](17-theories.md#real-graph-admission-and-checks).
 
 ### Selected propagation projections
 
@@ -669,7 +669,7 @@ Reachability and full-circuit dominator filtering inspect the remaining arcs.
 General CP optimization builds its private state in retained batches before
 traversal, and assumption installation commits each fixpoint before the next;
 closing releases the cursor without exposing partial state. See
-[private CP preparation](12-portfolio.md#private-cp-preparation).
+[private CP preparation](15-portfolio-scheduling.md#private-cp-preparation).
 
 Cumulative edge-finding runs in both time directions over fixed durations, demands
 and capacity, declining the reversed pass when its arithmetic is not safely
@@ -746,4 +746,4 @@ available to the LP relaxation.
 
 ---
 
-Previous: [7. Presolve and validation](07-presolve.md) · [Contents](README.md) · Next: [9. Learning and theory completion](09-learning.md)
+Previous: [8. Presolve reductions and validation](08-presolve-reductions.md) · [Contents](README.md) · Next: [10. Learning](10-learning.md)
