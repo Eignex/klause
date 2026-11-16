@@ -247,7 +247,7 @@ class SmtLibSession(
         command.size(2)
         val key = command.atom(1)
         if (key == ":all-statistics") {
-            channels.regular("()")
+            channels.regular("unsupported")
             return
         }
         val value = when (key) {
