@@ -62,7 +62,7 @@ internal fun normalizeSmtSourceCommands(
                             if (value != null) index++
                             if (keyword == ":named") {
                                 val label = value as? SExpr.Atom ?: smtUnsupported(":named requires a symbol")
-                                if (freeAnnotationSymbols(body, scope, cancellation)
+                                if (!bound.isEmpty && freeAnnotationSymbols(body, scope, cancellation)
                                         .any { it in bound }) {
                                     smtUnsupported(":named requires a closed term")
                                 }
@@ -120,6 +120,7 @@ private data class AnnotationExit(val bindings: Set<String>) : AnnotationWork
 
 private class AnnotationBindings(private val cancellation: ExecutionControl) {
     private val counts = HashMap<String, Int>()
+    val isEmpty: Boolean get() = counts.isEmpty()
 
     fun enter(names: Set<String>) {
         for (name in names) {
