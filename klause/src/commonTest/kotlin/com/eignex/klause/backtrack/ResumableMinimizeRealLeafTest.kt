@@ -775,7 +775,10 @@ class ResumableMinimizeRealLeafTest {
 
     @Test
     fun `an undecided component should report its native stop without proving exhaustion`() {
-        for (cause in listOf(SearchStopCause.RepresentationDecline, SearchStopCause.OperationAllowance)) {
+        for ((cause, reason) in listOf(
+            SearchStopCause.RepresentationDecline to TerminationReason.RepresentationDeclined,
+            SearchStopCause.OperationAllowance to TerminationReason.BudgetExhausted,
+        )) {
             val events = ArrayList<SearchEvent>()
             val problem = Problem(1, 0, emptyArray(), emptyArray()).bake()
             val params = BacktrackParams(
@@ -793,8 +796,7 @@ class ResumableMinimizeRealLeafTest {
             BacktrackSolver(problem).resumable(LinearObjective(boolWeights = longArrayOf(1L)), params).use { search ->
                 val result = assertIs<MinimizeResult.Unknown>(search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
 
-                assertEquals(if (cause == SearchStopCause.RepresentationDecline) TerminationReason.RepresentationDeclined
-                else TerminationReason.BudgetExhausted, result.reason)
+                assertEquals(reason, result.reason)
                 assertTrue(search.isDone)
                 assertSame(result, search.runSlice(ExecutionControl.Never, 1000L, 256L) {})
                 assertEquals(

@@ -208,7 +208,7 @@ class BooleanSatisfactionRepairTest {
                     Double.POSITIVE_INFINITY, ExecutionControl { true })
                 val cancelled = search.runSlice(ExecutionControl.Never, Long.MAX_VALUE, 5000L)
                 assertNull(cancelled.sample)
-                assertEquals(TerminationReason.BudgetExhausted, cancelled.reason)
+                assertEquals(TerminationReason.Cancelled, cancelled.reason)
 
                 search.begin(Assumptions(bools = mapOf(0 to true, 1 to false)), Long.MAX_VALUE,
                     Double.POSITIVE_INFINITY, ExecutionControl.Never)
