@@ -194,15 +194,24 @@ Reduction passes carry transformed commands, original declarations, named privat
 recipes and original-source checks together. Every pass and fallback charges the
 same cancellation token, so representation changes do not reset an encoding
 budget. Caller endpoint overrides apply only to original scalar declarations;
-private reduction coordinates keep the bounds supplied by their encoding.
+private reduction coordinates keep the bounds supplied by their encoding. Only
+original zero-arity numeric declarations receive caller endpoint overrides;
+numeric function results do not acquire universal bounds from that policy.
 
 `SmtLibProblem.reconstructModel` reads retained scalar coordinates by name and
 composes source-owned recipes into scalar, word, function and constructor values.
 The CLI uses that surface for finite and open assignments and prints only original
-bindings. Composite reductions supply source checks which must accept the
-reconstructed values before rendering; the common pipeline still checks scalar
-arithmetic witnesses against their captured source. Interruption withholds the
-entire reconstructed model.
+bindings; public scalar name maps also exclude private encoding coordinates.
+Composite reductions attach their source checks through the common source witness
+validator, which checks library and CLI candidates before publication and final
+claims. Reconstruction repeats those checks before rendering. The common pipeline
+also checks scalar arithmetic witnesses against their captured source. Check work
+uses the solving invocation's allowance, and interruption withholds the entire
+reconstructed model and its terminal claim.
+Source checks and rendering use the same exact-value formatter, including rational,
+algebraic and symbolic coordinates carried by native assignments or samples.
+Different exact terms can denote the same real; their text does not establish
+mathematical equality or disequality.
 
 ### Linear and conditional lowering
 

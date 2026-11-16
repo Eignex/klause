@@ -529,11 +529,19 @@ internal fun FinitePipeline.solve(
     require(request.engine == FiniteEngine.FIXED || lpSolveContext == request.lpSolveContext) {
         "custom LP dependencies require the fixed finite route"
     }
-    val stop = request.shape.sourceInvocation?.let {
+    val validation = request.shape.sourceInvocation?.source?.takeIf { it.witnessValidators.isNotEmpty() }?.let {
+        SourceWitnessPublication(it, request.cancellation or request.shape.sourceInvocation!!.cancellation)
+    }
+    val publicationCallbacks = if (validation == null) callbacks else FiniteSolveCallbacks(
+        { sample -> if (validation.accept(sample)) callbacks.onSample(sample) },
+        { improvement -> if (validation.accept(improvement.sample)) callbacks.onImprovement(improvement) },
+    )
+    val containingStop = request.shape.sourceInvocation?.let {
         (request.cancellation or it.cancellation).encodingPreparationScope()
     } ?: request.cancellation
+    val stop = validation?.let { containingStop or it.stop } ?: containingStop
     val gridPublication = request.shape.sourceInvocation?.floatGrid?.let {
-        FloatGridPublication(it, stop, request.toleranceCheck, callbacks)
+        FloatGridPublication(it, stop, request.toleranceCheck, publicationCallbacks)
     }
     fun result(
         preparation: FinitePipelinePreparation,
@@ -550,6 +558,7 @@ internal fun FinitePipeline.solve(
                 it.bindCompleteSearchAdmission(completeSearchAdmitted)
                 if (gridPublication == null) it.nativeObjectiveBound = nativeObjectiveBound
             }
+            .let { validation?.qualify(it) ?: it }
     if (request.shape.sourceInvocation != null && stop()) {
         return result(
             FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
@@ -703,13 +712,13 @@ internal fun FinitePipeline.solve(
         FiniteExecutionCallbacks(
             onSample = { sample ->
                 val lifted = preparation.reconstruct(sample)
-                if (gridPublication == null) callbacks.onSample(lifted) else gridPublication.onSample(lifted)
+                if (gridPublication == null) publicationCallbacks.onSample(lifted) else gridPublication.onSample(lifted)
             },
             onImprovement = { improvement ->
                 if (gridPublication != null) {
                     gridPublication.onImprovement(preparation.reconstruct(improvement.sample),
                         improvement.workerLabel, improvement.elapsedMs)
-                } else callbacks.onImprovement(
+                } else publicationCallbacks.onImprovement(
                     FiniteSolveImprovement(
                         preparation.reconstruct(improvement.sample),
                         improvement.workerLabel,

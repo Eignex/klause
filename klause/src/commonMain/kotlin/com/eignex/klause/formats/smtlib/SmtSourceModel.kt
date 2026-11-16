@@ -1,5 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.pipeline.SourceWitnessValidator
 import com.eignex.klause.util.Cancellation
 import kotlin.coroutines.cancellation.CancellationException
 
@@ -12,44 +14,91 @@ sealed interface SmtSort {
     /** Exact mathematical reals. */
     data object Real : SmtSort
     /** Fixed-width words. */
-    data class BitVector(val width: kotlin.Int) : SmtSort {
+    data class BitVector(
+        /** Positive number of bits. */
+        val width: kotlin.Int,
+    ) : SmtSort {
         init { require(width > 0) }
     }
     /** Extensional arrays. */
-    data class Array(val index: SmtSort, val element: SmtSort) : SmtSort
+    data class Array(
+        /** Index sort. */
+        val index: SmtSort,
+        /** Stored value sort. */
+        val element: SmtSort,
+    ) : SmtSort
     /** A named source sort and its sort arguments. */
-    data class Uninterpreted(val name: String, val arguments: List<SmtSort> = emptyList()) : SmtSort
+    data class Uninterpreted(
+        /** Source spelling of the sort constructor. */
+        val name: String,
+        /** Applied sort arguments. */
+        val arguments: List<SmtSort> = emptyList(),
+    ) : SmtSort
 }
 
 /** An original declaration, including functions with nonempty [parameters]. */
-data class SmtSourceDeclaration(val name: String, val parameters: List<SmtSort>, val result: SmtSort)
+data class SmtSourceDeclaration(
+    /** Original source spelling. */
+    val name: String,
+    /** Function argument sorts; empty for constants. */
+    val parameters: List<SmtSort>,
+    /** Constant or function result sort. */
+    val result: SmtSort,
+)
 
 /** A reconstructed value in the source language. Real terms retain certified SMT syntax. */
 sealed interface SmtValue {
     /** A Boolean value. */
-    data class Boolean(val value: kotlin.Boolean) : SmtValue
+    data class Boolean(
+        /** Mathematical truth value. */
+        val value: kotlin.Boolean,
+    ) : SmtValue
     /** An arbitrary-precision integer in decimal notation. */
-    data class Integer(val value: String) : SmtValue
+    data class Integer(
+        /** Exact signed decimal digits. */
+        val value: String,
+    ) : SmtValue
     /** An exact rational, algebraic or symbolic real term in SMT syntax. */
-    data class Real(val term: String) : SmtValue
+    data class Real(
+        /** Certified exact SMT term. */
+        val term: String,
+    ) : SmtValue
     /** Most-significant bit first. */
-    data class BitVector(val bits: String) : SmtValue {
+    data class BitVector(
+        /** Binary digits in most-significant-bit order. */
+        val bits: String,
+    ) : SmtValue {
         init { require(bits.isNotEmpty() && bits.all { it == '0' || it == '1' }) }
     }
     /** A value of a free source sort. */
-    data class Uninterpreted(val sort: SmtSort, val identity: String) : SmtValue
+    data class Uninterpreted(
+        /** Declared free sort. */
+        val sort: SmtSort,
+        /** Abstract model-domain symbol. */
+        val identity: String,
+    ) : SmtValue
     /** A finite function table with its value outside the table. */
     data class Function(
+        /** Function argument sorts. */
         val parameters: List<SmtSort>,
+        /** Argument tuples and their results. */
         val entries: List<Pair<List<SmtValue>, SmtValue>>,
+        /** Result for tuples absent from [entries]. */
         val default: SmtValue,
     ) : SmtValue
     /** A constructor application for a composite source value. */
-    data class Application(val constructor: String, val arguments: List<SmtValue>) : SmtValue
+    data class Application(
+        /** Source constructor symbol. */
+        val constructor: String,
+        /** Constructor field values. */
+        val arguments: List<SmtValue>,
+    ) : SmtValue
 }
 
 /** Named access to retained coordinates and composed reconstruction bindings. */
 interface SmtModelValues {
+    /** Charge and poll the current witness-check allowance, independent of admission. */
+    fun checkpoint(units: Long = 1)
     /** Read a retained Boolean coordinate by its encoding name. */
     fun boolean(name: String): Boolean
     /** Read a retained integer coordinate as an exact decimal. */
@@ -66,7 +115,12 @@ fun interface SmtReconstruction {
     fun reconstruct(values: SmtModelValues): SmtValue
 
     /** A scalar coordinate retained by name. */
-    data class Scalar(val name: String, val sort: SmtSort) : SmtReconstruction {
+    data class Scalar(
+        /** Retained encoding coordinate name. */
+        val name: String,
+        /** Coordinate's scalar sort. */
+        val sort: SmtSort,
+    ) : SmtReconstruction {
         override fun reconstruct(values: SmtModelValues): SmtValue = when (sort) {
             SmtSort.Bool -> SmtValue.Boolean(values.boolean(name))
             SmtSort.Int -> SmtValue.Integer(values.integer(name))
@@ -76,7 +130,10 @@ fun interface SmtReconstruction {
     }
 
     /** Boolean coordinates in least-significant-bit order. */
-    data class Bits(val names: List<String>) : SmtReconstruction {
+    data class Bits(
+        /** Retained Boolean names in least-significant-bit order. */
+        val names: List<String>,
+    ) : SmtReconstruction {
         init { require(names.isNotEmpty()) }
         override fun reconstruct(values: SmtModelValues): SmtValue = SmtValue.BitVector(
             names.asReversed().joinToString("") { if (values.boolean(it)) "1" else "0" },
@@ -85,16 +142,24 @@ fun interface SmtReconstruction {
 }
 
 /** An original declaration and its private encoding recipe. */
-data class SmtSourceBinding(val declaration: SmtSourceDeclaration, val reconstruction: SmtReconstruction)
+data class SmtSourceBinding(
+    /** Original declaration being reconstructed. */
+    val declaration: SmtSourceDeclaration,
+    /** Owned encoding recipe. */
+    val reconstruction: SmtReconstruction,
+)
 
-/** An original-source obligation evaluated after reconstructing a candidate model. */
+/** An original-source obligation with immutable captures, evaluated under each candidate's allowance. */
 fun interface SmtSourceCheck {
     /** Return whether the original obligation holds for the reconstructed source values. */
     fun check(values: SmtModelValues): Boolean
 }
 
 /** A model containing only original declarations, in source order. */
-data class SmtSourceModel(val values: List<Pair<SmtSourceDeclaration, SmtValue>>)
+data class SmtSourceModel(
+    /** Original declarations paired with their values in source order. */
+    val values: List<Pair<SmtSourceDeclaration, SmtValue>>,
+)
 
 /** The original typed source, retained through all encoding passes and solving. */
 class SmtSourceSnapshot internal constructor(internal val typed: SmtTypedSource) {
@@ -113,15 +178,16 @@ internal fun scalarSmtBindings(
     }
 }
 
-internal fun reconstructSmtModel(
+private fun <T> withSmtModelValues(
     problem: SmtLibProblem,
     boolean: (Int) -> Boolean,
     integer: (Int) -> String,
     real: (Int) -> String,
     cancellation: Cancellation,
-): SmtSourceModel {
-    fun checkpoint() {
-        cancellation.charge(1)
+    action: (SmtModelValues, () -> Unit) -> T,
+): T {
+    fun checkpoint(units: Long = 1) {
+        cancellation.charge(units)
         if (cancellation()) throw CancellationException("SMT model reconstruction interrupted")
     }
     val booleans = problem.encodingBoolVarNames.mapKeys { checkpoint(); polynomialSymbol(it.key) }
@@ -132,6 +198,11 @@ internal fun reconstructSmtModel(
     val cache = HashMap<String, SmtValue>()
     val active = HashSet<String>()
     val values = object : SmtModelValues {
+        override fun checkpoint(units: Long) {
+            require(units >= 0)
+            cancellation.charge(units)
+            if (cancellation()) throw CancellationException("SMT model reconstruction interrupted")
+        }
         override fun boolean(name: String): Boolean {
             checkpoint()
             return boolean(booleans.getValue(polynomialSymbol(name)))
@@ -161,16 +232,49 @@ internal fun reconstructSmtModel(
             return result
         }
     }
+    return action(values) { checkpoint() }
+}
+
+internal fun reconstructSmtModel(
+    problem: SmtLibProblem,
+    boolean: (Int) -> Boolean,
+    integer: (Int) -> String,
+    real: (Int) -> String,
+    cancellation: Cancellation,
+): SmtSourceModel = withSmtModelValues(problem, boolean, integer, real, cancellation) { values, checkpoint ->
     val model = SmtSourceModel(problem.sourceBindings.map { binding ->
         checkpoint()
         binding.declaration to values.value(binding.declaration.name)
     })
+    checkSmtSource(problem, values, checkpoint)
+    model
+}
+
+private fun checkSmtSource(problem: SmtLibProblem, values: SmtModelValues, checkpoint: () -> Unit) {
     for (check in problem.sourceChecks) {
         checkpoint()
-        require(check.check(values)) { "reconstructed SMT model failed original-source checking" }
+        if (!check.check(values)) throw SmtSourceWitnessRejected()
     }
     checkpoint()
-    return model
+}
+
+private class SmtSourceWitnessRejected : IllegalArgumentException(
+    "reconstructed SMT model failed original-source checking",
+)
+
+internal fun SmtLibProblem.withSourceWitnessValidation(): SmtLibProblem {
+    if (sourceChecks.isEmpty()) return this
+    val validator = SourceWitnessValidator { assignment, cancellation ->
+        try {
+            withSmtModelValues(this, assignment::boolValue, assignment::intValue,
+                { assignment.smtRealValue(it, cancellation) },
+                cancellation) { values, checkpoint -> checkSmtSource(this, values, checkpoint) }
+            SourceEvidenceCheck.Checked
+        } catch (_: SmtSourceWitnessRejected) {
+            SourceEvidenceCheck.Rejected("SMT reconstructed value violates its original source")
+        }
+    }
+    return copy(source = source.withWitnessValidator(validator))
 }
 
 /** Render a source sort using SMT-LIB syntax. */

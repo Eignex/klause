@@ -17,7 +17,8 @@ class SmtSourceModelTest {
         val source = SmtLib.parse("(declare-const |result| Real) (declare-const flag Bool) " +
             "(assert (= (* result result) 2.0))")
 
-        val model = source.reconstructModel({ true }, { error("unexpected integer") }, { "(root-obj (+ (^ x 2) (- 2)) 2)" })
+        val model = source.reconstructModel({ true }, { error("unexpected integer") },
+            { "(root-obj (+ (^ x 2) (- 2)) 2)" })
 
         assertEquals(listOf("|result|", "flag"), model.values.map { it.first.name })
         assertTrue(model.toSmtLib().contains("(define-fun |result| () Real (root-obj"))

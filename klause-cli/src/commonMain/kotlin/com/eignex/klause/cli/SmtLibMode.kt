@@ -2,6 +2,8 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.smtLibSemantics
+import com.eignex.klause.formats.smtlib.smtRealTerm
+import com.eignex.klause.formats.smtlib.smtRealValue
 import com.eignex.klause.formats.smtlib.toSmtLib
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.simplex.exact.BigFraction
@@ -10,8 +12,6 @@ import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.solver.pipeline.algebraicRealValue
-import com.eignex.klause.solver.pipeline.symbolicRealValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
@@ -68,22 +68,14 @@ internal object SmtLibMode : CliMode {
             return attachedSourceSolvable(
                 parsed.source,
                 common,
-                { assignment ->
-                    parsed.reconstructModel(assignment::boolValue, assignment::intValue, { id ->
-                        assignment.symbolicRealValue(id)?.let(::smtSymbolicValue)
-                            ?: assignment.algebraicRealValue(id)?.let(::smtAlgebraicValue)
-                            ?: smtReal(assignment.realValue(id))
-                    }).toSmtLib()
-                },
+                { assignment -> parsed.reconstructModel(assignment, stop).toSmtLib() },
                 admissionStart.elapsedNow().inWholeMilliseconds,
                 parsed.quadraticObjective,
                 parsed.sense,
                 objective = objective,
                 renderFinite = { sample ->
                     latestSourceObjective = objective?.evaluateExact(sample)
-                    parsed.reconstructModel(sample::boolValue, { sample.intValue(it).toString() }, { id ->
-                        smtReal(requireNotNull(sample.exactReals) { "SMT model has no certified real values" }[id].toString())
-                    }).toSmtLib()
+                    parsed.reconstructModel(sample, stop).toSmtLib()
                 },
             )
         }
@@ -99,15 +91,8 @@ internal fun renderModel(ints: Map<String, Int>, bools: Map<String, Int>, reals:
         append("(\n")
         for ((name, id) in ints) append("  (define-fun $name () Int ${smtInteger(s.intValue(id).toString())})\n")
         for ((name, id) in bools) append("  (define-fun $name () Bool ${s.boolValue(id)})\n")
-        val exactReals = if (reals.isEmpty()) {
-            emptyList()
-        } else {
-            requireNotNull(s.exactReals) {
-                "SMT model has no certified real values"
-            }
-        }
         for ((name, id) in reals) {
-            append("  (define-fun $name () Real ${smtReal(exactReals[id].toString())})\n")
+            append("  (define-fun $name () Real ${s.smtRealValue(id)})\n")
         }
         append(")")
     }
@@ -123,8 +108,7 @@ internal fun renderOpenTheoryModel(
     for ((name, id) in ints) append("  (define-fun $name () Int ${smtInteger(assignment.intValue(id))})\n")
     for ((name, id) in bools) append("  (define-fun $name () Bool ${assignment.boolValue(id)})\n")
     for ((name, id) in reals) {
-        val value = assignment.symbolicRealValue(id)?.let(::smtSymbolicValue)
-            ?: assignment.algebraicRealValue(id)?.let(::smtAlgebraicValue) ?: smtReal(assignment.realValue(id))
+        val value = assignment.smtRealValue(id)
         append("  (define-fun $name () Real $value)\n")
     }
     append(")")
@@ -132,17 +116,7 @@ internal fun renderOpenTheoryModel(
 
 internal fun smtInteger(value: String): String = if (value.startsWith('-')) "(- ${value.drop(1)})" else value
 
-internal fun smtReal(value: String): String {
-    val negative = value.startsWith('-')
-    val magnitude = if (negative) value.drop(1) else value
-    val parts = magnitude.split('/')
-    require(parts.size in 1..2 && parts.all { it.isNotEmpty() && it.all { c -> c.isDigit() || c == '.' } }) {
-        "invalid exact real value: $value"
-    }
-    val realParts = parts.map { if ('.' in it) it else "$it.0" }
-    val term = if (realParts.size == 1) realParts[0] else "(/ ${realParts[0]} ${realParts[1]})"
-    return if (negative) "(- $term)" else term
-}
+internal fun smtReal(value: String): String = smtRealTerm(value)
 
 /** SMT-LIB output protocol: `sat`/`unsat`/`unknown` + the buffered model on sat. */
 internal class SmtLibOutput(private val sourceObjective: () -> BigFraction? = { null }) : BufferedBestOutput() {

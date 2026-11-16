@@ -11,6 +11,8 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceSemanticsOwner
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.io.CharSource
@@ -57,6 +59,18 @@ data class SmtLibProblem(
         real: (Int) -> String,
         cancellation: Cancellation = Cancellation.Never,
     ): SmtSourceModel = reconstructSmtModel(this, boolean, integer, real, cancellation)
+
+    /** Reconstruct a checked native assignment using its certified exact real representation. */
+    fun reconstructModel(
+        assignment: OpenTheoryAssignment,
+        cancellation: Cancellation = Cancellation.Never,
+    ): SmtSourceModel = reconstructModel(assignment::boolValue, assignment::intValue,
+        { assignment.smtRealValue(it, cancellation) }, cancellation)
+
+    /** Reconstruct a checked sample, retaining arbitrary integers and exact real authority. */
+    fun reconstructModel(sample: Sample, cancellation: Cancellation = Cancellation.Never): SmtSourceModel =
+        reconstructModel(sample::boolValue, { sample.exactIntValue(it).toString() },
+            { sample.smtRealValue(it, cancellation) }, cancellation)
 
     internal val model: Problem get() = source.originalSource as? Problem
         ?: error("SMT source retains an exact formula")

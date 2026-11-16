@@ -72,7 +72,8 @@ internal class SmtLibScope(private val cancellation: Cancellation) {
                     smtUnsupported("duplicate declaration of '$name'")
                 } else {
                     globals[name] = Signature(parameters, result, symbolIdentity++)
-                    originalDeclarations += SmtSourceDeclaration((command.items[1] as SExpr.Atom).text, parameters, result)
+                    val spelling = (command.items[1] as SExpr.Atom).text
+                    originalDeclarations += SmtSourceDeclaration(spelling, parameters, result)
                     true
                 }
             }
