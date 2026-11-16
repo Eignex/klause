@@ -36,8 +36,12 @@ internal class SmtSessionOutput(
     }
     override fun onArithmeticIncumbent(rendered: String, objective: SourceValue): Boolean {
         witnessed = true
-        if (optimize) comment("objective=${arithmeticObjectiveText(objective)}")
+        if (optimize) comment("objective=${formatArithmeticObjective(objective)}")
         return true
+    }
+    override fun formatArithmeticObjective(objective: SourceValue): String = when (objective) {
+        is SourceValue.Algebraic -> smtAlgebraicValue(objective.value)
+        else -> arithmeticObjectiveText(objective)
     }
     override fun onQuadraticResult(rendered: String?, result: QuadraticOptimizationResult) {
         quadraticResult = result
@@ -70,7 +74,7 @@ internal class SmtSessionOutput(
         } ?: return
         val direction = if (result.scope.objective?.sense == ObjectiveSense.MINIMIZE) "lower" else "upper"
         comment("objectiveBoundDirection=$direction")
-        comment("objectiveBound=${arithmeticObjectiveText(bound.value)}")
+        comment("objectiveBound=${formatArithmeticObjective(bound.value)}")
         comment("objectiveBoundStrict=${bound.strict}")
     }
     override fun onVerdictContext(context: VerdictContext) { reason = context.softVerdictCause() }

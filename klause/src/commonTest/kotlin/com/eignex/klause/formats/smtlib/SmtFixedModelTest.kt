@@ -10,6 +10,46 @@ import kotlin.test.assertFailsWith
 
 class SmtFixedModelTest {
     @Test
+    fun `declared pi keeps its retained value instead of the real-function constant`() {
+        val parsed = SmtLib.parse("(declare-const pi Real)")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0)))
+
+        val result = model.evaluate(SExpr.Atom("pi"))
+
+        assertEquals("0.0", result)
+    }
+
+    @Test
+    fun `declared exp keeps its total function table instead of the real-function extension`() {
+        val parsed = SmtLib.parse("(declare-fun exp (Real) Real)")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+
+        val result = model.evaluate(SExprReader("(exp 1.0)").readAll().single())
+
+        assertEquals("0.0", result)
+    }
+
+    @Test
+    fun `direct source reconstruction retains implicit named definitions`() {
+        val parsed = SmtLib.parse("(assert (! true :named label))")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+
+        val result = model.evaluate(SExpr.Atom("label"))
+
+        assertEquals("true", result)
+    }
+
+    @Test
+    fun `quoted indexed operator symbols retain their standard bitvector identity`() {
+        val parsed = SmtLib.parse("")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+
+        val result = model.evaluate(SExprReader("((_ |extract| 0 0) (_ |bv10| 4))").readAll().single())
+
+        assertEquals("#b0", result)
+    }
+
+    @Test
     fun `qualified helper calls retain quoted grammar-word identities`() {
         val parsed = SmtLib.parse("(define-fun |let| ((x Int)) Int (+ x 1))")
         val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))

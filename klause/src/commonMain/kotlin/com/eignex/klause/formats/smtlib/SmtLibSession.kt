@@ -92,7 +92,7 @@ class SmtLibSession(
                 "set-option" -> setOption(command)
                 "get-option" -> {
                     command.size(2)
-                    val key = command.atom(1)
+                    val key = command.keyword(1)
                     val value = when (key) {
                         ":regular-output-channel" -> SExpr.Atom(smtSessionString(channels.name(false)))
                         ":diagnostic-output-channel" -> SExpr.Atom(smtSessionString(channels.name(true)))
@@ -102,10 +102,10 @@ class SmtLibSession(
                     channels.regular(value?.smtText() ?: "unsupported")
                 }
                 "set-info" -> {
-                    if (command.items.size !in 2..3 || !command.atom(1).startsWith(':')) {
+                    if (command.items.size !in 2..3) {
                         fail("expected an information attribute")
                     }
-                    information[command.atom(1)] = command.items.getOrNull(2) ?: SExpr.Atom("")
+                    information[command.keyword(1)] = command.items.getOrNull(2) ?: SExpr.Atom("")
                     success()
                 }
                 "get-info" -> getInfo(command)
@@ -177,6 +177,13 @@ class SmtLibSession(
                 "get-assignment" -> getAssignment(command)
                 "get-proof", "get-unsat-core", "get-unsat-assumptions" -> {
                     command.size(1)
+                    val option = when (head) {
+                        "get-proof" -> ":produce-proofs"
+                        "get-unsat-core" -> ":produce-unsat-cores"
+                        else -> ":produce-unsat-assumptions"
+                    }
+                    if (!enabled(option)) fail("$option is disabled")
+                    if (result?.status != "unsat") fail("the last result was not unsat")
                     channels.regular("unsupported")
                 }
                 "echo" -> {
@@ -224,7 +231,7 @@ class SmtLibSession(
 
     private fun setOption(command: SExpr.SList) {
         command.size(3)
-        val original = command.atom(1)
+        val original = command.keyword(1)
         val key = if (original == ":interactive-mode") ":produce-assertions" else original
         if (key in START_OPTIONS && started) fail("$key may be set only in start mode")
         when (key) {
@@ -245,7 +252,7 @@ class SmtLibSession(
 
     private fun getInfo(command: SExpr.SList) {
         command.size(2)
-        val key = command.atom(1)
+        val key = command.keyword(1)
         if (key == ":all-statistics") {
             channels.regular("unsupported")
             return
@@ -376,6 +383,8 @@ class SmtLibSession(
     }
     private fun SExpr.SList.atom(index: Int): String =
         (items.getOrNull(index) as? SExpr.Atom)?.text ?: fail("expected a symbol")
+    private fun SExpr.SList.keyword(index: Int): String = atom(index).takeIf { it.length > 1 && it.startsWith(':') }
+        ?: fail("expected a keyword")
     private fun SExpr.SList.numeral(index: Int): Int {
         val text = atom(index)
         if (text.isEmpty() || text.any { it !in '0'..'9' } || text.length > 1 && text[0] == '0') {

@@ -300,6 +300,7 @@ class CliModeSmtTest {
         val source = File.createTempFile("nia-wide", ".smt2").apply {
             writeText(
                 "(set-option :produce-models true) (declare-const |source n| Int) " +
+                    "(declare-const q Int) (assert (= (* q q) 1)) " +
                     "(assert (= |source n| 100000000000000000000)) " +
                     "(assert (= (* |source n| |source n|) 10000000000000000000000000000000000000000)) " +
                     "(check-sat) (get-model)",

@@ -29,6 +29,12 @@ private fun retainSmtSessionModel(
 ): SmtSessionModel = withSmtModelValues(problem, boolean, integer, real, control, exactReal) { values, checkpoint ->
     val captured = LinkedHashMap<String, SmtValue>()
     val authorities = HashMap<SmtValue.Real, ExactRealValue>()
+    val freeSorts = problem.originalSource?.typed?.commands.orEmpty().mapNotNull {
+        val command = it as? SExpr.SList ?: return@mapNotNull null
+        if ((command.items.firstOrNull() as? SExpr.Atom)?.text == "declare-sort") {
+            smtSessionSymbol((command.items[1] as SExpr.Atom).text) to (command.items[2] as SExpr.Atom).text.toInt()
+        } else null
+    }.toMap()
     fun capture(name: String, value: SmtValue) {
         captured[smtSessionSymbol(name)] = value
         val work = ArrayDeque<SmtValue>()
@@ -79,9 +85,13 @@ private fun retainSmtSessionModel(
         override fun real(name: String): String = (value(name) as SmtValue.Real).term
         override fun exactReal(value: SmtValue.Real): ExactRealValue? =
             authorities[value] ?: smtRationalValue(value.term, control)
-        override fun cardinality(sort: SmtSort, cap: Int): Int? =
-            problem.originalSource?.typed?.datatypes?.cardinality(sort, cap, control)
+        override fun cardinality(sort: SmtSort, cap: Int): Int? {
+            problem.originalSource?.typed?.datatypes?.cardinality(sort, cap, control)?.let { return it }
+            return if (sort is SmtSort.Uninterpreted &&
+                freeSorts[smtSessionSymbol(sort.name)] == sort.arguments.size) cap else null
+        }
     }
-    val source = problem.originalSource?.typed?.commands ?: emptyList()
+    val original = problem.originalSource?.typed?.commands ?: emptyList()
+    val source = normalizeSmtSourceCommands(original, SmtLibScope(control), control)
     SmtFixedModel(source, SmtSourceModel(declarations), snapshot, control, problem.originalSource)
 }

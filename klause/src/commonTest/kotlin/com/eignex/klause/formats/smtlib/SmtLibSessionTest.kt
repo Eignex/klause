@@ -118,7 +118,8 @@ class SmtLibSessionTest {
             (get-proof)
         """.trimIndent()))
 
-        assertEquals(listOf("unsupported", "false", "unsupported"), replies)
+        assertEquals(listOf("unsupported", "false"), replies.take(2))
+        assertTrue(replies[2].startsWith("(error "))
     }
 
     @Test

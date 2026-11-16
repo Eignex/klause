@@ -28,7 +28,7 @@ class SmtLibModeAffineObjectiveTest(private val engine: String, private val zero
                 """
                 (set-option :produce-models true)
                 (declare-const i Int) (declare-const x Real) (declare-const y Real)
-                (assert (and (>= i 0) (<= i 1))) (assert (= x 1))
+                (assert (and (>= i 0) (<= i 1))) (assert (> x 0)) (assert (= (* x x) 1))
                 (assert (= (* (to_real i) x) y))
                 (minimize (+ 7 $term)) (check-sat)
                 (get-model)
@@ -55,12 +55,12 @@ class SmtLibModeAffineObjectiveTest(private val engine: String, private val zero
         }
 
         val text = bytes.toString(Charsets.UTF_8.name())
+        assertEquals(0, code, text)
         val integer = assertNotNull(
             Regex("""\(define-fun (?:\|i\||i) \(\) Int ([01])\)""").findAll(text).lastOrNull(),
             text,
         ).groupValues[1].toInt()
         val status = if (engine == "ls") "best-found" else "optimal"
-        assertEquals(0, code, text)
         assertTrue("; objective=${7 + integer}.0" in text.lines(), text)
         assertTrue("; optimizationStatus=$status" in text.lines(), text)
         assertTrue(text.lines().any { it.startsWith("; quadraticNativeWork=") && !it.endsWith("=0") }, text)

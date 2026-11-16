@@ -36,6 +36,7 @@ internal class SmtFixedModel(
     private var queryWork = 0L
     private val arithmetic by lazy { smtExactArithmetic(control) }
     private val sourceScope by lazy { smtSessionScope(source, control) }
+    private val declaredNames by lazy { sourceScope.declarations.map { symbol(it.name) }.toSet() }
     private val values = object : SmtModelValues by retained, SmtSortCardinalities {
         override val cancellation: ExecutionControl get() = control
         override fun checkpoint(units: Long) = this@SmtFixedModel.checkpoint(units)
@@ -213,6 +214,7 @@ internal class SmtFixedModel(
                             expression.text.startsWith("#b") -> stack += SmtValue.BitVector(expression.text.drop(2))
                             expression.text.startsWith("#x") -> stack += hex(expression.text.drop(2))
                             name in constructors -> stack += constructorValue(name, emptyList(), null)
+                            name in declaredNames -> stack += function(name, emptyList(), null)
                             name == "pi" -> stack += real(arithmetic.pi())
                             else -> stack += function(name, emptyList(), null)
                         }
@@ -301,6 +303,7 @@ internal class SmtFixedModel(
             unavailable("invalid qualified operator")
         }
         val name = symbol((head as SExpr.Atom).text)
+        if (name in declaredNames) return function(name, args, null)
         fun bool(value: Boolean) = SmtValue.Boolean(value)
         fun equality(a: SmtValue, b: SmtValue): Boolean = values.equal(a, b)
             ?: unavailable("model equality is not certified")
@@ -512,7 +515,7 @@ internal class SmtFixedModel(
     }
 
     private fun indexed(identifier: SExpr.SList, args: List<SmtValue>): SmtValue {
-        val name = (identifier.items[1] as SExpr.Atom).text
+        val name = symbol((identifier.items[1] as SExpr.Atom).text)
         if (name == "is") {
             val constructor = symbol((identifier.items[2] as SExpr.Atom).text)
             val value = args.single() as SmtValue.Application
