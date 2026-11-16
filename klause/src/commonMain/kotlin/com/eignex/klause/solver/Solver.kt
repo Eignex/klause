@@ -59,9 +59,8 @@ interface SolverParams {
  * Outcome of a single-shot [Solver.solve] call.
  *
  *  - [Sat] — the engine found a satisfying assignment.
- *  - [Unsat] — the engine proved no assignment exists. Only complete backends (
- *    `BruteForceSolver`, `BacktrackSolver`) return this; the local-search engine
- *    returns [Unknown] when its budget is exhausted.
+ *  - [Unsat] — the engine proved no assignment exists. Complete backends can exhaust
+ *    the search; local search can return a root-propagation refutation.
  *  - [Unknown] — the engine returned without a definitive answer (LS budget exhausted,
  *    timeout, etc.).
  */
@@ -252,8 +251,8 @@ interface Optimizer<P : SolverParams> : Solver<P> {
      *  - [MinimizeResult.Infeasible] — no feasible exists.
      *  - [MinimizeResult.Unknown] — no feasible found, no infeasibility proven.
      *
-     * Local-search backends can never return [MinimizeResult.Optimal] or
-     * [MinimizeResult.Infeasible].
+     * Local-search backends return [MinimizeResult.Infeasible] only for a root-propagation refutation
+     * and cannot return [MinimizeResult.Optimal].
      */
     fun minimize(objective: LinearObjective, params: P): MinimizeResult
 
