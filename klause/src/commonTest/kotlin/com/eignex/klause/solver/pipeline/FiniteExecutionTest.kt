@@ -42,9 +42,9 @@ class FiniteExecutionTest {
             val problem = Problem.of(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
             val shape = FiniteSolveShape(problem, optimize, false, null,
                 if (optimize) LinearObjective(boolWeights = longArrayOf(1)) else null, null, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioArms = 1).finiteRequest(
                 shape, FiniteEngine.LOCAL_SEARCH, presolveConfig = PresolveConfig.NONE,
-                randomSeed = 17L, defaultArms = 1,
+                randomSeed = 17L,
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -62,9 +62,9 @@ class FiniteExecutionTest {
         for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH)) {
             val shape = FiniteSolveShape(Problem.of(2, 0, emptyArray(),
                 arrayOf(Clause(intArrayOf(0, 2)))), false, false, null, null, null, null)
-            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioArms = 1).finiteRequest(
                 shape, engine, presolveConfig = PresolveConfig.NONE,
-                randomSeed = 17L, defaultArms = 1, nodeBudget = NodeBudget(0L),
+                randomSeed = 17L, nodeBudget = NodeBudget(0L),
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
