@@ -248,6 +248,10 @@ class SmtLibSession(
     private fun getInfo(command: SExpr.SList) {
         command.size(2)
         val key = command.atom(1)
+        if (key == ":all-statistics") {
+            channels.regular("()")
+            return
+        }
         val value = when (key) {
             ":name" -> smtSessionString("klause")
             ":version" -> smtSessionString(version)

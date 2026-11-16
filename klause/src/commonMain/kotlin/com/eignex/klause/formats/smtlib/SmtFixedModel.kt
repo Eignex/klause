@@ -31,6 +31,7 @@ internal class SmtFixedModel(
     private val constructors = HashSet<String>()
     private val selectors = HashMap<String, List<Pair<String, Int>>>()
     private val authorities = HashMap<SmtValue.Real, ExactRealValue>()
+    private val queryValues = ArrayList<SmtValue>()
     private var queryWork = 0L
     private val arithmetic by lazy { smtExactArithmetic(control) }
     private val values = object : SmtModelValues by retained, SmtSortCardinalities {
@@ -112,6 +113,7 @@ internal class SmtFixedModel(
     override fun abstractValues(): Map<String, SmtSort> = buildMap {
         val work = ArrayDeque<SmtValue>()
         model.values.forEach { work += it.second }
+        work.addAll(queryValues)
         while (work.isNotEmpty()) when (val value = work.removeLast()) {
             is SmtValue.Uninterpreted -> put(symbol(value.identity), value.sort)
             is SmtValue.Application -> work.addAll(value.arguments)
@@ -138,6 +140,7 @@ internal class SmtFixedModel(
         var value = evaluateValue(expanded)
         val type = smtSessionQuerySort(source, term, control, abstractValues())
         if (type == SmtSort.Real && value is SmtValue.Integer) value = real(exact(value))
+        queryValues += value
         return value.toSmtLib()
     }
 
@@ -170,7 +173,7 @@ internal class SmtFixedModel(
                             expression.text.matches(DECIMAL) -> stack += real(exactLiteral(expression.text))
                             expression.text.startsWith("#b") -> stack += SmtValue.BitVector(expression.text.drop(2))
                             expression.text.startsWith("#x") -> stack += hex(expression.text.drop(2))
-                            name in constructors -> stack += SmtValue.Application(expression.text, emptyList())
+                            name in constructors -> stack += constructorValue(name, emptyList(), null)
                             name == "pi" -> stack += real(arithmetic.pi())
                             else -> stack += function(name, emptyList(), null)
                         }
@@ -215,7 +218,7 @@ internal class SmtFixedModel(
                         val constructor = if (pattern is SExpr.Atom) symbol(pattern.text)
                             else (pattern as SExpr.SList).head()
                         val locals = when {
-                            constructor == symbol(value.constructor) -> {
+                            constructor == constructorSymbol(value.constructor) -> {
                                 val names = (pattern as? SExpr.SList)?.items?.drop(1).orEmpty().map {
                                     symbol((it as SExpr.Atom).text)
                                 }
@@ -245,6 +248,7 @@ internal class SmtFixedModel(
                 val qualification = scope.sourceSort(head.items[2])
                 if (selected is SExpr.SList) return indexed(selected, args)
                 val name = symbol((selected as SExpr.Atom).text)
+                if (name in constructors) return constructorValue(name, args, qualification)
                 return if (model.values.any { symbol(it.first.name) == name }) function(name, args, qualification)
                     else operation(selected, args).let {
                         if (qualification == SmtSort.Real && it is SmtValue.Integer) real(exact(it)) else it
@@ -282,15 +286,8 @@ internal class SmtFixedModel(
                 if (compare(right, SmtValue.Integer("0")) == 0) underspecified("/", listOf(left, right))
                 else real(arithmetic.multiply(listOf(exact(left), reciprocal(exact(right)))))
             }
-            "div", "mod" -> {
-                val a = integer(args[0])
-                val b = integer(args[1])
-                if (b.isZero()) underspecified(name, args) else {
-                    var remainder = a.remainderOf(b)
-                    if (remainder.signum() < 0) remainder += b.abs()
-                    SmtValue.Integer((if (name == "mod") remainder else (a - remainder) / b).toString())
-                }
-            }
+            "div" -> args.drop(1).fold(args[0]) { a, b -> integerDivision(name, a, b) }
+            "mod" -> integerDivision(name, args[0], args[1])
             "abs" -> if (compare(args.single(), SmtValue.Integer("0")) >= 0) args.single()
                 else operation(SExpr.Atom("-"), args)
             "to_real" -> real(exact(args.single()))
@@ -307,11 +304,11 @@ internal class SmtFixedModel(
             "store" -> (args[0] as SmtValue.Array).let { array ->
                 array.copy(entries = array.entries + (args[1] to args[2]))
             }
-            in constructors -> SmtValue.Application((head as SExpr.Atom).text, args)
+            in constructors -> constructorValue(name, args, null)
             in selectors -> {
                 val application = args.single() as? SmtValue.Application
                 val selected = selectors.getValue(name).firstOrNull {
-                    application != null && symbol(application.constructor) == it.first
+                    application != null && constructorSymbol(application.constructor) == it.first
                 }
                 if (selected != null) requireNotNull(application).arguments[selected.second]
                 else underspecified("selector:$name", args)
@@ -323,6 +320,28 @@ internal class SmtFixedModel(
             return bitVector(name, emptyList(), args)
         }
         return function(name, args, null)
+    }
+
+    private fun integerDivision(name: String, left: SmtValue, right: SmtValue): SmtValue {
+        val a = integer(left)
+        val b = integer(right)
+        return if (b.isZero()) underspecified(name, listOf(left, right)) else {
+            var remainder = a.remainderOf(b)
+            if (remainder.signum() < 0) remainder += b.abs()
+            SmtValue.Integer((if (name == "mod") remainder else (a - remainder) / b).toString())
+        }
+    }
+
+    private fun constructorValue(name: String, args: List<SmtValue>, qualification: SmtSort?): SmtValue {
+        val registry = smtSessionScope(source, control).datatypes
+        val selected = registry.resolve(name, args.map(::valueSort), qualification)
+            ?: unavailable("constructor rank is not determined")
+        return SmtValue.Application(registry.constructorName(selected.instance, selected.constructor), args)
+    }
+
+    private fun constructorSymbol(text: String): String = when (val identifier = SExprReader(text).readAll().single()) {
+        is SExpr.Atom -> symbol(identifier.text)
+        is SExpr.SList -> symbol((identifier.items[1] as SExpr.Atom).text)
     }
 
     private fun function(name: String, args: List<SmtValue>, result: SmtSort?): SmtValue {
@@ -405,7 +424,7 @@ internal class SmtFixedModel(
         if (selected is SExpr.SList) return indexed(selected, emptyList())
         val name = symbol((selected as SExpr.Atom).text)
         if (name.startsWith('@')) return SmtValue.Uninterpreted(sort, selected.text)
-        if (name in constructors) return SmtValue.Application(selected.text, emptyList())
+        if (name in constructors) return constructorValue(name, emptyList(), sort)
         return function(name, emptyList(), sort)
     }
 
@@ -413,7 +432,7 @@ internal class SmtFixedModel(
         val name = (identifier.items[1] as SExpr.Atom).text
         if (name == "is") {
             val constructor = symbol((identifier.items[2] as SExpr.Atom).text)
-            return SmtValue.Boolean((args.single() as SmtValue.Application).constructor.let(::symbol) == constructor)
+            return SmtValue.Boolean(constructorSymbol((args.single() as SmtValue.Application).constructor) == constructor)
         }
         if (name.startsWith("bv") && args.isEmpty()) {
             val width = (identifier.items[2] as SExpr.Atom).text.toInt()
@@ -547,7 +566,7 @@ internal class SmtFixedModel(
         is SmtSort.BitVector -> value is SmtValue.BitVector && value.bits.length == sort.width
         is SmtSort.Array -> value is SmtValue.Array && value.sort == sort
         is SmtSort.Uninterpreted -> value is SmtValue.Uninterpreted && value.sort == sort ||
-            value is SmtValue.Application
+            value is SmtValue.Application && valueSort(value) == sort
     }
     private fun hex(text: String): SmtValue.BitVector = SmtValue.BitVector(buildString {
         for (digit in text) append(digit.digitToInt(16).toString(2).padStart(4, '0'))
