@@ -102,7 +102,9 @@ class SmtLibSession(
                     channels.regular(value?.smtText() ?: "unsupported")
                 }
                 "set-info" -> {
-                    if (command.items.size !in 2..3 || !command.atom(1).startsWith(':')) fail("expected an information attribute")
+                    if (command.items.size !in 2..3 || !command.atom(1).startsWith(':')) {
+                        fail("expected an information attribute")
+                    }
                     information[command.atom(1)] = command.items.getOrNull(2) ?: SExpr.Atom("")
                     success()
                 }
@@ -210,11 +212,6 @@ class SmtLibSession(
     }
     private fun addCommand(command: SExpr.SList) {
         val head = command.atom(0)
-        if (head in setOf("define-fun-rec", "define-funs-rec")) {
-            scopes.last().entries += Entry(command, enabled(":global-declarations"))
-            validateCurrent()
-            return
-        }
         val prepared = prepareSmtSessionCommand(commands(), command, cancellation)
         prepared.forEachIndexed { index, normalized ->
             val named = index != prepared.lastIndex
@@ -231,7 +228,8 @@ class SmtLibSession(
         val key = if (original == ":interactive-mode") ":produce-assertions" else original
         if (key in START_OPTIONS && started) fail("$key may be set only in start mode")
         when (key) {
-            ":print-success", ":produce-models", ":produce-assertions", ":produce-assignments", ":global-declarations" -> {
+            ":print-success", ":produce-models", ":produce-assertions",
+            ":produce-assignments", ":global-declarations" -> {
                 if (command.atom(2) !in setOf("true", "false")) fail("$key expects a Boolean")
                 options[key] = command.items[2]
                 success()
@@ -324,7 +322,8 @@ class SmtLibSession(
     private fun enabled(key: String): Boolean = (options[key] ?: defaultOption(key)) == SExpr.Atom("true")
     private fun defaultOption(key: String): SExpr? = when (key) {
         ":print-success", ":produce-models", ":produce-assertions", ":global-declarations", ":produce-proofs",
-        ":produce-unsat-cores", ":produce-unsat-assumptions", ":produce-assignments", ":interactive-mode" -> SExpr.Atom("false")
+        ":produce-unsat-cores", ":produce-unsat-assumptions",
+        ":produce-assignments", ":interactive-mode" -> SExpr.Atom("false")
         ":random-seed", ":reproducible-resource-limit", ":verbosity" -> SExpr.Atom("0")
         else -> null
     }
@@ -360,19 +359,24 @@ class SmtLibSession(
     private fun SExpr.SList.size(expected: Int) {
         if (items.size != expected) fail("${items.firstOrNull()?.smtText()} expects ${expected - 1} arguments")
     }
-    private fun SExpr.SList.atom(index: Int): String = (items.getOrNull(index) as? SExpr.Atom)?.text ?: fail("expected a symbol")
+    private fun SExpr.SList.atom(index: Int): String =
+        (items.getOrNull(index) as? SExpr.Atom)?.text ?: fail("expected a symbol")
     private fun SExpr.SList.numeral(index: Int): Int {
         val text = atom(index)
-        if (text.isEmpty() || text.any { it !in '0'..'9' } || text.length > 1 && text[0] == '0') fail("expected a nonnegative numeral")
+        if (text.isEmpty() || text.any { it !in '0'..'9' } || text.length > 1 && text[0] == '0') {
+            fail("expected a nonnegative numeral")
+        }
         return text.toIntOrNull() ?: fail("stack count exceeds available resources")
     }
     private companion object {
-        val START_OPTIONS = setOf(":produce-models", ":produce-assertions", ":produce-assignments", ":global-declarations",
+        val START_OPTIONS = setOf(":produce-models", ":produce-assertions", ":produce-assignments",
+            ":global-declarations",
             ":produce-proofs", ":produce-unsat-cores", ":produce-unsat-assumptions")
     }
 }
 
-internal fun smtSessionSymbol(text: String): String = if (text.startsWith('|') && text.endsWith('|')) text.drop(1).dropLast(1) else text
+internal fun smtSessionSymbol(text: String): String =
+    if (text.startsWith('|') && text.endsWith('|')) text.drop(1).dropLast(1) else text
 internal fun smtSessionError(message: String): String = "(error ${smtSessionString(message)})"
 
 /** Render an S-expression without changing quoted symbols or string contents. */

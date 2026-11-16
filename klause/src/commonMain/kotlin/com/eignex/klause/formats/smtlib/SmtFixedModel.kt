@@ -77,8 +77,20 @@ internal class SmtFixedModel(
         }
     }
 
-    override fun withRecursiveDefinitions(source: List<SExpr>): SmtSessionModel =
-        SmtFixedModel(source, model, retained, control, originalSource)
+    override fun withRecursiveDefinitions(source: List<SExpr>): SmtSessionModel {
+        val names = source.flatMap { expression ->
+            val command = expression as? SExpr.SList
+            when (command?.head()) {
+                "define-fun-rec" -> listOf(symbol((command.items[1] as SExpr.Atom).text))
+                "define-funs-rec" -> (command.items[1] as SExpr.SList).items.map {
+                    symbol(((it as SExpr.SList).items[0] as SExpr.Atom).text)
+                }
+                else -> emptyList()
+            }
+        }.toSet()
+        val ordinary = SmtSourceModel(model.values.filter { symbol(it.first.name) !in names })
+        return SmtFixedModel(source, ordinary, retained, control, originalSource)
+    }
 
     override fun render(): String {
         val response = SExprReader(model.toSmtLib()).readAll().single() as SExpr.SList
@@ -432,7 +444,8 @@ internal class SmtFixedModel(
         val name = (identifier.items[1] as SExpr.Atom).text
         if (name == "is") {
             val constructor = symbol((identifier.items[2] as SExpr.Atom).text)
-            return SmtValue.Boolean(constructorSymbol((args.single() as SmtValue.Application).constructor) == constructor)
+            val value = args.single() as SmtValue.Application
+            return SmtValue.Boolean(constructorSymbol(value.constructor) == constructor)
         }
         if (name.startsWith("bv") && args.isEmpty()) {
             val width = (identifier.items[2] as SExpr.Atom).text.toInt()
@@ -534,11 +547,16 @@ internal class SmtFixedModel(
         if (exponent.signum() < 0) unavailable("negative real power is outside this extension")
         if (args[0] is SmtValue.Integer) {
             var base = integer(args[0])
+            if (base != BIG_ZERO && base != BIG_ONE && base != -BIG_ONE &&
+                exponent > parseBigInt("100000")) unavailable("integer power representation limit")
             var result = BIG_ONE
             val two = BIG_ONE + BIG_ONE
             while (exponent > BIG_ZERO) {
                 checkpoint()
-                if (!exponent.remainderOf(two).isZero()) result *= base
+                if (!exponent.remainderOf(two).isZero()) {
+                    checkpoint(base.toString().length.toLong() + result.toString().length)
+                    result *= base
+                }
                 exponent /= two
                 if (exponent > BIG_ZERO) base *= base
             }

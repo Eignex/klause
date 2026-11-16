@@ -55,6 +55,8 @@ internal class SmtSessionChannels(
 internal fun smtSessionString(value: String): String = "\"${value.replace("\"", "\"\"")}\""
 internal fun smtSessionStringValue(value: SExpr): String {
     val text = (value as? SExpr.Atom)?.text ?: throw UnsupportedSmtException("expected a string literal")
-    if (text.length < 2 || !text.startsWith('"') || !text.endsWith('"')) throw UnsupportedSmtException("expected a string literal")
+    if (text.length < 2 || !text.startsWith('"') || !text.endsWith('"')) {
+        throw UnsupportedSmtException("expected a string literal")
+    }
     return text.substring(1, text.lastIndex).replace("\"\"", "\"")
 }

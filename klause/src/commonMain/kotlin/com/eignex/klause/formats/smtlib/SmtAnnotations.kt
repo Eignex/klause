@@ -37,14 +37,17 @@ internal fun normalizeSmtSourceCommands(
                         while (index < items.size) {
                             val keyword = (items[index++] as? SExpr.Atom)?.text
                                 ?.takeIf { it.startsWith(':') } ?: smtUnsupported("expected an annotation keyword")
-                            val value = items.getOrNull(index)?.takeUnless { it is SExpr.Atom && it.text.startsWith(':') }
+                            val value = items.getOrNull(index)?.takeUnless {
+                                it is SExpr.Atom && it.text.startsWith(':')
+                            }
                             if (value != null) index++
                             if (keyword == ":named") {
                                 val label = value as? SExpr.Atom ?: smtUnsupported(":named requires a symbol")
                                 if (freeAnnotationSymbols(body, scope.datatypes.operatorNames).any { it in bound }) {
                                     smtUnsupported(":named requires a closed term")
                                 }
-                                val sort = scope.termSort(body) ?: smtUnsupported(":named requires a closed well-sorted term")
+                                val sort = scope.termSort(body)
+                                    ?: smtUnsupported(":named requires a closed well-sorted term")
                                 accept(SExpr.SList(listOf(SExpr.Atom("define-fun"), label, SExpr.SList(emptyList()),
                                     SExprReader(sort.toSmtLib()).readAll().single(), body)))
                             }
@@ -60,7 +63,8 @@ internal fun normalizeSmtSourceCommands(
                         "let" -> (node.items.getOrNull(1) as? SExpr.SList)?.items.orEmpty().mapNotNull {
                             ((it as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol)
                         }.toSet()
-                        "define-fun", "define-fun-rec" -> (node.items.getOrNull(2) as? SExpr.SList)?.items.orEmpty().mapNotNull {
+                        "define-fun", "define-fun-rec" ->
+                            (node.items.getOrNull(2) as? SExpr.SList)?.items.orEmpty().mapNotNull {
                             ((it as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol)
                         }.toSet()
                         else -> emptySet()
@@ -102,7 +106,9 @@ private fun freeAnnotationSymbols(root: SExpr, constructors: Set<String>): Set<S
             is SExpr.SList -> {
                 if ((node.items.firstOrNull() as? SExpr.Atom)?.text == "let" && node.items.size == 3) {
                     val bindings = (node.items[1] as? SExpr.SList)?.items.orEmpty().mapNotNull { it as? SExpr.SList }
-                    val names = bindings.mapNotNull { (it.items.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol) }.toSet()
+                    val names = bindings.mapNotNull {
+                        (it.items.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol)
+                    }.toSet()
                     bindings.forEach { binding -> binding.items.getOrNull(1)?.let { work += it to bound } }
                     work += node.items[2] to (bound + names)
                 } else if ((node.items.firstOrNull() as? SExpr.Atom)?.text == "match" && node.items.size == 3) {

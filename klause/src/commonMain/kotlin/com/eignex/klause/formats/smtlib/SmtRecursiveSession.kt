@@ -62,7 +62,8 @@ fun solveSmtRecursiveSession(
         return forms
     }
     val declarations = definitions.map { definition ->
-        recList("declare-fun", definition.rawName, SExpr.SList(definition.parameters.map { it.second }), definition.sort)
+        recList("declare-fun", definition.rawName,
+            SExpr.SList(definition.parameters.map { it.second }), definition.sort)
     }
     val sourceScope = smtSessionScope(replaceDefinitions(declarations), cancellation)
     val constructors = sourceScope.datatypes.operatorNames
@@ -97,8 +98,11 @@ fun solveSmtRecursiveSession(
         applications += definition to arguments
     }
     for ((definition, arguments) in applications.distinct()) {
-        if (arguments.size != definition.parameters.size) throw UnsupportedSmtException("wrong recursive function arity")
-        val application = if (arguments.isEmpty()) definition.rawName else SExpr.SList(listOf(definition.rawName) + arguments)
+        if (arguments.size != definition.parameters.size) {
+            throw UnsupportedSmtException("wrong recursive function arity")
+        }
+        val application = if (arguments.isEmpty()) definition.rawName
+            else SExpr.SList(listOf(definition.rawName) + arguments)
         if (sourceScope.termSort(application) == null) continue
         necessary += recList("assert", recList("=", application,
             substitute(definition.body, definition.parameters.map { it.first }.zip(arguments).toMap())))
@@ -142,7 +146,10 @@ fun solveSmtRecursiveSession(
             if (suitable && wellSorted && solve(script(proof)).status == "unsat") {
                 val checked = relaxation.model.withRecursiveDefinitions(commands)
                 val assertions = ordinary.filter { it.recHead() == "assert" }.map { it.items[1] }
-                if (checked != null && assertions.all { checked.evaluate(it) == "true" }) {
+                val accepted = checked != null && try {
+                    assertions.all { checked.evaluate(it) == "true" }
+                } catch (_: UnsupportedSmtException) { false }
+                if (accepted) {
                     return SmtSessionResult("sat", checked, observations = relaxation.observations)
                 }
             }
@@ -170,7 +177,9 @@ fun solveSmtRecursiveSession(
     var attempted = 0
     while (attempted++ < candidateLimit) {
         if (cancellation()) return SmtSessionResult("unknown", reasonUnknown = "cancelled")
-        val interpretations = definitions.indices.map { index -> definitions[index].define(candidates[index][positions[index]]) }
+        val interpretations = definitions.indices.map { index ->
+            definitions[index].define(candidates[index][positions[index]])
+        }
         val candidateCommands = replaceDefinitions(interpretations)
         val candidateSource = script(candidateCommands)
         val wellSorted = try {
@@ -186,7 +195,8 @@ fun solveSmtRecursiveSession(
                 val arguments = definition.parameters.map { (_, sort) ->
                     fresh().also { validation += recList("declare-const", it, sort) }
                 }
-                val application = if (arguments.isEmpty()) definition.rawName else SExpr.SList(listOf(definition.rawName) + arguments)
+                val application = if (arguments.isEmpty()) definition.rawName
+                    else SExpr.SList(listOf(definition.rawName) + arguments)
                 equalities += recList("=", application,
                     substitute(definition.body, definition.parameters.map { it.first }.zip(arguments).toMap()))
             }
@@ -214,7 +224,9 @@ private fun recursiveCalls(body: SExpr, names: Set<String>): List<RecursiveCall>
     while (work.isNotEmpty()) {
         val (term, guards) = work.removeLast()
         when (term) {
-            is SExpr.Atom -> if (smtSessionSymbol(term.text) in names) calls += RecursiveCall(smtSessionSymbol(term.text), emptyList(), guards)
+            is SExpr.Atom -> if (smtSessionSymbol(term.text) in names) {
+                calls += RecursiveCall(smtSessionSymbol(term.text), emptyList(), guards)
+            }
             is SExpr.SList -> {
                 if (term.recHead() in names) calls += RecursiveCall(term.recHead(), term.items.drop(1), guards)
                 if (term.recHead() == "ite" && term.items.size == 4) {
@@ -247,7 +259,8 @@ private data class RecursiveDefinition(val fields: List<SExpr>) {
     }
     val sort: SExpr get() = fields[2]
     val body: SExpr get() = fields[3]
-    fun define(candidate: SExpr): SExpr.SList = SExpr.SList(listOf(SExpr.Atom("define-fun")) + fields.take(3) + candidate)
+    fun define(candidate: SExpr): SExpr.SList =
+        SExpr.SList(listOf(SExpr.Atom("define-fun")) + fields.take(3) + candidate)
     fun candidates(recursiveNames: Set<String>): List<SExpr> {
         val values = ArrayList<SExpr>()
         val scalar = (sort as? SExpr.Atom)?.text
@@ -367,5 +380,6 @@ private sealed interface RecursiveSubstitutionFrame {
         RecursiveSubstitutionFrame
 }
 
-private fun SExpr.SList.recHead(): String = (items.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol).orEmpty()
+private fun SExpr.SList.recHead(): String =
+    (items.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol).orEmpty()
 private fun recList(head: String, vararg args: SExpr): SExpr.SList = SExpr.SList(listOf(SExpr.Atom(head)) + args)
