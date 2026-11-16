@@ -83,5 +83,5 @@ private fun retainSmtSessionModel(
             problem.originalSource?.typed?.datatypes?.cardinality(sort, cap, control)
     }
     val source = problem.originalSource?.typed?.commands ?: emptyList()
-    SmtFixedModel(source, SmtSourceModel(declarations), snapshot, control)
+    SmtFixedModel(source, SmtSourceModel(declarations), snapshot, control, problem.originalSource)
 }

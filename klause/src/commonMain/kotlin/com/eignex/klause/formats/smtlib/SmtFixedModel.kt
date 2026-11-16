@@ -24,6 +24,7 @@ internal class SmtFixedModel(
     private val model: SmtSourceModel,
     private val retained: SmtModelValues,
     private val control: ExecutionControl,
+    private val originalSource: SmtSourceSnapshot? = null,
 ) : SmtSessionModel {
     private data class Definition(val parameters: List<String>, val body: SExpr)
     private val definitions = LinkedHashMap<String, Definition>()
@@ -76,7 +77,7 @@ internal class SmtFixedModel(
     }
 
     override fun withRecursiveDefinitions(source: List<SExpr>): SmtSessionModel =
-        SmtFixedModel(source, model, retained, control)
+        SmtFixedModel(source, model, retained, control, originalSource)
 
     override fun render(): String {
         val response = SExprReader(model.toSmtLib()).readAll().single() as SExpr.SList
@@ -334,7 +335,38 @@ internal class SmtFixedModel(
             if (value !is SmtValue.Function) return value
             return table(value, args)
         }
+        val schema = originalSource?.typed?.symbols?.firstOrNull {
+            symbol(it.declaration.name) == name && it.definition == null
+        }?.declaration
+        if (schema != null) {
+            val parameters = args.map(::valueSort)
+            val rank = instantiateSmtRank(schema.parameters, schema.result,
+                originalSource.typed.sortParameters, parameters, result, control)
+            if (rank != null) {
+                val value = originalSource.polymorphicModel?.instantiate(name, rank.first, rank.second, values) {
+                        sort, second -> originalSource.typed.datatypes?.modelPoint(sort, second, values)
+                }
+                if (value != null) return if (value is SmtValue.Function) table(value, args) else value
+            }
+        }
         unavailable("the retained model has no interpretation for '$name'")
+    }
+
+    private fun valueSort(value: SmtValue): SmtSort = when (value) {
+        is SmtValue.Boolean -> SmtSort.Bool
+        is SmtValue.Integer -> SmtSort.Int
+        is SmtValue.Real -> SmtSort.Real
+        is SmtValue.BitVector -> SmtSort.BitVector(value.bits.length)
+        is SmtValue.Array -> value.sort
+        is SmtValue.Uninterpreted -> value.sort
+        is SmtValue.Application -> {
+            val identifier = SExprReader(value.constructor).readAll().single()
+            val scope = smtSessionScope(source, control)
+            if (identifier is SExpr.SList && identifier.head() == "as") scope.sourceSort(identifier.items[2])
+            else scope.datatypes.resolve(symbol((identifier as SExpr.Atom).text), value.arguments.map(::valueSort))
+                ?.result ?: unavailable("constructor result sort is not determined")
+        }
+        is SmtValue.Function -> unavailable("functions cannot be first-order arguments")
     }
 
     private fun table(table: SmtValue.Function, args: List<SmtValue>): SmtValue {
