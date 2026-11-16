@@ -4,10 +4,10 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.transcendental.RationalEnclosure
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
-import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.remainderOf
 import com.eignex.util.numbers.shr

@@ -1,19 +1,19 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.real.ExactRealFunction
 import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.arithmetic.real.RealCertificationUnavailable
 import com.eignex.klause.arithmetic.real.RealDomainInvalid
-import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
-import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
-import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
-import com.eignex.util.numbers.BigFraction
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
@@ -25,10 +25,15 @@ import com.eignex.util.numbers.signum
 internal class SmtArithmeticConstants(private val control: ExecutionControl) {
     private val arithmetic = smtExactArithmetic(control)
 
-    fun knownRational(expression: SExpr): BigFraction? = try { rational(expression) }
-        catch (_: TranscendentalResourceLimit) { null }
-        catch (_: TranscendentalInterrupted) { throw PolynomialSourceInterrupted() }
-        catch (_: PolynomialInterrupted) { throw PolynomialSourceInterrupted() }
+    fun knownRational(expression: SExpr): BigFraction? = try {
+        rational(expression)
+    } catch (_: TranscendentalResourceLimit) {
+        null
+    } catch (_: TranscendentalInterrupted) {
+        throw PolynomialSourceInterrupted()
+    } catch (_: PolynomialInterrupted) {
+        throw PolynomialSourceInterrupted()
+    }
 
     fun rational(expression: SExpr): BigFraction? {
         val work = ArrayDeque<Pair<SExpr, Boolean>>()
@@ -106,10 +111,10 @@ internal class SmtArithmeticConstants(private val control: ExecutionControl) {
                 val lower = floor(enclosure.lower)
                 val upper = floor(enclosure.upper)
                 if (lower == upper) return if (operator == "to_int") literal(BigFraction.of(lower, BIG_ONE))
-                    else if (arithmetic.compare(exact, arithmetic.rational(BigFraction.of(lower, BIG_ONE))) == 0)
-                        SExpr.Atom("true") else if (enclosure.lower > BigFraction.of(lower, BIG_ONE))
-                        SExpr.Atom("false")
-                    else null
+                else if (arithmetic.compare(exact, arithmetic.rational(BigFraction.of(lower, BIG_ONE))) == 0)
+                    SExpr.Atom("true") else if (enclosure.lower > BigFraction.of(lower, BIG_ONE))
+                    SExpr.Atom("false")
+                else null
             }
             return null
         }
@@ -118,9 +123,12 @@ internal class SmtArithmeticConstants(private val control: ExecutionControl) {
         return when (operator) {
             "+" -> literal(values.fold(BigFraction.ZERO, arithmetic.transcendental::add))
             "*" -> literal(values.fold(BigFraction.ONE, arithmetic.transcendental::multiply))
-            "-" -> literal(if (values.size == 1) values.single().negated() else values.drop(1).fold(values.first()) {
-                value, term -> arithmetic.transcendental.add(value, term.negated())
-            })
+            "-" -> literal(
+                if (values.size == 1) values.single().negated()
+                else values.drop(1).fold(values.first()) { value, term ->
+                    arithmetic.transcendental.add(value, term.negated())
+                }
+            )
             "to_real" -> literal(values.single())
             "to_int" -> literal(BigFraction.of(floor(values.single()), BIG_ONE))
             "is_int" -> SExpr.Atom((values.single().den == BIG_ONE).toString())
@@ -136,7 +144,10 @@ internal class SmtArithmeticConstants(private val control: ExecutionControl) {
             control.polynomialSourceCheckpoint(1)
             val (node, combine) = work.removeLast()
             val number = rational(node)
-            if (number != null) { values.addLast(arithmetic.rational(number)); continue }
+            if (number != null) {
+                values.addLast(arithmetic.rational(number))
+                continue
+            }
             val list = node as? SExpr.SList ?: return null
             val head = (list.items.firstOrNull() as? SExpr.Atom)?.text ?: return null
             if (head !in setOf("exp", "log", "sin", "cos", "+", "-", "*")) return null
@@ -160,11 +171,15 @@ internal class SmtArithmeticConstants(private val control: ExecutionControl) {
     private fun floor(value: BigFraction): BigInt {
         val quotient = value.num / value.den
         return if (value.num.signum() < 0 && value.num.remainderOf(value.den) != BIG_ZERO) quotient - BIG_ONE
-            else quotient
+        else quotient
     }
 
     private fun boolean(expression: SExpr): Boolean? = (expression as? SExpr.Atom)?.text?.let {
-        when (it) { "true" -> true; "false" -> false; else -> null }
+        when (it) {
+            "true" -> true
+            "false" -> false
+            else -> null
+        }
     }
     private fun form(operator: String, vararg arguments: SExpr): SExpr =
         SExpr.SList(listOf(SExpr.Atom(operator)) + arguments)

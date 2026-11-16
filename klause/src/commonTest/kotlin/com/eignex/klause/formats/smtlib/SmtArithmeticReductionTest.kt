@@ -22,6 +22,7 @@ import kotlin.test.assertIs
 
 class SmtArithmeticReductionTest {
     private var diagnostic: String? = null
+
     @Test
     fun `variable integer division should keep euclidean signs`() {
         val input = SmtLib.parse("(declare-const n Int) (declare-const d Int) " +

@@ -502,8 +502,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                             if (index.isNotEmpty() && index.any { it != '0' } && index.all { it in '0'..'9' })
                                 SmtSort.Bool else null
                         } else smtIndexedBitVectorSort(indexed, args)
-                    }
-                    else if (signature == null) datatype?.result
+                    } else if (signature == null) datatype?.result
                         ?: if (frame.tester) null else operator(polynomialSymbol(frame.head), args) else {
                         instantiateSmtRank(signature.parameters, signature.result, globalSortParameters, args,
                             frame.qualification, cancellation)?.second ?: return null

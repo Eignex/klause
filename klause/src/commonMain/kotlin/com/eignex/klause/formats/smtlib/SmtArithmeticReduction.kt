@@ -87,18 +87,24 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
             return input.copy(commands = commands, privateBindings = interpretations)
         }
         // Definitions can depend on later private coordinates, so all scalar declarations precede formulas.
-        val insertion = commands.indexOfFirst { it is SExpr.SList && it.polynomialHead() in setOf(
-            "assert", "minimize", "maximize", "check-sat", "check-sat-assuming", "get-model", "get-value", "exit") }
+        val insertion = commands.indexOfFirst {
+            it is SExpr.SList && it.polynomialHead() in setOf(
+                "assert", "minimize", "maximize", "check-sat", "check-sat-assuming", "get-model", "get-value", "exit")
+        }
             .let { if (it < 0) commands.size else it }
         commands.addAll(insertion, declarations)
         if (prelude.isNotEmpty()) {
-            val start = commands.indexOfFirst { it is SExpr.SList &&
-                it.polynomialHead() !in setOf("set-logic", "set-info", "set-option") }
+            val start = commands.indexOfFirst {
+                it is SExpr.SList &&
+                    it.polynomialHead() !in setOf("set-logic", "set-info", "set-option")
+            }
                 .let { if (it < 0) commands.size else it }
             commands.addAll(start, prelude)
         }
-        val query = commands.indexOfFirst { it is SExpr.SList && it.polynomialHead() in setOf(
-            "check-sat", "check-sat-assuming", "get-model", "get-value", "exit") }
+        val query = commands.indexOfFirst {
+            it is SExpr.SList && it.polynomialHead() in setOf(
+                "check-sat", "check-sat-assuming", "get-model", "get-value", "exit")
+        }
             .let { if (it < 0) commands.size else it }
         commands.addAll(query, obligations.map { form("assert", it) })
         val checks = sourceChecks + listOf(SmtArithmeticCongruenceCheck(integerChecks.toList(), false),
@@ -156,7 +162,7 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
                     val arguments = List(node.items.size - 1) { ids.removeLast() }.reversed()
                     val identifier = unqualified(node.items.first())
                     val head = if (identifier is SExpr.Atom) SExpr.Atom(polynomialSymbol(identifier.text))
-                        else identifier
+                    else identifier
                     val name = (head as? SExpr.Atom)?.text?.let(::polynomialSymbol)
                     val key = Key(name ?: head.toString(), arguments, frame.activation)
                     active = frame.activation
@@ -347,7 +353,10 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
 
     private fun freshName(): String {
         var name: String
-        do { step(); name = "klause!arithmetic${identity++}" } while (!used.add(name))
+        do {
+            step()
+            name = "klause!arithmetic${identity++}"
+        } while (!used.add(name))
         return name
     }
 

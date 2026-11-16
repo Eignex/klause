@@ -8,10 +8,10 @@ import com.eignex.klause.arithmetic.real.RealCertificationUnavailable
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
-import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.compareTo
@@ -27,12 +27,19 @@ internal enum class SmtArithmeticOperation { DIV_MOD, REAL_DIV, FLOOR, POWER }
 
 internal class SmtArithmeticCheck(private val operation: SmtArithmeticOperation,
     private val coordinates: List<String>) : SmtSourceCheck {
-    override fun check(values: SmtModelValues): Boolean = try { checkOperation(values) }
-    catch (_: TranscendentalResourceLimit) { throw SmtSourceCheckingUnavailable() }
-    catch (_: TranscendentalInterrupted) { throw CancellationException("SMT arithmetic source checking interrupted") }
-    catch (_: PolynomialResourceLimit) { throw SmtSourceCheckingUnavailable() }
-    catch (_: PolynomialInterrupted) { throw CancellationException("SMT arithmetic source checking interrupted") }
-    catch (_: RealCertificationUnavailable) { throw SmtSourceCheckingUnavailable() }
+    override fun check(values: SmtModelValues): Boolean = try {
+        checkOperation(values)
+    } catch (_: TranscendentalResourceLimit) {
+        throw SmtSourceCheckingUnavailable()
+    } catch (_: TranscendentalInterrupted) {
+        throw CancellationException("SMT arithmetic source checking interrupted")
+    } catch (_: PolynomialResourceLimit) {
+        throw SmtSourceCheckingUnavailable()
+    } catch (_: PolynomialInterrupted) {
+        throw CancellationException("SMT arithmetic source checking interrupted")
+    } catch (_: RealCertificationUnavailable) {
+        throw SmtSourceCheckingUnavailable()
+    }
 
     private fun checkOperation(values: SmtModelValues): Boolean = when (operation) {
         SmtArithmeticOperation.DIV_MOD -> {
@@ -97,25 +104,27 @@ internal data class SmtArithmeticApplication(val coordinates: List<String>, val 
 internal class SmtArithmeticCongruenceCheck(private val applications: List<SmtArithmeticApplication>,
     private val real: Boolean) : SmtSourceCheck {
     override fun check(values: SmtModelValues): Boolean {
-        for (first in applications.indices) for (second in first + 1 until applications.size) {
-            values.arithmeticCheckpoint()
-            val firstApplication = applications[first]
-            val secondApplication = applications[second]
-            if (firstApplication.activation?.let { !values.boolean(it) } == true ||
-                secondApplication.activation?.let { !values.boolean(it) } == true) continue
-            val a = firstApplication.coordinates
-            val b = secondApplication.coordinates
-            if (real) {
-                val numeratorEqual = values.equal(a[0], b[0])
-                val denominatorEqual = values.equal(a[1], b[1])
-                if (numeratorEqual == false || denominatorEqual == false) continue
-                if (numeratorEqual == null || denominatorEqual == null) throw SmtSourceCheckingUnavailable()
-                val resultEqual = values.equal(a[2], b[2]) ?: throw SmtSourceCheckingUnavailable()
-                if (!resultEqual) return false
-            } else if (parseBigInt(values.integer(a[0])) == parseBigInt(values.integer(b[0])) &&
-                parseBigInt(values.integer(a[1])) == parseBigInt(values.integer(b[1]))) {
-                if (parseBigInt(values.integer(a[2])) != parseBigInt(values.integer(b[2])) ||
-                    parseBigInt(values.integer(a[3])) != parseBigInt(values.integer(b[3]))) return false
+        for (first in applications.indices) {
+            for (second in first + 1 until applications.size) {
+                values.arithmeticCheckpoint()
+                val firstApplication = applications[first]
+                val secondApplication = applications[second]
+                if (firstApplication.activation?.let { !values.boolean(it) } == true ||
+                    secondApplication.activation?.let { !values.boolean(it) } == true) continue
+                val a = firstApplication.coordinates
+                val b = secondApplication.coordinates
+                if (real) {
+                    val numeratorEqual = values.equal(a[0], b[0])
+                    val denominatorEqual = values.equal(a[1], b[1])
+                    if (numeratorEqual == false || denominatorEqual == false) continue
+                    if (numeratorEqual == null || denominatorEqual == null) throw SmtSourceCheckingUnavailable()
+                    val resultEqual = values.equal(a[2], b[2]) ?: throw SmtSourceCheckingUnavailable()
+                    if (!resultEqual) return false
+                } else if (parseBigInt(values.integer(a[0])) == parseBigInt(values.integer(b[0])) &&
+                    parseBigInt(values.integer(a[1])) == parseBigInt(values.integer(b[1]))) {
+                    if (parseBigInt(values.integer(a[2])) != parseBigInt(values.integer(b[2])) ||
+                        parseBigInt(values.integer(a[3])) != parseBigInt(values.integer(b[3]))) return false
+                }
             }
         }
         return true

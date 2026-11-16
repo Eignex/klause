@@ -3,8 +3,8 @@ package com.eignex.klause.arithmetic.real
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
-import com.eignex.util.numbers.BigFraction
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
