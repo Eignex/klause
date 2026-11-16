@@ -37,7 +37,9 @@ internal class SmtPolymorphicModel(
                 SmtPolymorphicTransport(archetype, declaration) { sort, second ->
                     modelPoint(sort, second, values, externalPoint)
                 }.reconstruct(values)
-            } catch (_: SmtSourceCheckingUnavailable) { null }
+            } catch (_: SmtSourceCheckingUnavailable) {
+                null
+            }
         }
         val point = modelPoint(result, false, values, externalPoint) ?: return null
         return if (parameters.isEmpty()) point else SmtValue.Function(parameters, emptyList(), point)
@@ -75,7 +77,10 @@ internal class SmtPolymorphicModel(
             when (val frame = work.removeLast()) {
                 is Frame.Evaluate -> {
                     val local = frame.locals[frame.node]
-                    if (local != null) { stack.addLast(local); continue }
+                    if (local != null) {
+                        stack.addLast(local)
+                        continue
+                    }
                     work.addLast(Frame.Combine(frame.node, frame.locals))
                     for (argument in source.terms[frame.node].arguments.asReversed()) {
                         work.addLast(Frame.Evaluate(argument, frame.locals))
@@ -157,7 +162,6 @@ private class SmtPolymorphicTransport(private val archetype: String,
             smtPolymorphicPoint(declaration.result, (function.default as SmtValue.Boolean).value,
                 values, externalPoint))
     }
-
 }
 
 internal fun smtPolymorphicPoint(sort: SmtSort, second: Boolean, values: SmtModelValues,

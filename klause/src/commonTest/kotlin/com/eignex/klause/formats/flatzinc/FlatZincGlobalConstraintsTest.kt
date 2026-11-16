@@ -46,7 +46,8 @@ class FlatZincGlobalConstraintsTest {
 
     @Test
     fun `optional unary exclusion should reach the original choice channel`() {
-        val program = parseFlatZinc("""
+        val program =
+            parseFlatZinc("""
             var 0..2: a; var 0..2: b; var 0..2: c;
             var bool: p; var bool: choice;
             constraint klause_disjunctive_opt([true,true,p],[a,b,c],[2,2,2]);
@@ -63,7 +64,8 @@ class FlatZincGlobalConstraintsTest {
     fun `shared optional guards should preserve polarity and repeated starts`() {
         for (negative in listOf(false, true)) {
             val guard = if (negative) "q" else "p"
-            val program = parseFlatZinc("""
+            val program =
+                parseFlatZinc("""
                 var 0..1: start;
                 var bool: p; var bool: q;
                 constraint bool_not(p,q);
@@ -79,7 +81,8 @@ class FlatZincGlobalConstraintsTest {
 
     @Test
     fun `an absent native task should preserve all values of its start`() {
-        val program = parseFlatZinc("""
+        val program =
+            parseFlatZinc("""
             var -2..2: start;
             array[1..2] of bool: present = [false,true];
             constraint klause_disjunctive_opt(present,[start,0],[2,2]);
@@ -115,7 +118,7 @@ class FlatZincGlobalConstraintsTest {
                     var $domain: d;
                     constraint klause_disjunctive_opt([true,true],[0,1],[1,d]);
                     solve satisfy;
-                    """.trimIndent())
+                """.trimIndent())
             }
         }
     }

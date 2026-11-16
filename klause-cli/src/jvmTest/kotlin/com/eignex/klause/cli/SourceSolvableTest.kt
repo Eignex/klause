@@ -45,7 +45,9 @@ class SourceSolvableTest(private val direction: String) {
             override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
                 points += rendered to objective
             }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         SolveCore.solve(solvable, common, output)

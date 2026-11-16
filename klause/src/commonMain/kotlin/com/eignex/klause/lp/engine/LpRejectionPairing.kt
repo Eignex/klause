@@ -6,8 +6,17 @@ import com.eignex.klause.simplex.exact.ContinuationPhase
 internal enum class LpContinuationSite { EARLY, LATE }
 internal enum class LpRefinementBudget { UNREACHED, AVAILABLE, WORK_EMPTY, ALLOCATION_EMPTY, BOTH_EMPTY }
 internal enum class LpRefinementStage {
-    ADMISSION, PRIOR, ENTRY_CHARGE, RUN, SOURCE_BASIS, SOURCE_AUTHORITY, KNOWN_POINT,
-    STRICT_ELIGIBILITY, STRICT_MARGIN, CHILD_ADMISSION, COMPLETION,
+    ADMISSION,
+    PRIOR,
+    ENTRY_CHARGE,
+    RUN,
+    SOURCE_BASIS,
+    SOURCE_AUTHORITY,
+    KNOWN_POINT,
+    STRICT_ELIGIBILITY,
+    STRICT_MARGIN,
+    CHILD_ADMISSION,
+    COMPLETION,
 }
 
 internal class LpRefinementPath(val preferBasis: Boolean) {

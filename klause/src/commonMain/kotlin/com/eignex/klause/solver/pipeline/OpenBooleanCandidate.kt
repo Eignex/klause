@@ -97,7 +97,9 @@ internal class SourceConjunctionHints private constructor(
         private val primitiveValues = HashMap<Int, Boolean?>()
         private val knownValues = HashMap<Int, Boolean?>()
 
-        init { reserve(2) }
+        init {
+            reserve(2)
+        }
 
         fun visit(count: Int = 1): Boolean {
             if (count > MAX_INDEX_ENTRIES - visits) {
@@ -363,7 +365,10 @@ internal class SourceConjunctionHints private constructor(
                         if (!canonical) {
                             var width = count
                             var levels = 0
-                            while (width > 0) { width = width ushr 1; levels++ }
+                            while (width > 0) {
+                                width = width ushr 1
+                                levels++
+                            }
                             val sortingWork = count.toLong() * levels
                             if (!visit(sortingWork.toInt())) return visitDecline()
                             operands.sort()

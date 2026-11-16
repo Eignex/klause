@@ -37,7 +37,9 @@ internal data class QfNraParams(
     val coupledPreparation: Boolean = true,
     val coupledJoint: Boolean = true,
 ) {
-    init { require(maximumWork == null || maximumWork >= 0) }
+    init {
+        require(maximumWork == null || maximumWork >= 0)
+    }
 }
 
 internal data class QfNraStats(
@@ -280,7 +282,10 @@ internal class QfNraQuery(
                         MAX_WITNESS_TERMS, MAX_WITNESS_BITS))
                 )
             if (refuted) null else WitnessProbe(reducedFormula, boolCount, arithmetic, algebraic, work)
-                .also { it.failureCapture = failureCapture; it.captureSnapshot = progress.searchSnapshot }
+                .also {
+                    it.failureCapture = failureCapture
+                    it.captureSnapshot = progress.searchSnapshot
+                }
                 .probeWitness(realCount, fixed, work::coupled)
         }
         probeCompleted = true
@@ -427,9 +432,18 @@ internal class QfNraQuery(
                     }
                     complete = included == ordered.size
                     try {
-                        val selected = family.map { arithmetic.step(); it }
-                        val required = equations.filter { arithmetic.step(); it in family }
-                        val exclusions = nonzero.filter { arithmetic.step(); it in family }
+                        val selected = family.map {
+                            arithmetic.step()
+                            it
+                        }
+                        val required = equations.filter {
+                            arithmetic.step()
+                            it in family
+                        }
+                        val exclusions = nonzero.filter {
+                            arithmetic.step()
+                            it in family
+                        }
                         failureCapture?.operation(
                             "projection", progress.searchSnapshot, progress.regions,
                             work.spentWork, arithmetic, selected, zeroes = required, nonzero = exclusions,
@@ -848,7 +862,10 @@ internal class WitnessProbe(
                     }
                 ) {
                     repeat(3 * guideIndices.size + 1) { arithmetic.step() }
-                    guideIndices.map { index -> arithmetic.step(); sourcePayloads[index] }
+                    guideIndices.map { index ->
+                        arithmetic.step()
+                        sourcePayloads[index]
+                    }
                 } else null
                 if (guidePayloads != null) {
                     admittedTerms = Triple(
@@ -981,10 +998,16 @@ internal class WitnessProbe(
             )
                 .point(atoms, payloads, realCount, fixed, takeAxis = {
                     arithmetic.step()
-                    if (queries == MAX_WITNESS_AXES) false else { queries++; true }
+                    if (queries == MAX_WITNESS_AXES) false else {
+                        queries++
+                        true
+                    }
                 }, takeProposal = {
                     arithmetic.step()
-                    if (proposals >= MAX_WITNESS_PROPOSALS - 1) false else { proposals++; true }
+                    if (proposals >= MAX_WITNESS_PROPOSALS - 1) false else {
+                        proposals++
+                        true
+                    }
                 }) ?: return null
             candidate(captureRational(point))
         } catch (_: PolynomialResourceLimit) {
@@ -1016,9 +1039,15 @@ internal class WitnessProbe(
                 val axis = plan.axis(atom.polynomial, variable) ?: return null
                 if (axis.isZero || axis.degree <= 0) continue
                 val boundaries = ArrayList<AlgebraicReal?>()
-                for (root in algebraic.roots(axis)) { arithmetic.step(); boundaries.add(root) }
+                for (root in algebraic.roots(axis)) {
+                    arithmetic.step()
+                    boundaries.add(root)
+                }
                 val seen = HashSet<BigFraction>()
-                while (boundaries.any { arithmetic.step(); it != null }) {
+                while (boundaries.any {
+                        arithmetic.step()
+                        it != null
+                    }) {
                     for (index in boundaries.indices) {
                         arithmetic.step()
                         if (exhausted || proposals >= MAX_WITNESS_PROPOSALS / 2) return null
@@ -1208,7 +1237,10 @@ internal class WitnessProbe(
         val affine = ArrayList<Polynomial>()
         for ((index, atom) in atoms.withIndex()) {
             arithmetic.step()
-            val payload = coupledTerms?.let { arithmetic.step(); it[index] } ?: atom.polynomial.terms
+            val payload = coupledTerms?.let {
+                arithmetic.step()
+                it[index]
+            } ?: atom.polynomial.terms
             var linear = true
             for (term in payload) {
                 arithmetic.step()
@@ -1233,9 +1265,15 @@ internal class WitnessProbe(
         val variables = active.sorted()
         val rows = affineRows(affine, variables) ?: return null
         val pivots = rows.map { row ->
-            variables.indices.first { column -> arithmetic.step(); !row[column].isZero }
+            variables.indices.first { column ->
+                arithmetic.step()
+                !row[column].isZero
+            }
         }
-        val free = variables.indices.filter { arithmetic.step(); it !in pivots }
+        val free = variables.indices.filter {
+            arithmetic.step()
+            it !in pivots
+        }
         val scaled = if (queries == 0 && atomTermCounts != null && affine.isEmpty() && atoms.none {
                 arithmetic.step()
                 it.relation == PolynomialRelation.EQ && !it.polynomial.isZero
@@ -1290,9 +1328,13 @@ internal class WitnessProbe(
         orderedGroups.add(variables)
         orderedGroups.addAll(groups)
         for (column in free) orderedGroups.add(listOf(variables[column]))
-        for (group in orderedGroups) for (alternating in listOf(false, true)) for (center in bases.indices) {
-            if (queries >= MAX_WITNESS_AXES / 2 || proposals >= MAX_WITNESS_PROPOSALS / 2) return null
-            offer(center, group, alternating)?.let { return it }
+        for (group in orderedGroups) {
+            for (alternating in listOf(false, true)) {
+                for (center in bases.indices) {
+                    if (queries >= MAX_WITNESS_AXES / 2 || proposals >= MAX_WITNESS_PROPOSALS / 2) return null
+                    offer(center, group, alternating)?.let { return it }
+                }
+            }
         }
         return null
     }
@@ -1316,7 +1358,10 @@ internal class WitnessProbe(
             val count = counts[index]
             if (count < 0 || count > MAX_WITNESS_TERMS - total) return null
             total += count
-            val terms = coupledTerms?.let { arithmetic.step(); it[index] } ?: run {
+            val terms = coupledTerms?.let {
+                arithmetic.step()
+                it[index]
+            } ?: run {
                 repeat(count * (seed.size + 1) + 1) { arithmetic.step() }
                 chargeDyadicSorting(count, seed.size)
                 atom.polynomial.terms
@@ -1411,7 +1456,9 @@ internal class WitnessProbe(
     private data class DyadicWeightEntry(val revision: Long, val value: Long)
 
     private inner class DyadicWeights(val size: Int) {
-        init { arithmetic.step() }
+        init {
+            arithmetic.step()
+        }
 
         private val exponents = IntArray(size)
         private var revision = 0L
@@ -1553,7 +1600,7 @@ internal class WitnessProbe(
         val power = bigIntOf(1) shl magnitude
         arithmetic.step()
         val result = if (exponent < 0) BigFraction.of(bigIntOf(1), power)
-            else BigFraction.of(power, bigIntOf(1))
+        else BigFraction.of(power, bigIntOf(1))
         arithmetic.step()
         return result
     }
@@ -1590,7 +1637,10 @@ internal class WitnessProbe(
         pivots: List<Int>,
         free: List<Int>,
     ): List<BigFraction>? {
-        val direction = MutableList(size) { arithmetic.step(); BigFraction.ZERO }
+        val direction = MutableList(size) {
+            arithmetic.step()
+            BigFraction.ZERO
+        }
         for ((index, variable) in group.withIndex()) {
             repeat(variables.size + free.size + 1) { arithmetic.step() }
             if (variables.indexOf(variable) in free) {
@@ -1611,7 +1661,12 @@ internal class WitnessProbe(
             }
             direction[variables[pivots[index]]] = value
         }
-        return direction.takeIf { it.count { value -> arithmetic.step(); !value.isZero } >= 2 }
+        return direction.takeIf {
+            it.count { value ->
+                arithmetic.step()
+                !value.isZero
+            } >= 2
+        }
     }
 
     private fun offerCoupledLine(
@@ -1651,7 +1706,10 @@ internal class WitnessProbe(
         }.toMutableList()
         var rank = 0
         for (column in variables.indices) {
-            val pivot = (rank until rows.size).firstOrNull { arithmetic.step(); !rows[it][column].isZero }
+            val pivot = (rank until rows.size).firstOrNull {
+                arithmetic.step()
+                !rows[it][column].isZero
+            }
                 ?: continue
             val swap = rows[rank]
             rows[rank] = rows[pivot]
@@ -1699,7 +1757,10 @@ internal class WitnessProbe(
         for ((index, atom) in atoms.withIndex()) {
             var curved = false
             val variables = LinkedHashSet<Int>()
-            val payload = coupledTerms?.let { arithmetic.step(); it[index] } ?: atom.polynomial.terms
+            val payload = coupledTerms?.let {
+                arithmetic.step()
+                it[index]
+            } ?: atom.polynomial.terms
             for (term in payload) {
                 arithmetic.step()
                 val ids = term.monomial.variables
@@ -1946,9 +2007,11 @@ private fun independentRegionAtoms(
     arithmetic: PolynomialArithmetic,
 ): Set<Int> {
     val projectedVariables = HashSet<Int>()
-    for (polynomial in family) for (variable in polynomial.variables) {
-        arithmetic.step()
-        projectedVariables.add(variable)
+    for (polynomial in family) {
+        for (variable in polynomial.variables) {
+            arithmetic.step()
+            projectedVariables.add(variable)
+        }
     }
     val independent = HashSet<Int>()
     for (index in region.atoms.keys) {

@@ -4,7 +4,9 @@ internal class SourceLpFunding(
     private val workLimit: Long,
     private val allocationLimit: Long,
 ) {
-    init { require(workLimit >= 0 && allocationLimit >= 0) }
+    init {
+        require(workLimit >= 0 && allocationLimit >= 0)
+    }
 
     var spent: Long = 0
         private set

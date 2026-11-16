@@ -12,5 +12,7 @@ data class IntPower(
     /** Fixed nonnegative integer exponent. */
     val exponent: Int,
 ) : IntExpr {
-    init { require(exponent >= 0) { "Power requires a nonnegative integer exponent" } }
+    init {
+        require(exponent >= 0) { "Power requires a nonnegative integer exponent" }
+    }
 }

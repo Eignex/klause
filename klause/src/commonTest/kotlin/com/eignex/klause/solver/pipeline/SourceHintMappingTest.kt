@@ -34,11 +34,13 @@ class SourceHintMappingTest {
         ))
 
         for ((y, z) in listOf(1L to 2L, 0L to 1L, 1L to 1L)) {
-            val truth = projected.holds { id -> when (id) {
-                1 -> y
-                2 -> z
-                else -> error("a retained input is required")
-            } }
+            val truth = projected.holds { id ->
+                when (id) {
+                    1 -> y
+                    2 -> z
+                    else -> error("a retained input is required")
+                }
+            }
 
             assertEquals(2 * (3 + 2 * y - z) - y + 5 < 10, truth)
         }

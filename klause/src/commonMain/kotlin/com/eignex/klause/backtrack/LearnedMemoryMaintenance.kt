@@ -22,7 +22,9 @@ internal class LearnedMemoryMaintenance {
     )
 
     private var observed: Position? = null
-    fun reset() { observed = null }
+    fun reset() {
+        observed = null
+    }
 
     fun run(
         session: PropagationSession,

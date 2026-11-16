@@ -68,7 +68,7 @@ internal class LpPassiveVariableChoice(
         if (!accepted) return
         observe(if (applyAdvice) "PASSIVE_VARIABLE_COMMITTED" else "PASSIVE_VARIABLE_COMMIT_WITHHELD")
         if (wasChanged) observe(if (applyAdvice) "PASSIVE_VARIABLE_COMMIT_CHANGED"
-            else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED")
+        else "PASSIVE_VARIABLE_COMMIT_WITHHELD_CHANGED")
     }
 
     private fun Candidate.fractional(): Boolean {

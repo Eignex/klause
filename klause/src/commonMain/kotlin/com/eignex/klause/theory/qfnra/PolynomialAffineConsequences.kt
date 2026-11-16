@@ -60,22 +60,30 @@ internal fun preparePolynomialAffineConsequences(
             if ((row.coefficient.signum() > 0) == increasing) lower.add(bound) else upper.add(bound)
             yield(null)
         }
-        for (a in lower) for (b in upper) {
-            arithmetic.step()
-            val polynomial = arithmetic.subtract(b.polynomial, a.polynomial)
-            val support = polynomial.variables.size
-            if (support < maxOf(a.support, b.support)) {
-                val atom = PolynomialAtom(polynomial,
-                    if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE)
-                val tautology = support == 0 && atom.holds(polynomial.coefficient(Monomial.ONE).signum())
-                if (!tautology && seen.add(atom)) consequences.add(AffineConsequence(atom, support))
+        for (a in lower) {
+            for (b in upper) {
+                arithmetic.step()
+                val polynomial = arithmetic.subtract(b.polynomial, a.polynomial)
+                val support = polynomial.variables.size
+                if (support < maxOf(a.support, b.support)) {
+                    val atom = PolynomialAtom(polynomial,
+                        if (a.strict || b.strict) PolynomialRelation.GT else PolynomialRelation.GE)
+                    val tautology = support == 0 && atom.holds(polynomial.coefficient(Monomial.ONE).signum())
+                    if (!tautology && seen.add(atom)) consequences.add(AffineConsequence(atom, support))
+                }
+                yield(null)
             }
-            yield(null)
         }
     }
-    val ordered = consequences.sortedWith { a, b -> arithmetic.step(); a.support.compareTo(b.support) }
+    val ordered = consequences.sortedWith { a, b ->
+        arithmetic.step()
+        a.support.compareTo(b.support)
+    }
     arithmetic.step()
-    yield(ordered.map { arithmetic.step(); it.atom })
+    yield(ordered.map {
+        arithmetic.step()
+        it.atom
+    })
 }.iterator()
 
 private class ConsequenceInput(val atom: PolynomialAtom, val coefficient: BigFraction, val support: Int)

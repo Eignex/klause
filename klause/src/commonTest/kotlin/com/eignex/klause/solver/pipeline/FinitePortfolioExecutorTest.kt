@@ -269,9 +269,9 @@ class FinitePortfolioExecutorTest {
                     elapsed[arm] += 100L
                     clock += 100.milliseconds
                 }).also {
-                    if (arm == 1) it.restartingSearch = true
-                    if (arm == 2) it.family = ArmFamily.LocalSearch
-                }
+                if (arm == 1) it.restartingSearch = true
+                if (arm == 2) it.family = ArmFamily.LocalSearch
+            }
         }
         val observer = deferredLpProbes(workers)
 

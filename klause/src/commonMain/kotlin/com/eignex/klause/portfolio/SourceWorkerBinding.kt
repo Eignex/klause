@@ -1,6 +1,5 @@
 package com.eignex.klause.portfolio
 
-
 import com.eignex.klause.solver.evidence.QuadraticEngineInvocation
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.incumbent.EngineInvocation

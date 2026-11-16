@@ -68,18 +68,18 @@ internal object NativeLpSuite : BenchSuite {
             "nativeGcPolicy" to "compiled-default",
         ), buildProvenance = provenance, buildFingerprint = provenance?.fingerprint,
             comparisonControls = KlauseLabSuite.comparisonControls(case) + buildMap {
-            put("series", "${case.parameters["comparison-series"] ?: "sdk-v1"}-native-lp")
-            put("cliRuntime", "kotlin-native-linux-x86_64")
-            put("heap-mib", "not-applicable-native")
-            put("gc", "kotlin-native-compiled-default")
-            put("harnessHeapMiB", "512")
-            provenance?.let { build ->
-                put("runtimeFingerprint",
-                    ComparisonProvenance.runtimeFingerprint(build.copy(distribution = emptyMap())))
-                put("harnessFingerprint", identities.harnessFingerprint)
-                put("libraryFingerprint", identities.libraryFingerprint)
-            }
-        })
+                put("series", "${case.parameters["comparison-series"] ?: "sdk-v1"}-native-lp")
+                put("cliRuntime", "kotlin-native-linux-x86_64")
+                put("heap-mib", "not-applicable-native")
+                put("gc", "kotlin-native-compiled-default")
+                put("harnessHeapMiB", "512")
+                provenance?.let { build ->
+                    put("runtimeFingerprint",
+                        ComparisonProvenance.runtimeFingerprint(build.copy(distribution = emptyMap())))
+                    put("harnessFingerprint", identities.harnessFingerprint)
+                    put("libraryFingerprint", identities.libraryFingerprint)
+                }
+            })
         Files.writeString(report.resolve("solve-record.json"),
             Reports.json.encodeToString(SolveRecord.serializer(), retained))
         Files.writeString(context.outputDirectory.resolve("runtime.json"), buildJsonObject {
@@ -132,15 +132,19 @@ internal object NativeLpSuite : BenchSuite {
             SolveMetric.solve(entry, settings, budget, timestamp, sha, installedBuild = { identity },
                 invoke = { current, options, allowance, optimize ->
                     SolverInvocation.withSourceInput(CorpusFetcher.resolve(current.ref.source), allowance) {
-                            file, remaining, ->
+                            file,
+                            remaining,
+                        ->
                         val command = SolverInvocation.klauseCommand(current, options, remaining, optimize,
                             file, executable)
                         SolverInvocation.invoke(command, SolverInvocation.dialectFor(current.ref.format),
                             hardTimeoutMs = remaining.timeoutMillis * 2 + 20_000,
                             captureDirectory = options.captureDirectory, measureResources = options.measureResources,
-                            startProcess = { argv -> ProcessBuilder(argv).apply {
-                                environment()["KLAUSE_DEBUG"] = p.getValue("debug")
-                            }.start() }).copy(buildProvenance = identity)
+                            startProcess = { argv ->
+                                ProcessBuilder(argv).apply {
+                                    environment()["KLAUSE_DEBUG"] = p.getValue("debug")
+                                }.start()
+                            }).copy(buildProvenance = identity)
                     }
                 }).first
         }.getOrElse { failure ->

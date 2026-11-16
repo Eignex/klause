@@ -50,7 +50,7 @@ class SubsetDominationTest {
 
         val reduced = SubsetDomination().removeDominated(
             problem, ColumnRanges.of(problem.intBounds), problem.factors.asList(),
-                budget.orSpent(ExecutionControl.Never),
+            budget.orSpent(ExecutionControl.Never),
         )
 
         val call = budget.invocations.single()
@@ -143,8 +143,10 @@ class SubsetDominationTest {
         val count = 128
         val problem = Problem(0, count * 3 + 4, Array(count * 3 + 4) { IntDomain(0, 1) },
             List(count) { Linear(intArrayOf(1, 1), intArrayOf(0, it + 1), LinearOp.LE, 0) } +
-                List(count) { Linear(intArrayOf(1, 1, 1), intArrayOf(0, count + it + 1, 2 * count + it + 1),
-                    LinearOp.LE, 0) } +
+                List(count) {
+                    Linear(intArrayOf(1, 1, 1), intArrayOf(0, count + it + 1, 2 * count + it + 1),
+                        LinearOp.LE, 0)
+                } +
                 Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, count * 3 + 1, count * 3 + 2, count * 3 + 3),
                     LinearOp.LE, 0))
         val state = SubsetDomination()
@@ -169,8 +171,10 @@ class SubsetDominationTest {
     fun `removing a wider row should not rescan unchanged smaller pairs`() {
         val count = 64
         val rows = List(count) { Linear(intArrayOf(1, 1), intArrayOf(0, it + 1), LinearOp.LE, 0) } +
-            List(count) { Linear(intArrayOf(1, 1, 1), intArrayOf(0, count + it + 1, 2 * count + it + 1),
-                LinearOp.LE, 0) }
+            List(count) {
+                Linear(intArrayOf(1, 1, 1), intArrayOf(0, count + it + 1, 2 * count + it + 1),
+                    LinearOp.LE, 0)
+            }
         val wide = Linear(intArrayOf(1, 1, 1, 1), intArrayOf(0, count * 3 + 1, count * 3 + 2, count * 3 + 3),
             LinearOp.LE, 0)
         val domains = Array(count * 3 + 4) { IntDomain(0, 1) }

@@ -38,9 +38,11 @@ internal fun allDifferentLinearFormula(
                     listOf(Term.ofLit(factor.presents[position]) to BigFraction.ONE), LinearOp.EQ, BigFraction.ZERO,
                 )
             }
-            for (value in factor.exceptSet) choices += comparison(
-                listOf(a to BigFraction.ONE), LinearOp.EQ, BigFraction.ofLong(value),
-            )
+            for (value in factor.exceptSet) {
+                choices += comparison(
+                    listOf(a to BigFraction.ONE), LinearOp.EQ, BigFraction.ofLong(value),
+                )
+            }
             clauses += LinearEncodingFormula.Or(choices)
         }
     }
@@ -67,9 +69,11 @@ internal fun allDifferentPolynomialFormula(
                 val boolean = PolynomialRealFormula.BooleanVariable(SourceBoolId(Lit.variable(literal)))
                 choices += if (Lit.isPositive(literal)) PolynomialRealFormula.Not(boolean) else boolean
             }
-            for (value in factor.exceptSet) choices += PolynomialRealFormula.Atom(
-                a, PolynomialRelation.EQ, PolynomialRealLowering.constant(BigFraction.ofLong(value)),
-            )
+            for (value in factor.exceptSet) {
+                choices += PolynomialRealFormula.Atom(
+                    a, PolynomialRelation.EQ, PolynomialRealLowering.constant(BigFraction.ofLong(value)),
+                )
+            }
             clauses += PolynomialRealFormula.Or(choices)
         }
     }

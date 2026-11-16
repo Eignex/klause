@@ -250,7 +250,7 @@ class PropagationSession private constructor(
         if (simplifiedRootSources?.contains(factor) == true) return null
         if (factor < problem.numFactors) {
             val literals = if (usesNativeSat) (problem.factors[factor] as? Clause)?.literals
-                else (projection.propagators[factor] as? ClausePropagator)?.literals
+            else (projection.propagators[factor] as? ClausePropagator)?.literals
             if (literals == null || literals.size > limit) return null
             state.work += literals.size
             if (!literals.all { lit -> Lit.variable(lit) < problem.numBoolVars }) {

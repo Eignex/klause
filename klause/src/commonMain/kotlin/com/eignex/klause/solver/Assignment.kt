@@ -205,8 +205,10 @@ class Sample private constructor(
 
     /** Certified real values indexed by real variable id, when a residual LP supplied them. */
     val exactReals: List<BigFraction>? = exactReals?.let { snapshotValues(it) }
+
     /** Exact rational or algebraic coordinates certified by a polynomial theory component. */
     val algebraicReals: List<AlgebraicReal>? = algebraicReals?.let { snapshotValues(it) }
+
     /** Authoritative exact real expression coordinates, when supplied by a source owner. */
     val symbolicReals: List<ExactRealValue>? = symbolicReals?.let { snapshotValues(it) }
     private val approximateReals = if (owned) reals else reals.copyOf()

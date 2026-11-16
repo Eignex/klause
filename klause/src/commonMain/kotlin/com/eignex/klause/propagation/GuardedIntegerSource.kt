@@ -124,8 +124,8 @@ internal fun PropagationState.integerGuardTrueAt(guard: Int, trail: Int = undo.s
     val truth = when (atoms.kind[atom]) {
         AtomKind.GE -> if (domain.min >= threshold) true else if (domain.max < threshold) false else null
         AtomKind.LE -> if (domain.max <= threshold) true else if (domain.min > threshold) false else null
-        AtomKind.EQ -> if (domain.min == threshold && domain.max == threshold) true else
-            if (!inDomainAt(atoms.intVar[atom], threshold, trail, domain)) false else null
+        AtomKind.EQ -> if (domain.min == threshold && domain.max == threshold) true
+        else if (!inDomainAt(atoms.intVar[atom], threshold, trail, domain)) false else null
     }
     return truth != null && Lit.evaluate(guard, truth)
 }

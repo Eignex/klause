@@ -13,9 +13,9 @@ internal fun absoluteValueRows(operand: Int, result: Int): List<LinearForm> = li
     LinearForm.Conjunction(listOf(Linear(intArrayOf(1), intArrayOf(result), LinearOp.GE, 0))),
     LinearForm.Disjunction(
         listOf(
-        Linear(intArrayOf(1, -1), intArrayOf(result, operand), LinearOp.EQ, 0),
-        Linear(intArrayOf(1, 1), intArrayOf(result, operand), LinearOp.EQ, 0),
-    )
+            Linear(intArrayOf(1, -1), intArrayOf(result, operand), LinearOp.EQ, 0),
+            Linear(intArrayOf(1, 1), intArrayOf(result, operand), LinearOp.EQ, 0),
+        )
     ),
 )
 

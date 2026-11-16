@@ -74,13 +74,15 @@ class CpToLpRelaxationTest {
                 PbOp.LE, Long.MAX_VALUE),
             PseudoBoolean(longArrayOf(Long.MIN_VALUE), intArrayOf(Lit.make(0, false)), PbOp.GE, Long.MIN_VALUE),
         )
-        for (source in sources) for (factor in listOf<Factor>(source, object : Factor by source {})) {
-            val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
-            val objective = LinearObjective(boolWeights = longArrayOf(1, 1))
+        for (source in sources) {
+            for (factor in listOf<Factor>(source, object : Factor by source {})) {
+                val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
+                val objective = LinearObjective(boolWeights = longArrayOf(1, 1))
 
-            val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))
+                val relaxation = CpToLpRelaxation(problem, objective).build(RootDomains(problem))
 
-            assertEquals(0, relaxation.model.m)
+                assertEquals(0, relaxation.model.m)
+            }
         }
     }
 

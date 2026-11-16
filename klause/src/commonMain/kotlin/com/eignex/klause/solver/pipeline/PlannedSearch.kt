@@ -77,6 +77,7 @@ internal class PreparedSearchComponents(
 
     private val clauses = spec.factors.indices.filter { plan.factorOwner(it) == FactorOwner.SHARED }
         .mapNotNull { spec.factors[it] as? Clause }
+
     // CP owns its projected cardinalities; a second component would enforce them twice.
     private val cardinalities = spec.factors.indices
         .filter { plan.factorOwner(it) != FactorOwner.CP }

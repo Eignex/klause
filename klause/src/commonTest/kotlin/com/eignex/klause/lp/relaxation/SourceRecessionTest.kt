@@ -152,6 +152,7 @@ class SourceRecessionTest {
 
         for ((case, expected) in cases) assertEquals(expected, proves(case), case.name)
     }
+
     @Test
     fun `distinct rays should preserve every affine separation`() {
         val distinct = Distinct((0..1).map {

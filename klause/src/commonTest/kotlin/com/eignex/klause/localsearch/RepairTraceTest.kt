@@ -117,7 +117,10 @@ class RepairTraceTest {
         for (observed in listOf(false, true)) {
             val draws = mutableListOf<Long>()
             val strategy = SourceDrivenStrategy(sources = emptyList(), acceptance = AcceptanceRule.GreedyDescent,
-                feasibleDescent = FeasibleDescent.SelfOwned, perturbation = { draws.add(it.rng.nextLong()); null })
+                feasibleDescent = FeasibleDescent.SelfOwned, perturbation = {
+                    draws.add(it.rng.nextLong())
+                    null
+                })
             val engine = LocalSearchEngine(LocalSearchModel.open(problem), strategy = strategy,
                 restartPolicy = IteratedLocalSearchRestart(initialPerturbationStrength = 1),
                 seedImplicitOnRestart = true)

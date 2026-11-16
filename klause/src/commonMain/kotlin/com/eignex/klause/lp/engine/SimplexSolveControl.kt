@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ArithmeticWorkSource
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.pollStop

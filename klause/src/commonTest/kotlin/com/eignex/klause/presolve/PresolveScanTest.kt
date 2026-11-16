@@ -13,7 +13,10 @@ class PresolveScanTest {
     @Test
     fun `nested scalar scans should share the phase checkpoint cadence`() {
         var polls = 0
-        val control = ExecutionControl { polls++; false }.bindStopControl()
+        val control = ExecutionControl {
+            polls++
+            false
+        }.bindStopControl()
 
         repeat(256) {
             PresolveScan(control).use { scan -> assertFalse(scan.poll()) }

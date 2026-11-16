@@ -120,10 +120,12 @@ internal fun Problem.finiteComponentContract(
         ComponentStrategySupport(ProcedureCompleteness.UNAVAILABLE, emptySet(),
             listOf(ExecutionDecline(cause, "finite", index)))
     val incompleteProjection = integers.any { !intBounds.hasLower(it) || !intBounds.hasUpper(it) } ||
-        factors.any { index -> this.factors[index].intVars.any { column ->
-            !intBounds.hasLower(column) || !intBounds.hasUpper(column) ||
-                ownership?.intOwner(column) == IntVariableOwner.THEORY
-        } }
+        factors.any { index ->
+            this.factors[index].intVars.any { column ->
+                !intBounds.hasLower(column) || !intBounds.hasUpper(column) ||
+                    ownership?.intOwner(column) == IntVariableOwner.THEORY
+            }
+        }
     val unsupportedPropagation = factors.firstOrNull {
         capabilities(it).propagation == PropagationCapability.UNSUPPORTED
     }

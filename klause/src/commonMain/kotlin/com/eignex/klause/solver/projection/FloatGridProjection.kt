@@ -44,7 +44,13 @@ internal class FloatGridRequest(
 }
 
 internal enum class FloatGridDecline {
-    POLICY, COORDINATES, OPEN_INTEGER, GEOMETRY, FACTOR, SCALING, RESOURCE,
+    POLICY,
+    COORDINATES,
+    OPEN_INTEGER,
+    GEOMETRY,
+    FACTOR,
+    SCALING,
+    RESOURCE,
 }
 
 internal sealed interface FloatGridPreparation {
@@ -220,7 +226,7 @@ internal fun floatGridColumn(
     }) ?: return null
     if (origin > upper) return null
     val buckets = if (origin == upper && !variable.preserveBuckets) 1
-        else variable.buckets ?: inheritedBuckets ?: policy.buckets
+    else variable.buckets ?: inheritedBuckets ?: policy.buckets
     val step = if (buckets == 1) BigFraction.ZERO
     else (upper - origin) * BigFraction.ofLong(buckets - 1L).reciprocal()
     val lo = approximateGridValue(origin)

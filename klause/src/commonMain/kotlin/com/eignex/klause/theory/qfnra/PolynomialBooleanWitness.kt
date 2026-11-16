@@ -12,7 +12,10 @@ internal class PolynomialBooleanWitness(
     private val parents: List<List<Int>>,
     private val arithmetic: PolynomialArithmetic,
 ) {
-    private val supported = IntArray(nodes.size) { arithmetic.step(); UNASSIGNED }
+    private val supported = IntArray(nodes.size) {
+        arithmetic.step()
+        UNASSIGNED
+    }
     private val trueChildren = IntArray(nodes.size)
     private val falseChildren = IntArray(nodes.size)
     private val pending = IntArrayDeque()

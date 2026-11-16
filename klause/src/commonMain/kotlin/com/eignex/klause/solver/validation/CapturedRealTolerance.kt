@@ -429,7 +429,7 @@ private fun powerBracket(
     }
     val shift = magnitude.num.magnitudeBitLength() - magnitude.den.magnitudeBitLength() - bits
     val floor = if (shift >= 0) magnitude.num / (magnitude.den shl shift)
-        else (magnitude.num shl -shift) / magnitude.den
+    else (magnitude.num shl -shift) / magnitude.den
     var lowBase = Dyadic(floor, shift.toLong())
     var highBase = Dyadic(floor + BIG_ONE, shift.toLong())
     var low = Dyadic(BIG_ONE, 0L)
@@ -452,7 +452,7 @@ private fun powerBracket(
 // `mantissa * 2^exponent`.
 private class Dyadic(val mantissa: BigInt, val exponent: Long) {
     fun fraction(): BigFraction = if (exponent >= 0) BigFraction.of(mantissa shl exponent.toInt(), BIG_ONE)
-        else BigFraction.of(mantissa, BIG_ONE shl (-exponent).toInt())
+    else BigFraction.of(mantissa, BIG_ONE shl (-exponent).toInt())
 }
 
 // A lower bound on `log2(this)` for a positive fraction, which lies below `2^(log2Floor() + 2)`.

@@ -119,6 +119,7 @@ class ImplicationGraphTest {
         val lifted = booleanArrayOf(true, false).also { delta.rebuild.rebuildInto(it) }
         assertEquals(listOf(true, true), lifted.toList())
     }
+
     @Test
     fun `unused and root fixed columns should not starve equivalence harvesting`() {
         val problem = Problem(

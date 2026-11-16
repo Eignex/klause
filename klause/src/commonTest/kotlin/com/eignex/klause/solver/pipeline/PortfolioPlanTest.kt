@@ -59,7 +59,6 @@ class PortfolioPlanTest {
         }
     }
 
-
     @Test
     fun `sharing memory controls work without diagnostic scheduling`() {
         val params = EngineParams(listOf("sharing-memory=true", "sharing-memory-work=7", "sharing-memory-scratch=1",

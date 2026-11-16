@@ -264,5 +264,4 @@ class ExecutionSemanticsTest {
 
         assertSame(linear, result.linearResult)
     }
-
 }

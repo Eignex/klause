@@ -26,7 +26,10 @@ class DiophantineReductionTest {
         for (sourceLane in listOf(true, false)) {
             val budget = PresolveBudget(1000)
             var polls = 0
-            val token = budget.orSpent(ExecutionControl { polls++; true })
+            val token = budget.orSpent(ExecutionControl {
+                polls++
+                true
+            })
 
             if (sourceLane) {
                 val delta = DiophantineReduction.reduceSource(source, token)
@@ -128,7 +131,10 @@ class DiophantineReductionTest {
         for (workLimited in listOf(true, false)) {
             val budget = PresolveBudget(if (workLimited) 64 else Long.MAX_VALUE)
             var polls = 0
-            val token = budget.orSpent(ExecutionControl { polls++; !workLimited && budget.spent() >= 64 })
+            val token = budget.orSpent(ExecutionControl {
+                polls++
+                !workLimited && budget.spent() >= 64
+            })
 
             val delta = DiophantineReduction.reduce(model, token)
 
@@ -151,7 +157,10 @@ class DiophantineReductionTest {
         )
         val budget = PresolveBudget(Long.MAX_VALUE)
         var polls = 0
-        val token = budget.orSpent(ExecutionControl { polls++; false })
+        val token = budget.orSpent(ExecutionControl {
+            polls++
+            false
+        })
 
         val delta = DiophantineReduction.reduce(model, token)
 

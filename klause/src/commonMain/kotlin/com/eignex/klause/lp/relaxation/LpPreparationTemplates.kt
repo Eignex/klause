@@ -353,15 +353,17 @@ internal class LpPreparationTemplates private constructor(
                             bound.statedUpper != problem.statesUpperBound(variable)
                         ) return false
                     }
-                    for (component in old.components) for (index in component.references.indices) {
-                        if (!visit()) return false
-                        val reference = component.references[index]
-                        val cost = if (Term.isInt(reference)) {
-                            objective?.intCoefficientValues?.getOrElse(Term.intVar(reference)) { 0L } ?: 0L
-                        } else {
-                            objective?.boolWeightValues?.getOrElse(Term.lit(reference) shr 1) { 0L } ?: 0L
+                    for (component in old.components) {
+                        for (index in component.references.indices) {
+                            if (!visit()) return false
+                            val reference = component.references[index]
+                            val cost = if (Term.isInt(reference)) {
+                                objective?.intCoefficientValues?.getOrElse(Term.intVar(reference)) { 0L } ?: 0L
+                            } else {
+                                objective?.boolWeightValues?.getOrElse(Term.lit(reference) shr 1) { 0L } ?: 0L
+                            }
+                            if (cost != component.costs[index]) return false
                         }
-                        if (cost != component.costs[index]) return false
                     }
                     return true
                 }
@@ -390,7 +392,7 @@ internal class LpPreparationTemplates private constructor(
                         }
                         if (!reserveBound()) return null
                         val updated = LpIntegerBoundTemplate(variable, domain.min, domain.max, lower, upper)
-                            changedBounds[variable] = updated
+                        changedBounds[variable] = updated
                         reusedBounds--
                     }
                     if (!visit()) return null
@@ -487,9 +489,9 @@ internal class LpPreparationTemplates private constructor(
                 }
                 val unchangedIncidence = old != null && !old.objectiveIndependent &&
                     old.factors.size == factors.size && factors.indices.all {
-                    if (!visit()) return null
-                    old.factors[it] === factors[it]
-                }
+                        if (!visit()) return null
+                        old.factors[it] === factors[it]
+                    }
                 val groups = if (unchangedIncidence) {
                     requireNotNull(old).components.map { it.factors }
                 } else {
@@ -504,16 +506,18 @@ internal class LpPreparationTemplates private constructor(
                         return current
                     }
                     val owners = HashMap<Int, Int>()
-                    for (index in factors.indices) for (supportId in 0 until factors[index].supportSize) {
-                        val reference = factors[index].reference(supportId)
-                        if (!visit()) return null
-                        val owner = owners.put(reference, index) ?: continue
-                        val first = root(index)
-                        val second = root(owner)
-                        if (first == second) continue
-                        if (ranks[first] < ranks[second]) parents[first] = second else {
-                            parents[second] = first
-                            if (ranks[first] == ranks[second]) ranks[first]++
+                    for (index in factors.indices) {
+                        for (supportId in 0 until factors[index].supportSize) {
+                            val reference = factors[index].reference(supportId)
+                            if (!visit()) return null
+                            val owner = owners.put(reference, index) ?: continue
+                            val first = root(index)
+                            val second = root(owner)
+                            if (first == second) continue
+                            if (ranks[first] < ranks[second]) parents[first] = second else {
+                                parents[second] = first
+                                if (ranks[first] == ranks[second]) ranks[first]++
+                            }
                         }
                     }
                     val collected = LinkedHashMap<Int, MutableList<LpFactorTemplate>>()
@@ -529,19 +533,21 @@ internal class LpPreparationTemplates private constructor(
                     val componentBounds = LinkedHashMap<Int, LpIntegerBoundTemplate>()
                     val costs = ArrayList<Long>()
                     val seen = LinkedHashSet<Int>()
-                    for (entry in group) for (supportId in 0 until entry.supportSize) {
-                        val reference = entry.reference(supportId)
-                        if (!visit()) return null
-                        if (!seen.add(reference)) continue
-                        if (Term.isInt(reference)) {
-                            val variable = Term.intVar(reference)
-                            componentBounds[variable] = bounds.getValue(variable)
-                            if (!reuseMetadata) {
-                                costs.add(objective?.intCoefficientValues?.getOrElse(variable) { 0L } ?: 0L)
+                    for (entry in group) {
+                        for (supportId in 0 until entry.supportSize) {
+                            val reference = entry.reference(supportId)
+                            if (!visit()) return null
+                            if (!seen.add(reference)) continue
+                            if (Term.isInt(reference)) {
+                                val variable = Term.intVar(reference)
+                                componentBounds[variable] = bounds.getValue(variable)
+                                if (!reuseMetadata) {
+                                    costs.add(objective?.intCoefficientValues?.getOrElse(variable) { 0L } ?: 0L)
+                                }
+                            } else if (!reuseMetadata) {
+                                val variable = Term.lit(reference) shr 1
+                                costs.add(objective?.boolWeightValues?.getOrElse(variable) { 0L } ?: 0L)
                             }
-                        } else if (!reuseMetadata) {
-                            val variable = Term.lit(reference) shr 1
-                            costs.add(objective?.boolWeightValues?.getOrElse(variable) { 0L } ?: 0L)
                         }
                     }
                     storage += group.size * 3L + seen.size * 4L

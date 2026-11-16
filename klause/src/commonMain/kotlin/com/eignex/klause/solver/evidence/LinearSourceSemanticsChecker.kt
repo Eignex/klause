@@ -25,9 +25,11 @@ class LinearSourceSemanticsChecker(
     init {
         require(this.premises.all { it.inequality.coefficients.keys.all(this.coordinates::contains) })
         require(this.objective.keys.all(this.coordinates::contains))
-        require(this.premises.all { premise -> premise.guards.keys.all {
-            SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in this.coordinates
-        } })
+        require(this.premises.all { premise ->
+            premise.guards.keys.all {
+                SourceCoordinate(SourceCoordinate.Kind.Boolean, it) in this.coordinates
+            }
+        })
         require(this.premises.all { premise -> premise.integerPins.keys.all(this.coordinates::contains) })
         for (kind in SourceCoordinate.Kind.entries) {
             val ids = this.coordinates.filter { it.kind == kind }.map { it.id }.sorted()
@@ -87,7 +89,7 @@ class LinearSourceSemanticsChecker(
                 ?: return@checked SourceEvidenceCheck.Rejected("ray has no objective scope")
             val slope = dot(objective, direction)
             val improves = if (objectiveScope.sense == ObjectiveSense.MINIMIZE) slope < BigFraction.ZERO
-                else slope > BigFraction.ZERO
+            else slope > BigFraction.ZERO
             if (improves) SourceEvidenceCheck.Checked
             else SourceEvidenceCheck.Rejected("ray does not improve the objective")
         }

@@ -16,7 +16,9 @@ internal class WorkCreditPool(val limit: Long?, val concurrency: Concurrency = C
     val spent: Long get() = counter.value
     val exhausted: Boolean get() = limit?.let { spent >= it } == true
 
-    init { require(limit == null || limit >= 0L) }
+    init {
+        require(limit == null || limit >= 0L)
+    }
 
     fun reserve(maximum: Int): WorkReservation? {
         require(maximum > 0)

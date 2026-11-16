@@ -14,15 +14,17 @@ class SmtArrayValuesTest {
         var comparisons = 0
         val source = SmtLib.parse("(declare-const b Bool)").copy(sourceChecks = listOf(SmtSourceCheck { values ->
             val sort = SmtSort.Array(SmtSort.Bool, SmtSort.Bool)
-            for (left in 0..3) for (right in 0..3) {
-                val a = SmtValue.Array(sort, SmtValue.Boolean(false), listOf(
-                    SmtValue.Boolean(false) to SmtValue.Boolean(left and 1 != 0),
-                    SmtValue.Boolean(true) to SmtValue.Boolean(left and 2 != 0)))
-                val b = SmtValue.Array(sort, SmtValue.Boolean(true), listOf(
-                    SmtValue.Boolean(false) to SmtValue.Boolean(right and 1 != 0),
-                    SmtValue.Boolean(true) to SmtValue.Boolean(right and 2 != 0)))
-                assertEquals(left == right, values.equal(a, b))
-                comparisons++
+            for (left in 0..3) {
+                for (right in 0..3) {
+                    val a = SmtValue.Array(sort, SmtValue.Boolean(false), listOf(
+                        SmtValue.Boolean(false) to SmtValue.Boolean(left and 1 != 0),
+                        SmtValue.Boolean(true) to SmtValue.Boolean(left and 2 != 0)))
+                    val b = SmtValue.Array(sort, SmtValue.Boolean(true), listOf(
+                        SmtValue.Boolean(false) to SmtValue.Boolean(right and 1 != 0),
+                        SmtValue.Boolean(true) to SmtValue.Boolean(right and 2 != 0)))
+                    assertEquals(left == right, values.equal(a, b))
+                    comparisons++
+                }
             }
             true
         }))

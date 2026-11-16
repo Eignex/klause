@@ -56,8 +56,10 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
             }
         }
         for (symbol in source.symbols.filter { it.definition == null }) {
-            if (symbol.declaration.parameters.any { smtSortParameters(it, source.sortParameters, cancellation)
-                    .isNotEmpty() } || smtSortParameters(symbol.declaration.result, source.sortParameters,
+            if (symbol.declaration.parameters.any {
+                    smtSortParameters(it, source.sortParameters, cancellation)
+                        .isNotEmpty()
+                } || smtSortParameters(symbol.declaration.result, source.sortParameters,
                     cancellation).isNotEmpty()) continue
             instance(symbol, symbol.declaration.parameters, symbol.declaration.result)
         }
@@ -124,7 +126,12 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                             listOf(Value(SExpr.Atom(name), sort))
                         }
                         val next = ArrayList<List<Value>>()
-                        for (tuple in tuples) for (value in values) { step(); next += tuple + value }
+                        for (tuple in tuples) {
+                            for (value in values) {
+                                step()
+                                next += tuple + value
+                            }
+                        }
                         tuples = next
                     }
                     tuples
@@ -148,16 +155,20 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
     private fun constructiveSchema(): Boolean {
         // A Boolean interpretation embeds in every available non-datatype sort. Ground terms stay in that image.
         if (source.terms.any { it.operator == "log" }) return false
-        if (source.commands.any { (it as? SExpr.SList)?.polynomialHead() in
-                setOf("declare-datatype", "declare-datatypes") }) return false
+        if (source.commands.any {
+                (it as? SExpr.SList)?.polynomialHead() in
+                    setOf("declare-datatype", "declare-datatypes")
+            }) return false
         val seen = HashSet<Int>()
         val work = ArrayDeque<Int>()
         for ((head, root) in source.obligations) {
             if (head != "assert") return false
             work.addLast(root)
         }
-        for (symbol in source.symbols) symbol.definition?.let { definition ->
-            if (definitionParameters(symbol).isNotEmpty()) work.addLast(definition.body)
+        for (symbol in source.symbols) {
+            symbol.definition?.let { definition ->
+                if (definitionParameters(symbol).isNotEmpty()) work.addLast(definition.body)
+            }
         }
         fun supported(sort: SmtSort): Boolean = sort == SmtSort.Bool ||
             (sort is SmtSort.Uninterpreted && sort.arguments.isEmpty() &&
@@ -217,7 +228,10 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
             when (val frame = work.removeLast()) {
                 is Frame.Evaluate -> {
                     val local = frame.locals[frame.node]
-                    if (local != null) { values.addLast(local); continue }
+                    if (local != null) {
+                        values.addLast(local)
+                        continue
+                    }
                     val node = source.terms[frame.node]
                     work.addLast(Frame.Combine(frame.node, frame.substitution, frame.locals))
                     for (argument in node.arguments.asReversed()) {
@@ -244,7 +258,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                             source.sortParameters, arguments.map { it.sort }, result, cancellation)
                             ?: smtUnsupported("polymorphic helper rank cannot be instantiated")
                         val types = smtRankSubstitution(symbol.declaration, rank.first, rank.second,
-                    source.sortParameters, cancellation)
+                            source.sortParameters, cancellation)
                         val definition = symbol.definition
                         val locals = definition.parameters.indices.associate { index ->
                             definition.parameters[index] to arguments[index].copy(sort = rank.first[index])
@@ -256,7 +270,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                             ?: smtUnsupported("polymorphic function rank cannot be instantiated")
                         val name = instance(symbol, rank.first, rank.second)
                         values.addLast(Value(if (arguments.isEmpty()) SExpr.Atom(name)
-                            else command(name, *arguments.map { it.expression }.toTypedArray()), rank.second))
+                        else command(name, *arguments.map { it.expression }.toTypedArray()), rank.second))
                     }
                 }
             }
@@ -314,7 +328,10 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
             val sort = work.removeLast()
             if (smtSortParameters(sort, source.sortParameters, cancellation).isEmpty()) sorts += sort
             when (sort) {
-                is SmtSort.Array -> { work.addLast(sort.index); work.addLast(sort.element) }
+                is SmtSort.Array -> {
+                    work.addLast(sort.index)
+                    work.addLast(sort.element)
+                }
                 is SmtSort.Uninterpreted -> for (argument in sort.arguments) work.addLast(argument)
                 else -> Unit
             }
@@ -326,9 +343,11 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
         var result = listOf(emptyMap<String, SmtSort>())
         for (parameter in parameters) {
             val next = ArrayList<Map<String, SmtSort>>()
-            for (previous in result) for (sort in sorts) {
-                step()
-                next += previous + (parameter to sort)
+            for (previous in result) {
+                for (sort in sorts) {
+                    step()
+                    next += previous + (parameter to sort)
+                }
             }
             result = next
         }

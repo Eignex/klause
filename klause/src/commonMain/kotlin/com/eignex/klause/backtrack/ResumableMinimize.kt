@@ -81,7 +81,6 @@ import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.theory.requiresRealCompletionSearch
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.bindStopControl
-import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.numbers.BigFraction
 import kotlin.coroutines.cancellation.CancellationException
@@ -181,12 +180,15 @@ internal class ResumableMinimize(
     private var clausePrimal: MonotoneClausePrimal? = null
     private var clausePrimalStarted = false
     private var clausePrimalCandidate: Sample? = null
+
     // Work of the leaf searches, charged to slices as LP work. A search runs to completion like an LP factorization:
     // a slice it overruns repays the excess from the slices that follow.
     private var leafSearchWork = 0L
     private val slice = SliceBudget(
-        { sink.search.searchWork + (clausePrimal?.work ?: 0L) +
-            (if (::lpEngine.isInitialized) lpEngine.primalSearchWork else 0L) },
+        {
+            sink.search.searchWork + (clausePrimal?.work ?: 0L) +
+                (if (::lpEngine.isInitialized) lpEngine.primalSearchWork else 0L)
+        },
         { (if (::lpEngine.isInitialized) lpEngine.totalSolveWork() else 0L) + sink.lp.standaloneWork + leafSearchWork },
         {
             (if (::cp.isInitialized) session.work else preparedSession?.work ?: 0L) +
@@ -213,7 +215,7 @@ internal class ResumableMinimize(
         override fun isCancelled(): Boolean = if (includeSlice) sliceCancelled() else solveCancelled()
         override fun deadline() = runDeadline()
         override val workScheduled get() = baseCancellation.workScheduled()
-        override val stopPolling get() = (if(pausable) globalToken else baseCancellation).stopPolling
+        override val stopPolling get() = (if (pausable) globalToken else baseCancellation).stopPolling
     }
 
     private fun runDeadline(): ComparableTimeMark? = (if (pausable) globalToken else baseCancellation).deadline()
@@ -275,6 +277,7 @@ internal class ResumableMinimize(
     private val resources = SearchInvocationResources().also { owner ->
         owner.own(AutoCloseable { sink.stop() })
     }
+
     // Built once; persists across slices, so warm starts roll forward. Always constructed so the
     // always-on linear lower bound runs; its internal bounds are null/empty when their feature flag
     // is off.
@@ -1246,6 +1249,7 @@ internal class ResumableMinimize(
         }
         if (handoffRootTargets(rootToken)) return null
         var installed: MinimizeResult.WithSample? = null
+
         // A rounding is a leaf of this arm's propagation; the first one to improve the incumbent stops the heuristic.
         fun accept(proposal: Sample): Sample? {
             val started = TimeSource.Monotonic.markNow()
@@ -1357,8 +1361,10 @@ internal class ResumableMinimize(
         if (params.lpPlan.rootBudgetFraction <= 0.0) return params.cancellation
         val opsBudget = lpEngine.params.lpPlan.rootMaxWork
         return params.cancellation or
-            ExecutionControl { lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
-                lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork) }
+            ExecutionControl {
+                lpEngine.workSpentExceeds(opsBudget, sink.lp.standaloneWork) ||
+                    lpEngine.lpWorkAllowanceSpent(sink.lp.standaloneWork)
+            }
     }
 
     /** Milliseconds left until the effective deadline: the armed slice end (pausable portfolio path),
@@ -1385,9 +1391,13 @@ internal class ResumableMinimize(
 
     /** LP guidance affects only branch order; the shared runner still owns every frame and retraction. */
     private inner class LpGuidedBranching : BacktrackBranching {
-        override fun onBranch(variable: VarRef) { lpHints?.branch(variable) }
+        override fun onBranch(variable: VarRef) {
+            lpHints?.branch(variable)
+        }
 
-        override fun onCommit(decision: SearchDecision, depth: Int) { lpHints?.commit(decision, depth) }
+        override fun onCommit(decision: SearchDecision, depth: Int) {
+            lpHints?.commit(decision, depth)
+        }
 
         override fun onRestart() {
             lpHints?.resetHistory()
@@ -1435,7 +1445,7 @@ internal class ResumableMinimize(
                 }
                 val dominated = if (exactBound != null)
                     lpEngine.linearBoundDominates(session, exactBound)
-                    else
+                else
                     lpEngine.linearBoundDominates(session, effectiveBound)
                 if (dominated) return SearchNodeDisposition.Prune
             }
@@ -1497,7 +1507,7 @@ internal class ResumableMinimize(
                         if (pausable && params.cancellation()) return SearchModelDisposition.Pause
                         val published = if (accepted)
                             recordIfImproving(checkNotNull(witness),
-                            objective.evaluate(witness)) else
+                                objective.evaluate(witness)) else
                             null
                         incomplete = published != null && !rebindable
                         unresolved = published == null

@@ -159,11 +159,13 @@ internal class LpHints(
         val point = passivePoint
         val state = passiveState
         val stamp = solveStamp
-        val current = { !cancelled() && passivePoint === point && passiveState === state &&
-            stamp == solveStamp && passivePointCurrent() }
+        val current = {
+            !cancelled() && passivePoint === point && passiveState === state &&
+                stamp == solveStamp && passivePointCurrent()
+        }
         val proposed = LpPassiveVariableChoice.Candidate(proposal, value(proposal))
         val reference = if (proposal == baseline) proposed
-            else LpPassiveVariableChoice.Candidate(baseline, value(baseline))
+        else LpPassiveVariableChoice.Candidate(baseline, value(baseline))
         val selected = choice.select(proposed, reference, stamp,
             fresh = current,
             reliable = { history.hasTwoSidedSamples && history.score(proposal, value(proposal)).isFinite() })

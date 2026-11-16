@@ -43,10 +43,14 @@ class LinearBooleanCutsTest {
     private val objective = LinearObjective(realCoefficients = doubleArrayOf(-1.0, 1.0))
 
     private fun model(refutation: Boolean = false): Problem = Problem(1, 0, emptyArray(), buildList {
-        for (id in 0..1) add(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(id),
-            doubleArrayOf(1.0), LinearOp.LE, 0.0))
-        for (sign in listOf(-1.0, 1.0)) add(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
-            doubleArrayOf(sign, sign), LinearOp.LE, 0.25))
+        for (id in 0..1) {
+            add(ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(id),
+                doubleArrayOf(1.0), LinearOp.LE, 0.0))
+        }
+        for (sign in listOf(-1.0, 1.0)) {
+            add(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
+                doubleArrayOf(sign, sign), LinearOp.LE, 0.25))
+        }
         if (refutation) add(Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1),
             doubleArrayOf(-1.0, 1.0), LinearOp.LE, -0.5))
     }, numRealVars = 2, realLower = doubleArrayOf(-1.0, -1.0), realUpper = doubleArrayOf(1.0, 1.0))
@@ -235,10 +239,11 @@ class LinearBooleanCutsTest {
                 y to BigFraction.MINUS_ONE), quarter))
         }
         val remap: (SourceCoordinate) -> SourceCoordinate = { if (it == y) it.copy(id = 2) else it }
-        val mapped = SourceProofContext(scope, source.coordinates.map(remap).toSet(), source.premises.mapValues {
-            (_, premise) -> SourcePremise(SourceInequality(premise.inequality.coefficients.mapKeys { remap(it.key) },
-                premise.inequality.rhs, premise.inequality.strict), premise.guards, premise.integerPins)
-        }, source.objective.mapKeys { remap(it.key) })
+        val mapped =
+            SourceProofContext(scope, source.coordinates.map(remap).toSet(), source.premises.mapValues { (_, premise) ->
+                SourcePremise(SourceInequality(premise.inequality.coefficients.mapKeys { remap(it.key) },
+                    premise.inequality.rhs, premise.inequality.strict), premise.guards, premise.integerPins)
+            }, source.objective.mapKeys { remap(it.key) })
 
         val verdict = SourceEvidenceVerifier(mapped).verify(common)
 
@@ -277,7 +282,10 @@ class LinearBooleanCutsTest {
             var allocation = 0L
 
             val result = LinearBooleanCutPreparation.prepare(source, ExecutionControl.Never,
-                { steps, bytes -> work += steps; allocation += bytes }, limits)
+                { steps, bytes ->
+                    work += steps
+                    allocation += bytes
+                }, limits)
 
             assertFalse(result.complete)
             assertTrue(result.consequences.isEmpty())

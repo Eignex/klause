@@ -132,9 +132,9 @@ internal data class LpSolveMetrics(
         updateLimitRefactorizations = updateLimitRefactorizations - previous.updateLimitRefactorizations,
         backendRequestedRefactorizations = backendRequestedRefactorizations - previous.backendRequestedRefactorizations,
         reconcileRecoveryRefactorizations =
-            reconcileRecoveryRefactorizations - previous.reconcileRecoveryRefactorizations,
+        reconcileRecoveryRefactorizations - previous.reconcileRecoveryRefactorizations,
         numericalRecoveryRefactorizations =
-            numericalRecoveryRefactorizations - previous.numericalRecoveryRefactorizations,
+        numericalRecoveryRefactorizations - previous.numericalRecoveryRefactorizations,
         primalRefactorizations = primalRefactorizations - previous.primalRefactorizations,
         objectiveWarmAttempts = objectiveWarmAttempts - previous.objectiveWarmAttempts,
         objectiveWarmHits = objectiveWarmHits - previous.objectiveWarmHits,
@@ -437,9 +437,11 @@ internal fun newLpSolver(
             model,
             cancellation,
             null,
-            { part, token, rowOnlyRows -> factory.newGeneralSolver(
-                part, token, workLimit, pricing.componentShare(part.n, model.n, rowOnlyRows),
-            ) },
+            { part, token, rowOnlyRows ->
+                factory.newGeneralSolver(
+                    part, token, workLimit, pricing.componentShare(part.n, model.n, rowOnlyRows),
+                )
+            },
             factory::newComponentSolver,
         )?.let { return it }
     }
@@ -474,9 +476,12 @@ internal fun newComponentTableauCutSolver(
     pricing: LpPricingOptions = LpPricingOptions(),
 ): TableauCutSolver = componentLpSolverOrNull(
     model, cancellation, null,
-    { part, token, rowOnlyRows -> factory.newTableauSolver(
-        part, token, iterationLimit, workLimit, trackDegeneracy, pricing.componentShare(part.n, model.n, rowOnlyRows),
-    ) },
+    { part, token, rowOnlyRows ->
+        factory.newTableauSolver(
+            part, token, iterationLimit, workLimit, trackDegeneracy,
+            pricing.componentShare(part.n, model.n, rowOnlyRows),
+        )
+    },
     { parent, parts, children, isolated ->
         ComponentLpSolver(parent, parts, children, isolated).apply {
             queryAllowance = LpFloatAllowance(workLimit, iterationLimit)

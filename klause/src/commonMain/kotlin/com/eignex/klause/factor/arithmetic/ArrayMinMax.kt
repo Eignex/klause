@@ -36,7 +36,7 @@ class ArrayMinMax(val result: Int, val xs: IntArray, val max: Boolean) : Factor 
     @Suppress("UNUSED_PARAMETER")
     override fun structuralReduce(domains: Array<IntDomain>): FactorReduction = if (xs.size == 1) {
         Rewrite(if (result == xs[0]) emptyList()
-            else listOf(Linear(intArrayOf(1, -1), intArrayOf(result, xs[0]), LinearOp.EQ, 0)))
+        else listOf(Linear(intArrayOf(1, -1), intArrayOf(result, xs[0]), LinearOp.EQ, 0)))
     } else {
         Unchanged
     }

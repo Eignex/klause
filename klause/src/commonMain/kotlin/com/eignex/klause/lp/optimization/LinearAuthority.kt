@@ -51,7 +51,9 @@ internal class LinearAuthority(
     additionalCuts: List<LinearAuthorityCut> = emptyList(),
     private val aggregateCuts: Boolean = false,
 ) : AutoCloseable {
-    init { require(additionalCuts.size <= 64) }
+    init {
+        require(additionalCuts.size <= 64)
+    }
     private val additionalCuts = additionalCuts.toList()
     private var replayCuts: List<LinearAuthorityCut>? = null
 
@@ -516,10 +518,12 @@ internal class LinearAuthority(
         }
         val replay = replayCuts
         val prepared = if (retainLp || cuts) {
-            template?.takeIf { it.matches(source) && (it.cuts != null) == cuts &&
-                (!cuts || it.cuts?.complementary == (cutMask != null) ||
-                    pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
-                    it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer }) }
+            template?.takeIf {
+                it.matches(source) && (it.cuts != null) == cuts &&
+                    (!cuts || it.cuts?.complementary == (cutMask != null) ||
+                        pointPolicy?.managesCurrentRecipe(it.cuts?.rows) == true ||
+                        it.coordinates.all { coordinate -> coordinate.kind == SourceCoordinate.Kind.Integer })
+            }
                 ?: LinearAuthorityTemplate.prepare(source, cancellation, cuts && replay == null,
                     cutMask != null) { work ->
                     cutPreparationWork += work
@@ -568,7 +572,7 @@ internal class LinearAuthority(
                 }
             }, maximumCandidates = 64 - additionalCuts.size,
             limits = if (point == null) LinearAuthorityAggregateCuts.sourcePairLimits
-                else LinearAuthorityAggregateCuts.pointSourcePairLimits,
+            else LinearAuthorityAggregateCuts.pointSourcePairLimits,
             point = point) else emptyList()
         if (funded()) return null
         val additional = if (generated.isEmpty()) additionalCuts else {
@@ -623,8 +627,10 @@ internal class LinearAuthority(
             }
         }
         fun derivation(weights: List<BigFraction>): SourceDerivation = SourceDerivation.Combination(
-            weights.mapIndexedNotNull { id, weight -> if (weight.isZero) null
-                else SourceDerivation.Combination.Term(weight, cited[id].second) })
+            weights.mapIndexedNotNull { id, weight ->
+                if (weight.isZero) null
+                else SourceDerivation.Combination.Term(weight, cited[id].second)
+            })
         fun checked(claim: SourceClaim, proof: SourceDerivation): SourceEvidence? {
             val evidence = SourceEvidence(source.scope, claim, proof)
             return evidence.takeIf {

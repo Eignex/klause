@@ -41,21 +41,21 @@ class ConflictSupportedRemovalTest {
         val control = BacktrackSolver(problem).minimize(
             objective,
             base.copy(
-            objectiveBoundSupplier = {
-                plainCalls++;
-                2.0
-            },
-        )
+                objectiveBoundSupplier = {
+                    plainCalls++
+                    2.0
+                },
+            )
         )
         val observed = BacktrackSolver(problem).minimize(
             objective,
             guidance.observe(
                 base.copy(
-            objectiveBoundSupplier = {
-                observedCalls++;
-                2.0
-            },
-        )
+                    objectiveBoundSupplier = {
+                        observedCalls++
+                        2.0
+                    },
+                )
             )
         )
         guidance.end()

@@ -147,7 +147,6 @@ class CorpusFilesTest {
         }
     }
 
-
     @Test
     fun `readText should return the plain text of a compressed instance`() {
         val root = Files.createTempDirectory("corpusfiles").toFile()

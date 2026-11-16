@@ -1,7 +1,9 @@
 plugins {
-    id("com.eignex.kmp") version "1.3.5"
+    id("com.eignex.kmp")
     kotlin("plugin.serialization")
 }
+
+eignexBuild { jvmToolchain.set(25) }
 
 tasks.withType<org.gradle.api.tasks.testing.AbstractTestTask>().configureEach {
     testLogging.events = testLogging.events + org.gradle.api.tasks.testing.logging.TestLogEvent.STARTED

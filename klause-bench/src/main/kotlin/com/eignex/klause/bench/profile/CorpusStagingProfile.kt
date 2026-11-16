@@ -190,7 +190,7 @@ internal object CorpusStagingProfile {
                         }
                         else -> {
                             observedHash = digest(if (mode == "decode-hash") CorpusFiles.open(source)
-                                else source.inputStream(), ::checkActive)
+                            else source.inputStream(), ::checkActive)
                         }
                     }
                 }.exceptionOrNull()?.toString()

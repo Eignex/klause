@@ -61,7 +61,7 @@ class JointRepairNeighborhoodTest {
                 if (variant == "unpinned") pinned.copy(upper = emptyMap()) else pinned,
                 SourceLpBudget(funding = funding), ExecutionControl { variant == "cancelled" })
             val current = if (variant == "center") listOf(BigFraction.ZERO, BigFraction.ZERO, BigFraction.ONE)
-                else centers
+            else centers
             val cutoff = if (variant == "cutoff") BigFraction.ONE else null
 
             val proposed = repair.propose(current, booleanArrayOf(variant == "boolean"), 2, 1, BigFraction.ONE, cutoff)

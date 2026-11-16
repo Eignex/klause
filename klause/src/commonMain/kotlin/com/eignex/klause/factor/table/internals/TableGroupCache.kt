@@ -20,6 +20,7 @@ import kotlin.concurrent.Volatile
  */
 internal class TableGroupCache(private val arity: Int, private val tuples: LongArray, private val hi: LongArray?) {
     private class Prepared(val index: ExtensionalSupportIndex?)
+
     @Volatile
     private var prepared: Prepared? = null
 

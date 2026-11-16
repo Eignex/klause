@@ -48,31 +48,33 @@ class FiniteNumericalCompanionsTest {
         val center = Sample(BooleanArray(0), LongArray(4) { 1 }, doubleArrayOf(0.0),
             exactReals = listOf(BigFraction.ZERO))
 
-        for (sharePoints in listOf(false, true)) for (arm in 0..1) {
-            val events = mutableListOf<PortfolioLifecycleKind>()
-            val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
-                ExecutionControl.Never, cost, incumbentCompletionCheck = { _, _, _ -> true }).companions)
-            companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
+        for (sharePoints in listOf(false, true)) {
+            for (arm in 0..1) {
+                val events = mutableListOf<PortfolioLifecycleKind>()
+                val companions = assertNotNull(FiniteNumericalCompanions.prepare(model, objective, params,
+                    ExecutionControl.Never, cost, incumbentCompletionCheck = { _, _, _ -> true }).companions)
+                companions.incumbents.exchange.offer(center, BigFraction.ofLong(4))
 
-            PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
-                companions.factories(plan, 0, sharePoints).elementAt(arm)
-                    .materialize(plan, resources.slots[arm]).use { worker ->
-                        worker.onLifecycle = { kind, _ -> events += kind }
-                        assertNotNull(worker.newResumableSearch(companions.incumbents::bound)).use { search ->
-                            repeat(4) {
-                                if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { }
+                PortfolioInvocationResources(2, 1, 0, ExecutionControl.Never, null).use { resources ->
+                    companions.factories(plan, 0, sharePoints).elementAt(arm)
+                        .materialize(plan, resources.slots[arm]).use { worker ->
+                            worker.onLifecycle = { kind, _ -> events += kind }
+                            assertNotNull(worker.newResumableSearch(companions.incumbents::bound)).use { search ->
+                                repeat(4) {
+                                    if (!search.isDone) search.runSlice(ExecutionControl.Never, 1_000, 5_000) { }
+                                }
                             }
                         }
-                    }
-            }
+                }
 
-            assertEquals(sharePoints, PortfolioLifecycleKind.INCUMBENT_IMPORTED in events)
-            if (!sharePoints) {
-                assertFalse(PortfolioLifecycleKind.INCUMBENT_READ in events)
-                assertFalse(PortfolioLifecycleKind.INCUMBENT_CONSUMED in events)
+                assertEquals(sharePoints, PortfolioLifecycleKind.INCUMBENT_IMPORTED in events)
+                if (!sharePoints) {
+                    assertFalse(PortfolioLifecycleKind.INCUMBENT_READ in events)
+                    assertFalse(PortfolioLifecycleKind.INCUMBENT_CONSUMED in events)
+                }
+                assertEquals(4.0, companions.incumbents.bound())
+                assertSame(center, companions.incumbents.exchange.current()?.assignment)
             }
-            assertEquals(4.0, companions.incumbents.bound())
-            assertSame(center, companions.incumbents.exchange.current()?.assignment)
         }
     }
 
@@ -264,9 +266,11 @@ class FiniteNumericalCompanionsTest {
             numericalCompanions = TheoryParams(sourceIncumbentCompletion = true),
             fundedCompanions = true, waitForCompanionImprovement = true, adaptiveCompanionRepair = true)
 
-        baseline.use { before -> candidate.use { after ->
-            assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
-        } }
+        baseline.use { before ->
+            candidate.use { after ->
+                assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
+            }
+        }
 
         val declined = events.filter { it.recipe.endsWith("finite-companion") || it.recipe.endsWith("joint-companion") }
         assertEquals(2, declined.size)
@@ -293,9 +297,11 @@ class FiniteNumericalCompanionsTest {
                 numericalCompanions = TheoryParams(sourceIncumbentCompletion = true),
                 fundedCompanions = true, waitForCompanionImprovement = true, adaptiveCompanionRepair = true)
 
-            baseline.use { before -> candidate.use { after ->
-                assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
-            } }
+            baseline.use { before ->
+                candidate.use { after ->
+                    assertEquals(before.resources.slots.map { it.seed }, after.resources.slots.map { it.seed })
+                }
+            }
         }
     }
 

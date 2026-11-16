@@ -14,7 +14,6 @@ import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraAssignment
-import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
@@ -250,7 +249,7 @@ internal class NonlinearIntegerCursor(
                 current = current.mapIndexed { index, value ->
                     if (index in released)
                         hints.getOrNull(random.nextInt(hints.size.coerceAtLeast(1)))
-                        ?: (value + if (random.nextBoolean()) radius else -radius)
+                            ?: (value + if (random.nextBoolean()) radius else -radius)
                     else
                         value
                 }
@@ -367,12 +366,12 @@ internal class NonlinearIntegerCursor(
         checkNonlinearSource(problem.formula, assignment, arithmetic)
     private fun unknown(): QfNraResult.Unknown =
         representationDecline?.takeIf { !work() }?.copy(stats = polynomialStats()) ?: QfNraResult.Unknown(
-        if (work.limitReached || !params.arithmetic.cancellation())
+            if (work.limitReached || !params.arithmetic.cancellation())
                 QfNraReason.WorkLimit
-        else
+            else
                 QfNraReason.Interrupted,
-        polynomialStats(),
-    )
+            polynomialStats(),
+        )
     private fun polynomialStats(): QfNraStats = invocation.stats.copy(workSpent = work.spent)
     private fun withStats(result: QfNraResult): QfNraResult = when (result) {
         is QfNraResult.Satisfiable -> result.copy(stats = polynomialStats())
@@ -389,50 +388,50 @@ private fun integerNear(value: AlgebraicReal, arithmetic: PolynomialArithmetic):
 
 private fun sourceIntegerHints(formula: PolynomialRealFormula, arithmetic: PolynomialArithmetic): List<BigInt> =
     arithmetic.execution.operation {
-    val hints = linkedSetOf<BigInt>()
-    val formulas = ArrayDeque<PolynomialRealFormula>()
-    val expressions = ArrayDeque<PolynomialExpression>()
-    val seenFormulas = HashSet<PolynomialRealFormula>()
-    val seenExpressions = HashSet<PolynomialExpression>()
-    formulas.addLast(formula)
-    while (formulas.isNotEmpty()) {
-        arithmetic.step()
-        val node = formulas.removeLast()
-        if (!seenFormulas.add(node)) continue
-        when (node) {
-            is PolynomialRealFormula.Atom -> {
-                expressions.addLast(node.left)
-                expressions.addLast(node.right)
+        val hints = linkedSetOf<BigInt>()
+        val formulas = ArrayDeque<PolynomialRealFormula>()
+        val expressions = ArrayDeque<PolynomialExpression>()
+        val seenFormulas = HashSet<PolynomialRealFormula>()
+        val seenExpressions = HashSet<PolynomialExpression>()
+        formulas.addLast(formula)
+        while (formulas.isNotEmpty()) {
+            arithmetic.step()
+            val node = formulas.removeLast()
+            if (!seenFormulas.add(node)) continue
+            when (node) {
+                is PolynomialRealFormula.Atom -> {
+                    expressions.addLast(node.left)
+                    expressions.addLast(node.right)
+                }
+                is PolynomialDistinct -> expressions.addAll(node.operands)
+                is PolynomialSelection -> {
+                    formulas.addLast(node.condition)
+                    expressions.addLast(node.whenTrue)
+                    expressions.addLast(node.whenFalse)
+                }
+                is PolynomialRealFormula.And -> formulas.addAll(node.operands)
+                is PolynomialRealFormula.Or -> formulas.addAll(node.operands)
+                is PolynomialRealFormula.Not -> formulas.addLast(node.operand)
+                else -> Unit
             }
-            is PolynomialDistinct -> expressions.addAll(node.operands)
-            is PolynomialSelection -> {
-                formulas.addLast(node.condition)
-                expressions.addLast(node.whenTrue)
-                expressions.addLast(node.whenFalse)
-            }
-            is PolynomialRealFormula.And -> formulas.addAll(node.operands)
-            is PolynomialRealFormula.Or -> formulas.addAll(node.operands)
-            is PolynomialRealFormula.Not -> formulas.addLast(node.operand)
-            else -> Unit
         }
-    }
-    while (expressions.isNotEmpty()) {
-        arithmetic.step()
-        val node = expressions.removeLast()
-        if (!seenExpressions.add(node)) continue
-        when (node) {
-            is PolynomialExpression.Constant -> {
-                val value = BigFraction.of(node.numerator, node.denominator).ceilInteger()
-                hints.add(value)
-                hints.add(value - BIG_ONE)
-                hints.add(value + BIG_ONE)
-                hints.add(-value)
+        while (expressions.isNotEmpty()) {
+            arithmetic.step()
+            val node = expressions.removeLast()
+            if (!seenExpressions.add(node)) continue
+            when (node) {
+                is PolynomialExpression.Constant -> {
+                    val value = BigFraction.of(node.numerator, node.denominator).ceilInteger()
+                    hints.add(value)
+                    hints.add(value - BIG_ONE)
+                    hints.add(value + BIG_ONE)
+                    hints.add(-value)
+                }
+                is PolynomialExpression.Sum -> expressions.addAll(node.operands)
+                is PolynomialExpression.Product -> expressions.addAll(node.operands)
+                is PolynomialExpression.Power -> expressions.addLast(node.base)
+                is PolynomialExpression.Variable -> Unit
             }
-            is PolynomialExpression.Sum -> expressions.addAll(node.operands)
-            is PolynomialExpression.Product -> expressions.addAll(node.operands)
-            is PolynomialExpression.Power -> expressions.addLast(node.base)
-            is PolynomialExpression.Variable -> Unit
         }
-    }
         hints.toList()
-}
+    }

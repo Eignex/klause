@@ -184,7 +184,6 @@ class SharedCpPremisesTest {
         assertNull(shared.explainAtoms(repeated))
     }
 
-
     @Test
     fun `branched inherited proofs should retain unavailable siblings`() {
         val native = PropagationSession(Problem(1, 2, Array(2) { IntDomain(0, 10) }, arrayOf(
@@ -209,7 +208,6 @@ class SharedCpPremisesTest {
         assertNull(shared.explainAtoms(first))
         assertNull(shared.explainAtoms(repeated))
     }
-
 
     @Test
     fun `native deductions should preserve distinct named bounds`() {
@@ -237,5 +235,4 @@ class SharedCpPremisesTest {
 
         assertContentEquals(intArrayOf(1, 3), assertNotNull(shared.explainAtoms(premise)).literals.sortedArray())
     }
-
 }

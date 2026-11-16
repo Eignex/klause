@@ -66,10 +66,12 @@ class SearchTest {
         val attempts = ArrayList<SearchDecision>()
         val commits = ArrayList<SearchDecision>()
         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
-            componentFactory = { listOf(object : SearchComponent {
-                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
-                    if (context.decisionLevel > 0) ComponentResult.Conflict() else ComponentResult.Consistent
-            }) },
+            componentFactory = {
+                listOf(object : SearchComponent {
+                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                        if (context.decisionLevel > 0) ComponentResult.Conflict() else ComponentResult.Consistent
+                })
+            },
             branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     attempts.add(decision)
@@ -91,10 +93,12 @@ class SearchTest {
         var cancelled = false
         val commits = ArrayList<SearchDecision>()
         val params = BacktrackParams(variableSelector = InputOrder, valueSelector = IndomainMin,
-            componentFactory = { listOf(object : SearchComponent {
-                override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
-                    if (cancelled) ComponentResult.Indeterminate else ComponentResult.Consistent
-            }) },
+            componentFactory = {
+                listOf(object : SearchComponent {
+                    override fun assert(decision: SearchDecision, context: SearchContext): ComponentResult =
+                        if (cancelled) ComponentResult.Indeterminate else ComponentResult.Consistent
+                })
+            },
             cancellation = ExecutionControl { cancelled }, branchObserver = object : SearchBranchAttemptObserver {
                 override fun onAttempt(decision: SearchDecision, context: SearchContext) {
                     cancelled = true
@@ -116,8 +120,12 @@ class SearchTest {
         val events = mutableListOf<String>()
         val exchange = object : ClauseExchange {
             override fun onRestart(session: PropagationSession) = Unit
-            override fun onSearchEnd(session: PropagationSession) { events += "end" }
-            override fun onSearchPause(session: PropagationSession) { events += "pause" }
+            override fun onSearchEnd(session: PropagationSession) {
+                events += "end"
+            }
+            override fun onSearchPause(session: PropagationSession) {
+                events += "pause"
+            }
         }
 
         CpSatisfactionTraversal(

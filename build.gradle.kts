@@ -58,6 +58,12 @@ allprojects {
         }
     }
     repositories {
+        ivy {
+            url = uri("https://github.com/Eignex/kbuild/releases/download")
+            patternLayout { artifact("v[revision]/[artifact]-[revision](-[classifier]).[ext]") }
+            metadataSources { gradleMetadata() }
+            content { includeModule("com.eignex", "kbuild-platform") }
+        }
         maven("https://central.sonatype.com/repository/maven-snapshots/") {
             mavenContent { snapshotsOnly() }
         }

@@ -48,8 +48,16 @@ internal class ExactRealArithmetic(
                         if (integer.startsWith("-")) (4 - residue) % 4 else residue
                     }
                     val value = if (function == ExactRealFunction.SIN) {
-                        when (quadrant) { 1 -> 1L; 3 -> -1L; else -> 0L }
-                    } else when (quadrant) { 0 -> 1L; 2 -> -1L; else -> 0L }
+                        when (quadrant) {
+                            1 -> 1L
+                            3 -> -1L
+                            else -> 0L
+                        }
+                    } else when (quadrant) {
+                        0 -> 1L
+                        2 -> -1L
+                        else -> 0L
+                    }
                     return rational(BigFraction.ofLong(value))
                 }
             }

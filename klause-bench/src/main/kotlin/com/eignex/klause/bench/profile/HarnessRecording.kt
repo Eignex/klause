@@ -40,7 +40,10 @@ internal object HarnessRecording {
                         put("ioPolicy", "IO call duration includes scheduling and GC; it does not prove device wait")
                         putJsonArray("eventTypes") {
                             input.readEventTypes().filter { it.name in events }.forEach { type ->
-                                add(buildJsonObject { put("name", type.name); put("id", type.id) })
+                                add(buildJsonObject {
+                                    put("name", type.name)
+                                    put("id", type.id)
+                                })
                             }
                         }
                     }.toString())

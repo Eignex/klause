@@ -205,7 +205,12 @@ class FactorPolynomialProjectionTest {
             val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
                 if (target != EncodingTarget.POLYNOMIAL) BuiltInEncoderProvider.select(factor, target)
                 else Encoder(if (factor === unsupported) EncoderSupport.UNSUPPORTED else EncoderSupport.EQUIVALENT) {
-                    _, encoding, -> installs++; encoding.polynomial(PolynomialRealFormula.Constant(true)); null
+                        _,
+                        encoding,
+                    ->
+                    installs++
+                    encoding.polynomial(PolynomialRealFormula.Constant(true))
+                    null
                 }
             })
             val declines = ArrayList<EncoderDecline>()

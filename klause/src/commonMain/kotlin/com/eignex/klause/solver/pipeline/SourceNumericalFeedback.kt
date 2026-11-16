@@ -18,7 +18,9 @@ import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class SourceNumericalCutoff(val value: BigFraction, val premise: String) {
-    init { require(premise.isNotBlank()) }
+    init {
+        require(premise.isNotBlank())
+    }
     fun applyTo(
         source: SourceProofContext, funding: SourceLpFunding, cancellation: ExecutionControl = ExecutionControl.Never,
     ): SourceProofContext? {

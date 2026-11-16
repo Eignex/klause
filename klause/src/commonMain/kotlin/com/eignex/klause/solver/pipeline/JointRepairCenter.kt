@@ -67,11 +67,13 @@ internal class JointRepairCenter(
         for ((id, value) in condition.bools) {
             if (stop() || cancellation() || id !in bools.indices || bools[id] != value) return false
         }
-        for (bounds in listOf(condition.lower, condition.upper)) for ((id, value) in bounds) {
-            if (id !in 0 until model.numIntVars || id !in centers.indices) return false
-            val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
-            if (bits > MAX_SCALAR_BITS || !pay(1L + bits * bits / 64L) || cancellation()) return false
-            if (centers[id] != value || condition.lower[id] != condition.upper[id]) return false
+        for (bounds in listOf(condition.lower, condition.upper)) {
+            for ((id, value) in bounds) {
+                if (id !in 0 until model.numIntVars || id !in centers.indices) return false
+                val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
+                if (bits > MAX_SCALAR_BITS || !pay(1L + bits * bits / 64L) || cancellation()) return false
+                if (centers[id] != value || condition.lower[id] != condition.upper[id]) return false
+            }
         }
         if (step.coordinate !in centers.indices || centers[step.coordinate] != step.before ||
             !pay(1L, 64L) || cancellation() || !legal(step.coordinate, step.after)) return false

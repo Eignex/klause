@@ -113,9 +113,9 @@ class CoverColumnDominanceTest {
                 val problem = Problem(
                     3, 0, emptyArray(),
                     listOf(
-                    Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-                    reader,
-                )
+                        Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                        reader,
+                    )
                 )
 
                 assertTrue(CoverColumnDominance.pins(problem, mapOf(0 to 2L, 1 to 1L),
@@ -167,9 +167,9 @@ class CoverColumnDominanceTest {
         val problem = Problem(
             2, 0, emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, false))),
+            )
         )
         for (limit in 0L..40L) {
             val budget = PresolveBudget(limit)
@@ -189,8 +189,8 @@ class CoverColumnDominanceTest {
         val problem = Problem(
             2, 0, emptyArray(),
             listOf(
-            Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
-        )
+                Clause(intArrayOf(Lit.make(0, true), Lit.make(1, true))),
+            )
         )
         val context = PresolveContext(
             objectiveBoolCoeffs = mapOf(0 to 2L, 1 to 1L),
@@ -242,7 +242,7 @@ class CoverColumnDominanceTest {
         assertEquals(
             objective.evaluateLong(witness),
             document.fixedCost + document.softClauses
-            .filter { !holds(Clause(it.literals), mask) }.sumOf { it.weight }
+                .filter { !holds(Clause(it.literals), mask) }.sumOf { it.weight }
         )
         val assumptions = Assumptions.None.withBool(0, witness.boolValue(0)).withBool(1, witness.boolValue(1))
         assertFalse(source.problem.propagate(assumptions) is PropagationResult.Unsat)
@@ -271,8 +271,8 @@ class CoverColumnDominanceTest {
         assertEquals(
             listOf(1, 2, 3),
             (0 until 4).filter { mask ->
-            finite.problem.factors.all { holds(it as Clause, mask) }
-        }
+                finite.problem.factors.all { holds(it as Clause, mask) }
+            }
         )
     }
 

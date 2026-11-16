@@ -79,9 +79,11 @@ class BooleanProofTasksTest {
         val cubes = List(tasks.size) { assertNotNull(tasks.acquire(it)).cube.literals }
 
         for (assignment in 0 until 8) {
-            val matches = cubes.count { cube -> cube.all {
-                Lit.isPositive(it) == (assignment and (1 shl Lit.variable(it)) != 0)
-            } }
+            val matches = cubes.count { cube ->
+                cube.all {
+                    Lit.isPositive(it) == (assignment and (1 shl Lit.variable(it)) != 0)
+                }
+            }
             assertEquals(1, matches)
         }
         assertNull(tasks.acquire(4))

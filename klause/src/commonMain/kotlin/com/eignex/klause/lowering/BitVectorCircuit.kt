@@ -120,7 +120,7 @@ internal class BitVectorCircuit<T>(private val gates: BitVectorGates<T>) {
         val distance = amount % value.size
         return List(value.size) { i ->
             val source = if (right) (i.toLong() + distance) % value.size
-                else (i.toLong() + value.size - distance) % value.size
+            else (i.toLong() + value.size - distance) % value.size
             value[source.toInt()]
         }
     }

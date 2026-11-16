@@ -605,8 +605,10 @@ internal fun LpEngine.sparseSafePrune(
             sink.lp.observeCutAccounting(fresh.size, 0, 0)
             if (fresh.isEmpty()) break
             recordSearchCuts(fresh, boundRes.primal, boundRel, session)
-            for (c in fresh) if (!c.global) {
-                SourceCut.fromCut(c, boundRel).orNull()?.let(localCuts::add)
+            for (c in fresh) {
+                if (!c.global) {
+                    SourceCut.fromCut(c, boundRel).orNull()?.let(localCuts::add)
+                }
             }
             val selectedCuts = cutPool.select(
                 boundRes.primal,
@@ -666,7 +668,9 @@ internal fun LpEngine.sparseSafePrune(
             component?.primary ?: nodeDualCertificate(
                 boundRel.model, boundRes.duals, cancellation, sink.lp.certificationObserver(LpRoute.NODE),
                 eliminateContinuousObjective = !canPrune && objectiveCeiling != null,
-                onAdditionalCertificate = if (canFix) { { additionalCertificates.add(it) } } else null,
+                onAdditionalCertificate = if (canFix) {
+                    { additionalCertificates.add(it) }
+                } else null,
                 sharedMeter = rowMeter,
                 preferredColumns = if (rowMeter != null && canFix && session.decisionLevel > 0) {
                     narrowedRowColumns(boundRel, session, cancellation)
@@ -794,9 +798,9 @@ internal fun LpEngine.sparseSafePrune(
         val additional = solveContext.certificationPolicy.acceptNullable(LpCertifier.INTEGER, candidate) ?: continue
         val phase = if (index == 0) LpSolvePhase.NODE_SECONDARY_FIXING else LpSolvePhase.NODE_TERTIARY_FIXING
         if (observeNodeFixing(sink, phase) {
-            applySparseReducedCostFixing(boundRel, additional, session, bound, sink, objectiveVar,
-                objectiveAscending, learn, cancellation, objectiveCeiling)
-        }) {
+                applySparseReducedCostFixing(boundRel, additional, session, bound, sink, objectiveVar,
+                    objectiveAscending, learn, cancellation, objectiveCeiling)
+            }) {
             return LpNodeOutcome(true, null)
         }
     }
@@ -855,7 +859,7 @@ private fun LpEngine.applyMixedRowBounds(
         repeat(if (relaxer == null) 1 else 2) { pass ->
             if (cancellation.pollStop()) return false
             val affectedColumns = if (session.decisionLevel == 0) null
-                else narrowedRowColumns(current, session, cancellation)
+            else narrowedRowColumns(current, session, cancellation)
             val projected = solveContext.certificationPolicy.acceptNullable(
                 LpCertifier.INTEGER,
                 mixedRowBounds(
@@ -864,8 +868,8 @@ private fun LpEngine.applyMixedRowBounds(
             ).orEmpty()
             var changed = false
             if (observeNodeFixing(sink, LpSolvePhase.NODE_ROW_FIXING) {
-                applyRowBounds(current, projected, session, sink, learn, cancellation) { changed = true }
-            }) return true
+                    applyRowBounds(current, projected, session, sink, learn, cancellation) { changed = true }
+                }) return true
             if (!changed || relaxer == null || pass == 1 || cancellation.pollStop()) return false
             meter.reserve(current.model.numVars.toLong() * 16L + 128L)
             onRefresh()
@@ -923,8 +927,12 @@ private fun LpEngine.applyRowBounds(
         noteNodeOverhead(48L)
         val bool = relaxation.colIsBool[column]
         val pinned = if (bool) session.boolValue(variable) else null
-        val minimum = if (bool) { if (pinned == true) 1L else 0L } else session.intDomain(variable).min
-        val maximum = if (bool) { if (pinned == false) 0L else 1L } else session.intDomain(variable).max
+        val minimum = if (bool) {
+            if (pinned == true) 1L else 0L
+        } else session.intDomain(variable).min
+        val maximum = if (bool) {
+            if (pinned == false) 0L else 1L
+        } else session.intDomain(variable).max
         if ((certificate.upper && threshold >= maximum) || (!certificate.upper && threshold <= minimum)) continue
         noteNodeOverhead(certificate.supportCount.toLong() * LpNodeOverhead.FIXING)
         val support = LpExplanation.rowBoundReason(relaxation, certificate, session) ?: continue
@@ -955,13 +963,13 @@ private fun LpEngine.applyRowBounds(
             }
             noteNodeOverhead(support.size.toLong() + 1L)
             val clause = intArrayOf(conclusion) + support
-                val learned =
-            if (pool.add(clause, registered = true) ) {
-                session.addLearnedClause(Clause(clause), lbd = clause.size, permanent = true)
+            val learned =
+                if (pool.add(clause, registered = true) ) {
+                    session.addLearnedClause(Clause(clause), lbd = clause.size, permanent = true)
                 } else {
                     null
                 }
-                if (learned is PropagationResult.Unsat
+            if (learned is PropagationResult.Unsat
             ) {
                 sink.lp.observePrune()
                 LpClaim.BOUND.consumed(sink.lp.certificationObserver(LpRoute.NODE))
@@ -1234,14 +1242,16 @@ internal fun reducedCostFixingReasons(
         supportCols.add(-1) // row premise: part of every fixing's reason, never excluded
         supportLits.add(premLits[k])
     }
-    for (col in relaxation.colVarId.indices) for (lowerSide in LpExplanation.citedSides(cert, col)) {
-        val premises = LpExplanation.boundPremiseLits(relaxation, session, col, lowerSide) ?: return null
-        // Only the minimizing endpoint is the fixed column's own; a side another bound reads stays in its reason.
-        val sign = cert.reducedCostSign(col)
-        val own = relaxation.colVarId[col] >= 0 && sign != 0 && lowerSide == sign > 0
-        for (literal in premises) {
-            supportCols.add(if (own) col else -1)
-            supportLits.add(literal)
+    for (col in relaxation.colVarId.indices) {
+        for (lowerSide in LpExplanation.citedSides(cert, col)) {
+            val premises = LpExplanation.boundPremiseLits(relaxation, session, col, lowerSide) ?: return null
+            // Only the minimizing endpoint is the fixed column's own; a side another bound reads stays in its reason.
+            val sign = cert.reducedCostSign(col)
+            val own = relaxation.colVarId[col] >= 0 && sign != 0 && lowerSide == sign > 0
+            for (literal in premises) {
+                supportCols.add(if (own) col else -1)
+                supportLits.add(literal)
+            }
         }
     }
     return ReducedCostFixingReasons(
@@ -1529,7 +1539,7 @@ private fun LpEngine.retainedRootLpRelaxationBound(
             }
             // Scoped preparation has already charged its scaling-construction reservation.
             val metrics = if (nodeUsesTrail) propagator.lastMetrics.copy(preparationOps = 0L)
-                else attempt.first.lastMetrics
+            else attempt.first.lastMetrics
             observeRootSolve(attempt.first, metrics)
             val component = attempt.first as? ComponentLpSolverCapability
             if (attempt.second?.optimal != true) {

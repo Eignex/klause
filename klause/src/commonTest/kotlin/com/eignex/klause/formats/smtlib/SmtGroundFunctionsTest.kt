@@ -3,16 +3,16 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.solver.pipeline.ExecutionOperation
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.TranscendentalTheoryParams
 import com.eignex.klause.solver.pipeline.execute
-import com.eignex.klause.solver.pipeline.FiniteEngine
-import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
@@ -83,7 +83,6 @@ class SmtGroundFunctionsTest {
         assertIs<OpenTheoryResult.Sat>(result)
     }
 
-
     @Test
     fun `quoted grammar words remain ordinary declared function symbols`() {
         val parsed = SmtLib.parse("""
@@ -97,7 +96,6 @@ class SmtGroundFunctionsTest {
 
         assertIs<OpenTheoryResult.Unsat>(result)
     }
-
 
     @Test
     fun `quoted Core constants and sorts retain interpreted meaning`() {
@@ -117,7 +115,6 @@ class SmtGroundFunctionsTest {
 
         assertIs<OpenTheoryResult.Unsat>(result)
     }
-
 
     @Test
     fun `equal arguments require equal uninterpreted results`() {

@@ -201,7 +201,7 @@ internal interface RepairSearch : AutoCloseable {
     fun begin(assumptions: Assumptions, decisionBudget: Long, cutoff: Double, cancellation: ExecutionControl)
 
     fun beginExact(assumptions: Assumptions, decisionBudget: Long, cutoff: BigFraction,
-        cancellation: ExecutionControl) : Unit =
+        cancellation: ExecutionControl): Unit =
         throw UnsupportedOperationException("exact repair cutoffs are unavailable")
 
     fun runSlice(cancellation: ExecutionControl, millis: Long, work: Long): RepairSearchStep

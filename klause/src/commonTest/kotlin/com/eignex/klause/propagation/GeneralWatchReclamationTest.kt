@@ -109,6 +109,7 @@ class GeneralWatchReclamationTest {
             assertEquals(true, session.boolValue(5))
         }
     }
+
     @Test
     fun `a missing live back pointer should leave full compaction available`() {
         val session = PropagationSession(Problem(6, 0, emptyArray(),

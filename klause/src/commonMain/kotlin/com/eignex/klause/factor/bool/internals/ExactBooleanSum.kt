@@ -50,7 +50,7 @@ internal class ExactBooleanSum(constants: IntegralConstants, literals: IntArray)
         if (holds(sum, op)) return 0
         val residual = sum - bound
         val magnitude = if (residual.magnitudeBitLength() >= Long.SIZE_BITS) Long.MAX_VALUE
-            else if (residual.signum() < 0) (-residual).toLong() else residual.toLong()
+        else if (residual.signum() < 0) (-residual).toLong() else residual.toLong()
         return compressViolation(magnitude, softCap)
     }
 }

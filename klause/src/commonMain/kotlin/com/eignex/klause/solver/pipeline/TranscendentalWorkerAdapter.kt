@@ -190,7 +190,7 @@ internal class TranscendentalWorkerAdapter(
                 if (lifetime()) return finish(SolveResult.Unknown(terminationReason(), stats))
                 if (sliceNodes == 0L || sliceMillis == 0L) return null
                 deadline = if (sliceMillis == Long.MAX_VALUE) ExecutionControl.Never
-                    else ExecutionControl.after(sliceMillis.milliseconds)
+                else ExecutionControl.after(sliceMillis.milliseconds)
                 end = if (sliceNodes < 0) Long.MAX_VALUE else work + minOf(sliceNodes, Long.MAX_VALUE - work)
                 return try {
                     if (run == null) {

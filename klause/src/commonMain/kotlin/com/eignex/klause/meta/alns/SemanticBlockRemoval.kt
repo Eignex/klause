@@ -161,7 +161,10 @@ internal class SemanticBlockRemoval(
     ) {
         val count = factor.starts.size
         if (count > maxVariables) work.stop(RepairBlockDecline.Oversized)
-        val starts = LongArray(count) { work.charge(); center.intValue(factor.starts[it]) }
+        val starts = LongArray(count) {
+            work.charge()
+            center.intValue(factor.starts[it])
+        }
         val order = (0 until count).sortedWith { left, right ->
             work.charge()
             starts[left].compareTo(starts[right]).takeIf { it != 0 } ?: left.compareTo(right)

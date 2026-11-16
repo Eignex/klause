@@ -38,7 +38,11 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
         }
     }
     sample.ownedReferences(lazyReasonMemo, lazyReasonMemo.size.toLong() * 2L, true)
-    lazyReasonMemo.forEach { (marker, reason) -> sample.step(); add(marker); add(reason) }
+    lazyReasonMemo.forEach { (marker, reason) ->
+        sample.step()
+        add(marker)
+        add(reason)
+    }
     add(nativeConflictReason)
     add(atoms.pendingMoveAnt)
     sample.record(mapOf("reasonPayloadBytes" to reasonBytes, "reasonArrays" to reasons.size.toLong(),
@@ -53,17 +57,19 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
         atomBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
         sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
     }
-    for (indexes in listOf(atoms.byIntVar, atoms.watchedByVar)) for (index in indexes) {
-        sample.step()
-        if (index == null || !sample.retain(atomRuns, index)) continue
-        for (run in listOf(index.ge, index.le, index.eq)) {
+    for (indexes in listOf(atoms.byIntVar, atoms.watchedByVar)) {
+        for (index in indexes) {
             sample.step()
-            atomBytes += run.mainKeys.allocatedBytes + run.pendKeys.allocatedBytes +
-                (run.mainIds.backingData.size.toLong() + run.pendIds.backingData.size) * Int.SIZE_BYTES
-            sample.owned(run.mainKeys, run.mainKeys.allocatedBytes, true)
-            sample.owned(run.pendKeys, run.pendKeys.allocatedBytes, true)
-            sample.owned(run.mainIds.backingData, run.mainIds.backingData.size.toLong() * Int.SIZE_BYTES, true)
-            sample.owned(run.pendIds.backingData, run.pendIds.backingData.size.toLong() * Int.SIZE_BYTES, true)
+            if (index == null || !sample.retain(atomRuns, index)) continue
+            for (run in listOf(index.ge, index.le, index.eq)) {
+                sample.step()
+                atomBytes += run.mainKeys.allocatedBytes + run.pendKeys.allocatedBytes +
+                    (run.mainIds.backingData.size.toLong() + run.pendIds.backingData.size) * Int.SIZE_BYTES
+                sample.owned(run.mainKeys, run.mainKeys.allocatedBytes, true)
+                sample.owned(run.pendKeys, run.pendKeys.allocatedBytes, true)
+                sample.owned(run.mainIds.backingData, run.mainIds.backingData.size.toLong() * Int.SIZE_BYTES, true)
+                sample.owned(run.pendIds.backingData, run.pendIds.backingData.size.toLong() * Int.SIZE_BYTES, true)
+            }
         }
     }
     sample.ownedReferences(atoms.byIntVar, atoms.byIntVar.size.toLong(), true)
@@ -72,7 +78,8 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
     sample.ownedReferences(atoms.watchersByLit, atoms.watchersByLit.size.toLong(), true)
     var channelBytes = 0L
     for (pending in pendingChanneling) {
-        sample.step(); channelBytes += pending.size.toLong() * Int.SIZE_BYTES
+        sample.step()
+        channelBytes += pending.size.toLong() * Int.SIZE_BYTES
         sample.owned(pending, pending.size.toLong() * Int.SIZE_BYTES, true)
     }
     sample.ownedReferences(pendingChanneling, pendingChanneling.size.toLong(), true)
@@ -102,7 +109,10 @@ private fun PropagationState.protectedLearnedMemory(
     intMaxReason.forEach(::protect)
     for (i in 0 until undo.size) {
         sample.step()
-        if (undo.tag[i] == 1) { protect(undo.minReason[i]); protect(undo.maxReason[i]) }
+        if (undo.tag[i] == 1) {
+            protect(undo.minReason[i])
+            protect(undo.maxReason[i])
+        }
     }
     for (i in 0 until learned.pendingAttach.size) {
         sample.step()
@@ -184,7 +194,8 @@ private fun PropagationState.learnedSharingMemory(
         learned.store[index, GeneralLearnedRows.PERMANENT] == 1 || sample.contains(protected, index)
     }
     for (column in columns) {
-        sample.step(); metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
+        sample.step()
+        metadata += column.backingData.size.toLong() * Int.SIZE_BYTES
         sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
     }
     sample.ownedReferences(refPayloadStore, refPayloadStore.size.toLong(), baseFactorCount > 0 || protectedRows)
@@ -237,7 +248,8 @@ private fun PropagationState.learnedSharingMemory(
         if (list != null) sample.owned(list.backingData, list.backingData.size.toLong() * Int.SIZE_BYTES, true)
     }
     for (mark in events.dirtyMark) {
-        sample.step(); eventBytes += mark?.allocatedBytes ?: 0L
+        sample.step()
+        eventBytes += mark?.allocatedBytes ?: 0L
         if (mark != null) sample.owned(mark, mark.allocatedBytes, true)
     }
     sample.ownedReferences(events.dirtyVars, events.dirtyVars.size.toLong(), true)
@@ -278,22 +290,29 @@ private fun PropagationState.reasonIndexMemory(sample: SharingMemoryObservation)
     var journalBytes = undo.carved.allocatedBytes
     sample.owned(undo.carved, undo.carved.allocatedBytes, true)
     for (column in journal) {
-        sample.step(); journalBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
+        sample.step()
+        journalBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
         sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
     }
     var historyBytes = 0L
-    for (columns in listOf(boundMoves, holeHistLvl, holeHistPos)) for (column in columns) {
-        sample.step()
-        historyBytes += (column?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES
-        if (column != null) sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
+    for (columns in listOf(boundMoves, holeHistLvl, holeHistPos)) {
+        for (column in columns) {
+            sample.step()
+            historyBytes += (column?.backingData?.size?.toLong() ?: 0L) * Int.SIZE_BYTES
+            if (column != null)
+                sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
+        }
     }
-    for (columns in listOf(boundMovePriorMin, boundMovePriorMax, holeHistVal)) for (column in columns) {
-        sample.step()
-        historyBytes += column?.allocatedBytes ?: 0L
-        if (column != null) sample.owned(column, column.allocatedBytes, true)
+    for (columns in listOf(boundMovePriorMin, boundMovePriorMax, holeHistVal)) {
+        for (column in columns) {
+            sample.step()
+            historyBytes += column?.allocatedBytes ?: 0L
+            if (column != null) sample.owned(column, column.allocatedBytes, true)
+        }
     }
     for (index in holeHistIndex) {
-        sample.step(); historyBytes += index?.primitiveCapacityBytes ?: 0L
+        sample.step()
+        historyBytes += index?.primitiveCapacityBytes ?: 0L
         if (index != null) sample.owned(index, index.primitiveCapacityBytes, true)
     }
     for (array in listOf(boolReason, intMinReason, intMaxReason, boolPinPos)) {

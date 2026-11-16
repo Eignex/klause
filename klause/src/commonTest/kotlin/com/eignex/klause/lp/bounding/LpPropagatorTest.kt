@@ -81,7 +81,7 @@ class LpPropagatorTest {
             LpPropagator(object : LpSearchPolicy {}, cancellation = ExecutionControl { storedStopped },
                 effort = { LpEffortProfile(work = 100_000L) }).use { lp ->
                 val installed = if (requested == null) lp.install(base, exact)
-                    else lp.install(base, exact, ExecutionControl { requested })
+                else lp.install(base, exact, ExecutionControl { requested })
 
                 assertEquals(expected, installed)
                 assertEquals(expected, lp.prepare(ExecutionControl.Never, 100_000L))
@@ -177,7 +177,10 @@ class LpPropagatorTest {
         LpPropagator(
             object : LpSearchPolicy {},
             cancellation = ExecutionControl { stopped },
-            queryWorkAllowance = { queries++; 100_000L },
+            queryWorkAllowance = {
+                queries++
+                100_000L
+            },
             onPreparation = { reported += it.workOps },
         ).use { lp ->
             assertTrue(lp.install(base, assertNotNull(base.model.authoritativeModel())))

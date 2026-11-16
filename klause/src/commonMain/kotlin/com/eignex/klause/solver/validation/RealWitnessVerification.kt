@@ -175,7 +175,7 @@ internal fun checkExactRealRelation(
         val position = (if (index.fitsLong()) factor.position(index.toLongExact()) else null)
             ?: return Verification.Rejected("real factor $id has an invalid index")
         val selected = if (factor.arrIsVars) reals[factor.entries[position]]
-            else checkNotNull(BigFraction.ofDouble(factor.constants[position]))
+        else checkNotNull(BigFraction.ofDouble(factor.constants[position]))
         return if (selected == reals[factor.result]) null
         else Verification.Rejected("real factor $id refutes the assignment")
     }

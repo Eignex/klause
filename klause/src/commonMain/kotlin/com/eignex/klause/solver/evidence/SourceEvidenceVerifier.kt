@@ -27,8 +27,10 @@ class SourcePremise(
     private val capturedIntegers = integerPins.toMap()
     internal val guardCount: Int get() = captured.size
     internal val integerPinCount: Int get() = capturedIntegers.size
+
     /** Boolean source pins required to use this premise. */
     val guards: Map<Int, Boolean> get() = captured.toMap()
+
     /** Exact integer source equalities required to use this premise. */
     val integerPins: Map<SourceCoordinate, BigFraction> get() = capturedIntegers.toMap()
 
@@ -77,10 +79,13 @@ class SourceProofContext(
     internal val coordinateCount: Int get() = capturedCoordinates.size
     internal val premiseCount: Int get() = capturedPremises.size
     internal val affineObjectiveAvailable: Boolean get() = capturedObjective != null
+
     /** Declared source coordinates. */
     val coordinates: Set<SourceCoordinate> get() = capturedCoordinates.toSet()
+
     /** Original rows and declarations indexed by stable premise identifiers. */
     val premises: Map<String, SourcePremise> get() = capturedPremises.toMap()
+
     /** Exact affine source objective coefficients; an omitted constructor objective has no affine authority. */
     val objective: Map<SourceCoordinate, BigFraction> get() = capturedObjective.orEmpty().toMap()
 
@@ -121,7 +126,9 @@ class SourceEvidenceVerifier(
     private val maximumSteps: Int = 100_000,
     private val maximumDepth: Int = 128,
 ) {
-    init { require(maximumSteps > 0 && maximumDepth > 0) }
+    init {
+        require(maximumSteps > 0 && maximumDepth > 0)
+    }
 
     /** Verify scope, premises, imports, branch coverage and the mathematical claim. */
     fun verify(evidence: SourceEvidence, cancellation: ExecutionControl = ExecutionControl.Never): SourceEvidenceCheck =
@@ -200,7 +207,10 @@ class SourceEvidenceVerifier(
                     else -> null
                 }
                 if (sample != null) {
-                    val checked = scope.condition.checkWitness(sample, ExecutionControl { step(depth); cancellation() })
+                    val checked = scope.condition.checkWitness(sample, ExecutionControl {
+                        step(depth)
+                        cancellation()
+                    })
                     if (checked != SourceEvidenceCheck.Checked) return checked
                 }
                 if (claim is SourceClaim.Ray) {
@@ -298,7 +308,7 @@ class SourceEvidenceVerifier(
                 is SourceClaim.Bound -> {
                     val objective = scope.objective ?: return reject("objective bound has no objective scope")
                     val sign = if (objective.sense == ObjectiveSense.MINIMIZE) BigFraction.MINUS_ONE
-                        else BigFraction.ONE
+                    else BigFraction.ONE
                     val derived = inequality(derivation, scope, depth + 1)
                     if (derived.contradicts()) return SourceEvidenceCheck.Checked
                     if (!context.affineObjectiveAvailable) {
@@ -386,8 +396,13 @@ class SourceEvidenceVerifier(
                     }
                     if (premise.integerPins.isNotEmpty()) {
                         val bounds = integerScopes[scope.condition] ?: context.integerPinBounds(scope.condition,
-                            ExecutionControl { step(depth); cancellation() })?.also { integerScopes[scope
-                                .condition] = it }
+                            ExecutionControl {
+                                step(depth)
+                                cancellation()
+                            })?.also {
+                            integerScopes[scope
+                                .condition] = it
+                        }
                             ?: throw ProofStop(SourceEvidenceCheck.Unavailable("integer premise scope check stopped"))
                         if (bounds.status(premise.integerPins) != IntegerPinStatus.Established) {
                             rejectProof("original-source integer premise guard is not established")
@@ -432,7 +447,7 @@ class SourceEvidenceVerifier(
                         ) rejectProof("integer rounding requires integral activity over declared integers")
                     }
                     val rhs = if (row.strict) BigFraction.of(row.rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
-                        else BigFraction.of(row.rhs.negated().ceilInteger(), BIG_ONE).negated()
+                    else BigFraction.of(row.rhs.negated().ceilInteger(), BIG_ONE).negated()
                     SourceInequality(coefficients, rhs)
                 }
                 is SourceDerivation.MixedIntegerRounding -> {
@@ -441,7 +456,10 @@ class SourceEvidenceVerifier(
                     if (row.coefficients.keys.any { it !in coordinates }) {
                         rejectProof("mixed integer rounding references an undeclared coordinate")
                     }
-                    mixedIntegerRounding(row, bounds, ExecutionControl { step(depth); cancellation() })
+                    mixedIntegerRounding(row, bounds, ExecutionControl {
+                        step(depth)
+                        cancellation()
+                    })
                         ?: rejectProof("mixed integer rounding requires integral activity and continuous bounds")
                 }
                 is SourceDerivation.Import -> {

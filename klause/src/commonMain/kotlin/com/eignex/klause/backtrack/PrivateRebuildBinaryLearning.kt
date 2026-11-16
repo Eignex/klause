@@ -54,7 +54,10 @@ internal class PrivateRebuildBinaryLearning private constructor(
                 var claimed = false
                 for (entry in 0 until attemptedCount) {
                     if (!visit(1L)) return null
-                    if (attempted[entry] == relation) { claimed = true; break }
+                    if (attempted[entry] == relation) {
+                        claimed = true
+                        break
+                    }
                 }
                 if (claimed) continue
                 val oppositeSlot = slot(previous, opposite, visit) ?: return null

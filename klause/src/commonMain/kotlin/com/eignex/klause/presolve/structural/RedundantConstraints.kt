@@ -168,9 +168,9 @@ internal object RedundantConstraints {
         }
         // Unit-coefficient clause rows have the same bound; their duplicates were removed by keys.
         if (deduped.all {
-            visit(scan)
-            it is Clause
-        }) {
+                visit(scan)
+                it is Clause
+            }) {
             return deduped
         }
         // Phase 2: bucket the ≤-normalised Linear inequalities by coefficient vector; the bucket's
@@ -273,6 +273,7 @@ internal object RedundantConstraints {
      */
     internal class SubsumeMemo : SubsumeState {
         val subsets = SubsetDomination()
+
         // Long-keyed to avoid boxing the shallow key on every factor: a clause-heavy model registers
         // hundreds of thousands of factors, and a `HashMap<Long, …>` would box the key on each lookup.
         private val shallowSingle = MutableLongObjectMap<SubsumeFactor>()
@@ -420,6 +421,7 @@ internal object RedundantConstraints {
             }
             indexed.put(entry.id, entry)
             val f = entry.factor
+
             // Most factors (every Clause, Xor, plain global) offer nothing to the phase-2 buckets, so the
             // touched-key set and the row form are derived only once a factor actually offers.
             @Suppress("DoubleMutabilityForCollection") // deliberately lazily created on the first offer

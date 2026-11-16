@@ -115,6 +115,7 @@ internal class PolynomialTheoryInvocation(
         return object : Iterator<QfNraResult?> {
             private var finished = false
             override fun hasNext(): Boolean = !closed && !finished
+
             @Suppress("TooGenericExceptionCaught") // query failures retain their spent native allowance
             override fun next(): QfNraResult? {
                 check(!closed) { "polynomial query is closed" }

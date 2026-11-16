@@ -80,14 +80,20 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
     fun <T> usingBudget(budget: ReclamationPreparation, operation: () -> T): T {
         val previous = activeBudget
         activeBudget = budget
-        return try { operation() } finally { activeBudget = previous }
+        return try {
+            operation()
+        } finally {
+            activeBudget = previous
+        }
     }
 
     fun admissionPages(rows: Int): Long = if (readyForAdmissions) {
         ((requiredSlots(rows) - pool.slots).coerceAtLeast(0L) + 7L) / 8L
     } else 0L
 
-    fun reserveAdmission() { pool.reserve() }
+    fun reserveAdmission() {
+        pool.reserve()
+    }
 
     fun reservePages(budget: ReclamationPreparation) {
         while (pool.slots < requiredSlots(candidates.size)) {
@@ -122,7 +128,9 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
         captureSuppressed = true
     }
 
-    fun invalidateRetiredHandles() { revision++ }
+    fun invalidateRetiredHandles() {
+        revision++
+    }
 
     fun prepareUntrackedRetirement(retirement: Int, budget: ReclamationPreparation) {
         if (retirement <= retirementBaseline) return
@@ -261,7 +269,11 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                         rescanNext = true
                     } else {
                         callback = true
-                        pendingKeep = try { policy.keep(pending) } finally { callback = false }
+                        pendingKeep = try {
+                            policy.keep(pending)
+                        } finally {
+                            callback = false
+                        }
                         classifications++
                     }
                     stage = Stage.Mark
@@ -388,7 +400,7 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
                 }
                 Stage.TrimPool -> {
                     val needed = if (candidates.size == 0 && dirty.size == 0 && aging.size == 0) 0L
-                        else maxOf(requiredSlots(candidates.size), dirty.size.toLong() + aging.size + 64L)
+                    else maxOf(requiredSlots(candidates.size), dirty.size.toLong() + aging.size + 64L)
                     if (pool.available > 0L && pool.slots - 8L >= needed) {
                         budget.visit(8L)
                         budget.visit(0L)
@@ -583,12 +595,35 @@ internal class NativeCapIndex(private val candidates: IntArrayList) {
         changed()
     }
 
-    private fun changed() { serial = if (serial == Long.MAX_VALUE) 0L else serial + 1L }
+    private fun changed() {
+        serial = if (serial == Long.MAX_VALUE) 0L else serial + 1L
+    }
 
     enum class Completion { None, Pass, Cleaned, Aborted }
     private enum class Stage {
-        Idle, Reserve, Clean, Repair, PruneDirty, PruneAging, Aging, Dirty, Admissions, Scan, Inspect,
-        Classify, Mark, Admit, Up, Down, Select, Retire, Remove, Restore, Clear, Finalize, TrimPool,
+        Idle,
+        Reserve,
+        Clean,
+        Repair,
+        PruneDirty,
+        PruneAging,
+        Aging,
+        Dirty,
+        Admissions,
+        Scan,
+        Inspect,
+        Classify,
+        Mark,
+        Admit,
+        Up,
+        Down,
+        Select,
+        Retire,
+        Remove,
+        Restore,
+        Clear,
+        Finalize,
+        TrimPool,
     }
 
     companion object {

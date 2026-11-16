@@ -11,7 +11,9 @@ internal class LinearOperationCancellation(
     private val containingStopped: () -> Boolean,
 ) : ExecutionControl() {
     @JvmField var active = false
+
     @JvmField val polling = StopPolling(8192)
+
     @JvmField var stopped = false
     private var boundAccounting: WorkMeter? = null
     private var boundAdmission: ArithmeticWorkSource? = null

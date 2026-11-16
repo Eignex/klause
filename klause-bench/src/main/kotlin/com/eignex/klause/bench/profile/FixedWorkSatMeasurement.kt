@@ -333,11 +333,16 @@ object FixedWorkSatMeasurement {
 
             fun processCpu(): Long? = os?.processCpuTime?.takeIf { it >= 0L }
 
-            fun allocated(): Long? = sunThreads?.takeIf { it.isThreadAllocatedMemorySupported &&
-                it.isThreadAllocatedMemoryEnabled }?.currentThreadAllocatedBytes?.takeIf { it >= 0L }
+            fun allocated(): Long? = sunThreads?.takeIf {
+                it.isThreadAllocatedMemorySupported &&
+                    it.isThreadAllocatedMemoryEnabled
+            }?.currentThreadAllocatedBytes?.takeIf { it >= 0L }
 
             fun collections(): Pair<Long, Long> = ManagementFactory.getGarbageCollectorMXBeans().fold(0L to 0L) {
-                    (count, millis), bean, -> (count + bean.collectionCount.coerceAtLeast(0L)) to
+                    (count, millis),
+                    bean,
+                ->
+                (count + bean.collectionCount.coerceAtLeast(0L)) to
                     (millis + bean.collectionTime.coerceAtLeast(0L))
             }
 
@@ -374,7 +379,9 @@ object FixedWorkSatMeasurement {
         var limitReached = false
             private set
 
-        fun start(meter: Meter) { this.meter = meter }
+        fun start(meter: Meter) {
+            this.meter = meter
+        }
 
         fun picked(variable: VarRef?, session: PropagationSession) {
             picks++

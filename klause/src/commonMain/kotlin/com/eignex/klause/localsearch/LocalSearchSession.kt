@@ -32,7 +32,11 @@ class LocalSearchSession(override val solver: LocalSearchSolver) : StatelessSess
 
     /** Release the active search and discard learned weights; idempotent. */
     override fun close() {
-        try { super.close() } finally { warm.reset() }
+        try {
+            super.close()
+        } finally {
+            warm.reset()
+        }
     }
 
     internal val warmState: WarmState get() = warm

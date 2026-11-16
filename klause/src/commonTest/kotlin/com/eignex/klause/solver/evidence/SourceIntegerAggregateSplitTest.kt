@@ -119,7 +119,10 @@ class SourceIntegerAggregateSplitTest {
         val evidence = SourceEvidence(scope, SourceClaim.Refutation, derivation)
         var polls = 0
         assertEquals(SourceEvidenceCheck.Checked,
-            SourceEvidenceVerifier(context).verify(evidence, ExecutionControl { polls++; false }))
+            SourceEvidenceVerifier(context).verify(evidence, ExecutionControl {
+                polls++
+                false
+            }))
 
         val result = SourceEvidenceVerifier(context, maximumSteps = polls - 1).verify(evidence)
 

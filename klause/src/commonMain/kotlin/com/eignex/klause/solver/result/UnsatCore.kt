@@ -2,7 +2,6 @@ package com.eignex.klause.solver.result
 
 import com.eignex.util.arrays.emptyIntArray
 
-
 /**
  * A jointly-infeasible subset of `Problem.factors`, identified by factor id, in the sense of SMT-LIB's
  * `get-unsat-core`: the constraints whose conjunction a complete backend proved unsat.

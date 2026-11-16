@@ -26,6 +26,7 @@ class Power(
             /** Source integer location. */
             val id: SourceIntId,
         ) : Coordinate
+
         /** Continuous source coordinate. */
         data class Real(
             /** Source real location. */

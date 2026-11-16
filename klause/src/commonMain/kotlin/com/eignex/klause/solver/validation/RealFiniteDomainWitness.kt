@@ -13,10 +13,10 @@ internal fun checkRealFiniteDomains(
     sample: Sample,
     cancellation: ExecutionControl,
 ): Verification<List<BigFraction>, Unit> = if (sample.numRealVars != source.numRealVars) {
-        Verification.Rejected("assignment does not cover the real variables")
-    } else {
-        finiteDomainCoordinates(source, sample, cancellation)
-    }
+    Verification.Rejected("assignment does not cover the real variables")
+} else {
+    finiteDomainCoordinates(source, sample, cancellation)
+}
 
 private fun finiteDomainCoordinates(
     source: Problem,

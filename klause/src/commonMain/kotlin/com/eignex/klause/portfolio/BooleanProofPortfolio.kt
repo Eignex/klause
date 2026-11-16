@@ -84,8 +84,10 @@ internal class BooleanProofPortfolio private constructor(
         require(reservations == null || reservations.size == parameters.size)
         require(condition.lower.isEmpty() && condition.upper.isEmpty() && condition.integerRows.isEmpty())
         require(condition.bools.keys.all { it in 0 until problem.numBoolVars })
-        require(parameters.all { it.assumptions.numInts == 0 && it.assumptions.deductions.isEmpty &&
-            it.assumptions.bools == condition.bools })
+        require(parameters.all {
+            it.assumptions.numInts == 0 && it.assumptions.deductions.isEmpty &&
+                it.assumptions.bools == condition.bools
+        })
     }
 
     private fun board(splits: List<Int>): BooleanProofScheduler {
@@ -255,14 +257,18 @@ internal class BooleanProofPortfolio private constructor(
                 return null
             }
             if (cancellation()) return decline("source-admission-cancelled")
-            if (workers.size != 2 || workers.any { !it.permitsSourceProofs || it.improvementOnly ||
-                    it.auxiliaryProof || it.startAfterIncumbent || it.startAfterAcceptedImprovement ||
-                    it.firstWitnessOnly })
+            if (workers.size != 2 || workers.any {
+                    !it.permitsSourceProofs || it.improvementOnly ||
+                        it.auxiliaryProof || it.startAfterIncumbent || it.startAfterAcceptedImprovement ||
+                        it.firstWitnessOnly
+                })
                 return decline("workers-not-two-canonical-complete")
             val recipes = workers.map { it.booleanProofRecipe ?: return decline("builder-ownership-unavailable") }
             val problem = recipes.first().problem
-            if (recipes.any { it.problem !== problem || !it.deterministicClauseQuery(nativeOnly) ||
-                    !it.matches(recipes.first()) })
+            if (recipes.any {
+                    it.problem !== problem || !it.deterministicClauseQuery(nativeOnly) ||
+                        !it.matches(recipes.first())
+                })
                 return decline("worker-model-or-recipe-mismatch")
             if (problem.numBoolVars !in 2..4096 || problem.numIntVars != 0 || problem.numRealVars != 0 ||
                 problem.hasSymmetryBreaking || problem.rootDeductions is PropagationResult.Unsat)

@@ -28,7 +28,9 @@ internal class QuadraticWorkerRuntime(
     private var publication: ((QuadraticIncumbent) -> Unit)? = null
     private var neighborhoodPreparationInstructions = 0L
 
-    fun publish(incumbent: QuadraticIncumbent) { publication?.invoke(incumbent) }
+    fun publish(incumbent: QuadraticIncumbent) {
+        publication?.invoke(incumbent)
+    }
 
     fun execute(body: () -> QuadraticOptimizationResult): QuadraticOptimizationResult = try {
         guarded(body, partial)
@@ -53,7 +55,10 @@ internal class QuadraticWorkerRuntime(
         check(!closed) { "quadratic worker is closed" }
         publication = { onIncumbent(quadraticScalar(it, sense, snapshot())) }
         try {
-            terminal = guarded({ advance(); terminal }, partial)
+            terminal = guarded({
+                advance()
+                terminal
+            }, partial)
         } finally {
             publication = null
         }
@@ -66,7 +71,7 @@ internal class QuadraticWorkerRuntime(
         } ?: MinimizeResult.Unknown(TerminationReason.BudgetExhausted, snapshot())
 
     fun completeHandle(countedWork: () -> Long, advance: (ExecutionControl, Long, Long) ->
-        Unit): QuadraticPortfolioSearch =
+    Unit): QuadraticPortfolioSearch =
         object : QuadraticPortfolioSearch, ReseedGuard {
             override val canReseed: Boolean get() = false
             override val completion: QuadraticOptimizationResult? get() = terminal
@@ -110,7 +115,7 @@ internal class QuadraticWorkerRuntime(
             }
             val stop = native.polynomial or cancellation or global
             val segment = stop or if (sliceMillis == Long.MAX_VALUE) ExecutionControl.Never
-                else ExecutionControl.after(sliceMillis.milliseconds)
+            else ExecutionControl.after(sliceMillis.milliseconds)
             val done = cursor.advance(segment,
                 if (sliceInstructions < 0) Long.MAX_VALUE else sliceInstructions, global)
             if (done || stop()) terminal = partial()

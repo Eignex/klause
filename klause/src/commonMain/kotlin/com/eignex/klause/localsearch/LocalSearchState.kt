@@ -75,6 +75,7 @@ class LocalSearchState private constructor(
             }
         }
     }
+
     /** A search over the finite model [problem]. */
     constructor(
         problem: BakedProblem,

@@ -107,8 +107,8 @@ internal class OpenExactNeighborhood(
         val result = queries.check(condition, cancellation)
         if (result !is ExactNeighborhoodResult.Witness) return result
         if ((params.timeout.withAccounting(
-                    cancellation,
-                ) or params.cancellation or cancellation)()) return ExactNeighborhoodResult.Undecided
+                cancellation,
+            ) or params.cancellation or cancellation)()) return ExactNeighborhoodResult.Undecided
         val sample = result.sample
         val checked = try {
             if (sample.exactInts?.any { !it.fitsLong() } == true ||
@@ -119,14 +119,14 @@ internal class OpenExactNeighborhood(
             } else {
                 verifyOpenWitness(model, sample,
                     params.timeout.withAccounting(cancellation) or params.cancellation or cancellation,
-                        witnessProjection)
+                    witnessProjection)
             }
         } catch (_: CancellationException) {
             return ExactNeighborhoodResult.Undecided
         }
         if (checked !is Verification.Accepted || (params.timeout.withAccounting(
-                    cancellation,
-                ) or params.cancellation or cancellation)()) {
+                cancellation,
+            ) or params.cancellation or cancellation)()) {
             return ExactNeighborhoodResult.Undecided
         }
         sample.witnessCertificate = invocation()?.let { binding ->
@@ -176,15 +176,17 @@ internal class OpenExactNeighborhood(
             BigFraction.ofDouble(model.realLower[id])?.let { centers[coordinate] = greater(centers[coordinate], it) }
             BigFraction.ofDouble(model.realUpper[id])?.let { centers[coordinate] = lesser(centers[coordinate], it) }
         }
-        for (factor in model.factors) for (row in factor.linearRows) {
-            if (row.size != 1 || row.activator >= 0 || row.relation != LinearOp.EQ) continue
-            val constants = row.constants as? IntegralConstants ?: continue
-            val coefficient = constants.exactCoeff(0)
-            if (coefficient == bigIntOf(0)) continue
-            val value = BigFraction.of(constants.exactBound, coefficient)
-            val ref = row.ref(0)
-            if (Term.isInt(ref) && value.den == BIG_ONE) centers[Term.intVar(ref)] = value
-            if (Term.isReal(ref)) centers[model.numIntVars + Term.realVar(ref)] = value
+        for (factor in model.factors) {
+            for (row in factor.linearRows) {
+                if (row.size != 1 || row.activator >= 0 || row.relation != LinearOp.EQ) continue
+                val constants = row.constants as? IntegralConstants ?: continue
+                val coefficient = constants.exactCoeff(0)
+                if (coefficient == bigIntOf(0)) continue
+                val value = BigFraction.of(constants.exactBound, coefficient)
+                val ref = row.ref(0)
+                if (Term.isInt(ref) && value.den == BIG_ONE) centers[Term.intVar(ref)] = value
+                if (Term.isReal(ref)) centers[model.numIntVars + Term.realVar(ref)] = value
+            }
         }
         return centers
     }
@@ -193,17 +195,23 @@ internal class OpenExactNeighborhood(
 internal fun LinearObjective.below(value: BigFraction): ExactSearchRow {
     val refs = ArrayList<Int>()
     val coefficients = ArrayList<BigFraction>()
-    for (id in boolWeightValues.indices) if (boolWeightValues[id] != 0L) {
-        refs += Term.ofLit(Lit.make(id, true))
-        coefficients += BigFraction.ofLong(boolWeightValues[id])
+    for (id in boolWeightValues.indices) {
+        if (boolWeightValues[id] != 0L) {
+            refs += Term.ofLit(Lit.make(id, true))
+            coefficients += BigFraction.ofLong(boolWeightValues[id])
+        }
     }
-    for (id in intCoefficientValues.indices) if (intCoefficientValues[id] != 0L) {
-        refs += Term.ofIntVar(id)
-        coefficients += BigFraction.ofLong(intCoefficientValues[id])
+    for (id in intCoefficientValues.indices) {
+        if (intCoefficientValues[id] != 0L) {
+            refs += Term.ofIntVar(id)
+            coefficients += BigFraction.ofLong(intCoefficientValues[id])
+        }
     }
-    for (id in realCoefficientValues.indices) if (realCoefficientValues[id] != 0.0) {
-        refs += Term.ofRealVar(id)
-        coefficients += requireNotNull(BigFraction.ofDouble(realCoefficientValues[id]))
+    for (id in realCoefficientValues.indices) {
+        if (realCoefficientValues[id] != 0.0) {
+            refs += Term.ofRealVar(id)
+            coefficients += requireNotNull(BigFraction.ofDouble(realCoefficientValues[id]))
+        }
     }
     return ExactSearchRow.of(refs.toIntArray(), coefficients, LinearOp.LE,
         value - BigFraction.ofLong(constant), strict = true)

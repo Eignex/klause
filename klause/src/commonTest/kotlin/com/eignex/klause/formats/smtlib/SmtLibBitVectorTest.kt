@@ -10,14 +10,14 @@ import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
-import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.SourceFiniteControls
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
-import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRequest
+import com.eignex.klause.solver.pipeline.solve
 import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ExecutionControl

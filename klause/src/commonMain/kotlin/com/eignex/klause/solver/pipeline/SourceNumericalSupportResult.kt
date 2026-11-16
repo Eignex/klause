@@ -96,9 +96,11 @@ internal fun sourceNumericalRefutationSupport(
                 assumptions += proof
                 true
             }
-            is SourceDerivation.Combination -> proof.terms.let { terms -> spend(terms.size) && terms.all {
-                it.weight.isZero || visit(it.derivation, depth + 1)
-            } }
+            is SourceDerivation.Combination -> proof.terms.let { terms ->
+                spend(terms.size) && terms.all {
+                    it.weight.isZero || visit(it.derivation, depth + 1)
+                }
+            }
             is SourceDerivation.IntegerRounding -> visit(proof.inequality, depth + 1)
             is SourceDerivation.MixedIntegerRounding -> visit(proof.inequality, depth + 1) &&
                 proof.bounds.let { bounds -> spend(bounds.size) && bounds.all { visit(it, depth + 1) } }

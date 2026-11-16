@@ -78,7 +78,7 @@ internal class MutableIntObjectIndex<V : Any> {
         }
         val prefix = key and (mask or (mask - 1)).inv()
         val branch = if (key and mask == 0) Branch(mask, prefix, leaf, node)
-            else Branch(mask, prefix, node, leaf)
+        else Branch(mask, prefix, node, leaf)
         branch.parent = parent
         node.parent = branch
         leaf.parent = branch
@@ -162,7 +162,10 @@ internal class MutableIntObjectIndex<V : Any> {
         when {
             parent == null -> root = next
             parent.zero === previous -> parent.zero = next
-            else -> { check(parent.one === previous); parent.one = next }
+            else -> {
+                check(parent.one === previous)
+                parent.one = next
+            }
         }
     }
 
@@ -198,7 +201,10 @@ internal class MutableIntObjectIndex<V : Any> {
         visit(1L)
         when (node) {
             is Leaf -> action(node.key, node.value)
-            is Branch -> { walk(node.zero, visit, action); walk(node.one, visit, action) }
+            is Branch -> {
+                walk(node.zero, visit, action)
+                walk(node.one, visit, action)
+            }
         }
     }
 }

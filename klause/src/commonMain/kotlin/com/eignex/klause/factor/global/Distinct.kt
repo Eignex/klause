@@ -25,6 +25,7 @@ class Distinct(
         constant: BigFraction = BigFraction.ZERO,
     ) {
         private val terms: Map<Int, BigFraction>
+
         /** Exact additive constant after Boolean literal normalization. */
         val constant: BigFraction
 
@@ -38,7 +39,7 @@ class Distinct(
                 val coefficient = coefficients[index]
                 val complemented = Term.isBool(reference) && !Lit.isPositive(Term.lit(reference))
                 val normalized = if (complemented) Term.ofLit(Lit.make(Lit.variable(Term.lit(reference)), true))
-                    else reference
+                else reference
                 if (complemented) offset += coefficient
                 captured[normalized] = (captured[normalized] ?: BigFraction.ZERO) +
                     if (complemented) coefficient.negated() else coefficient
@@ -88,7 +89,9 @@ class Distinct(
 
     private val captured = operands.toList()
 
-    init { require(activator >= LinearRow.ALWAYS) }
+    init {
+        require(activator >= LinearRow.ALWAYS)
+    }
 
     /** Immutable source operands in their original order. */
     val operands: List<Operand> get() = captured.toList()

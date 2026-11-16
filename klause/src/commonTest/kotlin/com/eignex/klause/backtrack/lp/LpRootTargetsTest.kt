@@ -177,7 +177,6 @@ class LpRootTargetsTest {
         }
     }
 
-
     @Test
     fun `completed auxiliary root points guide ordinary values without a live numerical owner`() {
         val problem = Problem(0, 2, Array(2) { IntDomain(0, 1) },

@@ -20,8 +20,10 @@ class FixedWorkSatAdapterTest {
         val cases = FixedWorkSatSuite.plan(BenchRequest(PARAMETERS + ("sources" to "$SHA:$PATH,$OTHER_SHA:$OTHER")))
 
         assertEquals(listOf("1", "3", "1", "3"), cases.map { it.parameters.getValue("seed") })
-        assertTrue(cases.all { it.inputs.single().sha256 == it.parameters["sha256"] &&
-            it.inputs.single().path == it.parameters["source-path"] })
+        assertTrue(cases.all {
+            it.inputs.single().sha256 == it.parameters["sha256"] &&
+                it.inputs.single().path == it.parameters["source-path"]
+        })
         assertTrue(cases.all { it.resources.cpus == 1 && it.resources.timeoutSeconds == 30L + 60L + 60L })
         assertEquals(4, cases.map { it.attributes.getValue("comparisonKey") }.distinct().size)
     }

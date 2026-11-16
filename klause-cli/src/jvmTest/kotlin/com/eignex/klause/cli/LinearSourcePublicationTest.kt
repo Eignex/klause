@@ -32,15 +32,22 @@ class LinearSourcePublicationTest {
     @Test
     fun `a stopped source preparation should report unknown without requiring a completed binding`() {
         val source = LinearSourceProblem(listOf(LinearSourceVariable("n", true)), emptyList())
-        val common = CommonOptions().apply { engine = "fixed"; deadlineAtMs = nowMillis() - 1L }
+        val common = CommonOptions().apply {
+            engine = "fixed"
+            deadlineAtMs = nowMillis() - 1L
+        }
         val solvable = linearSourceSolvable(SourceAttachment(source, ProblemSettings()), common, {
             error("a stopped preparation published a point")
         })
         var completed: Verdict? = null
         var retained: SourceExecutionResult? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onLinearSourceResult(result: SourceExecutionResult) { retained = result }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onLinearSourceResult(result: SourceExecutionResult) {
+                retained = result
+            }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         SolveCore.solve(solvable, common, output)
@@ -74,8 +81,12 @@ class LinearSourcePublicationTest {
                 values += assertIs<SourceValue.Rational>(objective).value
                 return true
             }
-            override fun onLinearSourceResult(result: SourceExecutionResult) { retained = result }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onLinearSourceResult(result: SourceExecutionResult) {
+                retained = result
+            }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         SolveCore.solve(solvable, common, output)
@@ -109,8 +120,12 @@ class LinearSourcePublicationTest {
                 values += assertIs<SourceValue.Rational>(objective).value
                 return true
             }
-            override fun onLinearSourceResult(result: SourceExecutionResult) { retained = result }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onLinearSourceResult(result: SourceExecutionResult) {
+                retained = result
+            }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         SolveCore.solve(solvable, common, output)
@@ -136,15 +151,22 @@ class LinearSourcePublicationTest {
                 absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
             )).resolve(),
         )
-        val common = CommonOptions().apply { engine = "fixed"; engineParams += "node-limit=0" }
+        val common = CommonOptions().apply {
+            engine = "fixed"
+            engineParams += "node-limit=0"
+        }
         val solvable = linearSourceSolvable(SourceAttachment(source, ProblemSettings()), common, {
             error("a stopped execution published a point")
         })
         var completed: Verdict? = null
         var reason: TerminationReason? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onComplete(verdict: Verdict) { completed = verdict }
-            override fun onVerdictContext(context: VerdictContext) { reason = context.terminationReason }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
+            override fun onVerdictContext(context: VerdictContext) {
+                reason = context.terminationReason
+            }
         }
 
         SolveCore.solve(solvable, common, output)
@@ -168,7 +190,9 @@ class LinearSourcePublicationTest {
                 attempted = true
                 return false
             }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         SolveCore.solve(solvable, common, output)
@@ -185,7 +209,10 @@ class LinearSourcePublicationTest {
                 absolute = SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
             )).resolve(),
         )
-        val common = CommonOptions().apply { engine = "fixed"; engineParams += "unknown-source-knob=1" }
+        val common = CommonOptions().apply {
+            engine = "fixed"
+            engineParams += "unknown-source-knob=1"
+        }
         val solvable = linearSourceSolvable(SourceAttachment(source, ProblemSettings()), common, {
             error("an invalid invocation published a point")
         })

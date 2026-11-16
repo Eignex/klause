@@ -90,6 +90,7 @@ sealed interface SearchEvent {
         /** Logical schedule event. */
         val event: PortfolioEvent,
     ) : SearchEvent
+
     /** The backtrack engine completed a restart. [index] counts restarts from 1
      *  within the solve; [steps] is the decisions spent in the run that just ended.
      *  (Local-search restarts are deliberately not reported — they fire on a flip

@@ -3,8 +3,8 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.scheduling.Cumulative
-import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.SolveDirective
+import com.eignex.klause.formats.flatzinc.linearObjective
 import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.formats.flatzinc.prepareSourceExecution
 import com.eignex.klause.formats.flatzinc.sourceAttachment
@@ -274,7 +274,7 @@ class FiniteExecutionTest {
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
                 cancellation = ExecutionControl.after(1.seconds), executionOptions = options, nodeBudget =
-                    NodeBudget(8),
+                NodeBudget(8),
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -446,7 +446,7 @@ class FiniteExecutionTest {
             val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF).finiteRequest(
                 shape, FiniteEngine.MIXED, presolveConfig = PresolveConfig.NONE,
                 cancellation = ExecutionControl.after(1.seconds), executionOptions = options, nodeBudget =
-                    NodeBudget(8),
+                NodeBudget(8),
             )
 
             val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
@@ -797,7 +797,7 @@ class FiniteExecutionTest {
     @Test
     fun `paid heuristic probes should compose with buffered publication`() {
         for (options in listOf(ExecutionOptions(ExecutionOption.portfolioProbes("family-work"),
-                ExecutionOption.portfolioPublications("segment")),
+            ExecutionOption.portfolioPublications("segment")),
             ExecutionOptions.parse(listOf("portfolio-probes=family-work", "portfolio-publications=segment")),
             ExecutionOptions(ExecutionOption.portfolioProbes("heuristic-work"),
                 ExecutionOption.portfolioPublications("segment")),

@@ -3,11 +3,23 @@ package com.eignex.klause.propagation
 import com.eignex.klause.util.SharingMemoryObservation
 
 internal enum class LearnedRetirementStatus {
-    Captured, AlreadyOwned, Pending, Deferred, StaleSelection, Unsupported, ProtectedFloor,
-    Retired, AlreadyGone, Cancelled, ScopeReleased, Idle,
+    Captured,
+    AlreadyOwned,
+    Pending,
+    Deferred,
+    StaleSelection,
+    Unsupported,
+    ProtectedFloor,
+    Retired,
+    AlreadyGone,
+    Cancelled,
+    ScopeReleased,
+    Idle,
 }
 
-internal class LearnedRetirementScope { var active = true }
+internal class LearnedRetirementScope {
+    var active = true
+}
 
 internal class LearnedRetirementHandle internal constructor(internal val scope: LearnedRetirementScope) {
     internal var storedStatus = LearnedRetirementStatus.Captured

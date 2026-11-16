@@ -47,7 +47,6 @@ class PrivateRebuildSatisfactionTest {
         }
     }
 
-
     @Test
     fun `proved parity pins should reach a consuming worker and a checked source witness`() {
         for (native in listOf(false, true)) {
@@ -154,40 +153,45 @@ class PrivateRebuildSatisfactionTest {
 
     @Test
     fun `an owned learned equivalence should publish a checked witness without root pins`() {
-        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
-                Clause(intArrayOf(0, Lit.negate(replacement), 6)), Clause(intArrayOf(0, Lit.negate(replacement), 7)),
-            )).bake()
-            var opens = 0
-            var closes = 0
-            val exchange = object : ClauseExchange {
-                override fun onSearchStart(session: PropagationSession) {
-                    opens++
-                    session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
-                    session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
+        for (replacement in listOf(2, 3)) {
+            for (native in listOf(false, true)) {
+                val source = Problem(4, 0, emptyArray(), arrayOf(
+                    Clause(intArrayOf(1, replacement, 4)), Clause(intArrayOf(1, replacement, 5)),
+                    Clause(intArrayOf(0, Lit.negate(replacement), 6)),
+                    Clause(intArrayOf(0, Lit.negate(replacement), 7)),
+                )).bake()
+                var opens = 0
+                var closes = 0
+                val exchange = object : ClauseExchange {
+                    override fun onSearchStart(session: PropagationSession) {
+                        opens++
+                        session.addLearnedClause(Clause(intArrayOf(1, replacement)), 2)
+                        session.addLearnedClause(Clause(intArrayOf(0, Lit.negate(replacement))), 2)
+                    }
+                    override fun onSearchClose(session: PropagationSession) {
+                        closes++
+                    }
+                    override fun onRestart(session: PropagationSession) = Unit
                 }
-                override fun onSearchClose(session: PropagationSession) { closes++ }
-                override fun onRestart(session: PropagationSession) = Unit
+
+                val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+                    nativeSat = native, privateRebuildWork = 65_536L, clauseExchange = exchange,
+                )))
+
+                assertTrue(source.factors.all { factor ->
+                    (factor as Clause).literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+                })
+                val stats = result.stats.search.learning
+                assertNull(stats["privateRebuildProgressPins"])
+                assertEquals(1L, stats["privateRebuildBinaryRelations"])
+                assertEquals(1L, stats["privateRebuildEquivalentColumns"])
+                assertEquals(0L, stats["privateRebuildBveIndexedFactors"])
+                assertEquals(1L, stats["privateRebuildConsumers"])
+                assertEquals(1L, stats["privateRebuildSourceAccepted"])
+                assertEquals(1L, stats["privateRebuildRetired"])
+                assertEquals(1, opens)
+                assertEquals(1, closes)
             }
-
-            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
-                nativeSat = native, privateRebuildWork = 65_536L, clauseExchange = exchange,
-            )))
-
-            assertTrue(source.factors.all { factor ->
-                (factor as Clause).literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
-            })
-            val stats = result.stats.search.learning
-            assertNull(stats["privateRebuildProgressPins"])
-            assertEquals(1L, stats["privateRebuildBinaryRelations"])
-            assertEquals(1L, stats["privateRebuildEquivalentColumns"])
-            assertEquals(0L, stats["privateRebuildBveIndexedFactors"])
-            assertEquals(1L, stats["privateRebuildConsumers"])
-            assertEquals(1L, stats["privateRebuildSourceAccepted"])
-            assertEquals(1L, stats["privateRebuildRetired"])
-            assertEquals(1, opens)
-            assertEquals(1, closes)
         }
     }
 
@@ -201,8 +205,12 @@ class PrivateRebuildSatisfactionTest {
             var opens = 0
             var closes = 0
             val exchange = object : ClauseExchange {
-                override fun onSearchStart(session: PropagationSession) { opens++ }
-                override fun onSearchClose(session: PropagationSession) { closes++ }
+                override fun onSearchStart(session: PropagationSession) {
+                    opens++
+                }
+                override fun onSearchClose(session: PropagationSession) {
+                    closes++
+                }
                 override fun onRestart(session: PropagationSession) = Unit
             }
 
@@ -427,36 +435,38 @@ class PrivateRebuildSatisfactionTest {
 
     @Test
     fun `automatic parity admission should publish a checked source point and release its consumer`() {
-        for (native in listOf(false, true)) for (mixed in listOf(false, true)) {
-            val clauses = (0 until 128).flatMap { row ->
-                listOf(1, 2, 4, 7).map { mask ->
-                    Clause(IntArray(3) {
-                        val column = row + if (mixed) 2 * (row / 16) + it else it
-                        Lit.make(column, mask and (1 shl it) == 0)
-                    })
-                }
-            } + if (mixed) listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))) else emptyList()
-            val source = Problem(if (mixed) 144 else 130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
+        for (native in listOf(false, true)) {
+            for (mixed in listOf(false, true)) {
+                val clauses = (0 until 128).flatMap { row ->
+                    listOf(1, 2, 4, 7).map { mask ->
+                        Clause(IntArray(3) {
+                            val column = row + if (mixed) 2 * (row / 16) + it else it
+                            Lit.make(column, mask and (1 shl it) == 0)
+                        })
+                    }
+                } + if (mixed) listOf(Clause(intArrayOf(Lit.make(0, false), Lit.make(1, true)))) else emptyList()
+                val source = Problem(if (mixed) 144 else 130, 0, emptyArray(), clauses.toTypedArray<Factor>()).bake()
 
-            val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
-                nativeSat = native, privateRebuildWork = -1L, learnedMemoryScratchBytes = 4_194_304L,
-                variableSelector = InputOrder, valueSelector = IndomainMin,
-            )))
+                val result = assertIs<SolveResult.Sat>(BacktrackSolver(source).solve(BacktrackParams(
+                    nativeSat = native, privateRebuildWork = -1L, learnedMemoryScratchBytes = 4_194_304L,
+                    variableSelector = InputOrder, valueSelector = IndomainMin,
+                )))
 
-            assertTrue(clauses.all { clause ->
-                clause.literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
-            })
-            val learning = result.stats.search.learning
-            assertEquals(1L, learning["privateRebuildAutomaticAdmitted"])
-            assertEquals(1L, learning["privateRebuildConsumers"])
-            assertEquals(1L, learning["privateRebuildSourceAccepted"])
-            assertEquals(1L, learning["privateRebuildRetired"])
-            assertEquals(4_194_304L, learning["privateRebuildAutomaticWorkLimit"])
-            val stages = listOf("RootScanWork", "ParityDiscoveryWork", "BinaryScanWork", "BinaryHistoryWork",
-                "PreparationWork", "OpeningConstructionWork", "TrialWork", "ReconstructionWork", "SourceCheckWork")
-            assertEquals(stages.sumOf { learning["privateRebuild$it"] ?: 0L },
-                learning.getValue("privateRebuildChargedWork"))
-            assertTrue(learning.getValue("privateRebuildChargedWork") <= 1_048_576L)
+                assertTrue(clauses.all { clause ->
+                    clause.literals.any { Lit.evaluate(it, result.assignment.boolValue(Lit.variable(it))) }
+                })
+                val learning = result.stats.search.learning
+                assertEquals(1L, learning["privateRebuildAutomaticAdmitted"])
+                assertEquals(1L, learning["privateRebuildConsumers"])
+                assertEquals(1L, learning["privateRebuildSourceAccepted"])
+                assertEquals(1L, learning["privateRebuildRetired"])
+                assertEquals(4_194_304L, learning["privateRebuildAutomaticWorkLimit"])
+                val stages = listOf("RootScanWork", "ParityDiscoveryWork", "BinaryScanWork", "BinaryHistoryWork",
+                    "PreparationWork", "OpeningConstructionWork", "TrialWork", "ReconstructionWork", "SourceCheckWork")
+                assertEquals(stages.sumOf { learning["privateRebuild$it"] ?: 0L },
+                    learning.getValue("privateRebuildChargedWork"))
+                assertTrue(learning.getValue("privateRebuildChargedWork") <= 1_048_576L)
+            }
         }
     }
 

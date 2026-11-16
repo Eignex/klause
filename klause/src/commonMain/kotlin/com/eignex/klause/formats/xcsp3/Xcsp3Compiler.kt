@@ -5,7 +5,6 @@ import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.Product
-import com.eignex.klause.factor.arithmetic.ReifiedLinear
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.EffectiveSourceSemantics
@@ -258,9 +257,7 @@ internal object Compiler {
         internal fun addVar(name: String, dom: IntDomain) {
             varIds[name] = problemBuilder.newInt(dom)
         }
-        internal fun newAuxVar(lo: Long, hi: Long): Int {
-            return problemBuilder.newInt(IntDomain(lo, hi, settings.storage))
-        }
+        internal fun newAuxVar(lo: Long, hi: Long): Int = problemBuilder.newInt(IntDomain(lo, hi, settings.storage))
         override fun newBool(): Int = problemBuilder.newBool()
 
         /** The domain of a `<var>`/`<array>`: its inline domain text, or — when that is empty and an
@@ -954,7 +951,7 @@ internal object Compiler {
         /** `if(cond, a, b)` as a linear term: a fresh int pinned to `a` or `b` by the condition. */
         internal fun ifTerm(args: List<FExpr>): IntComb = selectionTerm(compileBool(args[0]),
             materializeVar(linear(args[1])),
-                materializeVar(linear(args[2])))
+            materializeVar(linear(args[2])))
 
         internal fun divModTerm(args: List<FExpr>, mod: Boolean): IntComb {
             val a = divModOperand(args[0]) { linear(args[0]) }

@@ -30,22 +30,24 @@ class PseudoBooleanInvariantTest {
         val factor = PseudoBoolean(weights, literals, PbOp.EQ, wide)
         val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        for (mask in 0 until 4) for (variable in 0..1) {
-            for (v in 0..1) state.assignment.setBool(v, mask and (1 shl v) != 0)
-            state.recompute()
-            var sourceSum = BIG_ZERO
-            for (k in literals.indices) {
-                if (Lit.evaluate(literals[k], state.assignment.boolValue(Lit.variable(literals[k])))) {
-                    sourceSum += weights[k]
+        for (mask in 0 until 4) {
+            for (variable in 0..1) {
+                for (v in 0..1) state.assignment.setBool(v, mask and (1 shl v) != 0)
+                state.recompute()
+                var sourceSum = BIG_ZERO
+                for (k in literals.indices) {
+                    if (Lit.evaluate(literals[k], state.assignment.boolValue(Lit.variable(literals[k])))) {
+                        sourceSum += weights[k]
+                    }
                 }
+                assertEquals(sourceSum == wide, state.cost == 0L)
+                val before = state.cost
+                val predicted = state.netDelta(Move.BoolFlip(variable))
+
+                state.apply(Move.BoolFlip(variable))
+
+                assertEquals(predicted, state.cost - before)
             }
-            assertEquals(sourceSum == wide, state.cost == 0L)
-            val before = state.cost
-            val predicted = state.netDelta(Move.BoolFlip(variable))
-
-            state.apply(Move.BoolFlip(variable))
-
-            assertEquals(predicted, state.cost - before)
         }
     }
 
@@ -55,14 +57,16 @@ class PseudoBooleanInvariantTest {
         val factor = ReifiedPseudoBoolean(0, arrayOf(wide), intArrayOf(Lit.make(1, false)), PbOp.EQ, wide)
         val problem = Problem(2, 0, emptyArray(), arrayOf(factor))
         val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-        for (indicator in listOf(false, true)) for (body in listOf(false, true)) {
-            state.assignment.setBool(0, indicator)
-            state.assignment.setBool(1, body)
-            state.recompute()
+        for (indicator in listOf(false, true)) {
+            for (body in listOf(false, true)) {
+                state.assignment.setBool(0, indicator)
+                state.assignment.setBool(1, body)
+                state.recompute()
 
-            assertEquals(!body, factor.holdsNow(state, 0))
-            assertEquals(indicator == !body, state.cost == 0L)
-            assertEquals(body, factor.residualNow(state, 0, state.violationSoftCap) > 0)
+                assertEquals(!body, factor.holdsNow(state, 0))
+                assertEquals(indicator == !body, state.cost == 0L)
+                assertEquals(body, factor.residualNow(state, 0, state.violationSoftCap) > 0)
+            }
         }
     }
 

@@ -31,7 +31,11 @@ internal class NonlinearIntegerPortfolio(
                 ExecutionStrategy.ALNS -> 2
                 ExecutionStrategy.MIXED -> error("admission supplies participating arms")
             }
-            val family = when (arm) { 0 -> ArmFamily.Backtrack; 1 -> ArmFamily.LocalSearch; else -> ArmFamily.Lns }
+            val family = when (arm) {
+                0 -> ArmFamily.Backtrack
+                1 -> ArmFamily.LocalSearch
+                else -> ArmFamily.Lns
+            }
             PortfolioArmFactory(plan, arm, family, binding = {
                 SourceWorkerBinding(binding, provesResults = it.permitsSourceProofs)
             }) { slot ->
@@ -57,7 +61,7 @@ internal class NonlinearIntegerPortfolio(
         }
         val strategy = polynomial.strategy
         val seed = if (engine == FiniteEngine.BACKTRACK) strategy.backtrack.randomSeed
-            else strategy.localSearch.randomSeed
+        else strategy.localSearch.randomSeed
         val budget = params.nodeBudget ?: when (engine) {
             FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS -> strategy.localSearch.nodeBudget
             else -> strategy.backtrack.nodeBudget ?: strategy.localSearch.nodeBudget
@@ -78,7 +82,7 @@ internal class NonlinearIntegerPortfolio(
             is SolveResult.Sat -> OpenTheoryResult.Sat(nonlinearIntegerAssignment(result.assignment), result.stats)
             is SolveResult.Unsat -> OpenTheoryResult.Unsat(result.stats)
             is SolveResult.Unknown -> OpenTheoryResult.Unknown(if (polynomial.timeout()) TerminationReason.Timeout
-                else if (polynomial.cancellation()) TerminationReason.Cancelled else result.reason, result.stats)
+            else if (polynomial.cancellation()) TerminationReason.Cancelled else result.reason, result.stats)
         }
         return PolynomialTheoryExecution(published, scope.polynomialStats, workers.firstNotNullOfOrNull { it.resource },
             integerCells = cellReuseStats(params, workers), integerRoots = integerRootStats(params, workers),

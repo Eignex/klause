@@ -82,8 +82,7 @@ internal class DifferenceGuardPropagation private constructor(
             override fun deadline() = token().deadline()
             override val accounting get() = token().accounting
 
-            override
-                val admission get() = admissionFrom( token())
+            override val admission get() = admissionFrom( token())
         }
         fun finish(result: ComponentResult): ComponentResult {
             if (forcePoll() || result is ComponentResult.Indeterminate) {
@@ -221,8 +220,10 @@ internal class DifferenceGuardPropagation private constructor(
     internal companion object {
         // External cancellation is polled every POLL_INTERVAL units; an attached work meter after every debit.
         private const val POLL_INTERVAL = 64
+
         // Each open origin costs one sparse query; matches the finite difference propagator's sweep budget.
         private const val HEAD_SWEEP_BUDGET = 64
+
         // Optional index: declined above this edge count, like the other private difference indexes.
         private const val MAX_EDGES = 65_536
 

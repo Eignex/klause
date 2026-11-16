@@ -140,7 +140,7 @@ data class PolynomialTheoryStats(
             "$prefix)"
         } else {
             "$prefix, dyadicAttempts=$dyadicAttempts, dyadicBases=$dyadicBases, " +
-            "coupledWorkDeclines=$coupledWorkDeclines, dyadicPreExtractionDeclines=$dyadicPreExtractionDeclines)"
+                "coupledWorkDeclines=$coupledWorkDeclines, dyadicPreExtractionDeclines=$dyadicPreExtractionDeclines)"
         }
     }
 
@@ -260,11 +260,11 @@ private fun minimizePolynomial(
         result
     } else {
         when (result) {
-        is MinimizeResult.WithSample -> MinimizeResult.BestFound(
-            result.sample, result.objective, reason, result.stats,
-        )
-        else -> MinimizeResult.Unknown(reason, result.stats)
-    }
+            is MinimizeResult.WithSample -> MinimizeResult.BestFound(
+                result.sample, result.objective, reason, result.stats,
+            )
+            else -> MinimizeResult.Unknown(reason, result.stats)
+        }
     }
     return PolynomialOptimizationExecution(published, scope.stats)
 }
@@ -311,8 +311,8 @@ private fun executePolynomial(
         OpenTheoryResult.Unknown(
             reason,
             searchStats.copy(
-            run = searchStats.run.copy(timedOut = reason == TerminationReason.Timeout),
-        )
+                run = searchStats.run.copy(timedOut = reason == TerminationReason.Timeout),
+            )
         ),
         stats,
     )
@@ -351,10 +351,10 @@ private fun executePolynomial(
                 exact
             } else {
                 OpenTheoryAssignment.Rebuilt(
-                exact,
-                assignment.bools,
-                Array(shared.source.numIntVars) { bigIntOf(sample.intValue(it)) },
-            )
+                    exact,
+                    assignment.bools,
+                    Array(shared.source.numIntVars) { bigIntOf(sample.intValue(it)) },
+                )
             }
             if (stop()) {
                 incomplete(

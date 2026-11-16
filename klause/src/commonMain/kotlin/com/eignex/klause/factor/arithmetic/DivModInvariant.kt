@@ -22,8 +22,8 @@ import com.eignex.util.numbers.toLongExact
 
 internal class DivModInvariant(private val relation: DivMod) : Invariant {
     private fun grade(state: LocalSearchState, value: (Int) -> Long): Int {
-        val wordDivisor = relation.divisor?.let(value) ?:
-            relation.constantDivisor?.takeIf { it.fitsLong() }?.toLongExact()
+        val wordDivisor = relation.divisor?.let(value)
+            ?: relation.constantDivisor?.takeIf { it.fitsLong() }?.toLongExact()
         if (wordDivisor != null) {
             val outputs = relation.wordOutputs(value(relation.dividend), wordDivisor)
                 ?: return compressViolation(Long.MAX_VALUE, state.violationSoftCap)

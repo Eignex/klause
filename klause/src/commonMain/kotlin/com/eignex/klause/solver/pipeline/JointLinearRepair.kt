@@ -146,7 +146,9 @@ internal class JointLinearRepair(
             "jointRepairFundedAllocation" to funding.allocated,
         )).let { counters -> if (observation == null) counters else counters + observation.observations() }))
 
-    private fun observe(stage: String) { stages[stage] = (stages[stage] ?: 0) + 1 }
+    private fun observe(stage: String) {
+        stages[stage] = (stages[stage] ?: 0) + 1
+    }
 
     private fun observeExternal(stage: String) {
         if (observeExternalIncumbents) observe("jointRepairExternal$stage")
@@ -274,13 +276,16 @@ internal class JointLinearRepair(
             completionExhausted = { exhausted },
             centerPreparationPending = { rootPreparationPending },
             reviseRefutedCenter = centerProgress?.let { ::reviseRefutedCenter },
-            onProposalOperator = observation?.let { { operator, round ->
-                observedOperator = operator
-                observedSchedulingRound = round
-            } },
+            onProposalOperator = observation?.let {
+                { operator, round ->
+                    observedOperator = operator
+                    observedSchedulingRound = round
+                }
+            },
             proposal = ExactNeighborhoodProposal { centers, bools, count, round, radius, cutoff ->
-                val checked = preparedCenter?.takeIf { round == 0L &&
-                    (cutoff == null || it.value?.let { value -> value < cutoff } == true)
+                val checked = preparedCenter?.takeIf {
+                    round == 0L &&
+                        (cutoff == null || it.value?.let { value -> value < cutoff } == true)
                 } ?: checkedExternalCenter(cutoff)
                 checked?.sample?.let { sample ->
                     observe("jointRepairImportedCenters")
@@ -519,7 +524,7 @@ internal class JointLinearRepair(
                 for ((id, value) in entries) {
                     if (!upper && id < model.numIntVars && captured.upper[id] == value) pinnedIntegers++
                     val coordinate = if (id < model.numIntVars) SourceCoordinate(SourceCoordinate.Kind.Integer, id)
-                        else SourceCoordinate(SourceCoordinate.Kind.Real, id - model.numIntVars)
+                    else SourceCoordinate(SourceCoordinate.Kind.Real, id - model.numIntVars)
                     bounds = bounds.bound(coordinate, value, upper)
                 }
             }
@@ -584,7 +589,7 @@ internal class JointLinearRepair(
                     originalChecked = false
                     observe("jointRepairOriginalPublicationUnavailable")
                 } else observe(if (originalChecked) "jointRepairOriginalPublicationChecked"
-                    else "jointRepairOriginalPublicationRejected")
+                else "jointRepairOriginalPublicationRejected")
             }
             observation?.event(proposalSequence, observationQuery, "publication", when {
                 checked != SourceEvidenceCheck.Checked -> "source-unchecked"
@@ -633,10 +638,14 @@ internal class JointLinearRepair(
                 bound = snapshot.bound)
         }
         val refuted = result.terminal?.claim == SourceClaim.Refutation
-        val completedKey = queryRefutationKey.takeIf { refuted && !querySawExternal &&
-            result.terminal?.scope == queryRefutationScope }
-        val completedStep = queryCenterStep.takeIf { refuted && !querySawExternal &&
-            result.terminal?.scope == queryRefutationScope && anchor == null && preparedCenter == null }
+        val completedKey = queryRefutationKey.takeIf {
+            refuted && !querySawExternal &&
+                result.terminal?.scope == queryRefutationScope
+        }
+        val completedStep = queryCenterStep.takeIf {
+            refuted && !querySawExternal &&
+                result.terminal?.scope == queryRefutationScope && anchor == null && preparedCenter == null
+        }
         retire()
         if (completedKey != null) rememberRefutation(completedKey, cancellation)
         readyCenterStep = completedStep
@@ -665,14 +674,16 @@ internal class JointLinearRepair(
         funding.charge(0L, 64L)
         var work = 1L + 16L * entries
         var bytes = 256L + 64L * entries
-        for (values in listOf(condition.lower, condition.upper)) for (value in values.values) {
-            if (stop() || cancellation() || funding.exhausted) return null
-            val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
-            if (bits > MAX_REFUTATION_SCALAR_BITS) return null
-            work += MAX_REFUTED_CONDITIONS * (1L + bits * bits / 64L)
-            bytes += 64L + (bits + 7L) / 8L
-            if (work >= funding.remainingWork || bytes >= funding.remainingAllocation ||
-                bytes > MAX_REFUTATION_BYTES) return null
+        for (values in listOf(condition.lower, condition.upper)) {
+            for (value in values.values) {
+                if (stop() || cancellation() || funding.exhausted) return null
+                val bits = value.num.magnitudeBitLength().toLong() + value.den.magnitudeBitLength()
+                if (bits > MAX_REFUTATION_SCALAR_BITS) return null
+                work += MAX_REFUTED_CONDITIONS * (1L + bits * bits / 64L)
+                bytes += 64L + (bits + 7L) / 8L
+                if (work >= funding.remainingWork || bytes >= funding.remainingAllocation ||
+                    bytes > MAX_REFUTATION_BYTES) return null
+            }
         }
         if (work >= funding.remainingWork || bytes >= funding.remainingAllocation ||
             bytes > MAX_REFUTATION_BYTES) return null
@@ -738,7 +749,7 @@ internal class JointLinearRepair(
                 support.limitStage?.let { observe("jointRepairRefutationSupportLimit$it") }
                 if (support.reason == SourceNumericalSupportResult.Reason.Funding) {
                     observe(if (funding.exhausted) "jointRepairRefutationOwnerExhausted"
-                        else "jointRepairRefutationGrantPaused")
+                    else "jointRepairRefutationGrantPaused")
                 }
             }
         }

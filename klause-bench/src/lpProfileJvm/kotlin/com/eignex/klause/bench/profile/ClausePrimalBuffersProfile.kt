@@ -32,7 +32,9 @@ object ClausePrimalBuffersProfile {
         val thread = Thread.currentThread().threadId()
         check(bean.getThreadAllocatedBytes(thread) >= 0L)
         val until = System.nanoTime() + 1_000_000_000L
-        do { fixture.run(1, bean, thread) } while (System.nanoTime() < until)
+        do {
+            fixture.run(1, bean, thread)
+        } while (System.nanoTime() < until)
         val sessions = (524_288 / (groups * 3)).coerceIn(8, 8192)
         val samples = List(7) { fixture.run(sessions, bean, thread) }
         fun median(field: (Observation) -> Double) = samples.map(field).sorted()[samples.size / 2]
@@ -50,16 +52,18 @@ object ClausePrimalBuffersProfile {
             put("trialBytes", median { it.trialBytes.toDouble() / it.trials })
             put("constructionNs", median { it.constructionNs.toDouble() / sessions })
             put("trialNs", median { it.trialNs.toDouble() / it.trials })
-            put("samples", JsonArray(samples.map { row -> buildJsonObject {
-                put("sessions", sessions)
-                put("trials", row.trials)
-                put("constructionBytes", row.constructionBytes)
-                put("trialBytes", row.trialBytes)
-                put("constructionNs", row.constructionNs)
-                put("trialNs", row.trialNs)
-                put("work", row.work)
-                put("checksum", row.checksum)
-            } }))
+            put("samples", JsonArray(samples.map { row ->
+                buildJsonObject {
+                    put("sessions", sessions)
+                    put("trials", row.trials)
+                    put("constructionBytes", row.constructionBytes)
+                    put("trialBytes", row.trialBytes)
+                    put("constructionNs", row.constructionNs)
+                    put("trialNs", row.trialNs)
+                    put("work", row.work)
+                    put("checksum", row.checksum)
+                }
+            }))
         }
         Files.createDirectories(output.toAbsolutePath().parent)
         Files.writeString(output, "$result\n")

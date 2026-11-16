@@ -19,18 +19,22 @@ internal fun equationalSection(
 ): PolynomialEquationalProjection? {
     if (equations.isEmpty()) return null
     val occurrences = MutableIntIntMap()
-    for (polynomial in family) for (variable in polynomial.variables) {
-        arithmetic.step()
-        occurrences.addTo(variable, 1)
+    for (polynomial in family) {
+        for (variable in polynomial.variables) {
+            arithmetic.step()
+            occurrences.addTo(variable, 1)
+        }
     }
     var best: SectionPivot? = null
     for (polynomial in equations) {
         arithmetic.step()
         val terms = polynomial.terms
         val counts = MutableIntIntMap()
-        for (term in terms) for (variable in term.monomial.variables) {
-            arithmetic.step()
-            counts.addTo(variable, 1)
+        for (term in terms) {
+            for (variable in term.monomial.variables) {
+                arithmetic.step()
+                counts.addTo(variable, 1)
+            }
         }
         for (term in terms) {
             arithmetic.step()

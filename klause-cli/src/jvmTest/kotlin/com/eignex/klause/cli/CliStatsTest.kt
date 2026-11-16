@@ -59,7 +59,7 @@ class CliStatsTest {
     fun `arm output should distinguish queued incumbent offers checks and installations`() {
         val arm = ArmSchedule(label = "ls/cbls/fixed", segments = 1, work = 1, meanReward = 0.0,
             failures = 0, credit = emptyMap(), sharing = SharingStats(incumbents =
-            mapOf("offered" to 7L, "coalesced" to 5L, "checked" to 2L, "installed" to 1L)))
+                mapOf("offered" to 7L, "coalesced" to 5L, "checked" to 2L, "installed" to 1L)))
 
         val line = portfolioStatPairs(SolveStats(portfolio = PortfolioStats(arms = listOf(arm))))
             .toMap().getValue("arm.ls/cbls/fixed")
@@ -128,7 +128,6 @@ class CliStatsTest {
         assertEquals("5", pairs["valueProbeWork"])
         assertEquals("6", pairs["valueProbeCappedOrders"])
     }
-
 
     @Test
     fun `board restart outcomes should be emitted only after a completed observation`() {

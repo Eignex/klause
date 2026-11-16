@@ -158,7 +158,6 @@ class ImplicitSeeding(
         ownerInt = owners
         state.moveSink.setOwners(owners)
     }
-
 }
 
 /** Free-Boolean probe cap for [ImplicitSeeding.implicationGraph], mirroring the presolve

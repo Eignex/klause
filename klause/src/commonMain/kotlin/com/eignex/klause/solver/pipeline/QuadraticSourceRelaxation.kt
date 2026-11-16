@@ -106,7 +106,10 @@ internal class QuadraticSourceRelaxation(
                 upper[id] = upper[id]?.let { if (it < value) it else value } ?: value
             }
             val condition = PolynomialCondition(proposed.bools, lower, upper)
-            if (lower.any { (id, value) -> arithmetic.step(); upper[id]?.let { value > it } == true }) {
+            if (lower.any { (id, value) ->
+                    arithmetic.step()
+                    upper[id]?.let { value > it } == true
+                }) {
                 return QuadraticRelaxationResult.Infeasible(condition)
             }
             val conditioned = condition.apply(formula, boolCount, numericCount, arithmetic::step)

@@ -20,7 +20,10 @@ class CompilerInputReceiptsTest {
         val cache = root.resolve("receipts")
         var reads = 0
         repeat(2) {
-            val receipts = CompilerInputReceipts(cache, hash = { path -> reads++; LabInputs.treeHash(path) })
+            val receipts = CompilerInputReceipts(cache, hash = { path ->
+                reads++
+                LabInputs.treeHash(path)
+            })
             assertTrue(receipts.matches(compiler, expected))
         }
         assertEquals(1, reads)
@@ -56,7 +59,10 @@ class CompilerInputReceiptsTest {
             else -> error(change)
         }
         var reads = 0
-        val receipts = CompilerInputReceipts(cache, hash = { path -> reads++; LabInputs.treeHash(path) })
+        val receipts = CompilerInputReceipts(cache, hash = { path ->
+            reads++
+            LabInputs.treeHash(path)
+        })
         assertEquals(matches, receipts.matches(compiler, expected))
         assertEquals(1, reads)
     }
@@ -71,7 +77,10 @@ class CompilerInputReceiptsTest {
         val receipt = Files.list(cache).use { it.findFirst().orElseThrow() }
         Files.writeString(receipt, "broken")
         var reads = 0
-        val receipts = CompilerInputReceipts(cache, hash = { path -> reads++; LabInputs.treeHash(path) })
+        val receipts = CompilerInputReceipts(cache, hash = { path ->
+            reads++
+            LabInputs.treeHash(path)
+        })
         assertTrue(receipts.matches(compiler, expected))
         assertEquals(1, reads)
     }
@@ -94,7 +103,10 @@ class CompilerInputReceiptsTest {
         var reads = 0
         repeat(2) {
             val receipts = CompilerInputReceipts(
-                cache, hash = { path -> reads++; LabInputs.treeHash(path) }, reliable = { false },
+                cache, hash = { path ->
+                    reads++
+                    LabInputs.treeHash(path)
+                }, reliable = { false },
             )
             assertTrue(receipts.matches(compiler, expected))
         }

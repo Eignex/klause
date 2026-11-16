@@ -23,7 +23,6 @@ import com.eignex.util.collections.IntArrayList
  * They are unsupported in reified contexts.
  */
 
-
 /** Emit the [Mdd] factor when `seq` is all bare IntRefs; returns whether it was emitted. */
 internal fun Lowering.assertMddNative(
     seqExpr: List<IntExpr>,

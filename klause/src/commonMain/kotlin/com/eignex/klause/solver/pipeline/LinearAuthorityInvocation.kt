@@ -107,24 +107,32 @@ internal class LinearAuthorityInvocation(
     val stats: SolveStats get() = SolveStats(
         run = SolveStats.EMPTY.run.copy(backend = "linear-authority",
             wallMs = started.elapsedNow().inWholeMilliseconds, timedOut = params.timeout()),
-        smt = state.smt.snapshot().let { snapshot -> snapshot.copy(
-            completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
-            externalOffers +
-            mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
-                "numericalImportedIncumbents" to importedIncumbents) +
-            (frontier?.let { mapOf("numericalFrontierPending" to it.pending.toLong(),
-                "numericalFrontierPeakPending" to it.peakPending.toLong()) } ?: emptyMap())) },
+        smt = state.smt.snapshot().let { snapshot ->
+            snapshot.copy(
+                completeSearchStages = snapshot.completeSearchStages.orEmpty() + component.observations() +
+                    externalOffers +
+                    mapOf("numericalFundedWork" to funding.spent, "numericalFundedAllocation" to funding.allocated,
+                        "numericalImportedIncumbents" to importedIncumbents) +
+                    (frontier?.let {
+                        mapOf("numericalFrontierPending" to it.pending.toLong(),
+                            "numericalFrontierPeakPending" to it.peakPending.toLong())
+                    } ?: emptyMap()))
+        },
         openTheory = state.work.snapshot(),
         search = state.progress(if (closed) null else session))
     private val component = LinearAuthorityTraversal(context,
         budget, stop, ::paused, ::offer,
-        { incumbent?.let { sample -> value?.let {
-            if (sample === importedIncumbent && sample !== consumedIncumbent) {
-                consumedIncumbent = sample
-                onIncumbentUse?.invoke()
+        {
+            incumbent?.let { sample ->
+                value?.let {
+                    if (sample === importedIncumbent && sample !== consumedIncumbent) {
+                        consumedIncumbent = sample
+                        onIncumbentUse?.invoke()
+                    }
+                    sample to it
+                }
             }
-            sample to it
-        } } }, useBranchHistory, borrowedAuthority,
+        }, useBranchHistory, borrowedAuthority,
         useGuidance = boundOrdered || guidance || supportBranching || onNumericalFeedback != null,
         inheritBounds = boundOrdered, useCuts = cuts,
         useActiveRows = activeRows, useRefutationReuse = params.sourceRefutationReuse,
@@ -145,8 +153,8 @@ internal class LinearAuthorityInvocation(
         BooleanBranching.SourceOrder(context.coordinates.count {
             it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
         }) else HeuristicBooleanBranching(Vsids(), context.coordinates.count {
-            it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
-        })
+        it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
+    })
     private val run = if (boundOrdered) null else session.openRun(context.coordinates.count {
         it.kind == com.eignex.klause.solver.evidence.SourceCoordinate.Kind.Boolean
     }, SearchSolveParams(state.remainingDecisions()), decisionBudget = state.decisionBudget,
@@ -201,7 +209,7 @@ internal class LinearAuthorityInvocation(
                 }
             }
             if (stop()) return finish(null, if (params.timeout()) TerminationReason.Timeout
-                else TerminationReason.Cancelled)
+            else TerminationReason.Cancelled)
             if (funding.exhausted) return finish(null, TerminationReason.BudgetExhausted)
             if (!initialized) {
                 initialized = true
@@ -217,7 +225,7 @@ internal class LinearAuthorityInvocation(
                 SearchRunEvent.Exhausted -> {
                     val terminal = component.completed()
                     finish(terminal, if (terminal == null) TerminationReason.Unsupported
-                        else TerminationReason.SearchExhausted)
+                    else TerminationReason.SearchExhausted)
                 }
                 is SearchRunEvent.Indeterminate -> finish(null, when {
                     params.timeout() -> TerminationReason.Timeout
@@ -271,7 +279,7 @@ internal class LinearAuthorityInvocation(
             SourceClaim.Witness(sample), SourceDerivation.SourceWitness), checking)
         if (checked != SourceEvidenceCheck.Checked) {
             observeExternalOffer(external, if (checked is SourceEvidenceCheck.Rejected) "PointRejected"
-                else "PointUnavailable")
+            else "PointUnavailable")
             return
         }
         val exact = context.linearValue(sample, checking)
@@ -295,8 +303,8 @@ internal class LinearAuthorityInvocation(
 
     val objectiveBound: SourceEvidence? get() = component.rootBound
 
-    fun snapshot(reason: TerminationReason): LinearInvocationResult = result ?:
-        LinearInvocationResult(null, component.rootBound, incumbent, value, reason, stats)
+    fun snapshot(reason: TerminationReason): LinearInvocationResult = result
+        ?: LinearInvocationResult(null, component.rootBound, incumbent, value, reason, stats)
 
     private fun finish(terminal: SourceEvidence?, reason: TerminationReason): LinearInvocationResult {
         val cancelled = stop()

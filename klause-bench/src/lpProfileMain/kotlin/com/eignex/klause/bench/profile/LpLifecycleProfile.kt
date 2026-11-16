@@ -377,20 +377,22 @@ private fun lifecycle(
                     put("reconstructionEntryRejection", result?.reconstruction?.entryRejection?.toString())
                     put("basisDecline", result?.basisVerification?.decline?.name)
                     put("continuationDecline", result?.continuation?.decline?.name)
-                    put("continuation", result?.continuation?.let { metrics -> buildJsonObject {
-                        put("phase", metrics.phase.name)
-                        put("work", metrics.work)
-                        put("allocation", metrics.allocation)
-                        put("elapsedNs", metrics.elapsedNs)
-                        put("builds", metrics.builds)
-                        put("imports", metrics.imports)
-                        put("importPosition", metrics.importPosition)
-                        put("maxImportPivots", ExactContinuationLimits().maxImportPivots)
-                        put("restarts", metrics.restarts)
-                        put("resumed", metrics.resumed)
-                        put("invalidated", metrics.invalidated)
-                        put("workByPhase", numbers(metrics.workByPhase))
-                    } } ?: JsonNull)
+                    put("continuation", result?.continuation?.let { metrics ->
+                        buildJsonObject {
+                            put("phase", metrics.phase.name)
+                            put("work", metrics.work)
+                            put("allocation", metrics.allocation)
+                            put("elapsedNs", metrics.elapsedNs)
+                            put("builds", metrics.builds)
+                            put("imports", metrics.imports)
+                            put("importPosition", metrics.importPosition)
+                            put("maxImportPivots", ExactContinuationLimits().maxImportPivots)
+                            put("restarts", metrics.restarts)
+                            put("resumed", metrics.resumed)
+                            put("invalidated", metrics.invalidated)
+                            put("workByPhase", numbers(metrics.workByPhase))
+                        }
+                    } ?: JsonNull)
                     put("refinementDecline", result?.refinement?.decline?.name)
                     put("refinementWork", result?.refinement?.work)
                     put("refinementAllocation", result?.refinement?.allocation)
@@ -636,21 +638,25 @@ private fun sourceWorker(
         put("continuationWork", numbers(lp.continuation.work))
         put("continuationAllocation", numbers(lp.continuation.allocation))
         put("certificatePhases", buildJsonObject {
-            lp.phases.forEach { (name, phase) -> put(name, buildJsonObject {
-                put("calls", phase.calls)
-                put("nanos", phase.nanos)
-                put("work", phase.work)
-                put("outcomes", numbers(phase.outcomes))
-            }) }
+            lp.phases.forEach { (name, phase) ->
+                put(name, buildJsonObject {
+                    put("calls", phase.calls)
+                    put("nanos", phase.nanos)
+                    put("work", phase.work)
+                    put("outcomes", numbers(phase.outcomes))
+                })
+            }
         })
-        put("witness", result.assignment?.let { sample -> buildJsonObject {
-            put("bools", JsonArray(sample.bools.map(::JsonPrimitive)))
-            put("ints", JsonArray(sample.exactInts?.map { JsonPrimitive(it.toString()) }
-                ?: sample.ints.map(::JsonPrimitive)))
-            put("reals", JsonArray(sample.reals.map(::profileNumber)))
-            put("exactReals", sample.exactReals?.let { values ->
-                JsonArray(values.map { JsonPrimitive(it.toString()) })
-            } ?: JsonNull)
-        } } ?: JsonNull)
+        put("witness", result.assignment?.let { sample ->
+            buildJsonObject {
+                put("bools", JsonArray(sample.bools.map(::JsonPrimitive)))
+                put("ints", JsonArray(sample.exactInts?.map { JsonPrimitive(it.toString()) }
+                    ?: sample.ints.map(::JsonPrimitive)))
+                put("reals", JsonArray(sample.reals.map(::profileNumber)))
+                put("exactReals", sample.exactReals?.let { values ->
+                    JsonArray(values.map { JsonPrimitive(it.toString()) })
+                } ?: JsonNull)
+            }
+        } ?: JsonNull)
     })
 }

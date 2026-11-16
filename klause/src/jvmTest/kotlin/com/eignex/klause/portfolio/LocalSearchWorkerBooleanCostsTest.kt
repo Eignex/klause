@@ -97,12 +97,12 @@ class LocalSearchWorkerBooleanCostsTest(
         @Parameterized.Parameters(name = "minimize={0}, guidance={1}, perMove={2}, existing={3}, wcnf={4}")
         fun cases(): List<Array<Any>> = listOf(false, true).flatMap { minimize ->
             listOf(ObjectiveGuidance.Functional to true, ObjectiveGuidance.Functional to false,
-                ObjectiveGuidance.Canonical to true, ObjectiveGuidance.Geometric to true).flatMap {
-                (guidance, perMove) ->
-                listOf(false, true).flatMap { existing ->
-                    listOf(false, true).map { wcnf -> arrayOf<Any>(minimize, guidance, perMove, existing, wcnf) }
+                ObjectiveGuidance.Canonical to true, ObjectiveGuidance.Geometric to true)
+                .flatMap { (guidance, perMove) ->
+                    listOf(false, true).flatMap { existing ->
+                        listOf(false, true).map { wcnf -> arrayOf<Any>(minimize, guidance, perMove, existing, wcnf) }
+                    }
                 }
-            }
         }
     }
 }

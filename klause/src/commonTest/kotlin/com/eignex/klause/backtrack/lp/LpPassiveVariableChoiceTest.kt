@@ -73,7 +73,10 @@ class LpPassiveVariableChoiceTest {
             val events = ArrayList<String>()
             val choice = LpPassiveVariableChoice(true, events::add, { if (!duringRead) fresh = false })
 
-            val selected = choice.select(proposal, baseline, 1, { fresh }, { fresh = false; true })
+            val selected = choice.select(proposal, baseline, 1, { fresh }, {
+                fresh = false
+                true
+            })
 
             assertEquals(baseline.variable, selected)
             assertNull(choice.nominatedVariable)

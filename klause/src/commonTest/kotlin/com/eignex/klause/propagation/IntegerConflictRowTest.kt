@@ -17,14 +17,20 @@ class IntegerConflictRowTest {
     @Test
     fun `subsumption should require a stronger bound and an implied guard`() {
         val guards = listOf(Lit.NONE, Lit.make(0, true), Lit.make(0, false), Lit.make(1, true))
-        for (guard in guards) for (otherGuard in guards) for (bound in listOf(3L, 5L, 7L)) {
-            val retained = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-                longArrayOf(2), intArrayOf(0), LinearOp.LE, 10), useLo = true, guard = guard))
-            val candidate = requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
-                longArrayOf(1), intArrayOf(0), LinearOp.LE, bound), useLo = true, guard = otherGuard))
+        for (guard in guards) {
+            for (otherGuard in guards) {
+                for (bound in listOf(3L, 5L, 7L)) {
+                    val retained =
+                        requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+                            longArrayOf(2), intArrayOf(0), LinearOp.LE, 10), useLo = true, guard = guard))
+                    val candidate =
+                        requireNotNull(IntegerConflictRow.source(LinearPropagator(intArrayOf(), intArrayOf(0),
+                            longArrayOf(1), intArrayOf(0), LinearOp.LE, bound), useLo = true, guard = otherGuard))
 
-            assertEquals(bound >= 5 && (guard == Lit.NONE || guard == otherGuard), retained.subsumes(candidate),
-                "guard=$guard otherGuard=$otherGuard bound=$bound")
+                    assertEquals(bound >= 5 && (guard == Lit.NONE || guard == otherGuard), retained.subsumes(candidate),
+                        "guard=$guard otherGuard=$otherGuard bound=$bound")
+                }
+            }
         }
     }
 
@@ -133,12 +139,16 @@ class IntegerConflictRowTest {
 
         val row = requireNotNull(left.resolve(right, 1))
 
-        for (x in 0L..6L) for (y in 0L..12L) for (z in 0L..24L) {
-            if (2 * x + y <= z && 2 * x - y <= 0) {
-                val assignment = longArrayOf(x, y, z)
-                var activity = 0L
-                for (i in row.variables.indices) activity += row.coefficients[i] * assignment[row.variables[i]]
-                assertTrue(activity <= row.bound)
+        for (x in 0L..6L) {
+            for (y in 0L..12L) {
+                for (z in 0L..24L) {
+                    if (2 * x + y <= z && 2 * x - y <= 0) {
+                        val assignment = longArrayOf(x, y, z)
+                        var activity = 0L
+                        for (i in row.variables.indices) activity += row.coefficients[i] * assignment[row.variables[i]]
+                        assertTrue(activity <= row.bound)
+                    }
+                }
             }
         }
     }

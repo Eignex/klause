@@ -68,7 +68,10 @@ private fun quadraticModel(polynomial: Polynomial, arithmetic: PolynomialArithme
     var quadratic = false
     for (term in terms) {
         arithmetic.step()
-        val degree = term.monomial.variables.sumOf { arithmetic.step(); term.monomial.exponent(it).toLong() }
+        val degree = term.monomial.variables.sumOf {
+            arithmetic.step()
+            term.monomial.exponent(it).toLong()
+        }
         if (degree > 2) return null
         if (degree == 2L) quadratic = true
     }
@@ -80,11 +83,20 @@ private fun quadraticModel(polynomial: Polynomial, arithmetic: PolynomialArithme
     } catch (_: PolynomialResourceLimit) {
         return null
     }
-    val ids = coordinates.withIndex().associate { arithmetic.step(); it.value to it.index }
-    val linear = MutableList(coordinates.size) { arithmetic.step(); BigFraction.ZERO }
+    val ids = coordinates.withIndex().associate {
+        arithmetic.step()
+        it.value to it.index
+    }
+    val linear = MutableList(coordinates.size) {
+        arithmetic.step()
+        BigFraction.ZERO
+    }
     val hessian = List(coordinates.size) {
         arithmetic.step()
-        MutableList(coordinates.size) { arithmetic.step(); BigFraction.ZERO }
+        MutableList(coordinates.size) {
+            arithmetic.step()
+            BigFraction.ZERO
+        }
     }
     for (term in terms) {
         arithmetic.step()
@@ -117,7 +129,10 @@ private fun quadraticAffineRow(
         PolynomialRelation.NE -> return null
     }
     val reversed = atom.relation == PolynomialRelation.GE || atom.relation == PolynomialRelation.GT
-    val coefficients = MutableList(coordinates.size) { arithmetic.step(); BigFraction.ZERO }
+    val coefficients = MutableList(coordinates.size) {
+        arithmetic.step()
+        BigFraction.ZERO
+    }
     for (term in atom.polynomial.terms) {
         arithmetic.step()
         val variable = term.monomial.variables.singleOrNull()

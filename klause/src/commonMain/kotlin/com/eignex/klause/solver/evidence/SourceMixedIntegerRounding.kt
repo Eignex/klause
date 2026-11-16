@@ -20,8 +20,10 @@ internal fun mixedIntegerRounding(
         bounded(value)
     }
     if (coefficients.none { it.key.kind == SourceCoordinate.Kind.Integer } ||
-        coefficients.any { (id, value) -> id.kind == SourceCoordinate.Kind.Boolean ||
-            (id.kind == SourceCoordinate.Kind.Integer && value.den != BIG_ONE) }) return null
+        coefficients.any { (id, value) ->
+            id.kind == SourceCoordinate.Kind.Boolean ||
+                (id.kind == SourceCoordinate.Kind.Integer && value.den != BIG_ONE)
+        }) return null
     val sides = linkedMapOf<SourceCoordinate, Pair<BigFraction, Boolean>>()
     var shifted = bounded(row.rhs)
     for (bound in bounds) {

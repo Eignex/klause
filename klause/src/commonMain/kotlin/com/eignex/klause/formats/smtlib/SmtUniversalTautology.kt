@@ -10,7 +10,10 @@ internal fun smtUniversalTautology(source: SmtTypedSource, root: Int, cancellati
     fun formula(operator: String, arguments: List<Int> = emptyList(), atom: String = ""): Int {
         cancellation.polynomialSourceCheckpoint(1)
         val value = Formula(operator, arguments, atom)
-        return interned.getOrPut(value) { formulas.add(value); formulas.lastIndex }
+        return interned.getOrPut(value) {
+            formulas.add(value)
+            formulas.lastIndex
+        }
     }
     val truth = formula("true")
     val falsity = formula("false")
@@ -36,12 +39,14 @@ internal fun smtUniversalTautology(source: SmtTypedSource, root: Int, cancellati
             "literal:false" -> falsity
             "and", "or", "xor", "=>", "not" -> formula(node.operator, arguments)
             "ite" -> if (node.sort == SmtSort.Bool) formula("ite", arguments)
-                else formula("atom", atom = "term:$index")
+            else formula("atom", atom = "term:$index")
             "=" -> formula("and", node.arguments.zipWithNext().map { equality(it.first, it.second) })
             "distinct" -> {
                 val pairs = ArrayList<Int>()
-                for (left in node.arguments.indices) for (right in left + 1 until node.arguments.size) {
-                    pairs += formula("not", listOf(equality(node.arguments[left], node.arguments[right])))
+                for (left in node.arguments.indices) {
+                    for (right in left + 1 until node.arguments.size) {
+                        pairs += formula("not", listOf(equality(node.arguments[left], node.arguments[right])))
+                    }
                 }
                 formula("and", pairs)
             }
@@ -71,12 +76,16 @@ internal fun smtUniversalTautology(source: SmtTypedSource, root: Int, cancellati
                     var result = args.last()
                     for (left in args.dropLast(1).asReversed()) {
                         result = if (left == false || result == true) true
-                            else if (left == true) result else null
+                        else if (left == true) result else null
                     }
                     result
                 }
-                "ite" -> when (args[0]) { true -> args[1]; false -> args[2]; null ->
-                    if (args[1] == args[2]) args[1] else null }
+                "ite" -> when (args[0]) {
+                    true -> args[1]
+                    false -> args[2]
+                    null ->
+                        if (args[1] == args[2]) args[1] else null
+                }
                 else -> error("unknown Boolean schema operator")
             }
         }

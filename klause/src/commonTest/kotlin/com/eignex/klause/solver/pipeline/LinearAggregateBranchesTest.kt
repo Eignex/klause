@@ -43,8 +43,10 @@ class LinearAggregateBranchesTest {
         "lower" to SourcePremise(SourceInequality(weights.mapValues { it.value.negated() },
             BigFraction.ofLong(-150))),
         "upper" to SourcePremise(SourceInequality(weights, BigFraction.ofLong(151))),
-    ) + integers.associate { id -> "lower/${id.id}" to
-        SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO)) }
+    ) + integers.associate { id ->
+        "lower/${id.id}" to
+            SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO))
+    }
     private val source = SourceProofContext(scope, integers.toSet(), rows, emptyMap())
 
     @Test
@@ -71,8 +73,10 @@ class LinearAggregateBranchesTest {
             "lower" to SourcePremise(SourceInequality(coefficients.mapValues { it.value.negated() },
                 BigFraction.ofLong(-450))),
             "upper" to SourcePremise(SourceInequality(coefficients, BigFraction.ofLong(451))),
-        ) + ids.associate { id -> "lower/${id.id}" to
-            SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO)) }
+        ) + ids.associate { id ->
+            "lower/${id.id}" to
+                SourcePremise(SourceInequality(mapOf(id to BigFraction.MINUS_ONE), BigFraction.ZERO))
+        }
         val context = SourceProofContext(scope, ids.toSet(), premises)
 
         val row = LinearAggregateBranches(SourceLpBudget()).propose(context, ExecutionControl.Never)

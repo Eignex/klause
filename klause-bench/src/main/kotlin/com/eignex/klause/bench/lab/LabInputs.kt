@@ -5,11 +5,11 @@ import com.eignex.klause.bench.catalog.ProblemRef
 import com.eignex.klause.bench.catalog.ProblemSource
 import com.eignex.klause.bench.source.CorpusFetcher
 import com.eignex.klause.bench.source.CorpusFiles
-import com.eignex.lab.bench.WorkspaceChecksums
 import com.eignex.lab.bench.BenchCase
 import com.eignex.lab.bench.BenchContext
 import com.eignex.lab.bench.BenchInput
 import com.eignex.lab.bench.BenchInputRoot
+import com.eignex.lab.bench.WorkspaceChecksums
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path

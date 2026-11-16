@@ -73,7 +73,6 @@ import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.theory.AbsRealCompletion
 import com.eignex.klause.theory.requiresRealCompletionSearch
 import com.eignex.klause.util.ExecutionControl
-import com.eignex.klause.util.bindStopControl
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
 import com.eignex.util.arrays.emptyIntArray
@@ -294,8 +293,8 @@ internal class CpSatisfactionTraversal(
             val sharedCancellation = if (deferredRoot) cancelledWhen({
                 if (run == null) propagationCancellation.deadline() else params.cancellation.deadline()
             }, { params.cancellation.workScheduled() }, {
-                    if (run == null) propagationCancellation.stopPolling else params.cancellation.stopPolling
-                }) {
+                if (run == null) propagationCancellation.stopPolling else params.cancellation.stopPolling
+            }) {
                 if (run == null) propagationCancellation() else params.cancellation()
             } else params.cancellation
             val session = SearchComponentSet(components, branchers = listOf(traversal.brancher)).session(
@@ -607,7 +606,7 @@ private class CpSatisfactionTraversalPolicy(
     }
     override val observer: SearchRunObserver = brancher
     override val modelContinuation = if (rebindable) SearchModelContinuation.Chronological
-        else SearchModelContinuation.BlockAtRoot
+    else SearchModelContinuation.BlockAtRoot
     override val modelPolicy: SearchModelPolicy = SearchModelPolicy.SurfaceAll
     override val pauseBeforeDecision: () -> Boolean = slice?.beforeBranch ?: { false }
     override val nodePolicy: SearchNodePolicy = object : SearchNodePolicy {
@@ -626,9 +625,13 @@ private class CpSatisfactionTraversalPolicy(
     private val inprocessing = Inprocessing.from(params, sink?.search)
     private val learnedMemory = LearnedMemoryMaintenance()
 
-    init { session.retainedInprocessingMemory = inprocessing?.let { it::retainedMemory } }
+    init {
+        session.retainedInprocessingMemory = inprocessing?.let { it::retainedMemory }
+    }
 
-    fun releaseRetainedState() { inprocessing?.reset() }
+    fun releaseRetainedState() {
+        inprocessing?.reset()
+    }
 
     fun resetScope() {
         retainedRoot = false
@@ -750,6 +753,7 @@ internal class BacktrackBrancher(
     private val onEvent = params.onEvent
     private val branchObserver = params.branchObserver
     private var restartCount = 0L
+
     // A replayed point leads every value order, restarts included, until a decision it led conflicts.
     private var hint: Sample? = null
     private val hinted = HashSet<SearchDecision>()
@@ -901,7 +905,6 @@ internal class BacktrackBrancher(
         }
         phase.onSolution(sample)
     }
-
 }
 
 internal fun splitIntAlternatives(
@@ -1090,6 +1093,7 @@ private class ResidualRealComponent(
     LpSearchResource {
     private val toleranceCheck = params.toleranceCheck
     private val absCompletion = if (problem.requiresRealCompletionSearch()) AbsRealCompletion(problem) else null
+
     // The source's search within its tolerance, present when acceptance admits tolerance points.
     private val toleranceSearch = toleranceCheck.toleranceSearch()
     private val floatCompletion = toleranceCheck.permitsToleranceOptimum()
@@ -1175,7 +1179,7 @@ private class ResidualRealComponent(
             // A refused float point and an exact refutation leave the decision to the search within tolerance.
             LpVerdict.INFEASIBLE, LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
                 val unsearched = if (result.verdict == LpVerdict.INFEASIBLE) ComponentCheck.Infeasible()
-                    else ComponentCheck.Indeterminate
+                else ComponentCheck.Indeterminate
                 val search = toleranceSearch ?: return unsearched
                 when (val decided = withinTolerance(search, discrete(), context)) {
                     ToleranceLeaf.Refuted -> ComponentCheck.Infeasible()

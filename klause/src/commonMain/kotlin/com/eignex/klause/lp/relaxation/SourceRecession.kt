@@ -120,7 +120,7 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
             reals[factor.a] * reals[factor.b] == reals[factor.result] &&
                 (direction[factor.a] * direction[factor.b]).isZero &&
                 direction[factor.result] == direction[factor.a] * reals[factor.b] +
-                    reals[factor.a] * direction[factor.b]
+                reals[factor.a] * direction[factor.b]
         }
 
         // With the integer operand fixed at k, the product is the row `result − k·operand = 0`.
@@ -142,7 +142,7 @@ private fun keeps(factor: Factor, point: Sample, direction: List<BigFraction>): 
         is RealElement -> {
             val position = factor.position(point.intValue(factor.idx)) ?: return false
             val selected = if (factor.arrIsVars) reals[factor.entries[position]]
-                else BigFraction.ofDouble(factor.constants[position]) ?: return false
+            else BigFraction.ofDouble(factor.constants[position]) ?: return false
             val slope = if (factor.arrIsVars) direction[factor.entries[position]] else BigFraction.ZERO
             reals[factor.result] == selected && direction[factor.result] == slope
         }

@@ -172,5 +172,4 @@ internal class MixedEqualityRepair(
 
 private data class MixedEqualityKey(val terms: List<Pair<Int, BigFraction>>, val bound: BigFraction)
 
-
 private const val MAX_REPAIR_ENTRIES = 65536L

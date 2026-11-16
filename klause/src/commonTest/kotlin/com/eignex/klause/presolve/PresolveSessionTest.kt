@@ -302,7 +302,6 @@ class PresolveSessionTest {
         assertEquals(null, session.factorAt(2))
     }
 
-
     @Test
     fun `incremental and rebuilt complexity should agree across factor drops and domain narrowings`() {
         for (domains in listOf(

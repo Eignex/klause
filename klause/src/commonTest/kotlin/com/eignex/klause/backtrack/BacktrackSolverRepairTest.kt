@@ -103,7 +103,7 @@ class BacktrackSolverRepairTest {
             val second = 1L - first
             BacktrackSolver(compiled.model.bake()).openRepair(objective, BacktrackParams()).use { repair ->
                 val cutoff = if (compiled.maximize) BigFraction.ofLong(-2L) + epsilon
-                    else BigFraction.ofLong(3L) + epsilon
+                else BigFraction.ofLong(3L) + epsilon
                 repair.beginExact(Assumptions(ints = mapOf(0 to first)), 100L, cutoff, ExecutionControl.Never)
                 val a = assertNotNull(repair.runSlice(ExecutionControl.Never, Long.MAX_VALUE, -1L).sample)
                 repair.beginExact(Assumptions(ints = mapOf(0 to second)), 100L, cutoff, ExecutionControl.Never)

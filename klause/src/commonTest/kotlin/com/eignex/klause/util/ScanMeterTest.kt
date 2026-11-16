@@ -10,7 +10,10 @@ class ScanMeterTest {
     @Test
     fun `nested scans should share their containing checkpoint cadence`() {
         var polls = 0
-        val control = ExecutionControl { polls++; false }.bindStopControl()
+        val control = ExecutionControl {
+            polls++
+            false
+        }.bindStopControl()
 
         repeat(256) {
             ScanMeter(control).use { scan ->

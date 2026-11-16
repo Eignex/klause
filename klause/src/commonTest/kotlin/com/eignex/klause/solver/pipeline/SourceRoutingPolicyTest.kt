@@ -138,10 +138,10 @@ class SourceRoutingPolicyTest {
         for (engine in FiniteEngine.entries) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.SATISFY,
-                engine,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.SATISFY,
+                    engine,
+                )
             )
 
             val route = assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
@@ -164,12 +164,12 @@ class SourceRoutingPolicyTest {
         for (maximize in listOf(false, true)) {
             val invocation = SourceSetup.prepare(
                 SourceSetupRequest(
-                SourceAttachment(source),
-                ExecutionOperation.OPTIMIZE,
-                FiniteEngine.BACKTRACK,
-                objective,
-                maximize,
-            )
+                    SourceAttachment(source),
+                    ExecutionOperation.OPTIMIZE,
+                    FiniteEngine.BACKTRACK,
+                    objective,
+                    maximize,
+                )
             )
 
             val route = assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
@@ -192,11 +192,11 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+            )
         )
 
         assertIs<SourceProblemRoute.Finite>(invocation.route)
@@ -216,11 +216,11 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.LOCAL_SEARCH,
-            objective,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.LOCAL_SEARCH,
+                objective,
+            )
         )
 
         val route = assertIs<SourceProblemRoute.OpenTheory>(invocation.route)
@@ -245,12 +245,12 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.OPTIMIZE,
-            FiniteEngine.BACKTRACK,
-            objective,
-            cancellation = stop,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.OPTIMIZE,
+                FiniteEngine.BACKTRACK,
+                objective,
+                cancellation = stop,
+            )
         )
 
         val route = assertIs<SourceProblemRoute.UnsupportedOpen>(invocation.route)
@@ -275,11 +275,11 @@ class SourceRoutingPolicyTest {
 
         val invocation = SourceSetup.prepare(
             SourceSetupRequest(
-            SourceAttachment(source),
-            ExecutionOperation.SATISFY,
-            FiniteEngine.BACKTRACK,
-            cancellation = stop,
-        )
+                SourceAttachment(source),
+                ExecutionOperation.SATISFY,
+                FiniteEngine.BACKTRACK,
+                cancellation = stop,
+            )
         ) {
             observations++
             stopped = true

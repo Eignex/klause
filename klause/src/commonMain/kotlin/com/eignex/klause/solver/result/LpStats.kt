@@ -665,6 +665,7 @@ internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     val farkasNone: CountStat = CountStat()
 
     private var nodePasses = 0L
+
     // Standalone component work also spends its caller's allowance.
     private val standaloneComponents = LpRouteSolveStatsSink()
     internal val standaloneWork: Long

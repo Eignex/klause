@@ -205,7 +205,6 @@ class GeneralIntegerReclamationTest {
         assertEquals(IntDomain(0, 6), session.intDomain(0))
     }
 
-
     @Test
     fun `cancellation after funding should preserve paged integer cache capacity`() {
         val session = PropagationSession(Problem(0, 1, arrayOf(IntDomain(0, 10)),
@@ -230,5 +229,4 @@ class GeneralIntegerReclamationTest {
         assertEquals(1, rows.capacity)
         assertEquals(IntDomain(0, 8), session.intDomain(0))
     }
-
 }

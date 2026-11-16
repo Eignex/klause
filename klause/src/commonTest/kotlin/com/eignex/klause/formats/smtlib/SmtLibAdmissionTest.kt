@@ -163,7 +163,9 @@ class SmtLibAdmissionTest {
                 return null
             }
 
-            override fun close() { closes++ }
+            override fun close() {
+                closes++
+            }
         }
 
         assertFailsWith<CancellationException> { SmtLib.parse(source, cancellation = ExecutionControl { true }) }
@@ -308,22 +310,24 @@ class SmtLibAdmissionTest {
             override val accounting: WorkMeter get() = WorkMeter { work += it }
         }
 
-        val input = runCatching { SmtLib.parse(
-            {
-                val source = StringCharSource(
-                    "(declare-const n Int) (declare-const m Int) (declare-const x Real) " +
-                        "(assert (and (>= m 0) (<= m 1) (= n (+ m 1)))) " +
-                        "(assert (= (* (to_real n) x) 4)) (check-sat)",
-                )
-                object : CharSource, AutoCloseable {
-                    override fun next(): String? = source.next()
-                    override fun close() {
-                        capturedWork = work
+        val input = runCatching {
+            SmtLib.parse(
+                {
+                    val source = StringCharSource(
+                        "(declare-const n Int) (declare-const m Int) (declare-const x Real) " +
+                            "(assert (and (>= m 0) (<= m 1) (= n (+ m 1)))) " +
+                            "(assert (= (* (to_real n) x) 4)) (check-sat)",
+                    )
+                    object : CharSource, AutoCloseable {
+                        override fun next(): String? = source.next()
+                        override fun close() {
+                            capturedWork = work
+                        }
                     }
-                }
-            },
-            cancellation = stop,
-        ) }
+                },
+                cancellation = stop,
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
         assertTrue(work > requireNotNull(capturedWork))
@@ -447,19 +451,21 @@ class SmtLibAdmissionTest {
         var opens = 0
         val cancellation = ExecutionControl { exhausted }
 
-        val input = runCatching { SmtLib.parse(
-            {
-                opens++
-                val source = StringCharSource(
-                    "(define-fun f ((y Real)) Real (+ y 1)) " +
-                        "(declare-const x Real) (assert (= x 2)) (check-sat)",
-                )
-                object : CharSource {
-                    override fun next(): String? = source.next().also { if (it == null) exhausted = true }
-                }
-            },
-            cancellation = cancellation,
-        ) }
+        val input = runCatching {
+            SmtLib.parse(
+                {
+                    opens++
+                    val source = StringCharSource(
+                        "(define-fun f ((y Real)) Real (+ y 1)) " +
+                            "(declare-const x Real) (assert (= x 2)) (check-sat)",
+                    )
+                    object : CharSource {
+                        override fun next(): String? = source.next().also { if (it == null) exhausted = true }
+                    }
+                },
+                cancellation = cancellation,
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
         assertEquals(1, opens)
@@ -513,10 +519,12 @@ class SmtLibAdmissionTest {
 
     @Test
     fun `pre cancelled admission should not open a source`() {
-        val input = runCatching { SmtLib.parse(
-            { error("cancelled admission must not open a source") },
-            cancellation = ExecutionControl { true },
-        ) }
+        val input = runCatching {
+            SmtLib.parse(
+                { error("cancelled admission must not open a source") },
+                cancellation = ExecutionControl { true },
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
     }
@@ -527,21 +535,23 @@ class SmtLibAdmissionTest {
         var closed = false
         var opens = 0
 
-        val input = runCatching { SmtLib.parse(
-            {
-                opens++
-                object : CharSource, AutoCloseable {
-                    override fun next(): String? {
-                        stopped = true
-                        return "(declare-const x Real)"
+        val input = runCatching {
+            SmtLib.parse(
+                {
+                    opens++
+                    object : CharSource, AutoCloseable {
+                        override fun next(): String? {
+                            stopped = true
+                            return "(declare-const x Real)"
+                        }
+                        override fun close() {
+                            closed = true
+                        }
                     }
-                    override fun close() {
-                        closed = true
-                    }
-                }
-            },
-            cancellation = ExecutionControl { stopped },
-        ) }
+                },
+                cancellation = ExecutionControl { stopped },
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
         assertEquals(1, opens)
@@ -554,19 +564,21 @@ class SmtLibAdmissionTest {
         var stopped = false
         var opens = 0
 
-        val input = runCatching { SmtLib.parse(
-            {
-                opens++
-                object : CharSource {
-                    override fun next(): String? {
-                        reads++
-                        stopped = true
-                        return "(declare-const x Real)"
+        val input = runCatching {
+            SmtLib.parse(
+                {
+                    opens++
+                    object : CharSource {
+                        override fun next(): String? {
+                            reads++
+                            stopped = true
+                            return "(declare-const x Real)"
+                        }
                     }
-                }
-            },
-            cancellation = ExecutionControl { stopped },
-        ) }
+                },
+                cancellation = ExecutionControl { stopped },
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
         assertEquals(1, opens)
@@ -583,22 +595,24 @@ class SmtLibAdmissionTest {
             override val accounting: WorkMeter get() = WorkMeter { charged += it }
         }
 
-        val input = runCatching { SmtLib.parse(
-            {
-                opens++
-                val source = StringCharSource(
-                    "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
-                        "(assert (let ((x 7)) (= (f (+ 1 1)) 14))) (check-sat)",
-                )
-                object : CharSource, AutoCloseable {
-                    override fun next(): String? = source.next()
-                    override fun close() {
-                        closes++
+        val input = runCatching {
+            SmtLib.parse(
+                {
+                    opens++
+                    val source = StringCharSource(
+                        "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
+                            "(assert (let ((x 7)) (= (f (+ 1 1)) 14))) (check-sat)",
+                    )
+                    object : CharSource, AutoCloseable {
+                        override fun next(): String? = source.next()
+                        override fun close() {
+                            closes++
+                        }
                     }
-                }
-            },
-            cancellation = cancellation,
-        ) }
+                },
+                cancellation = cancellation,
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
         assertEquals(1, opens)
@@ -652,19 +666,21 @@ class SmtLibAdmissionTest {
             (reads == 1 && !observed).also { if (it) observed = true }
         }
 
-        val input = runCatching { SmtLib.parse(
-            {
-                opens++
-                object : CharSource {
-                    override fun next(): String? {
-                        reads++
-                        check(reads == 1)
-                        return "(declare-const x Real)"
+        val input = runCatching {
+            SmtLib.parse(
+                {
+                    opens++
+                    object : CharSource {
+                        override fun next(): String? {
+                            reads++
+                            check(reads == 1)
+                            return "(declare-const x Real)"
+                        }
                     }
-                }
-            },
-            cancellation = cancellation,
-        ) }
+                },
+                cancellation = cancellation,
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
         assertEquals(1, opens)
@@ -681,21 +697,23 @@ class SmtLibAdmissionTest {
             override val accounting: WorkMeter get() = WorkMeter { if (closes != 0) loweringWork += it }
         }
 
-        val input = runCatching { SmtLib.parse(
-            {
-                opens++
-                val source = StringCharSource(
-                    "(declare-const x Real) (assert (= (exp x) 1)) (check-sat)",
-                )
-                object : CharSource, AutoCloseable {
-                    override fun next(): String? = source.next()
-                    override fun close() {
-                        closes++
+        val input = runCatching {
+            SmtLib.parse(
+                {
+                    opens++
+                    val source = StringCharSource(
+                        "(declare-const x Real) (assert (= (exp x) 1)) (check-sat)",
+                    )
+                    object : CharSource, AutoCloseable {
+                        override fun next(): String? = source.next()
+                        override fun close() {
+                            closes++
+                        }
                     }
-                }
-            },
-            cancellation = cancellation,
-        ) }
+                },
+                cancellation = cancellation,
+            )
+        }
 
         assertIs<CancellationException>(input.exceptionOrNull())
         assertEquals(1, opens)

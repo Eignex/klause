@@ -31,13 +31,15 @@ fun Problem.quadraticSourceProofContext(
     cancellation: ExecutionControl = ExecutionControl.Never,
 ): SourceProofContext? {
     if (scope.objective == null) return null
-    for (term in objective.terms) for (variable in listOfNotNull(term.first, term.second)) {
-        val declared = when (variable) {
-            is QuadraticVariable.Bool -> variable.id.index < numBoolVars
-            is QuadraticVariable.Int -> variable.id.index < numIntVars
-            is QuadraticVariable.Real -> variable.id.index < numRealVars
+    for (term in objective.terms) {
+        for (variable in listOfNotNull(term.first, term.second)) {
+            val declared = when (variable) {
+                is QuadraticVariable.Bool -> variable.id.index < numBoolVars
+                is QuadraticVariable.Int -> variable.id.index < numIntVars
+                is QuadraticVariable.Real -> variable.id.index < numRealVars
+            }
+            if (!declared) return null
         }
-        if (!declared) return null
     }
     val base = sourceProofContext(scope.copy(objective = null), cancellation = cancellation) ?: return null
     val original = this
@@ -65,7 +67,7 @@ fun Problem.quadraticSourceProofContext(
 
         override fun derivation(
             claim: SourceClaim, derivation: SourceDerivation.Extension, scope: SourceScope,
-                cancellation: ExecutionControl,
+            cancellation: ExecutionControl,
         ): SourceEvidenceCheck {
             if (derivation != SourceQuadraticBoxDerivation || claim !is SourceClaim.Bound) {
                 return SourceEvidenceCheck.Unavailable("quadratic source derivation checker unavailable")
@@ -117,7 +119,7 @@ fun Problem.quadraticSourceProofContext(
                 val bound = if (scope.objective?.sense == ObjectiveSense.MINIMIZE) bounds.first else bounds.second
                 val comparison = arithmetic.compare(arithmetic.rational(bound), value)
                 val establishes = if (scope.objective?.sense == ObjectiveSense.MINIMIZE) comparison > 0
-                    else comparison < 0
+                else comparison < 0
                 if (establishes || (comparison == 0 && !claim.strict)) SourceEvidenceCheck.Checked
                 else SourceEvidenceCheck.Rejected("original quadratic intervals do not establish this bound")
             }

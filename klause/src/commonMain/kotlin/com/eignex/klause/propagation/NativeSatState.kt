@@ -170,6 +170,7 @@ internal class NativeSatState(private val state: PropagationState) {
     private var watchCleanupScan = 0
     private val watchCleanupReadIndex: Int
         get() = if (watchCleanupScan < 0) watchCleanupScan.inv() else watchCleanupScan
+
     // An inactive epoch encodes the completed retirement count without retaining another cursor.
     private var watchCleanupEpoch = -1
     private var watchCleanupSparse = false
@@ -531,7 +532,8 @@ internal class NativeSatState(private val state: PropagationState) {
             rows.sharingMemory(sample, protectedRows) { false }
         }
         for (column in columns) {
-            sample.step(); metadataBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
+            sample.step()
+            metadataBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
             sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
         }
         learnedPayloads.sharingMemory(sample, protectedRows, permanentCount == learnedCount) { index ->
@@ -683,16 +685,17 @@ internal class NativeSatState(private val state: PropagationState) {
                             learnedCount - retiredCount <= cap
                         if (preparationOnly && !active.retiredHandlesPending) active.trimReservations(budget)
                         else if (preparationOnly || (active.bootstrapping &&
-                            !budget.supportsAtomic(NATIVE_CAP_PAGE_WORK, NATIVE_CAP_PAGE_WORK,
-                                NATIVE_CAP_PAGE_BYTES + 64L))) {
+                                !budget.supportsAtomic(NATIVE_CAP_PAGE_WORK, NATIVE_CAP_PAGE_WORK,
+                                    NATIVE_CAP_PAGE_BYTES + 64L))) {
                             budget.visit(8L)
                             budget.visit(0L)
                             defaultCapIndex = null
                         } else {
                             var reserved = true
                             if (active.bootstrapping) {
-                                try { active.reservePages(budget) }
-                                catch (_: ReclamationPreparation.Deferred) {
+                                try {
+                                    active.reservePages(budget)
+                                } catch (_: ReclamationPreparation.Deferred) {
                                     reserved = false
                                     budget.visit(0L)
                                 }
@@ -739,7 +742,9 @@ internal class NativeSatState(private val state: PropagationState) {
             val retained = retain(index)
             return retained || protected
         }
-        override fun visited() { capVisits++ }
+        override fun visited() {
+            capVisits++
+        }
         override fun prepare(index: Int): Boolean {
             protected = capProtected(index, budget, CAP_ROW_POLICY_WORK)
             prepared = index
@@ -963,11 +968,13 @@ internal class NativeSatState(private val state: PropagationState) {
         state.work += state.selectedRetirements.remapWork
         state.selectedRetirements.remap(remap)
 
-        for (i in 0 until learnedCount) if (remap[i] < 0) {
-            state.work += 8L
-            if (!retiredOf(i)) state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
-            state.work += 24L
-            learnedPayloads.release(i)
+        for (i in 0 until learnedCount) {
+            if (remap[i] < 0) {
+                state.work += 8L
+                if (!retiredOf(i)) state.learned.lifecycle.note(LearnedKind.Clause, LearnedStage.Retired)
+                state.work += 24L
+                learnedPayloads.release(i)
+            }
         }
         state.remapReasons(state.boolReason, remap, baseCount)
         var queued = 0
@@ -1303,6 +1310,7 @@ internal class NativeSatState(private val state: PropagationState) {
         const val RECENT_USED = 8
         const val CAP_KEEP = 16
         const val CAP_CLASSIFIED = 32
+
         // Poll the deadline every 4096 propagated literals.
         const val CANCEL_POLL_MASK = 0xFFF
     }

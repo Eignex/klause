@@ -152,8 +152,8 @@ object SourceSetup {
         }
         val problem = request.source.problem
         if (problem.factors.any {
-            it is com.eignex.klause.factor.arithmetic.ExactRealEquality && it.value.algebraic == null
-        }) return SourceRouteSelection(request, prepareExactRealSource(request, stop), stop)
+                it is com.eignex.klause.factor.arithmetic.ExactRealEquality && it.value.algebraic == null
+            }) return SourceRouteSelection(request, prepareExactRealSource(request, stop), stop)
         val projections = (problem as? BakedProblem)?.factorProjections
             ?.takeIf { it.providers === request.providers } ?: request.providers.prepare(problem)
         val exactNormalization = request.maximize && request.objective?.let { objective ->

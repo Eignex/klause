@@ -37,8 +37,21 @@ internal class FiniteNumericalRemoval(
 ) : DestroyOperator, AutoCloseable {
     enum class Signal { Disagreement, Refutation }
     enum class Completion { None, SourceRows }
-    enum class Status { Unavailable, NoPoint, Agreement, EmptySupport, Supported, Incomplete, Incompatible,
-        Unsupported, Limited, Cancelled, Funding, ClosureDeclined, Closed }
+    enum class Status {
+        Unavailable,
+        NoPoint,
+        Agreement,
+        EmptySupport,
+        Supported,
+        Incomplete,
+        Incompatible,
+        Unsupported,
+        Limited,
+        Cancelled,
+        Funding,
+        ClosureDeclined,
+        Closed
+    }
 
     private var center: Sample? = null
     private var scores = intArrayOf()
@@ -236,7 +249,7 @@ internal class FiniteNumericalRemoval(
         if (source.objectiveConstant != original(objective.constant)) return false
         for (index in 0 until model.numBoolVars + model.numIntVars) {
             val coefficient = if (index < model.numBoolVars) objective.boolWeightValues.getOrElse(index) { 0L }
-                else objective.intCoefficientValues.getOrElse(index - model.numBoolVars) { 0L }
+            else objective.intCoefficientValues.getOrElse(index - model.numBoolVars) { 0L }
             if ((coefficients[coordinate(index)] ?: BigFraction.ZERO) != original(coefficient)) return false
         }
         return true
@@ -254,7 +267,7 @@ internal class FiniteNumericalRemoval(
     }
 
     private fun frozen(index: Int): Boolean = if (index < model.numBoolVars) callerPins.isFrozenBool(index)
-        else callerPins.isFrozenInt(index - model.numBoolVars)
+    else callerPins.isFrozenInt(index - model.numBoolVars)
 
     private fun rootFixed(index: Int): Boolean = if (index < model.numBoolVars) {
         (model.baked as? PropagationResult.Implied)?.boolValueOrNull(index) != null

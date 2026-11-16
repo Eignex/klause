@@ -135,7 +135,10 @@ internal class PolynomialPredicateSharing(
             arithmetic.step()
             if (node is FormulaNode.BooleanVariable) variables.add(node.variable)
         }
-        return variables.sortedWith(Comparator { left, right -> arithmetic.step(); left.compareTo(right) })
+        return variables.sortedWith(Comparator { left, right ->
+            arithmetic.step()
+            left.compareTo(right)
+        })
     }
 
     private fun predicate(atom: PolynomialAtom): Int {

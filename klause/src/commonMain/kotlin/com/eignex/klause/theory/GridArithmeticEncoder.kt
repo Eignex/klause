@@ -74,9 +74,11 @@ internal fun gridArithmeticEncoder(factor: GridArithmetic, target: EncodingTarge
             }
         } else {
             val formula = PolynomialRealFormula.Or(alternatives.map { rows ->
-                PolynomialRealFormula.And(rows.map { row -> polynomialRow(row,
-                    { id -> encoding.integer(SourceIntId(id)) }, { id -> encoding.real(SourceRealId(id)) },
-                    encoding::conditional) })
+                PolynomialRealFormula.And(rows.map { row ->
+                    polynomialRow(row,
+                        { id -> encoding.integer(SourceIntId(id)) }, { id -> encoding.real(SourceRealId(id)) },
+                        encoding::conditional)
+                })
             })
             encoding.polynomial(formula)
         }

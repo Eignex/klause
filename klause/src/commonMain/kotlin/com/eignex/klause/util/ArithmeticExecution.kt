@@ -14,7 +14,9 @@ internal interface ArithmeticWorkSource {
 internal class WorkReservation(@JvmField val capacity: Int, private val settlement: (Int) -> Unit) {
     private var settled = false
 
-    init { require(capacity > 0) }
+    init {
+        require(capacity > 0)
+    }
 
     fun settle(used: Int) {
         require(used in 0..capacity)
@@ -98,15 +100,25 @@ internal class ArithmeticExecution(
     private val interrupted: () -> Nothing,
 ) {
     @JvmField var source: ArithmeticWorkSource? = null
+
     @JvmField var accounting: WorkMeter? = null
+
     @JvmField var metered = false
+
     @JvmField val unchecked: Boolean = cancellation === ExecutionControl.Never
+
     @JvmField var depth = 0
+
     @JvmField var quantum = 8192
+
     @JvmField var untilPoll = quantum
+
     @JvmField var admittedUntil = 0
+
     @JvmField var reservation: WorkReservation? = null
+
     @JvmField var used = 0
+
     @JvmField var stopped = false
 
     val batching: Boolean get() = depth != 0
@@ -131,8 +143,10 @@ internal class ArithmeticExecution(
             } else {
                 this.quantum = previousQuantum
                 untilPoll = minOf(untilPoll, previousQuantum)
-                reservation?.let { admittedUntil = minOf(admittedUntil, used + minOf(previousQuantum,
-                    it.capacity - used)) }
+                reservation?.let {
+                    admittedUntil = minOf(admittedUntil, used + minOf(previousQuantum,
+                        it.capacity - used))
+                }
             }
         }
     }

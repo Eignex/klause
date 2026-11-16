@@ -238,25 +238,27 @@ class RootLearnedRetirementTest {
 
     @Test
     fun `an unfundable class grant should leave capture ownership unchanged`() {
-        for (native in listOf(false, true)) for (grant in listOf(1L, 10L)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = native)
-            assertEquals(native, session.usesNativeSat)
-            session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
-            val retirement = RootLearnedRetirement()
-            val spending = InprocessingSpending(InprocessingKind.Root)
-            val params = BacktrackParams(inprocessingRootWork = grant)
-            val before = session.work
+        for (native in listOf(false, true)) {
+            for (grant in listOf(1L, 10L)) {
+                val session = PropagationSession(Problem(4, 0, emptyArray(),
+                    arrayOf(Clause(intArrayOf(4, 6)))), nativeSat = native)
+                assertEquals(native, session.usesNativeSat)
+                session.addLearnedClause(Clause(intArrayOf(0, 2)), 9)
+                val retirement = RootLearnedRetirement()
+                val spending = InprocessingSpending(InprocessingKind.Root)
+                val params = BacktrackParams(inprocessingRootWork = grant)
+                val before = session.work
 
-            spending.run(session, params, null) { budget ->
-                assertEquals(LearnedRetirementStatus.Deferred,
-                    retirement.capture(session, 0, session.learnedRetirementGeneration, params, budget))
+                spending.run(session, params, null) { budget ->
+                    assertEquals(LearnedRetirementStatus.Deferred,
+                        retirement.capture(session, 0, session.learnedRetirementGeneration, params, budget))
+                }
+
+                assertEquals(before, session.work)
+                assertFalse(retirement.hasCapture)
+                assertFalse(session.hasLearnedRetirementContinuation)
+                assertTrue(session.isLearnedClause(0))
             }
-
-            assertEquals(before, session.work)
-            assertFalse(retirement.hasCapture)
-            assertFalse(session.hasLearnedRetirementContinuation)
-            assertTrue(session.isLearnedClause(0))
         }
     }
 

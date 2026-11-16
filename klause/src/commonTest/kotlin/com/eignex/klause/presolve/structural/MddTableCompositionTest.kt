@@ -94,11 +94,15 @@ class MddTableCompositionTest {
         )
         val composed = assertIs<Mdd>(result.factor)
 
-        for (first in 0L..1L) for (middle in 0L..1L) for (last in 0L..1L) {
-            val domains = arrayOf(IntDomain(first, first), IntDomain(middle, middle), IntDomain(last, last))
-            val state = PropagationState(Problem(0, 3, domains, arrayOf<Factor>(composed)), Assumptions.None)
+        for (first in 0L..1L) {
+            for (middle in 0L..1L) {
+                for (last in 0L..1L) {
+                    val domains = arrayOf(IntDomain(first, first), IntDomain(middle, middle), IntDomain(last, last))
+                    val state = PropagationState(Problem(0, 3, domains, arrayOf<Factor>(composed)), Assumptions.None)
 
-            assertEquals(first == last, state.runToFixpoint(allFactors = true) == null)
+                    assertEquals(first == last, state.runToFixpoint(allFactors = true) == null)
+                }
+            }
         }
     }
 

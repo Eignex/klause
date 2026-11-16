@@ -26,9 +26,11 @@ class AllDifferentTuplesInvariantTest {
             for (variable in 0 until 3) {
                 val value = 1 - state.assignment.intValue(variable)
                 val move = Move.IntSet(variable, value)
-                val after = rows.size - rows.map { row -> row.map {
-                    if (it == variable) value else state.assignment.intValue(it)
-                } }.distinct().size
+                val after = rows.size - rows.map { row ->
+                    row.map {
+                        if (it == variable) value else state.assignment.intValue(it)
+                    }
+                }.distinct().size
                 assertEquals((after - expected).toLong(), state.netDelta(move))
                 assertEquals(expected.toLong(), state.cost)
                 val old = state.assignment.intValue(variable)

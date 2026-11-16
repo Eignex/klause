@@ -22,47 +22,51 @@ import kotlin.test.assertTrue
 class PrivateRebuildWarmClausesTest {
     @Test
     fun `signed aliases should preserve consequences over retained and eliminated columns`() {
-        for (replacement in listOf(0, 1)) for (variable in listOf(0, 1)) {
-            val learned = Clause(intArrayOf(Lit.make(variable, true), 4))
-            val source = Problem(3, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(3, replacement)), Clause(intArrayOf(2, Lit.negate(replacement))), learned,
-            )).bake()
-            val session = PropagationSession(source)
-            session.addLearnedClause(learned, 2)
+        for (replacement in listOf(0, 1)) {
+            for (variable in listOf(0, 1)) {
+                val learned = Clause(intArrayOf(Lit.make(variable, true), 4))
+                val source = Problem(3, 0, emptyArray(), arrayOf(
+                    Clause(intArrayOf(3, replacement)), Clause(intArrayOf(2, Lit.negate(replacement))), learned,
+                )).bake()
+                val session = PropagationSession(source)
+                session.addLearnedClause(learned, 2)
 
-            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session,
-                SourceRebuilds(listOf(RebuildStep.CopyLiteral(1, replacement))), arrayOfNulls(3),
-                1_048_576L, 65_536L, ExecutionControl.Never))
+                val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session,
+                    SourceRebuilds(listOf(RebuildStep.CopyLiteral(1, replacement))), arrayOfNulls(3),
+                    1_048_576L, 65_536L, ExecutionControl.Never))
 
-            assertContentEquals(intArrayOf(if (variable == 0) 0 else replacement, 4),
-                (warm.clauses.single() as Clause).literals)
+                assertContentEquals(intArrayOf(if (variable == 0) 0 else replacement, 4),
+                    (warm.clauses.single() as Clause).literals)
+            }
         }
     }
 
     @Test
     fun `equivalent literal reconstruction should translate owned learning in either polarity`() {
-        for (replacement in listOf(2, 3)) for (native in listOf(false, true)) {
-            val source = Problem(3, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(1, replacement)), Clause(intArrayOf(0, Lit.negate(replacement))),
-                Clause(intArrayOf(1, 4)),
-            )).bake()
-            val session = PropagationSession(source, nativeSat = native)
-            session.addLearnedClause(Clause(intArrayOf(1, 4)), 2)
+        for (replacement in listOf(2, 3)) {
+            for (native in listOf(false, true)) {
+                val source = Problem(3, 0, emptyArray(), arrayOf(
+                    Clause(intArrayOf(1, replacement)), Clause(intArrayOf(0, Lit.negate(replacement))),
+                    Clause(intArrayOf(1, 4)),
+                )).bake()
+                val session = PropagationSession(source, nativeSat = native)
+                session.addLearnedClause(Clause(intArrayOf(1, 4)), 2)
 
-            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session,
-                SourceRebuilds(listOf(RebuildStep.CopyLiteral(0, replacement))), arrayOfNulls(3),
-                1_048_576L, 65_536L, ExecutionControl.Never))
+                val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session,
+                    SourceRebuilds(listOf(RebuildStep.CopyLiteral(0, replacement))), arrayOfNulls(3),
+                    1_048_576L, 65_536L, ExecutionControl.Never))
 
-            assertContentEquals(intArrayOf(Lit.negate(replacement), 4), (warm.clauses.single() as Clause).literals)
-            assertEquals(1, warm.translated)
-            for (mask in 0 until 8) {
-                val point = BooleanArray(3) { mask and (1 shl it) != 0 }
-                if (source.factors.all { factor ->
-                        (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
-                    }) {
-                    assertTrue((warm.clauses.single() as Clause).literals.any {
-                        Lit.evaluate(it, point[Lit.variable(it)])
-                    })
+                assertContentEquals(intArrayOf(Lit.negate(replacement), 4), (warm.clauses.single() as Clause).literals)
+                assertEquals(1, warm.translated)
+                for (mask in 0 until 8) {
+                    val point = BooleanArray(3) { mask and (1 shl it) != 0 }
+                    if (source.factors.all { factor ->
+                            (factor as Clause).literals.any { Lit.evaluate(it, point[Lit.variable(it)]) }
+                        }) {
+                        assertTrue((warm.clauses.single() as Clause).literals.any {
+                            Lit.evaluate(it, point[Lit.variable(it)])
+                        })
+                    }
                 }
             }
         }
@@ -148,28 +152,30 @@ class PrivateRebuildWarmClausesTest {
 
     @Test
     fun `learned clauses should project through either pivot polarity without excluding source points`() {
-        for (native in listOf(false, true)) for (pivot in listOf(0, 1)) {
-            val source = Problem(4, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(pivot, 2)), Clause(intArrayOf(Lit.negate(pivot), 4)),
-                Clause(intArrayOf(5, 6)),
-            )).bake()
-            val delta = BoundedVariableElimination.eliminateSource(source, setOf(1, 2, 3))
-            val session = PropagationSession(source, nativeSat = native)
-            session.addLearnedClause(Clause(intArrayOf(Lit.negate(pivot), 6)), 2)
+        for (native in listOf(false, true)) {
+            for (pivot in listOf(0, 1)) {
+                val source = Problem(4, 0, emptyArray(), arrayOf(
+                    Clause(intArrayOf(pivot, 2)), Clause(intArrayOf(Lit.negate(pivot), 4)),
+                    Clause(intArrayOf(5, 6)),
+                )).bake()
+                val delta = BoundedVariableElimination.eliminateSource(source, setOf(1, 2, 3))
+                val session = PropagationSession(source, nativeSat = native)
+                session.addLearnedClause(Clause(intArrayOf(Lit.negate(pivot), 6)), 2)
 
-            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
-                arrayOfNulls(4), 1_048_576L, 65_536L, ExecutionControl.Never))
+                val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
+                    arrayOfNulls(4), 1_048_576L, 65_536L, ExecutionControl.Never))
 
-            assertContentEquals(intArrayOf(6, 2), (warm.clauses.single() as Clause).literals)
-            assertEquals(1, warm.translated)
-            for (mask in 0 until 16) {
-                val point = Sample(BooleanArray(4) { mask and (1 shl it) != 0 }, longArrayOf())
-                if (source.factors.all { factor ->
-                        (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
-                    }) {
-                    assertTrue(warm.clauses.all { factor ->
-                        (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
-                    })
+                assertContentEquals(intArrayOf(6, 2), (warm.clauses.single() as Clause).literals)
+                assertEquals(1, warm.translated)
+                for (mask in 0 until 16) {
+                    val point = Sample(BooleanArray(4) { mask and (1 shl it) != 0 }, longArrayOf())
+                    if (source.factors.all { factor ->
+                            (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+                        }) {
+                        assertTrue(warm.clauses.all { factor ->
+                            (factor as Clause).literals.any { Lit.evaluate(it, point.boolValue(Lit.variable(it))) }
+                        })
+                    }
                 }
             }
         }
@@ -177,20 +183,22 @@ class PrivateRebuildWarmClausesTest {
 
     @Test
     fun `pure pivot choices should simplify learned consequences`() {
-        for (native in listOf(false, true)) for (pivot in listOf(0, 1)) {
-            val source = Problem(3, 0, emptyArray(), arrayOf(
-                Clause(intArrayOf(pivot, 2)), Clause(intArrayOf(3, 4)),
-            )).bake()
-            val delta = BoundedVariableElimination.eliminateSource(source, setOf(1, 2))
-            val session = PropagationSession(source, nativeSat = native)
-            session.addLearnedClause(Clause(intArrayOf(Lit.negate(pivot), 3, 4)), 2)
-            session.addLearnedClause(Clause(intArrayOf(pivot, 2, 4)), 2)
+        for (native in listOf(false, true)) {
+            for (pivot in listOf(0, 1)) {
+                val source = Problem(3, 0, emptyArray(), arrayOf(
+                    Clause(intArrayOf(pivot, 2)), Clause(intArrayOf(3, 4)),
+                )).bake()
+                val delta = BoundedVariableElimination.eliminateSource(source, setOf(1, 2))
+                val session = PropagationSession(source, nativeSat = native)
+                session.addLearnedClause(Clause(intArrayOf(Lit.negate(pivot), 3, 4)), 2)
+                session.addLearnedClause(Clause(intArrayOf(pivot, 2, 4)), 2)
 
-            val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
-                arrayOfNulls(3), 1_048_576L, 65_536L, ExecutionControl.Never))
+                val warm = assertNotNull(PrivateRebuildWarmClauses.capture(session, delta.rebuild,
+                    arrayOfNulls(3), 1_048_576L, 65_536L, ExecutionControl.Never))
 
-            assertContentEquals(intArrayOf(3, 4), (warm.clauses.single() as Clause).literals)
-            assertEquals(1, warm.translated)
+                assertContentEquals(intArrayOf(3, 4), (warm.clauses.single() as Clause).literals)
+                assertEquals(1, warm.translated)
+            }
         }
     }
 

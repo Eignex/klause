@@ -49,8 +49,10 @@ class PropagationProblem private constructor(
     val propagators: Array<out Propagator> by lazy {
         preparedPropagators ?: run {
             val preparation = FactorProjectionPreparation()
-            Array(problem.numFactors) { selection?.propagator(it, preparation)
-                ?: problem.factors[it].propagatorProjection(preparation) }
+            Array(problem.numFactors) {
+                selection?.propagator(it, preparation)
+                    ?: problem.factors[it].propagatorProjection(preparation)
+            }
         }
     }
 

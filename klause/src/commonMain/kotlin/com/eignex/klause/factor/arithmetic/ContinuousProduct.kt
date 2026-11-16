@@ -81,9 +81,11 @@ internal class ContinuousProductChoices(val operand: Int, values: DoubleArray, g
     fun literalAt(index: Int): Int = checkNotNull(literals)[index]
 
     fun remap(mapping: VarRemap): ContinuousProductChoices = ContinuousProductChoices(mapping.real(operand), captured,
-        literals?.let { source -> IntArray(source.size) {
-            Lit.make(mapping.bool(Lit.variable(source[it])), Lit.isPositive(source[it]))
-        } })
+        literals?.let { source ->
+            IntArray(source.size) {
+                Lit.make(mapping.bool(Lit.variable(source[it])), Lit.isPositive(source[it]))
+            }
+        })
 
     fun nearest(value: Double): Double {
         if (!value.isFinite() || captured.isEmpty()) return Double.NaN

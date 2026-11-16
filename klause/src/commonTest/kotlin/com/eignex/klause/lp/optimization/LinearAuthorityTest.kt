@@ -707,12 +707,14 @@ class LinearAuthorityTest {
     fun `redundant coordinate bounds should admit a checked optimum within one operation`() {
         val coordinates = List(32) { SourceCoordinate(SourceCoordinate.Kind.Real, it) }
         val premises = coordinates.flatMap { coordinate ->
-            List(2) { copy -> listOf(
-                "lower-${coordinate.id}-$copy" to SourcePremise(
-                    SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO)),
-                "upper-${coordinate.id}-$copy" to SourcePremise(
-                    SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ONE)),
-            ) }.flatten()
+            List(2) { copy ->
+                listOf(
+                    "lower-${coordinate.id}-$copy" to SourcePremise(
+                        SourceInequality(mapOf(coordinate to BigFraction.MINUS_ONE), BigFraction.ZERO)),
+                    "upper-${coordinate.id}-$copy" to SourcePremise(
+                        SourceInequality(mapOf(coordinate to BigFraction.ONE), BigFraction.ONE)),
+                )
+            }.flatten()
         }.toMap()
         val source = SourceProofContext(scope, coordinates.toSet(), premises,
             coordinates.associateWith { BigFraction.ONE })

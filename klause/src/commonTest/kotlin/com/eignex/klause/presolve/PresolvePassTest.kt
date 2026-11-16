@@ -44,7 +44,10 @@ class PresolvePassTest {
         )) {
             assertFalse(pass.applyFinite(problem, PresolveContext.EMPTY).isEmpty, pass.id)
             var polls = 0
-            val context = PresolveContext(cancellation = ExecutionControl { polls++; true })
+            val context = PresolveContext(cancellation = ExecutionControl {
+                polls++
+                true
+            })
 
             val delta = pass.applyFinite(problem, context)
 

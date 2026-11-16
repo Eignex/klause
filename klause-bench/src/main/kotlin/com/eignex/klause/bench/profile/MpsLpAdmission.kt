@@ -228,8 +228,10 @@ internal object MpsLpAdmission {
         val relaxer = constructor.newInstance(*values)
         val domainType = Class.forName("com.eignex.klause.lp.relaxation.RootDomains")
         val domains = domainType.constructors.single().newInstance(problem)
-        val build = type.methods.single { it.name == "build" && it.parameterCount == 3 &&
-            it.parameterTypes[0].simpleName == "RelaxationDomains" }
+        val build = type.methods.single {
+            it.name == "build" && it.parameterCount == 3 &&
+                it.parameterTypes[0].simpleName == "RelaxationDomains"
+        }
         return build.invoke(relaxer, domains, emptyList<Any>(), stop)
     }
 

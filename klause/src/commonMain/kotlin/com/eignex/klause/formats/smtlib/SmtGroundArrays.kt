@@ -38,6 +38,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     private val symbols = LinkedHashMap<String, Term>()
     private val nodes = HashMap<Node, Term>()
     private val arrays = LinkedHashMap<Int, ArrayTerm>()
+
     // Inner extensional witnesses must not create outer reads merely because their index sorts agree.
     private val indexes = LinkedHashMap<SmtSort.Array, LinkedHashMap<Int, Term>>()
     private val atoms = HashMap<Pair<String, SmtSort>, Term>()
@@ -82,8 +83,14 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         for ((_, array) in arrays) {
             step()
             val sort = array.term.sort as SmtSort.Array
-            val entries = allReads.filter { step(); it.array.id == array.term.id }
-                .map { step(); it.index.expressionName() to it.value.expressionName() }
+            val entries = allReads.filter {
+                step()
+                it.array.id == array.term.id
+            }
+                .map {
+                    step()
+                    it.index.expressionName() to it.value.expressionName()
+                }
             val name = array.term.expressionName()
             val recipe = SmtArrayReconstruction(sort, defaults.getValue(sort.element).expressionName(), entries)
             privateBindings[name] = recipe
@@ -92,11 +99,17 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
             }
         }
         output.addAll(queryPosition ?: output.size, axioms)
-        val checks = equalities.values.filter { step(); it.witness != null }.map { equality ->
+        val checks = equalities.values.filter {
+            step()
+            it.witness != null
+        }.map { equality ->
             step()
             SmtArrayEqualityCheck(equality.name, equality.left.expressionName(), equality.right.expressionName())
         }
-        val operationChecks = arrays.values.filter { step(); it.operator != "base" }.map { array ->
+        val operationChecks = arrays.values.filter {
+            step()
+            it.operator != "base"
+        }.map { array ->
             step()
             SmtArrayOperationCheck(array.term.expressionName(), array.operator,
                 array.arguments.map { it.expressionName() })
@@ -112,7 +125,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     private fun declare(command: SExpr.SList) {
         val name = command.polynomialName(1)
         val args = if (command.polynomialHead() == "declare-fun") (command.items[2] as SExpr.SList).items
-            else emptyList()
+        else emptyList()
         if (args.isNotEmpty()) smtUnsupported("array reduction requires eliminated ground function applications")
         val sort = sortScope.sourceSort(command.items.last())
         val term = atom((command.items[1] as SExpr.Atom).text, sort)
@@ -131,7 +144,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
             val frame = work.removeLast()
             when (val expression = frame.expression) {
                 is SExpr.Atom -> values.addLast(if (arrayLexicalLiteral(expression.text)) literal(expression)
-                    else symbols[polynomialSymbol(expression.text)] ?: literal(expression))
+                else symbols[polynomialSymbol(expression.text)] ?: literal(expression))
                 is SExpr.SList -> if ((expression.items.firstOrNull() as? SExpr.Atom)?.text == "_") {
                     val normalized = arrayBuiltinIdentifier(expression) as SExpr.SList
                     val sort = smtIndexedBitVectorSort(normalized, emptyList())
@@ -167,9 +180,9 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 listOf(capture(args[0]), args[1], args[2]), args[1].sort as SmtSort.Array, "ite")
             name in setOf("=", "distinct") && args[0].sort is SmtSort.Array -> {
                 val comparisons = if (name == "=") args.zipWithNext().map { equal(it.first, it.second) }
-                    else args.indices.flatMap { i ->
-                        (i + 1 until args.size).map { j -> form("not", equal(args[i], args[j])) }
-                    }
+                else args.indices.flatMap { i ->
+                    (i + 1 until args.size).map { j -> form("not", equal(args[i], args[j])) }
+                }
                 intern(SExpr.Atom("and"), comparisons.map { raw(it, SmtSort.Bool) }, SmtSort.Bool)
             }
             else -> intern(resolved, args, resultSort(resolved, args.map { it.sort }))
@@ -257,13 +270,15 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 }
             }
             val readList = reads.values.toList()
-            for (i in readList.indices) for (j in i + 1 until readList.size) {
-                step()
-                val left = readList[i]
-                val right = readList[j]
-                if (left.array.id == right.array.id &&
-                    processedCongruences.add(PairKey(left.value.id, right.value.id))) {
-                    axioms += assertion(form("=>", equal(left.index, right.index), equal(left.value, right.value)))
+            for (i in readList.indices) {
+                for (j in i + 1 until readList.size) {
+                    step()
+                    val left = readList[i]
+                    val right = readList[j]
+                    if (left.array.id == right.array.id &&
+                        processedCongruences.add(PairKey(left.value.id, right.value.id))) {
+                        axioms += assertion(form("=>", equal(left.index, right.index), equal(left.value, right.value)))
+                    }
                 }
             }
         }
@@ -284,7 +299,9 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
 
     private fun fresh(sort: SmtSort): Term {
         var name: String
-        do { name = "@klause.array.${nextName++}" } while (!usedNames.add(name))
+        do {
+            name = "@klause.array.${nextName++}"
+        } while (!usedNames.add(name))
         val term = atom(name, sort)
         if (sort !is SmtSort.Array) {
             output.add(queryPosition ?: output.size, form("declare-const", term.expression, sortSyntax(sort)))
@@ -399,9 +416,9 @@ private fun arrayBuiltinIdentifier(head: SExpr): SExpr = when (head) {
     is SExpr.Atom -> SExpr.Atom(polynomialSymbol(head.text))
     is SExpr.SList -> if ((head.items.firstOrNull() as? SExpr.Atom)?.text == "as")
         arrayBuiltinIdentifier(head.items[1])
-        else SExpr.SList(head.items.mapIndexed { index, part ->
-            if (index <= 1 && part is SExpr.Atom) SExpr.Atom(polynomialSymbol(part.text)) else part
-        })
+    else SExpr.SList(head.items.mapIndexed { index, part ->
+        if (index <= 1 && part is SExpr.Atom) SExpr.Atom(polynomialSymbol(part.text)) else part
+    })
 }
 
 private fun form(head: String, vararg args: SExpr): SExpr.SList = form(SExpr.Atom(head), *args)

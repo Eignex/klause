@@ -10,6 +10,7 @@ import com.eignex.koblas.SparseMatrix
 internal class SimplexBasisLifecycle(m: Int, numVars: Int) {
     val basicVar = IntArray(m)
     val status = Array(numVars) { VarStatus.BASIC }
+
     // Factors are acquired lazily because an unsolved engine can be discarded by its consumer.
     var current: BasisSolver? = null
         private set

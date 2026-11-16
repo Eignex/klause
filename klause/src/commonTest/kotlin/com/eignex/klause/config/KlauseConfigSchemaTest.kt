@@ -58,5 +58,4 @@ class KlauseConfigSchemaTest {
             assertTrue("SemanticOverrides" in error.message.orEmpty())
         }
     }
-
 }

@@ -166,12 +166,16 @@ class JointLinearRepairTest {
         assertEquals(0L, proposals.first().proposalRound)
         assertTrue(proposals.first().freed.isEmpty())
         assertTrue(proposals.any { it.refutationRoots.size == 2 && it.freed.size == 2 })
-        assertTrue(records.any { it.phase == "feedback" &&
-            it.disposition == "jointRepairRefutationGuidance" && it.support.isNotEmpty() })
+        assertTrue(records.any {
+            it.phase == "feedback" &&
+                it.disposition == "jointRepairRefutationGuidance" && it.support.isNotEmpty()
+        })
         assertTrue(records.any { it.phase == "result" && it.disposition == "checked-source-witness" })
         for (feedback in records.filter { it.phase == "feedback" && it.support.isNotEmpty() }) {
-            assertTrue(records.any { it.phase == "query" &&
-                it.proposal == feedback.proposal && it.query == feedback.query })
+            assertTrue(records.any {
+                it.phase == "query" &&
+                    it.proposal == feedback.proposal && it.query == feedback.query
+            })
         }
     }
 
@@ -661,7 +665,7 @@ class JointLinearRepairTest {
         val source = assertNotNull(model.linearAuthorityContext(objective, ObjectiveSense.MINIMIZE,
             ExecutionControl.Never))
         for ((exact, real, originalAccepted) in listOf(Triple(false, 1L, true), Triple(true, 2L, true),
-                Triple(true, 1L, false))) {
+            Triple(true, 1L, false))) {
             var offered = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(1.0),
                 exactReals = listOf(BigFraction.ONE))
             var halted = false
@@ -991,7 +995,8 @@ class JointLinearRepairTest {
                     val points = ArrayList<Sample>()
                     repeat(128) {
                         if (points.isEmpty()) search.advance(ExecutionControl.Never, 1) { sample, _, ->
-                            points += sample }
+                            points += sample
+                        }
                     }
                     val first = points.single()
                     assertContentEquals(LongArray(3) { 1 }, LongArray(3) { first.intValue(it) })
@@ -1137,7 +1142,10 @@ class JointLinearRepairTest {
         for (completion in listOf(false, true)) {
             var publicationChecks = 0
             JointLinearRepair(model, source, objective, TheoryParams(sourceIncumbentCompletion = completion),
-                external = { center }, incumbentCompletionCheck = { _, _, _ -> publicationChecks++; true },
+                external = { center }, incumbentCompletionCheck = { _, _, _ ->
+                    publicationChecks++
+                    true
+                },
             ).use { repair ->
                 var attempt = repair.attempt(condition, ExecutionControl.Never)
                 repeat(32) {

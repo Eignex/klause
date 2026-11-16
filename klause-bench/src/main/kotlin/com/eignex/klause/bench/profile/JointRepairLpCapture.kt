@@ -50,8 +50,10 @@ internal object JointRepairLpCapture {
         val executionPolicy = SourceExecutionPolicy()
         val prepared = SourceSetup.execute(SourceExecutionRequest(invocation, executionPolicy,
             ExecutionOptions.parse(FinitePortfolioLpCapture.parameters(options)),
-            finiteRequest = { shape -> executionPolicy.finiteRequest(shape, FiniteEngine.MIXED,
-                cancellation = stop, randomSeed = seed, prepareOnly = true) },
+            finiteRequest = { shape ->
+                executionPolicy.finiteRequest(shape, FiniteEngine.MIXED,
+                    cancellation = stop, randomSeed = seed, prepareOnly = true)
+            },
             randomSeed = seed, timeout = stop, cancellation = stop))
         val preparation = (prepared as? SourceExecutionResult.Finite)?.result?.preparation
             ?: error("joint capture requires finite preparation")
@@ -265,7 +267,9 @@ internal object JointRepairLpCapture {
     }
 
     internal class ConditionWindow(private val limit: Int) {
-        init { require(limit in 1..4) }
+        init {
+            require(limit in 1..4)
+        }
         private val conditions = IdentityHashMap<Any, String>()
         var size: Int = 0
             private set

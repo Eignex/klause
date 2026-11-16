@@ -81,6 +81,7 @@ class NativeLearnedMetadataTest {
         assertTrue(observed.getValue("protectedPrimitiveBytes") > 16L)
         assertTrue(observed.getValue("protectedPrimitiveBytes") < observed.getValue("ownedPrimitiveBytes"))
     }
+
     @Test
     fun `capacity growth should keep each observed allocation identity immutable`() {
         val metadata = NativeLearnedMetadata()
@@ -112,5 +113,4 @@ class NativeLearnedMetadataTest {
         assertEquals(2, metadata[0, NativeLearnedMetadata.LBD])
         assertEquals(9L, metadata.admission(0))
     }
-
 }

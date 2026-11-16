@@ -179,7 +179,7 @@ internal object LinearAuthorityAggregateCuts {
                         observe("AggregatePairAttempts", 1L)
                         val pivot = other.coefficients.getValue(id)
                         val rightWeight = meter.number(if (coefficient > BigFraction.ZERO) coefficient
-                            else coefficient.negated())
+                        else coefficient.negated())
                         val leftWeight = meter.number(if (pivot > BigFraction.ZERO) pivot else pivot.negated())
                         meter.reserve(1L, 320L)
                         val terms = listOf(row.term.copy(weight = leftWeight), other.term.copy(weight = rightWeight))
@@ -364,9 +364,11 @@ internal object LinearAuthorityAggregateCuts {
             } else other += row
         }
         var index = 0
-        for (group in listOf(scoped, other)) for (row in group) {
-            meter.reserve(1L)
-            rows[index++] = row
+        for (group in listOf(scoped, other)) {
+            for (row in group) {
+                meter.reserve(1L)
+                rows[index++] = row
+            }
         }
         observe("AggregatePointScopedOrderComplete", 1L)
     }
@@ -553,7 +555,7 @@ internal object LinearAuthorityAggregateCuts {
                     }
                     meter.arithmetic(value, BigFraction.ONE)
                     val rounded = meter.number(if (upper) BigFraction.of(value.ceilInteger(), BIG_ONE)
-                        else BigFraction.of(value.negated().ceilInteger(), BIG_ONE).negated())
+                    else BigFraction.of(value.negated().ceilInteger(), BIG_ONE).negated())
                     val delta = meter.add(rounded, meter.number(value.negated()))
                     meter.number(coefficient)
                     meter.arithmetic(BigFraction.ONE, coefficient)
@@ -574,7 +576,7 @@ internal object LinearAuthorityAggregateCuts {
             meter.arithmetic(rhs, BigFraction.ONE)
             val rounded = meter.number(if (strictSources > 0)
                 BigFraction.of(rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
-                else BigFraction.of(rhs.negated().ceilInteger(), BIG_ONE).negated())
+            else BigFraction.of(rhs.negated().ceilInteger(), BIG_ONE).negated())
             meter.reserve(1L)
             val proof = SourceDerivation.IntegerRounding(SourceDerivation.Combination(proofTerms))
             observe("AggregateCandidates", 1L)
@@ -1007,7 +1009,7 @@ internal object LinearAuthorityAggregateCuts {
                 meter.arithmetic(rhs, BigFraction.ONE)
                 val rounded = meter.number(if (strictSources > 0)
                     BigFraction.of(rhs.ceilInteger(), BIG_ONE) - BigFraction.ONE
-                    else BigFraction.of(rhs.negated().ceilInteger(), BIG_ONE).negated())
+                else BigFraction.of(rhs.negated().ceilInteger(), BIG_ONE).negated())
                 meter.reserve(8L)
                 val coefficient = initial.coefficients.getValue(id).toDouble()
                 val norm = sqrt(normSquared + 2.0 * coefficient + 1.0)
@@ -1061,9 +1063,9 @@ internal object LinearAuthorityAggregateCuts {
                 val aggregate = capture.coefficients ?: return null
                 val next = continuation(terms, aggregate, snapshots) ?: return null
                 val existingScale = meter.number(if (next.pivot > BigFraction.ZERO) next.pivot
-                    else next.pivot.negated())
+                else next.pivot.negated())
                 val appendedScale = meter.number(if (next.residual > BigFraction.ZERO) next.residual
-                    else next.residual.negated())
+                else next.residual.negated())
                 meter.reserve(terms.size + 1L, 128L + (terms.size + 1L) * 160L)
                 terms = terms.map { it.copy(weight = meter.multiply(it.weight, existingScale)) } +
                     next.row.term.copy(weight = appendedScale)
@@ -1322,7 +1324,10 @@ internal object LinearAuthorityAggregateCuts {
                 }
                 val conclusion = mixedIntegerRounding(SourceInequality(normalized, scaledRhs, strict),
                     sides.map { it.inequality },
-                        ExecutionControl { meter.reserve(1L); cancellation() }) { left, right ->
+                    ExecutionControl {
+                        meter.reserve(1L)
+                        cancellation()
+                    }) { left, right ->
                     meter.number(left)
                     meter.number(right)
                     meter.arithmetic(left, right)

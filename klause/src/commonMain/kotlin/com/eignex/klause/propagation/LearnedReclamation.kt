@@ -31,7 +31,9 @@ internal class ReclamationPreparation(
     var progressed = false
         private set
 
-    fun advanced() { progressed = true }
+    fun advanced() {
+        progressed = true
+    }
     val remainingWork: Long get() = maxWork - work
 
     fun supports(units: Long, scratchBytes: Long): Boolean = units <= maxWork && scratchBytes <= maxScratchBytes
@@ -60,14 +62,16 @@ internal class ReclamationPreparation(
 
     class Deferred : RuntimeException()
 
-    private companion object { const val ATOMIC_PRICE = 32L }
+    private companion object {
+        const val ATOMIC_PRICE = 32L
+    }
 }
 
 // Cleanup polls before every bounded mutation, a few work units apart. A short window keeps every poll; a long
 // one reads its token once per interval, so the deadline clocks stay off the cost of each step and a request
 // is still observed within that many steps.
 internal class CleanupCancellation(private val polling: StopPolling? = null, private val token: () ->
-    Boolean) : () -> Boolean {
+Boolean) : () -> Boolean {
     private var polls = 0
     private var requested = false
 
@@ -78,13 +82,15 @@ internal class CleanupCancellation(private val polling: StopPolling? = null, pri
             if (!shared.due(1)) return false
         } else {
             val poll = polls++
-        if (poll >= INTERVAL && poll and (INTERVAL - 1) != 0) return false
+            if (poll >= INTERVAL && poll and (INTERVAL - 1) != 0) return false
         }
         requested = token()
         return requested
     }
 
-    private companion object { const val INTERVAL = 64 }
+    private companion object {
+        const val INTERVAL = 64
+    }
 }
 
 internal fun <T> PropagationState.withLearnedOwnershipBudget(budget: ReclamationPreparation, operation: () -> T): T {
@@ -160,7 +166,9 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
     fun ints(value: IntArray?) {
         if (value != null) sample.owned(value, value.size.toLong() * Int.SIZE_BYTES, protected)
     }
-    fun longs(value: LongArray) { sample.owned(value, value.size.toLong() * Long.SIZE_BYTES, protected) }
+    fun longs(value: LongArray) {
+        sample.owned(value, value.size.toLong() * Long.SIZE_BYTES, protected)
+    }
     ints(prop.boolVars)
     ints(prop.intVars)
     ints(prop.initialBoolWatchers)
@@ -168,7 +176,11 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
     ints(prop.initialIntEventWatches)
     when (prop) {
         is ClausePropagator -> ints(prop.literals)
-        is PseudoBooleanPropagator -> { ints(prop.literals); ints(prop.byWeightDesc); longs(prop.weights) }
+        is PseudoBooleanPropagator -> {
+            ints(prop.literals)
+            ints(prop.byWeightDesc)
+            longs(prop.weights)
+        }
         is LearnedIntegerPropagator -> {
             sample.owned(prop, Int.SIZE_BYTES.toLong(), protected)
             ints(prop.row.variables)

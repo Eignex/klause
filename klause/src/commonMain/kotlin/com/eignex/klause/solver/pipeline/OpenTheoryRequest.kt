@@ -231,7 +231,7 @@ object OpenTheoryPipeline {
     ): OpenTheoryExecution {
         val portfolio = OpenPortfolio(request.model, request, params, seed = params.randomSeed, lanes = cores,
             sourceObjective = values, publication = publication, completeOnly = completeOnly)
-        val stop = params.cancellation .includingStop( params.timeout)
+        val stop = params.cancellation.includingStop( params.timeout)
         val objective = request.minimizedObjective ?: return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, integralMinimizer(request, objective), stop))
     }
@@ -262,7 +262,7 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val stop = params.cancellation .includingStop( params.timeout)
+        val stop = params.cancellation.includingStop( params.timeout)
         val prepared = preparedSource ?: model.prepareExecutionPlan(values?.original, values?.maximize ?: false,
             cancellation = stop)
         if (stop() || prepared.decline == PreparedPlanDecline.RESOURCE) return incompleteOpenExecution(objective,
@@ -398,7 +398,7 @@ object OpenTheoryPipeline {
         cores: Int,
         onAccepted: ((SourceIncumbentPublication) -> Unit)?,
     ): OpenTheoryExecution = observed(preparedSource.sourceSemantics, onAccepted) { publication ->
-        val stop = params.cancellation .includingStop( params.timeout)
+        val stop = params.cancellation.includingStop( params.timeout)
         if (stop() || preparedSource.decline == PreparedPlanDecline.RESOURCE) {
             incompleteOpenExecution(
                 objective,
@@ -421,7 +421,7 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val stop = params.cancellation .includingStop( params.timeout)
+        val stop = params.cancellation.includingStop( params.timeout)
         if (stop()) return incompleteOpenExecution(objective, params.preparationStopReason(stop))
         val selected = if (preparedSource == null) model.componentPlan(cancellation = stop) else null
         if (stop() || selected?.encodingDecline == EncoderDecline.RESOURCE ||
@@ -472,7 +472,7 @@ object OpenTheoryPipeline {
             if (integral != null) {
                 return integral.descent(params).use { descent ->
                     OpenTheoryExecution.Optimize(requireNotNull(descent.runSlice(
-                        params.cancellation .includingStop( params.timeout), Long.MAX_VALUE, -1,
+                        params.cancellation.includingStop( params.timeout), Long.MAX_VALUE, -1,
                     ) { assignment, _ -> values?.publish(assignment.toSample(request.model, binding), publication) }))
                 }
             }
@@ -480,21 +480,23 @@ object OpenTheoryPipeline {
         return RationalTheoryDescent(request.model, objective, params, context,
             publicationInvocation = binding).use { descent ->
             val result = requireNotNull(descent.runSlice(
-                params.cancellation .includingStop( params.timeout), Long.MAX_VALUE, -1,
+                params.cancellation.includingStop( params.timeout), Long.MAX_VALUE, -1,
             ) { incumbent -> values?.publish(incumbent.sample, publication) })
             val authority = descent.linearResult
             val folded = if (authority == null) result.openOptimum(objective) else requireNotNull(values).completed(
-                authority, params.cancellation .includingStop( params.timeout),
+                authority, params.cancellation.includingStop( params.timeout),
                 if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled)
             OpenTheoryExecution.Optimize(folded)
         }
     }
 
     private fun sourceObjective(request: OpenTheoryRequest, params: TheoryParams): OpenSourceObjective? =
-        request.objective?.let { original -> OpenSourceObjective(requireNotNull(request.minimizedObjective), original,
-            request.maximize, request.linearAuthorityContext(params.cancellation .includingStop( params.timeout)),
-            params.cancellation .includingStop( params.timeout),
-            ) }
+        request.objective?.let { original ->
+            OpenSourceObjective(requireNotNull(request.minimizedObjective), original,
+                request.maximize, request.linearAuthorityContext(params.cancellation.includingStop( params.timeout)),
+                params.cancellation.includingStop( params.timeout),
+            )
+        }
 
     private fun observed(
         semantics: EffectiveSourceSemantics?,

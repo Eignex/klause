@@ -241,7 +241,9 @@ internal object MpsLpQuery {
                     "safeBound" to lp.safeObjectiveLowerBound,
                     "farkas" to lp.exactFarkasRay,
                     "rational" to lp.rationalOutcome,
-                )) put(name, certifier(value))
+                )) {
+                    put(name, certifier(value))
+                }
             })
         }
     }

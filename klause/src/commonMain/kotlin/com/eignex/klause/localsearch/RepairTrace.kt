@@ -6,7 +6,12 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.util.numbers.BigFraction
 
 internal enum class RepairEndpoint {
-    PolicyLocalOptimum, FeasibleStall, Restarted, Repaired, Unresolved, Censored,
+    PolicyLocalOptimum,
+    FeasibleStall,
+    Restarted,
+    Repaired,
+    Unresolved,
+    Censored,
 }
 
 internal class RepairTrace(

@@ -213,7 +213,10 @@ internal class SourceClauseGuidance private constructor(
         private fun searchWork(size: Int): Int {
             var width = size
             var levels = 1
-            while (width > 0) { width = width ushr 1; levels++ }
+            while (width > 0) {
+                width = width ushr 1
+                levels++
+            }
             return levels + minOf(size, 16)
         }
     }
@@ -291,7 +294,9 @@ internal class SourceClauseGuidance private constructor(
         fun stopped(): Boolean = outcome == HintIndexOutcome.STOPPED ||
             stop().also { if (it) outcome = HintIndexOutcome.STOPPED }
 
-        fun invalidSource() { outcome = HintIndexOutcome.INVALID_PRIMITIVE }
+        fun invalidSource() {
+            outcome = HintIndexOutcome.INVALID_PRIMITIVE
+        }
 
         fun visit(count: Int = 1): Boolean {
             if (count > visits) {

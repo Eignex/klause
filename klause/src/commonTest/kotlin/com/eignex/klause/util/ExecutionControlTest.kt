@@ -19,8 +19,14 @@ class ExecutionControlTest {
     @Test
     fun `retaining a wrapped containing sequence should preserve its observation order once`() {
         val observations = ArrayList<Int>()
-        val first = ExecutionControl { observations.add(1); false }
-        val second = ExecutionControl { observations.add(2); false }
+        val first = ExecutionControl {
+            observations.add(1)
+            false
+        }
+        val second = ExecutionControl {
+            observations.add(2)
+            false
+        }
         val containing = (first or second).bindStopControl()
 
         assertFalse(containing.includingStop(first or second)())
@@ -32,7 +38,10 @@ class ExecutionControlTest {
     fun `a scope join should retain a new deadline after its covered stop prefix`() {
         val clock = TestTimeSource()
         var observations = 0
-        val predicate = ExecutionControl { observations++; false }
+        val predicate = ExecutionControl {
+            observations++
+            false
+        }
         val containing = object : ExecutionControl(predicate) {
             override val containingStop get() = predicate
         }
@@ -48,8 +57,14 @@ class ExecutionControlTest {
     @Test
     fun `a covered prefix should preserve explicit repetition in an attached scope`() {
         val observations = ArrayList<Int>()
-        val predicate = ExecutionControl { observations.add(1); false }
-        val extra = ExecutionControl { observations.add(2); false }
+        val predicate = ExecutionControl {
+            observations.add(1)
+            false
+        }
+        val extra = ExecutionControl {
+            observations.add(2)
+            false
+        }
         val containing = object : ExecutionControl(predicate) {
             override val containingStop get() = predicate
         }
@@ -62,7 +77,10 @@ class ExecutionControlTest {
     @Test
     fun `attaching a containing stop should preserve its predicate sequence once`() {
         var observations = 0
-        val predicate = ExecutionControl { observations++; false }
+        val predicate = ExecutionControl {
+            observations++
+            false
+        }
         val containing = object : ExecutionControl(predicate) {
             override val containingStop get() = predicate
         }
@@ -89,7 +107,10 @@ class ExecutionControlTest {
     @Test
     fun `retaining a known containing worker should observe its predicate once`() {
         var observations = 0
-        val predicate = ExecutionControl { observations++; false }
+        val predicate = ExecutionControl {
+            observations++
+            false
+        }
         val worker = predicate.bindStopControl()
 
         assertFalse(worker.includingStop(predicate)())

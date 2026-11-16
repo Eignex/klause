@@ -33,7 +33,6 @@ import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.toLongExact
-import kotlin.random.Random
 
 internal class QuadraticWorkerAdapter(
     private val request: PolynomialTheoryRequest,
@@ -66,13 +65,21 @@ internal class QuadraticWorkerAdapter(
     private var neighborhood: QuadraticNeighborhoodCursor? = null
     private var preparationWork = 0L
     private val runtime = QuadraticWorkerRuntime(native, sense, { stats }, ::partial) {
-        try { traversal?.close() } finally {
-            try { neighborhood?.close() } finally { sink.stop() }
+        try {
+            traversal?.close()
+        } finally {
+            try {
+                neighborhood?.close()
+            } finally {
+                sink.stop()
+            }
         }
     }
     private var terminal: QuadraticOptimizationResult?
         get() = runtime.terminal
-        set(value) { runtime.terminal = value }
+        set(value) {
+            runtime.terminal = value
+        }
     var readIncumbent: () -> QuadraticIncumbent? = { null }
     var onAccepted: ((QuadraticIncumbent) -> Unit)? = null
     private val stats: SolveStats get() = neighborhood?.let { sink.snapshot().mergedWith(it.stats) } ?: sink.snapshot()
@@ -159,14 +166,17 @@ internal class QuadraticWorkerAdapter(
     }
 
     private fun advanceComplete(global: ExecutionControl, millis: Long, nodes: Long) {
-        if (proofScope == null || native.stopped) { terminal = partial(); return }
+        if (proofScope == null || native.stopped) {
+            terminal = partial()
+            return
+        }
         prepare()
         readIncumbent()?.let { accept(it) }
         val stop = params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native
             .polynomial or global
         val cursor = traversal ?: QuadraticTraversalCursor(finite, params.strategy.backtrack.copy(
             assumptions = assumptions, cancellation =
-                params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native.polynomial,
+            params.strategy.backtrack.cancellation.withAccounting(native.polynomial) or native.polynomial,
             minHammingDistance = 0, recentWindow = 0,
         ), sink, { native.work }) { sample, cancellation ->
             completion.check(sample, condition(sample), cancellation)
@@ -369,7 +379,6 @@ internal class QuadraticWorkerAdapter(
             cursor.close()
         }
     }
-
 }
 
 internal fun quadraticAssumptions(params: PolynomialTheoryParams, engine: FiniteEngine): Assumptions {

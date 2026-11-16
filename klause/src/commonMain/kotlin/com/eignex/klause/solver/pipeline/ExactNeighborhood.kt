@@ -143,7 +143,11 @@ internal class ExactNeighborhood(
             }
             val total = centers.size + boolCount
             val operator = pending?.first ?: operator()
-            val count = when (operator) { 0 -> 1; 1 -> maxOf(1, total / 2); else -> total }
+            val count = when (operator) {
+                0 -> 1
+                1 -> maxOf(1, total / 2)
+                else -> total
+            }
             val before = nativeWork()
             if (pending == null) onProposalOperator?.invoke(operator, round)
             val condition = pending?.second ?: proposal?.propose(centers, bools, count,

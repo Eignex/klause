@@ -117,7 +117,9 @@ class NativeLearnedPayloadsTest {
 
         repeat(512) {
             val budget = ReclamationPreparation(40L, 256L, { false }, {})
-            try { payloads.sweepDirectory(budget) } catch (_: ReclamationPreparation.Deferred) { }
+            try {
+                payloads.sweepDirectory(budget)
+            } catch (_: ReclamationPreparation.Deferred) { }
             assertTrue(budget.work <= 40L)
         }
 

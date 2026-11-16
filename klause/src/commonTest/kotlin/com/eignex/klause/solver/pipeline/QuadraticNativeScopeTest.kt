@@ -81,8 +81,14 @@ class QuadraticNativeScopeTest {
         val visited = ArrayList<Int>()
         var expired = false
         val scope = QuadraticNativeScope(PolynomialTheoryParams(
-            timeout = ExecutionControl { visited += 1; expired },
-            cancellation = ExecutionControl { visited += 2; false },
+            timeout = ExecutionControl {
+                visited += 1
+                expired
+            },
+            cancellation = ExecutionControl {
+                visited += 2
+                false
+            },
         )).worker(0)
 
         assertFalse(scope.polynomial())
@@ -99,7 +105,10 @@ class QuadraticNativeScopeTest {
         var polls = 0
         val scope = QuadraticNativeScope(PolynomialTheoryParams(
             maximumWork = 3,
-            cancellation = ExecutionControl { polls++; false },
+            cancellation = ExecutionControl {
+                polls++
+                false
+            },
         ))
         val worker = scope.worker(0, maximumWork = 1)
 

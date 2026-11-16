@@ -29,7 +29,9 @@ internal class LinearAuthorityCut(
 ) {
     val owners: Set<Int> = owners.toSet()
 
-    init { require(owner in this.owners && this.owners.all { it >= 0 }) }
+    init {
+        require(owner in this.owners && this.owners.all { it >= 0 })
+    }
 }
 
 internal class LinearAuthorityCuts private constructor(
@@ -100,8 +102,10 @@ internal class LinearAuthorityCuts private constructor(
                     val (coordinate, coefficient) = row.coefficients.entries.singleOrNull() ?: continue
                     if (coordinate.kind != SourceCoordinate.Kind.Real ||
                         premise.guards.isNotEmpty() || premise.integerPins.isNotEmpty() ||
-                        (listOf(coefficient, row.rhs)).any { it.num.magnitudeBitLength() > 4096 ||
-                            it.den.magnitudeBitLength() > 4096 }) continue
+                        (listOf(coefficient, row.rhs)).any {
+                            it.num.magnitudeBitLength() > 4096 ||
+                                it.den.magnitudeBitLength() > 4096
+                        }) continue
                     bounds.getOrPut(coordinate to (coefficient > BigFraction.ZERO)) {
                         row to SourceDerivation.Premise(id)
                     }
@@ -122,8 +126,10 @@ internal class LinearAuthorityCuts private constructor(
                         continue
                     }
                     val values = coefficients.values
-                    if ((values + row.rhs).any { it.num.magnitudeBitLength() > 4096 ||
-                            it.den.magnitudeBitLength() > 4096 }) continue
+                    if ((values + row.rhs).any {
+                            it.num.magnitudeBitLength() > 4096 ||
+                                it.den.magnitudeBitLength() > 4096
+                        }) continue
                     val integerValues = coefficients.filterKeys { it.kind == SourceCoordinate.Kind.Integer }.values
                     if (integerValues.isEmpty()) continue
                     if (mixed) observe("MixedRowsVisited")
@@ -172,7 +178,7 @@ internal class LinearAuthorityCuts private constructor(
                                     originalDistance <= oppositeDistance) original else opposite ?: original
                             }.filterNotNull() else preferred
                         val choices = if (alternatives == preferred) listOf(preferred)
-                            else listOf(preferred, alternatives)
+                        else listOf(preferred, alternatives)
                         var eligible = false
                         for ((choice, selected) in choices.withIndex()) {
                             if (choice > 0) {
@@ -202,7 +208,8 @@ internal class LinearAuthorityCuts private constructor(
                                 continue
                             }
                             if ((conclusion.coefficients.values + conclusion.rhs).any {
-                                    it.num.magnitudeBitLength() > 4096 || it.den.magnitudeBitLength() > 4096 }) {
+                                    it.num.magnitudeBitLength() > 4096 || it.den.magnitudeBitLength() > 4096
+                                }) {
                                 observe("MixedWidthLimited")
                                 continue
                             }
@@ -215,7 +222,7 @@ internal class LinearAuthorityCuts private constructor(
                     }
                     val scaled = row.rhs * multiplier
                     val rhs = if (row.strict) BigFraction.of(scaled.ceilInteger(), BIG_ONE) - BigFraction.ONE
-                        else BigFraction.of(scaled.negated().ceilInteger(), BIG_ONE).negated()
+                    else BigFraction.of(scaled.negated().ceilInteger(), BIG_ONE).negated()
                     if (rhs == scaled && !row.strict) continue
                     val conclusion = SourceInequality(coefficients.mapValues { (_, value) -> value * multiplier }, rhs)
                     val proof = SourceDerivation.IntegerRounding(combination)

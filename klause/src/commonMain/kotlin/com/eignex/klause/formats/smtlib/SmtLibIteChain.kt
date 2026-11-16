@@ -179,7 +179,7 @@ internal fun Compiler.Builder.lowerOpenIteChains() {
 private fun Compiler.Builder.lowerIteChain(chain: IteChain) {
     val start = factors.size
     val parts = if (collapseToElement(chain)) factors.subList(start, factors.size).toList()
-        else exclusiveIntegerSelection(chain.result, chain.conds, chain.arms, chain.default)
+    else exclusiveIntegerSelection(chain.result, chain.conds, chain.arms, chain.default)
     conditionalEqualities.define(
         chain.result, chain.conds, chain.arms, chain.default, parts,
         chain.keys.map { GuardEquality(chain.selector, it, equal = true) },

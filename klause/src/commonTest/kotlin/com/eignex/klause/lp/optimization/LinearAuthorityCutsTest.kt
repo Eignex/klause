@@ -361,8 +361,10 @@ class LinearAuthorityCutsTest {
 
         val cuts = assertNotNull(LinearAuthorityCuts.prepareAtPoint(source, ExecutionControl.Never,
             mapOf(real to 2.0, other to 0.0), 65_536L))
-        val directed = cuts.rows.single { it.inequality.coefficients ==
-            mapOf(x to BigFraction.ONE, other to BigFraction.MINUS_ONE) }
+        val directed = cuts.rows.single {
+            it.inequality.coefficients ==
+                mapOf(x to BigFraction.ONE, other to BigFraction.MINUS_ONE)
+        }
 
         assertEquals(BigFraction.ofLong(2), directed.inequality.rhs)
         assertEquals(SourceEvidenceCheck.Checked, SourceEvidenceVerifier(source).verify(SourceEvidence(scope,

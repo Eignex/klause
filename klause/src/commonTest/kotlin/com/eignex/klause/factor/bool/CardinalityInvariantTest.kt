@@ -64,22 +64,26 @@ class CardinalityInvariantTest {
             ReifiedCardinality(4, literals, min = 2, max = 3),
             ReifiedPseudoBoolean(4, longArrayOf(5, 2, 3, 3, 4), literals, PbOp.EQ, 4L),
         )
-        for (factor in factors) for (cap in listOf(1, 3)) {
-            val problem = Problem(5, 0, emptyArray(), listOf(factor))
-            val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
-            state.violationSoftCap = cap
-            for (mask in 0 until 32) for (variable in 0 until 5) {
-                for (v in 0 until 5) state.assignment.setBool(v, mask and (1 shl v) != 0)
-                state.recompute()
-                val before = state.cost
-                val predicted = state.netDelta(BoolFlip(variable))
+        for (factor in factors) {
+            for (cap in listOf(1, 3)) {
+                val problem = Problem(5, 0, emptyArray(), listOf(factor))
+                val state = LocalSearchState(LocalSearchModel.open(problem), Random(0))
+                state.violationSoftCap = cap
+                for (mask in 0 until 32) {
+                    for (variable in 0 until 5) {
+                        for (v in 0 until 5) state.assignment.setBool(v, mask and (1 shl v) != 0)
+                        state.recompute()
+                        val before = state.cost
+                        val predicted = state.netDelta(BoolFlip(variable))
 
-                state.apply(BoolFlip(variable))
-                val applied = state.cost
-                state.recompute()
+                        state.apply(BoolFlip(variable))
+                        val applied = state.cost
+                        state.recompute()
 
-                assertEquals(state.cost, applied)
-                assertEquals(state.cost - before, predicted)
+                        assertEquals(state.cost, applied)
+                        assertEquals(state.cost - before, predicted)
+                    }
+                }
             }
         }
     }

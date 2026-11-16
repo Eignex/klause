@@ -21,8 +21,10 @@ import com.eignex.klause.lowering.realMinMaxEncoding
 internal val selectionEncoder = Encoder(EncoderSupport.EQUIVALENT) { factor, encoding ->
     try {
         if (encoding.target == EncodingTarget.POLYNOMIAL) {
-            val row = { row: LinearRow -> polynomialRow(row,
-                { encoding.integer(SourceIntId(it)) }, { encoding.real(SourceRealId(it)) }, encoding::conditional) }
+            val row = { row: LinearRow ->
+                polynomialRow(row,
+                    { encoding.integer(SourceIntId(it)) }, { encoding.real(SourceRealId(it)) }, encoding::conditional)
+            }
             val formula = when (factor) {
                 is ArrayMinMax -> minMaxEncoding(factor, encoding.cancellation, row,
                     { PolynomialRealFormula.And(it) }, { PolynomialRealFormula.Or(it) })

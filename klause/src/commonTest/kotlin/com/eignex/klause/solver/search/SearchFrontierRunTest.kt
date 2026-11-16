@@ -20,11 +20,13 @@ class SearchFrontierRunTest {
             }
         }
         val run = SearchFrontierRun(session, SearchSolveParams(), BooleanBranching.SourceOrder(2), policy,
-            SearchDecisionBudget.Unlimited, { when (session.boolValue(0)) {
-                false -> 10
-                true -> 1
-                null -> 0
-            } }, Comparator<Int> { left, right -> left.compareTo(right) }, { visited.size == 1 && !released })
+            SearchDecisionBudget.Unlimited, {
+                when (session.boolValue(0)) {
+                    false -> 10
+                    true -> 1
+                    null -> 0
+                }
+            }, Comparator<Int> { left, right -> left.compareTo(right) }, { visited.size == 1 && !released })
 
         assertIs<SearchRunEvent.Paused>(run.next())
         released = true

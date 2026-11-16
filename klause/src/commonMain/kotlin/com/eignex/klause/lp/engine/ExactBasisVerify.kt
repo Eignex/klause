@@ -253,7 +253,7 @@ internal fun verifyExactBasis(
             val rhs = authority.primalRhs()
             meter.phase = ExactBasisPhase.PRIMAL
             val basics = if (primalOnly) solveLogicalReducedPrimal(authority, rhs, meter)
-                else solveExactBasis(checkNotNull(factors), rhs, false, meter)
+            else solveExactBasis(checkNotNull(factors), rhs, false, meter)
             val primal = authority.sourcePrimal(basics)
             // Publish this complete independent witness before BTRAN can exhaust the remaining budget.
             val point = verifyBasisCandidates(model, authority, primal, null, null, meter)

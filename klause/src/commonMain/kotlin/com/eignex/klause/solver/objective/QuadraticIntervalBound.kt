@@ -27,7 +27,10 @@ internal fun QuadraticObjectiveSpec.intervalBounds(
             first.first * second.first, first.first * second.second,
             first.second * second.first, first.second * second.second,
         )
-        val scaled = values.map { step(); it * coefficient }
+        val scaled = values.map {
+            step()
+            it * coefficient
+        }
         lower += scaled.reduce { left, right -> if (left < right) left else right }
         upper += scaled.reduce { left, right -> if (left > right) left else right }
     }

@@ -16,7 +16,10 @@ class NonlinearIntegerResidueReductionTest {
             PolynomialRelation.EQ, PolynomialExpression.Constant.of(BIG_ONE))
         val source = PolynomialRealFormula.Or(List(16) { atom })
         var checks = 0
-        val reduction = NonlinearIntegerResidueReduction({}, {}) { checks++; true }
+        val reduction = NonlinearIntegerResidueReduction({}, {}) {
+            checks++
+            true
+        }
 
         val reduced = reduction.reduce(source)
 

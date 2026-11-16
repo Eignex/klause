@@ -7,7 +7,7 @@ internal enum class LpClaim(val phase: LpSolvePhase) {
     BOUND(LpSolvePhase.CLAIM_BOUND),
     CONTRADICTION(LpSolvePhase.CLAIM_CONTRADICTION),
     FEASIBLE_COMPLETION(LpSolvePhase.CLAIM_FEASIBLE_COMPLETION),
-    ATTAINED_OPTIMUM(LpSolvePhase.CLAIM_ATTAINED_OPTIMUM),;
+    ATTAINED_OPTIMUM(LpSolvePhase.CLAIM_ATTAINED_OPTIMUM), ;
 
     fun consumed(observer: LpCertificationObserver?) {
         observer?.observePhase(LpPhaseMetrics(LpSolvePhase.CLAIM_CONSUMPTION, name, 0L))

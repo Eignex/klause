@@ -40,6 +40,7 @@ internal class MddTransitionIndex(
     val maxSym: Long,
 ) {
     private class PreparedSymbols(val columns: Array<ExtensionalSupportIndex.Column>?)
+
     @Volatile
     private var preparedSymbols: PreparedSymbols? = null
 

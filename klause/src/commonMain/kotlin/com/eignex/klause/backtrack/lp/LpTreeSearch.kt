@@ -96,6 +96,7 @@ internal fun LpEngine.lbTreeSearch(
                 var bestValue: BigFraction? = null
                 var best: Sample? = null
                 val tried = HashSet<String>()
+
                 // A leaf of this tree passed its own propagation; only its real columns still need the exact LP.
                 fun offer(discrete: Sample): Boolean {
                     if (token()) return false

@@ -49,6 +49,7 @@ class SourceBoundAtom private constructor(
     val strict: Boolean,
 ) : SourceBoundPredicate {
     override val sourceBound: SourceBoundAtom get() = this
+
     /** Source coefficients, returned as a copy to preserve registered meaning. */
     val terms: List<SourceBoundTerm> get() = sourceTerms.toList()
 

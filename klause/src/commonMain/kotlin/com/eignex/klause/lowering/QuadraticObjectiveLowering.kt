@@ -23,10 +23,12 @@ internal fun lowerQuadraticObjective(
     }
     fun multiply(left: QuadraticTerms, right: QuadraticTerms): QuadraticTerms? {
         val result = LinkedHashMap<List<Int>, BigFraction>()
-        for ((first, a) in left) for ((second, b) in right) {
-            step()
-            if (first.size + second.size > 2) return null
-            add(result, (first + second).sorted(), a * b)
+        for ((first, a) in left) {
+            for ((second, b) in right) {
+                step()
+                if (first.size + second.size > 2) return null
+                add(result, (first + second).sorted(), a * b)
+            }
         }
         return result
     }
@@ -59,8 +61,10 @@ internal fun lowerQuadraticObjective(
                 mapOf(listOf(node.id.index) to BigFraction.ONE)
             }
             is PolynomialExpression.Sum -> LinkedHashMap<List<Int>, BigFraction>().also { result ->
-                for (child in children) for ((powers, coefficient) in values.getValue(child)) {
-                    add(result, powers, coefficient)
+                for (child in children) {
+                    for ((powers, coefficient) in values.getValue(child)) {
+                        add(result, powers, coefficient)
+                    }
                 }
             }
             is PolynomialExpression.Product -> {

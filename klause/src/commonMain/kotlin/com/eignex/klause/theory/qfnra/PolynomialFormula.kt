@@ -82,15 +82,15 @@ internal class PolynomialFormula private constructor(
             if (value == UNASSIGNED) continue
             val atom = atoms[node.atom]
             result.add(if (value == TRUE)
-                    atom else
-                    PolynomialAtom(atom.polynomial, when (atom.relation) {
-                PolynomialRelation.EQ -> PolynomialRelation.NE
-                PolynomialRelation.NE -> PolynomialRelation.EQ
-                PolynomialRelation.LT -> PolynomialRelation.GE
-                PolynomialRelation.LE -> PolynomialRelation.GT
-                PolynomialRelation.GT -> PolynomialRelation.LE
-                PolynomialRelation.GE -> PolynomialRelation.LT
-            }))
+                atom else
+                PolynomialAtom(atom.polynomial, when (atom.relation) {
+                    PolynomialRelation.EQ -> PolynomialRelation.NE
+                    PolynomialRelation.NE -> PolynomialRelation.EQ
+                    PolynomialRelation.LT -> PolynomialRelation.GE
+                    PolynomialRelation.LE -> PolynomialRelation.GT
+                    PolynomialRelation.GT -> PolynomialRelation.LE
+                    PolynomialRelation.GE -> PolynomialRelation.LT
+                }))
         }
         return result
     }

@@ -195,9 +195,9 @@ class PresolverTest {
 
             assertTrue((reduced as? BakedProblem)?.rootIntDomain(3)?.max == 2L ||
                 reduced.factors.filterIsInstance<Linear>().any {
-                it.vars.contentEquals(intArrayOf(3)) &&
-                    it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
-            })
+                    it.vars.contentEquals(intArrayOf(3)) &&
+                        it.op == LinearOp.LE && it.coeff(0) == 1L && it.bound == 2L
+                })
             assertEquals(
                 listOf(PresolveInvocationOutcome.COMPLETE_MISS, PresolveInvocationOutcome.CHANGED),
                 budget.invocations.filter { it.pass == "sparsify" }.map { it.outcome },
@@ -209,10 +209,12 @@ class PresolverTest {
     fun `linear misses should stay parked across many unrelated Boolean eliminations`() {
         val problem = Problem(64, 2, Array(2) { IntDomain(0, 2) }, listOf(
             Linear(intArrayOf(1, 1), intArrayOf(0, 1), LinearOp.LE, 3),
-        ) + (0 until 32).flatMap { v -> listOf(
-            Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, true))),
-            Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, false))),
-        ) })
+        ) + (0 until 32).flatMap { v ->
+            listOf(
+                Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, true))),
+                Clause(intArrayOf(Lit.make(2 * v, true), Lit.make(2 * v + 1, false))),
+            )
+        })
         for (lane in PresolveLane.entries) {
             val budget = PresolveBudget(Long.MAX_VALUE)
             val context = PresolveContext(

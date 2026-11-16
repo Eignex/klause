@@ -4,8 +4,10 @@ package com.eignex.klause.solver.search
 enum class SearchBranchKind {
     /** Source Boolean choices. */
     Boolean,
+
     /** Finite-domain splits. */
     Finite,
+
     /** Exact arithmetic splits. */
     Arithmetic,
 }

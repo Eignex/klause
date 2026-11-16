@@ -47,7 +47,9 @@ internal class SourceLpSparseAdmission internal constructor(
 ) : AutoCloseable {
     internal var closed = false
         private set
-    override fun close() { closed = true }
+    override fun close() {
+        closed = true
+    }
 }
 
 internal class SourceLpBudget(

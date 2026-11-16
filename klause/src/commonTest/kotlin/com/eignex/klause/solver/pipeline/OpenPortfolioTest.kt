@@ -41,7 +41,6 @@ class OpenPortfolioTest {
         assertTrue(result.stats.portfolio.arms.all { it.failure == null })
     }
 
-
     private fun openColumns(n: Int, vararg factors: Factor): Problem {
         val open = Bits(n).also { bits -> for (v in 0 until n) bits.set(v) }
         return Problem(

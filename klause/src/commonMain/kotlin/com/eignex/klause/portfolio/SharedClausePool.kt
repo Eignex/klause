@@ -177,11 +177,17 @@ internal class SharedClausePool(
         val budget = Budget(reclamationWork, reclamationScratchEntries, cancelled, charge)
         try {
             budget.checkpoint()
-                budget.reserve(count.toLong() * 2L)
-            val clauses = List(count) { budget.step(); store.clause(from + it) }
-            val origins = IntArray(count) { budget.step(); store.origins[from + it] }
+            budget.reserve(count.toLong() * 2L)
+            val clauses = List(count) {
+                budget.step()
+                store.clause(from + it)
+            }
+            val origins = IntArray(count) {
+                budget.step()
+                store.origins[from + it]
+            }
             budget.step()
-                budget.checkpoint()
+            budget.checkpoint()
             Drained(clauses, origins, cursorOf(generation, size))
         } catch (_: Stopped) {
             null
@@ -214,7 +220,10 @@ internal class SharedClausePool(
 
     private fun compact(budget: Budget) {
         budget.reserve(store.size * 2L)
-        val order = IntArray(store.size) { budget.step(); it }
+        val order = IntArray(store.size) {
+            budget.step()
+            it
+        }
         sort(order, budget)
         val limit = softLimitBytes?.div(2L) ?: Long.MAX_VALUE
         var target = minOf(cap / 2, store.size / 2)
@@ -389,7 +398,9 @@ internal class SharedClausePool(
         var scratchEntries = 0
         private var countdown = 0
 
-        init { require(maxWork >= 0L && maxScratchEntries >= 0) }
+        init {
+            require(maxWork >= 0L && maxScratchEntries >= 0)
+        }
 
         fun step() {
             if (work >= maxWork) throw Stopped()
@@ -656,7 +667,10 @@ internal class PoolClauseExchange(
         return { key ->
             val known = if (pool.softLimitBytes == null) key in seen else seen.containsBounded(
                 key, lookupWork, cancelled = { session.cancelRequested },
-                charge = { lookupWork--; session.chargeSharingWork(1L) },
+                charge = {
+                    lookupWork--
+                    session.chargeSharingWork(1L)
+                },
             )
             if (known == true) meter?.clauseCount("exportDuplicates", 1L)
             known

@@ -141,7 +141,7 @@ internal fun <T> realElementEncoding(
         selectionCheckpoint(cancellation)
         val guard = row(LinearRow.ofInts(index, longArrayOf(1), LinearOp.NE, offset + position))
         val variables = if (factor.arrIsVars) intArrayOf(factor.result, factor.entries[position])
-            else intArrayOf(factor.result)
+        else intArrayOf(factor.result)
         val coefficients = if (factor.arrIsVars) doubleArrayOf(1.0, -1.0) else doubleArrayOf(1.0)
         val bound = if (factor.arrIsVars) 0.0 else factor.constants[position]
         val equality = LinearRow.ofColumns(intArrayOf(), variables,

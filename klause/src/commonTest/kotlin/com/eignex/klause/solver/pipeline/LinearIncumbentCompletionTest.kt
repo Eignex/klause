@@ -66,7 +66,7 @@ class LinearIncumbentCompletionTest {
             }) { _, _ -> }.use { assertNotNull(it.complete(context, offered, ExecutionControl.Never)) }
 
             val expected = if (sense == ObjectiveSense.MINIMIZE) listOf(BigFraction.ONE, BigFraction.ofLong(6))
-                else listOf(BigFraction.ofLong(3), BigFraction.ofLong(4))
+            else listOf(BigFraction.ofLong(3), BigFraction.ofLong(4))
             assertEquals(expected, point.exactReals)
             assertEquals(1L, point.intValue(0))
             assertEquals(BigFraction.ONE + expected[0] - expected[1], checkedValue)
@@ -77,7 +77,10 @@ class LinearIncumbentCompletionTest {
     fun `companions should reuse an original checked completion of the same full point`() {
         val shared = LinearIncumbentSharing()
         var checks = 0
-        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> checks++; true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ ->
+            checks++
+            true
+        }
         val producerBudget = SourceLpBudget(maxOperations = 0)
         val budget = SourceLpBudget(maxOperations = 0)
         val offered = seed.copy(reals = doubleArrayOf(third.toDouble()))
@@ -122,7 +125,10 @@ class LinearIncumbentCompletionTest {
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
             assertNotNull(producer.complete(source, seed, ExecutionControl.Never))
-            LinearIncumbentCompletion(SourceLpBudget(), { _, _, _ -> rejectedChecks++; false }, shared) { _, _ -> }
+            LinearIncumbentCompletion(SourceLpBudget(), { _, _, _ ->
+                rejectedChecks++
+                false
+            }, shared) { _, _ -> }
                 .use { consumer -> assertNull(consumer.complete(source, seed, ExecutionControl.Never)) }
         }
 
@@ -155,7 +161,10 @@ class LinearIncumbentCompletionTest {
     fun `shared completion should retain the offered coordinate frame identity`() {
         val shared = LinearIncumbentSharing()
         var checks = 0
-        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> checks++; true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ ->
+            checks++
+            true
+        }
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
             assertNotNull(producer.complete(source, seed.withCoordinateFrame(Any()), ExecutionControl.Never))
@@ -218,7 +227,10 @@ class LinearIncumbentCompletionTest {
     fun `closing a producer should release its shared completions`() {
         val shared = LinearIncumbentSharing()
         var checks = 0
-        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> checks++; true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ ->
+            checks++
+            true
+        }
 
         LinearIncumbentCompletion(SourceLpBudget(), originalCheck, shared) { _, _ -> }.use { producer ->
             assertNotNull(producer.complete(source, seed, ExecutionControl.Never))
@@ -234,7 +246,10 @@ class LinearIncumbentCompletionTest {
     fun `full shared retention should preserve older points without refusing fresh completion`() {
         val shared = LinearIncumbentSharing()
         var checks = 0
-        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ -> checks++; true }
+        val originalCheck: (Sample, BigFraction, ExecutionControl) -> Boolean = { _, _, _ ->
+            checks++
+            true
+        }
         val first = Sample(booleanArrayOf(), longArrayOf(3), doubleArrayOf(1.0))
         val producerBudget = SourceLpBudget(maxOperations = 0)
 

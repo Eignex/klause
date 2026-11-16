@@ -42,21 +42,49 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
     var admissionFamilies = 0
 
     enum class Metric {
-        Fires, Work, Nanos, Deductions, Conflicts, Interrupted,
-        EagerReasons, ConflictReasonAttempts, ConflictReasonUnavailable,
-        LazyAttempts, LazyCompleted, LazyInterrupted, ReasonWork, ReasonNanos,
-        Support, MaxSupport, MemoHits, UipReasons, UipSupport, Learned, Consumed, UseEvents, LaterUseEvents, Untracked,
-        RefinementAttempts, RefinementWork, RefinementNanos, RefinementSupport, RefinementAccepted,
+        Fires,
+        Work,
+        Nanos,
+        Deductions,
+        Conflicts,
+        Interrupted,
+        EagerReasons,
+        ConflictReasonAttempts,
+        ConflictReasonUnavailable,
+        LazyAttempts,
+        LazyCompleted,
+        LazyInterrupted,
+        ReasonWork,
+        ReasonNanos,
+        Support,
+        MaxSupport,
+        MemoHits,
+        UipReasons,
+        UipSupport,
+        Learned,
+        Consumed,
+        UseEvents,
+        LaterUseEvents,
+        Untracked,
+        RefinementAttempts,
+        RefinementWork,
+        RefinementNanos,
+        RefinementSupport,
+        RefinementAccepted,
     }
 
-    init { require(capacity in 1..1024) }
+    init {
+        require(capacity in 1..1024)
+    }
 
     fun note(mask: Int, metric: Metric, value: Long = 1) {
-        for (family in FactorFamily.entries) if (mask and (1 shl family.ordinal) != 0) {
-            val row = counts[family.ordinal]
-            val i = metric.ordinal
-            row[i] = if (metric == Metric.MaxSupport) maxOf(row[i], value)
-            else row[i] + value.coerceIn(0, Long.MAX_VALUE - row[i])
+        for (family in FactorFamily.entries) {
+            if (mask and (1 shl family.ordinal) != 0) {
+                val row = counts[family.ordinal]
+                val i = metric.ordinal
+                row[i] = if (metric == Metric.MaxSupport) maxOf(row[i], value)
+                else row[i] + value.coerceIn(0, Long.MAX_VALUE - row[i])
+            }
         }
     }
 
@@ -84,9 +112,13 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
         note(mask, Metric.MaxSupport, size.toLong())
     }
 
-    fun beginAnalysis() { analysisFamilies = 0 }
+    fun beginAnalysis() {
+        analysisFamilies = 0
+    }
 
-    fun selectFamilies(mask: Int) { analysisFamilies = mask }
+    fun selectFamilies(mask: Int) {
+        analysisFamilies = mask
+    }
 
     fun participate(mask: Int, size: Int) {
         analysisFamilies = analysisFamilies or mask
@@ -133,9 +165,11 @@ internal class FactorAttribution(private val capacity: Int = 1024) {
     }
 
     fun snapshot(): Map<String, Long> = buildMap {
-        for (family in FactorFamily.entries) for (metric in Metric.entries) {
-            val value = counts[family.ordinal][metric.ordinal]
-            if (value != 0L) put("factor${family.name}${metric.name}", value)
+        for (family in FactorFamily.entries) {
+            for (metric in Metric.entries) {
+                val value = counts[family.ordinal][metric.ordinal]
+                if (value != 0L) put("factor${family.name}${metric.name}", value)
+            }
         }
         put("factorTrackedReasons", reasons.size.toLong())
         put("factorTrackedLearning", learned.size.toLong())

@@ -4,10 +4,12 @@ import java.security.MessageDigest
 import java.util.HexFormat
 
 plugins {
-    id("com.eignex.jvm") version "1.3.5"
+    id("com.eignex.jvm")
     kotlin("plugin.serialization")
     application
 }
+
+eignexBuild { jvmToolchain.set(25) }
 
 // Internal tooling module: use the build conventions but never publish.
 eignexPublish {

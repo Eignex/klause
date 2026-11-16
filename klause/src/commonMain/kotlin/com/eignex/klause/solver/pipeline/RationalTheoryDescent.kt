@@ -50,11 +50,11 @@ internal class RationalTheoryDescent(
                 (
                     (
                         publicationInvocation.sourceModel.sameModel(ModelIdentity.of(source)) ||
-                    publicationInvocation.preparedPlan.model === source
-                    ) &&
-                    publicationInvocation.model.matches(ModelIdentity.of(source, objective)) &&
-                    publicationInvocation.scope == context?.scope
-                ),
+                            publicationInvocation.preparedPlan.model === source
+                        ) &&
+                        publicationInvocation.model.matches(ModelIdentity.of(source, objective)) &&
+                        publicationInvocation.scope == context?.scope
+                    ),
         ) {
             "rational witness publication has a different source invocation"
         }
@@ -117,11 +117,11 @@ internal class RationalTheoryDescent(
                     global or params.timeout.withAccounting(params.cancellation) or params.cancellation)
                 onIncumbent(
                     MinimizeResult.BestFound(
-                    sample,
-                    (exact * sign).toDouble(),
-                    TerminationReason.BudgetExhausted,
-                    stats,
-                )
+                        sample,
+                        (exact * sign).toDouble(),
+                        TerminationReason.BudgetExhausted,
+                        stats,
+                    )
                 )
             } ?: return null
             val sourceContext = requireNotNull(context)
@@ -187,7 +187,7 @@ internal class RationalTheoryDescent(
             val current = round ?: run {
                 external()?.let { (sample, _) ->
                     if (!proofDeclined || retainChecked(sample,
-                        global or params.timeout.withAccounting(params.cancellation) or params.cancellation)) {
+                            global or params.timeout.withAccounting(params.cancellation) or params.cancellation)) {
                         val exact = objective.evaluateExact(sample)
                         if (value == null || exact < requireNotNull(value)) {
                             incumbent = sample
@@ -210,8 +210,8 @@ internal class RationalTheoryDescent(
                 ResumableOpenTheory(
                     engine,
                     params.copy(
-                    maxLeaves = (params.maxLeaves - state.work.snapshot().openTheoryChecks).coerceAtLeast(0),
-                ),
+                        maxLeaves = (params.maxLeaves - state.work.snapshot().openTheoryChecks).coerceAtLeast(0),
+                    ),
                     state
                 )
                     .also { round = it }
@@ -232,7 +232,7 @@ internal class RationalTheoryDescent(
                     check(value == null || exact < requireNotNull(value))
                     val standing = checkedIncumbent
                     if (proofDeclined && !retainChecked(sample,
-                        global or params.timeout.withAccounting(params.cancellation) or params.cancellation)) {
+                            global or params.timeout.withAccounting(params.cancellation) or params.cancellation)) {
                         return finish(
                             if (params.timeout()) {
                                 TerminationReason.Timeout
@@ -251,11 +251,11 @@ internal class RationalTheoryDescent(
                     if (!proofDeclined || checkedIncumbent !== standing) {
                         publish(
                             MinimizeResult.BestFound(
-                            sample,
-                            exact.toDouble(),
-                            TerminationReason.BudgetExhausted,
-                            stats,
-                        ),
+                                sample,
+                                exact.toDouble(),
+                                TerminationReason.BudgetExhausted,
+                                stats,
+                            ),
                             onIncumbent
                         )
                     }
@@ -313,10 +313,10 @@ internal class RationalTheoryDescent(
         sample.witnessCertificate = publicationInvocation?.let { binding ->
             EvidenceCertificate.published(
                 CompletedEnginePublication.Witness(
-                binding,
-                sample,
-                objective.evaluateExact(sample).toDouble(),
-            )
+                    binding,
+                    sample,
+                    objective.evaluateExact(sample).toDouble(),
+                )
             )
         }
     }
@@ -364,9 +364,9 @@ internal class RationalTheoryDescent(
             source
         } else {
             source.withFactors(
-            source.factors + rows,
-            source.impliedFactorMask?.let { it + BooleanArray(rows.size) },
-        )
+                source.factors + rows,
+                source.impliedFactorMask?.let { it + BooleanArray(rows.size) },
+            )
         }
     }
 
@@ -423,12 +423,12 @@ internal class RationalTheoryDescent(
         round = null
         if (proofDeclined && result == null) {
             linearResult = partial(
-            if (params.timeout()) {
-                TerminationReason.Timeout
-            } else {
-                TerminationReason.Cancelled
-            },
-        )
+                if (params.timeout()) {
+                    TerminationReason.Timeout
+                } else {
+                    TerminationReason.Cancelled
+                },
+            )
         }
         closed = true
     }

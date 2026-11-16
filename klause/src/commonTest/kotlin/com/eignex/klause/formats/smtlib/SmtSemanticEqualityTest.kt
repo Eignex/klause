@@ -5,8 +5,8 @@ import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
-import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test

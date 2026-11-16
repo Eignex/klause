@@ -124,8 +124,10 @@ class LpBoundCertificationTest {
                         .map { (row, coefficient) -> ExactLpEntry(row, ExactLpNumber.of(coefficient)) }
                 },
                 List(size) { zero },
-                List(size) { column -> ExactLpColumn(ExactLpBounds(ExactLpSide(zero),
-                    ExactLpSide(ExactLpNumber.of(1L)).takeIf { boxed && column > 0 })) } +
+                List(size) { column ->
+                    ExactLpColumn(ExactLpBounds(ExactLpSide(zero),
+                        ExactLpSide(ExactLpNumber.of(1L)).takeIf { boxed && column > 0 }))
+                } +
                     List(size) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
                 List(size) { ExactLpRow() },
                 ExactLpObjective(List(size) { ExactLpNumber.of(-3L) } + List(size) { zero }),
@@ -162,8 +164,10 @@ class LpBoundCertificationTest {
                 }
             },
             List(size) { zero },
-            List(size) { column -> ExactLpColumn(ExactLpBounds(ExactLpSide(zero),
-                ExactLpSide(ExactLpNumber.of(1L)).takeIf { column >= 2 })) } +
+            List(size) { column ->
+                ExactLpColumn(ExactLpBounds(ExactLpSide(zero),
+                    ExactLpSide(ExactLpNumber.of(1L)).takeIf { column >= 2 }))
+            } +
                 List(size) { ExactLpColumn(ExactLpBounds(ExactLpSide(zero))) },
             List(size) { ExactLpRow() },
             ExactLpObjective(List(size) { ExactLpNumber.of(if (it == 1) -4L else -3L) } +
@@ -555,7 +559,9 @@ class LpBoundCertificationTest {
             override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
             override fun observeExactInput(accepted: Boolean) = Unit
             override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-            override fun observePhase(metrics: LpPhaseMetrics) { phases += metrics }
+            override fun observePhase(metrics: LpPhaseMetrics) {
+                phases += metrics
+            }
         }
         val unobserved = certifyLpBoundOnly(model(), doubleArrayOf(-1.0), ReconstructionLimits())
 
@@ -583,7 +589,9 @@ class LpBoundCertificationTest {
                 override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) = Unit
                 override fun observeExactInput(accepted: Boolean) = Unit
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
-                override fun observePhase(metrics: LpPhaseMetrics) { phases += metrics }
+                override fun observePhase(metrics: LpPhaseMetrics) {
+                    phases += metrics
+                }
             }
             val unobserved = certifyLpBoundOnly(model(), doubleArrayOf(dual), limits)
 

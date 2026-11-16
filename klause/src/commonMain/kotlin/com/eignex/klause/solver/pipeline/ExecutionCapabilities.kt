@@ -4,16 +4,22 @@ package com.eignex.klause.solver.pipeline
 enum class ExecutionOperation {
     /** Find one source witness or decide infeasibility. */
     SATISFY,
+
     /** Improve a captured source objective, with separately checked terminal claims. */
     OPTIMIZE,
+
     /** Enumerate the source's discrete projection. */
     ENUMERATE,
+
     /** Count its discrete projection exactly. */
     EXACT_COUNT,
+
     /** Estimate its discrete projection through bounded cells. */
     APPROXIMATE_COUNT,
+
     /** Produce heuristic source samples. */
     SAMPLE,
+
     /** Sample the discrete projection through complete bounded cells. */
     UNIFORM_SAMPLE,
 }
@@ -22,10 +28,13 @@ enum class ExecutionOperation {
 enum class ExecutionStrategy {
     /** Source traversal with complete checks. */
     COMPLETE,
+
     /** Heuristic candidates with source completion. */
     LOCAL_SEARCH,
+
     /** Adaptive source neighborhoods with source completion. */
     ALNS,
+
     /** Compose the admitted complete and heuristic arms. */
     MIXED,
 }
@@ -34,10 +43,13 @@ enum class ExecutionStrategy {
 enum class ProcedureCompleteness {
     /** A terminating decision procedure with unrestricted resources. */
     DECISION,
+
     /** Exhaustive traversal whose termination is not guaranteed on every admitted source. */
     EXHAUSTIVE,
+
     /** Checked witnesses without a source exhaustion guarantee. */
     WITNESS_SEARCH,
+
     /** No installed procedure for this source operation. */
     UNAVAILABLE,
 }
@@ -46,16 +58,22 @@ enum class ProcedureCompleteness {
 enum class ExecutionClaimAuthority {
     /** A checked source witness. */
     WITNESS,
+
     /** A source-wide refutation. */
     REFUTATION,
+
     /** A checked bound for the source objective. */
     OBJECTIVE_BOUND,
+
     /** An attained optimum or certified unattained limit. */
     OPTIMALITY,
+
     /** Unlimited improvement of the source objective. */
     UNBOUNDEDNESS,
+
     /** A sound bound on the number of projected source assignments. */
     PROJECTED_COUNT_BOUND,
+
     /** A probabilistic projected count estimate under the counting contract. */
     COUNT_ESTIMATE,
 }
@@ -64,14 +82,19 @@ enum class ExecutionClaimAuthority {
 enum class ExecutionDeclineCause {
     /** Source ownership cannot construct a finite projection. */
     FINITE_PROJECTION,
+
     /** A factor has no direct heuristic projection. */
     HEURISTIC_PROJECTION,
+
     /** No installed check completes every required source constraint. */
     SOURCE_COMPLETION,
+
     /** This source representation has no entry point for the operation. */
     OPERATION_SURFACE,
+
     /** The captured objective is outside the installed operation contract. */
     OBJECTIVE,
+
     /** A prepared source assembler declined the required component. */
     PREPARATION,
 }
@@ -108,8 +131,10 @@ class StrategyAdmission internal constructor(
 
     /** Worker authority under this source scope, before evidence verification. */
     val claimAuthorities: Set<ExecutionClaimAuthority> get() = claims.toSet()
+
     /** Participating strategy arms, excluding declined arms. */
     val arms: List<ExecutionStrategy> get() = participating.toList()
+
     /** Explicit declines; a mixed strategy may retain declines beside admitted siblings. */
     val declines: List<ExecutionDecline> get() = refusals.toList()
 }

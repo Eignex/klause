@@ -297,7 +297,10 @@ internal fun integerCertifyUnchecked(
         if (j >= n) {
             dot.addLong(mult[j - n]) // slack column j is the unit vector e_{j−n}
         } else {
-            if (!integers.forEachCoefficient(j) { i, a -> scan?.invoke(); dot.addProduct(mult[i], a) }) return null
+            if (!integers.forEachCoefficient(j) { i, a ->
+                    scan?.invoke()
+                    dot.addProduct(mult[i], a)
+                }) return null
         }
         dAcc.subtract(dot)
         if (!dAcc.fitsLong()) return null // reduced cost too large to evaluate ⇒ keep node (sound)

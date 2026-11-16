@@ -45,7 +45,10 @@ internal class IntEventOverflow {
                 val next = if (factor < base) factor else remap.getOrNull(factor - base)?.let {
                     if (it < 0) null else base + it
                 }
-                if (next != null) { posting[write++] = next; work += 2L }
+                if (next != null) {
+                    posting[write++] = next
+                    work += 2L
+                }
             }
             posting.truncateTo(write)
             work++
@@ -113,7 +116,10 @@ internal class IntEventOverflow {
                 val record = deferredWork == 0L || work < deferredWork
                 budget.visit(if (record) 8L else 4L)
                 budget.visit(0L)
-                if (record) { deferredWork = work; deferredScratch = scratch }
+                if (record) {
+                    deferredWork = work
+                    deferredScratch = scratch
+                }
             }
         } else {
             budget.visit(4L)

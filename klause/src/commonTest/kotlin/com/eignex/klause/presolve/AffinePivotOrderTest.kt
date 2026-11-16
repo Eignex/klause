@@ -55,7 +55,7 @@ class AffinePivotOrderTest {
                 <minimize type="sum"><list>a b gt(x,0)</list><coeffs>1 1 7</coeffs></minimize>
               </objectives>
             </instance>
-            """.trimIndent())
+        """.trimIndent())
         val objective = assertNotNull(parsed.objective).toLinearObjective()
 
         val delta = AffineSingletons.eliminateSourceAffineSingletons(parsed.problem, objective = objective,

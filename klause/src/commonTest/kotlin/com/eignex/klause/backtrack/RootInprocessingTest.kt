@@ -408,22 +408,24 @@ class RootInprocessingTest {
 
     @Test
     fun `an unfundable learned selection should yield without replacement admission`() {
-        for (native in listOf(false, true)) for (grant in listOf(1L, 10L)) {
-            val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
-            assertEquals(native, session.usesNativeSat)
-            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
-            session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
-            val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
-            val params = BacktrackParams(inprocessingRootWork = grant)
+        for (native in listOf(false, true)) {
+            for (grant in listOf(1L, 10L)) {
+                val session = PropagationSession(problem(intArrayOf(1)).bake(), nativeSat = native)
+                assertEquals(native, session.usesNativeSat)
+                session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+                session.addLearnedClause(Clause(intArrayOf(0, 4, 6)), 3)
+                val loop = Inprocessing(listOf(RootSimplificationPass()), cadence = 1)
+                val params = BacktrackParams(inprocessingRootWork = grant)
 
-            repeat(64) { loop.onRestart(session, params) }
-            val partners = ArrayList<Int>()
-            session.explanationState.forEachBinaryPartner(4) { partners.add(it) }
+                repeat(64) { loop.onRestart(session, params) }
+                val partners = ArrayList<Int>()
+                session.explanationState.forEachBinaryPartner(4) { partners.add(it) }
 
-            assertTrue(partners.isEmpty())
-            assertEquals(2, session.learnedClauseCount)
-            assertFalse(session.hasLearnedRetirementContinuation)
-            assertEquals(0, session.decisionLevel)
+                assertTrue(partners.isEmpty())
+                assertEquals(2, session.learnedClauseCount)
+                assertFalse(session.hasLearnedRetirementContinuation)
+                assertEquals(0, session.decisionLevel)
+            }
         }
     }
 
@@ -1067,7 +1069,7 @@ class RootInprocessingTest {
     fun `completed root probes should preserve saved search phases`() {
         for ((native, conflicting) in listOf(false to false, false to true, true to false, true to true)) {
             val source = if (conflicting) problem(intArrayOf(1, 2), intArrayOf(1, 3))
-                else problem(intArrayOf(1, 2))
+            else problem(intArrayOf(1, 2))
             val session = PropagationSession(source.bake(), nativeSat = native)
             val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
             val phase = PhaseSaving(source.numBoolVars, 0, params)
@@ -1482,5 +1484,4 @@ class RootInprocessingTest {
             assertEquals(0, session.decisionLevel)
         }
     }
-
 }

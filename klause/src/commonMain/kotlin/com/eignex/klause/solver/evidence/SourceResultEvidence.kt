@@ -9,7 +9,9 @@ data class SourceEngineAttestation(
     /** Mathematical claim reported by that engine. */
     val claim: SourceClaim,
 ) {
-    init { require(producer.isNotBlank()) }
+    init {
+        require(producer.isNotBlank())
+    }
 }
 
 /** Optional immutable evidence retained by a completed solver result. */
@@ -30,6 +32,7 @@ class SourceResultEvidence private constructor(
     ) : this(scope, derivations, attestations, scope, emptyList())
 
     private val capturedMappings = mappings.toList()
+
     /** Retained reduced-source evidence and optional transformation justifications. */
     val mappings: List<SourceMappingEvidence> get() = capturedMappings.toList()
 
@@ -40,8 +43,10 @@ class SourceResultEvidence private constructor(
 
     private val capturedDerivations = derivations.toList()
     private val capturedAttestations = attestations.toList()
+
     /** Captured checkable claims; unavailable capture is represented explicitly in its derivation. */
     val derivations: List<SourceEvidence> get() = capturedDerivations.toList()
+
     /** Reported engine completions, which confer no independent derivation coverage. */
     val attestations: List<SourceEngineAttestation> get() = capturedAttestations.toList()
 
@@ -54,7 +59,7 @@ class SourceResultEvidence private constructor(
 
     internal fun verify(
         claim: SourceClaim, context: SourceProofContext, cancellation: ExecutionControl,
-            allowance: SourceProofAllowance,
+        allowance: SourceProofAllowance,
     ): SourceEvidenceCheck {
         if (scope != context.scope || capturedDerivations.any { it.scope != scope }) {
             return SourceEvidenceCheck.Rejected("completed result evidence has mismatched original-source scopes")

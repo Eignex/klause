@@ -183,7 +183,7 @@ internal object SolveCore {
         // Deadline-backed (Monotonic) rather than a bare `nowMillis()` predicate, so budget-relative tokens
         // like [ExecutionControl.shorten] can be computed from it downstream (the ALNS bootstrap). Fires at the
         // same absolute instant as the epoch deadline.
-        if (common.deadlineAtMs == null) common.deadlineAtMs =deadline
+        if (common.deadlineAtMs == null) common.deadlineAtMs = deadline
         val cancel = common.invocationCancellation()
         return deadline to cancel
     }

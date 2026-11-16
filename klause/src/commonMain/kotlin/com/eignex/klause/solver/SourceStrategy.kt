@@ -159,7 +159,7 @@ class SourceStrategy internal constructor(
         return (if (bound != null && result is OpenTheoryResult.Sat) {
             result.copy(assignment = OpenTheoryAssignment.Sampled(bound))
         } else
-                result).withSourceSemantics(source.semantics)
+            result).withSourceSemantics(source.semantics)
     }
 
     /** Optimize an affine source objective with an explicit engine and common execution controls. */
@@ -429,8 +429,8 @@ class SourceStrategy internal constructor(
             ?: if (compiledSchema == null)
                 objective else
                 return OpenTheoryExecution.Optimize(
-                OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY),
-            )
+                    OpenTheoryOptimum.Bounded(null, null, TerminationReason.Unsupported, SolveStats.EMPTY),
+                )
         val scope = scope(polynomial, theory)
         fun incomplete(reason: TerminationReason): OpenTheoryExecution = OpenTheoryExecution.Optimize(
             OpenTheoryOptimum.Bounded(null, null, reason, SolveStats.EMPTY),
@@ -555,9 +555,9 @@ class SourceStrategy internal constructor(
             is MinimizeResult.Unbounded -> TerminationReason.Unsupported
             else -> if (scope.stop())
                 scope.unknown().reason
-                else if (invocation.floatGrid != null)
+            else if (invocation.floatGrid != null)
                 TerminationReason.Unsupported
-                else
+            else
                 TerminationReason.BudgetExhausted
         }
         val optimum = when (outcome.verdict) {
@@ -650,10 +650,10 @@ class SourceStrategy internal constructor(
             polynomial.copy(
                 cancellation = stop,
                 strategy = polynomial.strategy.copy(
-                backtrack = backtrack,
-                localSearch = localSearch,
-                assumptions = assumptions,
-            )
+                    backtrack = backtrack,
+                    localSearch = localSearch,
+                    assumptions = assumptions,
+                )
             ),
         )
     }
@@ -676,17 +676,17 @@ class SourceStrategy internal constructor(
         fun polynomialPreparation(): ExecutionControl {
             if (originalPolynomial.maximumWork == null) return stop
             return object : ExecutionControl() {
-            override fun isCancelled(): Boolean = stop() ||
-                preparationPool.exhausted
-            override fun deadline() = stop.deadline()
-            override val accounting: WorkMeter = WorkMeter { units ->
-                preparationPool.debit(units)
-                stop.charge (units)
+                override fun isCancelled(): Boolean = stop() ||
+                    preparationPool.exhausted
+                override fun deadline() = stop.deadline()
+                override val accounting: WorkMeter = WorkMeter { units ->
+                    preparationPool.debit(units)
+                    stop.charge (units)
                 }
                 override val admission: ArithmeticWorkSource get() {
                     val parent = stop.admission
                     val sink =
-                stop.accounting
+                        stop.accounting
                     return object : ArithmeticWorkSource {
                         override val quotaOwner get() = parent?.quotaOwner
                         override val quotaRemaining get() = parent?.quotaRemaining
@@ -694,8 +694,8 @@ class SourceStrategy internal constructor(
                         override val exhausted get() = preparationPool.exhausted || parent?.exhausted == true
                         override fun reserve(maximum: Int) = reserveWork(maximum, preparationPools, parent) {
                             if (parent?.metered != true) sink?.charge(it.toLong())
-            }
-        }
+                        }
+                    }
                 }
             }
         }

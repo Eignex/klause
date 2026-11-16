@@ -532,7 +532,9 @@ class ComponentLpSolverTest {
             val expected = assertNotNull(it.exactBound()).value
             var checks = 0
             val observer = object : LpCertificationObserver {
-                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) { checks++ }
+                override fun observe(certifier: LpCertifier, success: Boolean, cost: LpCertifierCost) {
+                    checks++
+                }
                 override fun observeExactInput(accepted: Boolean) = Unit
                 override fun observeSolve(metrics: LpSolveMetrics, component: Boolean) = Unit
             }

@@ -53,9 +53,13 @@ internal class CorpusStore(private val root: File, private val workspace: File =
             val staging = Files.createTempFile(copy.parent, ".member-", ".partial")
             try {
                 Files.delete(staging)
-                try { Files.createLink(staging, target) }
-                catch (_: IOException) { Files.copy(target, staging, COPY_ATTRIBUTES) }
-                catch (_: UnsupportedOperationException) { Files.copy(target, staging, COPY_ATTRIBUTES) }
+                try {
+                    Files.createLink(staging, target)
+                } catch (_: IOException) {
+                    Files.copy(target, staging, COPY_ATTRIBUTES)
+                } catch (_: UnsupportedOperationException) {
+                    Files.copy(target, staging, COPY_ATTRIBUTES)
+                }
                 Files.move(staging, copy, ATOMIC_MOVE)
             } finally {
                 Files.deleteIfExists(staging)

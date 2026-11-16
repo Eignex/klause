@@ -66,6 +66,7 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     val preparationWork: Long get() = 46L + cachedIndices.size * 2L + cachedPages.size * 2L
     val capacityBytes: Long get() = words * Int.SIZE_BYTES
     val referenceCapacity: Long get() = referenceSlots
+
     // The index-array owner reference accompanies the cache's reference slots.
     val cacheReferenceCapacity: Long get() = cachedPages.size + 1L
     val directoryCapacity: Long get() = directory.referenceCapacity
@@ -75,7 +76,11 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     fun <T> usingBudget(active: ReclamationPreparation, operation: () -> T): T {
         val previous = budget
         budget = active
-        return try { operation() } finally { budget = previous }
+        return try {
+            operation()
+        } finally {
+            budget = previous
+        }
     }
 
     private inline fun locate(index: Int, visit: (Long) -> Unit): Page? {
@@ -188,7 +193,10 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
         if (page.live != 0) return
         val slot = page.slot
         val cacheSlot = slot?.let { it.key and CACHE_MASK } ?: -1
-        if (slot == null) { check(primary === page); primary = null } else {
+        if (slot == null) {
+            check(primary === page)
+            primary = null
+        } else {
             check(directory.remove(slot, {}, {}))
             directoryIdentity = Any()
         }
@@ -265,7 +273,10 @@ internal class NativeLearnedPayloads(private val state: PropagationState? = null
     ) {
         primary?.sharingMemory(sample, 0, protectedRows, allPermanent, protected)
         val retained = directory.protectedCapacity({ units -> repeat(units.toInt()) { sample.step() } }) {
-            index, page, -> page.sharingMemory(sample, index shl PAGE_SHIFT, protectedRows, allPermanent, protected)
+                index,
+                page,
+            ->
+            page.sharingMemory(sample, index shl PAGE_SHIFT, protectedRows, allPermanent, protected)
         }
         sample.owned(this, 24L, protectedRows)
         sample.owned(cachedIndices, cachedIndices.size.toLong() * Int.SIZE_BYTES, protectedRows)

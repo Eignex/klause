@@ -16,39 +16,39 @@ internal fun validatePolynomialEncodingCoordinates(
     cancellation: ExecutionControl,
 ) {
     ScanMeter(cancellation,
-).use { scan ->
+    ).use { scan ->
         if (!scan.check()) throw PolynomialSourceInterrupted()
-    val pending = ArrayDeque<Any>()
-    formula?.let(pending::addLast)
-    expression?.let(pending::addLast)
-    while (pending.isNotEmpty()&& scan.visit(1L)) {
-        when (val node = pending.removeLast()) {
-            is PolynomialRealFormula.Constant, is PolynomialExpression.Constant -> Unit
-            is PolynomialRealFormula.BooleanVariable -> require(node.id.index in booleanIds) {
-                "foreign Boolean coordinate in polynomial encoding"
+        val pending = ArrayDeque<Any>()
+        formula?.let(pending::addLast)
+        expression?.let(pending::addLast)
+        while (pending.isNotEmpty() && scan.visit(1L)) {
+            when (val node = pending.removeLast()) {
+                is PolynomialRealFormula.Constant, is PolynomialExpression.Constant -> Unit
+                is PolynomialRealFormula.BooleanVariable -> require(node.id.index in booleanIds) {
+                    "foreign Boolean coordinate in polynomial encoding"
+                }
+                is PolynomialExpression.Variable -> require(node.id.index in realIds) {
+                    "unattributed coordinate in polynomial encoding"
+                }
+                is PolynomialRealFormula.Atom -> {
+                    pending.addLast(node.left)
+                    pending.addLast(node.right)
+                }
+                is PolynomialDistinct -> pending.addAll(node.operands)
+                is PolynomialSelection -> {
+                    require(node.result.index in realIds) { "unattributed polynomial selection result" }
+                    pending.addLast(node.condition)
+                    pending.addLast(node.whenTrue)
+                    pending.addLast(node.whenFalse)
+                }
+                is PolynomialRealFormula.Not -> pending.addLast(node.operand)
+                is PolynomialExpression.Power -> pending.addLast(node.base)
+                is PolynomialRealFormula.And -> node.operands.forEach(pending::addLast)
+                is PolynomialRealFormula.Or -> node.operands.forEach(pending::addLast)
+                is PolynomialExpression.Sum -> node.operands.forEach(pending::addLast)
+                is PolynomialExpression.Product -> node.operands.forEach(pending::addLast)
             }
-            is PolynomialExpression.Variable -> require(node.id.index in realIds) {
-                "unattributed coordinate in polynomial encoding"
-            }
-            is PolynomialRealFormula.Atom -> {
-                pending.addLast(node.left)
-                pending.addLast(node.right)
-            }
-            is PolynomialDistinct -> pending.addAll(node.operands)
-            is PolynomialSelection -> {
-                require(node.result.index in realIds) { "unattributed polynomial selection result" }
-                pending.addLast(node.condition)
-                pending.addLast(node.whenTrue)
-                pending.addLast(node.whenFalse)
-            }
-            is PolynomialRealFormula.Not -> pending.addLast(node.operand)
-            is PolynomialExpression.Power -> pending.addLast(node.base)
-            is PolynomialRealFormula.And -> node.operands.forEach(pending::addLast)
-            is PolynomialRealFormula.Or -> node.operands.forEach(pending::addLast)
-            is PolynomialExpression.Sum -> node.operands.forEach(pending::addLast)
-            is PolynomialExpression.Product -> node.operands.forEach(pending::addLast)
         }
+        if (pending.isNotEmpty() || !scan.check()) throw PolynomialSourceInterrupted()
     }
-    if (pending.isNotEmpty() || !scan.check()) throw PolynomialSourceInterrupted()
-}
 }

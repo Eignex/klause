@@ -166,7 +166,10 @@ internal class PolynomialBooleanRegions(
         }
         val support = sections.refute(required, identities, coupledSupports) ?: return false
         // The support's signed predicates have no common real point, so the exclusion holds under every prefix.
-        exclusions.add(Exclusion(support.map { arithmetic.step(); premises[it] }, ExclusionKind.Coupled))
+        exclusions.add(Exclusion(support.map {
+            arithmetic.step()
+            premises[it]
+        }, ExclusionKind.Coupled))
         progress?.let {
             it.coupledConflicts++
             it.coupledConflictPremises += support.size
@@ -228,8 +231,11 @@ internal class PolynomialBooleanRegions(
                     it.partialConflicts++
                     it.partialConflictPremises += premises.size
                 }
-                onConflict?.let { observer -> arithmetic.execution.handoff { observer(required.toList())
-            } }
+                onConflict?.let { observer ->
+                    arithmetic.execution.handoff {
+                        observer(required.toList())
+                    }
+                }
             } else {
                 for (premise in premises) {
                     arithmetic.step()

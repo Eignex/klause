@@ -56,7 +56,10 @@ internal fun tryConvexPolynomialOptimum(
         val bound = checker.bound(model, stationary) ?: continue
         val optimum = checker.optimum(bound) ?: continue
         val assignment = QfNraAssignment(
-            BooleanArray(boolCount) { arithmetic.step(); bools[it] ?: false },
+            BooleanArray(boolCount) {
+                arithmetic.step()
+                bools[it] ?: false
+            },
             optimum.point.map(algebraic::rational),
         )
         val coordinates = assignment.reals.withIndex().associate { it.index to it.value }

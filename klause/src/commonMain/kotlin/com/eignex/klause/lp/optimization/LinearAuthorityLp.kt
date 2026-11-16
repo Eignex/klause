@@ -126,11 +126,13 @@ internal class LinearAuthorityLp(
                 ExactLpNumber.of(constant),
             )
             fun model() = ExactLpModel(
-                costs.indices.map { column -> workingRows.mapIndexedNotNull { index, row ->
-                    row.columns.indexOf(column).takeIf { it >= 0 }?.let {
-                        ExactLpEntry(index, ExactLpNumber.of(row.coefficients[it]))
+                costs.indices.map { column ->
+                    workingRows.mapIndexedNotNull { index, row ->
+                        row.columns.indexOf(column).takeIf { it >= 0 }?.let {
+                            ExactLpEntry(index, ExactLpNumber.of(row.coefficients[it]))
+                        }
                     }
-                } },
+                },
                 workingRows.map { ExactLpNumber.of(it.rhs) },
                 (if (retained == null) packed.columns else packed.columns.map {
                     it.copy(bounds = ExactLpBounds())
@@ -142,13 +144,15 @@ internal class LinearAuthorityLp(
             )
             val owner = if (retained != null) retained.bind(packed, objective, token, ::model)
                 ?: return@runPrepared null else LpScopedSolver(LpExactState(model()), token, context = budget.context,
-                    iterationLimit = 1024, workLimit = 2_000_000L)
+                iterationLimit = 1024, workLimit = 2_000_000L)
             val preparation = owner.metrics.preparationWork
             val refinement = owner.refinementCache.work
             try {
                 val solved = owner.solve(token = token, observer = observer, claim = claim)
-                val result = solved?.takeIf { result -> result.exactPrimal?.admittedSourcePoint() != false &&
-                    result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false } ?: return@runPrepared null
+                val result = solved?.takeIf { result ->
+                    result.exactPrimal?.admittedSourcePoint() != false &&
+                        result.lowerBound?.let { listOf(it).admittedSourcePoint() } != false
+                } ?: return@runPrepared null
                 val boundWeights = result.bound?.dualMultipliers?.map { it.negated() }
                     ?.let { packed.lift(it, costs.map { cost -> cost.negated() }, token) }
                 val conflict = result.rationalConflict
@@ -316,14 +320,18 @@ internal class LinearAuthorityLp(
             constraints += ExactRationalInequality(ids, ids.map { values[it].negated() }, bound.negated())
         }
         for (column in coefficients.indices) {
-            equality(rows.map { row -> row.columns.indexOf(column).let {
-                if (it < 0) BigFraction.ZERO else row.coefficients[it]
-            } } + if (strict) listOf(BigFraction.ZERO) else emptyList(), coefficients[column])
+            equality(rows.map { row ->
+                row.columns.indexOf(column).let {
+                    if (it < 0) BigFraction.ZERO else row.coefficients[it]
+                }
+            } + if (strict) listOf(BigFraction.ZERO) else emptyList(), coefficients[column])
         }
         equality(rows.map { it.rhs } + if (strict) listOf(BigFraction.ZERO) else emptyList(), rhs)
         val variables = count + if (strict) 1 else 0
-        for (id in 0 until variables) constraints += ExactRationalInequality(intArrayOf(id),
-            listOf(BigFraction.MINUS_ONE), BigFraction.ZERO)
+        for (id in 0 until variables) {
+            constraints += ExactRationalInequality(intArrayOf(id),
+                listOf(BigFraction.MINUS_ONE), BigFraction.ZERO)
+        }
         if (strict) {
             val selected = rows.indices.filter { rows[it].strict }
             if (selected.isEmpty()) return null

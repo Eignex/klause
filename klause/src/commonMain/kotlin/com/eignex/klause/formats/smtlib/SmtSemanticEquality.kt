@@ -10,9 +10,9 @@ import com.eignex.klause.arithmetic.real.RealCertificationUnavailable
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
-import com.eignex.util.numbers.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 import kotlin.coroutines.cancellation.CancellationException
 

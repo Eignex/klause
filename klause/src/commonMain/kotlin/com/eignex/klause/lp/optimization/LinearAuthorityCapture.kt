@@ -311,7 +311,7 @@ internal class LinearAuthorityCapture(
         }
         val condition = source.scope.condition
         if (full && (!spend(condition.bools.size.toLong(), condition.bools.size * 48L) ||
-            !(condition.lower.values + condition.upper.values).all(::scalar))) return
+                !(condition.lower.values + condition.upper.values).all(::scalar))) return
         val generationScope = template?.numeric?.scope?.takeIf { full }
         if (generationScope != null) {
             if (!spend(1L, 128L)) return
@@ -427,7 +427,7 @@ internal class LinearAuthorityCapture(
             LinearAuthorityFeedbackRequest.Cuts.All -> return cut.violation?.let {
                 LinearAuthorityCutViolation.Available(it)
             } ?: missing(if (values == null) LinearAuthorityCutViolation.Reason.NoPoint
-                else LinearAuthorityCutViolation.Reason.Uncovered)
+            else LinearAuthorityCutViolation.Reason.Uncovered)
             LinearAuthorityFeedbackRequest.Cuts.Installed -> Unit
         }
         val base = deliveredBase

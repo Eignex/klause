@@ -59,7 +59,7 @@ internal class QuadraticIntegerTraversalCursor(
         if (!initialized) {
             when (session.initialize()) {
                 is ComponentResult.Conflict -> terminal = if (global()) SearchRunEvent.Indeterminate.Cancelled
-                    else SearchRunEvent.Exhausted
+                else SearchRunEvent.Exhausted
                 ComponentResult.Indeterminate -> terminal = SearchRunEvent.Indeterminate.Component
                 ComponentResult.Consistent -> Unit
             }

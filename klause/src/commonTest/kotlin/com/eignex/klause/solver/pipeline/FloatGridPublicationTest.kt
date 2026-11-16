@@ -38,8 +38,8 @@ class FloatGridPublicationTest {
             ExecutionOperation.ENUMERATE, FiniteEngine.FIXED))
         val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(selection,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-            declaredGridSemantics = true)).invocation
+                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
+                declaredGridSemantics = true)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val publication = FloatGridPublication(binding, ExecutionControl.Never, null, FiniteSolveCallbacks({}, {}))
         publication.onSample(Sample(booleanArrayOf(), longArrayOf(1)))
@@ -62,8 +62,8 @@ class FloatGridPublicationTest {
             LinearObjective(realCoefficients = doubleArrayOf(1.0)), maximize = true))
         val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(selection,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
-            declaredGridSemantics = true)).invocation
+                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY,
+                declaredGridSemantics = true)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val publication = FloatGridPublication(binding, ExecutionControl.Never, { it.approximateRealValue(0) <= 0.5 },
             FiniteSolveCallbacks({}, {}))
@@ -88,7 +88,8 @@ class FloatGridPublicationTest {
             ExecutionOperation.SATISFY, FiniteEngine.FIXED))
         val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(selection,
-            List(3) { FloatGridVariable(SourceRealId(it)) }, FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
+                List(3) { FloatGridVariable(SourceRealId(it)) }, FloatGridConsumerPurpose.FINITE_COMPATIBILITY))
+            .invocation
         val binding = assertNotNull(invocation.floatGrid)
         val points = ArrayList<Sample>()
         val publication = FloatGridPublication(binding, ExecutionControl.Never, null,
@@ -112,7 +113,7 @@ class FloatGridPublicationTest {
             LinearObjective(realCoefficients = doubleArrayOf(1.0)), maximize = true))
         val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(selection,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
+                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val publications = FloatGridPublication(binding, ExecutionControl.Never, null, FiniteSolveCallbacks({}, {}))
         val preparation = FinitePipelinePreparation(binding.projection.problem, null, { it }, null)
@@ -141,11 +142,14 @@ class FloatGridPublicationTest {
             ExecutionOperation.SATISFY, FiniteEngine.FIXED))
         val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(selection,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
+                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         var stopped = false
         val points = ArrayList<Sample>()
-        val publications = FloatGridPublication(binding, ExecutionControl { stopped }, { stopped = true; true },
+        val publications = FloatGridPublication(binding, ExecutionControl { stopped }, {
+            stopped = true
+            true
+        },
             FiniteSolveCallbacks(points::add, {}))
         val native = FiniteSolveOutcome.Completed(FiniteSolveVerdict.SAT, SolveStats.EMPTY, 1,
             Sample(booleanArrayOf(), longArrayOf(1)), 0)
@@ -168,7 +172,7 @@ class FloatGridPublicationTest {
             ExecutionOperation.SATISFY, FiniteEngine.FIXED))
         val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(selection,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
+                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val publications = ArrayList<Sample>()
 
         val execution = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->
@@ -197,8 +201,8 @@ class FloatGridPublicationTest {
             ExecutionOperation.SATISFY, FiniteEngine.FIXED))
         val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(selection,
-            listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1))),
-            FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
+                listOf(FloatGridVariable(SourceRealId(0)), FloatGridVariable(SourceRealId(1))),
+                FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val binding = assertNotNull(invocation.floatGrid)
         val native = FiniteSolveOutcome.Completed(FiniteSolveVerdict.SAT, SolveStats.EMPTY, 1,
             Sample(booleanArrayOf(), longArrayOf(1, 0)), 0)
@@ -225,7 +229,7 @@ class FloatGridPublicationTest {
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED, objective, maximize = true))
         val invocation = assertIs<SelectedFloatGridPreparation.Prepared>(
             SourceSetup.prepareSelectedFloatGrid(selection,
-            listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
+                listOf(FloatGridVariable(SourceRealId(0))), FloatGridConsumerPurpose.FINITE_COMPATIBILITY)).invocation
         val points = ArrayList<Sample>()
 
         val execution = SourceSetup.execute(SourceExecutionRequest(invocation, finiteRequest = { shape ->

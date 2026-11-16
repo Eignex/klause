@@ -24,12 +24,14 @@ internal fun polynomialVariableOrder(
     for (polynomial in polynomials) {
         arithmetic.step()
         val local = HashMap<Int, Int>()
-        for (term in polynomial.terms) for (variable in term.monomial.variables) {
-            arithmetic.step()
-            require(variable in 0 until variableCount)
-            val degree = term.monomial.exponent(variable)
-            local[variable] = maxOf(local[variable] ?: 0, degree)
-            if (occurrences[variable] < Long.MAX_VALUE) occurrences[variable]++
+        for (term in polynomial.terms) {
+            for (variable in term.monomial.variables) {
+                arithmetic.step()
+                require(variable in 0 until variableCount)
+                val degree = term.monomial.exponent(variable)
+                local[variable] = maxOf(local[variable] ?: 0, degree)
+                if (occurrences[variable] < Long.MAX_VALUE) occurrences[variable]++
+            }
         }
         for ((variable, degree) in local) {
             arithmetic.step()

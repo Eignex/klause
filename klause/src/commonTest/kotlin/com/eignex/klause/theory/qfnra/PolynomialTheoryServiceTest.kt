@@ -410,7 +410,6 @@ class PolynomialTheoryServiceTest {
         assertEquals(invocation.stats.workSpent, charges)
     }
 
-
     @Test
     fun `cancellation at retained witness publication should withhold the result`() {
         val source = SmtLibPolynomial.parse("(declare-const b Bool) (assert b)")
@@ -431,7 +430,6 @@ class PolynomialTheoryServiceTest {
             assertEquals(charges, invocation.stats.workSpent)
         }
     }
-
 
     @Test
     fun `closed invocation should discard Boolean witness preferences`() {

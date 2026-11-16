@@ -30,7 +30,10 @@ internal fun smtArraysEqual(left: SmtValue.Array, right: SmtValue.Array, values:
         for (previous in indexes) {
             values.checkpoint()
             when (values.equal(previous, index)) {
-                true -> { present = true; break }
+                true -> {
+                    present = true
+                    break
+                }
                 false -> Unit
                 null -> unavailable = true
             }
@@ -42,7 +45,7 @@ internal fun smtArraysEqual(left: SmtValue.Array, right: SmtValue.Array, values:
     return when (values.equal(left.default, right.default)) {
         true -> if (unavailable) null else true
         false -> if (unavailable || arrayIndexCardinality(left.sort.index, indexes.size + 1, values) == null) null
-            else false
+        else false
         null -> null
     }
 }

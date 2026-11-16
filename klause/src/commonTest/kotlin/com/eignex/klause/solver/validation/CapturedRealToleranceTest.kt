@@ -103,7 +103,6 @@ class CapturedRealToleranceTest {
         assertFalse(accepts(point(0.5)))
     }
 
-
     private val residuals = mapOf(
         "abs" to (source(RealAbs(0, 1), reals = 2) to doubleArrayOf(0.5, 0.58, 0.65)),
         "max" to (source(RealArrayMinMax(2, intArrayOf(0, 1), max = true), reals = 3) to

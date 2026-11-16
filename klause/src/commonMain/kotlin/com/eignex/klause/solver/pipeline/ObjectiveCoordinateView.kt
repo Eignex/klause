@@ -40,8 +40,8 @@ internal class ObjectiveCoordinateView private constructor(
             val privateObjective = coordinates.objective ?: return null
             // Presolve retains column slots. Only equal, discrete namespaces can share reconstructed proposals.
             if (listOf(mapping.source, target, privateProblem).any {
-                it.numBoolVars != target.numBoolVars || it.numIntVars != target.numIntVars || it.numRealVars != 0
-            }) return null
+                    it.numBoolVars != target.numBoolVars || it.numIntVars != target.numIntVars || it.numRealVars != 0
+                }) return null
             val verifier = finiteWitnessVerifier(target, targetObjective, cancellation)
             return ObjectiveCoordinateView(
                 privateProblem, privateObjective, hints, ModelIdentity.of(target, targetObjective),

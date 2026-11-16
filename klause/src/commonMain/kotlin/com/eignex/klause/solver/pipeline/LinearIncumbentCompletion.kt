@@ -229,16 +229,16 @@ internal class LinearIncumbentCompletion(
 
     private fun metered(cancellation: ExecutionControl, checking: Boolean): ExecutionControl =
         object : ExecutionControl() {
-        private val meter = WorkMeter { units ->
-            if (checking) budget.observe(boundCertification = units) else budget.observe(preparation = units)
+            private val meter = WorkMeter { units ->
+                if (checking) budget.observe(boundCertification = units) else budget.observe(preparation = units)
+            }
+            override fun isCancelled(): Boolean {
+                charge(1L)
+                return closed || cancellation() || budget.funding?.paused == true
+            }
+            override fun deadline() = cancellation.deadline()
+            override val accounting: WorkMeter get() = meter
         }
-        override fun isCancelled(): Boolean {
-            charge(1L)
-            return closed || cancellation() || budget.funding?.paused == true
-        }
-        override fun deadline() = cancellation.deadline()
-        override val accounting: WorkMeter get() = meter
-    }
 
     private fun finish(attempt: Attempt, point: Sample?): Sample? {
         attempt.checked = point

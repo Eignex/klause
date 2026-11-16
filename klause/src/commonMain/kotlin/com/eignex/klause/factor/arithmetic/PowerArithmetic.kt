@@ -28,12 +28,12 @@ internal fun powerPreimage(
     fun afterLower(value: Long): Boolean {
         step()
         return if (increasing) compareIntegerPower(value, exponent, lower) >= 0
-            else compareIntegerPower(value, exponent, upper) <= 0
+        else compareIntegerPower(value, exponent, upper) <= 0
     }
     fun beforeUpper(value: Long): Boolean {
         step()
         return if (increasing) compareIntegerPower(value, exponent, upper) <= 0
-            else compareIntegerPower(value, exponent, lower) >= 0
+        else compareIntegerPower(value, exponent, lower) >= 0
     }
     if (!afterLower(hi) || !beforeUpper(lo)) return null
     var left = lo

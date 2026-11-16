@@ -107,7 +107,9 @@ internal class TranscendentalTheoryService(
         transcendental, AlgebraicArithmetic(PolynomialArithmetic(stop, polynomialLimits)),
     )
 
-    init { require(maximumWork == null || maximumWork >= 0) }
+    init {
+        require(maximumWork == null || maximumWork >= 0)
+    }
 
     fun check(
         condition: TranscendentalCondition = TranscendentalCondition(),
@@ -193,12 +195,16 @@ internal class TranscendentalTheoryService(
                 val upper = pins.upper[id]
                 var point = BigFraction.ofLong(hints[attempt])
                 if (lower != null && upper != null) {
-                    val part = BigFraction.ofLong(when (attempt % 4) { 0 -> 4; 1 -> 6; 2 -> 2; else -> 7 })
+                    val part = BigFraction.ofLong(when (attempt % 4) {
+                        0 -> 4
+                        1 -> 6
+                        2 -> 2
+                        else -> 7
+                    })
                     val width = transcendental.add(upper, lower.negated())
                     point = transcendental.add(lower,
                         transcendental.divide(transcendental.multiply(width, part), BigFraction.ofLong(8)))
-                }
-                else if (lower != null && point <= lower) point = lower + BigFraction.ONE
+                } else if (lower != null && point <= lower) point = lower + BigFraction.ONE
                 else if (upper != null && point >= upper) point = upper - BigFraction.ONE
                 if (id in source.integerCoordinates) point = BigFraction.of(point.ceilInteger(), BIG_ONE)
                 arithmetic.rational(point)

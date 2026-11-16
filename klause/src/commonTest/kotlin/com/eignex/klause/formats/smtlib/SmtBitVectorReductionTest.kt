@@ -48,10 +48,12 @@ class SmtBitVectorReductionTest {
 
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
-        assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
-        ) })
+        assertTrue(reduced.checks.all { check ->
+            check.check(
+                { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+                { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
+            )
+        })
     }
 
     @Test
@@ -67,10 +69,12 @@ class SmtBitVectorReductionTest {
 
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
-        assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
-        ) })
+        assertTrue(reduced.checks.all { check ->
+            check.check(
+                { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+                { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
+            )
+        })
     }
 
     @Test
@@ -88,10 +92,12 @@ class SmtBitVectorReductionTest {
         assertTrue(reduced.bitNames.getValue("x").all {
             assignment.boolValue(parsed.encodingBoolVarNames.getValue(it))
         })
-        assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
-        ) })
+        assertTrue(reduced.checks.all { check ->
+            check.check(
+                { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+                { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
+            )
+        })
     }
 
     @Test
@@ -104,10 +110,12 @@ class SmtBitVectorReductionTest {
 
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
-        assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
-        ) })
+        assertTrue(reduced.checks.all { check ->
+            check.check(
+                { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+                { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
+            )
+        })
     }
 
     @Test
@@ -118,10 +126,12 @@ class SmtBitVectorReductionTest {
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
         val flipped = reduced.bitNames.getValue("x")[0]
 
-        val valid = reduced.checks.all { check -> check.check(
-            { name -> assignment.boolValue(parsed.encodingBoolVarNames.getValue(name)) != (name == flipped) },
-            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
-        ) }
+        val valid = reduced.checks.all { check ->
+            check.check(
+                { name -> assignment.boolValue(parsed.encodingBoolVarNames.getValue(name)) != (name == flipped) },
+                { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
+            )
+        }
 
         assertFalse(valid)
     }
@@ -136,10 +146,12 @@ class SmtBitVectorReductionTest {
 
         val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
 
-        assertTrue(reduced.checks.all { check -> check.check(
-            { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
-            { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
-        ) })
+        assertTrue(reduced.checks.all { check ->
+            check.check(
+                { assignment.boolValue(parsed.encodingBoolVarNames.getValue(it)) },
+                { assignment.intValue(parsed.encodingIntVarNames.getValue(it)) },
+            )
+        })
     }
 
     private fun lower(source: String): Pair<SmtBitVectorReduction, SmtLibProblem> {

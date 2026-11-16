@@ -169,15 +169,17 @@ class ObjectiveProposalGeometryTest {
         state.shaping.objective = canonical
         val sink = MoveSink().apply { setInvariants(state.invariants) }
 
-        for (leaves in listOf(false, true)) for (geometric in listOf(false, true)) {
-            assertTrue(configureObjectiveProposals(state, functional, leaves, geometric))
-            sink.clear()
-            ObjectiveSeed().generate(state, sink)
+        for (leaves in listOf(false, true)) {
+            for (geometric in listOf(false, true)) {
+                assertTrue(configureObjectiveProposals(state, functional, leaves, geometric))
+                sink.clear()
+                ObjectiveSeed().generate(state, sink)
 
-            assertSame(canonical, state.shaping.objective)
-            assertContentEquals(intArrayOf(if (leaves) 0 else 1), state.shaping.objectiveIntVars)
-            assertEquals(geometric, Move.IntSet(0, 8) in sink.list)
-            assertTrue(sink.list.all { objectiveProposalValuesAgree(state, functional, it) })
+                assertSame(canonical, state.shaping.objective)
+                assertContentEquals(intArrayOf(if (leaves) 0 else 1), state.shaping.objectiveIntVars)
+                assertEquals(geometric, Move.IntSet(0, 8) in sink.list)
+                assertTrue(sink.list.all { objectiveProposalValuesAgree(state, functional, it) })
+            }
         }
     }
 

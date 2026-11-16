@@ -54,7 +54,7 @@ class LinearSourceBoundTest {
 
             val bound = assertNotNull(result.linearSource?.nativeObjectiveBound)
             val expected = if (sense == ObjectiveSense.MINIMIZE) BigFraction.of(bigIntOf(4), bigIntOf(15))
-                else BigFraction.of(bigIntOf(23), bigIntOf(30))
+            else BigFraction.of(bigIntOf(23), bigIntOf(30))
             assertEquals(expected, bound.value)
             assertEquals(sense, bound.sense)
             assertFalse(bound.strict)

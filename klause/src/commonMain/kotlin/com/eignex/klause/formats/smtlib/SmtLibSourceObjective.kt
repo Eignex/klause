@@ -39,7 +39,10 @@ internal fun SmtLibPolynomialProblem.bindObjective(
 ): SmtLibProblem {
     fun mapping(names: Map<String, Int>, retained: Map<String, Int>): IntArray {
         val canonical = retained.mapKeys { polynomialSymbol(it.key) }
-        return names.keys.map { cancellation.polynomialSourceCheckpoint(); canonical.getValue(it) }.toIntArray()
+        return names.keys.map {
+            cancellation.polynomialSourceCheckpoint()
+            canonical.getValue(it)
+        }.toIntArray()
     }
     val remap = VarRemap(mapping(boolVarNames, source.boolVarNames), mapping(intVarNames, source.intVarNames),
         mapping(realVarNames, source.realVarNames))

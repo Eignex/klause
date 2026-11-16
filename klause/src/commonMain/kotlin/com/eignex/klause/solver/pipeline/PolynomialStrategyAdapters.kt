@@ -24,7 +24,9 @@ data class PolynomialStrategyParams(
     /** ALNS destroy/repair iteration cap. */
     val alnsIterations: Int = 50,
 ) {
-    init { require(alnsIterations >= 0) }
+    init {
+        require(alnsIterations >= 0)
+    }
 }
 
 internal class PolynomialStrategyAdapters(
@@ -58,7 +60,7 @@ internal class PolynomialStrategyAdapters(
             cancellation, budget, if (complete) setOf(0) else emptySet()).use { resources ->
             val slot = resources.slots.single()
             val execution = if (complete) params.backtrack.withAssumptions(params.assumptions).assumptions
-                else params.localSearch.withAssumptions(params.assumptions).assumptions
+            else params.localSearch.withAssumptions(params.assumptions).assumptions
             val binding = EngineInvocation(plan, ModelIdentity.of(model.source, objective), objective,
                 params.assumptions, execution)
             action(PolynomialWorkerAdapter(model, scope.worker(slot), params, binding, scope.workerCancellation(slot)))
@@ -81,7 +83,11 @@ internal class PolynomialStrategyAdapters(
                 ExecutionStrategy.ALNS -> 2
                 ExecutionStrategy.MIXED -> error("admission supplies participating arms")
             }
-            val family = when (arm) { 0 -> ArmFamily.Backtrack; 1 -> ArmFamily.LocalSearch; else -> ArmFamily.Lns }
+            val family = when (arm) {
+                0 -> ArmFamily.Backtrack
+                1 -> ArmFamily.LocalSearch
+                else -> ArmFamily.Lns
+            }
             val executionAssumptions = if (arm == 0) {
                 params.backtrack.withAssumptions(params.assumptions).assumptions
             } else params.localSearch.withAssumptions(params.assumptions).assumptions

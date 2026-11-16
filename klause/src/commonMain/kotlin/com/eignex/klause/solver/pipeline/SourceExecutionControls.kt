@@ -52,7 +52,7 @@ internal fun bindSourceExecutionControls(
     policy.validate(kind, invocation.request.engine, preparation.requested, prepareOnly, preparation.config,
         invocation.canonicalPolynomial)
     val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }
-    val owner = if ( cancellation .accounting != null) cancellation else invocation.cancellation
+    val owner = if ( cancellation.accounting != null) cancellation else invocation.cancellation
     val stop = invocation.cancellation.withAccounting(owner).includingStop(cancellation).includingStop(timeout)
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without(
@@ -67,7 +67,7 @@ internal fun bindSourceExecutionControls(
             policy.finiteRequest(
                 shape, invocation.request.engine, resolvedPresolve ?: PresolveConfig.DEFAULT,
                 invocation.operation == ExecutionOperation.ENUMERATE,
-                cancellation = stop, presolveCancellation = presolveCancellation .includingStop( stop),
+                cancellation = stop, presolveCancellation = presolveCancellation.includingStop( stop),
                 presolveBudget = presolveBudget, cores = cores, executionOptions = finiteOptions,
                 randomSeed = seed, nodeBudget = budget,
                 solveBudgetMillis = null, allSolutions = invocation.operation == ExecutionOperation.ENUMERATE,
@@ -263,9 +263,9 @@ private fun FiniteSolveRequest.withSourceControls(
     return FiniteSolveRequest(
         shape, engine, resolvedPresolve ?: presolveConfig,
         explicitPresolveConfig || policy.explicitPresolve, solutionSetSensitive,
-        cancellation = cancellation .withAccounting(
+        cancellation = cancellation.withAccounting(
             if (cancellation.accounting != null) cancellation else stop,
-        ).includingStop( stop), presolveCancellation = presolveCancellation .withAccounting(
+        ).includingStop( stop), presolveCancellation = presolveCancellation.withAccounting(
             if (presolveCancellation.accounting != null) presolveCancellation else stop,
         ).includingStop(stop),
         presolveBudget = presolveBudget, cores = cores,

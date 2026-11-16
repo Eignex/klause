@@ -32,29 +32,30 @@ class CutPoolTest {
         )
         val cut = SourceCut(expression, Relation.LE, BigFraction.ofLong(3),
             CutProvenance(model, 0L, premises.map { CutProofFact(it, false) }, family = CutFamily.GOMORY))
-        for (prepared in listOf(false, true)) for (missing in premises) {
-            val events = ArrayList<Triple<CutFamily, String, String>>()
-            val pool = CutPool(prepareSources = prepared,
-                observe = { family, stage, outcome -> events.add(Triple(family, stage, outcome)) })
-            val active = CutSourceMap(model, 0L, listOf(CutColumnSource(source)), activePremises = premises.toSet())
-            assertTrue(pool.add(cut, active))
-            repeat(2) { pool.remap(active) }
-            pool.remap(CutSourceMap(Any(), 0L, listOf(CutColumnSource(source)),
-                activePremises = premises.toSet()))
-            assertTrue(pool.cuts().isEmpty())
-            pool.remap(active)
+        for (prepared in listOf(false, true)) {
+            for (missing in premises) {
+                val events = ArrayList<Triple<CutFamily, String, String>>()
+                val pool = CutPool(prepareSources = prepared,
+                    observe = { family, stage, outcome -> events.add(Triple(family, stage, outcome)) })
+                val active = CutSourceMap(model, 0L, listOf(CutColumnSource(source)), activePremises = premises.toSet())
+                assertTrue(pool.add(cut, active))
+                repeat(2) { pool.remap(active) }
+                pool.remap(CutSourceMap(Any(), 0L, listOf(CutColumnSource(source)),
+                    activePremises = premises.toSet()))
+                assertTrue(pool.cuts().isEmpty())
+                pool.remap(active)
 
-            pool.remap(CutSourceMap(model, 1L, listOf(CutColumnSource(source)),
-                activePremises = (premises - missing).toSet()))
+                pool.remap(CutSourceMap(model, 1L, listOf(CutColumnSource(source)),
+                    activePremises = (premises - missing).toSet()))
 
-            assertTrue(pool.cuts().isEmpty())
-            assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "UNAVAILABLE") in events)
-            pool.remap(active)
-            assertEquals(CutFamily.GOMORY, pool.cuts().single().family)
-            assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "REACTIVATED") in events)
+                assertTrue(pool.cuts().isEmpty())
+                assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "UNAVAILABLE") in events)
+                pool.remap(active)
+                assertEquals(CutFamily.GOMORY, pool.cuts().single().family)
+                assertTrue(Triple(CutFamily.GOMORY, "RETRACTION", "REACTIVATED") in events)
+            }
         }
     }
-
 
     @Test
     fun `projected rows should follow layout changes and release their storage on retirement`() {
@@ -151,7 +152,10 @@ class CutPoolTest {
         var cancelOnCharge = true
         var work = 0L
         val pool = CutPool(prepareSources = true, cancellation = ExecutionControl { cancelled },
-            onPreparationWork = { work += it; if (cancelOnCharge) cancelled = true })
+            onPreparationWork = {
+                work += it
+                if (cancelOnCharge) cancelled = true
+            })
         assertTrue(pool.add(source, map))
         pool.remap(map)
 

@@ -188,7 +188,6 @@ class AbsRealCompletionTest {
     private fun row(real: Int, op: LinearOp, bound: Double, strict: Boolean = false) =
         Linear(intArrayOf(), doubleArrayOf(), intArrayOf(real), doubleArrayOf(1.0), op, bound, strict)
 
-
     private val unitSum =
         Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 1.0)
 

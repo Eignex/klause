@@ -64,7 +64,7 @@ internal class PowerPropagator(private val base: Int, private val exponent: Int,
     private fun absentLiteral(state: PropagationState, variable: Int, value: Long): IntArray {
         if (value !in state.rootDomains[variable]) return intArrayOf()
         val literal = if (state.undoLogging) state.exclusionLiteral(variable, value, state.undo.size)
-            else Lit.make(state.atomVarEq(variable, value), true)
+        else Lit.make(state.atomVarEq(variable, value), true)
         return if (literal == Lit.NONE) intArrayOf() else intArrayOf(literal)
     }
 

@@ -506,8 +506,10 @@ class PortfolioLanesTest {
         }
         val stop = TimeSource.Monotonic.markNow() + Duration.parse("100ms")
 
-        val r = Portfolio.thompson(arms, lanes = 2).use { it.minimize(cancellation =
-            ExecutionControl { stop.hasPassedNow() }) }
+        val r = Portfolio.thompson(arms, lanes = 2).use {
+            it.minimize(cancellation =
+                ExecutionControl { stop.hasPassedNow() })
+        }
 
         assertEquals(listOf(1L, 1L), r.stats.portfolio.arms.map { it.segments })
     }

@@ -322,7 +322,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                             term("literal:${if (it == SmtSort.Bool) name else node.text}", emptyList(), it)
                         }
                             ?: frame.locals?.get(name) ?: globals[name]?.takeIf { it.parameters.isEmpty() }
-                                ?.let { term("symbol:${it.identity}:$name", emptyList(), it.result) }
+                            ?.let { term("symbol:${it.identity}:$name", emptyList(), it.result) }
                             ?: if (node.text == "pi") term("pi", emptyList(), SmtSort.Real) else return null
                         values.addLast(result)
                     }
@@ -474,7 +474,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
 
     private fun numeric(sort: SmtSort): Boolean = sort == SmtSort.Int || sort == SmtSort.Real
     private fun numericResult(args: List<SmtSort>): SmtSort? = if (!args.all(::numeric)) null
-        else if (SmtSort.Real in args) SmtSort.Real else SmtSort.Int
+    else if (SmtSort.Real in args) SmtSort.Real else SmtSort.Int
     private fun accepts(expected: SmtSort, actual: SmtSort): Boolean = expected == actual ||
         (expected == SmtSort.Real && actual == SmtSort.Int)
 

@@ -67,7 +67,7 @@ class SharedPolynomialModelTest {
 
                 assertNull(model)
                 assertEquals(if (support == EncoderSupport.CONDITIONED) EncoderDecline.CONDITIONS
-                    else EncoderDecline.UNSUPPORTED, decline)
+                else EncoderDecline.UNSUPPORTED, decline)
                 assertEquals(0, installed)
             }
         }

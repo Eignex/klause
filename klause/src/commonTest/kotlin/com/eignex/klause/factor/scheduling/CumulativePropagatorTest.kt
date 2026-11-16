@@ -123,21 +123,25 @@ class CumulativePropagatorTest {
 
     @Test
     fun `subset reasons should imply their bounds through aliases and holes`() {
-        for (lower in listOf(false, true)) for (offset in listOf(-4L, 0L)) for (alias in listOf(false, true)) {
-            val highMax = offset + if (lower) 3 else 4
-            val candidateMax = offset + if (lower) 4 else 3
-            val problem = Problem(0, 5, arrayOf(
-                IntDomain(offset, highMax), IntDomain(offset, highMax), IntDomain(offset, highMax),
-                IntDomain(offset, candidateMax), IntDomain(offset + 20, offset + 20),
-            ), arrayOf<Factor>(Cumulative(
-                intArrayOf(if (alias) 0 else 4, 2, 0, 1, 3), LongArray(5) { 1 }, longArrayOf(1, 2, 2, 2, 2), 3,
-            )))
+        for (lower in listOf(false, true)) {
+            for (offset in listOf(-4L, 0L)) {
+                for (alias in listOf(false, true)) {
+                    val highMax = offset + if (lower) 3 else 4
+                    val candidateMax = offset + if (lower) 4 else 3
+                    val problem = Problem(0, 5, arrayOf(
+                        IntDomain(offset, highMax), IntDomain(offset, highMax), IntDomain(offset, highMax),
+                        IntDomain(offset, candidateMax), IntDomain(offset + 20, offset + 20),
+                    ), arrayOf<Factor>(Cumulative(
+                        intArrayOf(if (alias) 0 else 4, 2, 0, 1, 3), LongArray(5) { 1 }, longArrayOf(1, 2, 2, 2, 2), 3,
+                    )))
 
-            PropagationReasonOracle.assertReasonsImply(problem, "subset $lower $offset $alias") { state ->
-                state.cumulativeUnarySubsets = true
-                (0 until 3).all {
-                    if (lower) state.tightenIntMax(it, offset + 2) else state.tightenIntMin(it, offset + 2)
-                } && state.excludeIntValue(3, offset + 1)
+                    PropagationReasonOracle.assertReasonsImply(problem, "subset $lower $offset $alias") { state ->
+                        state.cumulativeUnarySubsets = true
+                        (0 until 3).all {
+                            if (lower) state.tightenIntMax(it, offset + 2) else state.tightenIntMin(it, offset + 2)
+                        } && state.excludeIntValue(3, offset + 1)
+                    }
+                }
             }
         }
     }

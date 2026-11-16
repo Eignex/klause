@@ -37,7 +37,9 @@ class SourceExecutionOutputTest {
         }
         var observed: SolveStats? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) { observed = stats }
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                observed = stats
+            }
         }
 
         SolveCore.solve(solvable, common, output)
@@ -56,11 +58,17 @@ class SourceExecutionOutputTest {
         val source = SourceAttachment(
             LinearSourceProblem(listOf(LinearSourceVariable("x", true)), emptyList()), ProblemSettings(),
         )
-        val common = CommonOptions().apply { engine = "cp"; statistics = true; presolve = "off" }
+        val common = CommonOptions().apply {
+            engine = "cp"
+            statistics = true
+            presolve = "off"
+        }
         val solvable = linearSourceSolvable(source, common, { "point" })
         var observed: SolveStats? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) { observed = stats }
+            override fun onStatistics(stats: SolveStats, solveTimeMs: Long, solutions: Long) {
+                observed = stats
+            }
         }
 
         SolveCore.solve(solvable, common, output)
@@ -86,8 +94,12 @@ class SourceExecutionOutputTest {
         var completed: Verdict? = null
         var verdictContext: VerdictContext? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onVerdictContext(context: VerdictContext) { verdictContext = context }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onVerdictContext(context: VerdictContext) {
+                verdictContext = context
+            }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         reportNativeSatisfaction(execution, rendering, output, false, 0L, completePool = false)
@@ -112,8 +124,12 @@ class SourceExecutionOutputTest {
         var completed: Verdict? = null
         var verdictContext: VerdictContext? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onVerdictContext(context: VerdictContext) { verdictContext = context }
-            override fun onComplete(verdict: Verdict) { completed = verdict }
+            override fun onVerdictContext(context: VerdictContext) {
+                verdictContext = context
+            }
+            override fun onComplete(verdict: Verdict) {
+                completed = verdict
+            }
         }
 
         reportNativeSatisfaction(execution, rendering, output, false, 0L, completePool = false)

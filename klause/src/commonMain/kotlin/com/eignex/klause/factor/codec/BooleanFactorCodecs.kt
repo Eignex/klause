@@ -32,7 +32,10 @@ internal class PseudoBooleanPayload(
     val op: PbOp,
     val coefficients: LongArray? = null,
     val bound: Long? = null,
-    val wideCoefficients: List<@Serializable(with = BigIntSerializer::class) BigInt,>? = null,
+    val wideCoefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >? = null,
     @Serializable(with = BigIntSerializer::class) val wideBound: BigInt? = null,
 )
 
@@ -46,7 +49,10 @@ internal class ReifiedPseudoBooleanPayload(
     val op: PbOp,
     val coefficients: LongArray? = null,
     val bound: Long? = null,
-    val wideCoefficients: List<@Serializable(with = BigIntSerializer::class) BigInt,>? = null,
+    val wideCoefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >? = null,
     @Serializable(with = BigIntSerializer::class) val wideBound: BigInt? = null,
 )
 

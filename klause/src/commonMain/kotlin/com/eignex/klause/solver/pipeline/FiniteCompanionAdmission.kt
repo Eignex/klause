@@ -26,7 +26,9 @@ internal class FiniteCompanionAdmission(
     var declineReason: TerminationReason = TerminationReason.BudgetExhausted
         private set
 
-    init { require(active > Duration.ZERO && construction > Duration.ZERO) }
+    init {
+        require(active > Duration.ZERO && construction > Duration.ZERO)
+    }
 
     fun contextForStart(global: ExecutionControl, sliceMillis: Long): SourceProofContext? {
         if (!initiallyFunded || cancellation.isCancelled() || global.isCancelled() || remaining() < active) {
@@ -41,7 +43,9 @@ internal class FiniteCompanionAdmission(
             val localDeadline = minOf(deadline - pairLifetime, deadline - (remaining() - allowance))
             val limited = ExecutionControl.until(localDeadline) or cancellation or global
             val started = clock.markNow()
-            val captured = try { capture(limited) } finally {
+            val captured = try {
+                capture(limited)
+            } finally {
                 elapsedNanos = started.elapsedNow().inWholeNanoseconds
             }
             if (!limited.isCancelled() && remaining() >= pairLifetime) context = captured

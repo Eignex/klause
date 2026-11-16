@@ -48,8 +48,12 @@ class LinearSourceBoundPublicationTest(private val sense: ObjectiveSense) {
         val pairs = mutableMapOf<String, String>()
         var result: SourceExecutionResult? = null
         val output = object : OutputProtocol by SmtLibOutput() {
-            override fun onLinearSourceResult(value: SourceExecutionResult) { result = value }
-            override fun onAllowanceStatistics(values: List<Pair<String, String>>) { pairs.putAll(values) }
+            override fun onLinearSourceResult(value: SourceExecutionResult) {
+                result = value
+            }
+            override fun onAllowanceStatistics(values: List<Pair<String, String>>) {
+                pairs.putAll(values)
+            }
         }
 
         SolveCore.solve(solvable, common, output)

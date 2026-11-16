@@ -92,39 +92,49 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
     private val gates = object : BitVectorGates<SExpr> {
         override val zero get() = this@SmtBitVectorReducer.zero
         override val one get() = this@SmtBitVectorReducer.one
-        override fun not(value: SExpr): SExpr = checked { when (value) {
-            zero -> one
-            one -> zero
-            else -> if (head(value) == "not") (value as SExpr.SList).items[1] else gate("not", value)
-        } }
-        override fun and(left: SExpr, right: SExpr): SExpr = checked { when {
-            left == zero || right == zero -> zero
-            left == one -> right
-            right == one || left == right -> left
-            else -> gate("and", left, right)
-        } }
-        override fun or(left: SExpr, right: SExpr): SExpr = checked { when {
-            left == one || right == one -> one
-            left == zero -> right
-            right == zero || left == right -> left
-            else -> gate("or", left, right)
-        } }
-        override fun xor(left: SExpr, right: SExpr): SExpr = checked { when {
-            left == right -> zero
-            left == zero -> right
-            right == zero -> left
-            left == one -> not(right)
-            right == one -> not(left)
-            else -> gate("xor", left, right)
-        } }
-        override fun ite(condition: SExpr, yes: SExpr, no: SExpr): SExpr = checked { when {
-            condition == one -> yes
-            condition == zero -> no
-            yes == no -> yes
-            yes == one && no == zero -> condition
-            yes == zero && no == one -> not(condition)
-            else -> gate("ite", condition, yes, no)
-        } }
+        override fun not(value: SExpr): SExpr = checked {
+            when (value) {
+                zero -> one
+                one -> zero
+                else -> if (head(value) == "not") (value as SExpr.SList).items[1] else gate("not", value)
+            }
+        }
+        override fun and(left: SExpr, right: SExpr): SExpr = checked {
+            when {
+                left == zero || right == zero -> zero
+                left == one -> right
+                right == one || left == right -> left
+                else -> gate("and", left, right)
+            }
+        }
+        override fun or(left: SExpr, right: SExpr): SExpr = checked {
+            when {
+                left == one || right == one -> one
+                left == zero -> right
+                right == zero || left == right -> left
+                else -> gate("or", left, right)
+            }
+        }
+        override fun xor(left: SExpr, right: SExpr): SExpr = checked {
+            when {
+                left == right -> zero
+                left == zero -> right
+                right == zero -> left
+                left == one -> not(right)
+                right == one -> not(left)
+                else -> gate("xor", left, right)
+            }
+        }
+        override fun ite(condition: SExpr, yes: SExpr, no: SExpr): SExpr = checked {
+            when {
+                condition == one -> yes
+                condition == zero -> no
+                yes == no -> yes
+                yes == one && no == zero -> condition
+                yes == zero && no == one -> not(condition)
+                else -> gate("ite", condition, yes, no)
+            }
+        }
     }
     private val circuit = BitVectorCircuit(gates)
 
@@ -361,8 +371,10 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             if (operator == "=") {
                 for (i in 1 until bits.size) comparisons.add(circuit.equal(bits[i - 1], bits[i]))
             } else {
-                for (i in bits.indices) for (j in i + 1 until bits.size) {
-                    comparisons.add(gates.not(circuit.equal(bits[i], bits[j])))
+                for (i in bits.indices) {
+                    for (j in i + 1 until bits.size) {
+                        comparisons.add(gates.not(circuit.equal(bits[i], bits[j])))
+                    }
                 }
             }
             val result = bool(comparisons.fold(one, gates::and))
@@ -387,7 +399,7 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             "to_int", "div", "mod", "abs", "ubv_to_int", "sbv_to_int" -> intType
             "to_real", "/", "exp", "log", "sin", "cos" -> realType
             "ite" -> if (arguments.drop(1).any { it.type == realType }) realType
-                else arguments.getOrNull(1)?.type as? Type.Scalar ?: smtUnsupported("malformed ite")
+            else arguments.getOrNull(1)?.type as? Type.Scalar ?: smtUnsupported("malformed ite")
             else -> if (arguments.any { it.type == realType }) realType else intType
         }
         return Value.Scalar(form(operator, *args.toTypedArray()), resultType)
@@ -440,23 +452,23 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
             "bvredand" -> listOf(left.fold(one, gates::and))
             else -> {
                 val result = bool(when (operator) {
-                "bvult" -> circuit.unsignedLess(left, right)
-                "bvule" -> gates.not(circuit.unsignedLess(right, left))
-                "bvugt" -> circuit.unsignedLess(right, left)
-                "bvuge" -> gates.not(circuit.unsignedLess(left, right))
-                "bvslt" -> circuit.signedLess(left, right)
-                "bvsle" -> gates.not(circuit.signedLess(right, left))
-                "bvsgt" -> circuit.signedLess(right, left)
-                "bvsge" -> gates.not(circuit.signedLess(left, right))
-                "bvnego" -> circuit.negateOverflow(left)
-                "bvuaddo" -> circuit.unsignedAddOverflow(left, right)
-                "bvsaddo" -> circuit.signedAddOverflow(left, right)
-                "bvusubo" -> circuit.unsignedSubtractOverflow(left, right)
-                "bvssubo" -> circuit.signedSubtractOverflow(left, right)
-                "bvsdivo" -> circuit.signedDivideOverflow(left, right)
-                "bvumulo" -> circuit.unsignedMultiplyOverflow(left, right)
-                "bvsmulo" -> circuit.signedMultiplyOverflow(left, right)
-                else -> smtUnsupported("unknown bitvector operator '$operator'")
+                    "bvult" -> circuit.unsignedLess(left, right)
+                    "bvule" -> gates.not(circuit.unsignedLess(right, left))
+                    "bvugt" -> circuit.unsignedLess(right, left)
+                    "bvuge" -> gates.not(circuit.unsignedLess(left, right))
+                    "bvslt" -> circuit.signedLess(left, right)
+                    "bvsle" -> gates.not(circuit.signedLess(right, left))
+                    "bvsgt" -> circuit.signedLess(right, left)
+                    "bvsge" -> gates.not(circuit.signedLess(left, right))
+                    "bvnego" -> circuit.negateOverflow(left)
+                    "bvuaddo" -> circuit.unsignedAddOverflow(left, right)
+                    "bvsaddo" -> circuit.signedAddOverflow(left, right)
+                    "bvusubo" -> circuit.unsignedSubtractOverflow(left, right)
+                    "bvssubo" -> circuit.signedSubtractOverflow(left, right)
+                    "bvsdivo" -> circuit.signedDivideOverflow(left, right)
+                    "bvumulo" -> circuit.unsignedMultiplyOverflow(left, right)
+                    "bvsmulo" -> circuit.signedMultiplyOverflow(left, right)
+                    else -> smtUnsupported("unknown bitvector operator '$operator'")
                 })
                 record(operator, emptyList(), arguments, result)
                 return result
@@ -668,20 +680,22 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
         fun coordinate(value: Value): SmtBitVectorCoordinate = when (value) {
             is Value.Bits -> SmtBitVectorCoordinate.Bits(value.bits.map { symbol(it) })
             is Value.Scalar -> if (value.type == boolType) SmtBitVectorCoordinate.Boolean(symbol(value.expression))
-                else SmtBitVectorCoordinate.Integer(symbol(value.expression))
+            else SmtBitVectorCoordinate.Integer(symbol(value.expression))
         }
         checks.add(SmtBitVectorCheck(operator, indices, arguments.map(::coordinate), coordinate(result)))
     }
 
-    private fun fresh(sort: String): SExpr.Atom {
-        return atom(freshName()).also { output.add(form("declare-const", it, atom(sort))) }
+    private fun fresh(sort: String): SExpr.Atom = atom(freshName()).also {
+        output.add(form("declare-const", it, atom(sort)))
     }
 
     private fun freshName(): String {
         cancellation.polynomialSourceCheckpoint(1)
         if (nextName >= MAX_GATES) smtUnsupported("bitvector coordinates exceed the encoding budget")
         var name: String
-        do { name = "@klause.bv.${nextName++}" } while (!reserved.add(name))
+        do {
+            name = "@klause.bv.${nextName++}"
+        } while (!reserved.add(name))
         return name
     }
 

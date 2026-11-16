@@ -46,8 +46,10 @@ class LocalSearchSolverTest {
         for (slice in longArrayOf(1L, 3L, 9L)) {
             val actual = solver.resumableSolve(params).use { handle ->
                 var result: SolveResult? = null
-                repeat(20) { if (result == null) result = handle.runSlice(ExecutionControl.Never,
-                    Long.MAX_VALUE, slice) }
+                repeat(20) {
+                    if (result == null) result = handle.runSlice(ExecutionControl.Never,
+                        Long.MAX_VALUE, slice)
+                }
                 assertIs<SolveResult.Sat>(result)
             }
 

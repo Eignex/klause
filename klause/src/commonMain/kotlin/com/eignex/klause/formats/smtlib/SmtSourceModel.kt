@@ -10,17 +10,23 @@ import kotlin.coroutines.cancellation.CancellationException
 sealed interface SmtSort {
     /** Boolean values. */
     data object Bool : SmtSort
+
     /** Unbounded mathematical integers. */
     data object Int : SmtSort
+
     /** Exact mathematical reals. */
     data object Real : SmtSort
+
     /** Fixed-width words. */
     data class BitVector(
         /** Positive number of bits. */
         val width: kotlin.Int,
     ) : SmtSort {
-        init { require(width > 0) }
+        init {
+            require(width > 0)
+        }
     }
+
     /** Extensional arrays. */
     data class Array(
         /** Index sort. */
@@ -28,6 +34,7 @@ sealed interface SmtSort {
         /** Stored value sort. */
         val element: SmtSort,
     ) : SmtSort
+
     /** A named source sort and its sort arguments. */
     data class Uninterpreted(
         /** Source spelling of the sort constructor. */
@@ -51,28 +58,35 @@ data class SmtSourceDeclaration(
 sealed interface SmtValue {
     /** Compare composite values through their source semantics; null withholds an unavailable comparison. */
     fun semanticEquals(other: SmtValue, values: SmtModelValues): kotlin.Boolean? = null
+
     /** A Boolean value. */
     data class Boolean(
         /** Mathematical truth value. */
         val value: kotlin.Boolean,
     ) : SmtValue
+
     /** An arbitrary-precision integer in decimal notation. */
     data class Integer(
         /** Exact signed decimal digits. */
         val value: String,
     ) : SmtValue
+
     /** An exact rational, algebraic or symbolic real term in SMT syntax. */
     data class Real(
         /** Certified exact SMT term. */
         val term: String,
     ) : SmtValue
+
     /** Most-significant bit first. */
     data class BitVector(
         /** Binary digits in most-significant-bit order. */
         val bits: String,
     ) : SmtValue {
-        init { require(bits.isNotEmpty() && bits.all { it == '0' || it == '1' }) }
+        init {
+            require(bits.isNotEmpty() && bits.all { it == '0' || it == '1' })
+        }
     }
+
     /** A value of a free source sort. */
     data class Uninterpreted(
         /** Declared free sort. */
@@ -80,6 +94,7 @@ sealed interface SmtValue {
         /** Abstract model-domain symbol. */
         val identity: String,
     ) : SmtValue
+
     /** A finite function table with its value outside the table. */
     data class Function(
         /** Function argument sorts. */
@@ -89,6 +104,7 @@ sealed interface SmtValue {
         /** Result for tuples absent from [entries]. */
         val default: SmtValue,
     ) : SmtValue
+
     /** A constructor application for a composite source value. */
     data class Application(
         /** Source constructor symbol. */
@@ -96,6 +112,7 @@ sealed interface SmtValue {
         /** Constructor field values. */
         val arguments: List<SmtValue>,
     ) : SmtValue
+
     /** A total extensional array represented by a default and finite updates. */
     data class Array(
         /** Index and element sorts. */
@@ -114,22 +131,31 @@ sealed interface SmtValue {
 interface SmtModelValues {
     /** Current solve or reconstruction allowance, shared by all source checks. */
     val cancellation: ExecutionControl get() = ExecutionControl.Never
+
     /** Charge and poll the current witness-check allowance, independent of admission. */
     fun checkpoint(units: Long = 1)
+
     /** Read a retained Boolean coordinate by its encoding name. */
     fun boolean(name: String): Boolean
+
     /** Read a retained integer coordinate as an exact decimal. */
     fun integer(name: String): String
+
     /** Read a retained real coordinate as a certified SMT term. */
     fun real(name: String): String
+
     /** Reconstruct another named source or encoding binding. */
     fun value(name: String): SmtValue
+
     /** Native certified real authority, or null when a callback supplies no exact representation. */
     fun exactReal(name: String): ExactRealValue? = (value(name) as? SmtValue.Real)?.let { exactReal(it) }
+
     /** Native authority for a reconstructed real, with exact rational syntax as a fallback. */
     fun exactReal(value: SmtValue.Real): ExactRealValue? = smtRationalValue(value.term, cancellation)
+
     /** Certified semantic equality; null withholds an undecided comparison. */
     fun equal(left: String, right: String): Boolean? = equal(value(left), value(right))
+
     /** Certified equality including reconstructed composite fields. */
     fun equal(left: SmtValue, right: SmtValue): Boolean? = smtValuesEqual(this, left, right)
 }
@@ -159,7 +185,9 @@ fun interface SmtReconstruction {
         /** Retained Boolean names in least-significant-bit order. */
         val names: List<String>,
     ) : SmtReconstruction {
-        init { require(names.isNotEmpty()) }
+        init {
+            require(names.isNotEmpty())
+        }
         override fun reconstruct(values: SmtModelValues): SmtValue = SmtValue.BitVector(
             names.asReversed().joinToString("") { if (values.boolean(it)) "1" else "0" },
         )
@@ -203,8 +231,10 @@ internal fun scalarSmtBindings(
     reals: Map<String, Int>,
 ): List<SmtSourceBinding> = buildList {
     for ((sort, names) in listOf(SmtSort.Int to integers, SmtSort.Bool to booleans, SmtSort.Real to reals)) {
-        for (name in names.keys) add(SmtSourceBinding(SmtSourceDeclaration(name, emptyList(), sort),
-            SmtReconstruction.Scalar(name, sort)))
+        for (name in names.keys) {
+            add(SmtSourceBinding(SmtSourceDeclaration(name, emptyList(), sort),
+                SmtReconstruction.Scalar(name, sort)))
+        }
     }
 }
 
@@ -221,9 +251,18 @@ internal fun <T> withSmtModelValues(
         cancellation.charge(units)
         if (cancellation()) throw CancellationException("SMT model reconstruction interrupted")
     }
-    val booleans = problem.encodingBoolVarNames.mapKeys { checkpoint(); polynomialSymbol(it.key) }
-    val integers = problem.encodingIntVarNames.mapKeys { checkpoint(); polynomialSymbol(it.key) }
-    val reals = problem.encodingRealVarNames.mapKeys { checkpoint(); polynomialSymbol(it.key) }
+    val booleans = problem.encodingBoolVarNames.mapKeys {
+        checkpoint()
+        polynomialSymbol(it.key)
+    }
+    val integers = problem.encodingIntVarNames.mapKeys {
+        checkpoint()
+        polynomialSymbol(it.key)
+    }
+    val reals = problem.encodingRealVarNames.mapKeys {
+        checkpoint()
+        polynomialSymbol(it.key)
+    }
     val recipes = problem.privateBindings.mapKeys { polynomialSymbol(it.key) }.toMutableMap()
     for (binding in problem.sourceBindings) recipes[polynomialSymbol(binding.key)] = binding.reconstruction
     val cache = HashMap<String, SmtValue>()
@@ -273,7 +312,9 @@ internal fun <T> withSmtModelValues(
                     in reals -> SmtValue.Real(real(name))
                     else -> error("missing SMT reconstruction for '$name'")
                 }
-            } finally { active.remove(canonical) }
+            } finally {
+                active.remove(canonical)
+            }
             cache[canonical] = result
             return result
         }
@@ -316,8 +357,8 @@ internal fun SmtLibProblem.withSourceWitnessValidation(): SmtLibProblem {
             withSmtModelValues(this, assignment::boolValue, assignment::intValue,
                 { assignment.smtRealValue(it, cancellation) },
                 cancellation, { assignment.smtExactRealValue(it, cancellation) }) { values, checkpoint ->
-                    checkSmtSource(this, values, checkpoint)
-                }
+                checkSmtSource(this, values, checkpoint)
+            }
             SourceEvidenceCheck.Checked
         } catch (_: SmtSourceWitnessRejected) {
             SourceEvidenceCheck.Rejected("SMT reconstructed value violates its original source")
@@ -336,7 +377,7 @@ fun SmtSort.toSmtLib(): String = when (this) {
     is SmtSort.BitVector -> "(_ BitVec $width)"
     is SmtSort.Array -> "(Array ${index.toSmtLib()} ${element.toSmtLib()})"
     is SmtSort.Uninterpreted -> if (arguments.isEmpty()) name
-        else "($name ${arguments.joinToString(" ") { it.toSmtLib() }})"
+    else "($name ${arguments.joinToString(" ") { it.toSmtLib() }})"
 }
 
 /** Render one reconstructed value using SMT-LIB syntax. */
@@ -347,7 +388,7 @@ fun SmtValue.toSmtLib(): String = when (this) {
     is SmtValue.BitVector -> "#b$bits"
     is SmtValue.Uninterpreted -> "(as $identity ${sort.toSmtLib()})"
     is SmtValue.Application -> if (arguments.isEmpty()) constructor
-        else "($constructor ${arguments.joinToString(" ") { it.toSmtLib() }})"
+    else "($constructor ${arguments.joinToString(" ") { it.toSmtLib() }})"
     is SmtValue.Array -> {
         var result = "((as const ${sort.toSmtLib()}) ${default.toSmtLib()})"
         for ((index, value) in entries) result = "(store $result ${index.toSmtLib()} ${value.toSmtLib()})"
@@ -372,16 +413,20 @@ fun SmtSourceModel.toSmtLib(): String = buildString {
         } else {
             val expressions = ArrayDeque<SExpr>()
             for (expression in SExprReader(value.toSmtLib()).readAll()) expressions.addLast(expression)
-            while (expressions.isNotEmpty()) when (val expression = expressions.removeLast()) {
-                is SExpr.Atom -> usedNames += polynomialSymbol(expression.text)
-                is SExpr.SList -> for (item in expression.items) expressions.addLast(item)
+            while (expressions.isNotEmpty()) {
+                when (val expression = expressions.removeLast()) {
+                    is SExpr.Atom -> usedNames += polynomialSymbol(expression.text)
+                    is SExpr.SList -> for (item in expression.items) expressions.addLast(item)
+                }
             }
         }
     }
     var nextFormal = 0
     fun formal(): String {
         var name: String
-        do { name = ".klause.argument.${nextFormal++}" } while (!usedNames.add(name))
+        do {
+            name = ".klause.argument.${nextFormal++}"
+        } while (!usedNames.add(name))
         return name
     }
     append("(\n")

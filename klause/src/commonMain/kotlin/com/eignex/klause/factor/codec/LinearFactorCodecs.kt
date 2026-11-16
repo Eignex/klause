@@ -28,7 +28,10 @@ internal class LinearPayload(
     val op: LinearOp,
     val coefficients: LongArray? = null,
     val bound: Long? = null,
-    val wideCoefficients: List<@Serializable(with = BigIntSerializer::class) BigInt,>? = null,
+    val wideCoefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >? = null,
     @Serializable(with = BigIntSerializer::class) val wideBound: BigInt? = null,
     val realVars: IntArray? = null,
     val intCoefficients: DoubleArray? = null,
@@ -44,7 +47,10 @@ internal class ReifiedLinearPayload(
     val op: LinearOp,
     val coefficients: LongArray? = null,
     val bound: Long? = null,
-    val wideCoefficients: List<@Serializable(with = BigIntSerializer::class) BigInt,>? = null,
+    val wideCoefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >? = null,
     @Serializable(with = BigIntSerializer::class) val wideBound: BigInt? = null,
 )
 
@@ -52,7 +58,10 @@ internal class ReifiedLinearPayload(
 @Serializable
 internal class ExactLinearPayload(
     val terms: IntArray,
-    val coefficients: List<@Serializable(with = BigIntSerializer::class) BigInt,>,
+    val coefficients: List<
+        @Serializable(with = BigIntSerializer::class)
+        BigInt,
+        >,
     @Serializable(with = BigIntSerializer::class) val bound: BigInt,
     val op: LinearOp,
     val strict: Boolean = false,

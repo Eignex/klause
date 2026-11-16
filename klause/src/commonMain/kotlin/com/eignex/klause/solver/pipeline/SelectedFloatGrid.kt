@@ -15,7 +15,9 @@ import com.eignex.klause.solver.validation.hasCapturedLinearTolerance
 import com.eignex.klause.util.ExecutionControl
 
 internal enum class FloatGridConsumerPurpose {
-    FINITE_COMPATIBILITY, HEURISTIC_VIEW, AUTOMATIC_FINITE_COMPATIBILITY,
+    FINITE_COMPATIBILITY,
+    HEURISTIC_VIEW,
+    AUTOMATIC_FINITE_COMPATIBILITY,
 }
 
 internal class SelectedFloatGridConsumer(

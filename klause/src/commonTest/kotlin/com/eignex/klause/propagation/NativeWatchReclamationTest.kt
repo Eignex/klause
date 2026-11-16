@@ -124,6 +124,7 @@ class NativeWatchReclamationTest {
 
         assertEquals(baseline.getValue("sessionWatchCapacityBytes"), after.getValue("sessionWatchCapacityBytes"))
     }
+
     @Test
     fun `permanent floors should permit metadata page release within ordinary small grants`() {
         for (permanentCount in listOf(4000, 20_000)) {
@@ -188,5 +189,4 @@ class NativeWatchReclamationTest {
         session.popLast()
         assertEquals(reason, assertNotNull(session.boolReasonClause(1)).toList())
     }
-
 }

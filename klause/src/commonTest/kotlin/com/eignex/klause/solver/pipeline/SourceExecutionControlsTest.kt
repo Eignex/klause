@@ -112,8 +112,10 @@ class SourceExecutionControlsTest {
                 ExecutionOperation.OPTIMIZE, FiniteEngine.MIXED))
             val executionOptions = ExecutionOptions.parse(options)
             val request = SourceExecutionRequest(invocation, executionOptions, finiteRequest = if (supplied) {
-                { shape -> SourceExecutionPolicy().finiteRequest(shape, FiniteEngine.MIXED,
-                    executionOptions = executionOptions) }
+                { shape ->
+                    SourceExecutionPolicy().finiteRequest(shape, FiniteEngine.MIXED,
+                        executionOptions = executionOptions)
+                }
             } else null)
             val finite = assertNotNull(request.finiteRequest).invoke(invocation.finiteShape())
 
@@ -504,7 +506,7 @@ class SourceExecutionControlsTest {
         )) {
             val invocation = SourceSetup.prepare(SourceSetupRequest(
                 SmtLib.parse(text).source,
-            ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
+                ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK,
             ))
 
             val failure = assertFailsWith<PipelineConfigException> {

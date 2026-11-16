@@ -71,7 +71,7 @@ internal suspend fun SequenceScope<Unit>.prepareSparseLpAdmission(
         if (factor is ExactLinear && factor.strict) return decline("StrictRow")
         entries += when (factor) {
             is Linear -> if (factor.integerConstants != null && factor.op != LinearOp.NE) factor.vars.size
-                else return decline("Source")
+            else return decline("Source")
             is ExactLinear -> if (factor.constants is IntegerConstants && factor.activator == LinearRow.ALWAYS &&
                 factor.relation != LinearOp.NE) factor.size else return decline("Source")
             is SymmetryHandling -> 0
@@ -142,7 +142,11 @@ internal fun estimateSparseLpAdmission(
         var a = root(left)
         var b = root(right)
         if (a == b) return
-        if (rank[a] < rank[b]) { val swap = a; a = b; b = swap }
+        if (rank[a] < rank[b]) {
+            val swap = a
+            a = b
+            b = swap
+        }
         parent[b] = a
         if (rank[a] == rank[b]) rank[a]++
     }

@@ -87,7 +87,10 @@ internal fun PreparedSource.planned(
     PresolvePreparationStage.SOURCE_ENCODER, PresolveLane.SOURCE, model, cancellation,
 ) { token, observation ->
     val selected = capturedPlan?.takeIf { it.reusableFor(model, projections) }
-        ?.takeUnless { token.charge(1L); token() }
+        ?.takeUnless {
+            token.charge(1L)
+            token()
+        }
         ?: run {
             var retained: RetainedLinearEncoding? = null
             val selection = budget.observePreparation(

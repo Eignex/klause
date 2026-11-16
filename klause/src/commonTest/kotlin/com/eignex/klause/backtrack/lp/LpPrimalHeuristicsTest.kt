@@ -65,8 +65,9 @@ class LpPrimalHeuristicsTest {
             (0 until 2).flatMap { group ->
                 (0 until 8).map { mask ->
                     val coefficients = IntArray(4) { v ->
-                        if (v == 0) { if (group == 0) 2 else -2 }
-                        else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                        if (v == 0) {
+                            if (group == 0) 2 else -2
+                        } else if (mask and (1 shl (v - 1)) == 0) 1 else -1
                     }
                     Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
                         (if (group == 0) 2 else -2) - coefficients.drop(1).count { it < 0 })
@@ -252,8 +253,9 @@ class LpPrimalHeuristicsTest {
             (0 until 2).flatMap { group ->
                 (0 until 8).map { mask ->
                     val coefficients = IntArray(4) { v ->
-                        if (v == 0) { if (group == 0) 1 else -1 }
-                        else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                        if (v == 0) {
+                            if (group == 0) 1 else -1
+                        } else if (mask and (1 shl (v - 1)) == 0) 1 else -1
                     }
                     Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
                         (if (group == 0) 1 else -1) - coefficients.drop(1).count { it < 0 })
@@ -262,8 +264,15 @@ class LpPrimalHeuristicsTest {
         val objective = LinearObjective(intCoefficients = LongArray(8))
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
         val primal = DoubleArray(relaxation.model.n)
-        for (v in 0 until 8) primal[relaxation.intColOf[v]] =
-            when (v) { 0 -> 0.25; 4 -> 1.75; in 1..3 -> 0.4; else -> 0.6 }
+        for (v in 0 until 8) {
+            primal[relaxation.intColOf[v]] =
+                when (v) {
+                    0 -> 0.25
+                    4 -> 1.75
+                    in 1..3 -> 0.4
+                    else -> 0.6
+                }
+        }
         val factory = RecordingLpEngineFactory()
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),
@@ -312,7 +321,11 @@ class LpPrimalHeuristicsTest {
                 for (v in 0 until 2 * width) {
                     val column = relaxation.intColOf[v]
                     known[column] = v % width == 0 || v % width == 4
-                    primal[column] = when (v % width) { 0 -> 1.0; 4 -> 0.25; else -> 123.75 }
+                    primal[column] = when (v % width) {
+                        0 -> 1.0
+                        4 -> 0.25
+                        else -> 123.75
+                    }
                 }
                 val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal,
                     knownColumns = known, sourceProblem = problem)
@@ -422,7 +435,11 @@ class LpPrimalHeuristicsTest {
             for (v in 0 until 8) {
                 val column = relaxation.intColOf[v]
                 known[column] = v % 4 < 2
-                primal[column] = when (v % 4) { 0 -> 1.0; 1 -> 0.5; else -> 123.75 }
+                primal[column] = when (v % 4) {
+                    0 -> 1.0
+                    1 -> 0.5
+                    else -> 123.75
+                }
             }
             val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal, knownColumns = known,
                 sourceProblem = problem)
@@ -483,7 +500,11 @@ class LpPrimalHeuristicsTest {
             for (v in 0 until 8) {
                 val column = relaxation.intColOf[v]
                 known[column] = v % 4 < 2
-                primal[column] = when (v % 4) { 0 -> 1.0; 1 -> 0.5; else -> 123.75 }
+                primal[column] = when (v % 4) {
+                    0 -> 1.0
+                    1 -> 0.5
+                    else -> 123.75
+                }
             }
             val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal, knownColumns = known,
                 sourceProblem = problem)
@@ -529,8 +550,9 @@ class LpPrimalHeuristicsTest {
                 (0 until 2).flatMap { group ->
                     (0 until 8).map { mask ->
                         val coefficients = IntArray(4) { v ->
-                            if (v == 0) { if (group == 0) 1 else -1 }
-                            else if (mask and (1 shl (v - 1)) == 0) 1 else -1
+                            if (v == 0) {
+                                if (group == 0) 1 else -1
+                            } else if (mask and (1 shl (v - 1)) == 0) 1 else -1
                         }
                         Linear(coefficients, IntArray(4) { 4 * group + it }, LinearOp.GE,
                             (if (group == 0) 1 else -1) - coefficients.drop(1).count { it < 0 })
@@ -539,8 +561,15 @@ class LpPrimalHeuristicsTest {
             val objective = LinearObjective(intCoefficients = LongArray(8))
             val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
             val primal = DoubleArray(relaxation.model.n)
-            for (v in 0 until 8) primal[relaxation.intColOf[v]] =
-                when (v) { 0 -> 0.25; 4 -> 1.75; in 1..3 -> 0.4; else -> 0.6 }
+            for (v in 0 until 8) {
+                primal[relaxation.intColOf[v]] =
+                    when (v) {
+                        0 -> 0.25
+                        4 -> 1.75
+                        in 1..3 -> 0.4
+                        else -> 0.6
+                    }
+            }
             val guidance = RootRoundingWarmStart(objective, relaxation, primal = primal,
                 sourceProblem = problem, auxiliaryPoint = true)
             val factory = RecordingLpEngineFactory()
@@ -588,7 +617,13 @@ class LpPrimalHeuristicsTest {
         val objective = LinearObjective(intCoefficients = LongArray(8))
         val relaxation = CpToLpRelaxation(problem, objective).build(PropagationSession(problem))
         val primal = DoubleArray(relaxation.model.n)
-        for (v in 0 until 8) primal[relaxation.intColOf[v]] = when (v) { 0 -> 0.25; in 1..3 -> 0.4; else -> 0.5 }
+        for (v in 0 until 8) {
+            primal[relaxation.intColOf[v]] = when (v) {
+                0 -> 0.25
+                in 1..3 -> 0.4
+                else -> 0.5
+            }
+        }
         val factory = RecordingLpEngineFactory()
         LpEngine(problem, objective,
             LpParams(lpPlan = LpPlan(bounding = true, probe = true, componentOwnership = true)),

@@ -25,14 +25,14 @@ internal fun exactNeighborhoodWorker(
     pendingIncumbentTrial: () -> Boolean = { false },
     open: () -> ExactNeighborhood,
 ): PortfolioWorker {
-    fun stop(global: ExecutionControl) = lifetime .includingStop( global) or ExecutionControl(exhausted)
+    fun stop(global: ExecutionControl) = lifetime.includingStop( global) or ExecutionControl(exhausted)
     fun slice(global: ExecutionControl, millis: Long) = ( stop(global) or
         if (millis == Long.MAX_VALUE) ExecutionControl.Never else ExecutionControl.after(millis.milliseconds)
         ).bindStopControl()
     fun reason(global: ExecutionControl) = if (timeout()) TerminationReason.Timeout
-        else if (lifetime .includingStop( global)()) TerminationReason.Cancelled
-        else if (declined()) TerminationReason.RepresentationDeclined
-        else TerminationReason.BudgetExhausted
+    else if (lifetime.includingStop( global)()) TerminationReason.Cancelled
+    else if (declined()) TerminationReason.RepresentationDeclined
+    else TerminationReason.BudgetExhausted
     if (objective == null) return PortfolioWorker.ofSolve(label, armId, countsInstructions = true,
         resumable = {
             object : InstructionSlicedSolve, ReseedGuard {

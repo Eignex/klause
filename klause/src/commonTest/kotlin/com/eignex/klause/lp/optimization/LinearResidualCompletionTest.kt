@@ -118,7 +118,10 @@ class LinearResidualCompletionTest {
         LinearResidualCompletion(budget, policy).use {
             repeat(2) { _ ->
                 val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), BigFraction.ONE))
-                assertNull(it.complete(rows, 1, ExecutionControl.Never, observe, small = { attempts++; null }))
+                assertNull(it.complete(rows, 1, ExecutionControl.Never, observe, small = {
+                    attempts++
+                    null
+                }))
             }
         }
 
@@ -136,7 +139,10 @@ class LinearResidualCompletionTest {
             for (rhs in listOf(BigFraction.ZERO, BigFraction.ONE)) {
                 val rows = listOf(ExactRationalInequality(intArrayOf(0), listOf(BigFraction.ONE), rhs))
                 assertNull(completion.complete(rows, 1, ExecutionControl.Never, { _, _ -> },
-                    small = { attempts++; null }))
+                    small = {
+                        attempts++
+                        null
+                    }))
             }
         }
 

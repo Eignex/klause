@@ -79,7 +79,6 @@ class SmtPolymorphismTest {
         assertFailsWith<UnsupportedSmtException> { captureSmtSource(commands, ExecutionControl.Never) }
     }
 
-
     @Test
     fun `fixed polymorphic families instantiate unobserved wide bitvector ranks`() {
         val parsed = SmtLib.parse("""
@@ -104,7 +103,6 @@ class SmtPolymorphismTest {
         assertEquals(129, constant.bits.length)
         assertEquals(constant, function.entries.single { it.first == listOf(constant) }.second)
     }
-
 
     @Test
     fun `universal models share interpretations when instantiated ranks coincide`() {
@@ -152,7 +150,6 @@ class SmtPolymorphismTest {
         assertTrue(model.values.none { it.first.name == "id" })
     }
 
-
     @Test
     fun `constructive universal models transport a Boolean equality pattern`() {
         val cases = listOf("(= a b)", "(distinct a b)", "(= (f a) a)", "(p a)")
@@ -174,7 +171,6 @@ class SmtPolymorphismTest {
             assertTrue(integers.all { it.second in listOf(SmtValue.Integer("0"), SmtValue.Integer("1")) })
         }
     }
-
 
     @Test
     fun `sort parameters require the Boolean instance of universal assertions`() {

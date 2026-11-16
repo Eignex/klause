@@ -23,7 +23,10 @@ class FiniteCompanionAdmissionTest {
         val clock = TestTimeSource()
         var calls = 0
         val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 30.seconds), 4_000, 1_000,
-            capture = { calls++; null }, clock = clock)
+            capture = {
+                calls++
+                null
+            }, clock = clock)
 
         assertNull(admission.contextForStart(ExecutionControl { true }, 1_000))
 
@@ -37,7 +40,10 @@ class FiniteCompanionAdmissionTest {
             val clock = TestTimeSource()
             var calls = 0
             val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 30.seconds), 4_000, 1_000,
-                capture = { calls++; null }, clock = clock)
+                capture = {
+                    calls++
+                    null
+                }, clock = clock)
 
             assertNull(admission.contextForStart(ExecutionControl.Never, grant))
 
@@ -51,7 +57,10 @@ class FiniteCompanionAdmissionTest {
         val clock = TestTimeSource()
         var captured = false
         val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 30.seconds), 4_000, 1_000,
-            capture = { captured = true; null }, clock = clock)
+            capture = {
+                captured = true
+                null
+            }, clock = clock)
 
         assertTrue(admission.initiallyFunded)
         clock += 23.seconds
@@ -68,7 +77,10 @@ class FiniteCompanionAdmissionTest {
             val clock = TestTimeSource()
             var captured = false
             val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + remaining.seconds),
-                4_000, 1_000, capture = { captured = true; null }, clock = clock)
+                4_000, 1_000, capture = {
+                    captured = true
+                    null
+                }, clock = clock)
 
             assertFalse(admission.initiallyFunded)
             assertNull(admission.contextForStart(ExecutionControl.Never, 1_000))
@@ -87,7 +99,11 @@ class FiniteCompanionAdmissionTest {
         val clock = TestTimeSource()
         var calls = 0
         val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 10.seconds), 4_000, 1_000,
-            capture = { calls++; clock += 100.milliseconds; context }, clock = clock)
+            capture = {
+                calls++
+                clock += 100.milliseconds
+                context
+            }, clock = clock)
 
         assertSame(context, admission.contextForStart(ExecutionControl.Never, 1_000))
         clock += 4.seconds
@@ -129,7 +145,10 @@ class FiniteCompanionAdmissionTest {
         val clock = TestTimeSource()
         var calls = 0
         val admission = FiniteCompanionAdmission(ExecutionControl.until(clock.markNow() + 30.seconds), 4_000, 1_000,
-            capture = { calls++; null }, clock = clock)
+            capture = {
+                calls++
+                null
+            }, clock = clock)
 
         assertNull(admission.contextForStart(ExecutionControl.Never, 1_000))
         assertNull(admission.contextForStart(ExecutionControl.Never, 1_000))

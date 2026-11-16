@@ -119,7 +119,7 @@ class FinitePipelineTest {
                 FinitePipelineRequest(
                     source, FiniteEngine.BACKTRACK, presolveConfig = PresolveConfig.parse(spec),
                     cancellation = ExecutionControl { budget.probeCalls > 0L }, solveCancellation =
-                        ExecutionControl.Never,
+                    ExecutionControl.Never,
                     presolveBudget = budget,
                 ),
             )

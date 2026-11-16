@@ -52,8 +52,8 @@ class ExecutionCapabilitiesTest {
     @Test
     fun `native source completion should not invent a counting surface`() {
         val source = SmtLibPolynomial.parse(
-                "(declare-const x Real) (assert (= (* x x) 2))",
-            ).realSource()
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ).realSource()
         val plan = source.prepareExecutionPlan()
 
         val admission = plan.capabilities.admission(FiniteEngine.BACKTRACK, ExecutionOperation.EXACT_COUNT)
@@ -76,8 +76,8 @@ class ExecutionCapabilitiesTest {
             realUpper = doubleArrayOf(1.0),
         )
         val supported = SmtLibPolynomial.parse(
-                "(declare-const x Real) (assert (= (* x x) 2))",
-            ).realSource().pipelineRequest()
+            "(declare-const x Real) (assert (= (* x x) 2))",
+        ).realSource().pipelineRequest()
 
         val providers = FactorProjectionProviders(encoder = EncoderProvider { factor, target ->
             if (factor is Linear && target == EncodingTarget.POLYNOMIAL) Encoder(EncoderSupport.UNSUPPORTED)
@@ -146,8 +146,8 @@ class ExecutionCapabilitiesTest {
     @Test
     fun `polynomial invocation pins should not change prepared source admission or later witnesses`() {
         val source = SmtLibPolynomial.parse(
-                "(declare-const x Real) (declare-const b Bool) (assert (= (* x x) 2)) (assert b)",
-            ).realSource()
+            "(declare-const x Real) (declare-const b Bool) (assert (= (* x x) 2)) (assert b)",
+        ).realSource()
         val request = source.pipelineRequest()
         val scoped = PolynomialTheoryParams(
             strategy = PolynomialStrategyParams(

@@ -206,9 +206,11 @@ class DifferenceSearchComponent private constructor(
                 Potentials.Abandoned -> return ComponentCheck.Indeterminate
             }
         }
-        if (values.indices.any { variable -> model.intDomainOrNull(variable)?.let {
-                values[variable] !in it
-            } == true }) return ComponentCheck.Indeterminate
+        if (values.indices.any { variable ->
+                model.intDomainOrNull(variable)?.let {
+                    values[variable] !in it
+                } == true
+            }) return ComponentCheck.Indeterminate
         if (context.cancelled() || context.executionControls.exhausted) return ComponentCheck.Indeterminate
         assignment = Sample(bools, values)
         return ComponentCheck.Feasible
@@ -438,6 +440,7 @@ class DifferenceSearchComponent private constructor(
     internal companion object {
         // Root cooperation is optional; keep its worst-case relaxation work small and deterministic.
         private const val MAX_ROOT_BOUND_RELAXATIONS = 65_536L
+
         // Hint incidences have a bounded private index; declining it leaves complete graph coverage intact.
         private const val MAX_HINT_EDGES = 65_536
 

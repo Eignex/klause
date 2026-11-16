@@ -73,8 +73,10 @@ internal object FinitePortfolioLpCapture {
         val progress = options["portfolio-progress"]?.toBooleanStrict() ?: (mode == "portfolio")
         if (mode in setOf("joint-before", "joint-ordinary")) {
             require(handoff && preset == "complete" && !progress)
-            require(options.keys.none { it in setOf("cutoff-bits", "capture-worker", "capture-route",
-                "capture-guidance") })
+            require(options.keys.none {
+                it in setOf("cutoff-bits", "capture-worker", "capture-route",
+                    "capture-guidance")
+            })
             if (mode == "joint-ordinary") require((options["captures"]?.toInt() ?: 0) == 0)
             return listOf("companion-integers=true", "companion-active-ms=4000",
                 "companion-after-incumbent=false", "companion-admission=ordinary", "companion-repair=fixed",
@@ -155,17 +157,19 @@ internal object FinitePortfolioLpCapture {
                 out.resolve("queries.jsonl").bufferedWriter().use { records ->
                     out.resolve("events.jsonl").bufferedWriter().use { events ->
                         val request = SourceExecutionRequest(invocation, policy, ExecutionOptions.parse(pairs),
-                            finiteRequest = { shape -> policy.finiteRequest(shape, FiniteEngine.MIXED,
-                                cancellation = stop, randomSeed = seed,
-                                onPortfolioEvent = { worker, event ->
-                                    if (event.javaClass.simpleName in setOf(
-                                            "PortfolioDiagnostic", "CompanionComparison", "WorkerAdmission")) {
-                                        if (eventCount++ < 1024) events.appendLine(buildJsonObject {
-                                            put("worker", worker)
-                                            put("event", event.toString().take(4096))
-                                        }.toString()) else eventsDropped++
-                                    }
-                                }) }, cores = 1, randomSeed = seed, timeout = stop, cancellation = stop)
+                            finiteRequest = { shape ->
+                                policy.finiteRequest(shape, FiniteEngine.MIXED,
+                                    cancellation = stop, randomSeed = seed,
+                                    onPortfolioEvent = { worker, event ->
+                                        if (event.javaClass.simpleName in setOf(
+                                                "PortfolioDiagnostic", "CompanionComparison", "WorkerAdmission")) {
+                                            if (eventCount++ < 1024) events.appendLine(buildJsonObject {
+                                                put("worker", worker)
+                                                put("event", event.toString().take(4096))
+                                            }.toString()) else eventsDropped++
+                                        }
+                                    })
+                            }, cores = 1, randomSeed = seed, timeout = stop, cancellation = stop)
                         val observer: (String, Double?, Any) -> Unit = { worker, cutoff, query ->
                             val started = System.nanoTime()
                             try {

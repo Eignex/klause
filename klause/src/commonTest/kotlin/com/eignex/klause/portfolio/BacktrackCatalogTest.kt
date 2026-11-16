@@ -40,7 +40,6 @@ class BacktrackCatalogTest {
         }
     }
 
-
     @Test
     fun `clausal satisfaction should lead with its clause only proof recipe`() {
         val facts = ProblemFacts.assumed(Kind.CSP, ProblemClass.Sat)

@@ -103,6 +103,7 @@ class JfrCaptureSummaryTest {
 
         assertFailsWith<IllegalArgumentException> { JfrCaptureSummary.plan(request) }
     }
+
     @ParameterizedTest
     @ValueSource(strings = ["gzip-base64", "zstd-base64"])
     fun `oversized encoded captures fail before decoding`(codec: String) {

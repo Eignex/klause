@@ -276,6 +276,4 @@ internal class RealProductInvariant(
             }
         }
     }
-
-
 }

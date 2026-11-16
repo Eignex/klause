@@ -75,15 +75,15 @@ internal class PolynomialCoupledSections(
         return try {
             arithmetic.execution.operation {
                 arithmetic.step()
-            val direct = required.mapIndexed { index, atom ->
-                arithmetic.step()
-                PolynomialCoupledSupport(atom, setOf(index))
+                val direct = required.mapIndexed { index, atom ->
+                    arithmetic.step()
+                    PolynomialCoupledSupport(atom, setOf(index))
+                }
+                refuteSupports(direct, identities, checked, prepared = false)?.let { return it }
+                if (!prepareSupports) return null
+                val prepared = prepareCoupledSupport(direct, arithmetic) ?: return null
+                refuteSupports(prepared, identities, checked, prepared = true)
             }
-            refuteSupports(direct, identities, checked, prepared = false)?.let { return it }
-            if (!prepareSupports) return null
-            val prepared = prepareCoupledSupport(direct, arithmetic) ?: return null
-            refuteSupports(prepared, identities, checked, prepared = true)
-        }
         } catch (stop: PolynomialInterrupted) {
             if (parentStopped) throw stop
             declineCount++
@@ -116,7 +116,10 @@ internal class PolynomialCoupledSections(
         for ((index, entry) in required.withIndex()) {
             arithmetic.step()
             val variables = entry.atom.polynomial.variables
-            if (variables.size < 2 || variables.any { arithmetic.step(); it !in sections }) continue
+            if (variables.size < 2 || variables.any {
+                    arithmetic.step()
+                    it !in sections
+                }) continue
             if (!fitsCellLimits(entry.atom.polynomial, arithmetic)) continue
             candidates.add(index)
             checkSupport(listOf(index), required, identities, checked, sections, equations, roots, prepared)
@@ -137,8 +140,14 @@ internal class PolynomialCoupledSections(
                     arithmetic.step()
                     val index = iterator.next()
                     val dependencies = required[index].atom.polynomial.variables
-                    if (dependencies.any { arithmetic.step(); it in variables }) {
-                        for (variable in dependencies) { arithmetic.step(); variables.add(variable) }
+                    if (dependencies.any {
+                            arithmetic.step()
+                            it in variables
+                        }) {
+                        for (variable in dependencies) {
+                            arithmetic.step()
+                            variables.add(variable)
+                        }
                         connected.add(index)
                         iterator.remove()
                         changed = true
@@ -164,20 +173,31 @@ internal class PolynomialCoupledSections(
         prepared: Boolean,
     ): List<Int>? {
         val variables = LinkedHashSet<Int>()
-        for (index in predicates) for (variable in required[index].atom.polynomial.variables) {
-            arithmetic.step()
-            variables.add(variable)
+        for (index in predicates) {
+            for (variable in required[index].atom.polynomial.variables) {
+                arithmetic.step()
+                variables.add(variable)
+            }
         }
         val support = LinkedHashSet<Int>()
-        for (index in variables.map { arithmetic.step(); sections.getValue(it) } + predicates) {
-            for (premise in required[index].premises) { arithmetic.step(); support.add(premise) }
+        for (index in variables.map {
+            arithmetic.step()
+            sections.getValue(it)
+        } + predicates) {
+            for (premise in required[index].premises) {
+                arithmetic.step()
+                support.add(premise)
+            }
         }
         val ordered = support.sorted()
         repeat(ordered.size) { arithmetic.step() }
         val key = buildList {
             add(if (prepared) -1L else -2L)
             add(if (predicates.size > 1) -1L else -2L)
-            for (index in ordered) { arithmetic.step(); add(identities[index]) }
+            for (index in ordered) {
+                arithmetic.step()
+                add(identities[index])
+            }
         }
         if (!checked.add(key)) {
             repeatedCount++
@@ -197,7 +217,10 @@ internal class PolynomialCoupledSections(
                 return required[section].premises.sorted()
             }
         }
-        val atoms = predicates.map { arithmetic.step(); required[it].atom }
+        val atoms = predicates.map {
+            arithmetic.step()
+            required[it].atom
+        }
         if (satisfiable(atoms, variables.toList(), roots)) return null
         conflictCount++
         return ordered
@@ -212,7 +235,10 @@ internal class PolynomialCoupledSections(
         while (true) {
             arithmetic.step()
             combinationCount++
-            if (atoms.all { arithmetic.step(); it.holds(sign(it, variables, choice, roots)) }) return true
+            if (atoms.all {
+                    arithmetic.step()
+                    it.holds(sign(it, variables, choice, roots))
+                }) return true
             var position = 0
             while (position < variables.size) {
                 arithmetic.step()

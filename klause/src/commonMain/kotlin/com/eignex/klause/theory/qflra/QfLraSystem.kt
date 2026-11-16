@@ -239,7 +239,7 @@ internal class LiveQfLraSystem(
         stop: ExecutionControl,
         committed: (Int) -> Unit,
     ): Boolean {
-        if (stop() ||lp.state == null) return false
+        if (stop() || lp.state == null) return false
         val batch = SmtSourceBoundBatch(lp, ::assertBounds, committed)
         for ((index, input) in comparisons.withIndex()) {
             if (stop.pollStop()) return false

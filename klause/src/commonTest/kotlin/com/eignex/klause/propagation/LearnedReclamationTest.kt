@@ -33,7 +33,10 @@ class LearnedReclamationTest {
     fun `a long cleanup window should observe a cancellation within its poll interval`() {
         var requested = false
         var reads = 0
-        val cancelled = CleanupCancellation { reads++; requested }
+        val cancelled = CleanupCancellation {
+            reads++
+            requested
+        }
         repeat(1024) { assertFalse(cancelled()) }
         val settled = reads
         requested = true
@@ -86,39 +89,43 @@ class LearnedReclamationTest {
 
     @Test
     fun `tiny work allowances should defer without changing either learned store`() {
-        for (native in listOf(false, true)) for (allowance in listOf(0L, 1L, 7L)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
-            assertEquals(native, session.usesNativeSat)
-            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
-            val revision = session.learnedClauseRevision
+        for (native in listOf(false, true)) {
+            for (allowance in listOf(0L, 1L, 7L)) {
+                val session = PropagationSession(Problem(4, 0, emptyArray(),
+                    arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
+                assertEquals(native, session.usesNativeSat)
+                session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+                val revision = session.learnedClauseRevision
 
-            val reclaimed = session.reclaimLearnedMemory(0L, maxWork = allowance)
+                val reclaimed = session.reclaimLearnedMemory(0L, maxWork = allowance)
 
-            assertEquals(ReclamationStatus.DEFERRED, reclaimed.status)
-            assertTrue(reclaimed.work <= allowance)
-            assertEquals(1, session.learnedClauseCount)
-            assertEquals(revision, session.learnedClauseRevision)
-            session.pinBool(0, false)
-            assertEquals(true, session.boolValue(1))
+                assertEquals(ReclamationStatus.DEFERRED, reclaimed.status)
+                assertTrue(reclaimed.work <= allowance)
+                assertEquals(1, session.learnedClauseCount)
+                assertEquals(revision, session.learnedClauseRevision)
+                session.pinBool(0, false)
+                assertEquals(true, session.boolValue(1))
+            }
         }
     }
 
     @Test
     fun `tiny scratch allowances should preserve the learned watches on both stores`() {
-        for (native in listOf(false, true)) for (allowance in listOf(0L, 1L, 63L)) {
-            val session = PropagationSession(Problem(4, 0, emptyArray(),
-                arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
-            assertEquals(native, session.usesNativeSat)
-            session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
+        for (native in listOf(false, true)) {
+            for (allowance in listOf(0L, 1L, 63L)) {
+                val session = PropagationSession(Problem(4, 0, emptyArray(),
+                    arrayOf(Clause(intArrayOf(6, 7)))), nativeSat = native)
+                assertEquals(native, session.usesNativeSat)
+                session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
 
-            val reclaimed = session.reclaimLearnedMemory(0L, maxWork = 1_000_000L,
-                maxScratchBytes = allowance)
-            session.pinBool(0, false)
+                val reclaimed = session.reclaimLearnedMemory(0L, maxWork = 1_000_000L,
+                    maxScratchBytes = allowance)
+                session.pinBool(0, false)
 
-            assertEquals(ReclamationStatus.DEFERRED, reclaimed.status)
-            assertEquals(1, session.learnedClauseCount)
-            assertEquals(true, session.boolValue(1))
+                assertEquals(ReclamationStatus.DEFERRED, reclaimed.status)
+                assertEquals(1, session.learnedClauseCount)
+                assertEquals(true, session.boolValue(1))
+            }
         }
     }
 

@@ -90,11 +90,11 @@ class LabAdapterTest {
         val cases = KlauseLabSuite.plan(
             BenchRequest(
                 parameters = mapOf(
-            "suite" to "dimacs-core",
-            "name" to "php4",
-            "engines" to "cp",
-            "propagation-controls" to "true",
-        )
+                    "suite" to "dimacs-core",
+                    "name" to "php4",
+                    "engines" to "cp",
+                    "propagation-controls" to "true",
+                )
             )
         )
 
@@ -110,10 +110,10 @@ class LabAdapterTest {
         assertFailsWith<IllegalArgumentException> {
             LabSettings(
                 mapOf(
-                "engines" to "cp",
-                "propagation-controls" to "true",
-                "param.historical-table-reasons" to "false",
-            )
+                    "engines" to "cp",
+                    "propagation-controls" to "true",
+                    "param.historical-table-reasons" to "false",
+                )
             )
         }
     }
@@ -150,12 +150,12 @@ class LabAdapterTest {
         val cases = KlauseLabSuite.plan(
             BenchRequest(
                 parameters = mapOf(
-            "suite" to "dimacs-core",
-            "name" to "php4",
-            "compiler-seed" to "1",
-            "solver-seeds" to "1,3",
-            "repeats" to "2",
-        )
+                    "suite" to "dimacs-core",
+                    "name" to "php4",
+                    "compiler-seed" to "1",
+                    "solver-seeds" to "1,3",
+                    "repeats" to "2",
+                )
             )
         )
 

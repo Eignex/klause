@@ -32,7 +32,7 @@ class CliModePresolveTest {
                 constraint int_eq_reif(y, 1, c);
                 constraint bool_clause([b, c], []);
                 solve satisfy;
-                """.trimIndent())
+            """.trimIndent())
         }
 
         val output = try {

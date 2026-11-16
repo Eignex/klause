@@ -45,7 +45,7 @@ class NValueInvariantTest {
                 val delta = state.netDelta(move)
                 state.apply(move)
                 val active = if (state.assignment.boolValue(0)) listOf(state.assignment.intValue(0))
-                    else listOf(state.assignment.intValue(1))
+                else listOf(state.assignment.intValue(1))
                 val count = active.count { it == 1L }.toLong()
                 val n = state.assignment.intValue(0)
                 val expected = when (mode) {
