@@ -1,0 +1,335 @@
+package com.eignex.klause.formats.smtlib
+
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
+import com.eignex.klause.util.Cancellation
+
+internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: Cancellation): SmtReduction {
+    val needed = input.commands.any { command ->
+        cancellation.polynomialSourceCheckpoint(1)
+        command is SExpr.SList && (command.polynomialHead() == "declare-sort" ||
+            command.polynomialHead() == "declare-fun" &&
+            (command.items.getOrNull(2) as? SExpr.SList)?.items?.isNotEmpty() == true)
+    }
+    return if (needed) SmtGroundFunctionReducer(input, cancellation).reduce() else input
+}
+
+private class SmtGroundFunctionReducer(private val input: SmtReduction, private val cancellation: Cancellation) {
+    private data class Term(val id: Int, val expression: SExpr)
+    private data class NodeKey(val head: SExpr, val arguments: List<Int>)
+    private data class ApplicationKey(val function: Int, val arguments: List<Int>)
+    private data class Application(val arguments: List<String>, val result: String)
+    private data class Binding(val version: Int, val term: Term? = null, val function: Function? = null,
+        val macro: Macro? = null)
+    private class Function(val id: Int, val declaration: SmtSourceDeclaration) {
+        val applications = ArrayList<Application>()
+    }
+    private data class Macro(val parameters: List<String>, val body: SExpr, val environment: Environment)
+    private class Environment(val version: Int, val locals: Map<String, Term> = emptyMap(),
+        val parent: Environment? = null) {
+        fun local(name: String): Term? {
+            var scope: Environment? = this
+            while (scope != null) {
+                scope.locals[name]?.let { return it }
+                scope = scope.parent
+            }
+            return null
+        }
+    }
+    private sealed interface Frame {
+        data class Evaluate(val expression: SExpr, val environment: Environment) : Frame
+        data class Combine(val head: SExpr, val count: Int, val function: Function?) : Frame
+        data class Let(val names: List<String>, val body: SExpr, val environment: Environment) : Frame
+        data class Call(val macro: Macro) : Frame
+    }
+
+    private val declarations = input.declarations.associateBy { polynomialSymbol(it.name) }
+    private val bindings = HashMap<String, Binding>()
+    private val functions = LinkedHashMap<String, Function>()
+    private val sourceBindings = input.bindings.associateByTo(LinkedHashMap()) { polynomialSymbol(it.declaration.name) }
+    private val privateBindings = input.privateBindings.toMutableMap()
+    private val output = ArrayList<SExpr>()
+    private val atoms = HashMap<String, Term>()
+    private val nodes = HashMap<NodeKey, Term>()
+    private val applications = HashMap<ApplicationKey, Term>()
+    private val identities = LinkedHashMap<SmtSort.Uninterpreted, MutableList<String>>()
+    private val usedNames = HashSet<String>()
+    private var nextTerm = 0
+    private var nextName = 0
+
+    fun reduce(): SmtReduction {
+        collectNames()
+        for (expression in input.commands) {
+            step()
+            val command = expression as? SExpr.SList ?: smtUnsupported("expected SMT command")
+            when (command.polynomialHead()) {
+                "declare-sort", "define-sort" -> Unit
+                "declare-const", "declare-fun" -> declare(command)
+                "define-fun" -> define(command)
+                "assert", "minimize", "maximize" -> {
+                    val value = evaluate(command.items[1], Environment(bindings.size))
+                    output += SExpr.SList(listOf(command.items[0], value.expression))
+                }
+                "check-sat-assuming" -> {
+                    val assumptions = command.items[1] as SExpr.SList
+                    val environment = Environment(bindings.size)
+                    val values = assumptions.items.map { evaluate(it, environment).expression }
+                    output += SExpr.SList(listOf(command.items[0], SExpr.SList(values)))
+                }
+                "get-value" -> {
+                    val terms = command.items[1] as SExpr.SList
+                    val environment = Environment(bindings.size)
+                    output += SExpr.SList(listOf(command.items[0],
+                        SExpr.SList(terms.items.map { evaluate(it, environment).expression })))
+                }
+                else -> output += expression
+            }
+        }
+        val bounds = ArrayList<SExpr>()
+        for ((_, names) in identities) {
+            val upper = atom((names.size - 1).toString()).expression
+            for (name in names) {
+                step()
+                bounds += command("assert", expression("and", expression("<=", SExpr.Atom("0"), SExpr.Atom(name)),
+                    expression("<=", SExpr.Atom(name), upper)))
+            }
+        }
+        val query = output.indexOfFirst { it is SExpr.SList &&
+            it.polynomialHead() in setOf("check-sat", "check-sat-assuming", "get-model", "exit") }
+        output.addAll(if (query < 0) output.size else query, bounds)
+        for ((name, function) in functions) {
+            step()
+            val declaration = function.declaration
+            val entries = function.applications.map { it.arguments.toList() to it.result }
+            sourceBindings[name] = SmtSourceBinding(declaration,
+                GroundFunctionReconstruction(declaration.parameters.toList(), entries,
+                    defaultValue(declaration.result)))
+        }
+        return input.copy(commands = output.toList(), bindings = sourceBindings.values.toList(),
+            privateBindings = privateBindings.toMap())
+    }
+
+    private fun collectNames() {
+        val work = ArrayDeque<SExpr>()
+        for (command in input.commands) work.addLast(command)
+        while (work.isNotEmpty()) {
+            step()
+            when (val expression = work.removeLast()) {
+                is SExpr.Atom -> usedNames += polynomialSymbol(expression.text)
+                is SExpr.SList -> for (item in expression.items) work.addLast(item)
+            }
+        }
+    }
+
+    private fun declare(command: SExpr.SList) {
+        val name = command.polynomialName(1)
+        val declaration = declarations[name] ?: smtUnsupported("missing typed declaration '$name'")
+        if (declaration.parameters.isNotEmpty()) {
+            val function = Function(functions.size, declaration)
+            functions[name] = function
+            bindings[name] = Binding(bindings.size, function = function)
+            return
+        }
+        val term = if (declaration.result is SmtSort.Uninterpreted) {
+            val value = freshValue(declaration.result)
+            sourceBindings[name] = SmtSourceBinding(declaration,
+                checkNotNull(privateBindings[(value.expression as SExpr.Atom).text]))
+            value
+        } else {
+            output += command("declare-const", SExpr.Atom(declaration.name), sortExpression(declaration.result))
+            atom(declaration.name)
+        }
+        bindings[name] = Binding(bindings.size, term = term)
+    }
+
+    private fun define(command: SExpr.SList) {
+        val parameters = command.items[2] as SExpr.SList
+        val names = parameters.items.map { (it as SExpr.SList).polynomialName(0) }
+        val macro = Macro(names, command.items[4], Environment(bindings.size))
+        bindings[command.polynomialName(1)] = Binding(bindings.size, macro = macro)
+    }
+
+    private fun evaluate(root: SExpr, environment: Environment): Term {
+        val work = ArrayDeque<Frame>()
+        val values = ArrayDeque<Term>()
+        work.addLast(Frame.Evaluate(root, environment))
+        fun pop(count: Int): List<Term> = List(count) { values.removeLast() }.reversed()
+        while (work.isNotEmpty()) {
+            step()
+            when (val frame = work.removeLast()) {
+                is Frame.Evaluate -> when (val node = frame.expression) {
+                    is SExpr.Atom -> {
+                        val name = polynomialSymbol(node.text)
+                        val local = frame.environment.local(name)
+                        val binding = binding(name, frame.environment)
+                        when {
+                            local != null -> values.addLast(local)
+                            binding?.term != null -> values.addLast(binding.term)
+                            binding?.macro != null -> {
+                                work.addLast(Frame.Evaluate(binding.macro.body, binding.macro.environment))
+                            }
+                            else -> values.addLast(atom(node.text))
+                        }
+                    }
+                    is SExpr.SList -> {
+                        val head = node.items.first()
+                        val name = identifierName(head)
+                        if (name == "let") {
+                            val pairs = (node.items[1] as SExpr.SList).items.map { it as SExpr.SList }
+                            work.addLast(Frame.Let(pairs.map { it.polynomialName(0) }, node.items[2],
+                                frame.environment))
+                            for (pair in pairs.asReversed()) {
+                                work.addLast(Frame.Evaluate(pair.items[1], frame.environment))
+                            }
+                        } else if (name == "!") {
+                            work.addLast(Frame.Evaluate(node.items[1], frame.environment))
+                        } else if (name == "as") {
+                            val binding = identifierName(node)?.let { binding(it, frame.environment) }
+                            if (binding?.term != null) values.addLast(binding.term)
+                            else values.addLast(literalTerm(node))
+                        } else if (name == "_") {
+                            values.addLast(intern(head, node.items.drop(1).map { literalTerm(it) }))
+                        } else {
+                            val binding = name?.let { binding(it, frame.environment) }
+                            if (binding?.macro != null) work.addLast(Frame.Call(binding.macro))
+                            else work.addLast(Frame.Combine(head, node.items.size - 1, binding?.function))
+                            for (argument in node.items.drop(1).asReversed()) {
+                                work.addLast(Frame.Evaluate(argument, frame.environment))
+                            }
+                        }
+                    }
+                }
+                is Frame.Let -> {
+                    val locals = frame.names.zip(pop(frame.names.size)).toMap()
+                    work.addLast(Frame.Evaluate(frame.body, Environment(frame.environment.version, locals,
+                        frame.environment)))
+                }
+                is Frame.Call -> {
+                    val args = pop(frame.macro.parameters.size)
+                    val locals = frame.macro.parameters.zip(args).toMap()
+                    work.addLast(Frame.Evaluate(frame.macro.body, Environment(frame.macro.environment.version,
+                        locals, frame.macro.environment)))
+                }
+                is Frame.Combine -> {
+                    val args = pop(frame.count)
+                    values.addLast(if (frame.function == null) intern(frame.head, args)
+                        else apply(frame.function, args))
+                }
+            }
+        }
+        return values.single()
+    }
+
+    private fun literalTerm(root: SExpr): Term {
+        val work = ArrayDeque<Pair<SExpr, Boolean>>()
+        val values = ArrayDeque<Term>()
+        work.addLast(root to false)
+        while (work.isNotEmpty()) {
+            step()
+            val (node, combine) = work.removeLast()
+            when (node) {
+                is SExpr.Atom -> values.addLast(atom(node.text))
+                is SExpr.SList -> if (combine) {
+                    val args = List(node.items.size - 1) { values.removeLast() }.reversed()
+                    values.addLast(intern(node.items[0], args))
+                } else {
+                    work.addLast(node to true)
+                    for (item in node.items.drop(1).asReversed()) work.addLast(item to false)
+                }
+            }
+        }
+        return values.single()
+    }
+
+    private fun binding(name: String, environment: Environment): Binding? =
+        bindings[name]?.takeIf { it.version < environment.version }
+
+    private fun apply(function: Function, args: List<Term>): Term {
+        val key = ApplicationKey(function.id, args.map { it.id })
+        applications[key]?.let { return it }
+        val argumentNames = args.mapIndexed { index, argument ->
+            step()
+            val captured = freshValue(function.declaration.parameters[index])
+            output += command("assert", expression("=", captured.expression, argument.expression))
+            (captured.expression as SExpr.Atom).text
+        }
+        val result = freshValue(function.declaration.result)
+        val resultName = (result.expression as SExpr.Atom).text
+        for (previous in function.applications) {
+            step()
+            val equalArguments = argumentNames.indices.map { index ->
+                step()
+                expression("=", SExpr.Atom(previous.arguments[index]), SExpr.Atom(argumentNames[index]))
+            }
+            output += command("assert", expression("=>", expression("and", *equalArguments.toTypedArray()),
+                expression("=", SExpr.Atom(previous.result), result.expression)))
+        }
+        function.applications += Application(argumentNames, resultName)
+        applications[key] = result
+        return result
+    }
+
+    private fun freshValue(sort: SmtSort): Term {
+        step()
+        var name: String
+        do {
+            name = "@klause.uf.${nextName++}"
+        } while (!usedNames.add(name))
+        val encodedSort = if (sort is SmtSort.Uninterpreted) SmtSort.Int else sort
+        output += command("declare-const", SExpr.Atom(name), sortExpression(encodedSort))
+        privateBindings[name] = if (sort is SmtSort.Uninterpreted) {
+            val names = identities.getOrPut(sort) { ArrayList() }
+            names += name
+            FreeSortReconstruction(sort, name, identities.keys.indexOf(sort))
+        } else SmtReconstruction.Scalar(name, sort)
+        return atom(name)
+    }
+
+    private fun defaultValue(sort: SmtSort): SmtValue = when (sort) {
+        SmtSort.Bool -> SmtValue.Boolean(false)
+        SmtSort.Int -> SmtValue.Integer("0")
+        SmtSort.Real -> SmtValue.Real("0.0")
+        is SmtSort.BitVector -> SmtValue.BitVector("0".repeat(sort.width))
+        is SmtSort.Uninterpreted -> {
+            identities.getOrPut(sort) { ArrayList() }
+            SmtValue.Uninterpreted(sort, "@klause.u${identities.keys.indexOf(sort)}!0")
+        }
+        is SmtSort.Array -> SmtValue.Application("(as const ${sort.toSmtLib()})",
+            listOf(defaultValue(sort.element)))
+    }
+
+    private fun atom(text: String): Term = atoms.getOrPut(polynomialSymbol(text)) {
+        Term(nextTerm++, SExpr.Atom(text))
+    }
+
+    private fun intern(head: SExpr, args: List<Term>): Term = nodes.getOrPut(NodeKey(head, args.map { it.id })) {
+        Term(nextTerm++, SExpr.SList(listOf(head) + args.map { it.expression }))
+    }
+
+    private fun step() = cancellation.polynomialSourceCheckpoint(1)
+}
+
+private data class FreeSortReconstruction(val sort: SmtSort.Uninterpreted, val name: String,
+    val sortIdentity: Int) : SmtReconstruction {
+    override fun reconstruct(values: SmtModelValues): SmtValue =
+        SmtValue.Uninterpreted(sort, "@klause.u$sortIdentity!${values.integer(name)}")
+}
+
+private data class GroundFunctionReconstruction(val parameters: List<SmtSort>,
+    val entries: List<Pair<List<String>, String>>, val default: SmtValue) : SmtReconstruction {
+    override fun reconstruct(values: SmtModelValues): SmtValue = SmtValue.Function(parameters,
+        entries.map { (args, result) -> args.map { values.value(it) } to values.value(result) }, default)
+}
+
+private fun expression(head: String, vararg args: SExpr): SExpr.SList =
+    SExpr.SList(listOf(SExpr.Atom(head)) + args)
+
+private fun command(head: String, vararg args: SExpr): SExpr.SList = expression(head, *args)
+
+private fun sortExpression(sort: SmtSort): SExpr = SExprReader(sort.toSmtLib()).readAll().single()
+
+private fun identifierName(identifier: SExpr): String? = when (identifier) {
+    is SExpr.Atom -> polynomialSymbol(identifier.text)
+    is SExpr.SList -> if ((identifier.items.firstOrNull() as? SExpr.Atom)?.text == "as") {
+        (identifier.items.getOrNull(1) as? SExpr.Atom)?.text?.let(::polynomialSymbol)
+    } else null
+}
