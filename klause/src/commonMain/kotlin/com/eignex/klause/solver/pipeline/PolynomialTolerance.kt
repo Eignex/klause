@@ -112,7 +112,10 @@ private val wideningScales: List<BigFraction> =
 
 // This request's source lowered with its slack scaled by [scale], or null when the source declares no widening or
 // its widened encoding declines. A widened source enters the theory without presolve, whose reductions are exact.
-private fun PolynomialTheoryRequest.widened(scale: BigFraction, cancellation: ExecutionControl): PolynomialTheoryRequest? {
+private fun PolynomialTheoryRequest.widened(
+    scale: BigFraction,
+    cancellation: ExecutionControl,
+): PolynomialTheoryRequest? {
     val source = resolvedModel().source
     val tolerance = PolynomialTolerance.of(source, scale) ?: return null
     val projections = preparedPlan.factorProjections ?: return null
@@ -188,8 +191,11 @@ internal fun PolynomialTheoryRequest.optimizeWidened(
         work += execution.nativeWork
         val result = execution.result
         when {
-            result is QuadraticOptimizationResult.Infeasible -> return if (attempt == 0) execution
-                else bestFound(execution, TerminationReason.RepresentationDeclined)
+            result is QuadraticOptimizationResult.Infeasible -> return if (attempt == 0) {
+                execution
+            } else {
+                bestFound(execution, TerminationReason.RepresentationDeclined)
+            }
             result is QuadraticOptimizationResult.Unknown -> if (!execution.refusedPublication()) {
                 return bestFound(execution, result.reason)
             } else if (attempt == wideningScales.lastIndex) {
