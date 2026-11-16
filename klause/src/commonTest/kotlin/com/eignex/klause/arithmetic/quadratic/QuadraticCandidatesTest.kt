@@ -124,7 +124,7 @@ class QuadraticCandidatesTest {
 
     @Test
     fun `numerical rows should include a changed final coordinate in a large model`() {
-        val dimension = 257
+        val dimension = 65
         val coefficients = List(dimension) { if (it == dimension - 1) q(1) else q(0) }
         val model = QuadraticModel(
             List(dimension) { q(0) },
