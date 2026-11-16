@@ -197,8 +197,9 @@ defaults while public scalar maps retain original scalar sorts.
 
 Array and datatype lowering expose ground helper bodies before scalar compilation.
 Admission skips early exposure when the source has no array or datatype structure
-and no partial logarithm checks. The direct scalar lowering route retains lexical
-`let` sharing.
+and no partial logarithm checks. The direct scalar lowering route evaluates each
+lexical `let` binding and each `define-fun` argument once, reusing its compiled
+value throughout the body.
 
 Global sort parameters retain their universal source obligations. Necessary ground
 instances can refute them; finite instance satisfaction alone supplies no SAT
