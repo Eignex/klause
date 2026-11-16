@@ -6,6 +6,26 @@ import kotlin.test.assertTrue
 
 class SmtSessionChannelsTest {
     @Test
+    fun `invocation diagnostics follow the currently selected diagnostic destination`() {
+        val diagnostics = ArrayList<String>()
+        val appended = ArrayList<String>()
+        val session = SmtLibSession({ SmtSessionResult("sat") }, {}, diagnostic = diagnostics::add,
+            openAppend = { destination -> object : SmtSessionSink {
+                override fun write(text: String) { appended += "$destination:$text" }
+                override fun close() = Unit
+            } })
+
+        session.execute(SExprReader("(set-option :diagnostic-output-channel \"trace.log\")"))
+        session.diagnose("first")
+        session.execute(SExprReader("(reset)"))
+        session.diagnose("second")
+        session.close()
+
+        assertEquals(listOf("trace.log:first"), appended)
+        assertEquals(listOf("second"), diagnostics)
+    }
+
+    @Test
     fun `regular channel changes apply to their own success response`() {
         val standard = ArrayList<String>()
         val appended = ArrayList<String>()

@@ -24,7 +24,6 @@ import com.eignex.util.io.openTextFile
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
-import com.eignex.util.process.printErrorLine
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
@@ -52,6 +51,7 @@ internal object SmtLibMode : CliMode {
             val stop = common.invocationCancellation().withBoundedPolling()
             lateinit var session: SmtLibSession
             var initialized = false
+            val previousDiagnostic = common.diagnostic
             try {
                 session = SmtLibSession(
                     solve = { text -> solveSmtRecursiveSession(text, solve = { snapshot ->
@@ -69,16 +69,18 @@ internal object SmtLibMode : CliMode {
                     }, cancellation = stop) },
                     respond = ::println,
                     cancellation = stop,
-                    diagnostic = ::printErrorLine,
+                    diagnostic = previousDiagnostic,
                     openAppend = ::openSmtSessionAppend,
                     version = BuildInfo.VERSION,
                 )
                 initialized = true
+                common.diagnostic = session::diagnose
                 session.execute(SExprReader(source))
             } catch (_: CancellationException) {
                 if (initialized) session.interrupt(if (common.timeLimitMs != null && stop()) "wall timeout"
                     else "session interrupted")
             } finally {
+                common.diagnostic = previousDiagnostic
                 if (initialized) session.close()
                 if (source is AutoCloseable) source.close()
             }
@@ -111,7 +113,7 @@ internal object SmtLibMode : CliMode {
             val ints = parsed.intVarNames
             val bools = parsed.boolVarNames
             val reals = parsed.realVarNames
-            cliLogger(common.verbose).v {
+            cliLogger(common.verbose, common.diagnostic).v {
                 "parsed ${fileName(path)}: bool=${bools.size} int=${ints.size} real=${reals.size}"
             }
             val objective = parsed.objective?.toLinearObjective()

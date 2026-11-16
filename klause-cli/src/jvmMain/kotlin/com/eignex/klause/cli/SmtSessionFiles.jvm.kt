@@ -14,8 +14,7 @@ internal actual fun openSmtSessionAppend(path: String): SmtSessionSink {
     }
     return object : SmtSessionSink {
         override fun write(text: String) {
-            writer.write(text)
-            writer.newLine()
+            writer.write("$text\n")
             writer.flush()
         }
         override fun close() = writer.close()

@@ -368,6 +368,8 @@ class SmtLibSession(
     fun comment(text: String) {
         text.lineSequence().forEach { channels.regular(if (it.startsWith(';')) it else "; $it") }
     }
+    /** Emit an invocation diagnostic on the currently selected diagnostic channel. */
+    fun diagnose(text: String) = channels.diagnostic(text)
     private fun fail(message: String): Nothing = throw UnsupportedSmtException(message)
     private fun SExpr.SList.size(expected: Int) {
         if (items.size != expected) fail("${items.firstOrNull()?.smtText()} expects ${expected - 1} arguments")

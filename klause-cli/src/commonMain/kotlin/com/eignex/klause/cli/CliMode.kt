@@ -96,7 +96,7 @@ internal fun CommonOptions.logRoute(route: SourceProblemRoute, elapsedMs: Long) 
         SourceProblemRoute.Refuted -> "refuted"
     }
     frontendRouting = CliRoutingStats(lane, elapsedMs)
-    cliLogger(verbose).v {
+    cliLogger(verbose, diagnostic).v {
         "route: $lane in ${elapsedMs}ms" + presolveBudget?.let { ", routing work ${it.spent()}" }.orEmpty()
     }
 }
@@ -163,6 +163,7 @@ private const val OPEN_BOUND_PROOF_KEY = "open-bound-proof"
 
 /** Solver-control flags shared by every mode; populated by [commonFlagSpecs] during parsing. */
 internal class CommonOptions {
+    var diagnostic: (String) -> Unit = ::printErrorLine
     var config: KlauseConfig = KlauseConfig.current
     var semanticOverrides: SemanticOverrides = SemanticOverrides()
     val sourceOptions = SourceOptions()

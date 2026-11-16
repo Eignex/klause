@@ -3,8 +3,33 @@ package com.eignex.klause.cli
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class SmtLibSessionCliTest {
+    @Test
+    fun `verbose solver diagnostics honor the selected file destination`() {
+        val source = File.createTempFile("smt-verbose", ".smt2")
+        val destination = File.createTempFile("smt-trace", ".txt")
+        source.writeText("""
+            (set-option :diagnostic-output-channel "${destination.absolutePath}")
+            (declare-const p Bool)
+            (assert p)
+            (check-sat)
+        """.trimIndent())
+
+        try {
+            val errors = captureStderr {
+                captureStdout { assertEquals(0, runCli(arrayOf("-v", "-e", "cp", source.absolutePath))) }
+            }
+
+            assertEquals("", errors)
+            assertTrue("parsed" in destination.readText())
+        } finally {
+            source.delete()
+            destination.delete()
+        }
+    }
+
     @Test
     fun `one script can query checked models across assertion stack changes`() {
         val source = File.createTempFile("smt-session", ".smt2")
