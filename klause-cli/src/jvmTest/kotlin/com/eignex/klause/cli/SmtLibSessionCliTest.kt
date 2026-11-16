@@ -74,7 +74,9 @@ class SmtLibSessionCliTest {
 
         val output = try {
             captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
-        } finally { source.delete() }
+        } finally {
+            source.delete()
+        }
 
         assertEquals(listOf("sat", "(((not p) false))", "unsat", "sat", "((p true))"), output.trim().lines())
     }
@@ -109,7 +111,9 @@ class SmtLibSessionCliTest {
 
         val output = try {
             captureStdout { assertEquals(0, runCli(arrayOf(source.absolutePath))) }
-        } finally { source.delete() }
+        } finally {
+            source.delete()
+        }
 
         assertEquals("", output)
     }
