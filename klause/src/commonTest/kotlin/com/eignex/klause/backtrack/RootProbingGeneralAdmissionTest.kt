@@ -21,7 +21,7 @@ class RootProbingGeneralAdmissionTest {
     @Test
     fun `General admission should finish its initial global batch before restricting probes`() {
         for ((native, gate) in listOf(false to true, false to false, true to true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val session = PropagationSession(rootProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
             val stats = SearchStatsSink()
             val pass = RootProbingPass()
             val params = BacktrackParams(rootProbeBatch = 2,
@@ -161,7 +161,7 @@ class RootProbingGeneralAdmissionTest {
 
     @Test
     fun `General admission should retain its exploratory batch when a slice is unfunded`() {
-        val session = PropagationSession(rootInprocessingProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = false)
+        val session = PropagationSession(rootProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = false)
         val stats = SearchStatsSink()
         val pass = RootProbingPass()
         val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false, rootProbeGeneralGate = true)
@@ -176,7 +176,7 @@ class RootProbingGeneralAdmissionTest {
 
     @Test
     fun `scope reset should renew General exploratory probing`() {
-        val session = PropagationSession(rootInprocessingProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = false)
+        val session = PropagationSession(rootProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = false)
         val stats = SearchStatsSink()
         val pass = RootProbingPass()
         val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false, rootProbeGeneralGate = true)
@@ -197,7 +197,7 @@ class RootProbingGeneralAdmissionTest {
             arrayOf(intArrayOf(0, 2)),
             arrayOf(intArrayOf(1), intArrayOf(0, 2, 4)),
         )) {
-            val session = PropagationSession(rootInprocessingProblem(*clauses).bake(), nativeSat = false)
+            val session = PropagationSession(rootProblem(*clauses).bake(), nativeSat = false)
             val stats = SearchStatsSink()
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1,

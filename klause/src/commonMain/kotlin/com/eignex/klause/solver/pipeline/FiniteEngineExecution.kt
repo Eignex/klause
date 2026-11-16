@@ -195,7 +195,6 @@ private fun FiniteExecutionResult.withCompleteSearch(value: Boolean): FiniteExec
     return this
 }
 
-
 private fun executeSourceFinite(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,

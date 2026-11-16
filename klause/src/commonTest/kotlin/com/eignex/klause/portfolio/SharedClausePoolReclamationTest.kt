@@ -242,7 +242,8 @@ class SharedClausePoolReclamationTest {
         val before = pool.memory().getValue("poolOwnedBytes")
         var charged = 0
 
-        val accepted = pool.publish(listOf(sharedPoolTestClause(10, 1)), cancelled = { charged >= 10 }, charge = { charged++ })
+        val accepted = pool.publish(listOf(sharedPoolTestClause(10, 1)),
+            cancelled = { charged >= 10 }, charge = { charged++ })
 
         assertEquals(0, accepted)
         assertEquals(listOf(first), pool.drainSince(0).clauses)

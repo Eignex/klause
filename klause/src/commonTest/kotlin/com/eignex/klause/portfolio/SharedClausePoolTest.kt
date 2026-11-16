@@ -291,7 +291,8 @@ class SharedClausePoolTest {
             pool.publish(listOf(retained, evicted), origin = 2)
             exchange.onSearchStart(session)
             repeat(16) { round ->
-                pool.publish(listOf(sharedPoolTestClause(4 + round * 2, 2), sharedPoolTestClause(40 + round * 2, 2)), origin = 2)
+                pool.publish(
+                    listOf(sharedPoolTestClause(4 + round * 2, 2), sharedPoolTestClause(40 + round * 2, 2)), origin = 2)
             }
             pool.publish(listOf(evicted), origin = 2)
             exchange.onRestart(session)

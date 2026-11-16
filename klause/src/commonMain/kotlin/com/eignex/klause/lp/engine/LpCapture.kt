@@ -773,5 +773,4 @@ internal class LpExactCapture private constructor(
     }
 }
 
-
 private val EXACT_CAPTURE_MAGIC: ByteArray = byteArrayOf(0x4b, 0x4c, 0x50, 0x45, 0x58, 0x41, 0x43, 0x54)

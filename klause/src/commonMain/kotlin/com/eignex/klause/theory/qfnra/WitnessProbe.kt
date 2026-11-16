@@ -11,7 +11,6 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
-import com.eignex.util.numbers.shl
 
 internal const val MAX_WITNESS_WORK = 65_536L
 internal const val MAX_WITNESS_REALS = 32
@@ -605,7 +604,9 @@ internal class WitnessProbe(
                 it.dyadicAttempts += minOf(1L, Long.MAX_VALUE - it.dyadicAttempts)
                 it.dyadicPreExtraction = true
             }
-            DyadicWitnessBase(arithmetic).base(atoms, atomTermCounts, seed, active, fixed, coupledTerms, work).also { base ->
+            DyadicWitnessBase(arithmetic).base(
+                atoms, atomTermCounts, seed, active, fixed, coupledTerms, work,
+            ).also { base ->
                 work?.let {
                     it.dyadicPreExtraction = false
                     if (base != null) it.dyadicBases += minOf(1L, Long.MAX_VALUE - it.dyadicBases)
@@ -847,7 +848,10 @@ internal class WitnessProbe(
     ): QfNraAssignment? {
         // The private parameter lies outside every original ID, so substitutions cannot capture each other.
         val parameter = base.size
-        if (base.any { !arithmetic.admitsWitnessFraction(it) } || direction.any { !arithmetic.admitsWitnessFraction(it) }) return null
+        if (
+            base.any { !arithmetic.admitsWitnessFraction(it) } ||
+            direction.any { !arithmetic.admitsWitnessFraction(it) }
+        ) return null
         val replacements = base.indices.map { id ->
             arithmetic.add(
                 Polynomial.constant(base[id]), arithmetic.scale(Polynomial.variable(parameter), direction[id]),

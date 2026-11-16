@@ -955,5 +955,4 @@ internal object LinearAuthorityAggregateCuts {
         continuousBounds: Map<Pair<SourceCoordinate, Boolean>, LinearAuthorityAggregateTerm> = emptyMap(),
     ): LinearAuthorityCut? = deriveWithCoefficients(terms, cancellation, observe, limits, allowMixed,
         continuousBounds, coefficientSnapshots = null)
-
 }

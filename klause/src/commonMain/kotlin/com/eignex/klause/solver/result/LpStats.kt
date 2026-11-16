@@ -478,5 +478,3 @@ data class LpStats(
 /** Whether an LP engine was invoked on any production route. */
 internal fun LpStats.hasActivity(): Boolean =
     nodePasses.sum + standalonePasses.sum + componentPasses.sum + rootPasses.sum > 0.0
-
-/** Mutable LP-stats accumulator, one per solve; snapshots into an [LpStats]. See [SolveStatsSink]. */

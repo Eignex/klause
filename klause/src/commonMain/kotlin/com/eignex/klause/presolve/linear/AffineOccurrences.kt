@@ -1,9 +1,5 @@
 package com.eignex.klause.presolve.linear
 
-import com.eignex.klause.presolve.linear.AffineSingletons.AffineCandidate
-import com.eignex.klause.presolve.linear.AffineSingletons.FactorOcc
-import com.eignex.klause.presolve.linear.AffineSingletons.FOLD_ABSORB_CAP
-import com.eignex.klause.presolve.linear.AffineSingletons.CANCEL_POLL_MASK
 import com.eignex.klause.factor.arithmetic.ComparisonClause
 import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.arithmetic.ReifiedLinear
@@ -18,6 +14,10 @@ import com.eignex.klause.ir.linearRows
 import com.eignex.klause.presolve.ColumnRanges
 import com.eignex.klause.presolve.SharedIntOccurrence
 import com.eignex.klause.presolve.equivalentLinear
+import com.eignex.klause.presolve.linear.AffineSingletons.AffineCandidate
+import com.eignex.klause.presolve.linear.AffineSingletons.CANCEL_POLL_MASK
+import com.eignex.klause.presolve.linear.AffineSingletons.FOLD_ABSORB_CAP
+import com.eignex.klause.presolve.linear.AffineSingletons.FactorOcc
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
@@ -481,7 +481,6 @@ internal class AffineWorkingSet(
     }
 }
 
-
 /** [l] with `x` replaced by `constTerm + Σ A_j·y_j`: drop `x`'s term, add `coeff_x·A_j` to each
  *  term var `y_j`, shift the bound by `−coeff_x·constTerm`. Construction re-coalesces overlapping
  *  terms and preserves a reifying output in both directions. */
@@ -509,7 +508,6 @@ private fun foldAffineIntoRow(l: LinearRow, c: AffineCandidate): Factor {
     return if (l.activator == LinearRow.ALWAYS) Linear(newCoeffs, newVars, l.relation, bound)
     else ReifiedLinear(l.activator, newCoeffs, newVars, l.relation, bound)
 }
-
 
 /** Bounds on the term vars enforcing that `x = constTerm + Σ termCoeffs·termVars` stays within the
  *  extent [ranges] gives `x`, one row per side it bounds. */
@@ -560,31 +558,31 @@ private fun termActivity(ranges: ColumnRanges, c: AffineCandidate, upper: Boolea
     return total
 }
 private fun affineFoldRow(factor: Factor?, reified: Boolean): LinearRow? {
-if (reified && factor is ReifiedLinear) {
-    return if (factor.integerConstants != null) factor.linearRows.single() else null
-}
-return factor?.equivalentLinear()?.takeIf { it.integerConstants != null }
+    if (reified && factor is ReifiedLinear) {
+        return if (factor.integerConstants != null) factor.linearRows.single() else null
+    }
+    return factor?.equivalentLinear()?.takeIf { it.integerConstants != null }
 }
 
 private fun affineConsumerAccepts(
-factor: Factor,
-rewriteStructured: Boolean,
-x: Int,
-scale: Int,
-offset: Int,
-replacement: Int,
-cancellation: ExecutionControl,
+    factor: Factor,
+    rewriteStructured: Boolean,
+    x: Int,
+    scale: Int,
+    offset: Int,
+    replacement: Int,
+    cancellation: ExecutionControl,
 ): Boolean {
-if (affineFoldRow(factor, rewriteStructured) != null) return true
-if (factor is ComparisonClause) {
-    return rewriteStructured && factor.canSubstituteAffine(x, scale, offset, cancellation)
-}
-return factor.canSubstituteAffine(x, scale, offset, replacement)
+    if (affineFoldRow(factor, rewriteStructured) != null) return true
+    if (factor is ComparisonClause) {
+        return rewriteStructured && factor.canSubstituteAffine(x, scale, offset, cancellation)
+    }
+    return factor.canSubstituteAffine(x, scale, offset, replacement)
 }
 
 private fun LinearRow.intIndexOf(variable: Int): Int {
-for (index in 0 until size) if (Term.intVar(ref(index)) == variable) return index
-return -1
+    for (index in 0 until size) if (Term.intVar(ref(index)) == variable) return index
+    return -1
 }
 
 /** Whether folding `x = constTerm + Σ termCoeffs·termVars` into the Linear row [f] would overflow
@@ -592,33 +590,33 @@ return -1
  *  checked helpers, so an overflow surfaces as [CheckedLongOverflowException]; a `true` result lets the caller
  *  leave `x` un-eliminated (sound) rather than wrap a coefficient. */
 private fun foldRowOverflowsLong(
-f: LinearRow,
-x: Int,
-termVars: IntArray,
-termCoeffs: LongArray,
-constTerm: Long,
-termsSmall: Boolean,
+    f: LinearRow,
+    x: Int,
+    termVars: IntArray,
+    termCoeffs: LongArray,
+    constTerm: Long,
+    termsSmall: Boolean,
 ): Boolean {
-// Fast path, no `indexOf`: when the pivot's own terms are all below 2^31 ([termsSmall], hoisted by the
-// caller) and this row's magnitudes are too, no product `cX·c` reaches 2^62 and no sum reaches 2^63 —
-// `|cX| ≤ maxAbsCoeff`, so `cX` itself is never needed. The exact path runs only when some magnitude
-// is huge.
-val row = f.constants as? IntegerConstants ?: return true
-if (termsSmall && fitsHalfLong(row.bound) && fitsHalfLong(row.maxAbsCoeff)) return false
-val xi = f.intIndexOf(x)
-if (xi < 0) return false
-val cX = row.coeff(xi)
-return try {
-    subExact(row.bound, mulExact(cX, constTerm))
-    for (k in termVars.indices) {
-        val prod = mulExact(cX, termCoeffs[k])
-        val yi = f.intIndexOf(termVars[k])
-        if (yi >= 0) addExact(row.coeff(yi), prod)
+    // Fast path, no `indexOf`: when the pivot's own terms are all below 2^31 ([termsSmall], hoisted by the
+    // caller) and this row's magnitudes are too, no product `cX·c` reaches 2^62 and no sum reaches 2^63 —
+    // `|cX| ≤ maxAbsCoeff`, so `cX` itself is never needed. The exact path runs only when some magnitude
+    // is huge.
+    val row = f.constants as? IntegerConstants ?: return true
+    if (termsSmall && fitsHalfLong(row.bound) && fitsHalfLong(row.maxAbsCoeff)) return false
+    val xi = f.intIndexOf(x)
+    if (xi < 0) return false
+    val cX = row.coeff(xi)
+    return try {
+        subExact(row.bound, mulExact(cX, constTerm))
+        for (k in termVars.indices) {
+            val prod = mulExact(cX, termCoeffs[k])
+            val yi = f.intIndexOf(termVars[k])
+            if (yi >= 0) addExact(row.coeff(yi), prod)
+        }
+        false
+    } catch (_: CheckedLongOverflowException) {
+        true
     }
-    false
-} catch (_: CheckedLongOverflowException) {
-    true
-}
 }
 
 /** True when `|v| < 2^31`, so a product of two such values stays below 2^62 and a sum below 2^63 — the
@@ -628,9 +626,9 @@ private fun fitsHalfLong(v: Long): Boolean = v > -(1L shl 31) && v < (1L shl 31)
 /** Whether the fold's constant and every partner coefficient fit half-Long — the pivot-global half of the
  *  [foldRowOverflowsLong] fast path, computed once per pivot rather than once per rewritten row. */
 private fun termsFitHalfLong(constTerm: Long, termCoeffs: LongArray): Boolean {
-if (!fitsHalfLong(constTerm)) return false
-for (c in termCoeffs) if (!fitsHalfLong(c)) return false
-return true
+    if (!fitsHalfLong(constTerm)) return false
+    for (c in termCoeffs) if (!fitsHalfLong(c)) return false
+    return true
 }
 
 // Work units per scanned factor, tested term or folded fill-in entry, relative to one simplex operation.

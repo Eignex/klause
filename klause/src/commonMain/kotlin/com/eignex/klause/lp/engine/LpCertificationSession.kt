@@ -4,7 +4,6 @@ import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.unaryMinus
 
 internal class LpCertificationSession(private val context: LpSolveContext, private val pricing: LpPricingOptions) :

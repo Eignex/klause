@@ -316,5 +316,3 @@ private class ResidualRealComponent(
 
     override fun close() = engine.close()
 }
-
-/** The shared learned-clause bound mirrors the CP database's own cap and glue threshold. */

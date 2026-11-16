@@ -29,7 +29,7 @@ class RootProbingPassTest {
         for ((native, positive) in listOf(false to false, false to true, true to false, true to true)) {
             val literal = Lit.make(0, positive)
             val session = PropagationSession(
-                rootInprocessingProblem(intArrayOf(literal, 2), intArrayOf(literal, 3)).bake(), nativeSat = native,
+                rootProblem(intArrayOf(literal, 2), intArrayOf(literal, 3)).bake(), nativeSat = native,
             )
             val stats = SearchStatsSink()
 
@@ -50,7 +50,7 @@ class RootProbingPassTest {
             val b = Lit.make(1, positive)
             val c = Lit.make(2, positive)
             val d = Lit.make(3, positive)
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(Lit.negate(a), b),
+            val session = PropagationSession(rootProblem(intArrayOf(Lit.negate(a), b),
                 intArrayOf(Lit.negate(a), c), intArrayOf(Lit.negate(b), Lit.negate(c), d)).bake(),
                 nativeSat = native)
 
@@ -65,7 +65,7 @@ class RootProbingPassTest {
     @Test
     fun `disabled implication capture should retain consistent probes without new clauses`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(1, 4),
+            val session = PropagationSession(rootProblem(intArrayOf(1, 2), intArrayOf(1, 4),
                 intArrayOf(3, 5, 6)).bake(), nativeSat = native)
             val stats = SearchStatsSink()
 
@@ -81,7 +81,7 @@ class RootProbingPassTest {
     @Test
     fun `binary admission should restrict only requested Native probes without propagation opportunities`() {
         for ((native, gate) in listOf(true to true, true to false, false to true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
+            val session = PropagationSession(rootProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = native)
             val stats = SearchStatsSink()
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1,
@@ -95,7 +95,7 @@ class RootProbingPassTest {
 
     @Test
     fun `an exhausted binary scan should admit a newly learned failed literal without waiting for the interval`() {
-        val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2, 4), intArrayOf(1, 2, 5)).bake(),
+        val session = PropagationSession(rootProblem(intArrayOf(1, 2, 4), intArrayOf(1, 2, 5)).bake(),
             nativeSat = true)
         val pass = RootProbingPass()
         val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false,
@@ -125,7 +125,7 @@ class RootProbingPassTest {
             arrayOf(intArrayOf(0, 2)),
             arrayOf(intArrayOf(1), intArrayOf(0, 2, 4)),
         )) {
-            val session = PropagationSession(rootInprocessingProblem(*clauses).bake(), nativeSat = true)
+            val session = PropagationSession(rootProblem(*clauses).bake(), nativeSat = true)
             val stats = SearchStatsSink()
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1,
@@ -138,7 +138,7 @@ class RootProbingPassTest {
 
     @Test
     fun `buffer release should preserve discovered binary eligibility until scope reset`() {
-        val session = PropagationSession(rootInprocessingProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = true)
+        val session = PropagationSession(rootProblem(intArrayOf(0, 2, 4)).bake(), nativeSat = true)
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
         val pass = RootProbingPass()
         val params = BacktrackParams(rootProbeBatch = 1, rootProbeImplications = false, rootProbeBinaryGate = true)
@@ -162,7 +162,7 @@ class RootProbingPassTest {
         for ((native, positive) in listOf(false to false, false to true, true to false, true to true)) {
             val literal = Lit.make(0, positive)
             val session = PropagationSession(
-                rootInprocessingProblem(intArrayOf(literal, 2), intArrayOf(literal, 3)).bake(), nativeSat = native,
+                rootProblem(intArrayOf(literal, 2), intArrayOf(literal, 3)).bake(), nativeSat = native,
             )
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2, rootProbeImplications = false), null)
@@ -176,7 +176,8 @@ class RootProbingPassTest {
     @Test
     fun `disabling implication capture should fund cancellation of a pending candidate`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
+            val session =
+                PropagationSession(rootProblem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
             val pass = RootProbingPass()
             val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
             pass.run(session, params, null, containingWork = 63L)
@@ -196,7 +197,7 @@ class RootProbingPassTest {
     @Test
     fun `a consistent branch should not assert its implied literals at the root`() {
         for (native in listOf(false, true)) {
-            val source = rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(1, 4), intArrayOf(3, 5, 6))
+            val source = rootProblem(intArrayOf(1, 2), intArrayOf(1, 4), intArrayOf(3, 5, 6))
             val session = PropagationSession(source.bake(), nativeSat = native)
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 1), null)
@@ -212,7 +213,7 @@ class RootProbingPassTest {
     @Test
     fun `direct binary reasons should not be admitted again`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2)).bake(), nativeSat = native)
+            val session = PropagationSession(rootProblem(intArrayOf(1, 2)).bake(), nativeSat = native)
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
 
@@ -223,7 +224,8 @@ class RootProbingPassTest {
     @Test
     fun `a deferred consistent implication should resume without another probe`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
+            val session =
+                PropagationSession(rootProblem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
             val pass = RootProbingPass()
             val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
             val stats = SearchStatsSink()
@@ -243,7 +245,7 @@ class RootProbingPassTest {
     @Test
     fun `own implication history should survive learned compaction`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(1, 4),
+            val session = PropagationSession(rootProblem(intArrayOf(1, 2), intArrayOf(1, 4),
                 intArrayOf(3, 5, 6)).bake(), nativeSat = native)
             val pass = RootProbingPass()
             val stats = SearchStatsSink()
@@ -261,7 +263,7 @@ class RootProbingPassTest {
     @Test
     fun `optional buffer release should preserve the implication admission bound`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(3, 4),
+            val session = PropagationSession(rootProblem(intArrayOf(1, 2), intArrayOf(3, 4),
                 intArrayOf(5, 6), intArrayOf(7, 0)).bake(), nativeSat = native)
             val pass = RootProbingPass()
             val stats = SearchStatsSink()
@@ -280,7 +282,8 @@ class RootProbingPassTest {
     @Test
     fun `unfundable implication storage should retain failed literal probing`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(0, 2), intArrayOf(0, 3)).bake(), nativeSat = native)
+            val session =
+                PropagationSession(rootProblem(intArrayOf(0, 2), intArrayOf(0, 3)).bake(), nativeSat = native)
             val pass = RootProbingPass()
             val params = BacktrackParams(rootProbeBatch = 2, learnedMemoryScratchBytes = 0L)
 
@@ -294,7 +297,7 @@ class RootProbingPassTest {
     @Test
     fun `interrupted consistent probes should leave no retained implication`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(1, 4),
+            val session = PropagationSession(rootProblem(intArrayOf(1, 2), intArrayOf(1, 4),
                 intArrayOf(3, 5, 6)).bake(), nativeSat = native)
             val pass = RootProbingPass()
 
@@ -317,7 +320,8 @@ class RootProbingPassTest {
     @Test
     fun `reset should cancel an unadmitted consistent implication`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
+            val session =
+                PropagationSession(rootProblem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
             val pass = RootProbingPass()
             val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
             pass.run(session, params, null, containingWork = 63L)
@@ -334,7 +338,8 @@ class RootProbingPassTest {
     @Test
     fun `buffer release should retain an unadmitted consistent implication`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
+            val session =
+                PropagationSession(rootProblem(intArrayOf(1, 2), intArrayOf(3, 4)).bake(), nativeSat = native)
             val pass = RootProbingPass()
             val params = BacktrackParams(rootProbeBatch = 1, inprocessingProbeWork = 256L)
             val stats = SearchStatsSink()
@@ -372,8 +377,8 @@ class RootProbingPassTest {
     @Test
     fun `completed root probes should preserve saved search phases`() {
         for ((native, conflicting) in listOf(false to false, false to true, true to false, true to true)) {
-            val source = if (conflicting) rootInprocessingProblem(intArrayOf(1, 2), intArrayOf(1, 3))
-            else rootInprocessingProblem(intArrayOf(1, 2))
+            val source = if (conflicting) rootProblem(intArrayOf(1, 2), intArrayOf(1, 3))
+            else rootProblem(intArrayOf(1, 2))
             val session = PropagationSession(source.bake(), nativeSat = native)
             val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
             val phase = PhaseSaving(source.numBoolVars, 0, params)
@@ -407,7 +412,7 @@ class RootProbingPassTest {
     @Test
     fun `interrupted root probes should preserve saved search phases`() {
         for (native in listOf(false, true)) {
-            val source = rootInprocessingProblem(intArrayOf(1, 2))
+            val source = rootProblem(intArrayOf(1, 2))
             val session = PropagationSession(source.bake(), nativeSat = native)
             val params = BacktrackParams(rootProbeBatch = 1, rootProbeWork = 1L, phaseSaving = true)
             val phase = PhaseSaving(source.numBoolVars, 0, params)
@@ -424,7 +429,7 @@ class RootProbingPassTest {
     @Test
     fun `ordinary retractions after root probing should still save phases`() {
         for (native in listOf(false, true)) {
-            val source = rootInprocessingProblem(intArrayOf(1, 2))
+            val source = rootProblem(intArrayOf(1, 2))
             val session = PropagationSession(source.bake(), nativeSat = native)
             val params = BacktrackParams(rootProbeBatch = 1, phaseSaving = true)
             val phase = PhaseSaving(source.numBoolVars, 0, params)
@@ -581,7 +586,7 @@ class RootProbingPassTest {
     @Test
     fun `reset should release a retained probe neighborhood`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(0, 2)).bake(), nativeSat = native)
+            val session = PropagationSession(rootProblem(intArrayOf(0, 2)).bake(), nativeSat = native)
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2)
             val pass = RootProbingPass()
             val initial = SharingMemoryObservation(1024L, 128, { false }, {})
@@ -604,7 +609,8 @@ class RootProbingPassTest {
     @Test
     fun `a locally capped probe should restore the complete root for another invocation`() {
         for (native in listOf(false, true)) {
-            val session = PropagationSession(rootInprocessingProblem(intArrayOf(0, 2), intArrayOf(0, 3)).bake(), nativeSat = native)
+            val session =
+                PropagationSession(rootProblem(intArrayOf(0, 2), intArrayOf(0, 3)).bake(), nativeSat = native)
 
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2, rootProbeWork = 1), null)
 
@@ -618,7 +624,7 @@ class RootProbingPassTest {
 
     @Test
     fun `cancelled probing should leave no deduction or standing decision`() {
-        val session = PropagationSession(rootInprocessingProblem(intArrayOf(0, 2), intArrayOf(0, 3)).bake())
+        val session = PropagationSession(rootProblem(intArrayOf(0, 2), intArrayOf(0, 3)).bake())
         var polls = 0
         session.withCancellation(ExecutionControl { ++polls >= 2 }) {
             RootProbingPass().run(session, BacktrackParams(rootProbeBatch = 2), null)
@@ -632,7 +638,7 @@ class RootProbingPassTest {
     fun `logical retirement should preserve probe progress toward a useful learned suffix`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
-                rootInprocessingProblem(intArrayOf(6, 0), intArrayOf(6, 1)).bake(), nativeSat = native,
+                rootProblem(intArrayOf(6, 0), intArrayOf(6, 1)).bake(), nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(2, 4)), 2)
@@ -658,7 +664,7 @@ class RootProbingPassTest {
     fun `physical compaction should invalidate probe positions before a useful learned survivor`() {
         for (native in listOf(false, true)) {
             val session = PropagationSession(
-                rootInprocessingProblem(intArrayOf(6, 0), intArrayOf(6, 1)).bake(), nativeSat = native,
+                rootProblem(intArrayOf(6, 0), intArrayOf(6, 1)).bake(), nativeSat = native,
             )
             assertEquals(native, session.usesNativeSat)
             session.addLearnedClause(Clause(intArrayOf(2, 4)), 2)

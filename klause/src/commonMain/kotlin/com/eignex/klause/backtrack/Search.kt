@@ -2,7 +2,6 @@ package com.eignex.klause.backtrack
 
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.lp.bounding.LpEngine
 import com.eignex.klause.lp.bounding.hasDefaultNumericalSettings
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.propagation.Assumptions
@@ -684,6 +683,7 @@ private class CpSatisfactionTraversalPolicy(
     }
 }
 
+/** The shared learned-clause bound mirrors the CP database's own cap and glue threshold. */
 internal fun BacktrackParams.sharedLearnedDb(): SearchLearnedDbParams =
     SearchLearnedDbParams(maxClauses = maxLearnedClauses, glueLbd = lbdGlueThreshold,
         softLimitBytes = learnedMemoryBytes, reclamationWork = learnedMemoryWork,

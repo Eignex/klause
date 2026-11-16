@@ -3,7 +3,6 @@ package com.eignex.klause.formats.xcsp3
 import com.eignex.klause.config.KlauseConfig
 import com.eignex.klause.factor.arithmetic.ArrayMinMax
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.arithmetic.Product
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.DefinitionHint
 import com.eignex.klause.ir.EffectiveSourceSemantics

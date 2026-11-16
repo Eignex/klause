@@ -56,7 +56,6 @@ import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.mulExact
 import kotlin.math.abs
 import kotlin.math.nextUp
-import kotlin.math.round
 
 /**
  * Sound lower bound on a [LinearObjective] given the current partial assignment in

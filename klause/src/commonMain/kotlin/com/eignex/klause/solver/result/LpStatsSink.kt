@@ -14,6 +14,7 @@ import com.eignex.kumulant.stat.summary.SumResult
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource.Monotonic
 
+/** Mutable LP-stats accumulator, one per solve; snapshots into an [LpStats]. See [SolveStatsSink]. */
 internal class LpStatsSink(private val probeRoute: LpRoute = LpRoute.NODE) {
     var sparseTrial: Map<String, Long> = emptyMap()
     private val phases = LinkedHashMap<String, LpPhaseStats>()

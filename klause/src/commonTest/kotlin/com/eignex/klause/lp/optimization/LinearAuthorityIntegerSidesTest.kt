@@ -1,14 +1,12 @@
 package com.eignex.klause.lp.optimization
 
-import com.eignex.klause.lp.optimization.AggregateCutTestSource.right
-import com.eignex.klause.lp.optimization.AggregateCutTestSource.left
-import com.eignex.klause.lp.optimization.AggregateCutTestSource.scope
-import com.eignex.klause.lp.optimization.AggregateCutTestSource.real
-import com.eignex.klause.lp.optimization.AggregateCutTestSource.y
-import com.eignex.klause.lp.optimization.AggregateCutTestSource.x
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.engine.CutFamily
+import com.eignex.klause.lp.optimization.AggregateCutTestSource.real
+import com.eignex.klause.lp.optimization.AggregateCutTestSource.scope
+import com.eignex.klause.lp.optimization.AggregateCutTestSource.x
+import com.eignex.klause.lp.optimization.AggregateCutTestSource.y
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -22,7 +20,6 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
-import com.eignex.util.numbers.shl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

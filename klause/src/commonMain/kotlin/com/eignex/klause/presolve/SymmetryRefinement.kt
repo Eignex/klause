@@ -1,11 +1,9 @@
 package com.eignex.klause.presolve
 
-import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.StructuralKey
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.ir.values
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.baked
@@ -65,7 +63,9 @@ internal class ActiveSymmetryColumns(
     fun heldBools(objective: Set<Int>): Set<Int> = objective + readBools.indices.filter { !readBools[it] }
 }
 
-internal fun activeColumns(problem: Problem, columns: SymmetryColumns, cancellation: ExecutionControl): ActiveSymmetryColumns? =
+internal fun activeColumns(
+    problem: Problem, columns: SymmetryColumns, cancellation: ExecutionControl,
+): ActiveSymmetryColumns? =
     PresolveScan(cancellation).use { activeColumnsWithin(problem, columns, it) }
 
 private fun activeColumnsWithin(problem: Problem, columns: SymmetryColumns,
@@ -340,7 +340,6 @@ private fun assignColours(
     for (v in sigBool.indices) boolColour[v] = ids.getValue(sigBool[v])
     return ids.size
 }
-
 
 /**
  * A `LongArray`-backed colour-refinement signature, composed of integer words (variable colours and

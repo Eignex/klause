@@ -1,6 +1,5 @@
 package com.eignex.klause.lp.engine
 
-
 internal data class LpScopedMetrics(
     val editAttempts: Long,
     val editSuccesses: Long,

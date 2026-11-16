@@ -50,7 +50,8 @@ internal object SymmetryBreaking {
         objectiveBoolVars: Set<Int> = emptySet(),
         cancellation: ExecutionControl = ExecutionControl.Never,
     ): PassDelta {
-        val extra = breakings(problem, FiniteSymmetryColumns(problem), objectiveIntVars, objectiveBoolVars, cancellation)
+        val extra =
+            breakings(problem, FiniteSymmetryColumns(problem), objectiveIntVars, objectiveBoolVars, cancellation)
         return if (extra.isEmpty()) PassDelta() else PassDelta(addedFactors = extra)
     }
 

@@ -13,7 +13,6 @@ import com.eignex.klause.theory.qfnra.PolynomialSigns.ZERO_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.BigFraction
-import com.eignex.util.numbers.shl
 
 // Depth-first lifting over cylindrical algebraic decomposition cells: per coordinate, the projection
 // polynomials' roots split the line into sections and sectors, each sampled once. Collins, "Quantifier

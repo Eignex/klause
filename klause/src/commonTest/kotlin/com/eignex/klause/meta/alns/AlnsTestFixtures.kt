@@ -1,61 +1,31 @@
 package com.eignex.klause.meta.alns
 
-import com.eignex.klause.backtrack.BacktrackParams
-import com.eignex.klause.backtrack.BacktrackSolver
-import com.eignex.klause.backtrack.NodeBudget
-import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.factor.bool.Cardinality
 import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.ir.BoolFoldDefinition
 import com.eignex.klause.ir.Factor
-import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.DefinitionalSweep
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
-import com.eignex.klause.localsearch.RepairEndpoint
-import com.eignex.klause.localsearch.RepairTrace
-import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.propagation.DeducedRestrictions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.solver.IncumbentBootstrapSearch
-import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
-import com.eignex.klause.solver.RepairSearch
-import com.eignex.klause.solver.RepairSearchStep
-import com.eignex.klause.solver.ResumableOptimizer
-import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
-import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.IncumbentExchange
-import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
-import com.eignex.klause.solver.result.LocalSearchStats
 import com.eignex.klause.solver.result.MinimizeResult
-import com.eignex.klause.solver.result.SearchStats
-import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
-import com.eignex.klause.solver.validation.finiteWitnessVerifier
-import com.eignex.klause.util.ExecutionControl
-import com.eignex.kumulant.stat.summary.SumResult
-import com.eignex.util.numbers.BigFraction
-import kotlin.random.Random
-import kotlin.test.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
-import kotlin.test.assertIs
 import kotlin.test.assertNotNull
-import kotlin.test.assertNotSame
-import kotlin.test.assertNull
-import kotlin.test.assertSame
-import kotlin.test.assertTrue
 
 internal object AlnsTestFixtures {
+    val SELECT_WEIGHTS = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L, 12L, 4L, 11L, 10L)
+    const val SELECT_MIN = 4
+
+    val SELECT_DEAREST = listOf(8, 10, 11, 3)
+
     // The production deep arm's flipsOverride replaces maxFlips rather than being capped by it.
     val scaledRepairOperators: List<RepairOperator> = listOf(
         InnerLsRepair(label = "standard"),
@@ -106,7 +76,6 @@ internal object AlnsTestFixtures {
         initialAssignment = Sample(BooleanArray(SELECT_WEIGHTS.size) { true }, LongArray(0)),
     )
 
-
     fun bootstrapAt(problem: BakedProblem, sample: Sample) =
         object : Optimizer<LocalSearchParams> by NoFeasibleLs(problem) {
             override fun minimize(objective: LinearObjective, params: LocalSearchParams): MinimizeResult =
@@ -143,10 +112,4 @@ internal object AlnsTestFixtures {
         override fun samples(params: LocalSearchParams) = error("unused")
         override fun enumerate(params: LocalSearchParams) = error("unused")
     }
-
-
-    val SELECT_WEIGHTS = longArrayOf(7L, 3L, 5L, 9L, 1L, 8L, 2L, 6L, 12L, 4L, 11L, 10L)
-    const val SELECT_MIN = 4
-
-    val SELECT_DEAREST = listOf(8, 10, 11, 3)
 }

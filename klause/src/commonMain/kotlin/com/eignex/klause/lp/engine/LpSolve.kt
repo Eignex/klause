@@ -9,7 +9,6 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
-import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.unaryMinus
 import kotlin.time.Duration
 import kotlin.time.TimeSource

@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.relaxation
 
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
-import com.eignex.klause.factor.circuit.Circuit
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.values

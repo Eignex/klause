@@ -232,7 +232,9 @@ internal object AffineSingletons {
         // The session-maintained index matches the pristine input factor order, so the first candidate
         // search reads it instead of rebuilding an O(factors) index; each fold then patches only the
         // occurrence entries of the rewritten factors rather than re-indexing the whole set.
-        val ws = AffineWorkingSet(problem.factors, eliminated.size, sharedIntOcc, pivotOrder == AffinePivotOrder.REWRITE_COST)
+        val ws = AffineWorkingSet(
+            problem.factors, eliminated.size, sharedIntOcc,
+            pivotOrder == AffinePivotOrder.REWRITE_COST)
         // Each elimination rewrites only the factors mentioning the pivot and appends bound rows, so the
         // per-elimination cost is O(occurrences of x) rather than O(factors). The candidate scan still
         // walks the live factors in order (the elimination order is selection-order-sensitive), but the
@@ -707,7 +709,8 @@ internal object AffineSingletons {
     /**
      * The read-only occurrence queries the candidate scans ([findAffineCandidate], [findResidueCandidate])
      * run: walk the factors by stable id and, per pivot, test where else the variable occurs. Both the
-     * mutable [AffineWorkingSet] and the pristine-input [AffineSeedOccurrences] answer these, so a scan can run over the
+     * mutable [AffineWorkingSet] and the pristine-input [AffineSeedOccurrences] answer these,
+     * so a scan can run over the
      * session's shared occurrence index without first materialising a mutable working set.
      */
     internal interface FactorOcc {
@@ -790,8 +793,6 @@ internal object AffineSingletons {
     } catch (_: CheckedLongOverflowException) {
         true
     }
-
-
 }
 
 /** A single affine elimination `x = (constTerm + Σ termCoeffs·termVars) / divisor` recorded by

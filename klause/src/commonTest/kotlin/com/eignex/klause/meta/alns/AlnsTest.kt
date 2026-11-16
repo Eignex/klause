@@ -1,17 +1,5 @@
 package com.eignex.klause.meta.alns
 
-import com.eignex.klause.meta.alns.AlnsTestFixtures.selectOptimum
-import com.eignex.klause.meta.alns.AlnsTestFixtures.selectProblem
-import com.eignex.klause.meta.alns.AlnsTestFixtures.selectAlns
-import com.eignex.klause.meta.alns.AlnsTestFixtures.selectObjective
-import com.eignex.klause.meta.alns.AlnsTestFixtures.selectExchangeHolding
-import com.eignex.klause.meta.alns.AlnsTestFixtures.starvedBootstrap
-import com.eignex.klause.meta.alns.AlnsTestFixtures.bootstrapAt
-import com.eignex.klause.meta.alns.AlnsTestFixtures.chainProblem
-import com.eignex.klause.meta.alns.AlnsTestFixtures.chainSweep
-import com.eignex.klause.meta.alns.AlnsTestFixtures.NoFeasibleLs
-import com.eignex.klause.meta.alns.AlnsTestFixtures.SELECT_WEIGHTS
-import com.eignex.klause.meta.alns.AlnsTestFixtures.SELECT_DEAREST
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.factor.arithmetic.Linear
@@ -28,6 +16,18 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.localsearch.RepairEndpoint
 import com.eignex.klause.localsearch.RepairTrace
+import com.eignex.klause.meta.alns.AlnsTestFixtures.NoFeasibleLs
+import com.eignex.klause.meta.alns.AlnsTestFixtures.SELECT_DEAREST
+import com.eignex.klause.meta.alns.AlnsTestFixtures.SELECT_WEIGHTS
+import com.eignex.klause.meta.alns.AlnsTestFixtures.bootstrapAt
+import com.eignex.klause.meta.alns.AlnsTestFixtures.chainProblem
+import com.eignex.klause.meta.alns.AlnsTestFixtures.chainSweep
+import com.eignex.klause.meta.alns.AlnsTestFixtures.selectAlns
+import com.eignex.klause.meta.alns.AlnsTestFixtures.selectExchangeHolding
+import com.eignex.klause.meta.alns.AlnsTestFixtures.selectObjective
+import com.eignex.klause.meta.alns.AlnsTestFixtures.selectOptimum
+import com.eignex.klause.meta.alns.AlnsTestFixtures.selectProblem
+import com.eignex.klause.meta.alns.AlnsTestFixtures.starvedBootstrap
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.DeducedRestrictions
 import com.eignex.klause.propagation.bake

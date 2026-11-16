@@ -1,18 +1,18 @@
 package com.eignex.klause.meta.alns
 
-import com.eignex.klause.meta.alns.AlnsTestFixtures.selectOptimum
-import com.eignex.klause.meta.alns.AlnsTestFixtures.selectProblem
-import com.eignex.klause.meta.alns.AlnsTestFixtures.selectObjective
-import com.eignex.klause.meta.alns.AlnsTestFixtures.bootstrapAt
-import com.eignex.klause.meta.alns.AlnsTestFixtures.NoFeasibleLs
-import com.eignex.klause.meta.alns.AlnsTestFixtures.SELECT_WEIGHTS
-import com.eignex.klause.meta.alns.AlnsTestFixtures.SELECT_DEAREST
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.backtrack.NodeBudget
 import com.eignex.klause.localsearch.AcceptanceCriterion
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
+import com.eignex.klause.meta.alns.AlnsTestFixtures.NoFeasibleLs
+import com.eignex.klause.meta.alns.AlnsTestFixtures.SELECT_DEAREST
+import com.eignex.klause.meta.alns.AlnsTestFixtures.SELECT_WEIGHTS
+import com.eignex.klause.meta.alns.AlnsTestFixtures.bootstrapAt
+import com.eignex.klause.meta.alns.AlnsTestFixtures.selectObjective
+import com.eignex.klause.meta.alns.AlnsTestFixtures.selectOptimum
+import com.eignex.klause.meta.alns.AlnsTestFixtures.selectProblem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
