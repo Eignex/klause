@@ -3,6 +3,8 @@ package com.eignex.klause.factor.arithmetic
 import com.eignex.klause.factor.bool.internals.buildSignedWeightByVar
 import com.eignex.klause.factor.bool.internals.pbDistance
 import com.eignex.klause.factor.bool.internals.pbHolds
+import com.eignex.klause.factor.bool.internals.reifiedBoolApply
+import com.eignex.klause.factor.bool.internals.reifiedBoolDelta
 import com.eignex.klause.factor.bool.internals.reifiedBoolUpdateBreakMake
 import com.eignex.klause.factor.bool.internals.reifiedDegree
 import com.eignex.klause.factor.compressViolation
@@ -24,8 +26,6 @@ internal class ReifiedPseudoBooleanInvariant(
 ) : Invariant {
 
     private val signedByVar: IntLongMap = buildSignedWeightByVar(weights, literals, exclude = auxBoolVar)
-
-    private fun reifSignedFor(v: Int): Long = signedByVar[v]
 
     override fun initialize(state: LocalSearchState, factorId: Int) {
         var sum = 0L
@@ -52,37 +52,15 @@ internal class ReifiedPseudoBooleanInvariant(
 
     override val maintainsBreakMakeIncrementally: Boolean get() = true
 
-    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val aux = state.assignment.boolValue(auxBoolVar)
-        val total = state.longPayload[factorId]
-        val cap = state.violationSoftCap
-        return if (boolVar == auxBoolVar) {
-            reifDegree(total, !aux, cap) - reifDegree(total, aux, cap)
-        } else {
-            val signed = reifSignedFor(boolVar)
-            if (signed == 0L) return 0
-            val pre = state.assignment.boolValue(boolVar)
-            val change = if (pre) -signed else signed
-            reifDegree(total + change, aux, cap) - reifDegree(total, aux, cap)
+    override fun deltaIfBoolFlipped(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        reifiedBoolDelta(state, factorId, boolVar, auxBoolVar, signedByVar) { total, aux, cap ->
+            reifDegree(total, aux, cap)
         }
-    }
 
-    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int {
-        val oldTotal = state.longPayload[factorId]
-        val cap = state.violationSoftCap
-        if (boolVar == auxBoolVar) {
-            val newAux = state.assignment.boolValue(auxBoolVar)
-            return reifDegree(oldTotal, newAux, cap) - reifDegree(oldTotal, !newAux, cap)
+    override fun applyBoolFlip(state: LocalSearchState, factorId: Int, boolVar: Int): Int =
+        reifiedBoolApply(state, factorId, boolVar, auxBoolVar, signedByVar) { total, aux, cap ->
+            reifDegree(total, aux, cap)
         }
-        val signed = reifSignedFor(boolVar)
-        if (signed == 0L) return 0
-        val pre = !state.assignment.boolValue(boolVar)
-        val change = if (pre) -signed else signed
-        val newTotal = oldTotal + change
-        state.longPayload[factorId] = newTotal
-        val aux = state.assignment.boolValue(auxBoolVar)
-        return reifDegree(newTotal, aux, cap) - reifDegree(oldTotal, aux, cap)
-    }
 
     override fun proposeRepairMoves(state: LocalSearchState, factorId: Int, sink: MoveSink) {
         val aux = state.assignment.boolValue(auxBoolVar)

@@ -5,7 +5,6 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.values
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.collections.IntArrayList
-import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableLongIntMap
 
 /**
@@ -45,37 +44,16 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
         return col
     }
     for ((position, x) in xs.withIndex()) {
-        val box = builder.rootDomain(x)
-        val live = builder.liveDomain(x)
-        val sel = IntArrayList()
-        val selVal = LongArrayList()
-        box.values.forEach { v ->
-            // The selector z_xv is present while value v stays in x's live domain.
-            val z = builder.auxColumn(
-                0L,
-                if (live.contains(v)) 1L else 0L,
-                presence = longArrayOf(x.toLong(), v),
-                definition = LpAuxiliaryColumn(listOf(1L, position.toLong(), v), 1L, true),
+        if (!builder.emitOneHotValues(
+                x,
+                definition = { value -> LpAuxiliaryColumn(listOf(1L, position.toLong(), value), 1L, true) },
+                selector = { value, column ->
+                    if (value !in exceptValues) {
+                        builder.row(intArrayOf(column, yOf(value)), longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL)
+                    }
+                },
             )
-            sel.add(z)
-            selVal.add(v)
-            if (v !in exceptValues) {
-                builder.row(intArrayOf(z, yOf(v)), longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL)
-            }
-        }
-        val k = sel.size
-        if (k == 0) return // a variable with no values in its root box — leave it to propagation
-        builder.row(sel.toIntArray(), LongArray(k) { 1L }, LinearOp.EQ, 1L, Contribution.HULL) // Σ_v z = 1
-        // Σ_v v·z − xs(i) = 0.
-        val cCols = IntArray(k + 1)
-        val cVals = LongArray(k + 1)
-        for (s in 0 until k) {
-            cCols[s] = sel[s]
-            cVals[s] = selVal[s]
-        }
-        cCols[k] = builder.intColumn(x)
-        cVals[k] = -1L
-        builder.row(cCols, cVals, LinearOp.EQ, 0L, Contribution.HULL)
+        ) return
     }
     val op = when (mode) {
         NValue.Mode.Eq -> LinearOp.EQ

@@ -325,8 +325,6 @@ internal class KnapsackLagrangianBound(
         return Eval(feasible = true, num = num, x = x)
     }
 
-    /** One deflected subgradient ascent step; false if the subgradient is zero. Same Camerini–Fratta–Maffioli
-     *  deflection and Polyak step as [LagrangianBound]. */
     private fun subgradientStep(
         x: IntArray,
         p: LongArray,
@@ -335,43 +333,14 @@ internal class KnapsackLagrangianBound(
         prevDir: DoubleArray,
     ): Boolean {
         val g = LongArray(multiplierCount)
-        var gNorm2 = 0.0
         for (r in 0 until multiplierCount) {
             var gr = -rowRhs[r]
             val vs = rowVars[r]
             val cs = rowCoeffs[r]
             for (k in vs.indices) gr += cs[k] * x[vs[k]]
             g[r] = gr
-            gNorm2 += gr.toDouble() * gr.toDouble()
         }
-        if (gNorm2 == 0.0) return false
-        var gDotPrev = 0.0
-        var prevNorm2 = 0.0
-        for (r in 0 until multiplierCount) {
-            gDotPrev += g[r].toDouble() * prevDir[r]
-            prevNorm2 += prevDir[r] * prevDir[r]
-        }
-        val beta = if (prevNorm2 > 0.0 && gDotPrev < 0.0) -gDotPrev / prevNorm2 else 0.0
-        var dNorm2 = 0.0
-        val d = DoubleArray(multiplierCount)
-        for (r in 0 until multiplierCount) {
-            d[r] = g[r].toDouble() + beta * prevDir[r]
-            dNorm2 += d[r] * d[r]
-            prevDir[r] = d[r]
-        }
-        if (dNorm2 == 0.0) return false
-        val lValue = num.toDouble() / Q.toDouble()
-        val t = (incumbent - lValue) / dNorm2
-        for (r in 0 until multiplierCount) {
-            val step = (Q.toDouble() * t * d[r]).toLong()
-            var pr = p[r] + step
-            when (rowSign[r]) {
-                1 -> if (pr < 0L) pr = 0L
-                -1 -> if (pr > 0L) pr = 0L
-            }
-            p[r] = pr
-        }
-        return true
+        return p.deflectedSubgradientStep(g, num, incumbent, prevDir, Q, rowSign)
     }
 
     private fun coeffOf(r: Int, localVar: Int): Long {

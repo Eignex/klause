@@ -767,6 +767,11 @@ source rows, and omitting a row never removes its constraint from the witness ch
 Circuit arcs, Boolean RLT rows and scheduling families use only factors that keep
 their built-in descriptors.
 
+Regular and MDD projections share layered-flow row buffers and emission; each provider
+owns arc enumeration, auxiliary identities and preparation admission. GCC and NValue
+share per-variable one-hot selectors and value channels while retaining their own
+count relations, exceptions and column roles.
+
 ## LP certification
 
 Certification checks numerical proposals against the exact active model. Different
