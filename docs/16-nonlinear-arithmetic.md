@@ -301,9 +301,6 @@ defining polynomial and root index and never rounded for publication. The
 `QfNraParams.maximumWork` is nullable for unlimited work; zero prevents entry. One
 counted scope spans normalization, probing, projection, lifting, Boolean search and
 the final poll. A stop returns `Unknown` with its reason, never a partial verdict.
-Internal preparation pauses share a bounded advance; an externally returned pause
-settles its admitted work. A private probe ceiling releases only its own stop;
-containing cancellation remains terminal for the active operation.
 Kernel allocation caps (65,536 dense coefficients and 262,144 matrix cells by
 default) return `Unknown(ResourceLimit)`; see
 [kernel resources](18-exact-arithmetic.md#invocation-resources). A complete

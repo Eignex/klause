@@ -331,13 +331,8 @@ optimization returning with an unresolved objective leaf from an undecided
 component. It includes the native stop visible at return, when present. The
 CLI's verbose stream tags the worker; the event changes no result or allowance.
 
-Tight loops poll cancellation at bounded checkpoints independently of accounting.
-Finite propagation contributes primitive visits to its worker's shared 1,024-unit
-countdown; unbound propagation polls within 64 visits. Reconstruction schedules
-checks from its admitted work total within 4,096 work units. Integer limb counts
-advance that checkpoint without changing work charges.
-Value-ordering probes enforce a scoped integer work limit directly against
-propagation work; that limit does not change the cancellation cadence. Public entry, bulk allocation, result
+Tight loops poll cancellation at bounded checkpoints independently of accounting;
+nested worker operations share one countdown. Entry, bulk allocation, result
 delivery and nonpublication exits force a poll. Batching grants no work, and a
 stopped query publishes no partial fact, point or conflict. Custom contexts default
 to cancellation only.
@@ -429,29 +424,12 @@ variables. Each `WorkCounter` retains its fixed `concurrency` mode and defaults 
 acquire no mutex. Concurrent snapshots can span several charges; completed charges
 remain exact after workers join. Quota
 registration alone uses a mutex, and capacity is read before registration.
-`Cancellation` in `util` describes only stopping and deadline metadata.
-`ExecutionControl` binds that predicate to an explicit `WorkMeter` and optional
-arithmetic admission source. Adding a stop condition retains the receiver's
-accounting owner; execution boundaries bind a different owner explicitly.
-At ownership transitions, an already contained complete stop scope is retained
-once. Explicit Boolean composition preserves predicate order and repetition.
-Independent admission bounds and polling owners remain attached to their scopes.
-Internal scope joins recognize containing stops declared by worker, preparation and
-presolve wrappers. Accounting adaptation alone does not establish stop containment.
-Charging completed work never evaluates a stop predicate. Solver policy owns
-currency conversions and result semantics.
-`withBoundedPolling()` creates a countdown owned by one executing worker for
-cooperative checkpoints. Direct stop observations remain immediate, and numeric
-admission limits are checked independently of that countdown.
-Source routing and selected encoding construction bind checkpoints to their own
-serial operations. Private relation construction shares that operation's countdown;
-quota exhaustion and the final publication stop are checked immediately. Retained
-source controls do not retain a construction operation's mutable countdown.
-Required routing preparation keeps its closable work ledger as an accounting view of the
-invocation stop, so completing that ledger does not add another stop predicate.
-Source binding retains an already supplied invocation deadline as a live control
-instead of copying its current mark into another predicate. Independent earlier
-timeouts retain their own boundaries.
+`Cancellation` describes stopping and deadline metadata; `WorkMeter` records work.
+`ExecutionControl` binds these separately from arithmetic admission. Stop composition
+retains the receiver's accounting; `withAccounting` explicitly selects another owner.
+Charging work never evaluates cancellation. `withBoundedPolling()` gives each executing
+worker its own countdown, shared by nested work; direct stop observations and quota
+enforcement remain immediate. Solver policy owns currency conversions and result semantics.
 
 Arithmetic allowance cursors reserve bounded credit from persistent worker and
 containing `WorkCreditPool`s. Reserved capacity is distinct from spent work; a
@@ -459,21 +437,15 @@ sibling holding credit can delay admission without establishing exhaustion. A cu
 returns unused capacity and settles used units exactly once before handoff, pause
 or exit, including exceptional exits. Each containing meter receives the same
 admitted native units once. Unlimited pools still retain exact saturating charges.
-Within an admitted lease, the debit cursor advances to the nearer of its capacity
-and the next cancellation checkpoint. Polling does not maintain a second scalar
-decrement for those same native units; weighted arithmetic can shorten the cursor's
-next checkpoint without changing its admitted work.
-Serial pools use plain integer variables. Shared pools reserve available credit
-with integer compare-and-set and record settled work in a separate saturating
-integer counter. Admission updates precede completed debit publication; transient
-snapshots need not combine those updates atomically. Completed charges remain
-exact after workers join. Debits allocate no state objects and acquire no mutex.
+Serial pools use plain integer variables; shared pools reserve available credit
+through relaxed atomic compare-and-set and record settled work in a separate
+saturating integer counter, without a mutex.
 
 Polynomial native checkpoints read the shared allowance, worker quota and representation
 stops without locking, then inspect containing predicates. Representation declines
 use published reference cells; worker registration uses a separate mutex. Encoder
 preparation latches an observed stop for that capture while
-retaining its explicitly selected accounting and admission owner.
+forwarding live deadlines and work meters to its parent.
 
 ---
 

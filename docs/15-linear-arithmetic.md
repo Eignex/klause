@@ -172,14 +172,11 @@ guesses only order exhaustive Boolean splits. The `openHintFlips` allowance
 controls them: null enables direct preferences, a positive value also enables
 compound clause preferences, and zero disables steering.
 
-Source and point-hint scans poll cancellation within 8,192 scalar visits,
-independently of accounting. Reconstruction and projection meters contribute to
-that operation's same countdown. The operation binds its work sink once and records
-every debit directly. Loop polling is explicit; a containing engine checkpoint
-always evaluates the full stop, so nested loops do not multiply polling intervals.
-Entry, result allocation and hint publication poll the current tokens directly,
-so an interrupted scan publishes no preferences. Source-bound proofs and numerical
-claims keep their own cancellation boundaries.
+The incremental route shares bounded cancellation checkpoints across source and
+point-hint scans, independently of accounting. Every debit is recorded directly.
+Entry, result allocation and hint publication poll the current
+tokens directly, so an interrupted scan publishes no preferences. Source-bound
+proofs and numerical claims keep their own cancellation boundaries.
 
 ### Results and proof authority
 

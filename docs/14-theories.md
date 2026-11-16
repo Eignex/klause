@@ -209,8 +209,7 @@ difference fragment.
 Immutable edges and fragment descriptions belong to
 [arithmetic.difference](../klause/src/commonMain/kotlin/com/eignex/klause/arithmetic/difference).
 Each search component owns its active facts and captured assignment. Graph
-operations poll the caller's cancellation and bind its work sink at operation entry.
-Heap steps use that bound sink; an individual heap mutation completes before a stop is observed.
+operations poll the caller's cancellation and charge its meter.
 
 Private representations are bounded: registered edges and hint indexes share a
 65,536-entry envelope, and intervals wider than 255 keep ordinary graph search.

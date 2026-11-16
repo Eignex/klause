@@ -85,19 +85,6 @@ its matching column directly, without constructing a duplicate definition.
 Completed and interrupted template preparation and import work also debit the owning
 LP allowance. Import reports its actual charges before publishing authority and
 rechecks cancellation after that debit.
-Worker bound assembly and reduced-cost scans contribute to the worker's shared
-stop countdown. Unbound callers check directly. Scoped LP operations share their
-own countdown across projection, reconstruction and source scans; complete batch
-assertions remain atomic, and enclosing query publication checks the full stop.
-Scalar trail edits and numerical adoption contribute to the containing countdown;
-an unbound caller observes cancellation directly. Exact admission exhaustion is
-checked before an edit or trail commit independently of that countdown. Point-hint
-construction checks at coefficient and source-row boundaries while keeping scalar
-width and allocation guards immediate.
-Numerical pricing records completed work before checking its immediate numerical
-allowance. It advances the containing stop countdown by the estimated work since
-its preceding check; parent cancellation is observed when that countdown is due.
-The numerical solver binds its accounting sink when it adopts a containing token.
 Retained-source assembly and fixed-layout installation adopt the same immutable exact bound objects after a
 complete match against the current normalized column, including its origin, tag,
 integrality and both bound sides.
@@ -1078,13 +1065,6 @@ retries and nested operations share one invocation allowance, and setup, failed
 attempts and cleanup are charged. Cheap exact arithmetic charges operand
 word-length squared.
 
-Reconstruction schedules stop observations from its admitted work total, within
-4096 work units; wider integer inputs advance that checkpoint by their word count.
-The admitted limit is bounded by the resource ceiling, so each debit uses one
-limit check; reaching a checkpoint renews admission after observing cancellation.
-Refinement polls every 64 calls or 4096 work units. Both check resource caps on every
-charge and discard cancelled evidence.
-Work accounting does not increase the frequency of stop or clock observations.
 Every preparation, construction, copy, check and retention step in this chapter
 debits its containing allowance before it publishes. Capped stores (sparse owners,
 factor attempts, guidance, checking, probe and basis copies) reserve storage before

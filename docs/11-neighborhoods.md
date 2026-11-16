@@ -25,12 +25,6 @@ rescan only factors whose degrees change, in the order a full scan would use.
 Cancellation between reconciled primitive edits or definition outputs restores the
 saved coordinates before returning. A primitive probe edit and its restoration
 remain atomic; read-only extensional scores poll within their scans.
-Probe, objective and read-only scoring visits share their worker's countdown of
-at most 1,024 visits. Charging an inspection does not evaluate cancellation.
-Worker picks and probes contribute to that countdown. Direct probe predicates
-check between primitive edits and definition outputs. Unbound scans poll
-within 256 visits, and unbound picks check at entry and
-return; worker publication and suspension force full containing-stop checks.
 
 A functional objective whose every cone definition is a node of the live network
 scores as the linear form of its terms: the probe has already propagated the cone, so

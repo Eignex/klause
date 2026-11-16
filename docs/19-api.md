@@ -26,10 +26,9 @@ which Klause exposes transitively. Import these types from `com.eignex.util.coll
 | `formats.json.ProblemJson`, `factor.codec` | Problem documents, `FactorCodec` registration and `MissingFactorCodecException`; see [problem JSON](03-input-semantics.md#problem-json) |
 | Exported numerical contracts | `BigInt`, `BigFraction`, `AlgebraicReal`, `Cancellation`, `ExecutionControl` and `WorkMeter` |
 
-Execution parameters accept `ExecutionControl { cancelled }` for a stop predicate,
-or `ExecutionControl(Cancellation { cancelled }, meter)` when the caller owns a work
-sink. A work sink records units independently of stopping; explicit allowances
-bound admission. `Cancellation` composition combines only stop predicates.
+Solver execution parameters accept `ExecutionControl { cancelled }`.
+Use `ExecutionControl(Cancellation { cancelled }, meter)` to bind independent work
+accounting; charging does not evaluate cancellation.
 
 Supported extensions supply the behavior their interfaces document. A custom factor
 keeps borrowed arrays and structural keys stable, and registers a `FactorCodec` to be

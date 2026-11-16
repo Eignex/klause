@@ -8,42 +8,22 @@ and charge work to the explicitly bound execution owner.
 `util.ArithmeticExecution` separates native work admission from cancellation
 checkpoints. An owned arithmetic operation uses a local cursor: floating proposal
 loops checkpoint after at most 256 admitted units, quadratic certification after at
-most 64, and polynomial and enclosure kernels after at most 8,192. Operand limbs
-add checkpoint weight without changing the charged work currency. Coefficient
+most 64, and polynomial and enclosure kernels after at most 8,192. Coefficient
 operations whose combined operand size exceeds 4096 bits force a checkpoint before
-the exact primitive. Admission leases cover up to 32,768 native units independently of checkpoint cadence;
-cancellation polling does not settle a lease or allocate another reservation.
+the exact primitive. Cancellation polls retain admitted credit between settlement boundaries.
 Entry, allocation admission, callback handoff, prepared-cursor suspension and all
 exits settle spent work and check the live containing stop. Callback return rebinds
-the live accounting owner. Nested methods share the cursor; concurrent witness
-checks each own a cursor. Retained state holds no unused credit while paused. A stopped operation
+the accounting owner. Nested methods share the cursor; retained state holds no unused
+credit while paused. A stopped operation
 publishes no partial arithmetic result. One arbitrary-precision primitive remains
 cooperative and runs to completion between checkpoints.
-
-Polynomial query advances group internal generator pauses within 32,768 work units
-or 8,192 pauses. The initial normalization pause remains an entry boundary. Every
-returned pause settles admission; internal pauses within an advance share its cursor.
-Witness probe completion and committed root rewrites form suspension boundaries before search resumes.
 
 A unit is one explicit kernel `step`: scalar multiply-accumulate, coefficient visit,
 elimination update or operation admission, according to the kernel. A quadratic
 primitive used by polynomial refutation admits one polynomial unit; a pure
 checkpoint admits none. Numerical evaluation order and exact operands are unchanged.
-Accounting does not determine polling cadence. Nested operations share their
-owner's cursor even when the owner has no reservation source. A direct step
-outside an operation is a complete one-unit boundary. Counter charges themselves
-perform no cancellation observation. Only explicit allowance sources reserve
-credit; opaque work sinks receive exact completed unit charges.
-Admission reports permanent exhaustion separately from stop predicates. A view
-cannot mask its native owner's exhausted allowance, and combined presolve stops
-intersect available slice credit without selecting another accounting owner.
-Nonlinear queries, integer traversal and objective images use one arithmetic budget
-adapter to settle their cursor's pending work against the containing allowance.
-Admission objects contain quota state only. A finite worker owns one plain stop
-1,024-unit countdown shared by its nested propagation and scoring loops. Loops contribute
-their visited units to that countdown instead of multiplying independent polling
-intervals. Full checks at publication and suspension bypass the countdown.
-Independent workers never share countdown state; unbound controls check immediately.
+Accounting does not determine polling cadence. Only explicit allowance sources
+reserve credit; opaque work sinks receive completed unit charges without evaluating cancellation.
 
 ## Exact quadratic certificates
 
@@ -60,13 +40,10 @@ direction.
 `QuadraticCandidates` uses floating penalty-gradient iterations only to propose
 active rows. Owned primitive buffers retain the Hessian, rows, point and gradient.
 Preparation builds the floating model before separate iteration and row-selection routines use it.
-Conversion, copying and norm scans advance the operation's polling cursor by their vector lengths;
-the operation observes cancellation before publishing its selected rows.
 Koblas ASUM computes Hessian row magnitudes and DOT computes squared constraint-row
 magnitudes for the numerical step size.
 Koblas dot and AXPY calls process complete vectors, admitting one work unit per
-entry before each call. Vector admission adds units in checkpoint-sized batches
-without a scalar counter loop. Owned controls batch containing checks independently of
+entry before each call. Owned controls batch containing checks independently of
 these debits. Nonfinite inputs or iterates decline the
 proposal. Reduction rounding can change selected rows; it has no certificate
 authority. Selected rows and all equality rows form an exact rational KKT system;
