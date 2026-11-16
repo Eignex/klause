@@ -1,4 +1,4 @@
-# 16. Nonlinear arithmetic
+# 19. Nonlinear arithmetic
 
 Nonlinear services meet at exact polynomial real completion. Nonlinear integer
 search fixes integer candidates before completing reals; the polynomial theory
@@ -103,12 +103,12 @@ Candidate traversal enumerates integer tuples around zero and source constants,
 then widens; these are search choices, never source bounds. Heuristic strategies
 release one coordinate for local repair or two for a block repair, use rounded
 completion proposals, and escape repeated candidates. The public pipeline also uses
-the [shared exact neighborhood hook](10-local-search.md) for LS and adaptive ALNS,
+the [shared exact neighborhood hook](12-local-search.md) for LS and adaptive ALNS,
 with up to sixteen integer candidate attempts per callback. Heuristic failure and
 finite candidate exhaustion produce UNKNOWN.
 
 MIXED supplies retained whole-source traversal, LS and ALNS factories to the
-[common invocation](12-portfolio.md). Defaults are 1,024 whole-source candidates,
+[common invocation](14-portfolio.md). Defaults are 1,024 whole-source candidates,
 256 heuristic moves and 50 ALNS iterations.
 
 ### Results and proof authority
@@ -204,7 +204,7 @@ delegates bound classification to the quadratic pipeline policy.
 
 The polynomial theory decides rational-coefficient real formulas by CAD and completes
 reals beside finite search. Nonlinear integer and transcendental services reuse its
-conditioned checks. The [polynomial kernel](18-exact-arithmetic.md#exact-polynomial-and-algebraic-arithmetic)
+conditioned checks. The [polynomial kernel](22-exact-arithmetic.md#exact-polynomial-and-algebraic-arithmetic)
 owns arithmetic; this service owns formula decisions and projection policy.
 
 ### Scope and boundaries
@@ -214,7 +214,7 @@ and Boolean structure (QF_NRA). Shared composition supports finite integer domai
 and exact quadratic objectives over Boolean, integer and real coordinates. Open
 integer domains belong to [nonlinear integer arithmetic](#nonlinear-integer-arithmetic).
 [SMT-LIB semantics](05-arithmetic-formats.md#polynomial-source-lowering) owns source admission
-and the [exact polynomial kernel](18-exact-arithmetic.md#exact-polynomial-and-algebraic-arithmetic)
+and the [exact polynomial kernel](22-exact-arithmetic.md#exact-polynomial-and-algebraic-arithmetic)
 owns mathematical operations. Resource limits can interrupt even this complete
 procedure.
 
@@ -299,7 +299,7 @@ their traversal; neighborhood preparation converts native work to instructions
 before combining it with the retained cursor's work.
 `solvePolynomialObjectiveImage` optimizes over a conditioned source with the same IR, and `tryConvexPolynomialOptimum` admits affine rows with a quadratic
 objective through the
-[quadratic certificate kernel](18-exact-arithmetic.md#exact-quadratic-certificates).
+[quadratic certificate kernel](22-exact-arithmetic.md#exact-quadratic-certificates).
 
 ### Results and proof authority
 
@@ -323,7 +323,7 @@ The evidence is in-memory, not an exported CAD proof.
 [ExactNraAssignment](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/ExactNraAssignment.kt)
 captures Boolean buffers and exact real scalars, each represented by its rational
 defining polynomial and root index and never rounded for publication. The
-[API contract](19-api.md#exact-assignment-values) defines their public access.
+[API contract](23-api.md#exact-assignment-values) defines their public access.
 
 ### State and resources
 
@@ -332,9 +332,9 @@ counted scope spans normalization, probing, projection, lifting, Boolean search 
 the final poll. A stop returns `Unknown` with its reason, never a partial verdict.
 Kernel allocation caps (65,536 dense coefficients and 262,144 matrix cells by
 default) return `Unknown(ResourceLimit)`; see
-[kernel resources](18-exact-arithmetic.md#invocation-resources). A complete
+[kernel resources](22-exact-arithmetic.md#invocation-resources). A complete
 portfolio worker keeps its root preparation between slices; see
-[portfolio preparation](12-portfolio.md#polynomial-root-preparation).
+[portfolio preparation](15-portfolio-scheduling.md#polynomial-root-preparation).
 
 The rational definition and support witness heuristics share bounded rational powers
 and scalar admission. Every check and multiplication retains the requesting
@@ -544,7 +544,7 @@ return UNKNOWN/Unsupported. [SMT-LIB semantics](05-arithmetic-formats.md#smt-lib
 The service weakens the original formula into an exact polynomial formula. Each
 function application and each use of pi becomes a fresh real auxiliary, constrained
 by its domain, range and domain-bound affine relaxations from
-[certified enclosures](18-exact-arithmetic.md#certified-transcendental-enclosures).
+[certified enclosures](22-exact-arithmetic.md#certified-transcendental-enclosures).
 Rational enclosures propagate through sums, products and powers to bound the
 arguments. A comparison between two applications of the same monotone function,
 such as `exp(a) < exp(b)`, reduces to a comparison of the arguments. A completed
@@ -558,7 +558,7 @@ repair assigns that variable the exact value of the other side, through the inve
 function where needed. These proposals carry no refutation authority; each point
 still requires the complete original-source check of function atoms, integrality and
 invocation conditions.
-[Exact real coordinates](18-exact-arithmetic.md#exact-analytic-real-coordinates)
+[Exact real coordinates](22-exact-arithmetic.md#exact-analytic-real-coordinates)
 keep symbolic exp/log/sin/cos expressions.
 
 #### Strategies
@@ -609,4 +609,4 @@ other arithmetic kernels, never on factors, search, propagation or `lp.engine`.
 
 ---
 
-Previous: [15. Linear arithmetic](15-linear-arithmetic.md) · [Contents](README.md) · Next: [17. Linear programming](17-linear-programming.md)
+Previous: [18. Linear arithmetic](18-linear-arithmetic.md) · [Contents](README.md) · Next: [20. Linear programming](20-linear-programming.md)

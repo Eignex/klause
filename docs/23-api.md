@@ -1,4 +1,4 @@
-# 19. Library API
+# 23. Library API
 
 Library callers construct a source, choose an operation and consume owned results.
 Extensions supply factors, components, objectives or theories under the same semantic
@@ -38,7 +38,7 @@ keeps borrowed arrays and structural keys stable, and registers a `FactorCodec` 
 written as problem JSON; a custom component supplies complete
 checks and sound explanations; a custom objective agrees at feasible assignments.
 The type system does not certify these obligations. The
-[custom factor publication check](08-search.md#custom-factor-publication-checks)
+[custom factor publication check](09-search.md#custom-factor-publication-checks)
 pins every candidate coordinate when a propagation-only factor has no local checker.
 
 ## Model construction and solving
@@ -87,7 +87,7 @@ whose range exceeds binary64's exact integers; other finite models, including th
 without integer columns from a numerical source, keep finite execution. Native snapshots (`PolynomialRealProblem`,
 `NonlinearIntegerProblem`, `TranscendentalProblem`, `LinearSourceProblem`) attach
 with explicit `ProblemSettings` and keep their exact formula and objective. Hints are
-described under [source definition materialization](10-local-search.md#source-definition-materialization).
+described under [source definition materialization](12-local-search.md#source-definition-materialization).
 
 `PreparedSourceInvocation` retains the selected route, source plan, operation
 admission and any private grid. Setup finishes route and grid selection before
@@ -134,8 +134,8 @@ expose the native arithmetic sources through the same verdict and witness surfac
 Incomplete results retain a `TerminationReason`: `Unsupported` names an unimplemented
 feature or operation, while `RepresentationDeclined` names a required representation
 or exact check that declined for an admitted model. Neither promises a fallback backend.
-Coverage is defined by [nonlinear integer](16-nonlinear-arithmetic.md),
-[polynomial composition](16-nonlinear-arithmetic.md#shared-model-composition) and
+Coverage is defined by [nonlinear integer](19-nonlinear-arithmetic.md),
+[polynomial composition](19-nonlinear-arithmetic.md#shared-model-composition) and
 [quadratic representation](02-model.md#quadratic-objective-representation).
 
 ## Compatibility and implementation surfaces
@@ -166,13 +166,13 @@ Implement `Theory<A>` for a batch fragment-checking service and use
 `SearchComponent` directly for incremental finite or arithmetic state, adding
 brancher, blocker or conflict capabilities as needed. Supply `SearchBranchProposal`
 when an extension only proposes splits;
-[lazy branch selection](08-search.md#lazy-branch-selection) defines categories
+[lazy branch selection](09-search.md#lazy-branch-selection) defines categories
 and exhaustive-alternative obligations.
 
 A participating service can remain incomplete: an unresolved answer reports
 indeterminate checking without a witness or refutation, and decided answers apply
 only to the checked fragment. See
-[theory roles](14-theories.md#extension-roles-and-completeness).
+[theory roles](17-theories.md#extension-roles-and-completeness).
 
 ## Typed contributions
 
@@ -194,7 +194,7 @@ publication. The open executor decodes source scalar keys through a source-bound
 witness assembler: every declared coordinate must be present, and foreign mappings,
 unmapped ids or multiple real representations withhold publication. Assembly
 establishes no independent feasibility or proof authority; source checks and
-[evidence admission](13-evidence.md) keep their scope.
+[evidence admission](16-evidence.md) keep their scope.
 
 ## Identities at mapping boundaries
 
@@ -226,7 +226,7 @@ checks and exact rendering; an approximate coordinate is display or heuristic da
   `root(index;[c0,c1,...])` with ascending coefficients and a one-based root index.
   `Sample.algebraicReals` carries the same coordinates.
 - `TranscendentalAssignment.exactRealValue(id)` and `symbolicRealValue(id)` expose
-  [exact analytic real](18-exact-arithmetic.md#exact-analytic-real-coordinates)
+  [exact analytic real](22-exact-arithmetic.md#exact-analytic-real-coordinates)
   expressions, also captured by `Sample.symbolicReals`.
 
 Open optimization observers receive `SourceIncumbentPublication` with an owned
@@ -258,4 +258,4 @@ installing an encoding supplies no proof certificate by itself.
 
 ---
 
-Previous: [18. Exact arithmetic](18-exact-arithmetic.md) · [Contents](README.md) · Next: [20. Command line](20-cli.md)
+Previous: [22. Exact arithmetic](22-exact-arithmetic.md) · [Contents](README.md) · Next: [24. Command line](24-cli.md)

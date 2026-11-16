@@ -1,4 +1,4 @@
-# 13. Original-source derivations
+# 16. Original-source derivations
 
 `solver.evidence` checks typed witness, bound, refutation and optimum claims against
 an immutable original-source context supplied independently of the producer. That
@@ -41,7 +41,7 @@ justification. Other frontend semantics require their own checker. The native in
 Abs checker evaluates affine magnitudes at exact source coordinates together with
 their accompanying linear constraints; implied magnitude inequalities alone are not
 a complete source check. Witness contexts call
-[shared source validation](07-presolve.md#source-witness-validation) for finite and rational coordinate checks.
+[shared source validation](08-presolve-reductions.md#source-witness-validation) for finite and rational coordinate checks.
 
 ## Derivations and checks
 
@@ -173,7 +173,7 @@ bound.
 
 ## In-search publications
 
-[Portfolio admission](12-portfolio.md#witnesses-and-proof-scope) checks runtime
+[Portfolio admission](14-portfolio.md#witnesses-and-proof-scope) checks runtime
 publications while workers execute.
 
 `EngineInvocation` keeps the prepared plan, its original source and objective
@@ -210,4 +210,4 @@ cannot substitute for mathematical verification.
 
 ---
 
-Previous: [12. Portfolios](12-portfolio.md) · [Contents](README.md) · Next: [14. Theory services and difference logic](14-theories.md)
+Previous: [15. Portfolio scheduling and workers](15-portfolio-scheduling.md) · [Contents](README.md) · Next: [17. Theory services and difference logic](17-theories.md)

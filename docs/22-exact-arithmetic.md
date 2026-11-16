@@ -1,4 +1,4 @@
-# 18. Exact arithmetic
+# 22. Exact arithmetic
 
 Exact kernels certify arithmetic facts for source-aware callers. They own immutable
 values, numerical certificates and private workspace; callers own formula truth,
@@ -72,7 +72,7 @@ a bound.
 
 Each check polls cancellation and charges its containing control; work and matrix
 limits interrupt without evidence. The
-[quadratic source pipeline](16-nonlinear-arithmetic.md#quadratic-strategy-execution)
+[quadratic source pipeline](19-nonlinear-arithmetic.md#quadratic-strategy-execution)
 owns traversal, reconstruction and publication.
 
 ## Exact polynomial and algebraic arithmetic
@@ -80,8 +80,8 @@ owns traversal, reconstruction and publication.
 `arithmetic.polynomial` performs exact polynomial operations and represents real
 roots without rounding them. It uses Eignex Util rational arithmetic and Klause
 `util` execution controls.
-[Polynomial theory](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) owns formula decisions and projection
-policy, and [API value ownership](19-api.md#exact-assignment-values) owns public
+[Polynomial theory](19-nonlinear-arithmetic.md#polynomial-real-arithmetic) owns formula decisions and projection
+policy, and [API value ownership](23-api.md#exact-assignment-values) owns public
 witness access.
 
 ### Exact polynomials and projection
@@ -322,4 +322,4 @@ Linux arm64, Accelerate on macOS), with LP64 integers and one thread per call.
 
 ---
 
-Previous: [17. Linear programming](17-linear-programming.md) · [Contents](README.md) · Next: [19. Library API](19-api.md)
+Previous: [21. Simplex and LP certification](21-lp-engine.md) · [Contents](README.md) · Next: [23. Library API](23-api.md)

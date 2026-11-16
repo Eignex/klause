@@ -1,4 +1,4 @@
-# 11. Neighborhoods and restarts
+# 13. Neighborhoods and restarts
 
 A local move can affect definition outputs and several factors. Scoring must grade
 that whole transition and restore every probe. This chapter describes those checks,
@@ -212,9 +212,9 @@ recovery and sparse row repair, theory-backed linear completion keeps a worker-p
 conditioned query, and polynomial completion must accept the unchanged finite point.
 A completed witness is heuristic incumbent evidence, never an optimum proof.
 
-[Theory contracts](14-theories.md) define the supported graph, linear and polynomial
+[Theory contracts](17-theories.md) define the supported graph, linear and polynomial
 checks. A propagation-only custom factor receives a private
-[full-coordinate finite check](08-search.md#custom-factor-publication-checks), and an
+[full-coordinate finite check](09-search.md#custom-factor-publication-checks), and an
 uncovered continuous constraint declines finite local-search execution.
 
 ### Exact coordinate neighborhoods
@@ -233,9 +233,9 @@ conditions inherit nothing. Native work shares one allowance across repairs.
 
 The quadratic adapter uses the same contract with exact algebraic objective ordering,
 repairing finite assignments and continuous windows together
-([quadratic strategy execution](16-nonlinear-arithmetic.md#quadratic-strategy-execution)).
+([quadratic strategy execution](19-nonlinear-arithmetic.md#quadratic-strategy-execution)).
 Transcendental sources use the same move owner with original-source function
-completion ([transcendental real arithmetic](16-nonlinear-arithmetic.md#transcendental-real-arithmetic)). In every case
+completion ([transcendental real arithmetic](19-nonlinear-arithmetic.md#transcendental-real-arithmetic)). In every case
 only checked completions publish incumbents, and repair refutations or exhausted
 windows carry no proof authority.
 
@@ -445,8 +445,8 @@ maintained violation degrees per factor kind and up to eight representative
 factors, identified in the lowered local-search model. Workers keep the observation
 at the lowest total. A zero residual establishes neither completion nor source
 feasibility. The
-[CLI](20-cli.md) renders these observations when requested.
+[CLI](24-cli.md) renders these observations when requested.
 
 ---
 
-Previous: [10. Local search](10-local-search.md) · [Contents](README.md) · Next: [12. Portfolios](12-portfolio.md)
+Previous: [12. Local search](12-local-search.md) · [Contents](README.md) · Next: [14. Portfolios](14-portfolio.md)

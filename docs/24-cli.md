@@ -1,6 +1,6 @@
-# 20. Command line
+# 24. Command line
 
-The CLI parses sources, binds shared [source setup](19-api.md#source-setup) and
+The CLI parses sources, binds shared [source setup](23-api.md#source-setup) and
 renders their results. Common controls reach every mode; format frontends retain
 parsing and output semantics. The CLI adds no solving policy.
 
@@ -10,7 +10,7 @@ parsing and output semantics. The CLI adds no solving policy.
 `commonMain`, with platform services from `com.eignex:util`. The JVM distribution requires JDK 25
 or newer; native executables need no JVM. Build commands live in the
 [repository README](../README.md#build), and runtime numerical options in
-[numerical dependencies](18-exact-arithmetic.md#runtime-support).
+[numerical dependencies](22-exact-arithmetic.md#runtime-support).
 
 The JVM launcher stops compilation at the fast compiler tier (`-XX:TieredStopAtLevel=1`): a solve of
 seconds ends before optimized code repays its compilation, which shares the solver's processors.
@@ -80,7 +80,7 @@ and flushes each one before returning. Source refinement runs before duplicate
 handling, so a source veto cannot be bypassed and a vetoed rendering emits nothing.
 MPS witnesses use original units, exact decimals and their exact-source or tolerance
 qualification. The adapter performs no solver work or admission:
-[portfolio admission](12-portfolio.md) owns acceptance.
+[portfolio admission](14-portfolio.md) owns acceptance.
 
 With statistics enabled, finite linear-source portfolios emit worker attribution only
 after a checked source witness is accepted for rendering. Its objective is the exact
@@ -110,7 +110,7 @@ proof. A representation decline does not mean that a search budget was exhausted
 Solver-control flags are common to every mode; `--help` lists every parameter.
 
 The `source-cuts`, `source-point-cuts` and `source-aggregate-cuts` Boolean parameters
-configure [source cut selection](17-linear-programming.md#cuts) in admitted numerical
+configure [source cut selection](20-linear-programming.md#cuts) in admitted numerical
 companions of linear sources. Finite
 worker recipes do not interpret these controls; admission and lifetime are separate.
 
@@ -120,7 +120,7 @@ restart schedule takes precedence.
 
 `--param inprocessing-warmup-work=N` withholds optional inprocessing until that much
 non-inprocessing work follows the first eligible complete root. Zero disables the
-warmup; see [root scheduling](09-learning.md#restarts-phases-and-inprocessing).
+warmup; see [root scheduling](11-search-policies.md#restarts-phases-and-inprocessing).
 
 `--param learned-memory-bytes=N` enables the optional learned-store modeled-byte
 soft limit. `learned-memory-work` (65,536 visits) and `learned-memory-scratch-bytes`
@@ -159,7 +159,7 @@ this is separate from heap measurements and diagnostic payload-category sums.
   entering policy. Native arithmetic routes reject explicit LP flags.
 - `--exact`: continuous float interpretation and zero source tolerance for the
   format's declared policies. MPS and FlatZinc declare a positive tolerance, so their
-  finite LP deductions are [numerical](17-linear-programming.md#numerical-and-exact-deductions)
+  finite LP deductions are [numerical](21-lp-engine.md#numerical-and-exact-deductions)
   and their real completions are accepted within it; zero tolerance certifies both
   exactly. Formats without a declared tolerance are exact either way.
   Unsupported exact lowering declines explicitly.
@@ -167,12 +167,12 @@ this is separate from heap measurements and diagnostic payload-category sums.
   status 2. The families are CP and LS strategy settings, portfolio slice policy
   (`slice-work`, `slice-max-work`, `slice-growth`), opt-in portfolio phase controls (`portfolio-progress`,
   `companion-after-incumbent`, `companion-active-ms`, see
-  [phase accounting](12-portfolio.md#phase-progress-and-cost)), weighted objective controls
-  (`core-early`, `core-refinement`, see [core search](12-portfolio.md#boolean-objective-core-search)), resource work
+  [phase accounting](15-portfolio-scheduling.md#phase-progress-and-cost)), weighted objective controls
+  (`core-early`, `core-refinement`, see [core search](15-portfolio-scheduling.md#boolean-objective-core-search)), resource work
   (`node-limit`, `presolve-work-limit`, see [resource allowances](06-sessions.md#resource-allowances)),
   `boolean-proof-tasks=false|true` to disable or explicitly request disjoint Boolean tasks
   (eligible single-core native first-fail satisfaction portfolios admit them automatically;
-  see [Boolean task coverage](12-portfolio.md#boolean-task-sharing)),
+  see [Boolean task coverage](15-portfolio-scheduling.md#boolean-task-sharing)),
   `dry-run-presolve=true` for a preparation summary without solving, and presolve
   effort ([presolve](07-presolve.md)).
 - `--ozn FILE` (MiniZinc mode): render output with the native `.ozn` applier
@@ -191,11 +191,11 @@ has its own work currency, separate from `node-limit`:
 
 | Route | Parameters | Contract |
 |---|---|---|
-| Open linear | `open-work-limit`, `open-branching`, `open-linear-incremental`, `open-hint-flips`, `open-hint-min-splits` | [Linear arithmetic](15-linear-arithmetic.md) |
-| Polynomial real | `nra-work-limit`, `nra-dense-coefficients`, `nra-matrix-cells` | [Polynomial completion](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) |
-| Nonlinear integer | `nia-candidates`, `nia-moves`, `nia-cell-refinement`, `nia-cell-reuse`, `nia-cell-steering`, `nia-integer-roots`, plus the polynomial limits | [Integer candidates](16-nonlinear-arithmetic.md#nonlinear-integer-arithmetic) |
-| Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [Quadratic execution](16-nonlinear-arithmetic.md#quadratic-strategy-execution) |
-| Transcendental | `nra-*` limits and shared exact-satisfaction controls | [Function checks](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
+| Open linear | `open-work-limit`, `open-branching`, `open-linear-incremental`, `open-hint-flips`, `open-hint-min-splits` | [Linear arithmetic](18-linear-arithmetic.md) |
+| Polynomial real | `nra-work-limit`, `nra-dense-coefficients`, `nra-matrix-cells` | [Polynomial completion](19-nonlinear-arithmetic.md#polynomial-real-arithmetic) |
+| Nonlinear integer | `nia-candidates`, `nia-moves`, `nia-cell-refinement`, `nia-cell-reuse`, `nia-cell-steering`, `nia-integer-roots`, plus the polynomial limits | [Integer candidates](19-nonlinear-arithmetic.md#nonlinear-integer-arithmetic) |
+| Quadratic optimization | the polynomial limits; open integers also use `nia-*` | [Quadratic execution](19-nonlinear-arithmetic.md#quadratic-strategy-execution) |
+| Transcendental | `nra-*` limits and shared exact-satisfaction controls | [Function checks](19-nonlinear-arithmetic.md#transcendental-real-arithmetic) |
 
 `open-linear-incremental` defaults to true for complete open-linear traversal and
 is inactive when source preparation selects a finite route.
@@ -217,7 +217,7 @@ samples independently of `portfolio-work`. `sharing-memory-work` caps charged
 visits per sample (default 32,768); `sharing-memory-scratch` caps deduplication
 entries (default 4,096). Both accept zero. Samples report complete, partial or
 stale status; only complete current samples can support byte accounting. See
-[portfolios](12-portfolio.md#shared-channels) for ownership and aliasing.
+[portfolios](14-portfolio.md#shared-channels) for ownership and aliasing.
 
 `sharing-memory-bytes` optionally limits each shared learned-clause pool's modeled
 payload and index bytes, including private ALNS repair pools. It accepts zero,
@@ -229,10 +229,10 @@ The finite backtrack controls `propagation-attribution=true` and
 `historical-table-reasons=true` independently enable bounded family diagnostics
 and the historical Table retry. Both default to false. Attribution exports sparse
 `nativeFactor<Family><Metric>` counters with the existing learning statistics; see
-[attribution ownership](09-learning.md#propagation-and-explanation-attribution).
+[attribution ownership](10-learning.md#propagation-and-explanation-attribution).
 
 `cost-aware-propagation=true` independently enables the bounded finite worklist
-policy described in [finite propagation](08-search.md#finite-propagation). Fixed
+policy described in [finite propagation](09-search.md#finite-propagation). Fixed
 integer optimization enables it for mandatory cumulative tasks with constant
 durations, demands and capacities and no placement constraints. Explicit `false`
 retains FIFO. Other routes default to false. The policy requires neither attribution
@@ -240,13 +240,13 @@ nor historical refinement.
 
 `reason-preflight=true` independently checks recorded redundancy failures before
 historical sibling reconstruction. It defaults to false; see
-[conflict analysis](09-learning.md#conflict-analysis).
+[conflict analysis](10-learning.md#conflict-analysis).
 
 Learned-object counters use the `nativeLearning{Kind}{Stage}` and
 `sharedLearning{Kind}{Stage}` names for native and shared stores. Source refutation
 stages use `learningSourceRefutation{Stage}` in complete-search observations.
 Only observed nonzero counters are emitted. The
-[learning lifecycle](09-learning.md#learned-object-authority-and-lifetime) defines
+[learning lifecycle](10-learning.md#learned-object-authority-and-lifetime) defines
 construction, admission, assertion, consumption and retirement.
 
 For controlled nonlinear integer comparisons, `nia-cell-refinement=true` enables
@@ -297,14 +297,14 @@ entry point or terminal admission outcome (`finite-cp`, `open-theory`,
 `reportedBackend` the final backend; these labels describe stages and do not prove
 that a theory check executed. Arithmetic routes report their work under their own
 prefix (`open*`, `nra*`, `quadratic*`, `transcendental*`) and, on a resource stop,
-the limit that stopped them. The [search statistics](09-learning.md#statistics)
+the limit that stopped them. The [search statistics](11-search-policies.md#statistics)
 define the conflict counters.
 
 `frontendLoadMs` covers parsing, lowering, routing and solvable construction; the
 nested `frontendRoutingMs` must not be added to it. An omitted native work block is
 not a zero. `armFailure.<label>` reports a caught arm exception as one-line JSON; a
 sibling's accepted result can still be the verdict. See
-[portfolio failures](12-portfolio.md#reseeding-and-arm-failures).
+[portfolio failures](15-portfolio-scheduling.md#reseeding-and-arm-failures).
 
 Source routes use the same `presolvePreparationMs`, work, allowance, round-entry and
 pass-call fields as finite execution. Empty and stopped preparations retain these
@@ -385,4 +385,4 @@ interpretation is never an environment setting: it belongs to the format's typed
 
 ---
 
-Previous: [19. Library API](19-api.md) · [Contents](README.md)
+Previous: [23. Library API](23-api.md) · [Contents](README.md)

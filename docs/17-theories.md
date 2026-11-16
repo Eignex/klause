@@ -1,4 +1,4 @@
-# 14. Theory services and difference logic
+# 17. Theory services and difference logic
 
 A theory enforces an arithmetic fragment under shared search decisions and contributes
 coordinates or conflicts. The common contract below applies to difference, linear,
@@ -10,12 +10,12 @@ Boolean/integer domains; arithmetic components own open integers and reals.
 | Theory | Source fragment | Main mechanism |
 |---|---|---|
 | [Difference logic](#difference-logic) | Integer or real difference constraints with Boolean guards | Graph potentials and negative cycles |
-| [Linear real arithmetic](15-linear-arithmetic.md) | Linear real constraints with Boolean structure | Exact rational LP checks; the difference graph for admitted fragments |
-| [Linear integer arithmetic](15-linear-arithmetic.md#linear-integer-arithmetic) | Linear integer constraints with Boolean structure | Linear real checks plus integer reductions and branching |
-| [Linear mixed arithmetic](15-linear-arithmetic.md#linear-mixed-arithmetic) | Coupled linear integer/real constraints | The integer route with real completion and point recovery |
-| [Nonlinear integer arithmetic](16-nonlinear-arithmetic.md) | Polynomial Int/Real/Bool satisfaction | Incomplete integer search with exact polynomial real completion |
-| [Polynomial real arithmetic](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) | Polynomial real constraints, optionally beside finite factors | Exact algebraic completion and cylindrical algebraic decomposition |
-| [Transcendental real arithmetic](16-nonlinear-arithmetic.md#transcendental-real-arithmetic) | exp/log/sin/cos constraints with mixed declarations | Certified enclosures, polynomial relaxation and symbolic checks |
+| [Linear real arithmetic](18-linear-arithmetic.md) | Linear real constraints with Boolean structure | Exact rational LP checks; the difference graph for admitted fragments |
+| [Linear integer arithmetic](18-linear-arithmetic.md#linear-integer-arithmetic) | Linear integer constraints with Boolean structure | Linear real checks plus integer reductions and branching |
+| [Linear mixed arithmetic](18-linear-arithmetic.md#linear-mixed-arithmetic) | Coupled linear integer/real constraints | The integer route with real completion and point recovery |
+| [Nonlinear integer arithmetic](19-nonlinear-arithmetic.md) | Polynomial Int/Real/Bool satisfaction | Incomplete integer search with exact polynomial real completion |
+| [Polynomial real arithmetic](19-nonlinear-arithmetic.md#polynomial-real-arithmetic) | Polynomial real constraints, optionally beside finite factors | Exact algebraic completion and cylindrical algebraic decomposition |
+| [Transcendental real arithmetic](19-nonlinear-arithmetic.md#transcendental-real-arithmetic) | exp/log/sin/cos constraints with mixed declarations | Certified enclosures, polynomial relaxation and symbolic checks |
 
 Linear integer and mixed services add integrality to the real-linear machinery.
 Nonlinear integer search fixes candidates for polynomial real completion;
@@ -38,7 +38,7 @@ Optional branching, blocking and conflict capabilities extend that lifecycle.
 relaxation-only and unsupported representations. `TheoryEncoding` supplies typed
 source coordinates, original factor attribution and the receiving allowance.
 Prepared relations are combined within one arithmetic owner before its checks.
-[Provider extensions](19-api.md#projection-provider-extensions) define the public
+[Provider extensions](23-api.md#projection-provider-extensions) define the public
 obligations.
 
 Installation follows four rules:
@@ -79,10 +79,10 @@ encoding consume the same factor while retaining one primary coordinate owner.
 Arithmetic completion waits for authoritative finite choices. Native nonlinear
 snapshots already contain their formulas.
 
-[Shared search](08-search.md) owns decisions, levels and retraction. Neutral
+[Shared search](09-search.md) owns decisions, levels and retraction. Neutral
 `SourceBoundAtom` predicates mean the same thing in every adapter; multiple
-arithmetic groups use [coordinate agreement](09-learning.md#arithmetic-coordinate-agreement)
-to check one contributed point. [Heuristic completion](11-neighborhoods.md#continuous-candidate-completion)
+arithmetic groups use [coordinate agreement](11-search-policies.md#arithmetic-coordinate-agreement)
+to check one contributed point. [Heuristic completion](13-neighborhoods.md#continuous-candidate-completion)
 checks candidate restrictions without giving their refutations global authority.
 
 ## Results and proof authority
@@ -90,8 +90,8 @@ checks candidate restrictions without giving their refutations global authority.
 Each theory states its feasibility and objective authority separately. Witnesses
 retain authoritative exact values; proofs must cover their invocation and every
 required alternative. [Result guarantees](01-introduction.md#results-and-completeness),
-[source validation](07-presolve.md#source-witness-validation) and
-[LP certification](17-linear-programming.md#lp-certification) define shared checks.
+[source validation](08-presolve-reductions.md#source-witness-validation) and
+[LP certification](21-lp-engine.md#lp-certification) define shared checks.
 
 ## State and resources
 
@@ -130,8 +130,8 @@ SMT-LIB lowering represents a reified unit-coefficient integer difference equali
 as the conjunction of its two comparisons, each keeping both signed guarded
 meanings. Pure-real difference rows are handled inside the linear real component
 when they meet its graph admission conditions; other linear rows keep the
-[linear real](15-linear-arithmetic.md), [linear integer](15-linear-arithmetic.md#linear-integer-arithmetic) or
-[linear mixed](15-linear-arithmetic.md#linear-mixed-arithmetic) route. The theory graph and the finite-domain
+[linear real](18-linear-arithmetic.md), [linear integer](18-linear-arithmetic.md#linear-integer-arithmetic) or
+[linear mixed](18-linear-arithmetic.md#linear-mixed-arithmetic) route. The theory graph and the finite-domain
 difference propagator have separate state.
 
 ### Solving and composition
@@ -231,4 +231,4 @@ is the real graph used inside the linear component.
 
 ---
 
-Previous: [13. Original-source derivations](13-evidence.md) · [Contents](README.md) · Next: [15. Linear arithmetic](15-linear-arithmetic.md)
+Previous: [16. Original-source derivations](16-evidence.md) · [Contents](README.md) · Next: [18. Linear arithmetic](18-linear-arithmetic.md)

@@ -143,7 +143,7 @@ onto `v`. Top-level intension equalities with `min` or `max` also retain the
 declared result in either orientation, unless it occurs within the operands.
 The frontend records which auxiliaries, selection results and affine
 outputs are functionally defined, so
-[local search](10-local-search.md#maintained-literal-channels) can derive them
+[local search](12-local-search.md#maintained-literal-channels) can derive them
 from their inputs instead of searching them. `Xcsp3Problem.definitionHints` adds
 [typed relations](02-model.md#source-definition-hints) for materialized affine
 terms, declared `binPacking` loads, extremum results and the shared indicators,
@@ -269,7 +269,7 @@ before adding its own breaks; the factors stay enforced for every consumer.
 `FlatZincProgram.definitionHints` retains `defines_var` targets and their relation
 data in compiled source coordinates, with constants, aliases, repeated roles and
 polarity. Unrecognized orientations remain reference hints. Parsing does not order
-a definition graph; [definition materialization](10-local-search.md#source-definition-materialization)
+a definition graph; [definition materialization](12-local-search.md#source-definition-materialization)
 does that on request. Source constraints enforce every relation independently of
 these annotations.
 
@@ -339,7 +339,7 @@ Supported float operations retain exact relations: strict and reified comparison
 `RealAbs`, `RealArrayMinMax`, constant-array `RealElement`, constant scaling and
 products. Finite float choices become `RealFiniteDomain` memberships, products with
 a finite operand keep `ContinuousProduct` with the declared values, and
-unrestricted products go to [polynomial completion](16-nonlinear-arithmetic.md#polynomial-real-arithmetic). Linear
+unrestricted products go to [polynomial completion](19-nonlinear-arithmetic.md#polynomial-real-arithmetic). Linear
 consumers install alternatives privately; an LP relaxation alone never establishes
 membership or a product.
 
@@ -359,7 +359,7 @@ component needs one, reports no optimum and refutes only that way. Grid relation
 `GridProduct`, `GridPower`) keep their step, origin and nearest-bucket rounding.
 
 The original arm is numerical under the declared tolerance. Finite LP deductions are
-[numerical](17-linear-programming.md#numerical-and-exact-deductions), and a real
+[numerical](21-lp-engine.md#numerical-and-exact-deductions), and a real
 completion needs no exact certificate when every real declaration and every relation
 over a real coordinate holds within the slack. Rows measure it as
 [MPS rows do](05-arithmetic-formats.md#tolerance-publication). On the finite lane and
@@ -401,13 +401,13 @@ nothing, and keeps no LP lemma from that refutation. Minimization completes its 
 the same way when the objective reads no real coordinate; in every mode, a leaf with an
 absolute value, finite membership or choice product that the leaf LP leaves undecided
 is completed by the exact search. Local-search and ALNS workers
-[complete candidates](11-neighborhoods.md#continuous-candidate-completion) the same way.
+[complete candidates](13-neighborhoods.md#continuous-candidate-completion) the same way.
 A leaf whose objective reads a real coordinate completes through the leaf LP alone, so
 its refusals and refutations are those of the float point and the exact LP. Projected
 grid witnesses are checked against the same readings.
 
 A source without integer columns takes the finite lane under a positive tolerance and
-the [linear theory](15-linear-arithmetic.md) at zero tolerance; an MPS source takes the
+the [linear theory](18-linear-arithmetic.md) at zero tolerance; an MPS source takes the
 finite lane in both modes. On the finite lane its Booleans and clauses are searched by
 Boolean backtracking with a real completion at each leaf. Such a source stays with the
 linear theory when it states an open set over reals (a disequality, a reified row,
@@ -424,7 +424,7 @@ choices or a power above one routes to the polynomial theory, which states each
 unconditional strict row as its closed row in both of its formulas and decides the
 exact formula first: its witness,
 optimum or unboundedness stands. Only an exact refutation hands the remaining budget to a
-[widened formula](16-nonlinear-arithmetic.md#tolerance-widened-formulas), which reads the
+[widened formula](19-nonlinear-arithmetic.md#tolerance-widened-formulas), which reads the
 slack where acceptance does with the slack acceptance grants at a zero bound; a relation
 whose result is also one of its operands, such as `float_times(x, z, z)`, stays exact
 there although acceptance reads it within the slack. A widened witness is published only

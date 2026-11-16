@@ -1,9 +1,9 @@
-# 10. Local search
+# 12. Local search
 
 Local search changes assignments to reduce constraint violations and improve an
 objective. Incremental scores guide moves; maintained definitions keep functional
 outputs consistent. Before publication a zero-violation candidate passes
-[source validation](07-presolve.md#source-witness-validation) of the relations the walk
+[source validation](08-presolve-reductions.md#source-witness-validation) of the relations the walk
 cannot score and arithmetic completion. Unsuccessful search supplies no
 refutation or optimum proof.
 Root propagation over the declared finite domains can prove infeasibility before
@@ -28,7 +28,7 @@ bits carry an omission marker. Activity comes from the committed integer grader;
 unsupported graders remain explicit, and capture does not confer source authority.
 
 This chapter describes strategies, preparation and definitions.
-[Neighborhoods and restarts](11-neighborhoods.md) covers scoring probes, structured
+[Neighborhoods and restarts](13-neighborhoods.md) covers scoring probes, structured
 moves and continuous completion. Sessions and containing resources follow
 [chapter 6](06-sessions.md).
 
@@ -121,7 +121,7 @@ Circuit 2-opt reversal, an AllDifferent 3-cycle or a DP-optimal accepting run fo
 Regular. Default arms never pay for them. Each
 configured source carries a per-pick candidate cap and an enable gate. The reserved
 feasible structural draw in strict descent cycles elected globals and retains bounded
-[board swap coverage](11-neighborhoods.md#board-swap-coverage) between picks and slices
+[board swap coverage](13-neighborhoods.md#board-swap-coverage) between picks and slices
 within the existing resample window. The schedule
 axis gates the plateau-escape sources on its stall signal.
 
@@ -327,7 +327,7 @@ Partial state stays private until all factors are scored and the initial greedy 
 completes; shared indexes are published only when complete. Preparation consumes
 time but no move allowance. Individual allocations and factor visits stay atomic, so
 these are cooperative boundaries rather than elapsed-time bounds.
-[Portfolio preparation revisits](12-portfolio.md#preparation-revisits)
+[Portfolio preparation revisits](15-portfolio-scheduling.md#preparation-revisits)
 admit every initial sibling before extra visits.
 
 ### Initialization and implicit table moves
@@ -489,4 +489,4 @@ whose coefficient divides the driving drift.
 
 ---
 
-Previous: [9. Learning and theory completion](09-learning.md) · [Contents](README.md) · Next: [11. Neighborhoods and restarts](11-neighborhoods.md)
+Previous: [11. Search policies and completion](11-search-policies.md) · [Contents](README.md) · Next: [13. Neighborhoods and restarts](13-neighborhoods.md)

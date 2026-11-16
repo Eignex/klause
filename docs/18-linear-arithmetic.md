@@ -1,8 +1,8 @@
-# 15. Linear arithmetic
+# 18. Linear arithmetic
 
 Linear constraints combine coordinates with constant coefficients and Boolean
 structure. They generalize the difference rows of
-[difference logic](14-theories.md#difference-logic) to arbitrary rational coefficients.
+[difference logic](17-theories.md#difference-logic) to arbitrary rational coefficients.
 This chapter describes one linear component and the three theories built on it:
 linear real arithmetic checks the active system exactly, linear integer arithmetic
 adds integrality, and linear mixed arithmetic couples integer and real columns and
@@ -19,16 +19,16 @@ point on the closure's boundary.
 The pure-real route requires real variables, no source integer variables, and
 factors wholly represented by admitted exact linear forms. Source bounds,
 reification, disjunction and strictness remain authoritative. Nonconstant real
-products belong to [polynomial real arithmetic](16-nonlinear-arithmetic.md#polynomial-real-arithmetic).
-[Difference logic](14-theories.md#real-graph-admission-and-checks) handles an
+products belong to [polynomial real arithmetic](19-nonlinear-arithmetic.md#polynomial-real-arithmetic).
+[Difference logic](17-theories.md#real-graph-admission-and-checks) handles an
 admitted pure-real subfragment; a graph decline does not reject a supported
 linear source.
 
 ### Solving and composition
 
 The linear component sits on two lifecycles at once: the
-[search session](08-search.md) owns Boolean decisions and retraction, and the
-[LP engine](17-linear-programming.md) owns numerical state and scoped bound
+[search session](09-search.md) owns Boolean decisions and retraction, and the
+[LP engine](20-linear-programming.md) owns numerical state and scoped bound
 assertions. The component turns assigned source rows into LP bounds, and LP
 verdicts into conflicts, branches and witnesses.
 
@@ -70,7 +70,7 @@ A check proceeds in four steps:
    the LP solves the asserted system with exact certification. Partial Boolean
    states are checked once at least one arithmetic row is determined.
    Partial states retain a 128-row exact-continuation allowance. Boolean-complete
-   checks in complete search use the [kernel's storage admission](17-linear-programming.md#certification-mechanisms)
+   checks in complete search use the [kernel's storage admission](21-lp-engine.md#certification-mechanisms)
    under the same cumulative work and allocation ceilings.
 3. **Explain.** An infeasible system produces a conflict from the certified
    infeasibility support: each cited row or bound contributes its premise literals.
@@ -153,7 +153,7 @@ The floating simplex solves the closure, where strict and non-strict bounds
 coincide. Certification decides strictness with a margin auxiliary: it maximizes a
 slack `t` added to every strict row and accepts only an exact witness with positive
 `t`, or refutes only with an exact bound `t <= 0`.
-[LP certification](17-linear-programming.md#refinement-and-strict-inequalities)
+[LP certification](21-lp-engine.md#refinement-and-strict-inequalities)
 defines that check.
 
 #### Coordinate agreement
@@ -182,7 +182,7 @@ proofs and numerical claims keep their own cancellation boundaries.
 
 `ExactLraAssignment` captures Boolean values and rational real coordinates.
 Completed source checks admit witnesses. Exact conflicts, bounds and rays follow
-[LP certification](17-linear-programming.md#lp-certification); a floating status alone is
+[LP certification](21-lp-engine.md#lp-certification); a floating status alone is
 insufficient. Strict infeasibility requires a completed strict-feasibility check.
 
 Complete affine source capture uses `LinearAuthorityInvocation` through
@@ -223,10 +223,10 @@ the [mixed theory](#linear-mixed-arithmetic) reuses this machinery.
 
 The admitted surface consists of exactly representable linear conjunctions or
 disjunctions and their Boolean structure. Nonconstant products belong to
-[nonlinear integer arithmetic](16-nonlinear-arithmetic.md). Finite globals remain in
+[nonlinear integer arithmetic](19-nonlinear-arithmetic.md). Finite globals remain in
 their finite projection, and an open integer used by a CP-only factor requires a
 valid owner or the route declines. An entirely admitted difference fragment can use
-[difference logic](14-theories.md#difference-logic) instead. Finite declarations keep their
+[difference logic](17-theories.md#difference-logic) instead. Finite declarations keep their
 domain state and choices; the theory waits for authoritative finite assignments
 before publishing a completed point.
 
@@ -266,7 +266,7 @@ from free ones, allowing finite branching where its admission conditions hold.
    Other rows go to the unbounded set.
 2. **Transform.** The double-bounded rows are rewritten into mixed echelon form
    with a Hermite integer tail, using unimodular column operations from
-   [`lp.lattice`](17-linear-programming.md) that preserve the integer lattice.
+   [`lp.lattice`](20-linear-programming.md) that preserve the integer lattice.
 3. **Bound.** Forward substitution derives a range for every transformed
    coordinate. Integer pivots use inward-rounded division, so an empty integer
    interval is an exact refutation.
@@ -284,7 +284,7 @@ It is admitted only for small leaves: at most 512 Booleans, 128 factors, 128 row
 and 512 terms, with at most 128 active branches and 4,096-bit coefficients. Larger
 leaves use plain branching, though their equality rows alone may still be reduced.
 
-[Open portfolios](12-portfolio.md) can pair this proof-producing route with
+[Open portfolios](14-portfolio.md) can pair this proof-producing route with
 source-checked local-search workers.
 
 ### Results and proof authority
@@ -318,7 +318,7 @@ retained reduction; retraction restores the shared facts and component scope bef
 evidence can be reused.
 [TheoryParams](../klause/src/commonMain/kotlin/com/eignex/klause/solver/pipeline/TheoryParams.kt)
 separates theory checks, open work, decisions and cancellation; native LP work
-follows the [LP certification](17-linear-programming.md#lp-certification) resource contract.
+follows the [LP certification](21-lp-engine.md#lp-certification) resource contract.
 
 ### Implementation
 
@@ -348,7 +348,7 @@ declarations keep their domain state and choices, including holes.
 
 A finite integer × real product becomes linear once its integer operand is fixed.
 That leaf-completion case does not admit an unfixed bilinear factor; shared
-nonlinear products use [polynomial completion](16-nonlinear-arithmetic.md#polynomial-real-arithmetic).
+nonlinear products use [polynomial completion](19-nonlinear-arithmetic.md#polynomial-real-arithmetic).
 
 ### Solving and composition
 
@@ -377,7 +377,7 @@ tries to turn that float point into an exact witness:
    equations using bounded sparse elimination.
 4. Complete the free real coordinates per connected component, grouped by shared
    rows: by the difference checker where the rows form a difference graph,
-   otherwise by an exact point from the [source LP owner](17-linear-programming.md).
+   otherwise by an exact point from the [source LP owner](20-linear-programming.md).
    Completion is attempted only up to 65,536 row entries.
 
 The full rows, strictness, integrality and source reconstruction still gate
@@ -385,7 +385,7 @@ acceptance. A failed guess supplies no conflict or bound; the component returns 
 ordinary branching.
 
 Complete workers and open local search can share checked incumbents under the same
-source and objective through [portfolios](12-portfolio.md). Candidate integer
+source and objective through [portfolios](14-portfolio.md). Candidate integer
 windows guide heuristic search; they do not bound the source for a refutation.
 
 ### Results and proof authority
@@ -424,4 +424,4 @@ owns finite/theory decomposition; the open route is `EXACT_LIRA`.
 
 ---
 
-Previous: [14. Theory services and difference logic](14-theories.md) · [Contents](README.md) · Next: [16. Nonlinear arithmetic](16-nonlinear-arithmetic.md)
+Previous: [17. Theory services and difference logic](17-theories.md) · [Contents](README.md) · Next: [19. Nonlinear arithmetic](19-nonlinear-arithmetic.md)

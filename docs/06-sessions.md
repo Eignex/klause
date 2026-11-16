@@ -6,7 +6,7 @@ session excludes overlapping mutations until that owner closes. Published result
 outlive the operation.
 
 Sessions own scope and cleanup; the [resource allowance](#resource-allowances) owns
-effort across nested work. [Search](08-search.md) and [local search](10-local-search.md)
+effort across nested work. [Search](09-search.md) and [local search](12-local-search.md)
 describe the state retained by each engine.
 
 ## Assumptions and conditioned queries
@@ -122,7 +122,7 @@ Approximate counting and accurate sampling project only Boolean and finite integ
 values. Real columns stay existential: neither a real interval nor multiple real
 completions multiply the count. Cell exhaustion requires complete feasibility
 checks, so an indeterminate real leaf cannot give an exact count. Polynomial
-algebraic assignments belong to the [polynomial pipeline](16-nonlinear-arithmetic.md#polynomial-real-arithmetic),
+algebraic assignments belong to the [polynomial pipeline](19-nonlinear-arithmetic.md#polynomial-real-arithmetic),
 outside these entry points.
 
 Repeated coordinates in an explicit counting or accurate-sampling projection
@@ -173,7 +173,7 @@ with its deadline and meter. Restarts and backjumps preserve the opening decisio
 level, so exhaustion refutes only the condition. Unpinned Boolean splits consult
 caller hints before valid live-point preferences, retaining both alternatives.
 Polynomial and nonlinear integer invocations follow the same scope rule; their
-native units are described in [Part IV](14-theories.md).
+native units are described in [Part IV](17-theories.md).
 
 ## Resource allowances
 
@@ -204,7 +204,7 @@ construction and every later invocation or slice. Each retained slice supplies i
 own invocation token, and scopes keep their earliest deadline without retaining an
 old slice deadline.
 
-The opt-in [portfolio diagnostic schedule](12-portfolio.md#reproducible-diagnostics)
+The opt-in [portfolio diagnostic schedule](15-portfolio-scheduling.md#reproducible-diagnostics)
 marks internal cancellation adapters as work scheduled. Composition, invocation and
 lifetime wrappers preserve that policy. Finite root LP preparation, primal search
 and candidate verification retain work limits and emergency cancellation while
@@ -292,7 +292,7 @@ the containing token, so a checkpoint can overspend and leave debt for later sli
 Core-guided encoding and baking use the propagation currency and spend no
 decisions. An automatically deferred single-lane core worker has one base slice per
 turn and two seconds of cumulative active time; see
-[core search](12-portfolio.md#boolean-objective-core-search).
+[core search](15-portfolio-scheduling.md#boolean-objective-core-search).
 
 ### Preparation progress
 
@@ -300,8 +300,8 @@ Local-search initialization and general CP optimization construction retain priv
 cursors across slice expiry. Buffers, seeding, indexes, root propagation and LP
 installation advance in bounded batches, spending time without decision/move charges.
 Closing discards the cursor; individual allocations and factor calls stay atomic.
-[Local-search preparation](10-local-search.md#projections-and-preparation) and
-[CP preparation](12-portfolio.md#private-cp-preparation) own those mechanisms.
+[Local-search preparation](12-local-search.md#projections-and-preparation) and
+[CP preparation](15-portfolio-scheduling.md#private-cp-preparation) own those mechanisms.
 
 Encoder construction charges row, term, factor and installer visits. Required
 post-presolve installation uses the containing token; optional source passes use
@@ -410,12 +410,12 @@ Optional guidance reuses completed checks. Its index construction spends the che
 token under a 65,536-entry boundary; a private stop discards only the hint. Native
 setup prepays source capture, and new controls cannot revive stopped preparation.
 
-Theory-specific currencies and caps belong to [difference logic](14-theories.md#state-and-resources-1),
-[linear arithmetic](15-linear-arithmetic.md#state-and-resources),
-[nonlinear integer](16-nonlinear-arithmetic.md#state-and-resources),
-[polynomial real](16-nonlinear-arithmetic.md#state-and-resources-1) and
-[transcendental arithmetic](16-nonlinear-arithmetic.md#state-and-resources-2).
-[LP certification](17-linear-programming.md#resources-and-cancellation) defines its
+Theory-specific currencies and caps belong to [difference logic](17-theories.md#state-and-resources-1),
+[linear arithmetic](18-linear-arithmetic.md#state-and-resources),
+[nonlinear integer](19-nonlinear-arithmetic.md#state-and-resources),
+[polynomial real](19-nonlinear-arithmetic.md#state-and-resources-1) and
+[transcendental arithmetic](19-nonlinear-arithmetic.md#state-and-resources-2).
+[LP certification](21-lp-engine.md#resources-and-cancellation) defines its
 own interruption boundary.
 
 ### Mechanism and compatibility
@@ -455,4 +455,4 @@ forwarding live deadlines and work meters to its parent.
 
 ---
 
-Previous: [5. MPS and SMT-LIB](05-arithmetic-formats.md) · [Contents](README.md) · Next: [7. Presolve and validation](07-presolve.md)
+Previous: [5. MPS and SMT-LIB](05-arithmetic-formats.md) · [Contents](README.md) · Next: [7. Presolve preparation](07-presolve.md)
