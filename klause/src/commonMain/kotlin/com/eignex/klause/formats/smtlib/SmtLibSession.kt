@@ -73,6 +73,7 @@ class SmtLibSession(
         if (exited) return false
         checkpoint()
         val saved = save()
+        val commandName = (((expression as? SExpr.SList)?.items?.firstOrNull()) as? SExpr.Atom)?.text
         try {
             val command = expression as? SExpr.SList ?: fail("expected a command")
             when (val head = command.atom(0)) {
@@ -185,6 +186,13 @@ class SmtLibSession(
         } catch (error: IllegalArgumentException) {
             restore(saved)
             channels.regular(smtSessionError(error.message ?: "invalid command"))
+        } catch (error: CancellationException) {
+            restore(saved)
+            if (commandName in setOf("check-sat", "check-sat-assuming")) {
+                result = SmtSessionResult("unknown", reasonUnknown = "interrupted")
+                channels.regular("unknown")
+                exited = true
+            } else throw error
         }
         return !exited
     }
@@ -335,6 +343,10 @@ class SmtLibSession(
         queryDefinitions.clear(); queryDefinitions.addAll(saved.queryDefinitions)
     }
     override fun close() = channels.close()
+    /** Emit a solver observation on the current regular channel without adding a protocol response. */
+    fun comment(text: String) {
+        text.lineSequence().forEach { channels.regular(if (it.startsWith(';')) it else "; $it") }
+    }
     private fun fail(message: String): Nothing = throw UnsupportedSmtException(message)
     private fun SExpr.SList.size(expected: Int) {
         if (items.size != expected) fail("${items.firstOrNull()?.smtText()} expects ${expected - 1} arguments")

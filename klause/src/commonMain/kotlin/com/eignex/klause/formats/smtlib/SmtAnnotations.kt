@@ -1,12 +1,12 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun normalizeSmtSourceCommands(
     commands: List<SExpr>,
     scope: SmtLibScope,
-    cancellation: Cancellation,
+    cancellation: ExecutionControl,
 ): List<SExpr> {
     val normalized = ArrayList<SExpr>()
     fun accept(command: SExpr) {

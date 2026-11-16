@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -15,7 +15,7 @@ class SmtAnnotationsTest {
             (assert (= outer (+ x 1)))
         """.trimIndent()).readAll()
 
-        val result = captureSmtSource(commands, Cancellation.Never)
+        val result = captureSmtSource(commands, ExecutionControl.Never)
 
         assertEquals(listOf(
             "(declare-const x Int)",
@@ -30,14 +30,14 @@ class SmtAnnotationsTest {
     fun `named annotations reject references to enclosing binders`() {
         val commands = SExprReader("(declare-const x Int) (assert (let ((x 1)) (= (! x :named local) 1)))").readAll()
 
-        assertFailsWith<UnsupportedSmtException> { captureSmtSource(commands, Cancellation.Never) }
+        assertFailsWith<UnsupportedSmtException> { captureSmtSource(commands, ExecutionControl.Never) }
     }
 
     @Test
     fun `named terms can contain their own closed let bindings`() {
         val commands = SExprReader("(assert (= (! (let ((x 1)) x) :named one) one))").readAll()
 
-        val result = captureSmtSource(commands, Cancellation.Never)
+        val result = captureSmtSource(commands, ExecutionControl.Never)
 
         assertEquals("(define-fun one () Int (let ((x 1)) x))", result.commands.first().smtText())
     }
@@ -46,7 +46,7 @@ class SmtAnnotationsTest {
     fun `metadata annotations do not change the asserted term`() {
         val commands = SExprReader("(assert (! true :weight 3 :custom (a b) :marker))").readAll()
 
-        val result = captureSmtSource(commands, Cancellation.Never)
+        val result = captureSmtSource(commands, ExecutionControl.Never)
 
         assertEquals("(assert true)", result.commands.single().smtText())
     }
@@ -55,7 +55,7 @@ class SmtAnnotationsTest {
     fun `define const is a nullary function definition`() {
         val commands = SExprReader("(define-const one Int 1) (assert (= one 1))").readAll()
 
-        val result = captureSmtSource(commands, Cancellation.Never)
+        val result = captureSmtSource(commands, ExecutionControl.Never)
 
         assertEquals("(define-fun one () Int 1)", result.commands.first().smtText())
     }

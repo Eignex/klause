@@ -1,12 +1,12 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 /** Solve recursive equations by necessary instances and independently checked total interpretations. */
 fun solveSmtRecursiveSession(
     text: String,
     solve: (String) -> SmtSessionResult,
-    cancellation: Cancellation = Cancellation.Never,
+    cancellation: ExecutionControl = ExecutionControl.Never,
     candidateLimit: Int = 256,
 ): SmtSessionResult {
     val commands = SExprReader(text).readAll().map { it as? SExpr.SList
@@ -47,11 +47,14 @@ fun solveSmtRecursiveSession(
     fun script(forms: List<SExpr>): String = forms.joinToString("\n", postfix = "\n(check-sat)\n") { it.smtText() }
     fun replaceDefinitions(replacements: List<SExpr>): List<SExpr> {
         val forms = ArrayList<SExpr>()
-        var inserted = false
+        val byName = definitions.mapIndexed { index, definition -> definition.name to replacements[index] }.toMap()
         for (command in commands) when (command.recHead()) {
-            "define-fun-rec", "define-funs-rec" -> if (!inserted) {
-                forms += replacements
-                inserted = true
+            "define-fun-rec" -> forms += byName.getValue(smtSessionSymbol((command.items[1] as SExpr.Atom).text))
+            "define-funs-rec" -> {
+                for (signature in (command.items[1] as SExpr.SList).items) {
+                    val name = ((signature as SExpr.SList).items[0] as SExpr.Atom).text
+                    forms += byName.getValue(smtSessionSymbol(name))
+                }
             }
             "check-sat", "get-model", "get-value" -> Unit
             else -> forms += command
@@ -141,14 +144,33 @@ fun solveSmtRecursiveSession(
             }
         }
     }
-    val candidates = definitions.map { it.candidates(names) }
+    val relaxedDefinitions = relaxation.model?.let {
+        (SExprReader(it.render()).readAll().single() as SExpr.SList).items.map { it as SExpr.SList }
+    }.orEmpty().associateBy { smtSessionSymbol((it.items[1] as SExpr.Atom).text) }
+    val candidates = definitions.map { definition ->
+        val relaxed = relaxedDefinitions[definition.name]
+        val proposed = if (relaxed != null) {
+            val formals = (relaxed.items[2] as SExpr.SList).items.map {
+                smtSessionSymbol(((it as SExpr.SList).items[0] as SExpr.Atom).text)
+            }
+            substituteRecTerm(relaxed.items[4], formals.zip(definition.parameters.map {
+                SExpr.Atom(it.first)
+            }).toMap())
+        } else null
+        (definition.candidates(names) + listOfNotNull(proposed)).distinct()
+    }
+    if (candidates.any { it.isEmpty() }) {
+        return SmtSessionResult("unknown", reasonUnknown = "recursive-interpretation-incomplete")
+    }
     val positions = IntArray(definitions.size)
     var attempted = 0
     while (attempted++ < candidateLimit) {
         if (cancellation()) return SmtSessionResult("unknown", reasonUnknown = "cancelled")
         val interpretations = definitions.indices.map { index -> definitions[index].define(candidates[index][positions[index]]) }
-        val candidateSource = script(replaceDefinitions(interpretations))
-        val candidate = solve(candidateSource)
+        val candidateCommands = replaceDefinitions(interpretations)
+        val candidateSource = script(candidateCommands)
+        val wellSorted = runCatching { validateSmtSessionSource(candidateCommands, cancellation) }.isSuccess
+        val candidate = if (wellSorted) solve(candidateSource) else SmtSessionResult("unknown")
         if (candidate.status == "sat" && candidate.model != null) {
             val modelDefinitions = (SExprReader(candidate.model.render()).readAll().single() as SExpr.SList).items
                 .map { it as SExpr.SList }
@@ -266,28 +288,49 @@ private data class RecursiveDefinition(val fields: List<SExpr>) {
         }
         val safe = values.filterNot(::containsRecursive).distinct().toMutableList()
         if (!containsRecursive(body)) safe += body
-        if (safe.isEmpty()) throw UnsupportedSmtException("recursive result sort has no total candidate interpretation")
         return safe.distinct()
     }
 }
 
 private fun substituteRecTerm(root: SExpr, replacements: Map<String, SExpr>): SExpr {
-    val work = ArrayDeque<Triple<SExpr, Map<String, SExpr>, Boolean>>()
+    val work = ArrayDeque<RecursiveSubstitutionFrame>()
     val values = ArrayDeque<SExpr>()
-    work += Triple(root, replacements, false)
+    work += RecursiveSubstitutionFrame.Evaluate(root, replacements)
     while (work.isNotEmpty()) {
-        val (term, environment, combine) = work.removeLast()
-        when (term) {
-            is SExpr.Atom -> values += environment[smtSessionSymbol(term.text)] ?: term
-            is SExpr.SList -> if (combine) {
-                values += SExpr.SList(List(term.items.size) { values.removeLast() }.reversed())
-            } else {
-                work += Triple(term, environment, true)
-                for (child in term.items.asReversed()) work += Triple(child, environment, false)
+        when (val frame = work.removeLast()) {
+            is RecursiveSubstitutionFrame.Evaluate -> when (val term = frame.term) {
+                is SExpr.Atom -> values += frame.environment[smtSessionSymbol(term.text)] ?: term
+                is SExpr.SList -> if (term.recHead() == "let") {
+                    val bindings = (term.items[1] as SExpr.SList).items.map { it as SExpr.SList }
+                    val names = bindings.map { smtSessionSymbol((it.items[0] as SExpr.Atom).text) }
+                    work += RecursiveSubstitutionFrame.Let(names, term.items[2], frame.environment)
+                    for (binding in bindings.asReversed()) {
+                        work += RecursiveSubstitutionFrame.Evaluate(binding.items[1], frame.environment)
+                    }
+                } else {
+                    work += RecursiveSubstitutionFrame.Combine(term.items.size)
+                    for (child in term.items.asReversed()) {
+                        work += RecursiveSubstitutionFrame.Evaluate(child, frame.environment)
+                    }
+                }
+            }
+            is RecursiveSubstitutionFrame.Combine ->
+                values += SExpr.SList(List(frame.count) { values.removeLast() }.reversed())
+            is RecursiveSubstitutionFrame.Let -> {
+                val arguments = List(frame.names.size) { values.removeLast() }.reversed()
+                work += RecursiveSubstitutionFrame.Evaluate(frame.body,
+                    frame.environment + frame.names.zip(arguments))
             }
         }
     }
     return values.single()
+}
+
+private sealed interface RecursiveSubstitutionFrame {
+    data class Evaluate(val term: SExpr, val environment: Map<String, SExpr>) : RecursiveSubstitutionFrame
+    data class Combine(val count: Int) : RecursiveSubstitutionFrame
+    data class Let(val names: List<String>, val body: SExpr, val environment: Map<String, SExpr>) :
+        RecursiveSubstitutionFrame
 }
 
 private fun SExpr.SList.recHead(): String = (items.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol).orEmpty()

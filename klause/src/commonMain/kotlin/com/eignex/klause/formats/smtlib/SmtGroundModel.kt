@@ -1,7 +1,7 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.abs
@@ -20,7 +20,7 @@ import com.eignex.util.numbers.unaryMinus
 class SmtGroundModel(
     source: String,
     private val model: String,
-    private val cancellation: Cancellation = Cancellation.Never,
+    private val cancellation: ExecutionControl = ExecutionControl.Never,
     private val workLimit: Int = 100_000,
 ) : SmtSessionModel {
     private data class Function(val parameters: List<String>, val body: SExpr)

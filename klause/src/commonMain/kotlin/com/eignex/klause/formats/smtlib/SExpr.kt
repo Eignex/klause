@@ -85,7 +85,10 @@ class SExprReader(private val reader: CharReader) {
             '|'.code -> {
                 sb.append('|')
                 reader.advance()
-                while (!reader.eof() && reader.peek() != '|'.code) sb.appendCurrent()
+                while (!reader.eof() && reader.peek() != '|'.code) {
+                    if (reader.peek() == '\\'.code) parseError("backslash is not allowed in a quoted symbol")
+                    sb.appendCurrent()
+                }
                 if (reader.eof()) parseError("unterminated |quoted symbol|")
                 sb.append('|')
                 reader.advance()
@@ -119,7 +122,26 @@ class SExprReader(private val reader: CharReader) {
                     sb.appendCurrent()
                 }
         }
-        return sb.toString()
+        val token = sb.toString()
+        if (!validToken(token)) parseError("invalid token '$token'")
+        return token
+    }
+
+    private fun validToken(token: String): Boolean {
+        if (token.startsWith('|') || token.startsWith('"')) return true
+        if (token.startsWith("#b")) return token.length > 2 && token.drop(2).all { it in "01" }
+        if (token.startsWith("#x")) return token.length > 2 && token.drop(2).all {
+            it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F'
+        }
+        if (token.firstOrNull()?.let { it in '0'..'9' } == true) {
+            val pieces = token.split('.')
+            return pieces.size in 1..2 && pieces.all { part -> part.isNotEmpty() && part.all { it in '0'..'9' } } &&
+                (pieces[0] == "0" || !pieces[0].startsWith('0'))
+        }
+        val symbol = token.removePrefix(":")
+        val punctuation = "~!@$%^&*_-+=<>.?/"
+        fun initial(c: Char): Boolean = c in 'a'..'z' || c in 'A'..'Z' || c in punctuation
+        return symbol.isNotEmpty() && initial(symbol[0]) && symbol.all { initial(it) || it in '0'..'9' }
     }
 
     private fun skipWs() {
