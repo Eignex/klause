@@ -23,6 +23,14 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private data class Macro(val parameters: List<String>, val body: SExpr, val environment: Environment)
     private data class Environment(val symbols: Map<String, Term>, val functions: Map<String, Function>,
         val macros: Map<String, Macro>)
+    private sealed interface Frame {
+        data class Evaluate(val expression: SExpr, val environment: Environment) : Frame
+        data class Combine(val identifier: SExpr, val name: String?, val qualification: SmtSort?,
+            val tester: Boolean, val count: Int, val environment: Environment) : Frame
+        data class Let(val names: List<String>, val body: SExpr, val environment: Environment) : Frame
+        data class Match(val cases: SExpr, val environment: Environment) : Frame
+        data class Branches(val shape: SmtDatatypeShape, val cases: List<SmtDatatypeCase>) : Frame
+    }
     private val scope = SmtLibScope(cancellation)
     private val registry get() = scope.datatypes
     private val symbols = LinkedHashMap<String, Term>()
@@ -33,7 +41,6 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private val generated = ArrayList<SExpr>()
     private val usedNames = HashSet<String>()
     private val privateBindings = input.privateBindings.toMutableMap()
-    private val captures = HashMap<Pair<SExpr, SmtSort>, Term>()
     private val operationNames = HashMap<Pair<SmtSort, String>, String>()
     private val defined = LinkedHashMap<Pair<SExpr, SmtSort>, SmtDatatypeShape>()
     private val explicit = ArrayList<SmtDatatypeShape>()
@@ -96,95 +103,144 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private fun environment() = Environment(symbols.toMap(), functions.toMap(), macros.toMap())
 
     private fun rewrite(expression: SExpr, environment: Environment): Term {
-        step()
-        if (expression is SExpr.Atom) {
-            val name = polynomialSymbol(expression.text)
-            environment.symbols[name]?.let { return it }
-            environment.macros[name]?.takeIf { it.parameters.isEmpty() }?.let {
-                return rewrite(it.body, it.environment)
-            }
-            registry.resolve(name, emptyList())?.let { return constructor(it, emptyList()) }
-            return literal(expression)
-        }
-        expression as SExpr.SList
-        val headExpression = expression.items.firstOrNull() ?: smtUnsupported("empty datatype expression")
-        val identifier = headExpression as? SExpr.SList
-        val tester = identifier?.let {
-            it.polynomialHead() == "_" && it.items.size == 3 && it.polynomialAtom(1) == "is"
-        } == true
-        val name = when {
-            tester -> identifier!!.polynomialName(2)
-            identifier?.polynomialHead() == "as" -> identifier.polynomialName(1)
-            headExpression is SExpr.Atom -> polynomialSymbol(headExpression.text)
-            else -> null
-        }
-        if (name == "let") {
-            val bindings = (expression.items[1] as SExpr.SList).items.map { it as SExpr.SList }
-            val locals = bindings.associate { it.polynomialName(0) to rewrite(it.items[1], environment) }
-            return rewrite(expression.items[2], environment.copy(symbols = environment.symbols + locals))
-        }
-        if (name == "!") return rewrite(expression.items[1], environment)
-        if (name == "match") return match(expression, environment)
-        if (name == "as") {
-            val constant = expression.polynomialName(1)
-            val sort = scope.sourceSort(expression.items[2])
-            environment.symbols[constant]?.let { return it }
-            val operator = registry.resolve(constant, emptyList(), sort)
-                ?: smtUnsupported("ambiguous qualified datatype constant")
-            return constructor(operator, emptyList())
-        }
-        if (name == "_") {
-            val width = expression.polynomialAtom(2).toIntOrNull()
-                ?: smtUnsupported("invalid indexed bitvector constant")
-            return Term(SmtSort.BitVector(width), expression)
-        }
-        val arguments = expression.items.drop(1).map { rewrite(it, environment) }
-        environment.macros[name]?.let { macro ->
-            return rewrite(macro.body, macro.environment.copy(symbols = macro.environment.symbols +
-                macro.parameters.zip(arguments)))
-        }
-        val qualification = identifier?.takeIf { it.polynomialHead() == "as" }?.let { scope.sourceSort(it.items[2]) }
-        registry.resolve(name ?: "", arguments.map { it.sort }, qualification, tester)?.let { operator ->
-            return when {
-                operator.tester -> {
-                    val value = capture(arguments.single())
-                    val shape = define(value)
-                    Term(SmtSort.Bool, form("=", SExpr.Atom(shape.tag), SExpr.Atom(operator.constructor.toString())))
+        val work = ArrayDeque<Frame>()
+        val values = ArrayDeque<Term>()
+        work.addLast(Frame.Evaluate(expression, environment))
+        fun pop(count: Int): List<Term> = List(count) { values.removeLast() }.reversed()
+        while (work.isNotEmpty()) {
+            step()
+            when (val frame = work.removeLast()) {
+                is Frame.Evaluate -> when (val node = frame.expression) {
+                    is SExpr.Atom -> {
+                        val name = polynomialSymbol(node.text)
+                        val bound = frame.environment.symbols[name]
+                        val macro = frame.environment.macros[name]?.takeIf { it.parameters.isEmpty() }
+                        when {
+                            lexicalLiteral(node.text) -> values.addLast(literal(node))
+                            bound != null -> values.addLast(bound)
+                            macro != null -> work.addLast(Frame.Evaluate(macro.body, macro.environment))
+                            else -> values.addLast(registry.resolve(name, emptyList())?.let {
+                                constructor(it, emptyList())
+                            } ?: literal(node))
+                        }
+                    }
+                    is SExpr.SList -> {
+                        val original = node.items.firstOrNull() ?: smtUnsupported("empty datatype expression")
+                        val qualified = (original as? SExpr.SList)?.takeIf { it.polynomialHead() == "as" }
+                        val identifier = qualified?.items?.get(1) ?: original
+                        val indexed = identifier as? SExpr.SList
+                        val tester = indexed?.let {
+                            it.polynomialHead() == "_" && it.items.size == 3 && it.polynomialAtom(1) == "is"
+                        } == true
+                        val name = when {
+                            tester -> indexed!!.polynomialName(2)
+                            identifier is SExpr.Atom -> polynomialSymbol(identifier.text)
+                            else -> null
+                        }
+                        when (name) {
+                            "let" -> {
+                                val bindings = (node.items[1] as SExpr.SList).items.map { it as SExpr.SList }
+                                work.addLast(Frame.Let(bindings.map { it.polynomialName(0) }, node.items[2],
+                                    frame.environment))
+                                for (binding in bindings.asReversed()) {
+                                    work.addLast(Frame.Evaluate(binding.items[1], frame.environment))
+                                }
+                            }
+                            "!" -> work.addLast(Frame.Evaluate(node.items[1], frame.environment))
+                            "match" -> {
+                                work.addLast(Frame.Match(node.items[2], frame.environment))
+                                work.addLast(Frame.Evaluate(node.items[1], frame.environment))
+                            }
+                            "as" -> {
+                                val constant = node.polynomialName(1)
+                                val sort = scope.sourceSort(node.items[2])
+                                val term = frame.environment.symbols[constant] ?: registry.resolve(constant,
+                                    emptyList(), sort)?.let { constructor(it, emptyList()) }
+                                    ?: smtUnsupported("ambiguous qualified datatype constant")
+                                values.addLast(term)
+                            }
+                            "_" -> {
+                                val width = node.polynomialAtom(2).toIntOrNull()
+                                    ?: smtUnsupported("invalid indexed bitvector constant")
+                                values.addLast(Term(SmtSort.BitVector(width), node))
+                            }
+                            else -> {
+                                work.addLast(Frame.Combine(identifier, name,
+                                    qualified?.let { scope.sourceSort(it.items[2]) }, tester,
+                                    node.items.size - 1, frame.environment))
+                                for (argument in node.items.drop(1).asReversed()) {
+                                    work.addLast(Frame.Evaluate(argument, frame.environment))
+                                }
+                            }
+                        }
+                    }
                 }
-                operator.selector != null -> {
-                    val value = capture(arguments.single())
-                    define(value)
-                    operation(operator.instance, "selector:${operator.constructor}:${operator.selector}",
-                        listOf(value), operator.result)
+                is Frame.Let -> {
+                    val locals = frame.names.zip(pop(frame.names.size))
+                    work.addLast(Frame.Evaluate(frame.body,
+                        frame.environment.copy(symbols = frame.environment.symbols + locals)))
                 }
-                else -> constructor(operator, arguments)
+                is Frame.Combine -> {
+                    val arguments = pop(frame.count)
+                    val macro = frame.environment.macros[frame.name]
+                    if (macro != null) {
+                        work.addLast(Frame.Evaluate(macro.body, macro.environment.copy(symbols =
+                            macro.environment.symbols + macro.parameters.zip(arguments))))
+                    } else values.addLast(combine(frame, arguments))
+                }
+                is Frame.Match -> {
+                    val scrutinee = capture(values.removeLast())
+                    val instance = registry.instance(scrutinee.sort) ?: smtUnsupported("match expects datatype")
+                    val shape = define(scrutinee)
+                    val cases = registry.cases(scrutinee.sort, frame.cases)
+                    work.addLast(Frame.Branches(shape, cases))
+                    for (case in cases.asReversed()) {
+                        val arguments = if (case.constructor == null) listOf(scrutinee) else {
+                            instance.constructors[case.constructor].fields.mapIndexed { index, field ->
+                                operation(instance, "selector:${case.constructor}:$index", listOf(scrutinee),
+                                    field.sort)
+                            }
+                        }
+                        work.addLast(Frame.Evaluate(case.body, frame.environment.copy(symbols =
+                            frame.environment.symbols + case.variables.zip(arguments))))
+                    }
+                }
+                is Frame.Branches -> {
+                    val branches = pop(frame.cases.size)
+                    var result = branches.last().expression
+                    for (index in frame.cases.lastIndex - 1 downTo 0) {
+                        val constructor = frame.cases[index].constructor
+                            ?: smtUnsupported("non-final catch-all pattern")
+                        result = form("ite", form("=", SExpr.Atom(frame.shape.tag), SExpr.Atom(constructor.toString())),
+                            branches[index].expression, result)
+                    }
+                    val sort = if (branches.any { it.sort == SmtSort.Real }) SmtSort.Real else branches.first().sort
+                    values.addLast(Term(sort, result))
+                }
             }
         }
-        val sort = environment.functions[name]?.result ?: resultSort(headExpression, arguments.map { it.sort })
-        return Term(sort, form(headExpression, *arguments.map { it.expression }.toTypedArray()))
+        return values.single()
     }
 
-    private fun match(expression: SExpr.SList, environment: Environment): Term {
-        val scrutinee = capture(rewrite(expression.items[1], environment))
-        val instance = registry.instance(scrutinee.sort) ?: smtUnsupported("match expects datatype")
-        val shape = define(scrutinee)
-        val cases = registry.cases(scrutinee.sort, expression.items[2])
-        val branches = cases.map { case ->
-            val arguments = if (case.constructor == null) listOf(scrutinee) else {
-                instance.constructors[case.constructor].fields.mapIndexed { index, field ->
-                    operation(instance, "selector:${case.constructor}:$index", listOf(scrutinee), field.sort)
-                }
+    private fun combine(frame: Frame.Combine, arguments: List<Term>): Term {
+        val operator = registry.resolve(frame.name ?: "", arguments.map { it.sort }, frame.qualification, frame.tester)
+        if (operator != null) return when {
+            operator.tester -> {
+                val shape = define(capture(arguments.single()))
+                Term(SmtSort.Bool, form("=", SExpr.Atom(shape.tag), SExpr.Atom(operator.constructor.toString())))
             }
-            rewrite(case.body, environment.copy(symbols = environment.symbols + case.variables.zip(arguments)))
+            operator.selector != null -> {
+                val value = capture(arguments.single())
+                define(value)
+                operation(operator.instance, "selector:${operator.constructor}:${operator.selector}",
+                    listOf(value), operator.result)
+            }
+            else -> constructor(operator, arguments)
         }
-        var result = branches.last().expression
-        for (index in cases.lastIndex - 1 downTo 0) {
-            val constructor = cases[index].constructor ?: smtUnsupported("non-final catch-all pattern")
-            result = form("ite", form("=", SExpr.Atom(shape.tag), SExpr.Atom(constructor.toString())),
-                branches[index].expression, result)
-        }
-        val sort = if (branches.any { it.sort == SmtSort.Real }) SmtSort.Real else branches.first().sort
-        return Term(sort, result)
+        val identifier = if (frame.identifier is SExpr.Atom) SExpr.Atom(polynomialSymbol(frame.identifier.text))
+            else frame.identifier
+        val sort = frame.environment.functions[frame.name]?.result ?: resultSort(identifier, arguments.map { it.sort })
+        return Term(sort, form(identifier, *arguments.map { it.expression }.toTypedArray()))
     }
 
     private fun constructor(operator: SmtDatatypeOperator, arguments: List<Term>): Term {
@@ -255,9 +311,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
 
     private fun capture(term: Term): Term {
         if (term.expression is SExpr.Atom && polynomialSymbol(term.expression.text) in symbols) return term
-        return captures.getOrPut(term.expression to term.sort) {
-            fresh(term.sort).also { axioms += form("assert", form("=", it.expression, term.expression)) }
-        }
+        return fresh(term.sort).also { axioms += form("assert", form("=", it.expression, term.expression)) }
     }
 
     private fun fresh(sort: SmtSort): Term {
@@ -289,6 +343,12 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         return Term(sort, expression)
     }
 
+    private fun lexicalLiteral(text: String): Boolean = text in setOf("true", "false", "pi") ||
+        text.startsWith("#b") || text.startsWith("#x") ||
+        text.isNotEmpty() && text.all { it in '0'..'9' } ||
+        text.indexOf('.').let { dot -> dot > 0 && dot < text.lastIndex &&
+            text.indices.all { it == dot || text[it] in '0'..'9' } }
+
     private fun collectNames() {
         val work = ArrayDeque<SExpr>()
         input.commands.forEach(work::addLast)
@@ -311,6 +371,7 @@ private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
         val operator = head.polynomialAtom(1)
         val base = args.firstOrNull() as? SmtSort.BitVector
         return when (operator) {
+            "divisible" -> SmtSort.Bool
             "extract" -> SmtSort.BitVector(head.polynomialAtom(2).toInt() - head.polynomialAtom(3).toInt() + 1)
             "zero_extend", "sign_extend" -> SmtSort.BitVector(checkNotNull(base).width + head.polynomialAtom(2).toInt())
             "repeat" -> SmtSort.BitVector(checkNotNull(base).width * head.polynomialAtom(2).toInt())
@@ -322,7 +383,7 @@ private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
         "=", "distinct", "and", "or", "xor", "not", "=>", "<", "<=", ">", ">=", "is_int",
         "bvult", "bvule", "bvugt", "bvuge", "bvslt", "bvsle", "bvsgt", "bvsge",
         "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvnego", "bvusubo", "bvssubo", "bvsdivo" -> SmtSort.Bool
-        "ite" -> args[1]
+        "ite" -> if (args[1] == SmtSort.Real || args[2] == SmtSort.Real) SmtSort.Real else args[1]
         "select" -> (args[0] as SmtSort.Array).element
         "store" -> args[0]
         "to_int", "div", "mod", "ubv_to_int", "sbv_to_int", "bv2nat", "bv2int" -> SmtSort.Int

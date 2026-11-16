@@ -21,6 +21,7 @@ internal class SmtTypedSource(
     val sortParameters: Set<String> = emptySet(),
     val symbols: List<SmtTypedSymbol> = emptyList(),
     val obligations: List<Pair<String, Int>> = emptyList(),
+    val datatypes: SmtDatatypes? = null,
 )
 
 internal data class SmtReduction(
@@ -42,7 +43,8 @@ internal fun captureSmtSource(commands: List<SExpr>, cancellation: ExecutionCont
     }
     val declarations = scope.declarations
     val original = SmtTypedSource(commands.toList(), declarations, scope.terms, scope.assertions,
-        scope.sortParameters, scope.symbols, scope.obligations)
+        scope.sortParameters, scope.symbols, scope.obligations,
+        scope.datatypes.takeIf { it.names.isNotEmpty() }?.snapshot(ExecutionControl.Never))
     val bindings = declarations.map {
         cancellation.polynomialSourceCheckpoint(1)
         SmtSourceBinding(it, SmtReconstruction.Scalar(it.name, it.result))

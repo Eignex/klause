@@ -21,7 +21,7 @@ internal data class SmtDatatypeOperator(val instance: SmtDatatypeInstance,
         else instance.constructors[constructor].fields.map { it.sort }
 }
 
-internal class SmtDatatypes(private val cancellation: ExecutionControl) {
+internal class SmtDatatypes(private val cancellation: ExecutionControl, private val checkpoint: ((Long) -> Unit)? = null) {
     private val definitions = LinkedHashMap<String, SmtDatatypeDefinition>()
     private val groups = HashMap<String, Set<String>>()
     val names: Set<String> get() = definitions.keys
@@ -30,7 +30,8 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl) {
             constructor.fields.map { polynomialSymbol(it.name) } }
     }.toSet()
 
-    fun snapshot(cancellation: ExecutionControl): SmtDatatypes = SmtDatatypes(cancellation).also {
+    fun snapshot(cancellation: ExecutionControl, checkpoint: ((Long) -> Unit)? = null): SmtDatatypes =
+        SmtDatatypes(cancellation, checkpoint).also {
         it.definitions.putAll(definitions)
         it.groups.putAll(groups)
     }
@@ -70,6 +71,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl) {
         val group = headers.map { polynomialSymbol(it.first) }.toSet()
         if (group.size != headers.size || group.any { it in definitions }) smtUnsupported("duplicate datatype sort")
         val declared = ArrayList<SmtDatatypeDefinition>()
+        val operators = operatorNames.toMutableSet()
         for ((index, header) in headers.withIndex()) {
             step()
             val body = bodies[index] as? SExpr.SList ?: smtUnsupported("invalid datatype body")
@@ -95,6 +97,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl) {
                 val name = (ctor.items.firstOrNull() as? SExpr.Atom)?.text
                     ?: smtUnsupported("missing datatype constructor name")
                 if (!constructorNames.add(polynomialSymbol(name))) smtUnsupported("duplicate datatype constructor")
+                if (!operators.add(polynomialSymbol(name))) smtUnsupported("duplicate datatype function symbol")
                 val selectorNames = HashSet<String>()
                 val fields = ctor.items.drop(1).map { fieldExpression ->
                     step()
@@ -102,6 +105,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl) {
                     field.polynomialSize(2)
                     val selector = (field.items[0] as? SExpr.Atom)?.text ?: smtUnsupported("invalid selector name")
                     if (!selectorNames.add(polynomialSymbol(selector))) smtUnsupported("duplicate constructor selector")
+                    if (!operators.add(polynomialSymbol(selector))) smtUnsupported("duplicate datatype function symbol")
                     val sort = substitute(parseSort(field.items[1], parameters), parameterSubstitutions)
                     if (containsGroupBelowTop(sort, group)) {
                         smtUnsupported("recursive datatype occurs below a field sort head")
@@ -260,41 +264,71 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl) {
     }
 
     fun substitute(root: SmtSort, substitutions: Map<String, SmtSort>): SmtSort {
-        step()
-        return when (root) {
-            is SmtSort.Array -> SmtSort.Array(substitute(root.index, substitutions),
-                substitute(root.element, substitutions))
-            is SmtSort.Uninterpreted -> if (root.arguments.isEmpty()) substitutions[polynomialSymbol(root.name)] ?: root
-                else root.copy(arguments = root.arguments.map { substitute(it, substitutions) })
-            else -> root
+        val work = ArrayDeque<Pair<SmtSort, Boolean>>()
+        val values = ArrayDeque<SmtSort>()
+        work.addLast(root to false)
+        while (work.isNotEmpty()) {
+            step()
+            val (sort, combine) = work.removeLast()
+            when (sort) {
+                is SmtSort.Array -> if (combine) {
+                    val element = values.removeLast()
+                    values.addLast(SmtSort.Array(values.removeLast(), element))
+                } else {
+                    work.addLast(sort to true)
+                    work.addLast(sort.element to false)
+                    work.addLast(sort.index to false)
+                }
+                is SmtSort.Uninterpreted -> if (sort.arguments.isEmpty()) {
+                    values.addLast(substitutions[polynomialSymbol(sort.name)] ?: sort)
+                } else if (combine) {
+                    val arguments = List(sort.arguments.size) { values.removeLast() }.reversed()
+                    values.addLast(sort.copy(arguments = arguments))
+                } else {
+                    work.addLast(sort to true)
+                    for (argument in sort.arguments.asReversed()) work.addLast(argument to false)
+                }
+                else -> values.addLast(sort)
+            }
         }
+        return values.single()
     }
 
     private fun unify(template: SmtSort, actual: SmtSort, parameters: Set<String>,
         substitutions: MutableMap<String, SmtSort>, promotion: Boolean = true): Boolean {
-        step()
-        if (template is SmtSort.Uninterpreted && template.arguments.isEmpty() &&
-            polynomialSymbol(template.name) in parameters) {
-            val name = polynomialSymbol(template.name)
-            val previous = substitutions[name]
-            return when {
-                previous == null -> { substitutions[name] = actual; true }
-                previous == actual -> true
-                promotion && previous == SmtSort.Real && actual == SmtSort.Int -> true
-                promotion && previous == SmtSort.Int && actual == SmtSort.Real -> { substitutions[name] = actual; true }
-                else -> false
+        val work = ArrayDeque<Triple<SmtSort, SmtSort, Boolean>>()
+        work.addLast(Triple(template, actual, promotion))
+        while (work.isNotEmpty()) {
+            step()
+            val (first, second, promote) = work.removeLast()
+            if (first is SmtSort.Uninterpreted && first.arguments.isEmpty() &&
+                polynomialSymbol(first.name) in parameters) {
+                val name = polynomialSymbol(first.name)
+                val previous = substitutions[name]
+                when {
+                    previous == null -> substitutions[name] = second
+                    previous == second -> Unit
+                    promote && previous == SmtSort.Real && second == SmtSort.Int -> Unit
+                    promote && previous == SmtSort.Int && second == SmtSort.Real -> substitutions[name] = second
+                    else -> return false
+                }
+            } else when {
+                first is SmtSort.Array && second is SmtSort.Array -> {
+                    work.addLast(Triple(first.index, second.index, false))
+                    work.addLast(Triple(first.element, second.element, false))
+                }
+                first is SmtSort.Uninterpreted && second is SmtSort.Uninterpreted -> {
+                    if (polynomialSymbol(first.name) != polynomialSymbol(second.name) ||
+                        first.arguments.size != second.arguments.size) return false
+                    for (index in first.arguments.indices) {
+                        work.addLast(Triple(first.arguments[index], second.arguments[index], false))
+                    }
+                }
+                first == second || promote && first == SmtSort.Real && second == SmtSort.Int -> Unit
+                else -> return false
             }
         }
-        return when {
-            template is SmtSort.Array && actual is SmtSort.Array ->
-                unify(template.index, actual.index, parameters, substitutions, false) &&
-                    unify(template.element, actual.element, parameters, substitutions, false)
-            template is SmtSort.Uninterpreted && actual is SmtSort.Uninterpreted ->
-                polynomialSymbol(template.name) == polynomialSymbol(actual.name) &&
-                    template.arguments.size == actual.arguments.size && template.arguments.indices.all {
-                    unify(template.arguments[it], actual.arguments[it], parameters, substitutions, false) }
-            else -> template == actual || promotion && template == SmtSort.Real && actual == SmtSort.Int
-        }
+        return true
     }
 
     private fun containsGroupBelowTop(root: SmtSort, group: Set<String>): Boolean {
@@ -318,5 +352,8 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl) {
         return false
     }
 
-    private fun step() = cancellation.polynomialSourceCheckpoint(1)
+    private fun step() {
+        val current = checkpoint
+        if (current == null) cancellation.polynomialSourceCheckpoint(1) else current(1)
+    }
 }

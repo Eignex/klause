@@ -11,6 +11,23 @@ import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.rem
 import com.eignex.util.numbers.times
+import com.eignex.util.numbers.toLong
+import kotlin.coroutines.cancellation.CancellationException
+
+internal interface SmtSortCardinalities {
+    fun cardinality(sort: SmtSort, cap: Int): Int?
+}
+
+internal fun SmtDatatypes.cardinality(sort: SmtSort, cap: Int, cancellation: Cancellation): Int? {
+    fun checkpoint(units: Long = 1) {
+        cancellation.charge(units)
+        if (cancellation()) throw CancellationException("datatype cardinality check interrupted")
+    }
+    val current = snapshot(cancellation, ::checkpoint)
+    if (current.instance(sort) == null) return null
+    val count = SmtDatatypeCardinalities(current, parseBigInt(cap.toString()), { checkpoint() }).of(sort) ?: return cap
+    return count.toLong().toInt()
+}
 
 internal fun finishSmtGroundDatatypes(input: SmtReduction, cancellation: ExecutionControl): SmtReduction {
     val state = input.datatypes ?: return input
@@ -56,9 +73,38 @@ internal fun finishSmtGroundDatatypes(input: SmtReduction, cancellation: Executi
     val query = commands.indexOfFirst { (it as? SExpr.SList)?.polynomialHead() in
         setOf("check-sat", "check-sat-assuming", "get-model", "get-value", "exit") }
     commands.addAll(if (query < 0) commands.size else query, constraints)
-    val context = SmtDatatypeModelContext(state, coordinates.toList())
-    val recipes = coordinates.associate { coordinate ->
-        coordinate.name to SmtReconstruction { values -> context.reconstruct(coordinate, values) }
+    val groups = datatypeModelGroups(registry, coordinates, cancellation)
+    val context = SmtDatatypeModelContext(state, coordinates.toList(), groups)
+    val usedNames = HashSet<String>()
+    val names = ArrayDeque<SExpr>()
+    input.commands.forEach(names::addLast)
+    input.original?.commands?.forEach(names::addLast)
+    while (names.isNotEmpty()) {
+        cancellation.polynomialSourceCheckpoint(1)
+        when (val expression = names.removeLast()) {
+            is SExpr.Atom -> usedNames += polynomialSymbol(expression.text)
+            is SExpr.SList -> expression.items.forEach(names::addLast)
+        }
+    }
+    val recipes = LinkedHashMap<String, SmtReconstruction>()
+    var nextTable = 0
+    for (group in coordinates.groupBy { groups.getValue(it.sort) }.values) {
+        var name: String
+        do { name = "@klause.adt.model.${nextTable++}" } while (!usedNames.add(name))
+        val tableName = name
+        recipes[tableName] = SmtReconstruction { values ->
+            val model = context.reconstruct(group.first().sort, values)
+            val entries = group.mapIndexed { index, coordinate ->
+                values.checkpoint()
+                listOf<SmtValue>(SmtValue.Integer(index.toString())) to model.getValue(coordinate.name)
+            }
+            SmtValue.Function(listOf(SmtSort.Int), entries, entries.first().second)
+        }
+        for ((index, coordinate) in group.withIndex()) {
+            recipes[coordinate.name] = SmtReconstruction { values ->
+                (values.value(tableName) as SmtValue.Function).entries[index].second
+            }
+        }
     }
     val bindings = input.bindings.map { binding ->
         recipes[binding.declaration.name]?.let { binding.copy(reconstruction = it) } ?: binding
@@ -66,6 +112,61 @@ internal fun finishSmtGroundDatatypes(input: SmtReduction, cancellation: Executi
     val check = SmtSourceCheck { values -> context.check(values) }
     return input.copy(commands = commands.toList(), bindings = bindings,
         privateBindings = input.privateBindings + recipes, checks = input.checks + check, datatypes = null)
+}
+
+private fun datatypeModelGroups(registry: SmtDatatypes, coordinates: List<SmtDatatypeCoordinate>,
+    cancellation: Cancellation): Map<SmtSort.Uninterpreted, Set<SmtSort.Uninterpreted>> {
+    val sorts = coordinates.mapTo(LinkedHashSet()) { it.sort }
+    val edges = sorts.associateWith { sort ->
+        val dependencies = LinkedHashSet<SmtSort.Uninterpreted>()
+        val pending = ArrayDeque<SmtSort>()
+        for (constructor in registry.instance(sort)!!.constructors) {
+            constructor.fields.forEach { pending.addLast(it.sort) }
+        }
+        while (pending.isNotEmpty()) {
+            cancellation.polynomialSourceCheckpoint(1)
+            when (val field = pending.removeLast()) {
+                is SmtSort.Array -> { pending.addLast(field.index); pending.addLast(field.element) }
+                is SmtSort.Uninterpreted -> if (field in sorts) dependencies += field
+                else -> Unit
+            }
+        }
+        dependencies.toSet()
+    }
+    val reverse = sorts.associateWith { LinkedHashSet<SmtSort.Uninterpreted>() }
+    for ((sort, dependencies) in edges) for (dependency in dependencies) reverse.getValue(dependency) += sort
+    val seen = HashSet<SmtSort.Uninterpreted>()
+    val order = ArrayList<SmtSort.Uninterpreted>()
+    val work = ArrayDeque<Pair<SmtSort.Uninterpreted, Boolean>>()
+    for (sort in sorts) {
+        work.addLast(sort to false)
+        while (work.isNotEmpty()) {
+            cancellation.polynomialSourceCheckpoint(1)
+            val (current, finish) = work.removeLast()
+            if (finish) order += current else if (seen.add(current)) {
+                work.addLast(current to true)
+                for (dependency in edges.getValue(current)) work.addLast(dependency to false)
+            }
+        }
+    }
+    seen.clear()
+    val groups = LinkedHashMap<SmtSort.Uninterpreted, Set<SmtSort.Uninterpreted>>()
+    val pending = ArrayDeque<SmtSort.Uninterpreted>()
+    for (sort in order.asReversed()) {
+        if (sort in seen) continue
+        val group = LinkedHashSet<SmtSort.Uninterpreted>()
+        pending.addLast(sort)
+        while (pending.isNotEmpty()) {
+            cancellation.polynomialSourceCheckpoint(1)
+            val current = pending.removeLast()
+            if (!seen.add(current)) continue
+            group += current
+            for (dependency in reverse.getValue(current)) pending.addLast(dependency)
+        }
+        val frozen = group.toSet()
+        for (member in frozen) groups[member] = frozen
+    }
+    return groups.toMap()
 }
 
 internal class SmtDatatypeCardinalities(private val registry: SmtDatatypes, private val limit: BigInt? = null,
@@ -133,29 +234,28 @@ internal class SmtDatatypeCardinalities(private val registry: SmtDatatypes, priv
 }
 
 private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
-    private val coordinates: List<SmtDatatypeCoordinate>) {
+    private val coordinates: List<SmtDatatypeCoordinate>,
+    private val groups: Map<SmtSort.Uninterpreted, Set<SmtSort.Uninterpreted>>) {
     private data class Key(val sort: SmtSort.Uninterpreted, val identity: String)
     private data class Shape(val constructor: Int, val fields: List<String>)
 
-    fun reconstruct(coordinate: SmtDatatypeCoordinate, values: SmtModelValues): SmtValue {
-        val registry = state.registry.snapshot(values.cancellation)
-        val group = registry.group(coordinate.sort)
-        val relevant = coordinates.filter { polynomialSymbol(it.sort.name) in group }
+    fun reconstruct(sort: SmtSort.Uninterpreted, values: SmtModelValues): Map<String, SmtValue> {
+        val registry = state.registry.snapshot(values.cancellation, values::checkpoint)
+        val group = groups.getValue(sort)
+        val relevant = coordinates.filter { it.sort in group }
         val keys = relevant.associate { it.name to Key(it.sort, values.integer(it.name)) }
         val shapes = LinkedHashMap<Key, Shape>()
         for (record in state.shapes) {
             values.checkpoint()
-            if (polynomialSymbol(record.coordinate.sort.name) !in group) continue
+            if (record.coordinate.sort !in group) continue
             val key = keys.getValue(record.coordinate.name)
-            val tag = values.integer(record.tag).toIntOrNull() ?: error("invalid datatype constructor tag")
+            val tag = values.integer(record.tag).toIntOrNull() ?: throw SmtSourceWitnessRejected()
             val alternative = record.alternatives.singleOrNull { it.constructor == tag }
-                ?: error("datatype constructor tag has no matching alternative")
+                ?: throw SmtSourceWitnessRejected()
             val shape = Shape(tag, alternative.fields)
             val previous = shapes[key]
             if (previous == null) shapes[key] = shape
-            if (previous != null) check(previous.constructor == shape.constructor) {
-                "inconsistent datatype constructor tags"
-            }
+            if (previous != null && previous.constructor != shape.constructor) throw SmtSourceWitnessRejected()
         }
         val reconstructed = LinkedHashMap<Key, SmtValue>()
         val generator = SmtDatatypeTermGenerator(registry, relevant.size.coerceAtLeast(1), values)
@@ -168,7 +268,7 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
                 instance.constructors[shape.constructor].fields.indices.all { index ->
                     val fieldSort = instance.constructors[shape.constructor].fields[index].sort
                     val fieldInstance = registry.instance(fieldSort)
-                    fieldInstance == null || polynomialSymbol(fieldInstance.sort.name) !in group ||
+                    fieldInstance == null || fieldInstance.sort !in group ||
                         keys.getValue(shape.fields[index]) in reconstructed
                 }
             }
@@ -180,22 +280,20 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
                     val child = registry.instance(field.sort)
                     when {
                         child == null -> values.value(shape.fields[index])
-                        polynomialSymbol(child.sort.name) in group ->
+                        child.sort in group ->
                             reconstructed.getValue(keys.getValue(shape.fields[index]))
-                        else -> reconstruct(SmtDatatypeCoordinate(shape.fields[index], child.sort), values)
+                        else -> values.value(shape.fields[index])
                     }
                 }
                 val term = SmtValue.Application(registry.constructorName(instance, shape.constructor), arguments)
-                check(reconstructed.none { (key, value) ->
+                if (reconstructed.any { (key, value) ->
                     key.sort == ready.sort && key != ready && values.equivalent(value, term)
-                }) {
-                    "datatype identity encoding is not injective"
-                }
+                }) throw SmtSourceWitnessRejected()
                 reconstructed[ready] = term
                 pending.remove(ready)
             } else {
                 val open = pending.filter { it !in shapes }
-                check(open.isNotEmpty()) { "cyclic datatype reconstruction" }
+                if (open.isEmpty()) throw SmtSourceWitnessRejected()
                 var selected: Pair<Key, SmtValue>? = null
                 var selectedDepth = Int.MAX_VALUE
                 for (key in open) {
@@ -204,8 +302,8 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
                     val term = generator.values(key.sort).firstOrNull { candidate ->
                         used.none { values.equivalent(it, candidate) }
                     }
-                        ?: error("datatype cardinality exhausted")
-                    val depth = depth(term)
+                        ?: throw SmtSourceCheckingUnavailable()
+                    val depth = datatypeValueDepth(term) { values.checkpoint() }
                     if (depth < selectedDepth) { selected = key to term; selectedDepth = depth }
                 }
                 val (key, term) = checkNotNull(selected)
@@ -213,11 +311,15 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
                 pending.remove(key)
             }
         }
-        return reconstructed.getValue(keys.getValue(coordinate.name))
+        return keys.mapValues { (_, key) -> reconstructed.getValue(key) }
     }
 
     fun check(values: SmtModelValues): Boolean {
-        val registry = state.registry.snapshot(values.cancellation)
+        val registry = state.registry.snapshot(values.cancellation, values::checkpoint)
+        for (coordinate in coordinates) {
+            values.checkpoint()
+            if (values.value(coordinate.name) !is SmtValue.Application) return false
+        }
         for (record in state.shapes) {
             values.checkpoint()
             val value = values.value(record.coordinate.name) as? SmtValue.Application ?: return false
@@ -248,13 +350,6 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
         return true
     }
 
-    private fun depth(value: SmtValue): Int = when (value) {
-        is SmtValue.Application -> 1 + (value.arguments.maxOfOrNull(::depth) ?: 0)
-        is SmtValue.Array -> maxOf(depth(value.default), value.entries.maxOfOrNull {
-            maxOf(depth(it.first), depth(it.second))
-        } ?: 0)
-        else -> 0
-    }
 }
 
 private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, private val limit: Int,
@@ -269,7 +364,7 @@ private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, priva
             val terms = atDepth(sort, depth)
             if (terms.size >= limit || finite != null && parseBigInt(terms.size.toString()) == finite) return terms
             depth++
-            if (depth == Int.MAX_VALUE) error("datatype reconstruction depth is not representable")
+            if (depth == Int.MAX_VALUE) throw SmtSourceCheckingUnavailable()
         }
     }
 
@@ -358,13 +453,34 @@ private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, priva
         return result
     }
 
-    private fun termDepth(value: SmtValue): Int = when (value) {
-        is SmtValue.Application -> 1 + (value.arguments.maxOfOrNull(::termDepth) ?: 0)
-        is SmtValue.Array -> maxOf(termDepth(value.default), value.entries.maxOfOrNull {
-            maxOf(termDepth(it.first), termDepth(it.second))
-        } ?: 0)
-        else -> 0
+    private fun termDepth(value: SmtValue): Int = datatypeValueDepth(value) { values.checkpoint() }
+}
+
+private fun datatypeValueDepth(root: SmtValue, step: () -> Unit): Int {
+    val work = ArrayDeque<Pair<SmtValue, Int>>()
+    work.addLast(root to 0)
+    var maximum = 0
+    while (work.isNotEmpty()) {
+        step()
+        val (value, parent) = work.removeLast()
+        when (value) {
+            is SmtValue.Application -> {
+                if (parent == Int.MAX_VALUE) throw SmtSourceCheckingUnavailable()
+                val depth = parent + 1
+                maximum = maxOf(maximum, depth)
+                for (argument in value.arguments) work.addLast(argument to depth)
+            }
+            is SmtValue.Array -> {
+                work.addLast(value.default to parent)
+                for ((index, element) in value.entries) {
+                    work.addLast(index to parent)
+                    work.addLast(element to parent)
+                }
+            }
+            else -> Unit
+        }
     }
+    return maximum
 }
 
 private fun SmtModelValues.equivalent(left: SmtValue, right: SmtValue): Boolean =
