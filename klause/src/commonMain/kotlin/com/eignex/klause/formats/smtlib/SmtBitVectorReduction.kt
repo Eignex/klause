@@ -521,13 +521,18 @@ private class SmtBitVectorReducer(private val source: List<SExpr>, private val c
 
     private fun integerValue(bits: List<SExpr>, signed: Boolean): SExpr {
         chargeEncodingWork(bits.size.toLong() * (bits.size + 1L) / 2)
-        val summands = bits.mapIndexed { i, bit ->
+        val summands = bits.mapIndexedNotNull { i, bit ->
             cancellation.polynomialSourceCheckpoint(1)
+            if (bit == zero) return@mapIndexedNotNull null
             val weight = atom((BIG_ONE shl i).toString())
-            val term = form("*", weight, form("ite", bit, atom("1"), atom("0")))
+            val term = if (bit == one) weight else form("*", weight, form("ite", bit, atom("1"), atom("0")))
             if (signed && i == bits.lastIndex) form("-", term) else term
         }
-        return if (summands.size == 1) summands[0] else form("+", *summands.toTypedArray())
+        return when (summands.size) {
+            0 -> atom("0")
+            1 -> summands[0]
+            else -> form("+", *summands.toTypedArray())
+        }
     }
 
     private fun literal(expression: SExpr.Atom): Value {

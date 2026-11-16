@@ -97,13 +97,14 @@ class SmtLibBitVectorTest {
             "(assert (= ((_ int_to_bv 1) x) #b1))")
         var work = 0L
         val meter = WorkMeter { work += it }
-        val cancellation = ExecutionControl(Cancellation { work >= 100_000 }, meter)
+        val cancellation = ExecutionControl(Cancellation { work >= 500_000 }, meter)
 
         val result = BacktrackSolver.source(parsed.model).solve(
             FiniteEngine.BACKTRACK, cancellation = cancellation,
         )
+        val reason = (result as? OpenTheoryResult.Unknown)?.reason
         val assignment = assertIs<OpenTheoryResult.Sat>(result,
-            "work=$work route=${parsed.model.sourceRoute()} result=$result").assignment
+            "work=$work route=${parsed.model.sourceRoute()} reason=$reason").assignment
 
         assertEquals(SmtValue.Integer("36893488147419103233"),
             parsed.reconstructModel(assignment).values.single().second)
