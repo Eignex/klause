@@ -1,6 +1,9 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.formats.smtlib.SmtLib
+import com.eignex.klause.formats.smtlib.SExprReader
+import com.eignex.klause.formats.smtlib.SmtLibSession
+import com.eignex.klause.formats.smtlib.solveSmtRecursiveSession
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.formats.smtlib.smtRealTerm
 import com.eignex.klause.formats.smtlib.smtRealValue
@@ -17,6 +20,8 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.withBoundedPolling
 import com.eignex.util.io.openTextFile
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.io.CharSource
+import com.eignex.util.io.StringCharSource
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
@@ -39,7 +44,36 @@ internal object SmtLibMode : CliMode {
 
         override fun flags(): List<FlagSpec> = emptyList()
 
-        override fun load(path: String, common: CommonOptions): Solvable {
+        override fun runCommands(path: String, common: CommonOptions): Boolean {
+            val source = openTextFile(path)
+            try {
+                val stop = Cancellation { common.deadlineAtMs?.let { nowMillis() >= it } == true }
+                SmtLibSession(
+                    solve = { text -> solveSmtRecursiveSession(text, solve = { snapshot ->
+                        common.resetInvocationStatistics()
+                        common.sourceSemantics = null
+                        val started = nowMillis()
+                        val solvable = loadSource({ StringCharSource(snapshot) }, path, common)
+                        common.loadElapsedMs = nowMillis() - started
+                        val captured = SmtSessionOutput(snapshot)
+                        SolveCore.solve(solvable, common, captured.sourceQualified(common.sourceSemantics, ";"))
+                        captured.result()
+                    }, cancellation = stop) },
+                    respond = ::println,
+                    cancellation = stop,
+                ).execute(SExprReader(source))
+            } catch (_: CancellationException) {
+                println("unknown")
+            } finally {
+                if (source is AutoCloseable) source.close()
+            }
+            return true
+        }
+
+        override fun load(path: String, common: CommonOptions): Solvable =
+            loadSource({ openTextFile(path) }, path, common)
+
+        private fun loadSource(openSource: () -> CharSource, path: String, common: CommonOptions): Solvable {
             val config = common.config
             val overrides = common.sourceOverrides(smtLibSemantics)
             latestSourceObjective = null
@@ -47,7 +81,7 @@ internal object SmtLibMode : CliMode {
             val stop = common.invocationCancellation().withBoundedPolling()
             val parsed = try {
                 SmtLib.parse(
-                    { openTextFile(path) },
+                    openSource,
                     settings = config.problemSettings(),
                     cancellation = stop,
                     semanticOverrides = overrides,

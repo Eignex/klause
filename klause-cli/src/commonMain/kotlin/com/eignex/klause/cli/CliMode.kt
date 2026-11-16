@@ -663,6 +663,9 @@ internal interface ModeSession {
     fun flags(): List<FlagSpec>
     fun load(path: String, common: CommonOptions): Solvable
     fun output(common: CommonOptions): OutputProtocol
+
+    /** Run a format's command stream, or return false to use the single-source driver. */
+    fun runCommands(path: String, common: CommonOptions): Boolean = false
 }
 
 /**
