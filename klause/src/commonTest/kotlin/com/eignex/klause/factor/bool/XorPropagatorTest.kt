@@ -52,14 +52,9 @@ class XorPropagatorTest {
     @Test
     fun `complementary unassigned literals should retain their parity constant`() {
         for (target in 0..1) {
-            val problem = Problem(
-                2,
-                0,
-                emptyArray(),
-                arrayOf<Factor>(
-                    Xor(intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true)), target),
-                ),
-            )
+            val problem = Problem(2, 0, emptyArray(), arrayOf<Factor>(
+                Xor(intArrayOf(Lit.make(0, true), Lit.make(0, false), Lit.make(1, true)), target),
+            ))
 
             val session = PropagationSession(problem)
             assertIs<PropagationResult.Implied>(session.seed(Assumptions.None))
@@ -71,30 +66,17 @@ class XorPropagatorTest {
 
     @Test
     fun `signed and repeated literals should preserve their complete assignments`() {
-        val patterns = listOf(
-            intArrayOf(0, 1),
-            intArrayOf(0, 0),
-            intArrayOf(0, 1, 2),
-            intArrayOf(0, 0, 3, 4),
-            intArrayOf(1, 2, 5),
-            intArrayOf(1, 1, 2, 3, 4),
-        )
-        for (literals in patterns) {
-            for (target in 0..1) {
-                for (mask in 0..7) {
-                    val values = BooleanArray(3) { mask and (1 shl it) != 0 }
-                    val parity = literals.count { Lit.evaluate(it, values[Lit.variable(it)]) } and 1
-                    val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(literals, target)))
+        val patterns = listOf(intArrayOf(0, 1), intArrayOf(0, 0), intArrayOf(0, 1, 2),
+            intArrayOf(0, 0, 3, 4), intArrayOf(1, 2, 5), intArrayOf(1, 1, 2, 3, 4))
+        for (literals in patterns) for (target in 0..1) for (mask in 0..7) {
+            val values = BooleanArray(3) { mask and (1 shl it) != 0 }
+            val parity = literals.count { Lit.evaluate(it, values[Lit.variable(it)]) } and 1
+            val problem = Problem(3, 0, emptyArray(), arrayOf<Factor>(Xor(literals, target)))
 
-                    val result = problem.propagate(Assumptions(bools = (0..2).associateWith { values[it] }))
+            val result = problem.propagate(Assumptions(bools = (0..2).associateWith { values[it] }))
 
-                    if (parity == target) {
-                        assertIs<PropagationResult.Implied>(result)
-                    } else {
-                        assertIs<PropagationResult.Unsat>(result)
-                    }
-                }
-            }
+            if (parity == target) assertIs<PropagationResult.Implied>(result)
+            else assertIs<PropagationResult.Unsat>(result)
         }
     }
 

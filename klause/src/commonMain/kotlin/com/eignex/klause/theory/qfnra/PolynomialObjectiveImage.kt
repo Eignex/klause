@@ -14,11 +14,7 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.remap
 import com.eignex.klause.ir.requireVariableCounts
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.ArithmeticWorkSource
-import com.eignex.klause.util.ExecutionControl
-import com.eignex.klause.util.WorkCreditPool
-import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.reserveWork
+import com.eignex.klause.util.ArithmeticBudget
 
 internal class PolynomialObjectiveEvidence(
     val formula: PolynomialRealFormula,
@@ -73,8 +69,7 @@ internal fun solvePolynomialObjectiveImage(
 ): PolynomialObjectiveResult {
     val work = ObjectiveImageWork(params)
     val arithmetic = PolynomialArithmetic(work, params.polynomialLimits).also {
-        work.flush = it.execution::flush
-        work.pendingWork = { it.execution.admittedWork }
+        work.execution = it.execution
     }
     val algebraic = AlgebraicArithmetic(arithmetic)
     return try {
@@ -233,40 +228,9 @@ internal fun algebraicFixing(
     ))
 }
 
-private class ObjectiveImageWork(private val params: QfNraParams) : ExecutionControl() {
+private class ObjectiveImageWork(params: QfNraParams) : ArithmeticBudget(params.cancellation, params.maximumWork) {
     var projected: Long = 0
     var lifted: Long = 0
-    var flush: () -> Unit = {}
-    var pendingWork: () -> Long = { 0L }
-    private val pool = WorkCreditPool(params.maximumWork)
-    private val pools = listOf(pool)
-    private val spent: Long get() = sum(pool.spent, pendingWork())
-    val limitReached: Boolean get() = params.maximumWork?.let { spent >= it } == true
-    override fun isCancelled(): Boolean = limitReached || params.cancellation()
-    override fun deadline() = params.cancellation.deadline()
-    override val accounting: WorkMeter = WorkMeter(::recordWork)
-    override val admission: ArithmeticWorkSource get() {
-        val parent = params.cancellation.admission
-        val parentMeter = params.cancellation.accounting
-        return object : ArithmeticWorkSource {
-            override val quotaOwner get() = parent?.quotaOwner
-            override val quotaRemaining get() = parent?.quotaRemaining
-            override val quotaAvailable get() = parent?.quotaAvailable
-            override val exhausted get() = limitReached || parent?.exhausted == true
-    override fun reserve(maximum: Int) = run {
-                flush()
-                val containing = parent
-                reserveWork(maximum, pools, containing) {
-                    if (containing?.metered != true) parentMeter?. charge(it.toLong())
-                }
-            }
-        }
-    }
-    private fun recordWork(units: Long) {
-        require(units >= 0)
-        pool.debit( units)
-        params.cancellation.charge(units)
-    }
     fun snapshot(): QfNraStats = QfNraStats(projected, lifted, spent)
 }
 

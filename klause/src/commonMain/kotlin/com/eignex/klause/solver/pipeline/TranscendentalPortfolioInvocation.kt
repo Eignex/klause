@@ -21,20 +21,20 @@ internal fun TranscendentalProblem.prepareTranscendentalExecutionPlan(): Prepare
     this, PreparedExecution.Transcendental(this),
     listOf(
         ExecutionComponentDescriptor(
-            "transcendental",
-            ComponentResponsibility.COMPLETION,
-            emptyList(),
-            integerCoordinates,
-            realCoordinates,
-            (0 until boolCount).toList(),
-            ComponentExecutionContract(
-                ComponentStrategySupport(
-                    ProcedureCompleteness.WITNESS_SEARCH,
-                    setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION),
-                ),
-                ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority),
+        "transcendental",
+        ComponentResponsibility.COMPLETION,
+        emptyList(),
+        integerCoordinates,
+        realCoordinates,
+        (0 until boolCount).toList(),
+        ComponentExecutionContract(
+            ComponentStrategySupport(
+                ProcedureCompleteness.WITNESS_SEARCH,
+                setOf(ExecutionClaimAuthority.WITNESS, ExecutionClaimAuthority.REFUTATION),
             ),
+            ComponentStrategySupport(ProcedureCompleteness.WITNESS_SEARCH, witnessAuthority),
         ),
+    )
     ),
     boolCount, integerCoordinates.size, realCoordinates.size,
     integerCoordinates = integerCoordinates, realCoordinates = realCoordinates,
@@ -74,8 +74,8 @@ internal class TranscendentalPortfolioInvocation(
                 ExecutionStrategy.MIXED -> error("admission supplies participating arms")
             }
             val family = when (arm) {
-                0 -> ArmFamily.Backtrack
-                1 -> ArmFamily.LocalSearch
+                0 -> ArmFamily.Backtrack;
+                1 -> ArmFamily.LocalSearch;
                 else -> ArmFamily.Lns
             }
             PortfolioArmFactory(plan, arm, family, binding = {
@@ -128,8 +128,8 @@ internal class TranscendentalPortfolioInvocation(
             val complete = materialized.indices.filter { materialized[it].family == ArmFamily.Backtrack }
             PortfolioInvocationPolicy(
                 shares = DoubleArray(materialized.size) {
-                    if (it in complete) 0.75 / complete.size else 0.0
-                },
+                if (it in complete) 0.75 / complete.size else 0.0
+            }
             )
         }
         val result = invocation.use { it.solve(scope.cancellation) }

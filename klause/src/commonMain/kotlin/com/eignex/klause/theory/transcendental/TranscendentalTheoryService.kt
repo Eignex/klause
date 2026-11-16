@@ -104,13 +104,10 @@ internal class TranscendentalTheoryService(
     }
     private val transcendental = TranscendentalArithmetic(stop, maximumBits)
     private val arithmetic = ExactRealArithmetic(
-        transcendental,
-        AlgebraicArithmetic(PolynomialArithmetic(stop, polynomialLimits)),
+        transcendental, AlgebraicArithmetic(PolynomialArithmetic(stop, polynomialLimits)),
     )
 
-    init {
-        require(maximumWork == null || maximumWork >= 0)
-    }
+    init { require(maximumWork == null || maximumWork >= 0) }
 
     fun check(
         condition: TranscendentalCondition = TranscendentalCondition(),
@@ -153,24 +150,16 @@ internal class TranscendentalTheoryService(
             fun addBounds(ids: Set<Int>, values: Map<Int, BigFraction>, relation: PolynomialRelation) {
                 for (id in ids) {
                     val value = requireNotNull(values[id])
-                    add(
-                        PolynomialRealFormula.Atom(
-                            PolynomialExpression.Variable(SourceRealId(id)),
-                            relation,
-                            PolynomialExpression.Constant.of(value.num, value.den),
-                        ),
-                    )
+                    add(PolynomialRealFormula.Atom(PolynomialExpression.Variable(SourceRealId(id)), relation,
+                        PolynomialExpression.Constant.of(value.num, value.den)))
                 }
             }
             addBounds(condition.lowerStrict, pins.lower, PolynomialRelation.GT)
             addBounds(condition.upperStrict, pins.upper, PolynomialRelation.LT)
         }
         val result = solveQfNra(
-            PolynomialRealFormula.And(listOf(relaxed) + strict),
-            source.boolCount,
-            relaxation.numericCount,
-            QfNraParams(stop, 4096, polynomialLimits),
-            pins,
+            PolynomialRealFormula.And(listOf(relaxed) + strict), source.boolCount, relaxation.numericCount,
+            QfNraParams(stop, 4096, polynomialLimits), pins,
         )
         if (result is QfNraResult.Unsatisfiable) return TranscendentalCheckResult.Refuted
         val bools = (result as? QfNraResult.Satisfiable)?.assignment?.bools
@@ -180,18 +169,13 @@ internal class TranscendentalTheoryService(
                 val value = result.assignment.realValue(id)
                 if (id in source.integerCoordinates) {
                     arithmetic.rational(BigFraction.of(arithmetic.algebraic.ceilInteger(value), BIG_ONE))
-                } else {
-                    arithmetic.scalar(value)
-                }
+                } else arithmetic.scalar(value)
             }
             certify(proposed, bools, condition)?.let { return TranscendentalCheckResult.Witness(it) }
         }
         val algebraicProposal = solveQfNra(
             PolynomialRealFormula.And(listOf(polynomialProposal(source.formula, transcendental)) + strict),
-            source.boolCount,
-            source.numericCount,
-            QfNraParams(stop, 4096, polynomialLimits),
-            pins,
+            source.boolCount, source.numericCount, QfNraParams(stop, 4096, polynomialLimits), pins,
         )
         if (algebraicProposal is QfNraResult.Satisfiable) {
             val proposed = List(source.numericCount) { id ->
@@ -209,24 +193,13 @@ internal class TranscendentalTheoryService(
                 val upper = pins.upper[id]
                 var point = BigFraction.ofLong(hints[attempt])
                 if (lower != null && upper != null) {
-                    val part = BigFraction.ofLong(
-                        when (attempt % 4) {
-                            0 -> 4
-                            1 -> 6
-                            2 -> 2
-                            else -> 7
-                        },
-                    )
+                    val part = BigFraction.ofLong(when (attempt % 4) { 0 -> 4; 1 -> 6; 2 -> 2; else -> 7 })
                     val width = transcendental.add(upper, lower.negated())
-                    point = transcendental.add(
-                        lower,
-                        transcendental.divide(transcendental.multiply(width, part), BigFraction.ofLong(8)),
-                    )
-                } else if (lower != null && point <= lower) {
-                    point = lower + BigFraction.ONE
-                } else if (upper != null && point >= upper) {
-                    point = upper - BigFraction.ONE
+                    point = transcendental.add(lower,
+                        transcendental.divide(transcendental.multiply(width, part), BigFraction.ofLong(8)))
                 }
+                else if (lower != null && point <= lower) point = lower + BigFraction.ONE
+                else if (upper != null && point >= upper) point = upper - BigFraction.ONE
                 if (id in source.integerCoordinates) point = BigFraction.of(point.ceilInteger(), BIG_ONE)
                 arithmetic.rational(point)
             }
@@ -245,11 +218,8 @@ internal class TranscendentalTheoryService(
         if (pins.bools.any { (id, value) -> bools[id] != value }) return null
         fun obey(bounds: Map<Int, BigFraction>, strict: Set<Int>, lower: Boolean): Boolean = bounds.all { (id, value) ->
             val comparison = arithmetic.compare(values[id], arithmetic.rational(value))
-            comparison != null && if (lower) {
-                comparison > 0 || (comparison == 0 && id !in strict)
-            } else {
-                comparison < 0 || (comparison == 0 && id !in strict)
-            }
+            comparison != null && if (lower) comparison > 0 || (comparison == 0 && id !in strict)
+            else comparison < 0 || (comparison == 0 && id !in strict)
         }
         if (!obey(pins.lower, condition.lowerStrict, true) || !obey(pins.upper, condition.upperStrict, false)) {
             return null

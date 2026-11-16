@@ -18925,8 +18925,6 @@ open class com.eignex.klause.util/ExecutionControl { // com.eignex.klause.util/E
     constructor <init>(com.eignex.klause.util/Cancellation = ..., com.eignex.klause.util/WorkMeter? = ...) // com.eignex.klause.util/ExecutionControl.<init>|<init>(com.eignex.klause.util.Cancellation;com.eignex.klause.util.WorkMeter?){}[0]
     constructor <init>(com.eignex.klause.util/ExecutionControl) // com.eignex.klause.util/ExecutionControl.<init>|<init>(com.eignex.klause.util.ExecutionControl){}[0]
 
-    final val cancellationPredicate // com.eignex.klause.util/ExecutionControl.cancellationPredicate|{}cancellationPredicate[0]
-        final fun <get-cancellationPredicate>(): com.eignex.klause.util/Cancellation // com.eignex.klause.util/ExecutionControl.cancellationPredicate.<get-cancellationPredicate>|<get-cancellationPredicate>(){}[0]
     open val accounting // com.eignex.klause.util/ExecutionControl.accounting|{}accounting[0]
         open fun <get-accounting>(): com.eignex.klause.util/WorkMeter? // com.eignex.klause.util/ExecutionControl.accounting.<get-accounting>|<get-accounting>(){}[0]
 

@@ -14,9 +14,7 @@ internal interface ArithmeticWorkSource {
 internal class WorkReservation(@JvmField val capacity: Int, private val settlement: (Int) -> Unit) {
     private var settled = false
 
-    init {
-        require(capacity > 0)
-    }
+    init { require(capacity > 0) }
 
     fun settle(used: Int) {
         require(used in 0..capacity)

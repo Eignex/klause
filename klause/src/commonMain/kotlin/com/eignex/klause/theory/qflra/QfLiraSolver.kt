@@ -1584,7 +1584,7 @@ class ExactLiraSearchComponent private constructor(
                     ?: "NO_RECONSTRUCTION",
                 result.exactPoint?.let { "RECOVERY_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_RECOVERY",
                 result.refinement?.let { "REFINEMENT_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_REFINEMENT",
-                result.continuation?.let { "CONTINUATION_${it.decline?.name ?: "NO_DECLINE"}" } ?: "NO_CONTINUATION",
+                result.continuation?.run { "CONTINUATION_${decline?.name ?: "NO_DECLINE"}" } ?: "NO_CONTINUATION",
             ).joinToString("_")
             smtStats?.observeCompleteSearchLinearOutcome(key)
         }

@@ -37,6 +37,8 @@ credit; opaque work sinks receive exact completed unit charges.
 Admission reports permanent exhaustion separately from stop predicates. A view
 cannot mask its native owner's exhausted allowance, and combined presolve stops
 intersect available slice credit without selecting another accounting owner.
+Nonlinear queries, integer traversal and objective images use one arithmetic budget
+adapter to settle their cursor's pending work against the containing allowance.
 Admission objects contain quota state only. A finite worker owns one plain stop
 1,024-unit countdown shared by its nested propagation and scoring loops. Loops contribute
 their visited units to that countdown instead of multiplying independent polling

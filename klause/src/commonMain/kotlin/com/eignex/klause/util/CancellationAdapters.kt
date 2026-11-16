@@ -10,8 +10,8 @@ import kotlin.time.ComparableTimeMark
 internal fun cancelledWhen(
     deadlineOf: () -> ComparableTimeMark?,
     workScheduledOf: () -> Boolean = { false },
-    pollingOf: () -> StopPolling? = {
-        null }, cancelled:()
-        -> Boolean): ExecutionControl = stopExecutionControl(deadlineOf, workScheduledOf, pollingOf, cancelled)
+    pollingOf: () -> StopPolling? = { null },
+    cancelled: () -> Boolean,
+): ExecutionControl = PredicateExecutionControl(cancelled, deadlineOf, workScheduledOf, pollingOf)
 
 internal fun ExecutionControl.workScheduled(): Boolean =workScheduled

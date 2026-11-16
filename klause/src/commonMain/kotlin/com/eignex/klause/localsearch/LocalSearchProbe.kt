@@ -236,9 +236,7 @@ internal class LocalSearchProbe(
             val oldCost = cost
             val oldExactObjective = if (indexed == null) {
                 (objective as? FunctionalObjective)?.let(::committedValue)
-            } else {
-                null
-            }
+            } else null
             val oldObjective = if (
                 objective != null && objective !is LinearObjective && objective !is FunctionalObjective
             ) {
@@ -281,23 +279,15 @@ internal class LocalSearchProbe(
                 val weighted = if (weights.allocated) weightedDegreeDelta(checkNotNull(degBefore)) else delta.toDouble()
                 val objectiveDelta = when {
                     feasibleObjective && cost > 0L -> Double.POSITIVE_INFINITY
-
                     objective is LinearObjective -> probeLinearObjectiveDelta(objective)
-
                     indexed != null -> indexed.difference(
-                        assignment,
-                        slots,
-                        savedValues,
-                        ::checkObjectiveProbeWork,
+                        assignment, slots, savedValues, ::checkObjectiveProbeWork,
                     ).also { state.phaseTimer?.recordObjectiveScoring("indexed") }
-
                     objective is FunctionalObjective ->
                         (objective.evaluateExact(assignment) - checkNotNull(oldExactObjective)).toDouble().also {
                             state.phaseTimer?.recordObjectiveScoring("generic")
                         }
-
                     objective == null -> 0.0
-
                     else -> objective.evaluate(assignment) - oldObjective
                 }
                 val breaks = if (move is Move.Compound) newlyViolated else breakCount
@@ -411,9 +401,7 @@ internal class LocalSearchProbe(
         if (assignment.intValue(cell) == value) return true
         if (value !in state.rootDomains[cell] || !eligibility.allowsInt(cell) ||
             problem.numBoolVars + cell in slotSet
-        ) {
-            return false
-        }
+        ) return false
         return true
     }
 

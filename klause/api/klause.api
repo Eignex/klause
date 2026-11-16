@@ -17906,7 +17906,6 @@ public class com/eignex/klause/util/ExecutionControl {
 	public final fun charge (J)V
 	public fun deadline ()Lkotlin/time/ComparableTimeMark;
 	public fun getAccounting ()Lcom/eignex/klause/util/WorkMeter;
-	public final fun getCancellationPredicate ()Lcom/eignex/klause/util/Cancellation;
 	public final fun invoke ()Z
 	public fun isCancelled ()Z
 	public final fun or (Lcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/util/ExecutionControl;

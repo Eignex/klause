@@ -51,11 +51,9 @@ import kotlin.time.Duration.Companion.nanoseconds
 
 internal object ArithmeticCancellationProfile {
     private val cpu = ManagementFactory.getThreadMXBean()
-    private val workloads = listOf(
-        "float1", "float16", "float64", "float256", "exact8", "exact16",
+    private val workloads = listOf("float1", "float16", "float64", "float256", "exact8", "exact16",
         "polynomial8", "polynomial24", "rational16", "rational64", "exp4", "exp12",
-        "large-exact", "large-quadratic",
-    )
+        "large-exact", "large-quadratic")
 
     @Volatile private var sink = 0
 
@@ -124,13 +122,8 @@ internal object ArithmeticCancellationProfile {
     private class Accounting(mode: String, cancellation: ExecutionControl = ExecutionControl.Never) {
         private var charged = 0L
         private val parent = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = Long.MAX_VALUE), false)
-        private val scope = QuadraticNativeScope(
-            PolynomialTheoryParams(
-                maximumWork = Long.MAX_VALUE,
-                cancellation = if (mode == "nested") parent.polynomial or cancellation else cancellation,
-            ),
-            false,
-        )
+        private val scope = QuadraticNativeScope(PolynomialTheoryParams(maximumWork = Long.MAX_VALUE,
+            cancellation = if (mode == "nested") parent.polynomial or cancellation else cancellation), false)
         val token: ExecutionControl = when (mode) {
             "none" -> ExecutionControl.Never
 
@@ -154,36 +147,26 @@ internal object ArithmeticCancellationProfile {
 
     private fun kernel(name: String, token: ExecutionControl): () -> Int = when {
         name.startsWith("large-") -> latencyKernel(name, token)
-
         name.startsWith("float") -> {
             val n = name.removePrefix("float").toInt()
-            val model = QuadraticModel(
-                List(n) { q((it % 7 - 3).toLong()) },
-                List(n) { i ->
-                    List(n) { j -> q(if (i == j) 2 else 0) }
-                },
-                rows = List(maxOf(1, n / 4)) { row ->
-                    QuadraticRow(List(n) { q(if (it == row) 1 else 0) }, q(1), QuadraticRowRelation.LE)
-                },
-            )
+            val model = QuadraticModel(List(n) { q((it % 7 - 3).toLong()) }, List(n) { i ->
+                List(n) { j -> q(if (i == j) 2 else 0) }
+            }, rows = List(maxOf(1, n / 4)) { row ->
+                QuadraticRow(List(n) { q(if (it == row) 1 else 0) }, q(1), QuadraticRowRelation.LE)
+            })
             val candidates = QuadraticCandidates(QuadraticControl(token))
             val start = List(n) { (it % 5 - 2).toDouble() }
             ({ checkNotNull(candidates.proposeActiveRows(model, start)).hashCode() })
         }
-
         name.startsWith("exact") -> {
             val n = name.removePrefix("exact").toInt()
-            val model = QuadraticModel(
-                List(n) { q(1) },
-                List(n) { i ->
-                    List(n) { j -> q(if (i == j) 2 else 0) }
-                },
-            )
+            val model = QuadraticModel(List(n) { q(1) }, List(n) { i ->
+                List(n) { j -> q(if (i == j) 2 else 0) }
+            })
             val checker = QuadraticCertification(QuadraticControl(token))
             val point = List(n) { q(it.toLong() + 1) * q(13).reciprocal() }
             ({ checker.evaluate(model, point).hashCode() })
         }
-
         name.startsWith("polynomial") -> {
             val n = name.removePrefix("polynomial").toInt()
             val left = Polynomial.of(List(n) { PolynomialTerm(Monomial.of(mapOf(0 to it)), q(it.toLong() + 1)) })
@@ -191,21 +174,18 @@ internal object ArithmeticCancellationProfile {
             val arithmetic = PolynomialArithmetic(token)
             ({ arithmetic.multiply(left, right).hashCode() })
         }
-
         name.startsWith("rational") -> {
             val n = name.removePrefix("rational").toInt()
             val value = RationalPolynomial(List(n) { q(it.toLong() + 1) * q(13).reciprocal() })
             val arithmetic = RationalPolynomialArithmetic(PolynomialArithmetic(token))
             ({ arithmetic.evaluate(value, q(19) * q(17).reciprocal()).hashCode() })
         }
-
         name.startsWith("exp") -> {
             val terms = name.removePrefix("exp").toInt()
             val arithmetic = TranscendentalArithmetic(token)
             val input = RationalEnclosure.point(q(if (terms > 4) 8 else 1))
             ({ arithmetic.exp(input, terms).hashCode() })
         }
-
         else -> error("unknown workload")
     }
 
@@ -233,24 +213,17 @@ internal object ArithmeticCancellationProfile {
         val count = repetitions(name)
         repeat(4) { repeat(count) { check(run() == expected) } }
         val warmUntil = cpu.currentThreadCpuTime + 500_000_000L
-        do {
-            repeat(count) { check(run() == expected) }
-        } while (cpu.currentThreadCpuTime < warmUntil)
+        do { repeat(count) { check(run() == expected) } } while (cpu.currentThreadCpuTime < warmUntil)
         repeat(5) { sample ->
             val beforeWork = accounting.work
             val beforeCpu = cpu.currentThreadCpuTime
             val before = System.nanoTime()
-            repeat(count) {
-                check(run() == expected)
-                sink = sink xor expected
-            }
+            repeat(count) { check(run() == expected); sink = sink xor expected }
             val wall = System.nanoTime() - before
             val consumedCpu = cpu.currentThreadCpuTime - beforeCpu
             accounting.verify()
-            println(
-                "sample\t$name\t$mode\t$sample\t$count\t$wall\t$consumedCpu\t" +
-                    "${accounting.work - beforeWork}\t$expected\t$setupNanos",
-            )
+            println("sample\t$name\t$mode\t$sample\t$count\t$wall\t$consumedCpu\t" +
+                "${accounting.work - beforeWork}\t$expected\t$setupNanos")
         }
     }
 
@@ -264,22 +237,18 @@ internal object ArithmeticCancellationProfile {
             val start = CountDownLatch(1)
             val consumedCpu = AtomicLong()
             val beforeWork = scope.work
-            val threads = runs.map { run ->
-                thread {
-                    start.await()
-                    val beforeCpu = cpu.currentThreadCpuTime
-                    repeat(count) { check(run() == expected) }
-                    consumedCpu.addAndGet(cpu.currentThreadCpuTime - beforeCpu)
-                }
-            }
+            val threads = runs.map { run -> thread {
+                start.await()
+                val beforeCpu = cpu.currentThreadCpuTime
+                repeat(count) { check(run() == expected) }
+                consumedCpu.addAndGet(cpu.currentThreadCpuTime - beforeCpu)
+            } }
             val before = System.nanoTime()
             start.countDown()
             threads.forEach { it.join() }
             val wall = System.nanoTime() - before
-            println(
-                "sample\t$name\tparallel\t$sample\t${2 * count}\t$wall\t${consumedCpu.get()}\t" +
-                    "${scope.work - beforeWork}\t$expected\t0",
-            )
+            println("sample\t$name\tparallel\t$sample\t${2 * count}\t$wall\t${consumedCpu.get()}\t" +
+                "${scope.work - beforeWork}\t$expected\t0")
         }
     }
 
@@ -347,10 +316,8 @@ internal object ArithmeticCancellationProfile {
                     check(!worker.isAlive && observed.get() != 0L)
                     val wall = (observed.get() - request.get()).coerceAtLeast(0)
                     val consumedCpu = if (kind == "flag") {
-                        (observedCpu.get() - requestCpu.get()).coerceAtLeast(0)
-                    } else {
-                        -1
-                    }
+                    (observedCpu.get() - requestCpu.get()).coerceAtLeast(0)
+                } else -1
                     if (trial >= 0) println("latency\t$family\t$kind\t$trial\t$wall\t$consumedCpu\t${accounting.work}")
                 }
             }

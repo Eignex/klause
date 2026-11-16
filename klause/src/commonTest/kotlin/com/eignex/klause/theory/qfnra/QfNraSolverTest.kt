@@ -30,9 +30,7 @@ class QfNraSolverTest {
         val cleanup = IllegalStateException("accounting")
         val work = QfNraWork(QfNraParams(ExecutionControl(accounting = WorkMeter { throw cleanup })))
         val arithmetic = PolynomialArithmetic(work)
-        work.flush = arithmetic.execution::flush
-        work.pendingWork = { arithmetic.execution.admittedWork }
-        work.resume = arithmetic.execution::resume
+        work.execution = arithmetic.execution
 
         val observed = assertFailsWith<IllegalArgumentException> {
             arithmetic.execution.operation {

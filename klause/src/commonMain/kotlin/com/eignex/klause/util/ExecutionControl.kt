@@ -15,15 +15,6 @@ open class ExecutionControl(
     private val initialAccounting = accounting
     private var accountingOwner: ExecutionControl? = null
 
-    /** Stop predicate evaluated at execution checkpoints. */
-    val cancellationPredicate: Cancellation get() {
-        val owner = accountingOwner ?: return initialPredicate ?: Cancellation.Never
-        return object : Cancellation {
-            override fun isCancelled(): Boolean = owner()
-            override fun deadline() = owner.deadline()
-        }
-    }
-
     /** Explicitly bound work sink, independent of stop observation. */
     open val accounting: WorkMeter? get() = accountingOwner?.accounting ?: initialAccounting
     internal open val admission: ArithmeticWorkSource? get() = accountingOwner?.admission
@@ -196,11 +187,6 @@ internal fun ExecutionControl.includingStop(other: ExecutionControl): ExecutionC
     val predicates = (own as? OrExecutionControl)?.predicates ?: arrayOf(own)
     val required = (containing as? OrExecutionControl)?.predicates ?: arrayOf(containing)
     val count = required.size
-    if (deadlineCovered) {
-        for (start in 0..predicates.size - count) {
-            if ((0 until count).all { containsStop(predicates[start + it], required[it]) }) return this
-        }
-    }
     for (overlap in minOf(predicates.size, count) downTo 1) {
         if (!(0 until overlap).all { containsStop(predicates[predicates.size - overlap + it], required[it]) }) continue
         var joined = this
@@ -252,14 +238,7 @@ private fun combineStops(owner: ExecutionControl, other: ExecutionControl): Arra
 /** Construct execution controls from a stop predicate without an accounting owner. */
 fun ExecutionControl(cancelled: () -> Boolean): ExecutionControl = PredicateExecutionControl(cancelled)
 
-internal fun stopExecutionControl(
-    deadlineOf: () -> ComparableTimeMark?,
-    scheduledOf: () -> Boolean,
-    pollingOf: () -> StopPolling?,
-    cancelled: () -> Boolean,
-): ExecutionControl = PredicateExecutionControl(cancelled, deadlineOf, scheduledOf, pollingOf)
-
-private class PredicateExecutionControl(
+internal class PredicateExecutionControl(
     private val cancelled: () -> Boolean,
     private val deadlineOf: () -> ComparableTimeMark? = { null },
     private val scheduledOf: () -> Boolean = { false },

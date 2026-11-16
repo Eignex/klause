@@ -122,13 +122,8 @@ internal fun CommonOptions.sharedPresolveBudget(): PresolveBudget? {
             AllowanceSetting.Unlimited -> null
             is AllowanceSetting.Remaining -> PresolveBudget(setting.units)
         }
-        presolveTimeCancellation = if (budgetMs <= 0L) {
-            ExecutionControl.Never
-        } else {
-            ExecutionControl.after(
-                budgetMs.milliseconds,
-            )
-        }
+        presolveTimeCancellation = if (budgetMs <= 0L) ExecutionControl.Never else
+            ExecutionControl.after(budgetMs.milliseconds)
         presolveAllowanceInitialized = true
     }
     return presolveBudget

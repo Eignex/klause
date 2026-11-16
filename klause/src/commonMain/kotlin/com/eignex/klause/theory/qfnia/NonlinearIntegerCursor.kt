@@ -19,11 +19,8 @@ import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
-import com.eignex.klause.util.ArithmeticWorkSource
+import com.eignex.klause.util.ArithmeticBudget
 import com.eignex.klause.util.ExecutionControl
-import com.eignex.klause.util.WorkCreditPool
-import com.eignex.klause.util.WorkMeter
-import com.eignex.klause.util.reserveWork
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
@@ -42,10 +39,9 @@ internal class NonlinearIntegerCursor(
     private var closed = false
     private var initialized = false
     private var terminal: QfNraResult? = null
-    private val work = NonlinearIntegerWork(params.arithmetic)
+    private val work = ArithmeticBudget(params.arithmetic.cancellation, params.arithmetic.maximumWork)
     private val arithmetic = PolynomialArithmetic(work, params.arithmetic.polynomialLimits).also {
-        work.flush = it.execution::flush
-        work.pendingWork = { it.execution.admittedWork }
+        work.execution = it.execution
     }
     private val cells = NonlinearIntegerCells(problem.formula, problem.integerCoordinates, arithmetic)
     private var invocation = PolynomialTheoryService(problem.formula, problem.boolCount, problem.numericCount)
@@ -385,40 +381,6 @@ internal class NonlinearIntegerCursor(
             stats = polynomialStats(),
             reason = if (work.limitReached) QfNraReason.WorkLimit else result.reason,
         )
-    }
-}
-
-private class NonlinearIntegerWork(private val params: QfNraParams) : ExecutionControl() {
-    var flush: () -> Unit = {}
-    var pendingWork: () -> Long = { 0L }
-        private val pool = WorkCreditPool(params.maximumWork)
-    private val pools = listOf(pool)
-    val spent: Long get() = pool.spent.let { it + minOf(pendingWork(), Long.MAX_VALUE - it) }
-    val limitReached: Boolean get() = params.maximumWork?.let { spent >= it } == true
-    override fun isCancelled(): Boolean = limitReached || params.cancellation()
-    override fun deadline() = params.cancellation.deadline()
-    override val accounting: WorkMeter = WorkMeter(::recordWork)
-    override val admission: ArithmeticWorkSource get() {
-        val parent = params.cancellation.admission
-        val parentMeter = params.cancellation.accounting
-        return object: ArithmeticWorkSource {
-            override val quotaOwner get() = parent?.quotaOwner
-            override val quotaRemaining get() = parent?.quotaRemaining
-            override val quotaAvailable get() = parent?.quotaAvailable
-            override val exhausted get() = limitReached || parent?.exhausted == true
-    override fun reserve(maximum: Int) = run {
-                flush()
-                val containing = parent
-                reserveWork(maximum, pools, containing) {
-                    if (containing?.metered != true) parentMeter?. charge(it.toLong())
-                }
-            }
-        }
-    }
-    private fun recordWork(units: Long) {
-        require(units >= 0)
-        pool.debit(units)
-        params.cancellation.charge(units)
     }
 }
 
