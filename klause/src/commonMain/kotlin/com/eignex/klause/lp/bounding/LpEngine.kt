@@ -1468,10 +1468,9 @@ internal class LpEngine(
     ): LeafRealResult {
         requireOpen()
         lpBackjump = null
-        if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val relaxer = selectedSourceRelaxation ?: lpRelaxer
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
-        val relaxation = nodeRelaxation(relaxer, session)
+        val relaxation = leafRelaxation(relaxer, session)
             ?: return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
@@ -1521,10 +1520,9 @@ internal class LpEngine(
     // which leaves the caller its own exact completion.
     fun leafFloatCompletion(session: PropagationSession, toleranceCheck: (Sample) -> Boolean): Sample? {
         requireOpen()
-        if (residualOversized) return null
         val check = toleranceCheck.floatingOptimumAcceptance() ?: return null
         val relaxer = selectedSourceRelaxation ?: lpRelaxer ?: return null
-        val relaxation = nodeRelaxation(relaxer, session) ?: return null
+        val relaxation = leafRelaxation(relaxer, session) ?: return null
         val model = relaxation.model
         val solver = leafSolver ?: LpSolveSession(solveContext, pricingOptions, params.lpPlan.componentSplit)
             .also { leafSolver = it }
@@ -1538,6 +1536,14 @@ internal class LpEngine(
         ) ?: return null
         sink.lp.observeComponentSplit(float.blocks)
         return leafSample(session, relaxation.floatReals(float.primal, problem))
+    }
+
+    // The leaf's relaxation, or null when cancellation stops its assembly: a model above the per-node row cap
+    // assembles its layout here, at its first leaf, rather than during node bounding.
+    private fun leafRelaxation(relaxer: CpToLpRelaxation, session: PropagationSession): LpRelaxation? = try {
+        nodeRelaxation(relaxer, session)
+    } catch (_: LpAssemblyCancelled) {
+        null
     }
 
     private fun leafSample(session: PropagationSession, reals: DoubleArray): Sample = Sample(
@@ -1963,7 +1969,7 @@ internal class LpEngine(
 
 }
 
-/** Row cap for per-node / per-leaf exact residual work (one LU at ~1k rows is already ~ms-scale). */
+/** Row cap for per-node exact residual work (one LU at ~1k rows is already ~ms-scale). */
 private const val RESIDUAL_MAX_ROWS = 1000
 
 /** Eta-chain length of the persistent gated-residual simplex before it refactorizes: its pivots

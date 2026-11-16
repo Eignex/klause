@@ -136,24 +136,48 @@ class BacktrackSolverRealTest {
         assertEquals(LpVerdict.INDETERMINATE, res.verdict)
     }
 
+    // 1001 distinct rows `x(0) - x(1) <= offset - i` over `[0, 1]`: more real rows than node bounding admits.
+    private fun manyRows(offset: Long) = Problem(
+        numBoolVars = 0,
+        numIntVars = 1,
+        intDomains = arrayOf(IntDomain(0, 1)),
+        factors = Array<Factor>(1001) {
+            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0, -1.0), intArrayOf(0, 1), LinearOp.LE, offset - it)
+        },
+        numRealVars = 2,
+        realLower = DoubleArray(2),
+        realUpper = DoubleArray(2) { 1.0 },
+    )
+
     @Test
-    fun `a leaf no theory could decide should report unknown rather than unsat`() {
-        // Past RESIDUAL_MAX_ROWS the leaf certify declines deterministically rather than by cancellation.
-        val rows = Array<Factor>(1001) {
-            Linear(longArrayOf(), intArrayOf(), doubleArrayOf(1.0), intArrayOf(0), LinearOp.LE, 5L)
+    fun `a leaf with more real rows than node bounding admits should be completed`() {
+        val result = BacktrackSolver(manyRows(1000L).bake()).solve(BacktrackParams(randomSeed = 1L))
+
+        assertIs<SolveResult.Sat>(result)
+    }
+
+    @Test
+    fun `a leaf with more real rows than node bounding admits should be refuted`() {
+        val result = BacktrackSolver(manyRows(-2L).bake()).solve(BacktrackParams(randomSeed = 1L))
+
+        assertIs<SolveResult.Unsat>(result)
+    }
+
+    @Test
+    fun `a cancelled leaf with more real rows than node bounding admits should stop promptly`() {
+        val baked = manyRows(-2L).bake()
+        var polls = 0L
+        var stoppedAt = -1L
+        val stop = Cancellation {
+            polls++
+            if (stoppedAt < 0 && polls > 40) stoppedAt = polls
+            stoppedAt >= 0
         }
-        val p = Problem(
-            numBoolVars = 0,
-            numIntVars = 1,
-            intDomains = arrayOf(IntDomain(0, 1)),
-            factors = rows,
-            numRealVars = 1,
-            realLower = doubleArrayOf(0.0),
-            realUpper = doubleArrayOf(10.0),
-        )
-        val result = BacktrackSolver(p.bake()).solve(BacktrackParams(randomSeed = 1L))
-        val unknown = assertIs<SolveResult.Unknown>(result)
-        assertEquals(TerminationReason.Unsupported, unknown.reason)
+
+        val result = BacktrackSolver(baked).solve(BacktrackParams(randomSeed = 1L, cancellation = stop))
+
+        assertIs<SolveResult.Unknown>(result)
+        assertTrue(polls - stoppedAt < 100, "polled ${polls - stoppedAt} times after cancellation")
     }
 
     @Test

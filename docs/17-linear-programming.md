@@ -547,6 +547,11 @@ cancelled checks close nothing.
 
 ### Leaf completion
 
+Per-node bounding of a residual real model skips one with more than 1,000 real rows.
+Its leaves still complete: the leaf relaxation and solve run under the search's
+cancellation and a work limit sized from the model, so a stopped leaf is
+indeterminate and a decided one keeps its verdict.
+
 Finite optimization keeps a pinned real-leaf request across portfolio slices.
 The discrete assignment, assembled row authority, source encoding and required
 certification remain owned by that request. Numerical pauses preserve the live
