@@ -247,12 +247,16 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         if (operator != null) return when {
             operator.tester -> {
                 val shape = define(capture(arguments.single()))
-                Term(SmtSort.Bool, form("=", SExpr.Atom(shape.tag), SExpr.Atom(operator.constructor.toString())))
+                val known = shape.alternatives.singleOrNull()
+                Term(SmtSort.Bool, if (known != null) SExpr.Atom((known.constructor == operator.constructor).toString())
+                else form("=", SExpr.Atom(shape.tag), SExpr.Atom(operator.constructor.toString())))
             }
             operator.selector != null -> {
                 val value = capture(arguments.single())
-                define(value)
-                operation(operator.instance, "selector:${operator.constructor}:${operator.selector}",
+                val known = define(value).alternatives.singleOrNull()
+                if (known?.constructor == operator.constructor)
+                    Term(operator.result, SExpr.Atom(known.fields[operator.selector]))
+                else operation(operator.instance, "selector:${operator.constructor}:${operator.selector}",
                     listOf(value), operator.result)
             }
             else -> constructor(operator, arguments)

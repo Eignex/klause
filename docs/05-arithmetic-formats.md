@@ -225,7 +225,9 @@ constructor tags and strict integer depth comparisons. Exhaustiveness introduces
 one layer of constructor witnesses only; witness fields do not trigger recursive
 unfolding. Typed operation applications share scalar coordinates by their exact
 function rank and argument identities. Explicit constructor terms retain their
-known shape instead of allocating exhaustive alternatives. Arrays and function
+known shape instead of allocating exhaustive alternatives. Testers on a known
+shape reduce to Boolean literals, and matching selectors return its captured fields.
+Arrays and function
 applications retain opaque datatype sorts until
 their own reduction has introduced every relevant coordinate. Scalar erasure then
 maps datatype values to integer identities and supplies constructor recipes for
