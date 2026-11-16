@@ -256,12 +256,29 @@ query. Assertion levels scope declarations and definitions as well as assertions
 Global declarations survive stack operations and `reset-assertions`; `reset`
 restores the initial state, including options. `:print-success` defaults to false,
 and model production must be enabled in start mode. Model queries inspect the same
-checked interpretation until the context changes. Unsupported optional proof,
-core and assignment capabilities respond `unsupported` without being enabled.
+checked interpretation until the context changes. Assignment production returns
+the values of Boolean named terms. Enabling optional proof, core and
+unsat-assumption production responds `unsupported`; querying disabled production
+is a protocol error. Unsupported standard options retain their specified default
+in `get-option`.
+
+Each command validates syntax, declaration order and expression sorts before it
+changes the session. Protocol errors preserve the previous assertion context and
+checked model. `get-assertions` preserves original annotations. Regular and
+diagnostic channels route independently to stdout, stderr or append-file sinks;
+switching destinations closes the previous owned sink, and reset restores both defaults.
 
 Annotations normalize before typed capture. Closed `:named` subterms introduce
 nullary definitions in postorder, while other metadata leaves the term unchanged.
-`define-const` abbreviates a nullary `define-fun`.
+`define-const` abbreviates a nullary `define-fun`. Named definitions share the
+declaration lifetime, including names introduced by assumptions and value queries.
+
+`reconstructSessionModel` captures owned scalar values, composite recipes, native
+exact-real authorities and underspecified total-function tables while the checked
+assignment remains available. Later `get-value` terms evaluate in that fixed
+interpretation, including new polymorphic ranks. Evaluation shares the invocation
+control; an unavailable certificate or exhausted representation reports an explicit
+query error without replacing the retained model.
 
 Recursive command-session definitions use necessary ground equations for
 refutation. A satisfying result requires either a total interpretation whose
@@ -295,7 +312,7 @@ bare token.
 
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun`
 macros capture their definition scope and check argument sorts even for unused
-arguments. Recursive definitions belong to command sessions. Assertions see only the declarations visible
+arguments; recursive helpers decline. Assertions see only the declarations visible
 at their command. Compiler binding tables are discarded after lowering; the owned
 typed source and original declaration order and spellings remain attached.
 
@@ -456,8 +473,8 @@ approximation never replaces their authority.
 
 Optimization emits `; objective=<value>` for each published incumbent and
 `; optimizationStatus=<status>` at completion (`optimal`, `best-found`, `unbounded`),
-without needing `-s`; `sat` alone never claims optimality. Model output requires
-enabled model production and an explicit query after the check response. Exact objectives print as
+without needing `-s`; `sat` alone never claims optimality. Incumbents stream as they
+are accepted, each with its complete model. Exact objectives print as
 arbitrary-precision integers or reduced `numerator/denominator` text. Linear
 integer optimization uses the complete theory route when its objective range
 exceeds binary64's consecutive integers.
