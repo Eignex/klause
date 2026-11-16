@@ -2,7 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -61,7 +61,7 @@ class SmtPolymorphismTest {
             (declare-const b A)
             (assert (= a b))
         """.trimIndent()).readAll()
-        val reduction = reduceSmtPolymorphism(captureSmtSource(commands, Cancellation.Never), Cancellation.Never)
+        val reduction = reduceSmtPolymorphism(captureSmtSource(commands, ExecutionControl.Never), ExecutionControl.Never)
         val values = object : SmtModelValues {
             override fun checkpoint(units: Long) = Unit
             override fun boolean(name: String): Boolean = false

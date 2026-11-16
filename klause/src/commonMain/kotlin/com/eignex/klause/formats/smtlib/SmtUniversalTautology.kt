@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun smtUniversalTautology(source: SmtTypedSource, root: Int, cancellation: Cancellation): Boolean {
+internal fun smtUniversalTautology(source: SmtTypedSource, root: Int, cancellation: ExecutionControl): Boolean {
     data class Formula(val operator: String, val arguments: List<Int> = emptyList(), val atom: String = "")
     val formulas = ArrayList<Formula>()
     val interned = HashMap<Formula, Int>()

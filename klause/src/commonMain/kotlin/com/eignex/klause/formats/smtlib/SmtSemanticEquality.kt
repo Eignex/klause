@@ -11,14 +11,14 @@ import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
 import com.eignex.klause.simplex.exact.BigFraction
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
 import kotlin.coroutines.cancellation.CancellationException
 
 internal class SmtSourceCheckingUnavailable : RuntimeException("SMT source equality is not certified")
 
-internal fun smtExactArithmetic(cancellation: Cancellation): ExactRealArithmetic =
+internal fun smtExactArithmetic(cancellation: ExecutionControl): ExactRealArithmetic =
     ExactRealArithmetic(TranscendentalArithmetic(cancellation = cancellation),
         AlgebraicArithmetic(PolynomialArithmetic(cancellation = cancellation)))
 
@@ -41,7 +41,6 @@ private class SmtValueComparison(private val values: SmtModelValues) {
                 a is SmtValue.BitVector && b is SmtValue.BitVector -> a.bits == b.bits
                 a is SmtValue.Uninterpreted && b is SmtValue.Uninterpreted ->
                     a.sort == b.sort && a.identity == b.identity
-                a is SmtValue.Real && b is SmtValue.Real && a.term == b.term -> true
                 numeric(a) && numeric(b) -> {
                     val first = real(a)
                     val second = real(b)
@@ -70,7 +69,7 @@ private class SmtValueComparison(private val values: SmtModelValues) {
     }
 }
 
-internal fun smtRationalValue(term: String, cancellation: Cancellation): ExactRealValue? = smtEqualityAttempt {
+internal fun smtRationalValue(term: String, cancellation: ExecutionControl): ExactRealValue? = smtEqualityAttempt {
     val arithmetic = smtExactArithmetic(cancellation)
     fun checkpoint(units: Long = 1) {
         cancellation.charge(units)

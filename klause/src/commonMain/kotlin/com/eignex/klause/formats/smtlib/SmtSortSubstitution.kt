@@ -1,10 +1,10 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
 internal fun substituteSmtSort(root: SmtSort, substitution: Map<String, SmtSort>,
-    cancellation: Cancellation): SmtSort {
+    cancellation: ExecutionControl): SmtSort {
     val work = ArrayDeque<Pair<SmtSort, Boolean>>()
     val values = ArrayDeque<SmtSort>()
     work.addLast(root to false)
@@ -35,7 +35,7 @@ internal fun substituteSmtSort(root: SmtSort, substitution: Map<String, SmtSort>
     return values.single()
 }
 
-internal fun smtSortParameters(root: SmtSort, parameters: Set<String>, cancellation: Cancellation): Set<String> {
+internal fun smtSortParameters(root: SmtSort, parameters: Set<String>, cancellation: ExecutionControl): Set<String> {
     val found = LinkedHashSet<String>()
     val work = ArrayDeque<SmtSort>()
     work.addLast(root)
@@ -56,7 +56,7 @@ internal fun smtSortParameters(root: SmtSort, parameters: Set<String>, cancellat
 }
 
 internal fun instantiateSmtRank(parameters: List<SmtSort>, result: SmtSort, typeParameters: Set<String>,
-    arguments: List<SmtSort>, qualification: SmtSort?, cancellation: Cancellation,
+    arguments: List<SmtSort>, qualification: SmtSort?, cancellation: ExecutionControl,
 ): Pair<List<SmtSort>, SmtSort>? {
     if (parameters.size != arguments.size) return null
     val substitutions = HashMap<String, SmtSort>()

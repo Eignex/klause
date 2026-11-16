@@ -122,14 +122,14 @@ fun OpenTheoryAssignment.smtRealValue(id: Int, cancellation: ExecutionControl = 
     }
 }
 
-internal fun Sample.smtExactRealValue(id: Int, cancellation: Cancellation): ExactRealValue? {
+internal fun Sample.smtExactRealValue(id: Int, cancellation: ExecutionControl): ExactRealValue? {
     cancellation.smtValueCheckpoint()
     symbolicReals?.get(id)?.let { return it }
     algebraicReals?.get(id)?.let { return ExactRealValue(ExactRealExpression.Algebraic(it)) }
     return exactReals?.get(id)?.let { smtExactArithmetic(cancellation).rational(it) }
 }
 
-internal fun OpenTheoryAssignment.smtExactRealValue(id: Int, cancellation: Cancellation): ExactRealValue? {
+internal fun OpenTheoryAssignment.smtExactRealValue(id: Int, cancellation: ExecutionControl): ExactRealValue? {
     cancellation.smtValueCheckpoint()
     return when (this) {
         is OpenTheoryAssignment.Sampled -> sample.smtExactRealValue(id, cancellation)

@@ -193,7 +193,7 @@ internal fun scalarSmtBindings(
     }
 }
 
-private fun <T> withSmtModelValues(
+internal fun <T> withSmtModelValues(
     problem: SmtLibProblem,
     boolean: (Int) -> Boolean,
     integer: (Int) -> String,

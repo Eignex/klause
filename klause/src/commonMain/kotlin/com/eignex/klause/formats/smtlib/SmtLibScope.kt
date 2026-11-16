@@ -20,7 +20,6 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
         class Combine(val head: String, val count: Int, val signature: Signature?,
             val qualification: SmtSort? = null, val indexed: SExpr.SList? = null) : Frame
         class Let(val names: List<String>, val body: SExpr, val locals: Locals?) : Frame
-        class Qualified(val expected: SmtSort) : Frame
     }
     private val globals = HashMap<String, Signature>()
     private val globalSortParameters = LinkedHashSet<String>()
@@ -348,12 +347,6 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                             val type = smtIndexedBitVectorSort(node, emptyList()) ?: return null
                             val key = node.items.map { (it as? SExpr.Atom)?.text ?: return null }.joinToString(" ")
                             values.addLast(term("($key)", emptyList(), type))
-                        } else if (head == "as") {
-                            if (node.items.size != 3) return null
-                            val identifier = node.items[1]
-                            if (identifier is SExpr.SList && identifier.polynomialHead() != "_") return null
-                            work.addLast(Frame.Qualified(sourceSort(node.items[2])))
-                            work.addLast(Frame.Evaluate(identifier, frame.locals))
                         } else if (head == "!") {
                             if (node.items.size < 2) return null
                             work.addLast(Frame.Evaluate(node.items[1], frame.locals))
@@ -391,7 +384,6 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                     val bindings = frame.names.zip(pop(frame.names.size)).toMap()
                     work.addLast(Frame.Evaluate(frame.body, Locals(bindings, frame.locals)))
                 }
-                is Frame.Qualified -> if (nodes[values.last()].sort != frame.expected) return null
                 is Frame.Combine -> {
                     val arguments = pop(frame.count)
                     val args = arguments.map { nodes[it].sort }

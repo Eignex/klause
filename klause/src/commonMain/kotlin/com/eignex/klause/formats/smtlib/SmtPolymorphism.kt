@@ -1,16 +1,16 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun reduceSmtPolymorphism(input: SmtReduction, cancellation: Cancellation): SmtReduction {
+internal fun reduceSmtPolymorphism(input: SmtReduction, cancellation: ExecutionControl): SmtReduction {
     val source = input.original ?: return input
     if (source.sortParameters.isEmpty()) return input
     return SmtPolymorphicReduction(input, source, cancellation).reduce()
 }
 
 private class SmtPolymorphicReduction(private val input: SmtReduction, private val source: SmtTypedSource,
-    private val cancellation: Cancellation) {
+    private val cancellation: ExecutionControl) {
     private data class Instance(val symbol: Int, val parameters: List<SmtSort>, val result: SmtSort)
     private data class Value(val expression: SExpr, val sort: SmtSort)
     private sealed interface Frame {

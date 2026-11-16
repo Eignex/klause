@@ -7,6 +7,7 @@ import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.pipelineRequest
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.coroutines.cancellation.CancellationException
@@ -179,7 +180,7 @@ class SmtGroundFunctionsTest {
 
     @Test
     fun `function variables do not capture previously generated symbols`() {
-        val original = captureSmtSource(SExprReader("(declare-const n Int)").readAll(), Cancellation.Never)
+        val original = captureSmtSource(SExprReader("(declare-const n Int)").readAll(), ExecutionControl.Never)
         val commands = SExprReader("""
             (declare-const n Int)
             (declare-const @klause.uf.0 Int)
@@ -188,9 +189,9 @@ class SmtGroundFunctionsTest {
             (assert (= n @klause.uf.0))
             (assert (= (f @klause.uf.0) 2))
         """.trimIndent()).readAll()
-        val reduced = reduceSmtGroundFunctions(original.copy(commands = commands), Cancellation.Never)
+        val reduced = reduceSmtGroundFunctions(original.copy(commands = commands), ExecutionControl.Never)
         val parsed = lowerSmtReduction(reduced, Long.MIN_VALUE, Long.MAX_VALUE, ProblemSettings(),
-            Cancellation.Never, smtLibSemantics.resolve())
+            ExecutionControl.Never, smtLibSemantics.resolve())
 
         val result = BacktrackSolver.source(parsed.model).solve()
 
@@ -236,11 +237,11 @@ class SmtGroundFunctionsTest {
 
     @Test
     fun `generated function declarations stay outside the original source model`() {
-        val original = captureSmtSource(SExprReader("(declare-const flag Bool)").readAll(), Cancellation.Never)
+        val original = captureSmtSource(SExprReader("(declare-const flag Bool)").readAll(), ExecutionControl.Never)
         val commands = SExprReader("(declare-const flag Bool) (declare-fun private (Int) Int) " +
             "(assert (= (private 1) 2))").readAll()
 
-        val reduced = exposeSmtGroundFunctions(original.copy(commands = commands), Cancellation.Never)
+        val reduced = exposeSmtGroundFunctions(original.copy(commands = commands), ExecutionControl.Never)
 
         assertEquals(listOf("flag"), reduced.bindings.map { it.declaration.name })
         assertTrue("private" in reduced.privateBindings)
@@ -394,10 +395,7 @@ class SmtGroundFunctionsTest {
     @Test
     fun `function expansion observes the source cancellation allowance`() {
         var work = 0L
-        val cancellation = object : Cancellation {
-            override fun isCancelled(): Boolean = work >= 100
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
-        }
+        val cancellation = ExecutionControl(Cancellation { work >= 100 }, WorkMeter { work += it })
         val applications = (0..40).joinToString(" ") { "(assert (= (f $it) $it))" }
 
         assertFailsWith<CancellationException> {

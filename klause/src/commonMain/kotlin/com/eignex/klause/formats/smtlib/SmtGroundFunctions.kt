@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: Cancellation): SmtReduction {
+internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: ExecutionControl): SmtReduction {
     val pending = ArrayDeque<SExpr>()
     for (command in input.commands) pending.addLast(command)
     var needed = false
@@ -20,10 +20,10 @@ internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: Cancell
     return if (needed) SmtGroundFunctionReducer(input, cancellation, encodeUninterpreted = true).reduce() else input
 }
 
-internal fun exposeSmtGroundFunctions(input: SmtReduction, cancellation: Cancellation): SmtReduction =
+internal fun exposeSmtGroundFunctions(input: SmtReduction, cancellation: ExecutionControl): SmtReduction =
     SmtGroundFunctionReducer(input, cancellation, encodeUninterpreted = false).reduce()
 
-private class SmtGroundFunctionReducer(private val input: SmtReduction, private val cancellation: Cancellation,
+private class SmtGroundFunctionReducer(private val input: SmtReduction, private val cancellation: ExecutionControl,
     private val encodeUninterpreted: Boolean) {
     private data class Term(val id: Int, val expression: SExpr, val partial: Boolean = false)
     private data class NodeKey(val head: SExpr, val arguments: List<Int>)

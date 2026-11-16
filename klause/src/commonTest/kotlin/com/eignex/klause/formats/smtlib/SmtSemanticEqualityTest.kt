@@ -5,6 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.coroutines.cancellation.CancellationException
@@ -89,10 +90,7 @@ class SmtSemanticEqualityTest {
     @Test
     fun `source comparison shares its cumulative witness allowance`() {
         var work = 0L
-        val cancellation = object : Cancellation {
-            override fun isCancelled(): Boolean = work >= 100
-            override fun workMeter(): WorkMeter = WorkMeter { work += it }
-        }
+        val cancellation = ExecutionControl(Cancellation { work >= 100 }, WorkMeter { work += it })
         val parsed = SmtLib.parse("(declare-const a Real) (declare-const b Real)").copy(
             sourceChecks = listOf(SmtSourceCheck { values ->
                 repeat(100) { values.equal("a", "b") }
@@ -114,7 +112,7 @@ class SmtSemanticEqualityTest {
         val sample = Sample(booleanArrayOf(true), longArrayOf())
 
         val checked = parsed.source.witnessValidators.single().validate(OpenTheoryAssignment.Sampled(sample),
-            Cancellation.Never)
+            ExecutionControl.Never)
 
         assertIs<SourceEvidenceCheck.Unavailable>(checked)
     }
