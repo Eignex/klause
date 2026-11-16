@@ -151,7 +151,7 @@ exact authority explicitly, and rejection controls exercise publication gates.
 | --- | --- | --- |
 | C01 | `function bitvector results address reconstructed arrays` | SAT; the function maps the source value to `#b10`, whose array read is true |
 | C02 | `array stores use interpreted bitvector equality for function indexes` | UNSAT; `#b01 + #b01` is the stored index `#b10` |
-| C03 | `datatype function results retain bitvector and exact real array fields` | SAT; actual Packet contains `#b11` and weight `1/3` |
+| C03 | `datatype function results retain bitvector and exact real array fields` | SAT; an explicit source constructor witness gives the actual function-result Packet `#b11` and weight `1/3` |
 | C04 | `datatype array indexes preserve function congruence` | UNSAT; the selected constructor equals the stored constructor |
 | C05 | `nested array models contain datatype values at bitvector indexes` | SAT; read `a[#b1][true]` is the green constructor |
 | C06 | `finite datatype cardinality includes bitvector fields` | UNSAT; a one-bit record has exactly two values |

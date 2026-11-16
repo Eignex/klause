@@ -83,9 +83,10 @@ class SmtQfConformanceTest {
             (declare-sort U 0)
             (declare-datatype Packet ((packet (bits (_ BitVec 2)) (weights (Array Bool Real)))))
             (declare-const u U)
+            (declare-const w (Array Bool Real))
             (declare-fun payload (U) Packet)
-            (assert (= (bits (payload u)) #b11))
-            (assert (= (select (weights (payload u)) true) (/ 1.0 3.0)))
+            (assert (= (payload u) (packet #b11 w)))
+            (assert (= (select w true) (/ 1.0 3.0)))
         """.trimIndent())
 
         val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
@@ -99,7 +100,7 @@ class SmtQfConformanceTest {
         val weights = assertIs<SmtValue.Array>(packet.arguments[1])
         val weight = weights.entries.lastOrNull { it.first == SmtValue.Boolean(true) }?.second ?: weights.default
         assertEquals("(/ 1.0 3.0)", assertIs<SmtValue.Real>(weight).term)
-        assertEquals(setOf("u", "payload"), values.keys)
+        assertEquals(setOf("u", "w", "payload"), values.keys)
     }
 
     @Test
