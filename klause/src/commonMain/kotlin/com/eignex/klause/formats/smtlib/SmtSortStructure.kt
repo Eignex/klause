@@ -8,6 +8,10 @@ internal fun SmtSort.checkpointStructure(control: ExecutionControl) {
 }
 
 internal fun SmtSort.checkpointStructure(checkpoint: () -> Unit) {
+    if (this !is SmtSort.Array && (this !is SmtSort.Uninterpreted || arguments.isEmpty())) {
+        checkpoint()
+        return
+    }
     val work = ArrayDeque<SmtSort>()
     work.addLast(this)
     while (work.isNotEmpty()) {

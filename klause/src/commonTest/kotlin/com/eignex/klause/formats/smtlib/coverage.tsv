@@ -119,6 +119,7 @@ Resource	deep applied sort	R02
 Resource	current structural allowance	R03
 Resource	borrowed sort arguments	R04
 Resource	deep lazy model ranks	C27; C28
+Resource	capped composite cardinality	R05; SmtGroundDatatypesTest#finite record cardinality includes boolean array fields
 Commands	assert	C23; SmtLibSessionTest; SmtSessionValidationTest
 Commands	check-sat	C23; SmtLibSessionTest; SmtSessionValidationTest
 Commands	check-sat-assuming	C23; SmtLibSessionTest; SmtSessionValidationTest

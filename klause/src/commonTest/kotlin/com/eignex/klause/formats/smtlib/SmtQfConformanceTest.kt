@@ -577,7 +577,10 @@ class SmtQfConformanceTest {
             (get-assignment)
         """.trimIndent()))
 
-        assertEquals(listOf("sat", "((truth true) (falsehood false))"), replies)
+        assertEquals(2, replies.size)
+        assertEquals("sat", replies[0])
+        val assignment = SExprReader(replies[1]).readAll().single() as SExpr.SList
+        assertEquals(listOf("(falsehood false)", "(truth true)"), assignment.items.map { it.smtText() }.sorted())
     }
 
     private fun solveSession(text: String): SmtSessionResult {

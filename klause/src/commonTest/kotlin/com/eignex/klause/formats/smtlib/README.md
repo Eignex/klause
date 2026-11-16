@@ -25,6 +25,7 @@ The inventory was audited against these primary specifications on 2026-11-16:
 | [SMT-LIB reference](https://smt-lib.org/papers/smt-lib-reference-v2.7-r2025-07-07.pdf) | 2.7, release 2025-07-07 | Lexicon and terms, sections 3.1–3.6; command grammar, 3.11; command semantics, 4; polymorphism, 5 |
 | [Core](https://smt-lib.org/theories-Core.shtml) | Last updated 2024-07-21 | Bool and polymorphic Boolean operators |
 | [Ints](https://smt-lib.org/theories-Ints.shtml) | Last updated 2026-01-16 | Integer arithmetic, including `**` |
+| [QF_EIA](https://smt-lib.org/logics-all.shtml#QF_EIA) | Last updated 2026-03-18 | Quantifier-free integer arithmetic with symbolic exponentiation |
 | [Reals](https://smt-lib.org/theories-Reals.shtml) | Last updated 2024-07-21 | Exact real arithmetic and total division |
 | [Reals_Ints](https://smt-lib.org/theories-Reals_Ints.shtml) | Last updated 2024-07-21 | Mixed arithmetic, floor and integrality |
 | [FixedSizeBitVectors](https://smt-lib.org/theories-FixedSizeBitVectors.shtml) | Last updated 2025-09-09 | Core bitvectors, conversions and overflow |
@@ -209,6 +210,7 @@ argument-list behavior are observed separately.
 | R02 | `deep applied free sorts retain source identities during typed capture` |
 | R03 | `deep structural interning observes the current remaining allowance` |
 | R04 | `sort structural keys observe borrowed argument list changes` |
+| R05 | `nested array cardinalities retain their capped finite meaning` |
 
 The P fixtures isolate command protocol behavior. Their injected snapshot solver
 is deliberately unused except in the explicit inconclusive-result lifecycle

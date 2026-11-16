@@ -4,6 +4,7 @@ import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -65,5 +66,18 @@ class SmtQfResourceConformanceTest {
 
         assertEquals(expected, borrowed)
         assertEquals(expected.hashCode(), borrowed.hashCode())
+    }
+
+    @Test
+    fun `nested array cardinalities retain their capped finite meaning`() {
+        var sort: SmtSort = SmtSort.Bool
+        repeat(256) { sort = SmtSort.Array(SmtSort.Bool, sort) }
+        val registry = SmtDatatypes(ExecutionControl.Never)
+        val cap = parseBigInt("2")
+        val cardinalities = SmtDatatypeCardinalities(registry, cap) {}
+
+        val cardinality = cardinalities.of(sort)
+
+        assertEquals(cap, cardinality)
     }
 }
