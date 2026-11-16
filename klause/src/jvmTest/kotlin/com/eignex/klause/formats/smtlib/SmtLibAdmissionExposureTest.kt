@@ -21,9 +21,10 @@ class SmtLibAdmissionExposureTest(private val source: String) {
             """,
             """
             (define-sort A () (Array Bool Bool))
+            (declare-const a0 A)
             (declare-fun f (A) Bool)
             (define-fun read ((a A)) Bool (f a))
-            (assert (let ((a ((as const A) true))) (distinct (read a) (f a))))
+            (assert (let ((a (store a0 true true))) (distinct (read a) (f a))))
             """,
             """
             (declare-datatype Box ((box (value Bool))))
