@@ -250,7 +250,11 @@ class SharingMemoryTest {
 
             val after = assertNotNull(sample.snapshot {
                 for (column in columns) {
-                    sample.owned(column.borrowBackingArray(), column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, true)
+                    sample.owned(
+                        column.borrowBackingArray(),
+                        column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+                        true,
+                    )
                 }
                 state.learned.capRanking.sharingMemory(sample, true)
                 sample.owned(state.learned, 44L, true)
@@ -260,7 +264,11 @@ class SharingMemoryTest {
                 sample.ownedReferences(state.watches.pos, state.watches.pos.referenceCapacity, true)
                 for (literal in listOf(0, 2)) {
                     for (posting in listOf(state.watches.byLit[literal], state.watches.blockersByLit[literal])) {
-                        sample.owned(posting.borrowBackingArray(), posting.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, true)
+                        sample.owned(
+                            posting.borrowBackingArray(),
+                            posting.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+                            true,
+                        )
                     }
                 }
             }.completeValues)

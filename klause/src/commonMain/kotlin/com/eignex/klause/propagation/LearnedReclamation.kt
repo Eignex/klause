@@ -136,7 +136,10 @@ internal fun PropagationState.prepareReclamation(
     for (lists in listOf(watches.byLit.asList(), watches.blockersByLit.asList(), atoms.watchersByLit)) {
         for (list in lists) {
             budget.visit()
-            budget.atomic(1L + (list?.borrowBackingArray()?.size ?: 0), (list?.borrowBackingArray()?.size?.toLong() ?: 0L) * 8L)
+            budget.atomic(
+                1L + (list?.borrowBackingArray()?.size ?: 0),
+                (list?.borrowBackingArray()?.size?.toLong() ?: 0L) * 8L,
+            )
         }
     }
     if (intEvents.overflow != null) {
@@ -151,7 +154,10 @@ internal fun PropagationState.prepareReclamation(
     }
     learned.store.prepareRemap(budget)
     for (column in listOf(learned.units, learned.pendingAttach, learned.capCandidates)) {
-        budget.atomic(column.borrowBackingArray().size.toLong(), column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES)
+        budget.atomic(
+            column.borrowBackingArray().size.toLong(),
+            column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+        )
     }
     arithmeticLearningTrace?.let { trace ->
         val entries = trace.reclamationEntries.toLong()

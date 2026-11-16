@@ -1,8 +1,8 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.util.runtime.diagnostics.compilationTimeMillis
 import com.eignex.util.process.processProperty
+import com.eignex.util.runtime.diagnostics.compilationTimeMillis
 import kotlin.time.TimeSource
 
 internal fun platformDebugStats(): CliDebugStats = CliDebugStats(::compilationTimeMillis)

@@ -536,7 +536,11 @@ internal class NativeSatState(private val state: PropagationState) {
         for (column in columns) {
             sample.step()
             metadataBytes += column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES
-            sample.owned(column.borrowBackingArray(), column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, protectedRows)
+            sample.owned(
+                column.borrowBackingArray(),
+                column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+                protectedRows,
+            )
         }
         learnedPayloads.sharingMemory(sample, protectedRows, permanentCount == learnedCount) { index ->
             metadata[index, NativeLearnedMetadata.PERMANENT] == 1 || sample.contains(protected, index)
@@ -545,7 +549,11 @@ internal class NativeSatState(private val state: PropagationState) {
         sample.owned(arena.starts, arena.starts.size.toLong() * Int.SIZE_BYTES, true, shared = true)
         sample.owned(watchSizes, watchSizes.size.toLong() * Int.SIZE_BYTES, true)
         sample.owned(watchPos, watchPos.size.toLong() * Int.SIZE_BYTES, true)
-        sample.owned(baseUnits.borrowBackingArray(), baseUnits.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, true)
+        sample.owned(
+            baseUnits.borrowBackingArray(),
+            baseUnits.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            true,
+        )
         sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
         var watchPostings = 0L
@@ -944,7 +952,10 @@ internal class NativeSatState(private val state: PropagationState) {
         budget.atomic(1L)
         defaultCapIndex?.let { budget.atomic(it.resetWork + learnedCount.toLong() * 8L) }
         for (column in listOf(learnedUnits, rechecks, capCandidates)) {
-            budget.atomic(column.borrowBackingArray().size.toLong(), column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES)
+            budget.atomic(
+                column.borrowBackingArray().size.toLong(),
+                column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            )
         }
         for (entries in watchEntries) {
             budget.visit()

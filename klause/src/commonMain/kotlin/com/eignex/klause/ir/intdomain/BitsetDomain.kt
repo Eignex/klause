@@ -37,7 +37,8 @@ internal class BitsetDomain(
         s
     }
 
-    override fun contains(value: Long): Boolean = value in min..max && PackedBits.has(bitset, (value - bitsetLo).toInt())
+    override fun contains(value: Long): Boolean =
+        value in min..max && PackedBits.has(bitset, (value - bitsetLo).toInt())
 
     override fun valueAt(i: Int): Long {
         var remaining = i

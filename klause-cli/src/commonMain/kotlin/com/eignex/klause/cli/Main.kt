@@ -6,10 +6,10 @@ import com.eignex.klause.formats.opb.OpbLoweringException
 import com.eignex.klause.solver.pipeline.EngineParams
 import com.eignex.klause.solver.pipeline.PipelineConfigException
 import com.eignex.klause.solver.result.UnsoundnessException
-import com.eignex.util.runtime.diagnostics.startHeapPeakSampler
 import com.eignex.util.process.exitProcess
 import com.eignex.util.process.printErrorLine
 import com.eignex.util.process.processProperty
+import com.eignex.util.runtime.diagnostics.startHeapPeakSampler
 
 /*
  * CLI entry point: parse shared and mode flags, select a mode by --format or extension

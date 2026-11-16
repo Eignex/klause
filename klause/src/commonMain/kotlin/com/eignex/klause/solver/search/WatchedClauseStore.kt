@@ -92,8 +92,16 @@ internal class WatchedClauseStore {
         sample.ownedReferences(clauses, clauses.capacity.toLong(), protected)
         sample.owned(used.borrowBackingArray(), used.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, protected)
         sample.owned(lbds.borrowBackingArray(), lbds.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, protected)
-        sample.owned(attached.borrowBackingArray(), attached.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, protected)
-        sample.owned(unitClauses.borrowBackingArray(), unitClauses.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, protected)
+        sample.owned(
+            attached.borrowBackingArray(),
+            attached.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            protected,
+        )
+        sample.owned(
+            unitClauses.borrowBackingArray(),
+            unitClauses.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            protected,
+        )
         var protectedWatches = false
         watchers.forEachValueSlot { value ->
             sample.step()

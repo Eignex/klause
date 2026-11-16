@@ -66,11 +66,20 @@ internal fun PropagationState.sharingMemory(sample: SharingMemoryObservation) {
             for (run in listOf(index.ge, index.le, index.eq)) {
                 sample.step()
                 atomBytes += run.mainKeys.primitiveCapacityBytes + run.pendKeys.primitiveCapacityBytes +
-                    (run.mainIds.borrowBackingArray().size.toLong() + run.pendIds.borrowBackingArray().size) * Int.SIZE_BYTES
+                    (run.mainIds.borrowBackingArray().size.toLong() + run.pendIds.borrowBackingArray().size) *
+                    Int.SIZE_BYTES
                 sample.owned(run.mainKeys, run.mainKeys.primitiveCapacityBytes, true)
                 sample.owned(run.pendKeys, run.pendKeys.primitiveCapacityBytes, true)
-                sample.owned(run.mainIds.borrowBackingArray(), run.mainIds.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, true)
-                sample.owned(run.pendIds.borrowBackingArray(), run.pendIds.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, true)
+                sample.owned(
+                    run.mainIds.borrowBackingArray(),
+                    run.mainIds.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+                    true,
+                )
+                sample.owned(
+                    run.pendIds.borrowBackingArray(),
+                    run.pendIds.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+                    true,
+                )
             }
         }
     }
@@ -198,7 +207,11 @@ private fun PropagationState.learnedSharingMemory(
     for (column in columns) {
         sample.step()
         metadata += column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES
-        sample.owned(column.borrowBackingArray(), column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, protectedRows)
+        sample.owned(
+            column.borrowBackingArray(),
+            column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            protectedRows,
+        )
     }
     sample.ownedReferences(refPayloadStore, refPayloadStore.size.toLong(), baseFactorCount > 0 || protectedRows)
     learned.integerRows?.sharingMemory(sample, protectedInteger)
@@ -213,8 +226,16 @@ private fun PropagationState.learnedSharingMemory(
         val retained = protectedPosting(sample, posting, protected)
         protectedWatchIndex = protectedWatchIndex || retained
         watchers += (posting.borrowBackingArray().size.toLong() + blockers.borrowBackingArray().size) * Int.SIZE_BYTES
-        sample.owned(posting.borrowBackingArray(), posting.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, retained)
-        sample.owned(blockers.borrowBackingArray(), blockers.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, retained)
+        sample.owned(
+            posting.borrowBackingArray(),
+            posting.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            retained,
+        )
+        sample.owned(
+            blockers.borrowBackingArray(),
+            blockers.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            retained,
+        )
     }
     sample.owned(watches.pos, watches.pos.primitiveCapacityBytes, protectedWatchIndex)
     sample.ownedReferences(watches.pos, watches.pos.referenceCapacity, protectedWatchIndex)
@@ -247,7 +268,13 @@ private fun PropagationState.learnedSharingMemory(
     for (list in events.dirtyVars) {
         sample.step()
         eventBytes += (list?.borrowBackingArray()?.size?.toLong() ?: 0L) * Int.SIZE_BYTES
-        if (list != null) sample.owned(list.borrowBackingArray(), list.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, true)
+        if (list != null) {
+            sample.owned(
+                list.borrowBackingArray(),
+                list.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+                true,
+            )
+        }
     }
     for (mark in events.dirtyMark) {
         sample.step()
@@ -302,7 +329,11 @@ private fun PropagationState.reasonIndexMemory(sample: SharingMemoryObservation)
             sample.step()
             historyBytes += (column?.borrowBackingArray()?.size?.toLong() ?: 0L) * Int.SIZE_BYTES
             if (column != null)
-                sample.owned(column.borrowBackingArray(), column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, true)
+                sample.owned(
+                    column.borrowBackingArray(),
+                    column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+                    true,
+                )
         }
     }
     for (columns in listOf(boundMovePriorMin, boundMovePriorMax, holeHistVal)) {
