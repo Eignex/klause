@@ -8,9 +8,8 @@ included. Admission, solving, reconstructed values and command sessions are
 separate observable behaviors; successful parsing alone establishes no solve or
 model claim. `unknown` records an inconclusive solve.
 
-The conformance additions below are pending execution on the assembled feature
-stack. Entries describe the required contract, not an assertion that untested
-draft implementations satisfy it. The flat per-symbol catalogue is
+The controls below exercise the combined source frontend, retained-model queries,
+command sessions and resource boundaries. The flat per-symbol catalogue is
 [`coverage.tsv`](coverage.tsv); its references resolve to the fixture groups below
 and the focused test classes in this directory. A reference of the form
 `TestClass#test name` identifies one exact test; unqualified class references

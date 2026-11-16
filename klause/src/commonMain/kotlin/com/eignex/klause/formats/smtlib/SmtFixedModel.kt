@@ -471,7 +471,7 @@ internal class SmtFixedModel(
             }
             symbol(declaration.name) == name && declaration.parameters.size == args.size &&
                 (result == null || declaration.result == result) &&
-                (rank == null || declaration.parameters == rank.first && declaration.result == rank.second)
+                (rank == null || (declaration.parameters == rank.first && declaration.result == rank.second))
         }
         for ((declaration, value) in candidates) {
             if (!declaration.parameters.indices.all { accepts(declaration.parameters[it], args[it]) }) continue
