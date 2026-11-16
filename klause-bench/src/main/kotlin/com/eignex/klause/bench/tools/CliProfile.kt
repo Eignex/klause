@@ -86,8 +86,8 @@ internal object CliProfile {
                         val stack = event.stackTrace?.frames.orEmpty()
                             .map { "${it.method.type.name}.${it.method.name}" }
                         if (stack.firstOrNull()?.let {
-                            it.startsWith("kotlin.time.") || it.startsWith("java.util.concurrent.TimeUnit.")
-                        } == true) {
+                                it.startsWith("kotlin.time.") || it.startsWith("java.util.concurrent.TimeUnit.")
+                            } == true) {
                             val suffix = if (event.stackTrace?.isTruncated == true) " [capture truncated]" else ""
                             cpuClockCallers.merge(stack.take(32).joinToString(" <- ") + suffix, 1L, Long::plus)
                         }
