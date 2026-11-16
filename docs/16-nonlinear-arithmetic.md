@@ -356,7 +356,12 @@ assembles the source decomposition.
 [PolynomialTheoryService](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialTheoryService.kt)
 owns conditioned checks, and
 [QfNraSolver](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/QfNraSolver.kt)
-implements the decision procedure. The pipeline uses
+coordinates the decision procedure.
+[WitnessProbe](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/WitnessProbe.kt)
+constructs optional proposals, with dyadic bases owned by
+[DyadicWitnessBase](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/DyadicWitnessBase.kt).
+[PolynomialCellSearch](../klause/src/commonMain/kotlin/com/eignex/klause/theory/qfnra/PolynomialCellSearch.kt)
+lifts CAD cells and checks their samples. The pipeline uses
 `SourceProblemRoute.PolynomialTheory`.
 
 #### Decision procedure
