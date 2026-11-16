@@ -97,22 +97,7 @@ internal class CircuitInvariant(succ: IntArray, n: Int, computeCost: (LocalSearc
         proposeReversals(state, order, sink, MAX_SWAP_CANDIDATES, STRUCTURED_ATTEMPT_STRIDE)
     }
 
-    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean {
-        for (i in 0 until n) {
-            val target = (i + 1) % n
-            if (target.toLong() !in state.rootDomains[succ[i]]) return false
-            if (state.assumptions.isFrozenInt(
-                    succ[i],
-                ) && state.assignment.intValue(succ[i]) != target.toLong()
-            ) {
-                return false
-            }
-        }
-        for (i in 0 until n) {
-            if (!state.assumptions.isFrozenInt(succ[i])) state.assignment.setInt(succ[i], ((i + 1) % n).toLong())
-        }
-        return true
-    }
+    override fun seedFeasible(state: LocalSearchState, factorId: Int): Boolean = seedFullCycle(state)
 
     private fun proposeMergeSwaps(state: LocalSearchState, sink: MoveSink) {
         if (n < 3) return

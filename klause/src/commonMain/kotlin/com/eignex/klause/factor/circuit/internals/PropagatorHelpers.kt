@@ -116,3 +116,26 @@ internal fun walkPredChain(pred: IntArray, from: Int, n: Int): PredChain {
         if (len > n) return PredChain(head, len, true)
     }
 }
+
+// Each propagator owns the exclusion explanation and any resulting failure record.
+internal inline fun excludeClaimedSuccessors(
+    state: PropagationState,
+    succ: IntArray,
+    claimed: IntArray,
+    exclude: (variable: Int, target: Long, owner: Int, competitor: Int) -> Boolean,
+): Boolean {
+    val targets = IntArrayList()
+    for (target in claimed.indices) if (claimed[target] >= 0) targets.add(target)
+    if (targets.isEmpty()) return true
+    for (i in succ.indices) {
+        val v = succ[i]
+        if (state.intDomains[v].min == state.intDomains[v].max) continue
+        for (k in 0 until targets.size) {
+            val target = targets[k]
+            val owner = claimed[target]
+            if (owner == i || target.toLong() !in state.intDomains[v]) continue
+            if (!exclude(v, target.toLong(), owner, i)) return false
+        }
+    }
+    return true
+}

@@ -51,10 +51,7 @@ class WeightSchedule(
         require(relaxProbability in 0.0..1.0) { "relaxProbability must be in [0, 1], got $relaxProbability" }
     }
 
-    private var lastImprovingStep: Long = -1L
-    private var lastSeenStep: Long = -1L
-    private var lastCost: Long = Long.MAX_VALUE
-    private var lastFraction: Double = 0.0
+    private val progress = ProgressWindow(initialProgressStep = -1L, trackFraction = true)
     private var pendingBump: Boolean = false
 
     /** True iff a relax pass can ever run, so callers can skip allocating a snapshot when not. */
@@ -65,23 +62,11 @@ class WeightSchedule(
     fun observeStep(step: Long, cost: Long) = observeStep(step, cost, 0.0)
 
     internal fun observeStep(step: Long, cost: Long, fraction: Double) {
-        if (step < lastSeenStep) {
-            lastImprovingStep = step
-            lastCost = cost
-            lastFraction = fraction
-            lastSeenStep = step
-            return
-        }
-        if (step == lastSeenStep) return
-        if (cost < lastCost || (cost == lastCost && fraction < lastFraction)) {
-            lastImprovingStep = step
-            lastCost = cost
-            lastFraction = fraction
-        } else if (step - lastImprovingStep >= bumpAfter) {
+        val observation = progress.observe(step, cost, fraction)
+        if (observation == ProgressObservation.NonImproving && progress.elapsed(step) >= bumpAfter) {
             pendingBump = true
-            lastImprovingStep = step
+            progress.restartAt(step)
         }
-        lastSeenStep = step
     }
 
     /** Shared-channel hook: stall-detect off the round's step and incumbent cost. */
@@ -120,10 +105,7 @@ class WeightSchedule(
     }
 
     override fun reset() {
-        lastImprovingStep = -1L
-        lastSeenStep = -1L
-        lastCost = Long.MAX_VALUE
-        lastFraction = 0.0
+        progress.reset()
         pendingBump = false
     }
 

@@ -576,8 +576,10 @@ and the sum of coefficient magnitudes is at most `Long.MAX_VALUE`, keeping resid
 checks within 128 bits; wider rows keep arbitrary-precision propagation. Packed SAT
 propagation requires built-in clause descriptors, so a clause assigned to a custom
 projection uses the general CP lane. AllDifferent tries its cached incremental path
-before full matching. Assignment-dependent payloads such as live tuples and diagram
-reachability stay state-owned.
+before full matching. Both matching paths collect Hall-set variables with the same
+forward traversal; matching state and SCC memoization belong to each path.
+Assignment-dependent payloads such as live tuples and diagram reachability stay
+state-owned.
 
 Unguarded affine integer Distinct projects unit operands onto a shared value graph
 without adding finite coordinates. Exact offsets identify values; a compact
@@ -658,8 +660,10 @@ and LP branch proposals; the attachment can precede root initialization.
 Circuit propagation removes targets claimed by fixed incoming edges and premature
 chain closures throughout successor domains, including interior values. Full
 circuits also exclude self-loops; optional cycles treat an absent self-loop as
-mandatory participation even when it is an interior hole. Conditional removals cite
-their fixed edges and required participation premises and retract with them.
+mandatory participation even when it is an interior hole. Both variants enumerate
+competing incoming edges through a shared traversal, with each propagator owning
+its exclusion reasons and failure record. Conditional removals cite their fixed
+edges and required participation premises and retract with them.
 Reachability and full-circuit dominator filtering inspect the remaining arcs.
 
 General CP optimization builds its private state in retained batches before
