@@ -59,6 +59,8 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                     cancellation).isNotEmpty()) continue
             instance(symbol, symbol.declaration.parameters, symbol.declaration.result)
         }
+        val constructive = constructiveSchema()
+        val model = model(constructive)
         output += declarations
         output += obligations
         for (raw in source.commands) {
@@ -68,11 +70,73 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                 "get-model", "get-objectives", "exit" -> output += raw
             }
         }
-        val checks = if (universallyCertified) input.checks else input.checks + SmtSourceCheck { values ->
+        val checks = if (constructive) input.checks + model
+        else if (universallyCertified) input.checks else input.checks + SmtSourceCheck { values ->
             values.checkpoint()
             throw SmtSourceCheckingUnavailable()
         }
-        return input.copy(commands = output, bindings = bindings, checks = checks)
+        return input.copy(commands = output, bindings = bindings, checks = checks, polymorphicModel = model)
+    }
+
+    private fun constructiveSchema(): Boolean {
+        // A Boolean interpretation embeds in every available non-datatype sort. Ground terms stay in that image.
+        if (source.terms.any { it.operator == "log" }) return false
+        if (source.commands.any { (it as? SExpr.SList)?.polynomialHead() in
+                setOf("declare-datatype", "declare-datatypes") }) return false
+        val seen = HashSet<Int>()
+        val work = ArrayDeque<Int>()
+        for ((head, root) in source.obligations) {
+            if (head != "assert") return false
+            work.addLast(root)
+        }
+        fun supported(sort: SmtSort): Boolean = sort == SmtSort.Bool ||
+            (sort is SmtSort.Uninterpreted && sort.arguments.isEmpty() &&
+                polynomialSymbol(sort.name) in source.sortParameters)
+        while (work.isNotEmpty()) {
+            step()
+            val index = work.removeLast()
+            if (!seen.add(index)) continue
+            val node = source.terms[index]
+            if (!supported(node.sort)) return false
+            val symbol = symbol(node)
+            if (symbol != null) {
+                if (!(symbol.declaration.parameters + symbol.declaration.result).all(::supported)) return false
+                symbol.definition?.let { work.addLast(it.body) }
+            } else if (!node.operator.startsWith("parameter:") && node.operator !in setOf(
+                    "literal:true", "literal:false", "and", "or", "not", "xor", "=>", "=", "distinct", "ite")) {
+                return false
+            }
+            for (argument in node.arguments) work.addLast(argument)
+        }
+        return true
+    }
+
+    private fun model(constructive: Boolean): SmtPolymorphicModel {
+        val archetypes = HashMap<Int, String>()
+        val transports = HashMap<String, String>()
+        val substitution = source.sortParameters.associateWith { SmtSort.Bool }
+        if (constructive) for (symbol in source.symbols.filter { it.definition == null }) {
+            val parameters = symbol.declaration.parameters.map { substituteSmtSort(it, substitution, cancellation) }
+            val result = substituteSmtSort(symbol.declaration.result, substitution, cancellation)
+            if (parameters.all { it == SmtSort.Bool } && result == SmtSort.Bool) {
+                instance(symbol, parameters, result)
+            }
+        }
+        for ((key, name) in instances.toMap()) {
+            step()
+            val symbol = symbols.getValue(key.symbol)
+            val parameters = symbol.declaration.parameters.map { substituteSmtSort(it, substitution, cancellation) }
+            val result = substituteSmtSort(symbol.declaration.result, substitution, cancellation)
+            if (parameters.any { it != SmtSort.Bool } || result != SmtSort.Bool) continue
+            if (!constructive) continue
+            val archetype = instance(symbol, parameters, result)
+            archetypes[symbol.identity] = archetype
+            transports[polynomialSymbol(name)] = archetype
+        }
+        val keys = instances.map { (key, value) ->
+            symbols.getValue(key.symbol).declaration.copy(parameters = key.parameters, result = key.result) to value
+        }.toMap()
+        return SmtPolymorphicModel(source, archetypes, transports, keys, constructive)
     }
 
     private fun expand(root: Int, substitution: Map<String, SmtSort>): Value {

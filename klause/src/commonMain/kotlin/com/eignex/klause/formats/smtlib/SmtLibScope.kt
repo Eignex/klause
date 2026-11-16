@@ -209,7 +209,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
             cancellation.polynomialSourceCheckpoint(1)
             val (node, combine) = work.removeLast()
             when (node) {
-                is SExpr.Atom -> values.addLast(when (node.text) {
+                is SExpr.Atom -> values.addLast(when (polynomialSymbol(node.text)) {
                     "Bool" -> SmtSort.Bool
                     "Int" -> SmtSort.Int
                     "Real" -> SmtSort.Real
@@ -298,7 +298,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                 is Frame.Evaluate -> when (val node = frame.expression) {
                     is SExpr.Atom -> {
                         val name = polynomialSymbol(node.text)
-                        val result = literal(node.text)?.let { term("literal:${node.text}", emptyList(), it) }
+                        val result = literal(node.text)?.let {
+                            term("literal:${if (it == SmtSort.Bool) name else node.text}", emptyList(), it)
+                        }
                             ?: frame.locals?.get(name) ?: globals[name]?.takeIf { it.parameters.isEmpty() }
                                 ?.let { term("symbol:${it.identity}:$name", emptyList(), it.result) }
                             ?: if (node.text == "pi") term("pi", emptyList(), SmtSort.Real) else return null
@@ -321,8 +323,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                             }
                             continue
                         }
-                        val head = polynomialSymbol((selected as? SExpr.Atom)?.text ?: return null)
-                        if (head == "as" && qualified == null) {
+                        val syntax = (selected as? SExpr.Atom)?.text ?: return null
+                        val head = polynomialSymbol(syntax)
+                        if (syntax == "as" && qualified == null) {
                             if (node.items.size != 3) return null
                             val selectedIndex = node.items[1] as? SExpr.SList
                             if (selectedIndex != null) {
@@ -344,14 +347,14 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                             if (result != sourceSort(node.items[2])) return null
                             values.addLast(term(if (signature == null) name else "symbol:${signature.identity}:$name",
                                 emptyList(), result))
-                        } else if (head == "_") {
+                        } else if (syntax == "_") {
                             val type = smtIndexedBitVectorSort(node, emptyList()) ?: return null
                             val key = node.items.map { (it as? SExpr.Atom)?.text ?: return null }.joinToString(" ")
                             values.addLast(term("($key)", emptyList(), type))
-                        } else if (head == "!") {
+                        } else if (syntax == "!") {
                             if (node.items.size < 2) return null
                             work.addLast(Frame.Evaluate(node.items[1], frame.locals))
-                        } else if (head == "let") {
+                        } else if (syntax == "let") {
                             if (node.items.size != 3) return null
                             val bindings = node.items[1] as? SExpr.SList ?: return null
                             val names = ArrayList<String>()
@@ -408,7 +411,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     }
 
     private fun literal(text: String): SmtSort? {
-        if (text in setOf("true", "false")) return SmtSort.Bool
+        if (polynomialSymbol(text) in setOf("true", "false")) return SmtSort.Bool
         smtBitVectorLiteralSort(text)?.let { return it }
         if (text.isNotEmpty() && text.all { it in '0'..'9' }) return SmtSort.Int
         val dot = text.indexOf('.')

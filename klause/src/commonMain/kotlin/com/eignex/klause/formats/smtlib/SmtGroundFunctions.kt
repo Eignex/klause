@@ -12,7 +12,9 @@ internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: Executi
         val expression = pending.removeLast()
         if (expression is SExpr.SList) {
             val head = (expression.items.firstOrNull() as? SExpr.Atom)?.text
-            needed = head in setOf("declare-sort", "define-sort", "as") || (head == "declare-fun" &&
+            needed = head in setOf("declare-sort", "define-sort", "as") ||
+                (head == "define-fun" && expression.polynomialName(1) in setOf("let", "as", "_", "!")) ||
+                (head == "declare-fun" &&
                 (expression.items.getOrNull(2) as? SExpr.SList)?.items?.isNotEmpty() == true)
             for (item in expression.items) pending.addLast(item)
         }
@@ -201,16 +203,17 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                     is SExpr.SList -> {
                         val head = node.items.first()
                         val name = identifierName(head)
-                        if (name == "let") {
+                        val syntax = (head as? SExpr.Atom)?.text
+                        if (syntax == "let") {
                             val pairs = (node.items[1] as SExpr.SList).items.map { it as SExpr.SList }
                             work.addLast(Frame.Let(pairs.map { it.polynomialName(0) }, node.items[2],
                                 frame.environment))
                             for (pair in pairs.asReversed()) {
                                 work.addLast(Frame.Evaluate(pair.items[1], frame.environment))
                             }
-                        } else if (name == "!") {
+                        } else if (syntax == "!") {
                             work.addLast(Frame.Evaluate(node.items[1], frame.environment))
-                        } else if (name == "as") {
+                        } else if (syntax == "as") {
                             val selected = node.items[1]
                             val binding = identifierName(selected)?.let { binding(it, frame.environment) }
                             when {
@@ -220,7 +223,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                                 selected is SExpr.Atom -> values.addLast(atom(polynomialSymbol(selected.text)))
                                 else -> values.addLast(literalTerm(selected))
                             }
-                        } else if (name == "_") {
+                        } else if (syntax == "_") {
                             values.addLast(intern(head, node.items.drop(1).map { literalTerm(it) }))
                         } else {
                             val binding = name?.let { binding(it, frame.environment) }

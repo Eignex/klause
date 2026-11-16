@@ -177,7 +177,10 @@ data class SmtSourceModel(
 )
 
 /** The original typed source, retained through all encoding passes and solving. */
-class SmtSourceSnapshot internal constructor(internal val typed: SmtTypedSource) {
+class SmtSourceSnapshot internal constructor(
+    internal val typed: SmtTypedSource,
+    internal val polymorphicModel: SmtPolymorphicModel? = null,
+) {
     /** Original declarations, in source order. */
     val declarations: List<SmtSourceDeclaration> get() = typed.declarations.toList()
 }

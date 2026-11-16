@@ -11,6 +11,102 @@ import kotlin.test.assertTrue
 
 class SmtPolymorphismTest {
     @Test
+    fun `fixed polymorphic families instantiate unobserved wide bitvector ranks`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-const a A)
+            (declare-fun f (A) A)
+            (assert (= (f a) a))
+        """.trimIndent())
+        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
+        val family = parsed.originalSource!!.polymorphicModel!!
+        val sort = SmtSort.BitVector(129)
+
+        val result = withSmtModelValues(parsed, assignment::boolValue, assignment::intValue,
+            assignment::realValue, ExecutionControl.Never) { values, _ ->
+            val constant = family.instantiate("a", emptyList(), sort, values)
+            val function = family.instantiate("f", listOf(sort), sort, values)
+            constant to function
+        }
+
+        val constant = assertIs<SmtValue.BitVector>(result.first)
+        val function = assertIs<SmtValue.Function>(result.second)
+        assertEquals(129, constant.bits.length)
+        assertEquals(constant, function.entries.single { it.first == listOf(constant) }.second)
+    }
+
+
+    @Test
+    fun `universal models share interpretations when instantiated ranks coincide`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-sort-parameter B)
+            (declare-const a A)
+            (declare-fun p (A) Bool)
+            (assert (= (p a) (p (as a B))))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `coincident ranks cannot receive conflicting polymorphic interpretations`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-sort-parameter B)
+            (declare-const a A)
+            (declare-fun p (A) Bool)
+            (assert (distinct (p a) (p (as a B))))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `constructive schema checks expand macro bodies with their formal bindings`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-const a A)
+            (define-fun id ((x A)) A x)
+            (assert (= (id a) a))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        val model = parsed.reconstructModel(assignment)
+        assertTrue(model.values.none { it.first.name == "id" })
+    }
+
+
+    @Test
+    fun `constructive universal models transport a Boolean equality pattern`() {
+        val cases = listOf("(= a b)", "(distinct a b)", "(= (f a) a)", "(p a)")
+        for (body in cases) {
+            val parsed = SmtLib.parse("""
+                (declare-sort-parameter A)
+                (declare-const a A)
+                (declare-const b A)
+                (declare-fun f (A) A)
+                (declare-fun p (A) Bool)
+                (assert $body)
+            """.trimIndent())
+
+            val result = BacktrackSolver.source(parsed.model).solve()
+
+            val assignment = assertIs<OpenTheoryResult.Sat>(result, body).assignment
+            val model = parsed.reconstructModel(assignment)
+            val integers = model.values.filter { it.first.result == SmtSort.Int && it.first.parameters.isEmpty() }
+            assertTrue(integers.all { it.second in listOf(SmtValue.Integer("0"), SmtValue.Integer("1")) })
+        }
+    }
+
+
+    @Test
     fun `sort parameters require the Boolean instance of universal assertions`() {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)
@@ -58,8 +154,8 @@ class SmtPolymorphismTest {
         val commands = SExprReader("""
             (declare-sort-parameter A)
             (declare-const a A)
-            (declare-const b A)
-            (assert (= a b))
+            (declare-fun size (A) Int)
+            (assert (>= (size a) 0))
         """.trimIndent()).readAll()
         val reduction = reduceSmtPolymorphism(captureSmtSource(commands, ExecutionControl.Never),
             ExecutionControl.Never)

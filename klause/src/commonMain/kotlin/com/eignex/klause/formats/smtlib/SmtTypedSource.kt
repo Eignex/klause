@@ -30,6 +30,7 @@ internal data class SmtReduction(
     val privateBindings: Map<String, SmtReconstruction> = emptyMap(),
     val original: SmtTypedSource? = null,
     val checks: List<SmtSourceCheck> = emptyList(),
+    val polymorphicModel: SmtPolymorphicModel? = null,
 )
 
 internal fun captureSmtSource(commands: List<SExpr>, cancellation: ExecutionControl): SmtReduction {
@@ -45,5 +46,6 @@ internal fun captureSmtSource(commands: List<SExpr>, cancellation: ExecutionCont
         cancellation.polynomialSourceCheckpoint(1)
         SmtSourceBinding(it, SmtReconstruction.Scalar(it.name, it.result))
     }
-    return SmtReduction(original.commands, declarations, bindings, original = original)
+    return SmtReduction(original.commands.map { canonicalSmtCore(it, cancellation) },
+        declarations, bindings, original = original)
 }

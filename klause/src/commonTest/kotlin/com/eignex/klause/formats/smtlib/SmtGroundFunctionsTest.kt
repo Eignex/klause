@@ -23,6 +23,41 @@ import kotlin.test.assertTrue
 
 class SmtGroundFunctionsTest {
     @Test
+    fun `quoted grammar words remain ordinary declared function symbols`() {
+        val parsed = SmtLib.parse("""
+            (declare-fun |let| (Bool) Bool)
+            (define-fun |as| ((x Bool)) Bool (|let| x))
+            (assert (|as| true))
+            (assert (not (|let| true)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+
+    @Test
+    fun `quoted Core constants and sorts retain interpreted meaning`() {
+        val parsed = SmtLib.parse("""
+            (declare-const word (_ BitVec 1))
+            (declare-const flag |Bool|)
+            (declare-const n |Int|)
+            (declare-const r |Real|)
+            (assert |true|)
+            (assert (= flag |false|))
+            (assert (= n 1))
+            (assert (= r 1.0))
+            (assert flag)
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+
+    @Test
     fun `equal arguments require equal uninterpreted results`() {
         val cases = listOf(
             "(declare-const a Int) (declare-const b Int) (declare-fun f (Int) Int) " +

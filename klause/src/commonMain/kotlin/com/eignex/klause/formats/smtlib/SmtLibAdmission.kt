@@ -116,8 +116,9 @@ internal fun lowerSmtReduction(
         val originalIntegers = originals(SmtSort.Int)
         val originalBooleans = originals(SmtSort.Bool)
         val originalReals = originals(SmtSort.Real)
-    return result.copy(sourceBindings = reduction.bindings,
-        privateBindings = reduction.privateBindings, originalSource = reduction.original?.let(::SmtSourceSnapshot),
+    return result.copy(sourceBindings = reduction.polymorphicModel?.bindings(reduction.bindings) ?: reduction.bindings,
+        privateBindings = reduction.privateBindings,
+        originalSource = reduction.original?.let { SmtSourceSnapshot(it, reduction.polymorphicModel) },
         sourceChecks = reduction.checks,
             intVarNames = result.intVarNames.filterKeys { polynomialSymbol(it) in originalIntegers },
             boolVarNames = result.boolVarNames.filterKeys { polynomialSymbol(it) in originalBooleans },
