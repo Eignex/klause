@@ -273,6 +273,9 @@ units. Inspection work changes neither candidate ranking nor the native move cou
 Inprocessing scans, probes, attachment and retirement enter
 that propagation ledger; probe and visit diagnostics add no separate price.
 Fractional marks survive slices and the preparation-to-search transition.
+Each finite slice retains its monotonic deadline for metadata and binds its time
+predicate once when armed. JVM polls compare raw monotonic nanoseconds; rearming
+replaces the predicate, including transitions to or from an unlimited deadline.
 Overspend debt is settled once and repaid by later slices; a nested private search
 leaves debt with its containing budget. Private LP rounding and pumps charge the
 same currency, including rejected proposals. Optimization
