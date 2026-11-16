@@ -49,7 +49,8 @@ internal fun NValue.emitLpRelaxation(builder: RelaxationBuilder) {
                 definition = { value -> LpAuxiliaryColumn(listOf(1L, position.toLong(), value), 1L, true) },
                 selector = { value, column ->
                     if (value !in exceptValues) {
-                        builder.row(intArrayOf(column, yOf(value)), longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL)
+                        val columns = intArrayOf(column, yOf(value))
+                        builder.row(columns, longArrayOf(1L, -1L), LinearOp.LE, 0L, Contribution.HULL)
                     }
                 },
             )
