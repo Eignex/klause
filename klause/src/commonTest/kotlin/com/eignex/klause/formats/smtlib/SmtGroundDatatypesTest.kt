@@ -137,17 +137,17 @@ class SmtGroundDatatypesTest {
     }
 
     @Test
-    fun `polymorphic expansion preserves tester identity on distinct successors`() {
+    fun `polymorphic expansion refutes different tester results on successors`() {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)
             (declare-datatype Nat ((zero) (succ (pred Nat))))
             (assert (let ((x (succ zero)) (y (succ (succ zero))))
-                (and (distinct x y) (= ((_ is succ) x) ((_ is succ) y)))))
+                (and (distinct x y) (not (= ((_ is succ) x) ((_ is succ) y))))))
         """.trimIndent())
 
         val result = solve(parsed)
 
-        assertIs<OpenTheoryResult.Sat>(result, "termination reason: ${(result as? OpenTheoryResult.Unknown)?.reason}")
+        assertIs<OpenTheoryResult.Unsat>(result, "termination reason: ${(result as? OpenTheoryResult.Unknown)?.reason}")
     }
 
     @Test
