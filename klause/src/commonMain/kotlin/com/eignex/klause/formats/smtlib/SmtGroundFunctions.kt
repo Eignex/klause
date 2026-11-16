@@ -24,7 +24,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
     private data class Application(val arguments: List<String>, val result: String)
     private data class Binding(val version: Int, val term: Term? = null, val function: Function? = null,
         val macro: Macro? = null)
-    private class Function(val id: Int, val declaration: SmtSourceDeclaration) {
+    private class Function(val id: Int, val declaration: SmtSourceDeclaration, val default: String) {
         val applications = ArrayList<Application>()
     }
     private data class Macro(val parameters: List<String>, val body: SExpr, val environment: Environment)
@@ -107,12 +107,16 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
             step()
             val declaration = function.declaration
             val entries = function.applications.map { it.arguments.toList() to it.result }
-            sourceBindings[name] = SmtSourceBinding(declaration,
-                GroundFunctionReconstruction(declaration.parameters.toList(), entries,
-                    defaultValue(declaration.result)))
+            val original = sourceBindings[name]
+            val recipe = GroundFunctionReconstruction((original?.declaration ?: declaration).parameters.toList(),
+                entries, function.default)
+            if (original == null) privateBindings[declaration.name] = recipe
+            else sourceBindings[name] = original.copy(reconstruction = recipe)
         }
         return input.copy(commands = output.toList(), bindings = sourceBindings.values.toList(),
-            privateBindings = privateBindings.toMap())
+            privateBindings = privateBindings.toMap(), checks = input.checks + functions.values.map { function ->
+                GroundFunctionCheck(function.applications.map { it.arguments.toList() to it.result })
+            })
     }
 
     private fun collectNames() {
@@ -135,7 +139,8 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         val declaration = SmtSourceDeclaration((command.items[1] as SExpr.Atom).text, parameters,
             sortScope.sourceSort(command.items.last()))
         if (declaration.parameters.isNotEmpty()) {
-            val function = Function(functions.size, declaration)
+            val default = (freshValue(declaration.result).expression as SExpr.Atom).text
+            val function = Function(functions.size, declaration, default)
             functions[name] = function
             bindings[name] = Binding(bindings.size, function = function)
             return
@@ -176,6 +181,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                         val local = frame.environment.local(name)
                         val binding = binding(name, frame.environment)
                         when {
+                            lexicalLiteral(node.text) -> values.addLast(atom(node.text))
                             local != null -> values.addLast(local)
                             binding?.term != null -> values.addLast(binding.term)
                             binding?.macro != null -> {
@@ -298,21 +304,10 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         return atom(name)
     }
 
-    private fun defaultValue(sort: SmtSort): SmtValue = when (sort) {
-        SmtSort.Bool -> SmtValue.Boolean(false)
-        SmtSort.Int -> SmtValue.Integer("0")
-        SmtSort.Real -> SmtValue.Real("0.0")
-        is SmtSort.BitVector -> SmtValue.BitVector("0".repeat(sort.width))
-        is SmtSort.Uninterpreted -> {
-            identities.getOrPut(sort) { ArrayList() }
-            SmtValue.Uninterpreted(sort, freeIdentity(sort, "0"))
-        }
-        is SmtSort.Array -> SmtValue.Application("(as const ${sort.toSmtLib()})",
-            listOf(defaultValue(sort.element)))
-    }
-
-    private fun atom(text: String): Term = atoms.getOrPut(polynomialSymbol(text)) {
-        Term(nextTerm++, SExpr.Atom(text))
+    private fun atom(text: String): Term {
+        val literal = lexicalLiteral(text)
+        val key = if (literal) "literal:$text" else "symbol:${polynomialSymbol(text)}"
+        return atoms.getOrPut(key) { Term(nextTerm++, SExpr.Atom(text)) }
     }
 
     private fun intern(head: SExpr, args: List<Term>): Term = nodes.getOrPut(NodeKey(head, args.map { it.id })) {
@@ -321,6 +316,9 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
 
     private fun step() = cancellation.polynomialSourceCheckpoint(1)
 }
+
+private fun lexicalLiteral(text: String): Boolean = text in setOf("true", "false") ||
+    text.isNotEmpty() && text[0] in '0'..'9' || text.startsWith('#')
 
 private data class FreeSortReconstruction(val sort: SmtSort.Uninterpreted, val name: String) : SmtReconstruction {
     override fun reconstruct(values: SmtModelValues): SmtValue =
@@ -333,9 +331,39 @@ private fun freeIdentity(sort: SmtSort.Uninterpreted, identity: String): String 
     } + "!$identity"
 
 private data class GroundFunctionReconstruction(val parameters: List<SmtSort>,
-    val entries: List<Pair<List<String>, String>>, val default: SmtValue) : SmtReconstruction {
+    val entries: List<Pair<List<String>, String>>, val default: String) : SmtReconstruction {
     override fun reconstruct(values: SmtModelValues): SmtValue = SmtValue.Function(parameters,
-        entries.map { (args, result) -> args.map { values.value(it) } to values.value(result) }, default)
+        entries.map { (args, result) -> args.map { values.value(it) } to values.value(result) }, values.value(default))
+}
+
+private class GroundFunctionCheck(private val applications: List<Pair<List<String>, String>>) : SmtSourceCheck {
+    override fun check(values: SmtModelValues): Boolean {
+        for (first in applications.indices) for (second in first + 1 until applications.size) {
+            values.checkpoint()
+            val a = applications[first]
+            val b = applications[second]
+            var different = false
+            var unavailable = false
+            for (index in a.first.indices) {
+                values.checkpoint()
+                when (values.equal(a.first[index], b.first[index])) {
+                    true -> Unit
+                    false -> {
+                        different = true
+                        break
+                    }
+                    null -> unavailable = true
+                }
+            }
+            if (different) continue
+            when (values.equal(a.second, b.second)) {
+                true -> Unit
+                false -> if (!unavailable) return false else throw SmtSourceCheckingUnavailable()
+                null -> throw SmtSourceCheckingUnavailable()
+            }
+        }
+        return true
+    }
 }
 
 private fun expression(head: String, vararg args: SExpr): SExpr.SList =

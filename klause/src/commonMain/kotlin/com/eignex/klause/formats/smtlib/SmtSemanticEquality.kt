@@ -14,6 +14,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.parseBigInt
+import kotlin.coroutines.cancellation.CancellationException
 
 internal class SmtSourceCheckingUnavailable : RuntimeException("SMT source equality is not certified")
 
@@ -73,7 +74,7 @@ internal fun smtRationalValue(term: String, cancellation: Cancellation): ExactRe
     val arithmetic = smtExactArithmetic(cancellation)
     fun checkpoint(units: Long = 1) {
         cancellation.charge(units)
-        if (cancellation()) throw SmtSourceCheckingUnavailable()
+        if (cancellation()) throw CancellationException("SMT semantic comparison interrupted")
     }
     checkpoint(term.length.toLong())
     val roots = SExprReader(term).readAll()
@@ -137,11 +138,13 @@ private inline fun <T> smtEqualityAttempt(action: () -> T?): T? = try {
 } catch (_: TranscendentalResourceLimit) {
     null
 } catch (_: TranscendentalInterrupted) {
-    throw SmtSourceCheckingUnavailable()
+    throw CancellationException("SMT semantic comparison interrupted")
 } catch (_: PolynomialResourceLimit) {
     null
 } catch (_: PolynomialInterrupted) {
-    throw SmtSourceCheckingUnavailable()
+    throw CancellationException("SMT semantic comparison interrupted")
 } catch (_: RealCertificationUnavailable) {
+    null
+} catch (_: UnsupportedSmtException) {
     null
 }

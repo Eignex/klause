@@ -180,6 +180,53 @@ class SmtGroundFunctionsTest {
     }
 
     @Test
+    fun `quoted numeral symbols remain distinct from numeric arguments`() {
+        val parsed = SmtLib.parse("""
+            (declare-const |0| Int)
+            (declare-fun f (Int) Int)
+            (assert (= |0| 2))
+            (assert (distinct (f |0|) (f 0)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `integer declaration overrides do not constrain function results or free identities`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort U 0)
+            (declare-const a U)
+            (declare-const b U)
+            (declare-const n Int)
+            (declare-fun f (U) Int)
+            (assert (= n 100))
+            (assert (distinct a b))
+            (assert (= (f a) 1000000))
+        """.trimIndent(), unboundedIntLo = 100, unboundedIntHi = 101)
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
+        val model = parsed.reconstructModel(assignment)
+        val function = assertIs<SmtValue.Function>(model.values.single { it.first.name == "f" }.second)
+        assertEquals(SmtValue.Integer("1000000"), function.entries.single().second)
+    }
+
+    @Test
+    fun `generated function declarations stay outside the original source model`() {
+        val original = captureSmtSource(SExprReader("(declare-const flag Bool)").readAll(), Cancellation.Never)
+        val commands = SExprReader("(declare-const flag Bool) (declare-fun private (Int) Int) " +
+            "(assert (= (private 1) 2))").readAll()
+
+        val reduced = exposeSmtGroundFunctions(original.copy(commands = commands), Cancellation.Never)
+
+        assertEquals(listOf("flag"), reduced.bindings.map { it.declaration.name })
+        assertTrue("private" in reduced.privateBindings)
+    }
+
+    @Test
     fun `free sort erasure does not admit ill typed terms`() {
         val cases = listOf("(assert (= a b))", "(assert (= (+ a 1) 2))", "(assert (= (f b) a))")
 
