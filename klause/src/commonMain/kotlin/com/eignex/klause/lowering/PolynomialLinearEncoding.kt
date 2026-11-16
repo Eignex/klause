@@ -12,12 +12,18 @@ import com.eignex.klause.ir.Term
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 
+// A non-null [slack] widens the comparison the row states while active, an equality to the band of that width
+// around its right-hand side. A false activator still states the exact complement.
 internal fun polynomialRow(
     row: LinearRow,
     integer: (Int) -> PolynomialExpression,
     real: (Int) -> PolynomialExpression,
     conditional: (PolynomialRealFormula, PolynomialExpression, PolynomialExpression) -> PolynomialExpression,
+    slack: BigFraction? = null,
 ): PolynomialRealFormula {
+    require(slack == null || (slack.signum() >= 0 && row.relation != LinearOp.NE)) {
+        "only a nonnegative slack widens a comparison"
+    }
     val terms = List(row.size) { index ->
         val ref = row.ref(index)
         val value = when {
@@ -52,9 +58,18 @@ internal fun polynomialRow(
     }
     val expression = if (terms.size == 1) terms.single() else PolynomialExpression.Sum(terms)
     val atom = PolynomialRealFormula.Atom(expression, relation, constant(rhs))
-    return if (row.activator == LinearRow.ALWAYS) atom else PolynomialRealLowering.equivalent(
-        PolynomialRealFormula.BooleanVariable(SourceBoolId(row.activator)), atom,
-    )
+    val active = if (slack == null) atom else when (row.relation) {
+        LinearOp.LE -> PolynomialRealFormula.Atom(expression, relation, constant(rhs + slack))
+        LinearOp.GE -> PolynomialRealFormula.Atom(expression, relation, constant(rhs - slack))
+        else -> PolynomialRealLowering.and(listOf(
+            PolynomialRealFormula.Atom(expression, PolynomialRelation.GE, constant(rhs - slack)),
+            PolynomialRealFormula.Atom(expression, PolynomialRelation.LE, constant(rhs + slack)),
+        ))
+    }
+    if (row.activator == LinearRow.ALWAYS) return active
+    val activator = PolynomialRealFormula.BooleanVariable(SourceBoolId(row.activator))
+    return if (slack == null) PolynomialRealLowering.equivalent(activator, atom)
+    else PolynomialRealLowering.conditional(activator, active, PolynomialRealLowering.not(atom))
 }
 
 private fun constant(value: BigFraction): PolynomialExpression = PolynomialRealLowering.constant(value)

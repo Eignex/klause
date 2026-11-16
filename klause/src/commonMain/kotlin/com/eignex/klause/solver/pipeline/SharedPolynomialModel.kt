@@ -33,6 +33,8 @@ internal class SharedPolynomialModel private constructor(
     val integerColumns: Map<Int, Int>,
     val finiteFactorIndices: List<Int>,
     val encodingAttributions: List<EncodingAttribution>,
+    // The source slack [service] states, or null when its formula is the exact source.
+    val tolerance: PolynomialTolerance?,
 ) {
     val finiteEnforcingFactors: Set<Int> = finiteFactorIndices.indices.filter { local ->
         encodingAttributions.any { it.sourceFactorIndex == finiteFactorIndices[local] }
@@ -138,6 +140,7 @@ internal class SharedPolynomialModel private constructor(
             val kept = ArrayList<Int>()
             val attributions = ArrayList<EncodingAttribution>()
             val installationStop = request.cancellation
+            val tolerance = if (sourceFormula == null) PolynomialTolerance.of(source) else null
             var selectedIndex = 0
             for ((index, factor) in source.factors.withIndex()) {
                 if (stopped()) return null
@@ -147,11 +150,20 @@ internal class SharedPolynomialModel private constructor(
                 if (finite) kept += index
                 if (!participating[index]) continue
                 val selected = request.encoders[selectedIndex++]
+                val widened = tolerance?.takeIf { it.widens(factor) }
+                val substituted = LinkedHashMap<Int, Int>()
                 val encoding = PolynomialEncodingContext(index, factor, lowering, installationStop,
                     integerCoordinate = { integerIds.getOrPut(it) { lowering.opaqueReal().id.index } },
-                    realCoordinate = { it })
+                    realCoordinate = { substituted[it] ?: it })
                 val decline = try {
-                    selected.install(factor, encoding)
+                    when {
+                        widened == null -> selected.install(factor, encoding)
+                        widened.readsRows(factor) -> null.also { encoding.polynomial(widened.rows(factor, encoding)) }
+                        else -> {
+                            widened.substitutions(factor)?.forEach { substituted[it] = lowering.opaqueReal().id.index }
+                            selected.install(factor, encoding)
+                        }
+                    }
                 } catch (_: PolynomialSourceInterrupted) {
                     EncoderDecline.RESOURCE
                 }
@@ -160,6 +172,7 @@ internal class SharedPolynomialModel private constructor(
                     return null
                 }
                 formulas += encoding.formulas
+                for ((id, exact) in substituted) formulas += checkNotNull(widened).band(real(id), real(exact))
                 attributions += encoding.attribution()
             }
             for (id in 0 until source.numRealVars) {
@@ -169,14 +182,16 @@ internal class SharedPolynomialModel private constructor(
                 if (lower == Double.POSITIVE_INFINITY || upper == Double.NEGATIVE_INFINITY) {
                     formulas += PolynomialRealFormula.Constant(false)
                 }
-                if (lower.isFinite()) formulas += bound(real(id), PolynomialRelation.GE, lower)
-                if (upper.isFinite()) formulas += bound(real(id), PolynomialRelation.LE, upper)
+                val slack = tolerance?.declaration(id) ?: BigFraction.ZERO
+                if (lower.isFinite()) formulas += bound(real(id), PolynomialRelation.GE, lower, slack.negated())
+                if (upper.isFinite()) formulas += bound(real(id), PolynomialRelation.LE, upper, slack)
             }
             if (stopped()) return null
             val formula = lowering.formula(formulas)
             val fixedReals = (0 until source.numRealVars).mapNotNull { id ->
-                source.realLower[id].takeIf { it.isFinite() && it == source.realUpper[id] }
-                    ?.let { id to requireNotNull(BigFraction.ofDouble(it)) }
+                source.realLower[id].takeIf {
+                    it.isFinite() && it == source.realUpper[id] && tolerance?.declaration(id) == null
+                }?.let { id to requireNotNull(BigFraction.ofDouble(it)) }
             }.toMap()
             if (stopped()) return null
             return SharedPolynomialModel(
@@ -191,12 +206,14 @@ internal class SharedPolynomialModel private constructor(
                 integerIds.toMap(),
                 kept.toList(),
                 attributions.toList(),
+                tolerance,
             )
         }
 
         private fun constant(value: BigFraction): PolynomialExpression = PolynomialRealLowering.constant(value)
 
-        private fun bound(variable: PolynomialExpression, relation: PolynomialRelation, value: Double) =
-            PolynomialRealFormula.Atom(variable, relation, constant(requireNotNull(BigFraction.ofDouble(value))))
+        private fun bound(variable: PolynomialExpression, relation: PolynomialRelation, value: Double,
+            shift: BigFraction) = PolynomialRealFormula.Atom(variable, relation,
+            constant(requireNotNull(BigFraction.ofDouble(value)) + shift))
     }
 }

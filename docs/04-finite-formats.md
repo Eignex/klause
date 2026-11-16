@@ -401,11 +401,16 @@ Boolean backtracking with a real completion at each leaf. Such a source stays wi
 linear theory when it states an open set over reals (a strict row, a disequality or a
 reified row, whose false side is a strict complement), since leaf completion attains
 no supremum, and when all solutions are requested. A source the finite lane cannot
-complete, such as one with an extremum, an open integer, or a real product without
-finite choices or a power, routes to the linear or
-[polynomial](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) theory and is
-decided exactly. Completed search reports its optimum or refutation under this
-numerical policy.
+complete, such as one with an extremum or an open integer, routes to the linear theory
+and is decided exactly. A real product without finite choices or a power above one
+routes to the polynomial theory, which decides a
+[widened formula](16-nonlinear-arithmetic.md#tolerance-widened-formulas): every
+declaration and relation of a tolerance component holds within the absolute slack, and
+every other relation exactly. A relation whose result is also one of its operands, such
+as `float_times(x, z, z)`, keeps its exact encoding. The widened region lies inside what
+acceptance admits, so a refutation shows that no point holds every relation within the
+absolute slack; a relative tolerance widens acceptance but not that decision. Completed
+search reports its optimum or refutation under this numerical policy.
 
 `--exact` zeroes the tolerance, so completion and LP certification are exact. It
 preserves continuous variables and open bounds, routes linear
