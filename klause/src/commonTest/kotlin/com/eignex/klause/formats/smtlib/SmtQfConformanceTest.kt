@@ -526,20 +526,31 @@ class SmtQfConformanceTest {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)
             (define-sort R () Real)
+            (declare-datatype Choice ((left) (right)))
+            (declare-datatype Box ((box (value R))))
             (declare-fun p (A) Bool)
             (define-fun result () R 3)
             (define-fun identity ((x R)) R x)
-            (assert (p 3))
             (assert (not (p 3.0)))
+            (assert (p 3))
         """.trimIndent())
         val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
         val model = parsed.reconstructSessionModel(assignment)
 
-        val results = listOf("(p result)", "(p (identity 3))").map { expression ->
-            model.evaluate(SExprReader(expression).readAll().single())
-        }
+        val queries = listOf(
+            "(p 3)" to "true",
+            "(p result)" to "false",
+            "(p (identity 3))" to "false",
+            "(p (ite true 3 3.0))" to "false",
+            "(p ((as ite R) true 3 4))" to "false",
+            "(p (let ((x (ite true 3 3.0))) x))" to "false",
+            "(p (match left ((left 3) (right 3.0))))" to "false",
+            "(p (value (box 3)))" to "false",
+        )
 
-        assertEquals(listOf("false", "false"), results)
+        for ((expression, expected) in queries) {
+            assertEquals(expected, model.evaluate(SExprReader(expression).readAll().single()), expression)
+        }
     }
 
     @Test
