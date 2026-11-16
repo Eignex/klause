@@ -219,7 +219,7 @@ class LocalSearchEngineCompletionTest {
     @Test
     fun `unsuccessful startup completion should be scoped to one search invocation`() {
         var calls = 0
-        val search = engine { _, _ ->
+        val search = completionTestEngine { _, _ ->
             calls++
             Completion.Refuted(work = 2)
         }
@@ -353,28 +353,10 @@ class LocalSearchEngineCompletionTest {
     }
 
     // x + k = 2.5 and x ≤ 1 over a continuous x in [0, 10] and an integer k in [0, 5]: k ≥ 2 and x = 2.5 - k.
-    private fun mixedProblem(finiteMinimum: Int? = null): Problem = Problem(
-        numBoolVars = 0,
-        numIntVars = 1,
-        intDomains = arrayOf(IntDomain(0, 5)),
-        factors = arrayOf<Factor>(
-            Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 2.5),
-            Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
-        ) + if (finiteMinimum == null) emptyArray() else arrayOf<Factor>(
-            Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, finiteMinimum),
-        ),
-        numRealVars = 1,
-        realLower = doubleArrayOf(0.0),
-        realUpper = doubleArrayOf(10.0),
-    )
-
-    private fun engine(completion: CandidateCompletion) =
-        LocalSearchEngine(LocalSearchModel.of(mixedProblem().bake()), completion = completion)
-
     @Test
     fun `cancellation during completion should preserve the candidate`() {
         val initial = Sample(BooleanArray(0), longArrayOf(2), reals = doubleArrayOf(0.5))
-        val search = engine { candidate, cancellation ->
+        val search = completionTestEngine { candidate, cancellation ->
             if (cancellation()) Completion.Undecided() else Completion.Witness(candidate)
         }
         var polls = 0
@@ -395,7 +377,7 @@ class LocalSearchEngineCompletionTest {
         val initial = Sample(BooleanArray(0), longArrayOf(2), reals = doubleArrayOf(0.5))
         var expired = false
         var calls = 0
-        val search = engine { candidate, _ ->
+        val search = completionTestEngine { candidate, _ ->
             if (++calls == 1) {
                 expired = true
                 Completion.Undecided()
@@ -428,7 +410,7 @@ class LocalSearchEngineCompletionTest {
 
     @Test
     fun `a candidate over continuous columns should satisfy its rows within tolerance`() {
-        val result = engine { candidate, _ ->
+        val result = completionTestEngine { candidate, _ ->
             Completion.Witness(
                 candidate,
             )
@@ -443,7 +425,7 @@ class LocalSearchEngineCompletionTest {
     @Test
     fun `search should continue past a refuted candidate`() {
         var calls = 0
-        val result = engine { candidate, _ ->
+        val result = completionTestEngine { candidate, _ ->
             calls++
             if (calls == 1) Completion.Refuted(intArrayOf(0)) else Completion.Witness(candidate)
         }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
@@ -455,7 +437,7 @@ class LocalSearchEngineCompletionTest {
     @Test
     fun `completion work should be charged to the search budget`() {
         var calls = 0
-        val result = engine { _, _ ->
+        val result = completionTestEngine { _, _ ->
             calls++
             Completion.Refuted(work = 2_000L)
         }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
@@ -467,7 +449,7 @@ class LocalSearchEngineCompletionTest {
     @Test
     fun `decided candidates should be counted in the stats`() {
         var calls = 0
-        val result = engine { candidate, _ ->
+        val result = completionTestEngine { candidate, _ ->
             calls++
             if (calls == 1) Completion.Refuted() else Completion.Witness(candidate)
         }.solve(LocalSearchParams(maxFlips = 5_000, randomSeed = 2), null)
@@ -523,3 +505,21 @@ class LocalSearchEngineCompletionTest {
         assertTrue(queriedAt.zipWithNext().all { (first, second) -> second - first >= 4 })
     }
 }
+
+private fun mixedProblem(finiteMinimum: Int? = null): Problem = Problem(
+    numBoolVars = 0,
+    numIntVars = 1,
+    intDomains = arrayOf(IntDomain(0, 5)),
+    factors = arrayOf<Factor>(
+        Linear(intArrayOf(0), doubleArrayOf(1.0), intArrayOf(0), doubleArrayOf(1.0), LinearOp.EQ, 2.5),
+        Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0), LinearOp.LE, 1.0),
+    ) + if (finiteMinimum == null) emptyArray() else arrayOf<Factor>(
+        Linear(intArrayOf(1), intArrayOf(0), LinearOp.GE, finiteMinimum),
+    ),
+    numRealVars = 1,
+    realLower = doubleArrayOf(0.0),
+    realUpper = doubleArrayOf(10.0),
+)
+
+internal fun completionTestEngine(completion: CandidateCompletion) =
+    LocalSearchEngine(LocalSearchModel.of(mixedProblem().bake()), completion = completion)

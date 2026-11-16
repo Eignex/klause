@@ -480,7 +480,7 @@ internal fun LpEngine.harvestRootCuts(
 /** Most Gomory cuts to draw from one tableau per separation round. */
 internal const val GOMORY_CUTS_PER_ROUND: Int = 8
 
-private fun objectiveCoefficients(model: LpModel): DoubleArray = DoubleArray(model.n) { model.costD(it) }
+internal fun objectiveCoefficients(model: LpModel): DoubleArray = DoubleArray(model.n) { model.costD(it) }
 
 /** Separation rounds when harvesting the persistent root cut pool. */
 internal const val CUT_POOL_ROUNDS: Int = 8

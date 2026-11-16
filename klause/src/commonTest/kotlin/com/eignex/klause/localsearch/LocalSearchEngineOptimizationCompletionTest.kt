@@ -164,7 +164,7 @@ class LocalSearchEngineOptimizationCompletionTest {
         val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
         for (failure in listOf(Completion.Refuted(work = 2), Completion.Undecided(work = 2))) {
             var calls = 0
-            val search = engine { candidate, _ ->
+            val search = completionTestEngine { candidate, _ ->
                 calls++
                 if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else failure
             }
@@ -188,7 +188,7 @@ class LocalSearchEngineOptimizationCompletionTest {
         val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
         val budget = NodeBudget(5)
         var calls = 0
-        val search = engine { candidate, _ ->
+        val search = completionTestEngine { candidate, _ ->
             calls++
             if (candidate.intValue(0) == 2L) Completion.Witness(candidate) else Completion.Undecided(work = 4)
         }
@@ -558,7 +558,7 @@ class LocalSearchEngineOptimizationCompletionTest {
     fun `continuous move exploration should preserve finite invocation pins`() {
         val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
         val candidates = mutableListOf<Long>()
-        val search = engine { candidate, _ ->
+        val search = completionTestEngine { candidate, _ ->
             candidates += candidate.intValue(0)
             Completion.Witness(candidate)
         }
@@ -655,7 +655,7 @@ class LocalSearchEngineOptimizationCompletionTest {
         val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
         var expired = false
         var interrupted = false
-        val search = engine { candidate, _ ->
+        val search = completionTestEngine { candidate, _ ->
             if (candidate.intValue(0) != 2L && !interrupted) {
                 interrupted = true
                 expired = true
@@ -687,7 +687,7 @@ class LocalSearchEngineOptimizationCompletionTest {
     fun `continuous completion should not replace a move with different finite coordinates`() {
         val initial = Sample(BooleanArray(0), longArrayOf(2), doubleArrayOf(0.5))
         var rejected = 0
-        val search = engine { candidate, _ ->
+        val search = completionTestEngine { candidate, _ ->
             if (candidate.intValue(0) == 2L) {
                 Completion.Witness(candidate)
             } else {

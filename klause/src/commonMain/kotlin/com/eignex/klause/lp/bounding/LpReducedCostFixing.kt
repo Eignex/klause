@@ -559,4 +559,4 @@ private fun LpRelaxation.objectiveVariableValue(variable: Int, value: BigFractio
     return (value - constant) * scale * coefficient.reciprocal()
 }
 
-private const val EXACT_INTEGER_DOUBLE_LIMIT = 9007199254740992.0
+internal const val EXACT_INTEGER_DOUBLE_LIMIT = 9007199254740992.0
