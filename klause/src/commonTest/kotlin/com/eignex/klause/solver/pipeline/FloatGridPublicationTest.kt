@@ -7,9 +7,9 @@ import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpConfig
