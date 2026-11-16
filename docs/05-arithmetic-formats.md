@@ -101,9 +101,21 @@ use numerical tolerance policy, and output identifies that scope.
 
 Zero tolerance, including `--exact`, requires exact original-source certification.
 Native proof metadata retains its nominal-source or working-model scope when no
-qualified claim is available. Unboundedness requires a checked source recession
-proof under either policy. Original decimal objectives and caller declaration
+qualified claim is available. Original decimal objectives and caller declaration
 scope remain visible in both modes.
+
+`UNBOUNDED` requires a checked source recession proof under either policy. Under
+zero tolerance the lowered model must equal the source exactly and the base point
+must pass without slack. With positive tolerance the base point passes the
+original-source checks within slack, and the native ray, read in the exact source
+coefficients, must strictly improve the objective, move no integer column, move
+no column towards a declared bound and keep every row active at the base point
+on its bounded sides. Such a ray keeps every residual of the base point from
+growing, so the ray's tail stays accepted. A slope that only binary64 rounding
+made zero is not trusted: a ray whose projection is level on a row whose exact
+slope is not is first moved onto the exact kernel of those rows, and the moved
+ray must pass the same check. A ray that fails both leaves a feasible point
+without an unboundedness claim.
 
 ## Routing and result strength
 
