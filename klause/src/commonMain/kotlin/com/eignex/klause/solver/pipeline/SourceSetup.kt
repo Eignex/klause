@@ -11,6 +11,8 @@ import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpStats
+import com.eignex.klause.solver.validation.statesStrictMargin
+import com.eignex.klause.solver.validation.strictMargin
 import com.eignex.klause.util.ExecutionControl
 
 /** One operation binding over an attached source and its containing preparation allowance. */
@@ -182,11 +184,16 @@ object SourceSetup {
     }
 }
 
-// Whether a relation over reals states an open set: a strict row, a disequality, or a reified row whose false side
-// is a strict complement. The finite lane completes leaves over closed sets only, so a supremum such a relation
-// leaves unattained is the linear theory's to report.
-private fun Problem.statesOpenRealComparison(): Boolean = factors.any { factor ->
-    factor.variables.reals.isNotEmpty() && (factor is Distinct || factor.linearForm?.rows?.any { row ->
-        row.strict || row.relation == LinearOp.NE || row.activator != LinearRow.ALWAYS
-    } == true)
+// Whether a relation over reals states an open set: a strict row the absolute slack leaves without a margin, a
+// disequality, or a reified row whose false side is a strict complement. The finite lane completes leaves over
+// closed sets only, so a supremum such a relation leaves unattained is the linear theory's to report. An
+// unconditional strict row with a margin states the closed row `a·x <= b - margin`.
+private fun Problem.statesOpenRealComparison(): Boolean {
+    val margin = semantics.effective.feasibilityTolerance.strictMargin()
+    return factors.any { factor ->
+        factor.variables.reals.isNotEmpty() && !factor.statesStrictMargin(margin) &&
+            (factor is Distinct || factor.linearForm?.rows?.any { row ->
+                row.strict || row.relation == LinearOp.NE || row.activator != LinearRow.ALWAYS
+            } == true)
+    }
 }

@@ -21,6 +21,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
+import com.eignex.klause.lp.ExactComparison
 import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
@@ -42,6 +43,35 @@ import com.eignex.util.numbers.toLongExact
 
 internal fun Factor.hasCapturedLinearTolerance(): Boolean =
     this is Linear || this is ExactLinear || this is LinearIndicator
+
+// The gap a strict row keeps under [this] policy: its absolute slack. Zero, which keeps the row strict, when no
+// absolute slack applies.
+internal fun SourceTolerance?.strictMargin(): BigFraction =
+    if (this == null) BigFraction.ZERO else BigFraction.of(absolute.numerator, absolute.denominator)
+
+// Whether this relation is an unconditional strict row over real coordinates that a positive [margin] states as the
+// closed row `a·x <= b - margin`. That row reads no slack, so a point on the boundary `a·x = b` stays refused.
+internal fun Factor.statesStrictMargin(margin: BigFraction): Boolean =
+    margin > BigFraction.ZERO && this is Linear && realConstants?.strict == true
+
+// The closed row a strict row states under a positive [margin]: `a·x <= b - margin`, or `a·x >= b + margin`.
+internal fun ExactComparison.withMargin(margin: BigFraction): ExactComparison {
+    require(strict && (op == LinearOp.LE || op == LinearOp.GE)) { "only a strict inequality keeps a margin" }
+    return ExactComparison(terms, if (op == LinearOp.LE) bound - margin else bound + margin, op, false, hasReals,
+        ordered)
+}
+
+// The closed source row a strict [Linear] states under a positive [margin], over the same coordinates.
+internal fun Linear.marginRow(margin: BigFraction): ExactLinear {
+    val constants = checkNotNull(realConstants) { "only a real row keeps a margin" }
+    val coefficients = List(size) { index ->
+        checkNotNull(BigFraction.ofDouble(if (index < constants.intCoefficients.size) {
+            constants.intCoefficients.at(index)
+        } else constants.realCoefficients.at(index - constants.intCoefficients.size)))
+    }
+    val bound = checkNotNull(BigFraction.ofDouble(constants.bound))
+    return ExactLinear.of(IntArray(size, ::ref), coefficients, LinearOp.LE, bound - margin)
+}
 
 internal fun capturedSourceSlack(
     policy: SourceTolerance?,
@@ -90,8 +120,10 @@ internal fun capturedRealAcceptance(source: Problem, cancellation: ExecutionCont
 // The tolerance reading of each relation over real coordinates, and which real coordinates hold exactly.
 //
 // Rows read the slack as MPS rows do: an active non-strict row holds within `max(absolute, relative *
-// max(abs(bound), sum(abs(a(i) * x(i)))))`. A strict row, a disequality and a row whose activator is false hold
-// exactly. A finite membership admits a value within the slack of a member, measured as a declaration bound.
+// max(abs(bound), sum(abs(a(i) * x(i)))))`. An unconditional strict row `a·x < b` over real coordinates holds as the
+// closed row `a·x <= b - absolute`, exactly and in every component. A strict row under an activator, a disequality and
+// a row whose activator is false hold exactly. A finite membership admits a value within the slack of a member,
+// measured as a declaration bound.
 // Absolute value, minimum and maximum, selection over variables, an integer times a real, a real product and a
 // power state `r = f(x)` and read the slack as the row `r - f(x) = 0`: the residual `abs(r - f(x))` must stay
 // within `max(absolute, relative * (abs(r) + abs(f(x))))`. Selection from constants reads it as the row `r = c`.
@@ -144,12 +176,15 @@ internal class RealToleranceScope private constructor(
                 check.rows(id, source.factors[id])?.let { return it }
             }
         }
+        val margin = policy.strictMargin()
         for (id in relations) {
             cancellation.charge(1)
             if (cancellation()) return Verification.Indeterminate("tolerance relation check cancelled")
             val factor = source.factors[id]
             val verdict = if (factor is RealFiniteDomain) {
                 check.membership(id, factor, exact[factor.variable])
+            } else if (factor.statesStrictMargin(margin)) {
+                check.margin(id, factor as Linear, margin)
             } else if (exact[factor.variables.reals[0]]) {
                 checkExactRealRelation(id, factor, exactPoint, cancellation)
             } else check.relation(id, factor)
@@ -292,6 +327,14 @@ private class ToleranceWitness(
         }
         if (cancellation()) return Verification.Indeterminate("tolerance relation check cancelled")
         return if (holds) null else Verification.Rejected("real factor $id refutes the assignment within tolerance")
+    }
+
+    // An unconditional strict row read as its closed margin row, exactly.
+    fun margin(id: Int, row: Linear, margin: BigFraction): Verification<Nothing, Nothing>? {
+        cancellation.charge(row.size.toLong() + 1L)
+        if (cancellation()) return Verification.Indeterminate("tolerance margin check cancelled")
+        val holds = row.exactComparison(reals.size, true, exactPoint::truth).withMargin(margin).holdsAt(exactPoint)
+        return if (holds) null else Verification.Rejected("real factor $id refutes its strict margin")
     }
 
     fun rows(id: Int, factor: Factor): Verification<Nothing, Nothing>? {

@@ -15,6 +15,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SearchGroup
 import com.eignex.klause.ir.SearchHints
 import com.eignex.klause.ir.SemanticOverrides
+import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.presolve.PresolveConfig
@@ -24,6 +25,7 @@ import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.theory.SourceToleranceSearch
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -196,6 +198,82 @@ class FiniteExecutionTest {
         assertEquals(mapOf("within the slack" to FiniteSolveVerdict.SAT, "beyond the slack" to FiniteSolveVerdict.UNSAT,
             "optimum" to FiniteSolveVerdict.OPTIMAL, "unbounded" to FiniteSolveVerdict.UNBOUNDED,
             "with Booleans" to FiniteSolveVerdict.SAT), verdicts)
+    }
+
+    // `x < y` beside `y < x + bound`: each row keeps the absolute slack as its gap, so a point exists only when the
+    // bound is at least twice that slack.
+    private fun strictRows(bound: String, declarations: String = "", constraints: String = "") =
+        "$declarations var 0.0..1.0: x; var 0.0..1.0: y; constraint float_lt(x, y); " +
+            "constraint float_lin_lt([1.0, -1.0], [y, x], $bound); $constraints solve satisfy;"
+
+    // An absolute slack of 1/1024, whose gaps binary64 states exactly.
+    private val dyadicSlack = SemanticOverrides(feasibilityTolerance = SourceTolerance(SemanticRational.of(bigIntOf(1),
+        bigIntOf(1024))))
+
+    @Test
+    fun `a strict row should keep the absolute slack as its gap by default`() {
+        val sources = mapOf(
+            "sides held together" to strictRows("0.0000001"),
+            "bound below twice the slack" to strictRows("0.00000015"),
+            "with integers" to strictRows("0.00000015", "var 0..2: k;", "constraint int_le(k, 1);"),
+        )
+
+        val verdicts = sources.mapValues { (_, source) -> solveFlatZinc(SemanticOverrides(), source = source) }
+
+        assertEquals(sources.mapValues { FiniteSolveVerdict.UNSAT }, verdicts)
+    }
+
+    @Test
+    fun `a strict row should admit exactly the absolute slack as its gap`() {
+        val bounds = mapOf("twice the slack" to "0.001953125",
+            "just below twice the slack" to "0.001953124068677425384521484375")
+
+        val verdicts = bounds.mapValues { (_, bound) -> solveFlatZinc(dyadicSlack, source = strictRows(bound)) }
+
+        assertEquals(mapOf("twice the slack" to FiniteSolveVerdict.SAT,
+            "just below twice the slack" to FiniteSolveVerdict.UNSAT), verdicts)
+    }
+
+    @Test
+    fun `a scaled strict row should keep the absolute slack in the units of the row`() {
+        // `2x - 2y < 0` keeps `2(y - x) >= 1/1024`, so `y - x <= bound - 1/1024` needs a bound of 1.5/1024.
+        val bounds = mapOf("room for half the slack" to "0.00146484375",
+            "room below half the slack" to "0.001220703125")
+
+        val verdicts = bounds.mapValues { (_, bound) ->
+            solveFlatZinc(dyadicSlack, source = "var 0.0..1.0: x; var 0.0..1.0: y; " +
+                "constraint float_lin_lt([2.0, -2.0], [x, y], 0.0); " +
+                "constraint float_lin_lt([1.0, -1.0], [y, x], $bound); solve satisfy;")
+        }
+
+        assertEquals(mapOf("room for half the slack" to FiniteSolveVerdict.SAT,
+            "room below half the slack" to FiniteSolveVerdict.UNSAT), verdicts)
+    }
+
+    @Test
+    fun `incomplete engines should accept a strict row gap of the absolute slack`() {
+        val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
+
+        val verdicts = engines.associateWith { solveFlatZinc(dyadicSlack, it, source = strictRows("0.001953125")) }
+
+        assertEquals(engines.associateWith { FiniteSolveVerdict.SAT }, verdicts)
+    }
+
+    @Test
+    fun `maximization over a strict row should attain the bound less the absolute slack`() {
+        val sources = mapOf(
+            "two variables" to "var 0.0..1.0: x; var 0.0..0.5: y; constraint float_lt(x, y); solve maximize x;",
+            "one variable" to "var 0.0..1.0: x; constraint float_lt(x, 0.5); solve maximize x;",
+        )
+
+        val optima = sources.mapValues { (_, source) ->
+            val samples = ArrayList<Sample>()
+            val verdict = solveFlatZinc(SemanticOverrides(), onSample = samples::add, source = source)
+            verdict to samples.last().approximateRealValue(0)
+        }
+
+        assertEquals(sources.mapValues { FiniteSolveVerdict.OPTIMAL }, optima.mapValues { it.value.first })
+        assertTrue(optima.values.all { (_, x) -> kotlin.math.abs(x - 0.4999999) <= 1e-12 }, "$optima")
     }
 
     @Test

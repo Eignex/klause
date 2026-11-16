@@ -265,9 +265,25 @@ class AbsRealCompletionTest {
     }
 
     @Test
-    fun `a strict row should hold exactly in the tolerance search`() {
-        val problem = Problem(0, 0, emptyArray(), arrayOf(row(0, LinearOp.GE, 0.5), row(0, LinearOp.LE, 0.375, true)),
-            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+    fun `a strict row should keep the absolute slack as its gap in the tolerance search`() {
+        val lowers = mapOf("beyond the bound" to 0.5, "within the slack of the bound" to 0.4, "below the gap" to 0.2)
+
+        val results = lowers.mapValues { (_, lower) ->
+            val problem = Problem(0, 0, emptyArray(), arrayOf(row(0, LinearOp.GE, lower),
+                row(0, LinearOp.LE, 0.375, true)), numRealVars = 1, realLower = doubleArrayOf(0.0),
+                realUpper = doubleArrayOf(1.0))
+            withinTolerance(problem)::class.simpleName
+        }
+
+        assertEquals(mapOf("beyond the bound" to "Refuted", "within the slack of the bound" to "Refuted",
+            "below the gap" to "Witness"), results)
+    }
+
+    @Test
+    fun `a strict row should keep the absolute slack as its gap in an exact component`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf(unreadRelation(0, 1), row(0, LinearOp.GE, 0.3),
+            row(0, LinearOp.LE, 0.375, true)), numRealVars = 2, realLower = doubleArrayOf(0.0, 0.0),
+            realUpper = doubleArrayOf(1.0, 1.0))
 
         assertEquals(AbsRealCompletion.Result.Refuted, withinTolerance(problem))
     }

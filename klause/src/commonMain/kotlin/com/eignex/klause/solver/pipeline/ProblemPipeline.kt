@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.factor.arithmetic.Linear
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
@@ -12,6 +13,9 @@ import com.eignex.klause.solver.pipeline.componentPlan
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.klause.solver.validation.marginRow
+import com.eignex.klause.solver.validation.statesStrictMargin
+import com.eignex.klause.solver.validation.strictMargin
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
 
@@ -307,10 +311,15 @@ private fun Problem.pipelineRouteObserved(
     val preparationStop = if (stopped) ExecutionControl { true } or preparationCancellation else preparationCancellation
     val nativeFiniteAfterBounds = !exactObjective &&
         routed.nativeFiniteSource(projections, preparationStop)
+    // The finite lane states each unconditional strict real row as the closed margin row acceptance and the tolerance
+    // search read, so every engine decides the same row. Without an absolute slack it states the source rows. The view
+    // is built only when the finite lane is considered.
+    val finite by lazy { routed.withStrictRowMargins(preparationStop) ?: routed }
+    val finiteProjections by lazy { if (finite === routed) projections else selection.forEngineView(finite) }
     val finiteCompletion = nativeFiniteAfterBounds || (
         finiteIntegerRanges &&
             objective?.realCoefficientValues?.any { it != 0.0 } != true &&
-            routed.requiresPolynomialCompletion(projections) && routed.finiteRealCompletionSupported(projections)
+            routed.requiresPolynomialCompletion(projections) && finite.finiteRealCompletionSupported(finiteProjections)
         )
     val arithmeticStop = if (routed.requiresPolynomialCompletion(projections, preferFinite = finiteCompletion)) {
         polynomialCancellation
@@ -352,32 +361,33 @@ private fun Problem.pipelineRouteObserved(
         (arithmeticRoute == ProblemPipeline.EXACT_LRA || arithmeticRoute == ProblemPipeline.EXACT_LIRA)
     val preferFinite = finiteIntegerRanges && !preferExact &&
         (!routePureRealToTheory || arithmeticRoute != ProblemPipeline.EXACT_LRA) &&
-        routed.finiteRealCompletionSupported(projections)
-    val prepared = if (preferFinite && arithmeticRoute != ProblemPipeline.FINITE_CP) {
-        routed.prepareExecutionPlan(
+        finite.finiteRealCompletionSupported(finiteProjections)
+    val prepared = if (preferFinite && (arithmeticRoute != ProblemPipeline.FINITE_CP || finite !== routed)) {
+        finite.prepareExecutionPlan(
             this,
             objective,
             maximize,
             preferFinite = true,
             providers,
-            projections,
+            finiteProjections,
             preparationStop,
         )
     } else {
         arithmetic
     }
+    val engineProblem = if (prepared === arithmetic) routed else finite
     val selected = when (val execution = prepared.execution) {
-        is PreparedExecution.Declined -> return SourceProblemRoute.UnsupportedOpen(null, routed, prepared)
+        is PreparedExecution.Declined -> return SourceProblemRoute.UnsupportedOpen(null, engineProblem, prepared)
         is PreparedExecution.FiniteLinear -> execution
         else -> error("finite preference requires finite/linear execution")
     }
     val plan = selected.ownership
     if (plan.theoryPipeline == ProblemPipeline.FINITE_CP) {
-        return SourceProblemRoute.Finite(routed, plan, prepared)
+        return SourceProblemRoute.Finite(engineProblem, plan, prepared)
     }
-    val request = OpenTheoryRequest(routed, objective, maximize, plan, preparedPlan = prepared)
+    val request = OpenTheoryRequest(engineProblem, objective, maximize, plan, preparedPlan = prepared)
     return if (request.route == ProblemPipeline.UNSUPPORTED_OPEN || request.route == ProblemPipeline.FINITE_CP) {
-        SourceProblemRoute.UnsupportedOpen(request.componentPlan.unplaceable, routed, prepared)
+        SourceProblemRoute.UnsupportedOpen(request.componentPlan.unplaceable, engineProblem, prepared)
     } else {
         SourceProblemRoute.OpenTheory(request)
     }
@@ -394,6 +404,25 @@ private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, s
         }
         return scan.check()
     }
+}
+
+// This model with each unconditional strict real row replaced by its closed margin row under the source's absolute
+// slack, or null when it states no such row or no absolute slack applies. Each factor read charges [control].
+private fun Problem.withStrictRowMargins(control: ExecutionControl): Problem? {
+    val margin = semantics.effective.feasibilityTolerance.strictMargin()
+    if (margin.isZero) return null
+    var margined = false
+    val rewritten = Array(factors.size) { index ->
+        val factor = factors[index]
+        control.charge(1)
+        if (factor.statesStrictMargin(margin)) {
+            margined = true
+            val row = factor as Linear
+            control.charge(row.size.toLong())
+            row.marginRow(margin)
+        } else factor
+    }
+    return if (margined) withFactors(rewritten, impliedFactorMask?.copyOf()) else null
 }
 
 /**

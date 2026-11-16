@@ -12,6 +12,7 @@ import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
+import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -105,7 +106,8 @@ class CliModeVerdictTest {
             val bounds = if (bounded) BoundsOverride(upper = BoundOverride.Value(SemanticRational.ONE)) else null
             val program = parseFlatZinc(
                 "var float: x; constraint float_lt(0.0, x); solve minimize x;",
-                semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous, undeclaredReals = bounds),
+                semanticOverrides = SemanticOverrides(floats = FloatSemantics.Continuous, undeclaredReals = bounds,
+                    feasibilityTolerance = SourceTolerance()),
             )
             val result = BacktrackSolver.source(program.problem).optimizeOpen(
                 LinearObjective(realCoefficients = doubleArrayOf(1.0)),
@@ -126,30 +128,60 @@ class CliModeVerdictTest {
 
     @Test
     fun `the exact flag should refute a FlatZinc float bound that only tolerance admits`() {
-        val source = File.createTempFile("rounded-bound", ".fzn").apply {
-            writeText("var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; " +
-                "constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); solve satisfy;")
+        val model = "var 0.0..2.0: y :: output_var; var 200..200: n; var 0.0..200.0: nf; " +
+            "constraint int2float(n,nf); constraint float_lin_eq([0.01,-1.0],[nf,y],0.0); solve satisfy;"
+        for ((args, terminal) in listOf(
+            emptyArray<String>() to "==========", arrayOf("--exact") to "=====UNSATISFIABLE=====",
+        )) {
+            val out = solveFlatZinc(model, *args)
+
+            assertTrue(terminal in out.lines(), out)
         }
+    }
+
+    // The CLI output of a FlatZinc [model] solved by the single-threaded backtrack engine under [args].
+    private fun solveFlatZinc(model: String, vararg args: String): String {
+        val source = File.createTempFile("float-relation", ".fzn").apply { writeText(model) }
         try {
-            for ((args, terminal) in listOf(
-                emptyArray<String>() to "==========", arrayOf("--exact") to "=====UNSATISFIABLE=====",
-            )) {
-                val common = CommonOptions().apply {
-                    engine = "cp"
-                    parallel = 1
-                    randomSeed = 17
-                }
-                parseArgs(args, commonFlagSpecs(common)) {}
-                val session = MiniZincMode.newSession()
-                val solvable = session.load(source.absolutePath, common)
-
-                val out = captureStdout { SolveCore.solve(solvable, common, session.output(common)) }
-
-                assertTrue(terminal in out.lines(), out)
+            val common = CommonOptions().apply {
+                engine = "cp"
+                parallel = 1
+                randomSeed = 17
             }
+            parseArgs(arrayOf(*args), commonFlagSpecs(common)) {}
+            val session = MiniZincMode.newSession()
+            val solvable = session.load(source.absolutePath, common)
+            return captureStdout { SolveCore.solve(solvable, common, session.output(common)) }
         } finally {
             source.delete()
         }
+    }
+
+    @Test
+    fun `the exact flag should accept a FlatZinc strict row gap below the absolute slack`() {
+        val rows = "var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; var 0.0..1.0: p; " +
+            "constraint float_lt(x,y); constraint float_lin_lt([1.0,-1.0],[y,x],0.00000015);"
+        val models = mapOf("rows" to "$rows solve satisfy;",
+            "with a product" to "$rows constraint float_times(x,y,p); solve satisfy;")
+        val modes = mapOf("default" to emptyArray<String>(), "exact" to arrayOf("--exact"))
+
+        val terminals = models.mapValues { (_, model) ->
+            modes.mapValues { (_, args) ->
+                solveFlatZinc(model, *args).lines().first { it == "==========" || it == "=====UNSATISFIABLE=====" }
+            }
+        }
+
+        assertEquals(models.mapValues { mapOf("default" to "=====UNSATISFIABLE=====", "exact" to "==========") },
+            terminals)
+    }
+
+    @Test
+    fun `a FlatZinc strict lower bound should attain its minimum at the absolute slack by default`() {
+        val out = solveFlatZinc("var 0.0..1.0: x :: output_var; constraint float_lt(0.0,x); solve minimize x;")
+
+        val value = out.lines().first { it.startsWith("x = ") }.removePrefix("x = ").removeSuffix(";").toDouble()
+        assertEquals(1e-7, value, 1e-20, out)
+        assertTrue("==========" in out.lines() && "unattained-infimum" !in out, out)
     }
 
     @Test

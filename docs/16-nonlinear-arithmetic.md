@@ -257,8 +257,10 @@ that slack around its right-hand side, while a false activator keeps the exact
 complement. A relation stated as `r = f(x)` keeps its exact encoding over a private `r'`
 and adds `abs(r - r') <= slack`; a product with finite choices also moves its selecting
 operand, and a membership its variable. Declarations widen by the same slack and leave
-the fixed-coordinate substitution. Strict rows, disequalities, distinctness, relations
-of exact components and a relation whose result is also an operand stay exact. Presolve
+the fixed-coordinate substitution. In both formulas and every component, an unconditional
+strict row is the closed row acceptance reads, `a·x <= b - absolute`, without a band.
+Reified strict rows, disequalities, distinctness, the other relations of exact components
+and a relation whose result is also an operand stay exact. Presolve
 does not run on the widened source, because its reductions are exact, and the root
 objective bound from the declared box is withheld. SMT-LIB and linear sources, quadratic
 objectives and a zero tolerance never widen.
