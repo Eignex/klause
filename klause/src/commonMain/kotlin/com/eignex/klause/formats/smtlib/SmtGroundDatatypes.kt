@@ -23,6 +23,7 @@ internal fun exposeSmtGroundDatatypes(input: SmtReduction, cancellation: Executi
 private class SmtGroundDatatypeReducer(private val input: SmtReduction, private val cancellation: ExecutionControl) {
     private data class Term(val sort: SmtSort, val expression: SExpr)
     private data class Function(val parameters: List<SmtSort>, val result: SmtSort)
+    private data class OperationApplication(val function: String, val arguments: List<String>)
     private data class Macro(val parameters: List<String>, val body: SExpr, val environment: Environment)
     private data class Environment(val symbols: Map<String, Term>, val functions: Map<String, Function>,
         val macros: Map<String, Macro>)
@@ -45,6 +46,8 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private val usedNames = HashSet<String>()
     private val privateBindings = input.privateBindings.toMutableMap()
     private val operationNames = HashMap<Pair<SmtSort, String>, String>()
+    private val operationValues = HashMap<OperationApplication, Term>()
+    private val constructedShapes = HashMap<String, SmtDatatypeShape>()
     private val defined = LinkedHashMap<Pair<SExpr, SmtSort>, SmtDatatypeShape>()
     private val explicit = ArrayList<SmtDatatypeShape>()
     private val selectors = LinkedHashSet<SmtDatatypeSelector>()
@@ -258,26 +261,33 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                 Term(SmtSort.Real, form("to_real", argument.expression)) else argument)
         }
         val result = operation(operator.instance, "constructor:${operator.constructor}", values, operator.instance.sort)
+        if (result.name() in constructedShapes) return result
         val tag = operation(operator.instance, "tag", listOf(result), SmtSort.Int)
         val conditions = constructorSpec(operator.instance, operator.constructor, result, values, tag)
         axioms += form("assert", form("and", *conditions.toTypedArray()))
-        explicit += SmtDatatypeShape(SmtDatatypeCoordinate(result.name(), operator.instance.sort), tag.name(),
+        val shape = SmtDatatypeShape(SmtDatatypeCoordinate(result.name(), operator.instance.sort), tag.name(),
             listOf(SmtDatatypeAlternative(operator.constructor, values.map { it.name() })))
+        constructedShapes[result.name()] = shape
+        explicit += shape
         return result
     }
 
-    private fun define(value: Term): SmtDatatypeShape = defined.getOrPut(value.expression to value.sort) {
-        val instance = registry.instance(value.sort) ?: smtUnsupported("datatype constructor expected")
-        val tag = operation(instance, "tag", listOf(value), SmtSort.Int)
-        val alternatives = ArrayList<SmtDatatypeAlternative>()
-        val disjunction = instance.constructors.mapIndexed { index, constructor ->
-            step()
-            val fields = constructor.fields.map { fresh(it.sort) }
-            alternatives += SmtDatatypeAlternative(index, fields.map { it.name() })
-            form("and", *constructorSpec(instance, index, value, fields, tag).toTypedArray())
+    private fun define(value: Term): SmtDatatypeShape {
+        step()
+        constructedShapes[value.name()]?.let { return it }
+        return defined.getOrPut(value.expression to value.sort) {
+            val instance = registry.instance(value.sort) ?: smtUnsupported("datatype constructor expected")
+            val tag = operation(instance, "tag", listOf(value), SmtSort.Int)
+            val alternatives = ArrayList<SmtDatatypeAlternative>()
+            val disjunction = instance.constructors.mapIndexed { index, constructor ->
+                step()
+                val fields = constructor.fields.map { fresh(it.sort) }
+                alternatives += SmtDatatypeAlternative(index, fields.map { it.name() })
+                form("and", *constructorSpec(instance, index, value, fields, tag).toTypedArray())
+            }
+            axioms += form("assert", form("or", *disjunction.toTypedArray()))
+            SmtDatatypeShape(SmtDatatypeCoordinate(value.name(), instance.sort), tag.name(), alternatives)
         }
-        axioms += form("assert", form("or", *disjunction.toTypedArray()))
-        SmtDatatypeShape(SmtDatatypeCoordinate(value.name(), instance.sort), tag.name(), alternatives)
     }
 
     private fun constructorSpec(instance: SmtDatatypeInstance, index: Int, value: Term,
@@ -307,9 +317,12 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                     sortSyntax(result))
             }
         }
+        val application = OperationApplication(name, args.map { it.name() })
+        operationValues[application]?.let { return it }
         val expression = if (args.isEmpty()) SExpr.Atom(name)
             else form(name, *args.map { it.expression }.toTypedArray())
         val captured = capture(Term(result, expression))
+        operationValues[application] = captured
         if (operation.startsWith("selector:")) {
             val parts = operation.split(':')
             selectors += SmtDatatypeSelector(SmtDatatypeCoordinate(args.single().name(), instance.sort),

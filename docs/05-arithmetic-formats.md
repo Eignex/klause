@@ -223,7 +223,10 @@ rejected.
 Ground constructors, selectors and testers reduce to typed function consistency,
 constructor tags and strict integer depth comparisons. Exhaustiveness introduces
 one layer of constructor witnesses only; witness fields do not trigger recursive
-unfolding. Arrays and function applications retain opaque datatype sorts until
+unfolding. Typed operation applications share scalar coordinates by their exact
+function rank and argument identities. Explicit constructor terms retain their
+known shape instead of allocating exhaustive alternatives. Arrays and function
+applications retain opaque datatype sorts until
 their own reduction has introduced every relevant coordinate. Scalar erasure then
 maps datatype values to integer identities and supplies constructor recipes for
 original and private coordinates.

@@ -4,6 +4,7 @@ import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
@@ -82,41 +83,6 @@ class SmtGroundDatatypesTest {
     }
 
     @Test
-    fun `quoted grammar constructor names retain their symbol meaning`() {
-        val parsed = SmtLib.parse("""
-            (declare-datatype Box ((|let| (a Int)) (|as| (b Int)) (|match| (c Int))
-                (|!| (d Int)) (|_| (e Int))))
-            (assert (= (a (|let| 1)) 1))
-            (assert (= (b (|as| 2)) 2))
-            (assert (= (c (|match| 3)) 3))
-            (assert (= (d (|!| 4)) 4))
-            (assert (= (e (|_| 5)) 5))
-        """.trimIndent())
-
-        val result = solve(parsed)
-
-        assertIs<OpenTheoryResult.Sat>(result)
-    }
-
-    @Test
-    fun `quoted grammar selector names retain their symbol meaning`() {
-        val parsed = SmtLib.parse("""
-            (declare-datatype Box ((box (|let| Int) (|as| Int) (|match| Int) (|!| Int) (|_| Int))))
-            (declare-const x Box)
-            (assert (= x (box 1 2 3 4 5)))
-            (assert (= (|let| x) 1))
-            (assert (= (|as| x) 2))
-            (assert (= (|match| x) 3))
-            (assert (= (|!| x) 4))
-            (assert (= (|_| x) 5))
-        """.trimIndent())
-
-        val result = solve(parsed)
-
-        assertIs<OpenTheoryResult.Sat>(result)
-    }
-
-    @Test
     fun `quoted grammar functions retain their spelling through datatype exposure`() {
         val parsed = SmtLib.parse("""
             (declare-datatype Box ((box (field Int))))
@@ -183,7 +149,7 @@ class SmtGroundDatatypesTest {
 
         val result = solve(parsed)
 
-        assertIs<OpenTheoryResult.Sat>(result)
+        assertIs<OpenTheoryResult.Sat>(result, "termination reason: ${(result as? OpenTheoryResult.Unknown)?.reason}")
     }
 
     @Test
@@ -758,7 +724,7 @@ class SmtGroundDatatypesTest {
         }
     }
 
-    private fun solve(parsed: SmtLibProblem): OpenTheoryResult {
+    internal fun solve(parsed: SmtLibProblem): OpenTheoryResult {
         val invocation = SourceSetup.prepare(SourceSetupRequest(parsed.source, ExecutionOperation.SATISFY,
             FiniteEngine.BACKTRACK))
         var sample: Sample? = null
@@ -778,7 +744,9 @@ class SmtGroundDatatypesTest {
                     FiniteSolveVerdict.SAT -> OpenTheoryResult.Sat(
                         OpenTheoryAssignment.Sampled(requireNotNull(outcome.bestSample ?: sample)), outcome.stats)
                     FiniteSolveVerdict.UNSAT -> OpenTheoryResult.Unsat(outcome.stats)
-                    else -> OpenTheoryResult.Unknown(TerminationReason.RepresentationDeclined, outcome.stats)
+                    else -> OpenTheoryResult.Unknown(
+                        (result.result.nativeSourceResult as? SolveResult.Unknown)?.reason
+                            ?: TerminationReason.RepresentationDeclined, outcome.stats)
                 }
             }
             else -> error("unexpected datatype source result")
