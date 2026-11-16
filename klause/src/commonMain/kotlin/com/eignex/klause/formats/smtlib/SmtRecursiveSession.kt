@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
 
 /** Solve recursive equations by necessary instances and independently checked total interpretations. */
@@ -79,23 +80,15 @@ fun solveSmtRecursiveSession(
     val sourceScope = smtSessionScope(replaceDefinitions(declarations), cancellation)
     val constructors = sourceScope.datatypes.operatorNames
     fun substitute(term: SExpr, replacements: Map<String, SExpr>): SExpr =
-        substituteRecTerm(term, replacements, constructors)
+        substituteRecTerm(term, replacements, constructors, cancellation)
     val necessary = ArrayList<SExpr>()
     necessary += replaceDefinitions(declarations)
     val applications = ArrayList<Pair<RecursiveDefinition, List<SExpr>>>()
     val byName = definitions.associateBy { it.name }
-    val pending = ArrayDeque<SExpr>()
-    ordinary.filter { it.recHead() == "assert" }.forEach { pending += it.items[1] }
-    while (pending.isNotEmpty()) {
-        if (cancellation()) return SmtSessionResult("unknown", reasonUnknown = "cancelled")
-        val term = pending.removeLast()
-        when (term) {
-            is SExpr.Atom -> byName[smtSessionSymbol(term.text)]?.takeIf { it.parameters.isEmpty() }
-                ?.let { applications += it to emptyList() }
-            is SExpr.SList -> {
-                byName[smtSessionSymbol(term.recHead())]?.let { applications += it to term.items.drop(1) }
-                pending.addAll(term.items.drop(1))
-            }
+    for (assertion in ordinary.filter { it.recHead() == "assert" }) {
+        val body = substitute(assertion.items[1], emptyMap())
+        for (call in recursiveCalls(body, names, sourceScope, cancellation, ::substitute)) {
+            applications += byName.getValue(call.name) to call.arguments
         }
     }
     for (definition in definitions) {
@@ -107,6 +100,10 @@ fun solveSmtRecursiveSession(
             }
         }
         applications += definition to arguments
+        val body = substitute(definition.body, definition.parameters.map { it.first }.zip(arguments).toMap())
+        for (call in recursiveCalls(body, names, sourceScope, cancellation, ::substitute)) {
+            applications += byName.getValue(call.name) to call.arguments
+        }
     }
     for ((definition, arguments) in applications.distinct()) {
         if (arguments.size != definition.parameters.size) {
@@ -133,10 +130,14 @@ fun solveSmtRecursiveSession(
             var suitable = true
             for (definition in definitions) {
                 val bindings = definition.parameters.associate { (name, sort) ->
-                    name to fresh().also { proof += recList("declare-const", it, sort) }
+                    name to fresh().also {
+                        val declaration = recList("declare-const", it, sort)
+                        proof += declaration
+                        sourceScope.command(declaration)
+                    }
                 }
                 val body = substitute(definition.body, bindings)
-                val calls = recursiveCalls(body, names)
+                val calls = recursiveCalls(body, names, sourceScope, cancellation, ::substitute)
                 val caller = bindings.getValue(definition.parameters[ranking.getValue(definition.name)].first)
                 for ((name, arguments, guards) in calls) {
                     val callee = arguments.getOrNull(ranking.getValue(name))
@@ -230,25 +231,68 @@ fun solveSmtRecursiveSession(
 
 private data class RecursiveCall(val name: String, val arguments: List<SExpr>, val guards: List<SExpr>)
 
-private fun recursiveCalls(body: SExpr, names: Set<String>): List<RecursiveCall> {
+private fun recursiveCalls(
+    body: SExpr,
+    names: Set<String>,
+    scope: SmtLibScope,
+    cancellation: ExecutionControl,
+    substitute: (SExpr, Map<String, SExpr>) -> SExpr,
+): List<RecursiveCall> {
     val calls = ArrayList<RecursiveCall>()
     val work = ArrayDeque<Pair<SExpr, List<SExpr>>>()
     work += body to emptyList()
     while (work.isNotEmpty()) {
+        cancellation.polynomialSourceCheckpoint(1)
         val (term, guards) = work.removeLast()
         when (term) {
             is SExpr.Atom -> if (smtSessionSymbol(term.text) in names) {
                 calls += RecursiveCall(smtSessionSymbol(term.text), emptyList(), guards)
             }
             is SExpr.SList -> {
-                if (smtSessionSymbol(term.recHead()) in names) {
-                    calls += RecursiveCall(smtSessionSymbol(term.recHead()), term.items.drop(1), guards)
+                val head = term.recHead()
+                when (head) {
+                    "let" -> work += substitute(term, emptyMap()) to guards
+                    "!" -> work += term.items[1] to guards
+                    "ite" -> {
+                        work += term.items[1] to guards
+                        work += term.items[2] to (guards + term.items[1])
+                        work += term.items[3] to (guards + recList("not", term.items[1]))
+                    }
+                    "match" -> {
+                        val scrutinee = term.items[1]
+                        work += scrutinee to guards
+                        val sort = scope.termSort(scrutinee)
+                            ?: throw UnsupportedSmtException("invalid recursive match scrutinee")
+                        val instance = scope.datatypes.instance(sort)
+                            ?: throw UnsupportedSmtException("recursive match requires a datatype")
+                        var remaining = guards
+                        for (case in scope.datatypes.cases(sort, term.items[2])) {
+                            val constructor = case.constructor?.let { instance.constructors[it] }
+                            val bindings = case.variables.mapIndexed { index, name ->
+                                name to if (constructor == null) scrutinee else
+                                    recList(constructor.fields[index].name, scrutinee)
+                            }.toMap()
+                            val condition = constructor?.let {
+                                SExpr.SList(listOf(recList("_", SExpr.Atom("is"), SExpr.Atom(it.name)), scrutinee))
+                            }
+                            work += substitute(case.body, bindings) to
+                                if (condition == null) remaining else remaining + condition
+                            if (condition != null) remaining = remaining + recList("not", condition)
+                        }
+                    }
+                    else -> {
+                        val identifier = term.items.firstOrNull()
+                        val qualified = identifier as? SExpr.SList
+                        val rawName = if (head == "as") (term.items[1] as? SExpr.Atom)?.text else
+                            if (qualified?.recHead() == "as") (qualified.items[1] as? SExpr.Atom)?.text else head
+                        val name = rawName?.let(::smtSessionSymbol)
+                        if (name != null && name in names) {
+                            val arguments = if (head == "as") emptyList() else term.items.drop(1)
+                            calls += RecursiveCall(name, arguments, guards)
+                        }
+                        if (head != "as" && head != "_") term.items.drop(1).forEach { work += it to guards }
+                    }
                 }
-                if (smtSessionSymbol(term.recHead()) == "ite" && term.items.size == 4) {
-                    work += term.items[1] to guards
-                    work += term.items[2] to (guards + term.items[1])
-                    work += term.items[3] to (guards + recList("not", term.items[1]))
-                } else term.items.drop(1).forEach { work += it to guards }
             }
         }
     }
@@ -321,16 +365,24 @@ private data class RecursiveDefinition(val fields: List<SExpr>) {
     }
 }
 
-private fun substituteRecTerm(root: SExpr, replacements: Map<String, SExpr>, constructors: Set<String>): SExpr {
+private fun substituteRecTerm(
+    root: SExpr,
+    replacements: Map<String, SExpr>,
+    constructors: Set<String>,
+    cancellation: ExecutionControl,
+): SExpr {
     val work = ArrayDeque<RecursiveSubstitutionFrame>()
     val values = ArrayDeque<SExpr>()
     val symbols = HashSet<String>()
     val pending = ArrayDeque<SExpr>()
     pending += root
     pending.addAll(replacements.values)
-    while (pending.isNotEmpty()) when (val expression = pending.removeLast()) {
-        is SExpr.Atom -> symbols += smtSessionSymbol(expression.text)
-        is SExpr.SList -> pending.addAll(expression.items)
+    while (pending.isNotEmpty()) {
+        cancellation.polynomialSourceCheckpoint(1)
+        when (val expression = pending.removeLast()) {
+            is SExpr.Atom -> symbols += smtSessionSymbol(expression.text)
+            is SExpr.SList -> pending.addAll(expression.items)
+        }
     }
     var nextName = 0
     fun fresh(): SExpr.Atom {
@@ -341,6 +393,7 @@ private fun substituteRecTerm(root: SExpr, replacements: Map<String, SExpr>, con
     }
     work += RecursiveSubstitutionFrame.Evaluate(root, replacements)
     while (work.isNotEmpty()) {
+        cancellation.polynomialSourceCheckpoint(1)
         when (val frame = work.removeLast()) {
             is RecursiveSubstitutionFrame.Evaluate -> when (val term = frame.term) {
                 is SExpr.Atom -> values += frame.environment[smtSessionSymbol(term.text)] ?: term

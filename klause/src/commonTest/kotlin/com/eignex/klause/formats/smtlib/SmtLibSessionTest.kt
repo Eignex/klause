@@ -83,6 +83,33 @@ class SmtLibSessionTest {
     }
 
     @Test
+    fun `global declarations preserve dependencies across nested pops`() {
+        val snapshots = ArrayList<String>()
+        val replies = ArrayList<String>()
+        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, replies::add)
+
+        session.execute(SExprReader("""
+            (set-option :global-declarations true)
+            (push 1)
+            (declare-sort U 0)
+            (push 1)
+            (declare-const x U)
+            (pop 1)
+            (assert (= x x))
+            (check-sat)
+            (push 2)
+            (define-fun y () U x)
+            (pop 3)
+            (assert (= y x))
+            (check-sat)
+        """.trimIndent()))
+
+        assertEquals(listOf("sat", "sat"), replies)
+        assertTrue(snapshots.all { it.indexOf("declare-sort U") < it.indexOf("declare-const x") })
+        assertTrue("(define-fun y () U x)" in snapshots.last())
+    }
+
+    @Test
     fun `model queries require enabled production and a current sat result`() {
         val replies = ArrayList<String>()
         val model = object : SmtSessionModel {

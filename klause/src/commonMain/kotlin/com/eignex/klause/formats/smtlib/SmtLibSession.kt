@@ -136,10 +136,7 @@ class SmtLibSession(
                     command.size(2)
                     val count = command.numeral(1)
                     if (count >= scopes.size) fail("pop exceeds the assertion stack")
-                    repeat(count) {
-                        val removed = scopes.removeAt(scopes.lastIndex)
-                        scopes.first().entries += removed.entries.filter { it.global }
-                    }
+                    repeat(count) { scopes.removeAt(scopes.lastIndex) }
                     if (count > 0) { invalidate(); validateCurrent() }
                     success()
                 }
@@ -224,9 +221,10 @@ class SmtLibSession(
             val named = index != prepared.lastIndex
             val assertion = command.items.getOrNull(1)?.takeIf { head == "assert" && !named }
             val global = enabled(":global-declarations") && (named || head !in setOf("assert", "minimize", "maximize"))
-            scopes.last().entries += Entry(normalized, global, assertion, named)
+            declarationScope(global).entries += Entry(normalized, global, assertion, named)
         }
     }
+    private fun declarationScope(global: Boolean): Scope = if (global) scopes.first() else scopes.last()
     private fun validateCurrent() = validate(commands(), cancellation)
 
     private fun setOption(command: SExpr.SList) {
@@ -278,8 +276,9 @@ class SmtLibSession(
         val assumptions = if (head == "check-sat") emptyList() else
             (command.items[1] as? SExpr.SList)?.items ?: fail("expected assumption formulas")
         val prepared = prepareSmtSessionQueries(commands(), assumptions, cancellation)
-        scopes.last().entries += prepared.definitions.map {
-            Entry(it, enabled(":global-declarations"), named = true)
+        val global = enabled(":global-declarations")
+        declarationScope(global).entries += prepared.definitions.map {
+            Entry(it, global, named = true)
         }
         val source = commands() + prepared.terms.map { SExpr.SList(listOf(SExpr.Atom("assert"), it)) }
         validate(source, cancellation)

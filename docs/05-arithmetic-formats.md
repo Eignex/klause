@@ -253,7 +253,8 @@ registry supplies datatype cardinalities to extensional array value comparisons.
 `SmtLibSession` owns command-stream state separately from single-source admission.
 Each query rebuilds one active assertion snapshot; assumptions belong only to that
 query. Assertion levels scope declarations and definitions as well as assertions.
-Global declarations survive stack operations and `reset-assertions`; `reset`
+Global declarations enter the base signature in source order and survive stack
+operations and `reset-assertions`; `reset`
 restores the initial state, including options. `:print-success` defaults to false,
 and model production must be enabled in start mode. Model queries inspect the same
 checked interpretation until the context changes. Assignment production returns
@@ -284,6 +285,8 @@ Recursive command-session definitions use necessary ground equations for
 refutation. A satisfying result requires either a total interpretation whose
 equations pass a counterexample check, or a checked integer ranking that proves
 all recursive calls decrease, followed by evaluation of the source assertions.
+Call collection expands parallel lets and substitutes typed match fields and
+constructor guards throughout definition bodies.
 Ground evaluation uses an explicit work stack and a resource allowance; exhausted
 work yields an inconclusive result and supplies no recursive completion claim.
 
