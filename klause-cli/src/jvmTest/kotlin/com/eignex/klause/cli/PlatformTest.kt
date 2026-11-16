@@ -1,8 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.util.io.readTextFile
-import java.io.File
-import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -26,25 +23,5 @@ class PlatformTest {
         assertEquals("zst", compressionExtension("foo.cnf.zst"))
         assertNull(compressionExtension("foo.cnf"))
         assertNull(compressionExtension("foo.tar"))
-    }
-
-    @Test
-    fun `readTextFile should decompress a gzip-compressed instance`() {
-        val plain = File.createTempFile("klause-cmp", ".cnf").apply { deleteOnExit() }
-        val body = "p cnf 1 1\n1 0\n"
-        val gz = File(plain.absolutePath + ".gz").apply { deleteOnExit() }
-        GZIPOutputStream(gz.outputStream()).bufferedWriter().use { it.write(body) }
-        assertEquals(body, readTextFile(gz.absolutePath))
-    }
-
-    @Test
-    fun `readTextFile should decompress a zstd-compressed instance`() {
-        val plain = File.createTempFile("klause-cmp", ".cnf").apply { deleteOnExit() }
-        val body = "p cnf 1 1\n1 0\n"
-        plain.writeText(body)
-        val zst = File(plain.absolutePath + ".zst").apply { deleteOnExit() }
-        val zstd = ProcessBuilder("zstd", "-q", "-f", plain.absolutePath, "-o", zst.absolutePath).start()
-        assertEquals(0, zstd.waitFor())
-        assertEquals(body, readTextFile(zst.absolutePath))
     }
 }

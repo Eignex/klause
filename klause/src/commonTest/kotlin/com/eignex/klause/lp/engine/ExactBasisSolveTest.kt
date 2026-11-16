@@ -39,7 +39,6 @@ class ExactBasisSolveTest {
 
         assertFalse(exactPointFeasible(model, doubleArrayOf(1.0)))
         assertNull(verifyExactBasis(model, basis).witness)
-        assertNull(verifyExactBasis(model, basis).witness)
         assertTrue(exactPointFeasible(model, doubleArrayOf(0.5)))
     }
 
@@ -48,7 +47,6 @@ class ExactBasisSolveTest {
         val model = LpBuilder().apply { addRealVar(0.0, 0.5) }.build(Sense.MINIMIZE)
         val basis = Basis(intArrayOf(), arrayOf(VarStatus.AT_UPPER))
 
-        assertNotNull(verifyExactBasis(model, basis).witness)
         assertNotNull(verifyExactBasis(model, basis).witness)
         assertTrue(exactPointFeasible(model, doubleArrayOf(0.5)))
     }
@@ -86,7 +84,6 @@ class ExactBasisSolveTest {
             arrayOf(VarStatus.BASIC, VarStatus.BASIC, VarStatus.AT_LOWER, VarStatus.AT_LOWER),
         )
 
-        assertNotNull(verifyExactBasis(model, basis).witness)
         assertNotNull(verifyExactBasis(model, basis).witness)
     }
 }
