@@ -42,7 +42,7 @@ class SmtQfCommandConformanceTest {
         """.trimIndent()))
 
         assertEquals("unknown", replies[0])
-        assertEquals("(:reason-unknown (:resource budget))", replies[1])
+        assertEquals("(:reason-unknown \"(:resource budget)\")", replies[1])
         assertTrue(replies[2].startsWith("(error "))
     }
 

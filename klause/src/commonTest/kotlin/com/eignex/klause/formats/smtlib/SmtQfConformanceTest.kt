@@ -5,11 +5,14 @@ import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.arithmetic.real.ExactRealFunction
 import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.arithmetic.real.toExactRealValue
+import com.eignex.klause.backtrack.BacktrackParams
+import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FiniteSolveCallbacks
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
+import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryExecution
@@ -17,6 +20,7 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.SourceExecutionCallbacks
 import com.eignex.klause.solver.pipeline.SourceExecutionRequest
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
+import com.eignex.klause.solver.pipeline.SourceFiniteControls
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
@@ -417,7 +421,9 @@ class SmtQfConformanceTest {
             ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
         var publications = 0
 
-        val result = SourceSetup.execute(SourceExecutionRequest(invocation),
+        val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            finiteRequest = { FiniteSolveRequest(it, SourceFiniteControls.Backtrack(BacktrackParams())) },
+            presolveConfig = PresolveConfig.NONE),
             SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ publications++ }, { publications++ })))
 
         val finite = assertIs<SourceExecutionResult.Finite>(result)
@@ -636,7 +642,9 @@ class SmtQfConformanceTest {
         val invocation = SourceSetup.prepare(SourceSetupRequest(parsed.source,
             ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
         var sample: Sample? = null
-        return when (val result = SourceSetup.execute(SourceExecutionRequest(invocation),
+        return when (val result = SourceSetup.execute(SourceExecutionRequest(invocation,
+            finiteRequest = { FiniteSolveRequest(it, SourceFiniteControls.Backtrack(BacktrackParams())) },
+            presolveConfig = PresolveConfig.NONE),
             SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ sample = it }, {})))) {
             is SourceExecutionResult.Polynomial -> result.result.result
             is SourceExecutionResult.Transcendental -> result.result.result
