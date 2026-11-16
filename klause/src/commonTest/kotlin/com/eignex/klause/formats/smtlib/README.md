@@ -8,10 +8,11 @@ included. Admission, solving, reconstructed values and command sessions are
 separate observable behaviors; successful parsing alone establishes no solve or
 model claim. `unknown` records an inconclusive solve.
 
-The combined fixtures below are a draft until their dependent reductions and
-sessions have been integrated and their focused tests have passed. Entries in
-this inventory describe the required contract, not an assertion that untested
-draft implementations satisfy it.
+The conformance additions below are pending execution on the assembled feature
+stack. Entries describe the required contract, not an assertion that untested
+draft implementations satisfy it. The flat per-symbol catalogue is
+[`coverage.tsv`](coverage.tsv); its references resolve to the fixture groups below
+and the focused test classes in this directory.
 
 ## Specification identity
 
@@ -30,9 +31,11 @@ The inventory was audited against these primary specifications on 2026-11-16:
 
 These are version identities, not live dependencies. Tests perform no network
 requests, download no fixtures and provision no reference solver. The formulas
-in `SmtQfConformanceTest.kt` were written for this repository from the listed
-semantic laws; they are not copied benchmark inputs. Their stable identities are
-the complete test names and the rows C01–C13 below. The repository licence applies.
+in `SmtQfConformanceTest.kt`, `SmtQfValueConformanceTest.kt` and
+`SmtQfResourceConformanceTest.kt` were written for this repository from the listed
+semantic laws and existing local operator examples. They are not copied benchmark
+inputs. Stable identities are the complete test names and the C, V, R and P rows
+below. The repository licence applies.
 
 ## Term and operator inventory
 
@@ -105,7 +108,7 @@ CLI transcript tests own actual output and file-channel routing. The one-query
 | `check-sat`, `check-sat-assuming` | Arbitrary Bool-term assumptions in 2.7; assumptions query-local; snapshot and result invalidation |
 | `get-model`, `get-value` | Enabled model inspection of one fixed latest model, original symbols, exact and composite values |
 | `get-assertions` | Enabled inspection of current original assertions, preserving `:named`/`:pattern` annotations |
-| `get-assignment` | Optional capability; if unsupported, enabling option declines and remains false; disabled query is an error |
+| `get-assignment` | Enabled inspection of Boolean named terms, excluding numeric names; disabled query is an error |
 | `get-proof`, `get-unsat-core`, `get-unsat-assumptions` | Optional capabilities; unsupported enabling options decline; disabled or wrong-mode queries do not fabricate evidence |
 | `set-option`, `get-option` | Required options implemented; supported options validate types/modes; unsupported standard options retain/default on query; unknown options report unsupported |
 | `set-info`, `get-info` | Script metadata distinct from solver information; required solver flags supported; unsupported optional flags explicit |
@@ -120,7 +123,8 @@ CLI transcript tests own actual output and file-channel routing. The one-query
 | `:global-declarations` | Optional, false; start only |
 | `:produce-assertions`, deprecated `:interactive-mode` | Optional, false; start only; aliases when implemented |
 | `:produce-models` | Optional standard capability selected for this frontend, false; start only |
-| `:produce-assignments`, `:produce-proofs`, `:produce-unsat-assumptions`, `:produce-unsat-cores` | Optional, false; start only; unsupported enables return unsupported without changing default |
+| `:produce-assignments` | Optional standard capability selected for this frontend, false; start only |
+| `:produce-proofs`, `:produce-unsat-assumptions`, `:produce-unsat-cores` | Optional, false; start only; unsupported enables return unsupported without changing default |
 | `:random-seed` | Optional, 0; start only |
 | `:reproducible-resource-limit` | Optional, 0 disables; deterministic bounded checks when implemented |
 | `:verbosity` | Optional, no standard default; diagnostics only |
@@ -154,6 +158,64 @@ between families.
 | C11 | `indexed divisibility composes with datatype bitvector array values` | SAT; a divisor index beyond machine precision remains an integer predicate beside composite terms |
 | C12 | `mixed numeric conditionals retain real array index sorts` | SAT; the selected real branch remains `0.5` through every reduction |
 | C13 | `qualified indexed operators retain their declared result sorts` | SAT; qualified datatype testers, bitvector extraction and integer divisibility preserve their ranks |
+| C14 | `quoted builtin identities never turn quoted numeral names into literals` | SAT; quoted theory symbols resolve canonically while `\|1\|` remains a source variable |
+| C15 | `quoted grammar word helpers retain lexical function meaning` | SAT; a function named `\|let\|` is an ordinary helper |
+| C16 | `function model formals cannot shadow source constructors` | SAT; emitted model definitions remain well sorted with constructor `x0` |
+| C17 | `retained polymorphic models instantiate new array and wide word ranks coherently` | SAT; new array and 129-bit ranks obey the already selected universal interpretation |
+| C18 | `native exact array keys compare across different defining polynomials` | Native sqrt(2) keys agree extensionally despite distinct root syntax |
+| C19 | `retained division queries preserve chosen total interpretations` | SAT; observed integer/real division-by-zero choices remain fixed, including congruent later inputs |
+| C20 | `retained datatype selectors preserve observed and unobserved result sorts` | SAT; wrong-constructor selector choices remain fixed and correctly typed at each instantiation |
+| C21 | `direct library named terms remain visible to retained model queries` | SAT; direct-library named definitions remain queryable |
+| C22 | `rejected composite source checks withhold finite publications` | A source check which reads and rejects a reconstructed array suppresses all SAT publications |
+| C23 | `sessions preserve composite models across query only assumptions` | Actual SAT/UNSAT/SAT session with fixed bitvector array reads and transient assumptions |
+| C24 | `retained queries accept their previously returned abstract domain values` | Qualified abstract values remain valid inputs to queries on the same fixed model |
+| C25 | `retained source constants take precedence over analytic extension names` | SAT; a source constant named `pi` retains its chosen value |
+| C26 | `qualified numeric aliases retain real array index values` | SAT; qualified builtin results preserve alias-resolved Real sorts during composite reconstruction |
+| C27 | `retained polymorphic families construct deep array ranks without recursion` | SAT; a later rank contains 4096 array layers and a correctly typed scalar default |
+| C28 | `retained deep rank construction observes its current witness allowance` | Later model-rank construction stops under its own current witness allowance |
+
+The V fixtures exercise typed `get-value` evaluation in a retained empty model,
+which still interprets every standard builtin. They complement source-lowering
+and exhaustive circuit tests; they are not substitutes for them. Each listed
+expression has an independently specified exact expected value. Comparison and
+overflow groups include both true and false results.
+
+| ID | Test name in `SmtQfValueConformanceTest` |
+| --- | --- |
+| V01 | `core queries preserve boolean associativity and polymorphic equality` |
+| V02 | `integer queries retain exact arithmetic and euclidean signs` |
+| V03 | `integer exponent queries retain zero and negative exponent conventions` |
+| V04 | `real and mixed queries retain exact rational and floor values` |
+| V05 | `bitvector logical queries preserve every specified bit` |
+| V06 | `bitvector arithmetic queries preserve modular and signed results` |
+| V07 | `bitvector wiring queries preserve widths and arbitrary rotation indexes` |
+| V08 | `bitvector comparison queries distinguish signed and unsigned order` |
+| V09 | `bitvector overflow queries compare mathematical results before truncation` |
+| V10 | `bitvector conversion queries preserve signed and modular integer meanings` |
+
+The R fixtures exercise legal deep source sorts without adding a semantic depth
+bound. Typed capture, structural key identity, interruption and mutable public
+argument-list behavior are observed separately.
+
+| ID | Test name in `SmtQfResourceConformanceTest` |
+| --- | --- |
+| R01 | `deep array sorts retain source identities during typed capture` |
+| R02 | `deep applied free sorts retain source identities during typed capture` |
+| R03 | `deep structural interning observes the current remaining allowance` |
+| R04 | `sort structural keys observe borrowed argument list changes` |
+
+The P fixtures isolate command protocol behavior. Their injected snapshot solver
+is deliberately unused except in the explicit inconclusive-result lifecycle
+control P03. Formula semantics and actual session solving remain covered by C23.
+
+| ID | Test name in `SmtQfCommandConformanceTest` |
+| --- | --- |
+| P01 | `assertion inspection preserves original named and pattern annotations` |
+| P02 | `echo responses preserve string delimiters and doubled quotes` |
+| P03 | `unknown reasons belong only to the latest unchanged query context` |
+| P04 | `disabled optional proof queries report errors after declined enablement` |
+| P05 | `required error behavior and stack information survive an invalid logic change` |
+| P06 | `option and information flags require keyword tokens` |
 
 ## Explicit scope boundaries
 

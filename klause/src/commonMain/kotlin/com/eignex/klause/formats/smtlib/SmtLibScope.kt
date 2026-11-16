@@ -49,6 +49,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
 
     private fun term(operator: String, arguments: List<Int>, sort: SmtSort,
         datatype: SmtTypedDatatypeOperator? = null): Int {
+        sort.checkpointStructure(cancellation)
         val node = SmtTypedTerm(operator, arguments, sort, datatype)
         return interned.getOrPut(node) {
             cancellation.polynomialSourceCheckpoint(1)

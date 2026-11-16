@@ -147,7 +147,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 is SExpr.Atom -> values.addLast(if (arrayLexicalLiteral(expression.text)) literal(expression)
                 else symbols[polynomialSymbol(expression.text)] ?: literal(expression))
                 is SExpr.SList -> if ((expression.items.firstOrNull() as? SExpr.Atom)?.text == "_") {
-                    val normalized = arrayBuiltinIdentifier(expression) as SExpr.SList
+                    val normalized = smtBuiltinIdentifier(expression) as SExpr.SList
                     val sort = smtIndexedBitVectorSort(normalized, emptyList())
                         ?: smtUnsupported("invalid indexed bitvector literal")
                     values.addLast(raw(normalized, sort))
@@ -164,7 +164,10 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     }
 
     private fun combine(head: SExpr, args: List<Term>): Term {
-        val resolved = arrayBuiltinIdentifier(head)
+        val resolved = smtBuiltinIdentifier(head)
+        val qualification = (head as? SExpr.SList)?.takeIf {
+            (it.items.firstOrNull() as? SExpr.Atom)?.text == "as"
+        }?.let { sortScope.sourceSort(it.items[2]) }
         val name = (resolved as? SExpr.Atom)?.text
         name?.let(symbols::get)?.let { binding ->
             if (args.isEmpty()) return binding
@@ -186,7 +189,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 }
                 intern(SExpr.Atom("and"), comparisons.map { raw(it, SmtSort.Bool) }, SmtSort.Bool)
             }
-            else -> intern(resolved, args, resultSort(resolved, args.map { it.sort }))
+            else -> intern(resolved, args, smtBuiltinResultSort(resolved, args.map { it.sort }, qualification)
+                ?: smtUnsupported("unsupported array scalar expression"))
         }
     }
 
@@ -200,6 +204,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     }
 
     private fun registerIndex(index: Term, sort: SmtSort.Array) {
+        sort.checkpointStructure(cancellation)
         indexes.getOrPut(sort) { LinkedHashMap() }[index.id] = index
     }
 
@@ -239,6 +244,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
             for (array in arrays.values.toList()) {
                 val sort = array.term.sort as SmtSort.Array
                 default(sort.element)
+                sort.checkpointStructure(cancellation)
                 for (index in indexes[sort]?.values?.toList().orEmpty()) read(array.term, index)
             }
             for (read in reads.values.toList()) {
@@ -262,6 +268,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 val flag = SExpr.Atom(equality.name)
                 if (processedWitnesses.add(equality.name)) axioms += assertion(form("=>", form("not", flag), form("not",
                     equal(read(equality.left, witness), read(equality.right, witness)))))
+                equality.left.sort.checkpointStructure(cancellation)
                 for (index in indexes[equality.left.sort]?.values?.toList().orEmpty()) {
                     step()
                     if (processedAgreements.add(equality.name to index.id)) {
@@ -285,8 +292,11 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         }
     }
 
-    private fun default(sort: SmtSort): Term = defaults.getOrPut(sort) {
-        fresh(sort).also { if (sort is SmtSort.Array) arrays[it.id] = ArrayTerm(it, "base", emptyList()) }
+    private fun default(sort: SmtSort): Term {
+        sort.checkpointStructure(cancellation)
+        return defaults.getOrPut(sort) {
+            fresh(sort).also { if (sort is SmtSort.Array) arrays[it.id] = ArrayTerm(it, "base", emptyList()) }
+        }
     }
 
     private fun capture(term: Term): Term {
@@ -324,10 +334,11 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         return atom(text, sort)
     }
 
-    private fun atom(name: String, sort: SmtSort): Term = atoms.getOrPut(
-        (if (arrayLexicalLiteral(name)) "literal:$name" else "symbol:${polynomialSymbol(name)}") to sort,
-    ) {
-        raw(SExpr.Atom(name), sort)
+    private fun atom(name: String, sort: SmtSort): Term {
+        sort.checkpointStructure(cancellation)
+        return atoms.getOrPut(
+            (if (arrayLexicalLiteral(name)) "literal:$name" else "symbol:${polynomialSymbol(name)}") to sort,
+        ) { raw(SExpr.Atom(name), sort) }
     }
     private fun raw(expression: SExpr, sort: SmtSort): Term = Term(nextTerm++, sort, expression)
     private fun intern(head: SExpr, arguments: List<Term>, sort: SmtSort): Term =
@@ -391,35 +402,10 @@ private data class SmtArrayOperationCheck(val result: String, val operator: Stri
     }
 }
 
-private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
-    smtBitVectorBuiltinSort(head, args)?.let { return it }
-    val name = (head as? SExpr.Atom)?.text
-    if (head is SExpr.SList) {
-        if (head.polynomialAtom(1) == "divisible") return SmtSort.Bool
-        smtUnsupported("unsupported indexed scalar expression")
-    }
-    return when (name) {
-        "=", "distinct", "and", "or", "xor", "not", "=>", "<", "<=", ">", ">=", "is_int" -> SmtSort.Bool
-        "ite" -> if (SmtSort.Real in args.drop(1)) SmtSort.Real else args[1]
-        "to_int", "div", "mod" -> SmtSort.Int
-        "to_real", "/", "exp", "log", "sin", "cos", "pi" -> SmtSort.Real
-        else -> if (SmtSort.Real in args) SmtSort.Real else args.firstOrNull() ?: SmtSort.Int
-    }
-}
-
 private fun arrayLexicalLiteral(text: String): Boolean {
     if (text in setOf("true", "false")) return true
     if (text.startsWith('#')) return true
     return text.isNotEmpty() && text[0] in '0'..'9'
-}
-
-private fun arrayBuiltinIdentifier(head: SExpr): SExpr = when (head) {
-    is SExpr.Atom -> SExpr.Atom(polynomialSymbol(head.text))
-    is SExpr.SList -> if ((head.items.firstOrNull() as? SExpr.Atom)?.text == "as")
-        arrayBuiltinIdentifier(head.items[1])
-    else SExpr.SList(head.items.mapIndexed { index, part ->
-        if (index <= 1 && part is SExpr.Atom) SExpr.Atom(polynomialSymbol(part.text)) else part
-    })
 }
 
 private fun form(head: String, vararg args: SExpr): SExpr.SList = form(SExpr.Atom(head), *args)

@@ -322,6 +322,13 @@ and bare spellings of a symbol share one identity, and a negative numeral must b
 written `(- n)`. A semicolon starts a line comment even when it directly follows a
 bare token.
 
+Structured sort equality, hashing and rendering use explicit work stacks. Frontend
+interning and composite sort-key operations charge their current execution control
+for structural work. A shared builtin result-sort helper keeps post-reduction
+bookkeeping consistent across arrays and datatypes, including qualified and indexed
+operators and mixed numeric conditionals. Lexical scope, user ranks and source
+well-sortedness remain owned by the typed admission walk.
+
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun`
 macros capture their definition scope and check argument sorts even for unused
 arguments; recursive helpers decline. Assertions see only the declarations visible

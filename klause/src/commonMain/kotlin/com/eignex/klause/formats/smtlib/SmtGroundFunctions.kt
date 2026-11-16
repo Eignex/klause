@@ -160,6 +160,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         val term = if (encodeUninterpreted && declaration.result is SmtSort.Uninterpreted) {
             val sort = declaration.result
             output += groundCommand("declare-const", SExpr.Atom(declaration.name), SExpr.Atom("Int"))
+            sort.checkpointStructure(cancellation)
             identities.getOrPut(sort) { ArrayList() } += declaration.name
             val recipe = FreeSortReconstruction(sort, declaration.name)
             privateBindings[declaration.name] = recipe
@@ -330,6 +331,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         val encodedSort = if (encodeUninterpreted && sort is SmtSort.Uninterpreted) SmtSort.Int else sort
         output += groundCommand("declare-const", SExpr.Atom(name), sortExpression(encodedSort))
         privateBindings[name] = if (encodeUninterpreted && sort is SmtSort.Uninterpreted) {
+            sort.checkpointStructure(cancellation)
             val names = identities.getOrPut(sort) { ArrayList() }
             names += name
             FreeSortReconstruction(sort, name)

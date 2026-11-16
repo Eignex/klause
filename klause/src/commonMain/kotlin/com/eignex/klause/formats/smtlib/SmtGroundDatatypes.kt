@@ -262,7 +262,8 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
             else -> constructor(operator, arguments)
         }
         val sort = frame.environment.functions[frame.name]?.result
-            ?: resultSort(frame.identifier, arguments.map { it.sort })
+            ?: smtBuiltinResultSort(frame.identifier, arguments.map { it.sort }, frame.qualification)
+            ?: smtUnsupported("unsupported datatype scalar expression")
         return Term(sort, form(frame.identifier, *arguments.map { it.expression }.toTypedArray()))
     }
 
@@ -287,6 +288,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private fun define(value: Term): SmtDatatypeShape {
         step()
         constructedShapes[value.name()]?.let { return it }
+        value.sort.checkpointStructure(cancellation)
         return defined.getOrPut(value.expression to value.sort) {
             val instance = registry.instance(value.sort) ?: smtUnsupported("datatype constructor expected")
             val tag = operation(instance, "tag", listOf(value), SmtSort.Int)
@@ -323,6 +325,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private fun operation(instance: SmtDatatypeInstance, operation: String, args: List<Term>, result: SmtSort): Term {
         step()
         register(instance)
+        instance.sort.checkpointStructure(cancellation)
         val name = operationNames.getOrPut(instance.sort to operation) {
             freshName().also { name ->
                 generated += form("declare-fun", SExpr.Atom(name), SExpr.SList(args.map { sortSyntax(it.sort) }),
@@ -430,34 +433,6 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private fun step() = cancellation.polynomialSourceCheckpoint(1)
 }
 
-private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
-    val name = (head as? SExpr.Atom)?.text?.let(::polynomialSymbol)
-    if (head is SExpr.SList) {
-        val operator = head.polynomialAtom(1)
-        val base = args.firstOrNull() as? SmtSort.BitVector
-        return when (operator) {
-            "divisible" -> SmtSort.Bool
-            "extract" -> SmtSort.BitVector(head.polynomialAtom(2).toInt() - head.polynomialAtom(3).toInt() + 1)
-            "zero_extend", "sign_extend" -> SmtSort.BitVector(checkNotNull(base).width + head.polynomialAtom(2).toInt())
-            "repeat" -> SmtSort.BitVector(checkNotNull(base).width * head.polynomialAtom(2).toInt())
-            "int_to_bv", "int2bv" -> SmtSort.BitVector(head.polynomialAtom(2).toInt())
-            else -> checkNotNull(base)
-        }
-    }
-    return when (name) {
-        "=", "distinct", "and", "or", "xor", "not", "=>", "<", "<=", ">", ">=", "is_int",
-        "bvult", "bvule", "bvugt", "bvuge", "bvslt", "bvsle", "bvsgt", "bvsge",
-        "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvnego", "bvusubo", "bvssubo", "bvsdivo" -> SmtSort.Bool
-        "ite" -> if (args[1] == SmtSort.Real || args[2] == SmtSort.Real) SmtSort.Real else args[1]
-        "select" -> (args[0] as SmtSort.Array).element
-        "store" -> args[0]
-        "to_int", "div", "mod", "ubv_to_int", "sbv_to_int", "bv2nat", "bv2int" -> SmtSort.Int
-        "to_real", "/", "exp", "log", "sin", "cos", "pi" -> SmtSort.Real
-        "concat" -> SmtSort.BitVector(args.sumOf { (it as SmtSort.BitVector).width })
-        "bvcomp" -> SmtSort.BitVector(1)
-        else -> if (SmtSort.Real in args) SmtSort.Real else args.firstOrNull() ?: SmtSort.Int
-    }
-}
 private fun form(head: String, vararg args: SExpr): SExpr.SList = form(SExpr.Atom(head), *args)
 private fun form(head: SExpr, vararg args: SExpr): SExpr.SList = SExpr.SList(listOf(head) + args)
 private fun sortSyntax(sort: SmtSort): SExpr = SExprReader(sort.toSmtLib()).readAll().single()
