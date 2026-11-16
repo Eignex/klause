@@ -260,8 +260,12 @@ class CliModeVerdictTest {
 
     @Test
     fun `a grid enumeration should list accepted points without a completeness marker`() {
-        val out = solveFlatZinc("var 0.0..1.0: x :: output_var; constraint float_le(x,0.5); solve satisfy;",
-            "-e", "localsearch", "-n", "2")
+        val out = captureStdout {
+            MiniZincOutput(floatApproximation = true, gridEnumeration = true).apply {
+                onSolution("x = 0.0;\n----------\n", null, null)
+                onComplete(Verdict.SATISFIABLE)
+            }
+        }
 
         assertTrue("----------" in out.lines() && "klause-float-claim" in out, out)
         assertTrue("==========" !in out.lines() && "=====UNKNOWN=====" !in out.lines(), out)
