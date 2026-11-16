@@ -34,6 +34,28 @@ class ExactRealArithmeticTest {
     }
 
     @Test
+    fun `exponentials of integral log multiples should retain exact powers`() {
+        val arithmetic = arithmetic()
+        val logarithm = arithmetic.function(ExactRealFunction.LOG, arithmetic.rational(q(2)))
+        val multiple = arithmetic.multiply(listOf(arithmetic.rational(q(65)), logarithm))
+
+        val reconstructed = arithmetic.function(ExactRealFunction.EXP, multiple)
+
+        assertEquals("36893488147419103232", reconstructed.rational?.num.toString())
+    }
+
+    @Test
+    fun `fractional log multiples should not be treated as integral powers`() {
+        val arithmetic = arithmetic()
+        val logarithm = arithmetic.function(ExactRealFunction.LOG, arithmetic.rational(q(2)))
+        val multiple = arithmetic.multiply(listOf(arithmetic.rational(q(2).reciprocal()), logarithm))
+
+        val reconstructed = arithmetic.function(ExactRealFunction.EXP, multiple)
+
+        assertNull(reconstructed.rational)
+    }
+
+    @Test
     fun `logarithm of exponential should have the exact original negative value`() {
         val arithmetic = arithmetic()
         val original = arithmetic.rational(q(-8))

@@ -1,0 +1,148 @@
+package com.eignex.klause.formats.smtlib
+
+import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
+
+class SmtArithmeticReductionTest {
+    @Test
+    fun `variable integer division should keep euclidean signs`() {
+        val input = SmtLib.parse("(declare-const n Int) (declare-const d Int) " +
+            "(assert (= n (- 7))) (assert (= d (- 3))) " +
+            "(assert (= (div n d) 3)) (assert (= (mod n d) 2))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `variable integer division should refute a wrong remainder`() {
+        val input = SmtLib.parse("(declare-const n Int) (declare-const d Int) " +
+            "(assert (= n (- 7))) (assert (= d 3)) (assert (= (mod n d) (- 1)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `zero integer division should preserve evaluated argument congruence`() {
+        val input = SmtLib.parse("(declare-const x Int) (declare-const y Int) " +
+            "(assert (= x y)) (assert (distinct (div (+ x 1) 0) (div (+ 1 y) 0)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `zero quotient and remainder should have independent total values`() {
+        val input = SmtLib.parse("(assert (= (div 4 0) 12)) (assert (= (mod 4 0) (- 9)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `variable real division should preserve its exact rational value`() {
+        val input = SmtLib.parse("(declare-const n Real) (declare-const d Real) " +
+            "(assert (= n 1.0)) (assert (= d 2.0)) (assert (= (/ n d) 0.5))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `zero real division should preserve evaluated argument congruence`() {
+        val input = SmtLib.parse("(declare-const x Real) (declare-const y Real) " +
+            "(assert (= x y)) (assert (distinct (/ (+ x 1.0) 0.0) (/ (+ 1.0 y) 0.0)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `nonlinear floor should round negative arguments down`() {
+        val input = SmtLib.parse("(declare-const x Real) (assert (= x 1.5)) " +
+            "(assert (= (to_int (- (* x x))) (- 3)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `nonlinear integrality should reject a fractional square`() {
+        val input = SmtLib.parse("(declare-const x Real) (assert (= x 0.5)) (assert (is_int (* x x)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `indexed divisibility should accept arbitrary width indices`() {
+        val input = SmtLib.parse("(declare-const x Int) (assert (= x 18446744073709551618)) " +
+            "(assert ((_ divisible 18446744073709551618) x))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `symbolic integer powers should have exact integer witnesses`() {
+        val input = SmtLib.parse("(declare-const b Int) (declare-const e Int) " +
+            "(assert (= b 2)) (assert (= e 3)) (assert (= (** b e) 8))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `negative integer powers should use the specified integer convention`() {
+        val input = SmtLib.parse("(declare-const b Int) (declare-const e Int) " +
+            "(assert (= b (- 1))) (assert (= e (- 3))) (assert (= (** b e) (- 1)))")
+
+        val result = BacktrackSolver.source(input.source).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `integer exponentiation should reject real exponents in dead branches`() {
+        assertFailsWith<UnsupportedSmtException> {
+            SmtLib.parse("(assert (or true (= (** 2 1.5) 2)))")
+        }
+    }
+
+    @Test
+    fun `divisibility should reject a zero index in dead branches`() {
+        assertFailsWith<UnsupportedSmtException> {
+            SmtLib.parse("(assert (or true ((_ divisible 0) 2)))")
+        }
+    }
+
+    @Test
+    fun `source integer power checks should reject an incorrect candidate`() {
+        val values = object : SmtModelValues {
+            override val cancellation = com.eignex.klause.util.Cancellation.Never
+            override fun integer(name: String): String = mapOf("b" to "2", "e" to "3", "r" to "7").getValue(name)
+            override fun boolean(name: String): Boolean = error("unexpected Boolean")
+            override fun real(name: String): String = error("unexpected real")
+            override fun value(name: String): SmtValue = SmtValue.Integer(integer(name))
+        }
+
+        val accepted = SmtArithmeticCheck(SmtArithmeticOperation.POWER, listOf("b", "e", "r")).check(values)
+
+        assertEquals(false, accepted)
+    }
+}

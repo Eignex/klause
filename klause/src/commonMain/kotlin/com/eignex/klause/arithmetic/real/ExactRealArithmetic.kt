@@ -5,6 +5,12 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.transcendental.RationalEnclosure
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.remainderOf
+import com.eignex.util.numbers.shr
 
 internal class RealCertificationUnavailable : RuntimeException()
 internal class RealDomainInvalid : RuntimeException()
@@ -31,6 +37,20 @@ internal class ExactRealArithmetic(
         if (function == ExactRealFunction.EXP && node is ExactRealExpression.Function &&
             node.function == ExactRealFunction.LOG
         ) return ExactRealValue(node.argument)
+        if (function == ExactRealFunction.EXP) {
+            integerLogMultiple(node)?.let { (base, exponent) ->
+                var remaining = exponent.num
+                var factor = base
+                var result = BigFraction.ONE
+                while (remaining > BIG_ZERO) {
+                    transcendental.step()
+                    if (remaining.remainderOf(BIG_TWO) == BIG_ONE) result = transcendental.multiply(result, factor)
+                    remaining = remaining shr 1
+                    if (remaining > BIG_ZERO) factor = transcendental.multiply(factor, factor)
+                }
+                return rational(result)
+            }
+        }
         if (argument.rational?.isZero == true) {
             return rational(if (function == ExactRealFunction.SIN) BigFraction.ZERO else BigFraction.ONE)
         }
@@ -266,6 +286,16 @@ internal class ExactRealArithmetic(
         if (node !is ExactRealExpression.Power || node.exponent != 2) return null
         val function = node.base as? ExactRealExpression.Function ?: return null
         return function.takeIf { it.function in setOf(ExactRealFunction.SIN, ExactRealFunction.COS) }
+    }
+
+    private fun integerLogMultiple(node: ExactRealExpression): Pair<BigFraction, BigFraction>? {
+        if (node !is ExactRealExpression.Product || node.operands.size != 2) return null
+        val coefficient = (node.operands[0] as? ExactRealExpression.Algebraic)?.value?.rational ?: return null
+        if (coefficient.den != BIG_ONE || coefficient.num < BIG_ZERO) return null
+        val logarithm = node.operands[1] as? ExactRealExpression.Function ?: return null
+        if (logarithm.function != ExactRealFunction.LOG) return null
+        val base = (logarithm.argument as? ExactRealExpression.Algebraic)?.value?.rational ?: return null
+        return base to coefficient
     }
 
     private fun piMultiple(node: ExactRealExpression): BigFraction? {
