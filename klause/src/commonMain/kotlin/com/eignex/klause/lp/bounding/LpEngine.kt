@@ -79,6 +79,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.validation.floatingOptimumAcceptance
+import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.constructionLongArray
@@ -1481,6 +1482,7 @@ internal class LpEngine(
             },
             floatOffset = relaxation.objectiveConstant.toDouble(),
             claim = if (objective == null) LpClaim.FEASIBLE_COMPLETION else LpClaim.ATTAINED_OPTIMUM,
+            acceptFloatInfeasibility = toleranceCheck.permitsToleranceOptimum(),
         )
         certified.float?.let { sink.lp.observeComponentSplit(it.blocks) }
         return when (certified.verdict) {
@@ -1496,10 +1498,15 @@ internal class LpEngine(
                 // Pool the theory lemma for restart-time registration: the leaf itself just rejects
                 // (the engine backtracks chronologically), and the next restart makes the lemma a
                 // permanent clause pruning the dead region everywhere.
-                val clause = certified.farkasRay
-                    ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
-                    ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
-                    ?: activePremiseClause(relaxation, session)
+                val clause = if (certified.floatInfeasibility != null) {
+                    certified.floatInfeasibility.takeIf { it.isNotEmpty() }
+                        ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
+                } else {
+                    certified.farkasRay
+                        ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
+                        ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
+                        ?: activePremiseClause(relaxation, session)
+                }
                 if (clause != null && poolRefutation) lpNogoods?.add(clause)
                 LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray())
             }

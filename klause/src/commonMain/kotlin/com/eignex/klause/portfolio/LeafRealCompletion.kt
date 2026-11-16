@@ -38,9 +38,9 @@ internal class LeafRealCompletion(
     private val problem: Problem,
     private val objective: LinearObjective?,
     private val toleranceCheck: ((Sample) -> Boolean)?,
-    private val context: LpSolveContext = if (!toleranceCheck.permitsToleranceOptimum()) {
-        LpSolveContext.Production.copy(sparsePointRecovery = true)
-    } else LpSolveContext.Production,
+    private val context: LpSolveContext = LpSolveContext.finite(
+        problem.semantics.effective.feasibilityTolerance?.isExact == false,
+    ).copy(sparsePointRecovery = !toleranceCheck.permitsToleranceOptimum()),
 ) : CandidateCompletion {
     constructor(problem: Problem, objective: LinearObjective?) : this(problem, objective, null)
 
