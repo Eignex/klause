@@ -1,9 +1,13 @@
 package com.eignex.klause.formats.flatzinc
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
+import com.eignex.klause.arithmetic.polynomial.narrowToNearestDoubles
 import com.eignex.klause.lowering.FloatBucketing
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
+import com.eignex.klause.solver.pipeline.publicationNarrowing
+import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
@@ -17,15 +21,23 @@ fun writeFlatZincSolution(
     program: FlatZincProgram,
     assignment: OpenTheoryAssignment,
     outputObjective: Boolean = false,
-): String = writeFlatZincSolution(program, FlatZincValues(assignment), outputObjective)
+): String = writeFlatZincSolution(program, assignment, outputObjective, publicationNarrowing())
 
-internal class FlatZincValues(
+internal fun writeFlatZincSolution(
+    program: FlatZincProgram,
+    assignment: OpenTheoryAssignment,
+    outputObjective: Boolean,
+    narrowing: ExecutionControl,
+): String = writeFlatZincSolution(program, FlatZincValues(assignment, narrowing), outputObjective)
+
+internal class FlatZincValues private constructor(
     val boolValue: (Int) -> Boolean,
     val intValue: (Int) -> String,
-    val realValue: (Int) -> Double,
+    private val approximateRealValue: (Int) -> Double,
     val exactRealValue: (Int) -> String?,
+    private val displayed: DisplayedReals,
 ) {
-    constructor(sample: Sample) : this(
+    private constructor(sample: Sample, displayed: DisplayedReals) : this(
         { sample.boolValue(it) },
         { sample.exactIntValue(it).toString() },
         { sample.approximateRealValue(it) },
@@ -35,28 +47,60 @@ internal class FlatZincValues(
                     ?: "root(${value.rootIndex};[${value.definingCoefficients.joinToString(",")}])"
             }
         },
+        displayed,
     )
 
-    constructor(assignment: OpenTheoryAssignment) : this(
+    constructor(sample: Sample, narrowing: ExecutionControl = publicationNarrowing()) : this(
+        sample,
+        DisplayedReals(narrowing) { id -> sample.algebraicReals?.get(id)?.takeIf { sample.exactReals == null } },
+    )
+
+    constructor(assignment: OpenTheoryAssignment, narrowing: ExecutionControl = publicationNarrowing()) : this(
         assignment::boolValue,
         assignment::intValue,
         { id ->
-            val algebraic = assignment.algebraicRealValue(id)
-            if (algebraic != null) algebraic.rational?.toDouble()
-                ?: (algebraic.lowerBound.toDouble() / 2 + algebraic.upperBound.toDouble() / 2)
-            else {
-                val parts = assignment.realValue(id).split('/')
-                BigFraction.of(
-                    parseBigInt(parts[0]),
-                    if (parts.size == 1) BIG_ONE else parseBigInt(parts[1]),
-                ).toDouble()
-            }
+            val parts = assignment.realValue(id).split('/')
+            BigFraction.of(parseBigInt(parts[0]), if (parts.size == 1) BIG_ONE else parseBigInt(parts[1])).toDouble()
         },
         assignment::realValue,
+        DisplayedReals(narrowing) { id -> assignment.algebraicRealValue(id) },
     )
+
+    private val printed = HashSet<Int>()
+
+    // A real coordinate as a decimal literal: an algebraic one narrowed to its nearest binary64 value, and one past
+    // binary64 as the largest finite value of its sign, which [rounding] notes.
+    fun realValue(id: Int): Double {
+        printed += id
+        val value = nearest(id)
+        return if (value.isInfinite()) (if (value > 0) Double.MAX_VALUE else -Double.MAX_VALUE) else value
+    }
+
+    // Why a printed [realValue] is not the coordinate's nearest binary64 value, or null when it is.
+    fun rounding(id: Int): String? = when {
+        id !in printed -> null
+        displayed.undetermined(id) -> "undetermined"
+        nearest(id).isInfinite() -> "overflow"
+        else -> null
+    }
+
+    private fun nearest(id: Int): Double = displayed.value(id) ?: approximateRealValue(id)
 
     fun floatValue(b: FloatBucketing): Double =
         if (b.lpOnly) realValue(b.varId) else b.valueOf(intValue(b.varId).toInt())
+}
+
+// Algebraic coordinates narrowed on first display, all under one private allowance for the solution.
+private class DisplayedReals(private val narrowing: ExecutionControl, private val algebraic: (Int) -> AlgebraicReal?) {
+    private val narrowed = HashMap<Int, AlgebraicReal>()
+
+    private fun root(id: Int): AlgebraicReal? = narrowed[id] ?: algebraic(id)?.let { value ->
+        narrowToNearestDoubles(listOf(value), narrowing).single().also { narrowed[id] = it }
+    }
+
+    fun value(id: Int): Double? = root(id)?.approximateDouble
+
+    fun undetermined(id: Int): Boolean = root(id)?.let { it.nearestDouble == null } == true
 }
 
 private fun writeFlatZincSolution(program: FlatZincProgram, sample: FlatZincValues, outputObjective: Boolean): String {
@@ -111,6 +155,7 @@ internal fun writeFlatZincExactCoordinates(
             representation?.let { sb.append(" component=${it.component}") }
             if (!b.lpOnly) sb.append(" reason=${representation?.approximation ?: "finite grid"}")
             sb.append('\n')
+            if (b.lpOnly) sample.rounding(b.varId)?.let { sb.append("% klause-float-rounding: $name = $it\n") }
         }
     }
     if (program.floatVarsByName.values.any { it.lpOnly } &&

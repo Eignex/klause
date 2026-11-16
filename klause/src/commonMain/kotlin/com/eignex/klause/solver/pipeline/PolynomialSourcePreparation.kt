@@ -1,10 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
-import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
-import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
-import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -111,44 +107,9 @@ internal fun PolynomialTheoryRequest.reconstructSource(
     }
     val tolerance = sourceTolerance ?: return lifted
     // A widened witness may use the slack, so the float point it publishes is the one the source acceptance judges.
-    val published = lifted.withNearestReals(verification, limits) ?: return null
+    val published = lifted.publishedFloats(verification, limits) ?: return null
     return published.takeIf { tolerance.accepts(it, verification) is Verification.Accepted }
 }
-
-// This point with each real coordinate published as its nearest binary64 value and no rational authority, so that an
-// acceptance check reads exactly the floats a frontend prints. An algebraic interval is bisected until both endpoints
-// round to one value, which the root between them then rounds to as well; the narrowed interval is kept so every
-// reader rounds the coordinate the same way, and an interval still split after the step limit publishes its
-// midpoint. Null when refinement stops or declines, since no float point is then known.
-private fun Sample.withNearestReals(cancellation: ExecutionControl, limits: PolynomialLimits): Sample? {
-    val reals = DoubleArray(numRealVars) { id -> exactReals?.get(id)?.toDouble() ?: approximateRealValue(id) }
-    val algebraic = algebraicReals?.toMutableList() ?: return copy(reals = reals)
-    try {
-        val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation, limits))
-        for (id in algebraic.indices) {
-            var remaining = NEAREST_REAL_REFINEMENTS
-            while (true) {
-                val current = algebraic[id]
-                val exact = current.rational
-                val lower = current.lowerBound.toDouble()
-                val upper = current.upperBound.toDouble()
-                if (exact != null || lower == upper || remaining-- == 0) {
-                    reals[id] = exact?.toDouble() ?: (lower / 2 + upper / 2)
-                    break
-                }
-                algebraic[id] = arithmetic.refine(current)
-            }
-        }
-    } catch (_: PolynomialInterrupted) {
-        return null
-    } catch (_: PolynomialResourceLimit) {
-        return null
-    }
-    return copy(reals = reals, algebraicReals = algebraic)
-}
-
-// Bisections that bring an isolating interval within one binary64 rounding of any normal or subnormal value.
-private const val NEAREST_REAL_REFINEMENTS = 2_200
 
 // The slack the source's polynomial encoding states, or null when the theory decides the exact source.
 internal val PolynomialTheoryRequest.sourceTolerance: PolynomialTolerance?

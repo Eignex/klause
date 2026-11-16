@@ -61,6 +61,7 @@ import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -355,6 +356,22 @@ class SourceStrategyTest {
 
         assertIs<OpenTheoryResult.Unsat>(refuted)
         assertTrue(assertIs<OpenTheoryResult.Sat>(unpinned).assignment.boolValue(0))
+    }
+
+    @Test
+    fun `source optimize should publish an algebraic optimum as its nearest binary64 value`() {
+        val program = parseFlatZinc(
+            "var 0.0..3.0: x; var 0.0..9.0: y; constraint float_times(x, x, y); constraint float_eq(y, 2.0); " +
+                "solve minimize x;",
+            exactFloats = true,
+        )
+        val x = program.sourceProgram.floatVarsByName.getValue("x").varId
+        val coefficients = DoubleArray(program.problem.numRealVars).also { it[x] = 1.0 }
+
+        val result = BacktrackSolver.source(program.problem).optimize(LinearObjective(realCoefficients = coefficients))
+
+        val optimum = assertIs<QuadraticOptimizationResult.Optimal>(result.result)
+        assertEquals(sqrt(2.0), optimum.incumbent.sample.approximateRealValue(x))
     }
 
     @Test

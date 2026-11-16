@@ -24,6 +24,7 @@ import org.junit.runners.Parameterized
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
+import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -276,6 +277,37 @@ class MiniZincModeTest(private val direction: String) {
         assertTrue("==========" in text.lines(), text)
         assertFalse("klause-grid-verdict" in text, text)
         assertFalse("klause-float-claim" in text, text)
+    }
+
+    @Test
+    fun `exact nonlinear float optimization should print an irrational optimum as its nearest binary64 value`() {
+        val source = File.createTempFile("exact-irrational-flatzinc", ".fzn").apply {
+            writeText("var 0.0..2.0: x :: output_var; var 0.0..4.0: y; " +
+                "constraint float_times(x,x,y); constraint float_eq(y,2.0); solve $direction x;")
+        }
+        val common = CommonOptions().apply {
+            engine = "cp"
+            parallel = 1
+            randomSeed = 17
+        }
+        parseArgs(arrayOf("--exact"), commonFlagSpecs(common)) {}
+        val session = MiniZincMode.newSession()
+        val bytes = ByteArrayOutputStream()
+        val previous = System.out
+        val stream = PrintStream(bytes)
+
+        try {
+            val solvable = session.load(source.absolutePath, common)
+            System.setOut(stream)
+            SolveCore.solve(solvable, common, session.output(common))
+        } finally {
+            System.setOut(previous)
+            stream.close()
+            source.delete()
+        }
+
+        val text = bytes.toString(Charsets.UTF_8.name())
+        assertTrue("x = ${sqrt(2.0)};" in text.lines(), text)
     }
 
     @Test

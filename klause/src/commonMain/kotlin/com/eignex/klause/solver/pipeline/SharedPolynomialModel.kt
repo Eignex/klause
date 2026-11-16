@@ -60,14 +60,7 @@ internal class SharedPolynomialModel private constructor(
 
     fun capture(assignment: QfNraAssignment, bools: BooleanArray, ints: LongArray): Sample {
         val reals = List(source.numRealVars) { assignment.realValue(it) }
-        return Sample(
-            bools, ints,
-            DoubleArray(reals.size) { index ->
-                val value = reals[index]
-                value.rational?.toDouble() ?: (value.lowerBound.toDouble() / 2 + value.upperBound.toDouble() / 2)
-            },
-            algebraicReals = reals,
-        )
+        return Sample(bools, ints, DoubleArray(reals.size) { reals[it].guideDouble }, algebraicReals = reals)
     }
 
     companion object {

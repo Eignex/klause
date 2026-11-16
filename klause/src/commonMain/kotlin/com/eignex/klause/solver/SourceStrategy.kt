@@ -47,6 +47,7 @@ import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.admission
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.maximizeSourceObjective
+import com.eignex.klause.solver.pipeline.withNearestReals
 import com.eignex.klause.solver.pipeline.withSourceSemantics
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
@@ -182,7 +183,11 @@ class SourceStrategy internal constructor(
         return optimize(original, engine, executionOptions, sense, cores, timeout, cancellation, nodeBudget)
     }
 
-    /** Optimize an exact quadratic source objective with an explicit engine and common execution controls. */
+    /**
+     * Optimize an exact quadratic source objective with an explicit engine and common execution controls. The
+     * finished incumbent's algebraic coordinates carry their nearest binary64 values when a bounded narrowing of
+     * their isolating intervals settles them.
+     */
     fun optimize(
         objective: QuadraticObjectiveSpec,
         engine: FiniteEngine,
@@ -211,7 +216,7 @@ class SourceStrategy internal constructor(
             } ?: execution.result
             is SourceExecutionResult.Declined -> unsupportedQuadratic(sense, execution.reason)
             else -> unsupportedQuadratic(sense)
-        }.withSourceSemantics(source.semantics)
+        }.withSourceSemantics(source.semantics).withNearestReals()
     }
 
     /**
@@ -333,13 +338,14 @@ class SourceStrategy internal constructor(
      * Optimize an affine objective over supported integer declarations and exact continuous constraints.
      * The lossless shared bridge retains exact values, objective direction, bounds and attainment results.
      * [optimizeOpen] retains the linear result surface; an unsupported polynomial encoding explicitly declines.
+     * The finished incumbent's algebraic coordinates are narrowed to their nearest binary64 values.
      */
     fun optimize(
         objective: LinearObjective,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     ): QuadraticOptimizationExecution = optimizeSource(objective, polynomial, sense)
-        .withSourceSemantics(source.semantics)
+        .withSourceSemantics(source.semantics).withNearestReals()
 
     private fun optimizeSource(
         objective: LinearObjective,
@@ -373,13 +379,16 @@ class SourceStrategy internal constructor(
         return optimize(objective, polynomial.copy(strategy = polynomial.strategy.copy(localSearch = params)), sense)
     }
 
-    /** Optimize a captured exact quadratic objective over the source's integer and real constraints. */
+    /**
+     * Optimize a captured exact quadratic objective over the source's integer and real constraints. The finished
+     * incumbent's algebraic coordinates are narrowed to their nearest binary64 values.
+     */
     fun optimize(
         objective: QuadraticObjectiveSpec,
         polynomial: PolynomialTheoryParams = PolynomialTheoryParams(),
         sense: ObjectiveSense = ObjectiveSense.MINIMIZE,
     ): QuadraticOptimizationExecution = optimizeSource(objective, polynomial, sense)
-        .withSourceSemantics(source.semantics)
+        .withSourceSemantics(source.semantics).withNearestReals()
 
     private fun optimizeSource(
         objective: QuadraticObjectiveSpec,
