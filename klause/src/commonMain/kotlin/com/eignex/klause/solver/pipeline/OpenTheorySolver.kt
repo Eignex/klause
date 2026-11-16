@@ -86,8 +86,11 @@ sealed interface OpenTheoryAssignment {
     ) : OpenTheoryAssignment {
         override fun boolValue(id: Int): Boolean = sample.boolValue(id)
         override fun intValue(id: Int): String = sample.exactIntValue(id).toString()
-        override fun realValue(id: Int): String =
-            requireNotNull(sample.exactReals) { "a sampled witness carries certified real values" }[id].toString()
+        override fun realValue(id: Int): String = sample.symbolicReals?.get(id)?.expression?.exactRealText()
+            ?: sample.algebraicReals?.get(id)?.let { value ->
+                value.rational?.toString()
+                    ?: "root(${value.rootIndex};[${value.definingCoefficients.joinToString(",")}])"
+            } ?: requireNotNull(sample.exactReals) { "a sampled witness carries certified real values" }[id].toString()
     }
 
     /** A rational real witness from exact QF_LRA. */
@@ -158,6 +161,8 @@ sealed interface OpenTheoryAssignment {
  * Returns null for routes whose real coordinates retain their existing rational string surface.
  */
 fun OpenTheoryAssignment.algebraicRealValue(id: Int): AlgebraicReal? = when (this) {
+    is OpenTheoryAssignment.Sampled -> sample.algebraicReals?.get(id) ?: sample.symbolicReals?.get(id)?.algebraic
+    is OpenTheoryAssignment.Difference -> sample.algebraicReals?.get(id) ?: sample.symbolicReals?.get(id)?.algebraic
     is OpenTheoryAssignment.ExactNra -> assignment.realValue(id)
     is TranscendentalAssignment -> exactRealValue(id).algebraic
     is SourceCoordinateWitness -> real(id).algebraic

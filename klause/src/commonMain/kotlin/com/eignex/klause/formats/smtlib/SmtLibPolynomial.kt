@@ -115,6 +115,7 @@ internal class SmtLibPolynomialCompiler(
     private val allowIntegers: Boolean = false,
     private val allowFunctions: Boolean = false,
     private val semantics: EffectiveSourceSemantics = smtLibSemantics.resolve(),
+    private val semanticDeclarations: Set<String>? = null,
 ) {
     private var functionSyntax = false
     private val bindings = PolynomialBindings()
@@ -221,7 +222,8 @@ internal class SmtLibPolynomialCompiler(
             lowering, allowWidePowers = allowIntegers, cancellation = cancellation, functions = functions,
         )
         val declarationBounds = smtPolynomialDeclarationBounds(
-            semantics, intNames.values, realNames.values, cancellation,
+            semantics, intNames.filterKeys { semanticDeclarations == null || it in semanticDeclarations }.values,
+            realNames.filterKeys { semanticDeclarations == null || it in semanticDeclarations }.values, cancellation,
         )
         var formulas = assertions.map { (expression, environment) ->
             evaluator.evaluate(expression, environment).boolean()

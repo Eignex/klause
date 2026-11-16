@@ -19,6 +19,8 @@ class TranscendentalAssignment internal constructor(
 
 /** Typed exact real expression metadata for a transcendental witness, including reconstructed values. */
 fun OpenTheoryAssignment.symbolicRealValue(id: Int): ExactRealValue? = when (this) {
+    is OpenTheoryAssignment.Sampled -> sample.symbolicReals?.get(id)
+    is OpenTheoryAssignment.Difference -> sample.symbolicReals?.get(id)
     is TranscendentalAssignment -> exactRealValue(id)
     is SourceCoordinateWitness -> (real(id) as? SourceRealCoordinate.Expression)?.value
     is OpenTheoryAssignment.Rebuilt -> base.symbolicRealValue(id)

@@ -4,9 +4,9 @@ import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
 
 internal class SmtLibScope(private val cancellation: ExecutionControl) {
-    private class Signature(val parameters: List<Sort>, val result: Sort)
-    private class Locals(val values: Map<String, Sort>, val parent: Locals?) {
-        fun get(name: String): Sort? {
+    private class Signature(val parameters: List<SmtSort>, val result: SmtSort, val identity: Int)
+    private class Locals(val values: Map<String, Int>, val parent: Locals?) {
+        fun get(name: String): Int? {
             var scope: Locals? = this
             while (scope != null) {
                 scope.values[name]?.let { return it }
@@ -21,6 +21,25 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
         class Let(val names: List<String>, val body: SExpr, val locals: Locals?) : Frame
     }
     private val globals = HashMap<String, Signature>()
+    private val freeSorts = HashMap<String, Int>()
+    private val freeSortNames = HashMap<String, String>()
+    private val originalDeclarations = ArrayList<SmtSourceDeclaration>()
+    val declarations: List<SmtSourceDeclaration> get() = originalDeclarations.toList()
+    private val nodes = ArrayList<SmtTypedTerm>()
+    private val interned = HashMap<SmtTypedTerm, Int>()
+    private val assertionNodes = ArrayList<Int>()
+    private var symbolIdentity = 0
+    val terms: List<SmtTypedTerm> get() = nodes.toList()
+    val assertions: List<Int> get() = assertionNodes.toList()
+
+    private fun term(operator: String, arguments: List<Int>, sort: SmtSort): Int {
+        val node = SmtTypedTerm(operator, arguments, sort)
+        return interned.getOrPut(node) {
+            cancellation.polynomialSourceCheckpoint(1)
+            nodes.add(node)
+            nodes.lastIndex
+        }
+    }
     private var querySeen = false
     private var exited = false
 
@@ -31,15 +50,30 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
             return false
         }
         return when (head) {
+            "declare-sort" -> {
+                command.polynomialSize(3)
+                val name = command.polynomialName(1)
+                val arity = command.polynomialAtom(2).toIntOrNull() ?: return false
+                if (arity < 0 || name in freeSorts || name in setOf("Bool", "Int", "Real", "Array")) false else {
+                    freeSorts[name] = arity
+                    freeSortNames[name] = (command.items[1] as SExpr.Atom).text
+                    true
+                }
+            }
             "declare-const", "declare-fun" -> {
                 command.polynomialSize(if (head == "declare-const") 3 else 4)
-                if (head == "declare-fun" &&
-                    (command.items[2] as? SExpr.SList)?.items?.isEmpty() != true
-                ) return false
+                val parameters = if (head == "declare-fun") {
+                    val arguments = command.items[2] as? SExpr.SList ?: return false
+                    arguments.items.map(::sourceSort)
+                } else emptyList()
                 val name = command.polynomialName(1)
-                val result = polynomialSort(command.polynomialAtom(if (head == "declare-const") 2 else 3))
-                if (name in globals || name in setOf("true", "false")) false else {
-                    globals[name] = Signature(emptyList(), result)
+                val result = sourceSort(command.items[if (head == "declare-const") 2 else 3])
+                if (name in globals || name in setOf("true", "false")) {
+                    smtUnsupported("duplicate declaration of '$name'")
+                } else {
+                    globals[name] = Signature(parameters, result, symbolIdentity++)
+                    val spelling = (command.items[1] as SExpr.Atom).text
+                    originalDeclarations += SmtSourceDeclaration(spelling, parameters, result)
                     true
                 }
             }
@@ -50,7 +84,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
                 val parameters = command.items.getOrNull(2) as? SExpr.SList ?: return false
                 val names = ArrayList<String>()
                 val uniqueNames = HashSet<String>()
-                val sorts = ArrayList<Sort>()
+                val sorts = ArrayList<SmtSort>()
                 for (parameter in parameters.items) {
                     cancellation.polynomialSourceCheckpoint(1)
                     val pair = parameter as? SExpr.SList ?: return false
@@ -58,19 +92,24 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
                     val parameterName = pair.polynomialName(0)
                     if (!uniqueNames.add(parameterName) || parameterName in setOf("true", "false")) return false
                     names += parameterName
-                    sorts += polynomialSort(pair.polynomialAtom(1))
+                    sorts += sourceSort(pair.items[1])
                 }
-                val result = polynomialSort(command.polynomialAtom(3))
-                val body = sort(command.items.getOrNull(4) ?: return false,
-                    Locals(names.zip(sorts).toMap(), null)) ?: return false
-                if (!accepts(result, body)) return false
-                globals[name] = Signature(sorts, result)
+                val result = sourceSort(command.items[3])
+                val locals = names.indices.associate { index ->
+                    names[index] to term("parameter:${symbolIdentity++}", emptyList(), sorts[index])
+                }
+                val body = sort(command.items.getOrNull(4) ?: return false, Locals(locals, null)) ?: return false
+                if (!accepts(result, nodes[body].sort)) return false
+                globals[name] = Signature(sorts, result, symbolIdentity++)
                 true
             }
             "assert", "minimize", "maximize" -> {
                 command.polynomialSize(2)
                 val result = sort(command.items[1], null) ?: return false
-                if (head == "assert") result == Sort.BOOL else numeric(result)
+                if (head == "assert") {
+                    assertionNodes += result
+                    nodes[result].sort == SmtSort.Bool
+                } else numeric(nodes[result].sort)
             }
             "set-logic" -> {
                 command.polynomialSize(2)
@@ -79,6 +118,22 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
             }
             "check-sat" -> {
                 command.polynomialSize(1)
+                querySeen = true
+                true
+            }
+            "check-sat-assuming" -> {
+                command.polynomialSize(2)
+                val assumptions = command.items[1] as? SExpr.SList ?: return false
+                for (assumption in assumptions.items) {
+                    val atom = if (assumption is SExpr.SList) {
+                        if (assumption.items.size != 2 || assumption.polynomialHead() != "not") return false
+                        assumption.items[1] as? SExpr.Atom ?: return false
+                    } else assumption as? SExpr.Atom ?: return false
+                    if (globals[polynomialSymbol(atom.text)]?.let {
+                            it.parameters.isEmpty() && it.result == SmtSort.Bool
+                        } != true) return false
+                    assertionNodes += sort(assumption, null) ?: return false
+                }
                 querySeen = true
                 true
             }
@@ -95,23 +150,67 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
                 command.polynomialSize(3)
                 true
             }
-            else -> false
+            else -> smtUnsupported("unsupported command '$head'")
         }
     }
 
-    private fun sort(root: SExpr, locals: Locals?): Sort? {
+    internal fun sourceSort(expression: SExpr): SmtSort {
+        val work = ArrayDeque<Pair<SExpr, Boolean>>()
+        val values = ArrayDeque<SmtSort>()
+        work.addLast(expression to false)
+        while (work.isNotEmpty()) {
+            cancellation.polynomialSourceCheckpoint(1)
+            val (node, combine) = work.removeLast()
+            when (node) {
+                is SExpr.Atom -> values.addLast(when (node.text) {
+                    "Bool" -> SmtSort.Bool
+                    "Int" -> SmtSort.Int
+                    "Real" -> SmtSort.Real
+                    else -> {
+                        val name = polynomialSymbol(node.text)
+                        if (freeSorts[name] != 0) smtUnsupported("unsupported sort '$name'")
+                        SmtSort.Uninterpreted(freeSortNames.getValue(name))
+                    }
+                })
+                is SExpr.SList -> {
+                    val head = node.polynomialHead()
+                    if (head == "_") {
+                        node.polynomialSize(3)
+                        if (node.polynomialAtom(1) != "BitVec") smtUnsupported("unsupported indexed source sort")
+                        val width = node.polynomialAtom(2).toIntOrNull()
+                        if (width == null || width <= 0) smtUnsupported("invalid bitvector width")
+                        values.addLast(SmtSort.BitVector(width))
+                    } else if (combine) {
+                        val args = List(node.items.size - 1) { values.removeLast() }.reversed()
+                        values.addLast(if (head == "Array") SmtSort.Array(args[0], args[1])
+                            else SmtSort.Uninterpreted(freeSortNames.getValue(polynomialSymbol(head)), args))
+                    } else {
+                        val arity = if (head == "Array") 2 else freeSorts[polynomialSymbol(head)]
+                        if (arity == null || node.items.size != arity + 1) smtUnsupported("invalid source sort '$head'")
+                        work.addLast(node to true)
+                        for (argument in node.items.drop(1).asReversed()) work.addLast(argument to false)
+                    }
+                }
+            }
+        }
+        return values.single()
+    }
+
+    private fun sort(root: SExpr, locals: Locals?): Int? {
         val work = ArrayDeque<Frame>()
-        val values = ArrayDeque<Sort>()
+        val values = ArrayDeque<Int>()
         work.addLast(Frame.Evaluate(root, locals))
-        fun pop(count: Int): List<Sort> = List(count) { values.removeLast() }.reversed()
+        fun pop(count: Int): List<Int> = List(count) { values.removeLast() }.reversed()
         while (work.isNotEmpty()) {
             cancellation.polynomialSourceCheckpoint(1)
             when (val frame = work.removeLast()) {
                 is Frame.Evaluate -> when (val node = frame.expression) {
                     is SExpr.Atom -> {
                         val name = polynomialSymbol(node.text)
-                        val result = literal(node.text) ?: frame.locals?.get(name) ?: globals[name]
-                            ?.takeIf { it.parameters.isEmpty() }?.result ?: return null
+                        val result = literal(node.text)?.let { term("literal:${node.text}", emptyList(), it) }
+                            ?: frame.locals?.get(name) ?: globals[name]?.takeIf { it.parameters.isEmpty() }
+                                ?.let { term("symbol:${it.identity}:$name", emptyList(), it.result) }
+                            ?: if (node.text == "pi") term("pi", emptyList(), SmtSort.Real) else return null
                         values.addLast(result)
                     }
                     is SExpr.SList -> {
@@ -151,7 +250,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
                     work.addLast(Frame.Evaluate(frame.body, Locals(bindings, frame.locals)))
                 }
                 is Frame.Combine -> {
-                    val args = pop(frame.count)
+                    val arguments = pop(frame.count)
+                    val args = arguments.map { nodes[it].sort }
                     val signature = frame.signature
                     val result = if (signature == null) operator(frame.head, args) else {
                         if (args.size != signature.parameters.size || args.indices.any {
@@ -159,52 +259,62 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
                             }) return null
                         signature.result
                     }
-                    values.addLast(result ?: return null)
+                    val type = result ?: return null
+                    val operator = if (signature == null) frame.head else "symbol:${signature.identity}:${frame.head}"
+                    values.addLast(term(operator, arguments, type))
                 }
             }
         }
         return values.single()
     }
 
-    private fun literal(text: String): Sort? {
-        if (text in setOf("true", "false")) return Sort.BOOL
+    private fun literal(text: String): SmtSort? {
+        if (text in setOf("true", "false")) return SmtSort.Bool
         if (text.startsWith("#")) smtUnsupported("bitvector literal '$text'")
-        if (text.isNotEmpty() && text.all { it in '0'..'9' }) return Sort.INT
+        if (text.isNotEmpty() && text.all { it in '0'..'9' }) return SmtSort.Int
         val dot = text.indexOf('.')
         return if (dot > 0 && dot < text.lastIndex && text.indices.all { it == dot || text[it] in '0'..'9' }) {
-            Sort.REAL
+            SmtSort.Real
         } else null
     }
 
-    private fun operator(head: String, args: List<Sort>): Sort? = when (head) {
+    private fun operator(head: String, args: List<SmtSort>): SmtSort? = when (head) {
         "+", "*" -> numericResult(args)
         "-" -> if (args.isEmpty()) null else numericResult(args)
-        "/" -> if (args.size >= 2 && args.all(::numeric)) Sort.REAL else null
-        "^" -> if (args.size == 2 && numeric(args[0]) && args[1] == Sort.INT) args[0] else null
-        "and", "or" -> if (args.all { it == Sort.BOOL }) Sort.BOOL else null
-        "xor", "=>" -> if (args.size >= 2 && args.all { it == Sort.BOOL }) Sort.BOOL else null
-        "not" -> if (args == listOf(Sort.BOOL)) Sort.BOOL else null
+        "/" -> if (args.size >= 2 && args.all(::numeric)) SmtSort.Real else null
+        "^" -> if (args.size == 2 && numeric(args[0]) && args[1] == SmtSort.Int) args[0] else null
+        "and", "or" -> if (args.all { it == SmtSort.Bool }) SmtSort.Bool else null
+        "xor", "=>" -> if (args.size >= 2 && args.all { it == SmtSort.Bool }) SmtSort.Bool else null
+        "not" -> if (args == listOf(SmtSort.Bool)) SmtSort.Bool else null
         "=", "distinct" -> if (args.size >= 2 &&
-            (args.all { it == Sort.BOOL } || args.all(::numeric))) Sort.BOOL else null
-        "<", "<=", ">", ">=" -> if (args.size >= 2 && args.all(::numeric)) Sort.BOOL else null
+            (args.all { it == args[0] } || args.all(::numeric))) SmtSort.Bool else null
+        "<", "<=", ">", ">=" -> if (args.size >= 2 && args.all(::numeric)) SmtSort.Bool else null
         "ite" -> {
             if (args.size != 3) smtUnsupported("ite expects 3 arguments")
-            if (args[0] != Sort.BOOL) null
-            else if (args[1] == Sort.BOOL && args[2] == Sort.BOOL) Sort.BOOL else numericResult(args.drop(1))
+            if (args[0] != SmtSort.Bool) null
+            else if (args[1] == args[2]) args[1] else numericResult(args.drop(1))
         }
-        "to_real" -> if (args == listOf(Sort.INT)) Sort.REAL else null
-        "to_int" -> if (args.size == 1 && numeric(args[0])) Sort.INT else null
-        "is_int" -> if (args.size == 1 && numeric(args[0])) Sort.BOOL else null
+        "to_real" -> if (args == listOf(SmtSort.Int)) SmtSort.Real else null
+        "to_int" -> if (args.size == 1 && numeric(args[0])) SmtSort.Int else null
+        "is_int" -> if (args.size == 1 && numeric(args[0])) SmtSort.Bool else null
         "abs" -> if (args.size == 1 && numeric(args[0])) args[0] else null
-        "div", "mod" -> if (args == listOf(Sort.INT, Sort.INT)) Sort.INT else null
+        "div", "mod" -> if (args == listOf(SmtSort.Int, SmtSort.Int)) SmtSort.Int else null
+        "exp", "log", "sin", "cos" -> if (args.size == 1 && numeric(args[0])) SmtSort.Real else null
+        "pi" -> if (args.isEmpty()) SmtSort.Real else null
+        "select" -> (args.firstOrNull() as? SmtSort.Array)?.let {
+            if (args.size == 2 && args[1] == it.index) it.element else null
+        }
+        "store" -> (args.firstOrNull() as? SmtSort.Array)?.let {
+            if (args.size == 3 && args[1] == it.index && args[2] == it.element) it else null
+        }
         else -> null
     }
 
-    private fun numeric(sort: Sort): Boolean = sort != Sort.BOOL
-    private fun numericResult(args: List<Sort>): Sort? = if (!args.all(::numeric)) null
-        else if (Sort.REAL in args) Sort.REAL else Sort.INT
-    private fun accepts(expected: Sort, actual: Sort): Boolean = expected == actual ||
-        (expected == Sort.REAL && actual == Sort.INT)
+    private fun numeric(sort: SmtSort): Boolean = sort == SmtSort.Int || sort == SmtSort.Real
+    private fun numericResult(args: List<SmtSort>): SmtSort? = if (!args.all(::numeric)) null
+        else if (SmtSort.Real in args) SmtSort.Real else SmtSort.Int
+    private fun accepts(expected: SmtSort, actual: SmtSort): Boolean = expected == actual ||
+        (expected == SmtSort.Real && actual == SmtSort.Int)
 }
 
 internal fun SExpr.factorSourceSymbols(cancellation: ExecutionControl): SExpr {

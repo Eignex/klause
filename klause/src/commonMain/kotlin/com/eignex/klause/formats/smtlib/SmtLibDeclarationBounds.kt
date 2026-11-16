@@ -15,7 +15,8 @@ import com.eignex.klause.util.ExecutionControl
 
 internal fun Compiler.Builder.retainDeclarationBounds() {
     visitSmtDeclarationBounds(
-        semantics, intNames.values, realNames.values, sourceCancellation,
+        semantics, intNames.filterKeys(::hasDeclarationSemantics).values,
+        realNames.filterKeys(::hasDeclarationSemantics).values, sourceCancellation,
     ) { id, real, lower, value ->
         factors.add(ExactLinear.of(
             intArrayOf(if (real) Term.ofRealVar(id) else Term.ofIntVar(id)),

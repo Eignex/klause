@@ -37,6 +37,7 @@ internal object Compiler {
         internal val conditionalEqualities: SmtLibConditionalEquality = SmtLibConditionalEquality(),
         internal val sourceCancellation: ExecutionControl = ExecutionControl.Never,
         internal val semantics: EffectiveSourceSemantics = resolveSmtLibSemantics(unboundedIntLo, unboundedIntHi),
+        internal val semanticDeclarations: Set<String>? = null,
     ) :
         CnfLowering {
         internal val boolNames = HashMap<String, Int>()
@@ -295,12 +296,15 @@ internal object Compiler {
         private fun declare(name: String, sort: String) {
             requireFreshName(name)
             when (sort) {
-                "Int" -> intNames[name] = newInt()
+                "Int" -> intNames[name] = if (hasDeclarationSemantics(name)) newInt() else newInt(null, null)
                 "Bool" -> boolNames[name] = newBool()
                 "Real" -> realNames[name] = nextReal++
                 else -> throw UnsupportedSmtException("unsupported sort '$sort' for '$name'")
             }
         }
+
+        internal fun hasDeclarationSemantics(name: String): Boolean =
+            semanticDeclarations == null || polynomialSymbol(name) in semanticDeclarations
 
         private fun requireFreshName(name: String) {
             if (name in boolNames || name in intNames || name in realNames || name in macros) {
