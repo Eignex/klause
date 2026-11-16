@@ -1502,6 +1502,17 @@ abstract interface com.eignex.klause.formats.smtlib/SmtModelValues { // com.eign
     open fun exactReal(kotlin/String): com.eignex.klause.arithmetic.real/ExactRealValue? // com.eignex.klause.formats.smtlib/SmtModelValues.exactReal|exactReal(kotlin.String){}[0]
 }
 
+abstract interface com.eignex.klause.formats.smtlib/SmtSessionModel { // com.eignex.klause.formats.smtlib/SmtSessionModel|null[0]
+    abstract fun evaluate(com.eignex.klause.formats.smtlib/SExpr): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionModel.evaluate|evaluate(com.eignex.klause.formats.smtlib.SExpr){}[0]
+    abstract fun render(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionModel.render|render(){}[0]
+    open fun abstractValues(): kotlin.collections/Map<kotlin/String, com.eignex.klause.formats.smtlib/SmtSort> // com.eignex.klause.formats.smtlib/SmtSessionModel.abstractValues|abstractValues(){}[0]
+    open fun withRecursiveDefinitions(kotlin.collections/List<com.eignex.klause.formats.smtlib/SExpr>): com.eignex.klause.formats.smtlib/SmtSessionModel? // com.eignex.klause.formats.smtlib/SmtSessionModel.withRecursiveDefinitions|withRecursiveDefinitions(kotlin.collections.List<com.eignex.klause.formats.smtlib.SExpr>){}[0]
+}
+
+abstract interface com.eignex.klause.formats.smtlib/SmtSessionSink : kotlin/AutoCloseable { // com.eignex.klause.formats.smtlib/SmtSessionSink|null[0]
+    abstract fun write(kotlin/String) // com.eignex.klause.formats.smtlib/SmtSessionSink.write|write(kotlin.String){}[0]
+}
+
 abstract interface com.eignex.klause.ir/Factor { // com.eignex.klause.ir/Factor|null[0]
     abstract val variables // com.eignex.klause.ir/Factor.variables|{}variables[0]
         abstract fun <get-variables>(): com.eignex.klause.ir/VarList // com.eignex.klause.ir/Factor.variables.<get-variables>|<get-variables>(){}[0]
@@ -9015,6 +9026,39 @@ final class com.eignex.klause.formats.smtlib/SmtLibProblem : com.eignex.klause.i
     final fun reconstructModel(com.eignex.klause.solver/Sample, com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.formats.smtlib/SmtSourceModel // com.eignex.klause.formats.smtlib/SmtLibProblem.reconstructModel|reconstructModel(com.eignex.klause.solver.Sample;com.eignex.klause.util.ExecutionControl){}[0]
     final fun reconstructModel(kotlin/Function1<kotlin/Int, kotlin/Boolean>, kotlin/Function1<kotlin/Int, kotlin/String>, kotlin/Function1<kotlin/Int, kotlin/String>, com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.formats.smtlib/SmtSourceModel // com.eignex.klause.formats.smtlib/SmtLibProblem.reconstructModel|reconstructModel(kotlin.Function1<kotlin.Int,kotlin.Boolean>;kotlin.Function1<kotlin.Int,kotlin.String>;kotlin.Function1<kotlin.Int,kotlin.String>;com.eignex.klause.util.ExecutionControl){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtLibProblem.toString|toString(){}[0]
+}
+
+final class com.eignex.klause.formats.smtlib/SmtLibSession : kotlin/AutoCloseable { // com.eignex.klause.formats.smtlib/SmtLibSession|null[0]
+    constructor <init>(kotlin/Function1<kotlin/String, com.eignex.klause.formats.smtlib/SmtSessionResult>, kotlin/Function1<kotlin/String, kotlin/Unit>, com.eignex.klause.util/ExecutionControl = ..., kotlin/Function1<kotlin/String, kotlin/Unit> = ..., kotlin/Function1<kotlin/String, com.eignex.klause.formats.smtlib/SmtSessionSink> = ..., kotlin/String = ..., kotlin/String = ..., kotlin/Function2<kotlin.collections/List<com.eignex.klause.formats.smtlib/SExpr>, com.eignex.klause.util/ExecutionControl, kotlin/Unit> = ...) // com.eignex.klause.formats.smtlib/SmtLibSession.<init>|<init>(kotlin.Function1<kotlin.String,com.eignex.klause.formats.smtlib.SmtSessionResult>;kotlin.Function1<kotlin.String,kotlin.Unit>;com.eignex.klause.util.ExecutionControl;kotlin.Function1<kotlin.String,kotlin.Unit>;kotlin.Function1<kotlin.String,com.eignex.klause.formats.smtlib.SmtSessionSink>;kotlin.String;kotlin.String;kotlin.Function2<kotlin.collections.List<com.eignex.klause.formats.smtlib.SExpr>,com.eignex.klause.util.ExecutionControl,kotlin.Unit>){}[0]
+
+    final fun close() // com.eignex.klause.formats.smtlib/SmtLibSession.close|close(){}[0]
+    final fun comment(kotlin/String) // com.eignex.klause.formats.smtlib/SmtLibSession.comment|comment(kotlin.String){}[0]
+    final fun diagnose(kotlin/String) // com.eignex.klause.formats.smtlib/SmtLibSession.diagnose|diagnose(kotlin.String){}[0]
+    final fun execute(com.eignex.klause.formats.smtlib/SExpr): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtLibSession.execute|execute(com.eignex.klause.formats.smtlib.SExpr){}[0]
+    final fun execute(com.eignex.klause.formats.smtlib/SExprReader) // com.eignex.klause.formats.smtlib/SmtLibSession.execute|execute(com.eignex.klause.formats.smtlib.SExprReader){}[0]
+    final fun interrupt(kotlin/String) // com.eignex.klause.formats.smtlib/SmtLibSession.interrupt|interrupt(kotlin.String){}[0]
+}
+
+final class com.eignex.klause.formats.smtlib/SmtSessionResult { // com.eignex.klause.formats.smtlib/SmtSessionResult|null[0]
+    constructor <init>(kotlin/String, com.eignex.klause.formats.smtlib/SmtSessionModel? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ...) // com.eignex.klause.formats.smtlib/SmtSessionResult.<init>|<init>(kotlin.String;com.eignex.klause.formats.smtlib.SmtSessionModel?;kotlin.String?;kotlin.collections.List<kotlin.String>){}[0]
+
+    final val model // com.eignex.klause.formats.smtlib/SmtSessionResult.model|{}model[0]
+        final fun <get-model>(): com.eignex.klause.formats.smtlib/SmtSessionModel? // com.eignex.klause.formats.smtlib/SmtSessionResult.model.<get-model>|<get-model>(){}[0]
+    final val observations // com.eignex.klause.formats.smtlib/SmtSessionResult.observations|{}observations[0]
+        final fun <get-observations>(): kotlin.collections/List<kotlin/String> // com.eignex.klause.formats.smtlib/SmtSessionResult.observations.<get-observations>|<get-observations>(){}[0]
+    final val reasonUnknown // com.eignex.klause.formats.smtlib/SmtSessionResult.reasonUnknown|{}reasonUnknown[0]
+        final fun <get-reasonUnknown>(): kotlin/String? // com.eignex.klause.formats.smtlib/SmtSessionResult.reasonUnknown.<get-reasonUnknown>|<get-reasonUnknown>(){}[0]
+    final val status // com.eignex.klause.formats.smtlib/SmtSessionResult.status|{}status[0]
+        final fun <get-status>(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionResult.status.<get-status>|<get-status>(){}[0]
+
+    final fun component1(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionResult.component1|component1(){}[0]
+    final fun component2(): com.eignex.klause.formats.smtlib/SmtSessionModel? // com.eignex.klause.formats.smtlib/SmtSessionResult.component2|component2(){}[0]
+    final fun component3(): kotlin/String? // com.eignex.klause.formats.smtlib/SmtSessionResult.component3|component3(){}[0]
+    final fun component4(): kotlin.collections/List<kotlin/String> // com.eignex.klause.formats.smtlib/SmtSessionResult.component4|component4(){}[0]
+    final fun copy(kotlin/String = ..., com.eignex.klause.formats.smtlib/SmtSessionModel? = ..., kotlin/String? = ..., kotlin.collections/List<kotlin/String> = ...): com.eignex.klause.formats.smtlib/SmtSessionResult // com.eignex.klause.formats.smtlib/SmtSessionResult.copy|copy(kotlin.String;com.eignex.klause.formats.smtlib.SmtSessionModel?;kotlin.String?;kotlin.collections.List<kotlin.String>){}[0]
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtSessionResult.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtSessionResult.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSessionResult.toString|toString(){}[0]
 }
 
 final class com.eignex.klause.formats.smtlib/SmtSourceBinding { // com.eignex.klause.formats.smtlib/SmtSourceBinding|null[0]
@@ -19854,6 +19898,9 @@ final fun (com.eignex.klause.formats.flatzinc/FlatZincSearchHints).com.eignex.kl
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toLinearSourceProblem(com.eignex.klause.ir/SemanticOverrides = ..., com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.ir/LinearSourceProblem? // com.eignex.klause.formats.mps/toLinearSourceProblem|toLinearSourceProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.SemanticOverrides;com.eignex.klause.util.ExecutionControl){}[0]
 final fun (com.eignex.klause.formats.mps/MpsModel).com.eignex.klause.formats.mps/toProblem(com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.mps/MpsCompiled // com.eignex.klause.formats.mps/toProblem|toProblem@com.eignex.klause.formats.mps.MpsModel(com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
 final fun (com.eignex.klause.formats.opb/OpbDocument).com.eignex.klause.formats.opb/toProblem(com.eignex.klause.ir/ProblemSettings = ..., com.eignex.klause.ir/SemanticOverrides = ...): com.eignex.klause.formats.opb/OpbProblem // com.eignex.klause.formats.opb/toProblem|toProblem@com.eignex.klause.formats.opb.OpbDocument(com.eignex.klause.ir.ProblemSettings;com.eignex.klause.ir.SemanticOverrides){}[0]
+final fun (com.eignex.klause.formats.smtlib/SExpr).com.eignex.klause.formats.smtlib/smtText(): kotlin/String // com.eignex.klause.formats.smtlib/smtText|smtText@com.eignex.klause.formats.smtlib.SExpr(){}[0]
+final fun (com.eignex.klause.formats.smtlib/SmtLibProblem).com.eignex.klause.formats.smtlib/reconstructSessionModel(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.formats.smtlib/SmtSessionModel // com.eignex.klause.formats.smtlib/reconstructSessionModel|reconstructSessionModel@com.eignex.klause.formats.smtlib.SmtLibProblem(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.util.ExecutionControl){}[0]
+final fun (com.eignex.klause.formats.smtlib/SmtLibProblem).com.eignex.klause.formats.smtlib/reconstructSessionModel(com.eignex.klause.solver/Sample, com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.formats.smtlib/SmtSessionModel // com.eignex.klause.formats.smtlib/reconstructSessionModel|reconstructSessionModel@com.eignex.klause.formats.smtlib.SmtLibProblem(com.eignex.klause.solver.Sample;com.eignex.klause.util.ExecutionControl){}[0]
 final fun (com.eignex.klause.formats.smtlib/SmtSort).com.eignex.klause.formats.smtlib/toSmtLib(): kotlin/String // com.eignex.klause.formats.smtlib/toSmtLib|toSmtLib@com.eignex.klause.formats.smtlib.SmtSort(){}[0]
 final fun (com.eignex.klause.formats.smtlib/SmtSourceModel).com.eignex.klause.formats.smtlib/toSmtLib(): kotlin/String // com.eignex.klause.formats.smtlib/toSmtLib|toSmtLib@com.eignex.klause.formats.smtlib.SmtSourceModel(){}[0]
 final fun (com.eignex.klause.formats.smtlib/SmtValue).com.eignex.klause.formats.smtlib/toSmtLib(): kotlin/String // com.eignex.klause.formats.smtlib/toSmtLib|toSmtLib@com.eignex.klause.formats.smtlib.SmtValue(){}[0]
@@ -20072,6 +20119,7 @@ final fun com.eignex.klause.formats.smtlib/smtAlgebraicTerm(com.eignex.klause.ar
 final fun com.eignex.klause.formats.smtlib/smtRealTerm(kotlin/String): kotlin/String // com.eignex.klause.formats.smtlib/smtRealTerm|smtRealTerm(kotlin.String){}[0]
 final fun com.eignex.klause.formats.smtlib/smtRootTerm(kotlin.collections/List<com.eignex.util.numbers/BigFraction>, kotlin/Int, com.eignex.klause.util/ExecutionControl = ...): kotlin/String // com.eignex.klause.formats.smtlib/smtRootTerm|smtRootTerm(kotlin.collections.List<com.eignex.util.numbers.BigFraction>;kotlin.Int;com.eignex.klause.util.ExecutionControl){}[0]
 final fun com.eignex.klause.formats.smtlib/smtSymbolicTerm(com.eignex.klause.arithmetic.real/ExactRealValue, com.eignex.klause.util/ExecutionControl = ...): kotlin/String // com.eignex.klause.formats.smtlib/smtSymbolicTerm|smtSymbolicTerm(com.eignex.klause.arithmetic.real.ExactRealValue;com.eignex.klause.util.ExecutionControl){}[0]
+final fun com.eignex.klause.formats.smtlib/solveSmtRecursiveSession(kotlin/String, kotlin/Function1<kotlin/String, com.eignex.klause.formats.smtlib/SmtSessionResult>, com.eignex.klause.util/ExecutionControl = ..., kotlin/Int = ...): com.eignex.klause.formats.smtlib/SmtSessionResult // com.eignex.klause.formats.smtlib/solveSmtRecursiveSession|solveSmtRecursiveSession(kotlin.String;kotlin.Function1<kotlin.String,com.eignex.klause.formats.smtlib.SmtSessionResult>;com.eignex.klause.util.ExecutionControl;kotlin.Int){}[0]
 final fun com.eignex.klause.formats.xcsp3/parseXml(kotlin/String): com.eignex.klause.formats.xcsp3/XmlElement // com.eignex.klause.formats.xcsp3/parseXml|parseXml(kotlin.String){}[0]
 final fun com.eignex.klause.ir/constsOf(kotlin/IntArray): com.eignex.klause.ir/LongConstList // com.eignex.klause.ir/constsOf|constsOf(kotlin.IntArray){}[0]
 final fun com.eignex.klause.ir/constsOf(kotlin/LongArray): com.eignex.klause.ir/LongConstList // com.eignex.klause.ir/constsOf|constsOf(kotlin.LongArray){}[0]
