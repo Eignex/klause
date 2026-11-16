@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.polynomial
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal class Monomial private constructor(private val powers: Map<Int, Int>) : Comparable<Monomial> {
     private val coordinateIds = powers.keys.toIntArray().apply { sortDescending() }

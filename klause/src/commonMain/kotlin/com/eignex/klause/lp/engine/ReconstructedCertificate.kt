@@ -2,7 +2,6 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.RationalBasisLimits
 import com.eignex.klause.simplex.basis.RationalBasisStats
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.simplex.exact.Frac128

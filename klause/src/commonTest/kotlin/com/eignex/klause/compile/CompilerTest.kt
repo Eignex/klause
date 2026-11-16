@@ -38,9 +38,9 @@ import com.eignex.klause.schema.not
 import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.times
 import com.eignex.klause.schema.valuePrecede
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.SolveResult
 import com.eignex.skema.SchemaDef
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails

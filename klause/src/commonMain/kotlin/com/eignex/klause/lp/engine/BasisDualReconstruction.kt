@@ -4,9 +4,9 @@ import com.eignex.klause.simplex.basis.RationalBasisBuild
 import com.eignex.klause.simplex.basis.RationalBasisFactors
 import com.eignex.klause.simplex.basis.RationalBasisSolve
 import com.eignex.klause.simplex.basis.RationalBasisStats
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
 

@@ -13,7 +13,7 @@ import com.eignex.klause.lowering.scaleByConst
 import com.eignex.klause.lowering.scaleIntComb
 import com.eignex.klause.lowering.sumIntCombs
 import com.eignex.klause.lowering.trueLit
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.maxOf
 import com.eignex.util.numbers.parseBigInt
 import kotlin.math.abs

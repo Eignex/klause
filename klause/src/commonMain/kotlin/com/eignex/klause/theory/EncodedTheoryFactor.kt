@@ -14,7 +14,6 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarList
 import com.eignex.klause.lowering.LinearEncodingInterrupted
 import com.eignex.klause.lowering.LinearFormulaLowering
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.SelectedEncoderRequest
 import com.eignex.klause.solver.pipeline.ExactSearchRow

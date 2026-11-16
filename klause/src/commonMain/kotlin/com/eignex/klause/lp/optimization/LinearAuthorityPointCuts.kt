@@ -4,7 +4,6 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.cut.selectNonparallelCuts
 import com.eignex.klause.lp.engine.CutFamily
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength

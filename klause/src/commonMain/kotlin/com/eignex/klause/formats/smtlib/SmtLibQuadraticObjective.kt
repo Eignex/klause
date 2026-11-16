@@ -11,8 +11,8 @@ import com.eignex.klause.lowering.PolynomialConditional
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.lowerQuadraticObjective
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal object SmtLibQuadraticObjective {
     fun capture(

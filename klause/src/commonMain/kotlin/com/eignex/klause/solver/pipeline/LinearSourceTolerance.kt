@@ -4,10 +4,10 @@ import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.LinearToleranceQualification
 import com.eignex.klause.solver.evidence.ToleranceLinearRow
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal fun LinearSourceProblem.toleranceQualification(stop: ExecutionControl): LinearToleranceQualification? {
     fun interrupted(): Boolean {

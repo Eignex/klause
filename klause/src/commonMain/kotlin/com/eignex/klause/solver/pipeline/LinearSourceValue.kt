@@ -1,11 +1,11 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 internal fun SourceProofContext.linearValue(sample: Sample, cancellation: ExecutionControl): BigFraction? {
     if (cancellation() || !affineObjectiveAvailable) return null

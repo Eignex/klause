@@ -4,10 +4,12 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.minus
+import com.eignex.util.numbers.mulExact
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact

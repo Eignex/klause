@@ -21,13 +21,13 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.propagation.mark
 import com.eignex.klause.propagation.undoTo
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
 import com.eignex.klause.solver.pipeline.FinitePipelineRequest
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -1,6 +1,5 @@
 package com.eignex.klause.lp.optimization
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.LinearSourceSemanticsChecker
 import com.eignex.klause.solver.evidence.SourceClaim

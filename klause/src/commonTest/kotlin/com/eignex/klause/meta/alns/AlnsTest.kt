@@ -22,7 +22,6 @@ import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.DeducedRestrictions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.IncumbentBootstrapSearch
 import com.eignex.klause.solver.InstructionSlicedSearch
 import com.eignex.klause.solver.Optimizer
@@ -43,6 +42,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.kumulant.stat.summary.SumResult
+import com.eignex.util.numbers.BigFraction
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

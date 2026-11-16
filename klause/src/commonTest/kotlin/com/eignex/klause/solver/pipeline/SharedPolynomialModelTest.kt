@@ -16,7 +16,6 @@ import com.eignex.klause.model.SchemaEntry
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.theory.Encoder
 import com.eignex.klause.theory.EncoderDecline
@@ -27,6 +26,7 @@ import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.skema.SchemaDef
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

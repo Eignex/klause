@@ -2,11 +2,11 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.koblas.SparseMatrix
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.LongHashSet
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.Int128
 import kotlin.math.abs
 import kotlin.math.round

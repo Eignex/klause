@@ -3,7 +3,7 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal fun ContinuousProduct.emitLpRelaxation(builder: RelaxationBuilder) {
     val choices = finiteChoices?.takeIf { it.hasGuards } ?: return

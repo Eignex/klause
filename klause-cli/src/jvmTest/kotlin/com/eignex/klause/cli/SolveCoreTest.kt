@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import org.junit.runner.RunWith

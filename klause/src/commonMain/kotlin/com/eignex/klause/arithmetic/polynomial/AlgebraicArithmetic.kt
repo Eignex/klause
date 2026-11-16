@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.polynomial
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 /**
  * Exact arithmetic on real algebraic numbers held as a defining polynomial plus an isolating interval.

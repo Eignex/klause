@@ -4,11 +4,11 @@ import com.eignex.klause.lp.lattice.SparseIntRow
 import com.eignex.klause.lp.lattice.UnimodularTransform
 import com.eignex.klause.lp.lattice.hermiteNormalForm
 import com.eignex.klause.lp.lattice.sparseIntRow
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div

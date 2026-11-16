@@ -6,7 +6,6 @@ import com.eignex.klause.lp.SparseSourceLpLimits
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.engine.LpFloatAllowance
 import com.eignex.klause.lp.satisfiesSourceRows
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test

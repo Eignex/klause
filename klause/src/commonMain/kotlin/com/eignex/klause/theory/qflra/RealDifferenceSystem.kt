@@ -13,7 +13,6 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.linearRows
 import com.eignex.klause.lp.ExactRowForm
 import com.eignex.klause.lp.asFraction
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.util.ExecutionControl

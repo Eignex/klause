@@ -1,5 +1,6 @@
 package com.eignex.klause.simplex.exact
 
+import com.eignex.util.numbers.BigFraction
 /**
  * Fixed-width exact rational: a signed 128-bit numerator over a positive 128-bit denominator, always
  * gcd-normalized. The first level of the exact rational arithmetic ([FracOps]): pivot chains whose

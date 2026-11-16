@@ -5,7 +5,6 @@ import com.eignex.klause.formats.mps.MpsModel
 import com.eignex.klause.formats.mps.checkMpsWitness
 import com.eignex.klause.formats.mps.mpsSemantics
 import com.eignex.klause.formats.mps.toLinearSourceProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.LinearSourceConclusion
@@ -20,6 +19,7 @@ import com.eignex.util.io.openTextFile
 import com.eignex.util.io.useSource
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.fitsLong

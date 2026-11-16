@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.util.numbers.BigFraction
 import java.io.File
 import java.util.zip.GZIPOutputStream
 import kotlin.test.Test

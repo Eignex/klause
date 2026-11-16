@@ -15,6 +15,8 @@ class SemanticRationalTest {
 
         assertEquals(expected, actual)
         assertEquals(expected.hashCode(), actual.hashCode())
+        assertEquals(bigIntOf(1), actual.numerator)
+        assertEquals(bigIntOf(2), actual.denominator)
     }
 
     @Test

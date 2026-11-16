@@ -1,6 +1,5 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized

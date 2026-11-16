@@ -12,12 +12,12 @@ import com.eignex.klause.lp.lattice.EchelonLimits
 import com.eignex.klause.lp.lattice.LATTICE_WORK_WEIGHT
 import com.eignex.klause.lp.lattice.SparseIntRow
 import com.eignex.klause.lp.lattice.bareissEchelon
-import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.presolve.PresolveScan
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.klause.presolve.SourceDelta
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.isZero

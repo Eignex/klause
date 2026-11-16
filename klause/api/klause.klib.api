@@ -1,5 +1,5 @@
 // Klib ABI Dump
-// Targets: [linuxX64]
+// Targets: [linuxArm64, linuxX64, macosArm64]
 // Rendering settings:
 // - Signature version: 2
 // - Show manifest properties: true
@@ -4055,8 +4055,8 @@ sealed interface com.eignex.klause.solver.evidence/SourceClaim { // com.eignex.k
     abstract interface Extension : com.eignex.klause.solver.evidence/SourceClaim // com.eignex.klause.solver.evidence/SourceClaim.Extension|null[0]
 
     final class Bound : com.eignex.klause.solver.evidence/SourceClaim { // com.eignex.klause.solver.evidence/SourceClaim.Bound|null[0]
-        constructor <init>(com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ...) // com.eignex.klause.solver.evidence/SourceClaim.Bound.<init>|<init>(com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean){}[0]
         constructor <init>(com.eignex.klause.solver.evidence/SourceValue, kotlin/Boolean = ...) // com.eignex.klause.solver.evidence/SourceClaim.Bound.<init>|<init>(com.eignex.klause.solver.evidence.SourceValue;kotlin.Boolean){}[0]
+        constructor <init>(com.eignex.util.numbers/BigFraction, kotlin/Boolean = ...) // com.eignex.klause.solver.evidence/SourceClaim.Bound.<init>|<init>(com.eignex.util.numbers.BigFraction;kotlin.Boolean){}[0]
 
         final val strict // com.eignex.klause.solver.evidence/SourceClaim.Bound.strict|{}strict[0]
             final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.solver.evidence/SourceClaim.Bound.strict.<get-strict>|<get-strict>(){}[0]
@@ -4127,10 +4127,10 @@ sealed interface com.eignex.klause.solver.evidence/SourceClaim { // com.eignex.k
     }
 
     final class Ray : com.eignex.klause.solver.evidence/SourceClaim { // com.eignex.klause.solver.evidence/SourceClaim.Ray|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>) // com.eignex.klause.solver.evidence/SourceClaim.Ray.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction>) // com.eignex.klause.solver.evidence/SourceClaim.Ray.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.util.numbers.BigFraction>){}[0]
 
         final val direction // com.eignex.klause.solver.evidence/SourceClaim.Ray.direction|{}direction[0]
-            final fun <get-direction>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.evidence/SourceClaim.Ray.direction.<get-direction>|<get-direction>(){}[0]
+            final fun <get-direction>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.evidence/SourceClaim.Ray.direction.<get-direction>|<get-direction>(){}[0]
         final val sample // com.eignex.klause.solver.evidence/SourceClaim.Ray.sample|{}sample[0]
             final fun <get-sample>(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.evidence/SourceClaim.Ray.sample.<get-sample>|<get-sample>(){}[0]
     }
@@ -4213,16 +4213,16 @@ sealed interface com.eignex.klause.solver.evidence/SourceDerivation { // com.eig
             final fun <get-terms>(): kotlin.collections/List<com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term> // com.eignex.klause.solver.evidence/SourceDerivation.Combination.terms.<get-terms>|<get-terms>(){}[0]
 
         final class Term { // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term|null[0]
-            constructor <init>(com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.evidence/SourceDerivation) // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.<init>|<init>(com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceDerivation){}[0]
+            constructor <init>(com.eignex.util.numbers/BigFraction, com.eignex.klause.solver.evidence/SourceDerivation) // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.<init>|<init>(com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.evidence.SourceDerivation){}[0]
 
             final val derivation // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.derivation|{}derivation[0]
                 final fun <get-derivation>(): com.eignex.klause.solver.evidence/SourceDerivation // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.derivation.<get-derivation>|<get-derivation>(){}[0]
             final val weight // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.weight|{}weight[0]
-                final fun <get-weight>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.weight.<get-weight>|<get-weight>(){}[0]
+                final fun <get-weight>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.weight.<get-weight>|<get-weight>(){}[0]
 
-            final fun component1(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.component1|component1(){}[0]
+            final fun component1(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.component1|component1(){}[0]
             final fun component2(): com.eignex.klause.solver.evidence/SourceDerivation // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.component2|component2(){}[0]
-            final fun copy(com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.evidence/SourceDerivation = ...): com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.copy|copy(com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceDerivation){}[0]
+            final fun copy(com.eignex.util.numbers/BigFraction = ..., com.eignex.klause.solver.evidence/SourceDerivation = ...): com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.copy|copy(com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.evidence.SourceDerivation){}[0]
             final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.equals|equals(kotlin.Any?){}[0]
             final fun hashCode(): kotlin/Int // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.hashCode|hashCode(){}[0]
             final fun toString(): kotlin/String // com.eignex.klause.solver.evidence/SourceDerivation.Combination.Term.toString|toString(){}[0]
@@ -4269,7 +4269,7 @@ sealed interface com.eignex.klause.solver.evidence/SourceDerivation { // com.eig
     }
 
     final class IntegerSplit : com.eignex.klause.solver.evidence/SourceDerivation { // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit|null[0]
-        constructor <init>(com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.evidence/SourceDerivation, com.eignex.klause.solver.evidence/SourceDerivation) // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.<init>|<init>(com.eignex.klause.solver.evidence.SourceCoordinate;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceDerivation;com.eignex.klause.solver.evidence.SourceDerivation){}[0]
+        constructor <init>(com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction, com.eignex.klause.solver.evidence/SourceDerivation, com.eignex.klause.solver.evidence/SourceDerivation) // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.<init>|<init>(com.eignex.klause.solver.evidence.SourceCoordinate;com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.evidence.SourceDerivation;com.eignex.klause.solver.evidence.SourceDerivation){}[0]
 
         final val above // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.above|{}above[0]
             final fun <get-above>(): com.eignex.klause.solver.evidence/SourceDerivation // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.above.<get-above>|<get-above>(){}[0]
@@ -4278,13 +4278,13 @@ sealed interface com.eignex.klause.solver.evidence/SourceDerivation { // com.eig
         final val coordinate // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.coordinate|{}coordinate[0]
             final fun <get-coordinate>(): com.eignex.klause.solver.evidence/SourceCoordinate // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.coordinate.<get-coordinate>|<get-coordinate>(){}[0]
         final val threshold // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.threshold|{}threshold[0]
-            final fun <get-threshold>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.threshold.<get-threshold>|<get-threshold>(){}[0]
+            final fun <get-threshold>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.threshold.<get-threshold>|<get-threshold>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.evidence/SourceCoordinate // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.component1|component1(){}[0]
-        final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.component2|component2(){}[0]
+        final fun component2(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.evidence/SourceDerivation // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.evidence/SourceDerivation // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.component4|component4(){}[0]
-        final fun copy(com.eignex.klause.solver.evidence/SourceCoordinate = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.evidence/SourceDerivation = ..., com.eignex.klause.solver.evidence/SourceDerivation = ...): com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.copy|copy(com.eignex.klause.solver.evidence.SourceCoordinate;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceDerivation;com.eignex.klause.solver.evidence.SourceDerivation){}[0]
+        final fun copy(com.eignex.klause.solver.evidence/SourceCoordinate = ..., com.eignex.util.numbers/BigFraction = ..., com.eignex.klause.solver.evidence/SourceDerivation = ..., com.eignex.klause.solver.evidence/SourceDerivation = ...): com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.copy|copy(com.eignex.klause.solver.evidence.SourceCoordinate;com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.evidence.SourceDerivation;com.eignex.klause.solver.evidence.SourceDerivation){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.evidence/SourceDerivation.IntegerSplit.toString|toString(){}[0]
@@ -4405,13 +4405,13 @@ sealed interface com.eignex.klause.solver.evidence/SourceValue { // com.eignex.k
     }
 
     final class Rational : com.eignex.klause.solver.evidence/SourceValue { // com.eignex.klause.solver.evidence/SourceValue.Rational|null[0]
-        constructor <init>(com.eignex.klause.simplex.exact/BigFraction) // com.eignex.klause.solver.evidence/SourceValue.Rational.<init>|<init>(com.eignex.klause.simplex.exact.BigFraction){}[0]
+        constructor <init>(com.eignex.util.numbers/BigFraction) // com.eignex.klause.solver.evidence/SourceValue.Rational.<init>|<init>(com.eignex.util.numbers.BigFraction){}[0]
 
         final val value // com.eignex.klause.solver.evidence/SourceValue.Rational.value|{}value[0]
-            final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceValue.Rational.value.<get-value>|<get-value>(){}[0]
+            final fun <get-value>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceValue.Rational.value.<get-value>|<get-value>(){}[0]
 
-        final fun component1(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceValue.Rational.component1|component1(){}[0]
-        final fun copy(com.eignex.klause.simplex.exact/BigFraction = ...): com.eignex.klause.solver.evidence/SourceValue.Rational // com.eignex.klause.solver.evidence/SourceValue.Rational.copy|copy(com.eignex.klause.simplex.exact.BigFraction){}[0]
+        final fun component1(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceValue.Rational.component1|component1(){}[0]
+        final fun copy(com.eignex.util.numbers/BigFraction = ...): com.eignex.klause.solver.evidence/SourceValue.Rational // com.eignex.klause.solver.evidence/SourceValue.Rational.copy|copy(com.eignex.util.numbers.BigFraction){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.evidence/SourceValue.Rational.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.evidence/SourceValue.Rational.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.evidence/SourceValue.Rational.toString|toString(){}[0]
@@ -4566,7 +4566,7 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         open fun <get-linearResult>(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.linearResult.<get-linearResult>|<get-linearResult>(){}[0]
 
     final class Bounded : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment?, com.eignex.klause.simplex.exact/BigFraction?, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.klause.simplex.exact.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment?, com.eignex.util.numbers/BigFraction?, com.eignex.klause.solver.result/TerminationReason, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.util.numbers.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val incumbent // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.incumbent|{}incumbent[0]
             final fun <get-incumbent>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.incumbent.<get-incumbent>|<get-incumbent>(){}[0]
@@ -4579,15 +4579,15 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.stats.<get-stats>|<get-stats>(){}[0]
         final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.value|{}value[0]
-            final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.value.<get-value>|<get-value>(){}[0]
+            final fun <get-value>(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.value.<get-value>|<get-value>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component1|component1(){}[0]
-        final fun component2(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component2|component2(){}[0]
+        final fun component2(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/TerminationReason // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component4|component4(){}[0]
         final fun component5(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component5|component5(){}[0]
         final fun component6(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.component6|component6(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment? = ..., com.eignex.klause.simplex.exact/BigFraction? = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.klause.simplex.exact.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment? = ..., com.eignex.util.numbers/BigFraction? = ..., com.eignex.klause.solver.result/TerminationReason = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment?;com.eignex.util.numbers.BigFraction?;com.eignex.klause.solver.result.TerminationReason;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Bounded.toString|toString(){}[0]
@@ -4613,7 +4613,7 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
     }
 
     final class Optimal : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.util.numbers/BigFraction, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val assignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.assignment|{}assignment[0]
             final fun <get-assignment>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.assignment.<get-assignment>|<get-assignment>(){}[0]
@@ -4624,21 +4624,21 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.stats.<get-stats>|<get-stats>(){}[0]
         final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.value|{}value[0]
-            final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.value.<get-value>|<get-value>(){}[0]
+            final fun <get-value>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.value.<get-value>|<get-value>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component1|component1(){}[0]
-        final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component2|component2(){}[0]
+        final fun component2(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component4|component4(){}[0]
         final fun component5(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.component5|component5(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.util.numbers/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Optimal.toString|toString(){}[0]
     }
 
     final class Unbounded : com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/OpenTheoryAssignment, com.eignex.util.numbers/BigFraction, com.eignex.klause.solver.result/SolveStats, com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.<init>|<init>(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val linearResult // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.linearResult|{}linearResult[0]
             final fun <get-linearResult>(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.linearResult.<get-linearResult>|<get-linearResult>(){}[0]
@@ -4647,16 +4647,16 @@ sealed interface com.eignex.klause.solver.pipeline/OpenTheoryOptimum { // com.ei
         final val stats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.stats.<get-stats>|<get-stats>(){}[0]
         final val value // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.value|{}value[0]
-            final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.value.<get-value>|<get-value>(){}[0]
+            final fun <get-value>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.value.<get-value>|<get-value>(){}[0]
         final val witness // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.witness|{}witness[0]
             final fun <get-witness>(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.witness.<get-witness>|<get-witness>(){}[0]
 
         final fun component1(): com.eignex.klause.solver.pipeline/OpenTheoryAssignment // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component1|component1(){}[0]
-        final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component2|component2(){}[0]
+        final fun component2(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component2|component2(){}[0]
         final fun component3(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/LinearOptimizationResult? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component4|component4(){}[0]
         final fun component5(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.component5|component5(){}[0]
-        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
+        final fun copy(com.eignex.klause.solver.pipeline/OpenTheoryAssignment = ..., com.eignex.util.numbers/BigFraction = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.result/LinearOptimizationResult? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.copy|copy(com.eignex.klause.solver.pipeline.OpenTheoryAssignment;com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.result.LinearOptimizationResult?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/OpenTheoryOptimum.Unbounded.toString|toString(){}[0]
@@ -4914,10 +4914,10 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
     }
 
     final class Unbounded : com.eignex.klause.solver.result/MinimizeResult.WithSample { // com.eignex.klause.solver.result/MinimizeResult.Unbounded|null[0]
-        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/MinimizeResult.Unbounded.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
+        constructor <init>(com.eignex.klause.solver/Sample, kotlin/Double, kotlin.collections/List<com.eignex.util.numbers/BigFraction>, com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.result/MinimizeResult.Unbounded.<init>|<init>(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.util.numbers.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
         final val direction // com.eignex.klause.solver.result/MinimizeResult.Unbounded.direction|{}direction[0]
-            final fun <get-direction>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.direction.<get-direction>|<get-direction>(){}[0]
+            final fun <get-direction>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.direction.<get-direction>|<get-direction>(){}[0]
         final val evidence // com.eignex.klause.solver.result/MinimizeResult.Unbounded.evidence|{}evidence[0]
             final fun <get-evidence>(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Unbounded.evidence.<get-evidence>|<get-evidence>(){}[0]
         final val objective // com.eignex.klause.solver.result/MinimizeResult.Unbounded.objective|{}objective[0]
@@ -4931,11 +4931,11 @@ sealed interface com.eignex.klause.solver.result/MinimizeResult { // com.eignex.
 
         final fun component1(): com.eignex.klause.solver/Sample // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component1|component1(){}[0]
         final fun component2(): kotlin/Double // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component2|component2(){}[0]
-        final fun component3(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component3|component3(){}[0]
+        final fun component3(): kotlin.collections/List<com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component3|component3(){}[0]
         final fun component4(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component4|component4(){}[0]
         final fun component5(): com.eignex.klause.solver.evidence/SourceResultEvidence? // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component5|component5(){}[0]
         final fun component6(): com.eignex.klause.ir/EffectiveSourceSemantics? // com.eignex.klause.solver.result/MinimizeResult.Unbounded.component6|component6(){}[0]
-        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/MinimizeResult.Unbounded // com.eignex.klause.solver.result/MinimizeResult.Unbounded.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
+        final fun copy(com.eignex.klause.solver/Sample = ..., kotlin/Double = ..., kotlin.collections/List<com.eignex.util.numbers/BigFraction> = ..., com.eignex.klause.solver.result/SolveStats = ..., com.eignex.klause.solver.evidence/SourceResultEvidence? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...): com.eignex.klause.solver.result/MinimizeResult.Unbounded // com.eignex.klause.solver.result/MinimizeResult.Unbounded.copy|copy(com.eignex.klause.solver.Sample;kotlin.Double;kotlin.collections.List<com.eignex.util.numbers.BigFraction>;com.eignex.klause.solver.result.SolveStats;com.eignex.klause.solver.evidence.SourceResultEvidence?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
         final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.result/MinimizeResult.Unbounded.equals|equals(kotlin.Any?){}[0]
         final fun hashCode(): kotlin/Int // com.eignex.klause.solver.result/MinimizeResult.Unbounded.hashCode|hashCode(){}[0]
         final fun toString(): kotlin/String // com.eignex.klause.solver.result/MinimizeResult.Unbounded.toString|toString(){}[0]
@@ -6454,15 +6454,15 @@ final class <#A: out kotlin/Any?> com.eignex.klause.ir/SemanticSource : com.eign
 
 final class com.eignex.klause.arithmetic.polynomial/AlgebraicReal { // com.eignex.klause.arithmetic.polynomial/AlgebraicReal|null[0]
     final val definingCoefficients // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.definingCoefficients|{}definingCoefficients[0]
-        final fun <get-definingCoefficients>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.definingCoefficients.<get-definingCoefficients>|<get-definingCoefficients>(){}[0]
+        final fun <get-definingCoefficients>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction> // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.definingCoefficients.<get-definingCoefficients>|<get-definingCoefficients>(){}[0]
     final val lowerBound // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.lowerBound|{}lowerBound[0]
-        final fun <get-lowerBound>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.lowerBound.<get-lowerBound>|<get-lowerBound>(){}[0]
+        final fun <get-lowerBound>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.lowerBound.<get-lowerBound>|<get-lowerBound>(){}[0]
     final val rational // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.rational|{}rational[0]
-        final fun <get-rational>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.rational.<get-rational>|<get-rational>(){}[0]
+        final fun <get-rational>(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.rational.<get-rational>|<get-rational>(){}[0]
     final val rootIndex // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.rootIndex|{}rootIndex[0]
         final fun <get-rootIndex>(): kotlin/Int // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.rootIndex.<get-rootIndex>|<get-rootIndex>(){}[0]
     final val upperBound // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.upperBound|{}upperBound[0]
-        final fun <get-upperBound>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.upperBound.<get-upperBound>|<get-upperBound>(){}[0]
+        final fun <get-upperBound>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.arithmetic.polynomial/AlgebraicReal.upperBound.<get-upperBound>|<get-upperBound>(){}[0]
 }
 
 final class com.eignex.klause.arithmetic.real/ExactRealValue { // com.eignex.klause.arithmetic.real/ExactRealValue|null[0]
@@ -6471,7 +6471,7 @@ final class com.eignex.klause.arithmetic.real/ExactRealValue { // com.eignex.kla
     final val expression // com.eignex.klause.arithmetic.real/ExactRealValue.expression|{}expression[0]
         final fun <get-expression>(): com.eignex.klause.arithmetic.real/ExactRealExpression // com.eignex.klause.arithmetic.real/ExactRealValue.expression.<get-expression>|<get-expression>(){}[0]
     final val rational // com.eignex.klause.arithmetic.real/ExactRealValue.rational|{}rational[0]
-        final fun <get-rational>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.arithmetic.real/ExactRealValue.rational.<get-rational>|<get-rational>(){}[0]
+        final fun <get-rational>(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.arithmetic.real/ExactRealValue.rational.<get-rational>|<get-rational>(){}[0]
 }
 
 final class com.eignex.klause.backtrack.selector/Chb : com.eignex.klause.backtrack.selector/VariableSelector { // com.eignex.klause.backtrack.selector/Chb|null[0]
@@ -7428,7 +7428,7 @@ final class com.eignex.klause.factor.arithmetic/ExactLinear : com.eignex.klause.
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.arithmetic/ExactLinear.structuralKey|structuralKey(){}[0]
 
     final object Companion { // com.eignex.klause.factor.arithmetic/ExactLinear.Companion|null[0]
-        final fun of(kotlin/IntArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.ir/LinearOp, com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.factor.arithmetic/ExactLinear // com.eignex.klause.factor.arithmetic/ExactLinear.Companion.of|of(kotlin.IntArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.ir.LinearOp;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean;kotlin.Int){}[0]
+        final fun of(kotlin/IntArray, kotlin.collections/List<com.eignex.util.numbers/BigFraction>, com.eignex.klause.ir/LinearOp, com.eignex.util.numbers/BigFraction, kotlin/Boolean = ..., kotlin/Int = ...): com.eignex.klause.factor.arithmetic/ExactLinear // com.eignex.klause.factor.arithmetic/ExactLinear.Companion.of|of(kotlin.IntArray;kotlin.collections.List<com.eignex.util.numbers.BigFraction>;com.eignex.klause.ir.LinearOp;com.eignex.util.numbers.BigFraction;kotlin.Boolean;kotlin.Int){}[0]
     }
 }
 
@@ -7977,12 +7977,12 @@ final class com.eignex.klause.factor.global/Distinct : com.eignex.klause.ir/Fact
     final fun structuralKey(): com.eignex.klause.ir/StructuralKey // com.eignex.klause.factor.global/Distinct.structuralKey|structuralKey(){}[0]
 
     final class Operand { // com.eignex.klause.factor.global/Distinct.Operand|null[0]
-        constructor <init>(kotlin/IntArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.factor.global/Distinct.Operand.<init>|<init>(kotlin.IntArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+        constructor <init>(kotlin/IntArray, kotlin.collections/List<com.eignex.util.numbers/BigFraction>, com.eignex.util.numbers/BigFraction = ...) // com.eignex.klause.factor.global/Distinct.Operand.<init>|<init>(kotlin.IntArray;kotlin.collections.List<com.eignex.util.numbers.BigFraction>;com.eignex.util.numbers.BigFraction){}[0]
 
         final val coefficients // com.eignex.klause.factor.global/Distinct.Operand.coefficients|{}coefficients[0]
-            final fun <get-coefficients>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.factor.global/Distinct.Operand.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+            final fun <get-coefficients>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction> // com.eignex.klause.factor.global/Distinct.Operand.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
         final val constant // com.eignex.klause.factor.global/Distinct.Operand.constant|{}constant[0]
-            final fun <get-constant>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.factor.global/Distinct.Operand.constant.<get-constant>|<get-constant>(){}[0]
+            final fun <get-constant>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.factor.global/Distinct.Operand.constant.<get-constant>|<get-constant>(){}[0]
         final val references // com.eignex.klause.factor.global/Distinct.Operand.references|{}references[0]
             final fun <get-references>(): kotlin/IntArray // com.eignex.klause.factor.global/Distinct.Operand.references.<get-references>|<get-references>(){}[0]
         final val size // com.eignex.klause.factor.global/Distinct.Operand.size|{}size[0]
@@ -14425,16 +14425,16 @@ final class com.eignex.klause.propagation/PropagationState { // com.eignex.klaus
 final class com.eignex.klause.propagation/SharedClause // com.eignex.klause.propagation/SharedClause|null[0]
 
 final class com.eignex.klause.schema/AffineOperand { // com.eignex.klause.schema/AffineOperand|null[0]
-    constructor <init>(kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/IntTerm, com.eignex.klause.simplex.exact/BigFraction>> = ..., kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/BoolTerm, com.eignex.klause.simplex.exact/BigFraction>> = ..., kotlin.collections/List<kotlin/Pair<com.eignex.klause.schema/FloatHandle, com.eignex.klause.simplex.exact/BigFraction>> = ..., com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.schema/AffineOperand.<init>|<init>(kotlin.collections.List<kotlin.Pair<com.eignex.klause.model.IntTerm,com.eignex.klause.simplex.exact.BigFraction>>;kotlin.collections.List<kotlin.Pair<com.eignex.klause.model.BoolTerm,com.eignex.klause.simplex.exact.BigFraction>>;kotlin.collections.List<kotlin.Pair<com.eignex.klause.schema.FloatHandle,com.eignex.klause.simplex.exact.BigFraction>>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    constructor <init>(kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/IntTerm, com.eignex.util.numbers/BigFraction>> = ..., kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/BoolTerm, com.eignex.util.numbers/BigFraction>> = ..., kotlin.collections/List<kotlin/Pair<com.eignex.klause.schema/FloatHandle, com.eignex.util.numbers/BigFraction>> = ..., com.eignex.util.numbers/BigFraction = ...) // com.eignex.klause.schema/AffineOperand.<init>|<init>(kotlin.collections.List<kotlin.Pair<com.eignex.klause.model.IntTerm,com.eignex.util.numbers.BigFraction>>;kotlin.collections.List<kotlin.Pair<com.eignex.klause.model.BoolTerm,com.eignex.util.numbers.BigFraction>>;kotlin.collections.List<kotlin.Pair<com.eignex.klause.schema.FloatHandle,com.eignex.util.numbers.BigFraction>>;com.eignex.util.numbers.BigFraction){}[0]
 
     final val bools // com.eignex.klause.schema/AffineOperand.bools|{}bools[0]
-        final fun <get-bools>(): kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/BoolTerm, com.eignex.klause.simplex.exact/BigFraction>> // com.eignex.klause.schema/AffineOperand.bools.<get-bools>|<get-bools>(){}[0]
+        final fun <get-bools>(): kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/BoolTerm, com.eignex.util.numbers/BigFraction>> // com.eignex.klause.schema/AffineOperand.bools.<get-bools>|<get-bools>(){}[0]
     final val constant // com.eignex.klause.schema/AffineOperand.constant|{}constant[0]
-        final fun <get-constant>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.schema/AffineOperand.constant.<get-constant>|<get-constant>(){}[0]
+        final fun <get-constant>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.schema/AffineOperand.constant.<get-constant>|<get-constant>(){}[0]
     final val ints // com.eignex.klause.schema/AffineOperand.ints|{}ints[0]
-        final fun <get-ints>(): kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/IntTerm, com.eignex.klause.simplex.exact/BigFraction>> // com.eignex.klause.schema/AffineOperand.ints.<get-ints>|<get-ints>(){}[0]
+        final fun <get-ints>(): kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/IntTerm, com.eignex.util.numbers/BigFraction>> // com.eignex.klause.schema/AffineOperand.ints.<get-ints>|<get-ints>(){}[0]
     final val reals // com.eignex.klause.schema/AffineOperand.reals|{}reals[0]
-        final fun <get-reals>(): kotlin.collections/List<kotlin/Pair<com.eignex.klause.schema/FloatHandle, com.eignex.klause.simplex.exact/BigFraction>> // com.eignex.klause.schema/AffineOperand.reals.<get-reals>|<get-reals>(){}[0]
+        final fun <get-reals>(): kotlin.collections/List<kotlin/Pair<com.eignex.klause.schema/FloatHandle, com.eignex.util.numbers/BigFraction>> // com.eignex.klause.schema/AffineOperand.reals.<get-reals>|<get-reals>(){}[0]
 }
 
 final class com.eignex.klause.schema/BoolHandle : com.eignex.klause.model/BoolTerm { // com.eignex.klause.schema/BoolHandle|null[0]
@@ -14628,42 +14628,8 @@ final class com.eignex.klause.schema/OptNominalHandle { // com.eignex.klause.sch
     final fun ne(kotlin/String): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/OptNominalHandle.ne|ne(kotlin.String){}[0]
 }
 
-final class com.eignex.klause.simplex.exact/BigFraction { // com.eignex.klause.simplex.exact/BigFraction|null[0]
-    final val den // com.eignex.klause.simplex.exact/BigFraction.den|{}den[0]
-        final fun <get-den>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.simplex.exact/BigFraction.den.<get-den>|<get-den>(){}[0]
-    final val isZero // com.eignex.klause.simplex.exact/BigFraction.isZero|{}isZero[0]
-        final fun <get-isZero>(): kotlin/Boolean // com.eignex.klause.simplex.exact/BigFraction.isZero.<get-isZero>|<get-isZero>(){}[0]
-    final val num // com.eignex.klause.simplex.exact/BigFraction.num|{}num[0]
-        final fun <get-num>(): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.simplex.exact/BigFraction.num.<get-num>|<get-num>(){}[0]
-
-    final fun compareTo(com.eignex.klause.simplex.exact/BigFraction): kotlin/Int // com.eignex.klause.simplex.exact/BigFraction.compareTo|compareTo(com.eignex.klause.simplex.exact.BigFraction){}[0]
-    final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.simplex.exact/BigFraction.equals|equals(kotlin.Any?){}[0]
-    final fun hashCode(): kotlin/Int // com.eignex.klause.simplex.exact/BigFraction.hashCode|hashCode(){}[0]
-    final fun minus(com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.minus|minus(com.eignex.klause.simplex.exact.BigFraction){}[0]
-    final fun negated(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.negated|negated(){}[0]
-    final fun plus(com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.plus|plus(com.eignex.klause.simplex.exact.BigFraction){}[0]
-    final fun reciprocal(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.reciprocal|reciprocal(){}[0]
-    final fun signum(): kotlin/Int // com.eignex.klause.simplex.exact/BigFraction.signum|signum(){}[0]
-    final fun times(com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.times|times(com.eignex.klause.simplex.exact.BigFraction){}[0]
-    final fun toDouble(): kotlin/Double // com.eignex.klause.simplex.exact/BigFraction.toDouble|toDouble(){}[0]
-    final fun toString(): kotlin/String // com.eignex.klause.simplex.exact/BigFraction.toString|toString(){}[0]
-
-    final object Companion { // com.eignex.klause.simplex.exact/BigFraction.Companion|null[0]
-        final val MINUS_ONE // com.eignex.klause.simplex.exact/BigFraction.Companion.MINUS_ONE|{}MINUS_ONE[0]
-            final fun <get-MINUS_ONE>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.MINUS_ONE.<get-MINUS_ONE>|<get-MINUS_ONE>(){}[0]
-        final val ONE // com.eignex.klause.simplex.exact/BigFraction.Companion.ONE|{}ONE[0]
-            final fun <get-ONE>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.ONE.<get-ONE>|<get-ONE>(){}[0]
-        final val ZERO // com.eignex.klause.simplex.exact/BigFraction.Companion.ZERO|{}ZERO[0]
-            final fun <get-ZERO>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.ZERO.<get-ZERO>|<get-ZERO>(){}[0]
-
-        final fun of(com.ionspin.kotlin.bignum.integer/BigInteger, com.ionspin.kotlin.bignum.integer/BigInteger): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.of|of(com.ionspin.kotlin.bignum.integer.BigInteger;com.ionspin.kotlin.bignum.integer.BigInteger){}[0]
-        final fun ofDouble(kotlin/Double): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.simplex.exact/BigFraction.Companion.ofDouble|ofDouble(kotlin.Double){}[0]
-        final fun ofLong(kotlin/Long): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.simplex.exact/BigFraction.Companion.ofLong|ofLong(kotlin.Long){}[0]
-    }
-}
-
 final class com.eignex.klause.solver.evidence/LinearSourceSemanticsChecker : com.eignex.klause.solver.evidence/SourceSemanticsChecker { // com.eignex.klause.solver.evidence/LinearSourceSemanticsChecker|null[0]
-    constructor <init>(kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate>, kotlin.collections/List<com.eignex.klause.solver.evidence/SourcePremise>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> = ..., com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.solver.evidence/LinearSourceSemanticsChecker.<init>|<init>(kotlin.collections.Set<com.eignex.klause.solver.evidence.SourceCoordinate>;kotlin.collections.List<com.eignex.klause.solver.evidence.SourcePremise>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    constructor <init>(kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate>, kotlin.collections/List<com.eignex.klause.solver.evidence/SourcePremise>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> = ..., com.eignex.util.numbers/BigFraction = ...) // com.eignex.klause.solver.evidence/LinearSourceSemanticsChecker.<init>|<init>(kotlin.collections.Set<com.eignex.klause.solver.evidence.SourceCoordinate>;kotlin.collections.List<com.eignex.klause.solver.evidence.SourcePremise>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.util.numbers.BigFraction>;com.eignex.util.numbers.BigFraction){}[0]
 
     final fun objectiveEquals(com.eignex.klause.solver/Sample, com.eignex.klause.solver.evidence/SourceValue, com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.util/ExecutionControl): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/LinearSourceSemanticsChecker.objectiveEquals|objectiveEquals(com.eignex.klause.solver.Sample;com.eignex.klause.solver.evidence.SourceValue;com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.util.ExecutionControl){}[0]
     final fun ray(com.eignex.klause.solver.evidence/SourceClaim.Ray, com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.util/ExecutionControl): com.eignex.klause.solver.evidence/SourceEvidenceCheck // com.eignex.klause.solver.evidence/LinearSourceSemanticsChecker.ray|ray(com.eignex.klause.solver.evidence.SourceClaim.Ray;com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.util.ExecutionControl){}[0]
@@ -14671,23 +14637,23 @@ final class com.eignex.klause.solver.evidence/LinearSourceSemanticsChecker : com
 }
 
 final class com.eignex.klause.solver.evidence/SourceAffineImage { // com.eignex.klause.solver.evidence/SourceAffineImage|null[0]
-    constructor <init>(kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.solver.evidence/SourceAffineImage.<init>|<init>(kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    constructor <init>(kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction>, com.eignex.util.numbers/BigFraction = ...) // com.eignex.klause.solver.evidence/SourceAffineImage.<init>|<init>(kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.util.numbers.BigFraction>;com.eignex.util.numbers.BigFraction){}[0]
 
     final val coefficients // com.eignex.klause.solver.evidence/SourceAffineImage.coefficients|{}coefficients[0]
-        final fun <get-coefficients>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.evidence/SourceAffineImage.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+        final fun <get-coefficients>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.evidence/SourceAffineImage.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
     final val constant // com.eignex.klause.solver.evidence/SourceAffineImage.constant|{}constant[0]
-        final fun <get-constant>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceAffineImage.constant.<get-constant>|<get-constant>(){}[0]
+        final fun <get-constant>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceAffineImage.constant.<get-constant>|<get-constant>(){}[0]
 }
 
 final class com.eignex.klause.solver.evidence/SourceCondition { // com.eignex.klause.solver.evidence/SourceCondition|null[0]
-    constructor <init>(kotlin.collections/Map<kotlin/Int, kotlin/Boolean> = ..., kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> = ...) // com.eignex.klause.solver.evidence/SourceCondition.<init>|<init>(kotlin.collections.Map<kotlin.Int,kotlin.Boolean>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>){}[0]
+    constructor <init>(kotlin.collections/Map<kotlin/Int, kotlin/Boolean> = ..., kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> = ..., kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> = ...) // com.eignex.klause.solver.evidence/SourceCondition.<init>|<init>(kotlin.collections.Map<kotlin.Int,kotlin.Boolean>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.util.numbers.BigFraction>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.util.numbers.BigFraction>){}[0]
 
     final val bools // com.eignex.klause.solver.evidence/SourceCondition.bools|{}bools[0]
         final fun <get-bools>(): kotlin.collections/Map<kotlin/Int, kotlin/Boolean> // com.eignex.klause.solver.evidence/SourceCondition.bools.<get-bools>|<get-bools>(){}[0]
     final val lower // com.eignex.klause.solver.evidence/SourceCondition.lower|{}lower[0]
-        final fun <get-lower>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.evidence/SourceCondition.lower.<get-lower>|<get-lower>(){}[0]
+        final fun <get-lower>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.evidence/SourceCondition.lower.<get-lower>|<get-lower>(){}[0]
     final val upper // com.eignex.klause.solver.evidence/SourceCondition.upper|{}upper[0]
-        final fun <get-upper>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.evidence/SourceCondition.upper.<get-upper>|<get-upper>(){}[0]
+        final fun <get-upper>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.evidence/SourceCondition.upper.<get-upper>|<get-upper>(){}[0]
 
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.evidence/SourceCondition.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.evidence/SourceCondition.hashCode|hashCode(){}[0]
@@ -14763,12 +14729,12 @@ final class com.eignex.klause.solver.evidence/SourceEvidenceVerifier { // com.ei
 }
 
 final class com.eignex.klause.solver.evidence/SourceInequality { // com.eignex.klause.solver.evidence/SourceInequality|null[0]
-    constructor <init>(kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ...) // com.eignex.klause.solver.evidence/SourceInequality.<init>|<init>(kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean){}[0]
+    constructor <init>(kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction>, com.eignex.util.numbers/BigFraction, kotlin/Boolean = ...) // com.eignex.klause.solver.evidence/SourceInequality.<init>|<init>(kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.util.numbers.BigFraction>;com.eignex.util.numbers.BigFraction;kotlin.Boolean){}[0]
 
     final val coefficients // com.eignex.klause.solver.evidence/SourceInequality.coefficients|{}coefficients[0]
-        final fun <get-coefficients>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.evidence/SourceInequality.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
+        final fun <get-coefficients>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.evidence/SourceInequality.coefficients.<get-coefficients>|<get-coefficients>(){}[0]
     final val rhs // com.eignex.klause.solver.evidence/SourceInequality.rhs|{}rhs[0]
-        final fun <get-rhs>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceInequality.rhs.<get-rhs>|<get-rhs>(){}[0]
+        final fun <get-rhs>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceInequality.rhs.<get-rhs>|<get-rhs>(){}[0]
     final val strict // com.eignex.klause.solver.evidence/SourceInequality.strict|{}strict[0]
         final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.solver.evidence/SourceInequality.strict.<get-strict>|<get-strict>(){}[0]
 
@@ -14807,25 +14773,25 @@ final class com.eignex.klause.solver.evidence/SourceObjective { // com.eignex.kl
 
 final class com.eignex.klause.solver.evidence/SourcePremise { // com.eignex.klause.solver.evidence/SourcePremise|null[0]
     constructor <init>(com.eignex.klause.solver.evidence/SourceInequality, kotlin.collections/Map<kotlin/Int, kotlin/Boolean> = ...) // com.eignex.klause.solver.evidence/SourcePremise.<init>|<init>(com.eignex.klause.solver.evidence.SourceInequality;kotlin.collections.Map<kotlin.Int,kotlin.Boolean>){}[0]
-    constructor <init>(com.eignex.klause.solver.evidence/SourceInequality, kotlin.collections/Map<kotlin/Int, kotlin/Boolean>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>) // com.eignex.klause.solver.evidence/SourcePremise.<init>|<init>(com.eignex.klause.solver.evidence.SourceInequality;kotlin.collections.Map<kotlin.Int,kotlin.Boolean>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>){}[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceInequality, kotlin.collections/Map<kotlin/Int, kotlin/Boolean>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction>) // com.eignex.klause.solver.evidence/SourcePremise.<init>|<init>(com.eignex.klause.solver.evidence.SourceInequality;kotlin.collections.Map<kotlin.Int,kotlin.Boolean>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.util.numbers.BigFraction>){}[0]
 
     final val guards // com.eignex.klause.solver.evidence/SourcePremise.guards|{}guards[0]
         final fun <get-guards>(): kotlin.collections/Map<kotlin/Int, kotlin/Boolean> // com.eignex.klause.solver.evidence/SourcePremise.guards.<get-guards>|<get-guards>(){}[0]
     final val inequality // com.eignex.klause.solver.evidence/SourcePremise.inequality|{}inequality[0]
         final fun <get-inequality>(): com.eignex.klause.solver.evidence/SourceInequality // com.eignex.klause.solver.evidence/SourcePremise.inequality.<get-inequality>|<get-inequality>(){}[0]
     final val integerPins // com.eignex.klause.solver.evidence/SourcePremise.integerPins|{}integerPins[0]
-        final fun <get-integerPins>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.evidence/SourcePremise.integerPins.<get-integerPins>|<get-integerPins>(){}[0]
+        final fun <get-integerPins>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.evidence/SourcePremise.integerPins.<get-integerPins>|<get-integerPins>(){}[0]
 }
 
 final class com.eignex.klause.solver.evidence/SourceProofContext { // com.eignex.klause.solver.evidence/SourceProofContext|null[0]
-    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate>, kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourcePremise>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction>? = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.evidence/SourceSemanticsChecker? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.evidence/SourceProofContext.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.Set<com.eignex.klause.solver.evidence.SourceCoordinate>;kotlin.collections.Map<kotlin.String,com.eignex.klause.solver.evidence.SourcePremise>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.simplex.exact.BigFraction>?;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.evidence.SourceSemanticsChecker?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate>, kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourcePremise>, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction>? = ..., com.eignex.util.numbers/BigFraction = ..., com.eignex.klause.solver.evidence/SourceSemanticsChecker? = ..., com.eignex.klause.ir/EffectiveSourceSemantics? = ...) // com.eignex.klause.solver.evidence/SourceProofContext.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.Set<com.eignex.klause.solver.evidence.SourceCoordinate>;kotlin.collections.Map<kotlin.String,com.eignex.klause.solver.evidence.SourcePremise>;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.util.numbers.BigFraction>?;com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.evidence.SourceSemanticsChecker?;com.eignex.klause.ir.EffectiveSourceSemantics?){}[0]
 
     final val coordinates // com.eignex.klause.solver.evidence/SourceProofContext.coordinates|{}coordinates[0]
         final fun <get-coordinates>(): kotlin.collections/Set<com.eignex.klause.solver.evidence/SourceCoordinate> // com.eignex.klause.solver.evidence/SourceProofContext.coordinates.<get-coordinates>|<get-coordinates>(){}[0]
     final val objective // com.eignex.klause.solver.evidence/SourceProofContext.objective|{}objective[0]
-        final fun <get-objective>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.evidence/SourceProofContext.objective.<get-objective>|<get-objective>(){}[0]
+        final fun <get-objective>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.evidence/SourceProofContext.objective.<get-objective>|<get-objective>(){}[0]
     final val objectiveConstant // com.eignex.klause.solver.evidence/SourceProofContext.objectiveConstant|{}objectiveConstant[0]
-        final fun <get-objectiveConstant>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceProofContext.objectiveConstant.<get-objectiveConstant>|<get-objectiveConstant>(){}[0]
+        final fun <get-objectiveConstant>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceProofContext.objectiveConstant.<get-objectiveConstant>|<get-objectiveConstant>(){}[0]
     final val premises // com.eignex.klause.solver.evidence/SourceProofContext.premises|{}premises[0]
         final fun <get-premises>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourcePremise> // com.eignex.klause.solver.evidence/SourceProofContext.premises.<get-premises>|<get-premises>(){}[0]
     final val scope // com.eignex.klause.solver.evidence/SourceProofContext.scope|{}scope[0]
@@ -14898,14 +14864,14 @@ final class com.eignex.klause.solver.evidence/SourceScope { // com.eignex.klause
 }
 
 final class com.eignex.klause.solver.evidence/SourceTransformation { // com.eignex.klause.solver.evidence/SourceTransformation|null[0]
-    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.solver.evidence/SourceAffineImage>, kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourceDerivation>, com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.solver.evidence/SourceTransformation.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.solver.evidence.SourceAffineImage>;kotlin.collections.Map<kotlin.String,com.eignex.klause.solver.evidence.SourceDerivation>;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, com.eignex.klause.solver.evidence/SourceScope, kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.solver.evidence/SourceAffineImage>, kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourceDerivation>, com.eignex.util.numbers/BigFraction = ..., com.eignex.util.numbers/BigFraction = ...) // com.eignex.klause.solver.evidence/SourceTransformation.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;com.eignex.klause.solver.evidence.SourceScope;kotlin.collections.Map<com.eignex.klause.solver.evidence.SourceCoordinate,com.eignex.klause.solver.evidence.SourceAffineImage>;kotlin.collections.Map<kotlin.String,com.eignex.klause.solver.evidence.SourceDerivation>;com.eignex.util.numbers.BigFraction;com.eignex.util.numbers.BigFraction){}[0]
 
     final val images // com.eignex.klause.solver.evidence/SourceTransformation.images|{}images[0]
         final fun <get-images>(): kotlin.collections/Map<com.eignex.klause.solver.evidence/SourceCoordinate, com.eignex.klause.solver.evidence/SourceAffineImage> // com.eignex.klause.solver.evidence/SourceTransformation.images.<get-images>|<get-images>(){}[0]
     final val objectiveOffset // com.eignex.klause.solver.evidence/SourceTransformation.objectiveOffset|{}objectiveOffset[0]
-        final fun <get-objectiveOffset>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceTransformation.objectiveOffset.<get-objectiveOffset>|<get-objectiveOffset>(){}[0]
+        final fun <get-objectiveOffset>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceTransformation.objectiveOffset.<get-objectiveOffset>|<get-objectiveOffset>(){}[0]
     final val objectiveScale // com.eignex.klause.solver.evidence/SourceTransformation.objectiveScale|{}objectiveScale[0]
-        final fun <get-objectiveScale>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.evidence/SourceTransformation.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
+        final fun <get-objectiveScale>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.evidence/SourceTransformation.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
     final val premiseDerivations // com.eignex.klause.solver.evidence/SourceTransformation.premiseDerivations|{}premiseDerivations[0]
         final fun <get-premiseDerivations>(): kotlin.collections/Map<kotlin/String, com.eignex.klause.solver.evidence/SourceDerivation> // com.eignex.klause.solver.evidence/SourceTransformation.premiseDerivations.<get-premiseDerivations>|<get-premiseDerivations>(){}[0]
     final val source // com.eignex.klause.solver.evidence/SourceTransformation.source|{}source[0]
@@ -14934,7 +14900,7 @@ final class com.eignex.klause.solver.objective/LinearObjective : com.eignex.klau
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.objective/LinearObjective.equals|equals(kotlin.Any?){}[0]
     final fun evaluate(com.eignex.klause.solver/Assignment): kotlin/Double // com.eignex.klause.solver.objective/LinearObjective.evaluate|evaluate(com.eignex.klause.solver.Assignment){}[0]
     final fun evaluate(com.eignex.klause.solver/Sample): kotlin/Double // com.eignex.klause.solver.objective/LinearObjective.evaluate|evaluate(com.eignex.klause.solver.Sample){}[0]
-    final fun evaluateExact(com.eignex.klause.solver/Sample): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.objective/LinearObjective.evaluateExact|evaluateExact(com.eignex.klause.solver.Sample){}[0]
+    final fun evaluateExact(com.eignex.klause.solver/Sample): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.objective/LinearObjective.evaluateExact|evaluateExact(com.eignex.klause.solver.Sample){}[0]
     final fun evaluateLong(com.eignex.klause.solver/Assignment): kotlin/Long // com.eignex.klause.solver.objective/LinearObjective.evaluateLong|evaluateLong(com.eignex.klause.solver.Assignment){}[0]
     final fun evaluateLong(com.eignex.klause.solver/Sample): kotlin/Long // com.eignex.klause.solver.objective/LinearObjective.evaluateLong|evaluateLong(com.eignex.klause.solver.Sample){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.objective/LinearObjective.hashCode|hashCode(){}[0]
@@ -15276,12 +15242,12 @@ final class com.eignex.klause.solver.pipeline/LinearSourceBound { // com.eignex.
     final val strict // com.eignex.klause.solver.pipeline/LinearSourceBound.strict|{}strict[0]
         final fun <get-strict>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceBound.strict.<get-strict>|<get-strict>(){}[0]
     final val value // com.eignex.klause.solver.pipeline/LinearSourceBound.value|{}value[0]
-        final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/LinearSourceBound.value.<get-value>|<get-value>(){}[0]
+        final fun <get-value>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.pipeline/LinearSourceBound.value.<get-value>|<get-value>(){}[0]
 }
 
 final class com.eignex.klause.solver.pipeline/LinearSourceOutcome { // com.eignex.klause.solver.pipeline/LinearSourceOutcome|null[0]
     final val acceptedObjectiveBound // com.eignex.klause.solver.pipeline/LinearSourceOutcome.acceptedObjectiveBound|{}acceptedObjectiveBound[0]
-        final fun <get-acceptedObjectiveBound>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.pipeline/LinearSourceOutcome.acceptedObjectiveBound.<get-acceptedObjectiveBound>|<get-acceptedObjectiveBound>(){}[0]
+        final fun <get-acceptedObjectiveBound>(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.solver.pipeline/LinearSourceOutcome.acceptedObjectiveBound.<get-acceptedObjectiveBound>|<get-acceptedObjectiveBound>(){}[0]
     final val claimsCoverTolerance // com.eignex.klause.solver.pipeline/LinearSourceOutcome.claimsCoverTolerance|{}claimsCoverTolerance[0]
         final fun <get-claimsCoverTolerance>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.claimsCoverTolerance.<get-claimsCoverTolerance>|<get-claimsCoverTolerance>(){}[0]
     final val conclusion // com.eignex.klause.solver.pipeline/LinearSourceOutcome.conclusion|{}conclusion[0]
@@ -15301,7 +15267,7 @@ final class com.eignex.klause.solver.pipeline/LinearSourceOutcome { // com.eigne
     final val numericalClaims // com.eignex.klause.solver.pipeline/LinearSourceOutcome.numericalClaims|{}numericalClaims[0]
         final fun <get-numericalClaims>(): kotlin/Boolean // com.eignex.klause.solver.pipeline/LinearSourceOutcome.numericalClaims.<get-numericalClaims>|<get-numericalClaims>(){}[0]
     final val objectiveScale // com.eignex.klause.solver.pipeline/LinearSourceOutcome.objectiveScale|{}objectiveScale[0]
-        final fun <get-objectiveScale>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.pipeline/LinearSourceOutcome.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
+        final fun <get-objectiveScale>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.pipeline/LinearSourceOutcome.objectiveScale.<get-objectiveScale>|<get-objectiveScale>(){}[0]
     final val source // com.eignex.klause.solver.pipeline/LinearSourceOutcome.source|{}source[0]
         final fun <get-source>(): com.eignex.klause.ir/LinearSourceProblem // com.eignex.klause.solver.pipeline/LinearSourceOutcome.source.<get-source>|<get-source>(){}[0]
 }
@@ -16132,7 +16098,7 @@ final class com.eignex.klause.solver.pipeline/TranscendentalTheoryExecution { //
 }
 
 final class com.eignex.klause.solver.pipeline/TranscendentalTheoryParams { // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams|null[0]
-    constructor <init>(kotlin/Long? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Long? = ..., com.eignex.klause.util/ExecutionControl = ..., com.eignex.klause.util/ExecutionControl = ..., com.eignex.klause.solver.pipeline/PolynomialStrategyParams = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Set<kotlin/Int> = ..., kotlin.collections/Set<kotlin/Int> = ...) // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.<init>|<init>(kotlin.Long?;kotlin.Int;kotlin.Int;kotlin.Int?;kotlin.Long?;com.eignex.klause.util.ExecutionControl;com.eignex.klause.util.ExecutionControl;com.eignex.klause.solver.pipeline.PolynomialStrategyParams;com.eignex.klause.backtrack.NodeBudget?;kotlin.collections.Map<kotlin.Int,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Map<kotlin.Int,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Set<kotlin.Int>;kotlin.collections.Set<kotlin.Int>){}[0]
+    constructor <init>(kotlin/Long? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Long? = ..., com.eignex.klause.util/ExecutionControl = ..., com.eignex.klause.util/ExecutionControl = ..., com.eignex.klause.solver.pipeline/PolynomialStrategyParams = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin.collections/Map<kotlin/Int, com.eignex.util.numbers/BigFraction> = ..., kotlin.collections/Map<kotlin/Int, com.eignex.util.numbers/BigFraction> = ..., kotlin.collections/Set<kotlin/Int> = ..., kotlin.collections/Set<kotlin/Int> = ...) // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.<init>|<init>(kotlin.Long?;kotlin.Int;kotlin.Int;kotlin.Int?;kotlin.Long?;com.eignex.klause.util.ExecutionControl;com.eignex.klause.util.ExecutionControl;com.eignex.klause.solver.pipeline.PolynomialStrategyParams;com.eignex.klause.backtrack.NodeBudget?;kotlin.collections.Map<kotlin.Int,com.eignex.util.numbers.BigFraction>;kotlin.collections.Map<kotlin.Int,com.eignex.util.numbers.BigFraction>;kotlin.collections.Set<kotlin.Int>;kotlin.collections.Set<kotlin.Int>){}[0]
 
     final val cancellation // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.cancellation|{}cancellation[0]
         final fun <get-cancellation>(): com.eignex.klause.util/ExecutionControl // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
@@ -16149,9 +16115,9 @@ final class com.eignex.klause.solver.pipeline/TranscendentalTheoryParams { // co
     final val nodeBudget // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.nodeBudget|{}nodeBudget[0]
         final fun <get-nodeBudget>(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.nodeBudget.<get-nodeBudget>|<get-nodeBudget>(){}[0]
     final val realLower // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realLower|{}realLower[0]
-        final fun <get-realLower>(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realLower.<get-realLower>|<get-realLower>(){}[0]
+        final fun <get-realLower>(): kotlin.collections/Map<kotlin/Int, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realLower.<get-realLower>|<get-realLower>(){}[0]
     final val realUpper // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realUpper|{}realUpper[0]
-        final fun <get-realUpper>(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realUpper.<get-realUpper>|<get-realUpper>(){}[0]
+        final fun <get-realUpper>(): kotlin.collections/Map<kotlin/Int, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.realUpper.<get-realUpper>|<get-realUpper>(){}[0]
     final val strategy // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.strategy|{}strategy[0]
         final fun <get-strategy>(): com.eignex.klause.solver.pipeline/PolynomialStrategyParams // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.strategy.<get-strategy>|<get-strategy>(){}[0]
     final val strictRealLower // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.strictRealLower|{}strictRealLower[0]
@@ -16162,8 +16128,8 @@ final class com.eignex.klause.solver.pipeline/TranscendentalTheoryParams { // co
         final fun <get-timeout>(): com.eignex.klause.util/ExecutionControl // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.timeout.<get-timeout>|<get-timeout>(){}[0]
 
     final fun component1(): kotlin/Long? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component1|component1(){}[0]
-    final fun component10(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component10|component10(){}[0]
-    final fun component11(): kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component11|component11(){}[0]
+    final fun component10(): kotlin.collections/Map<kotlin/Int, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component10|component10(){}[0]
+    final fun component11(): kotlin.collections/Map<kotlin/Int, com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component11|component11(){}[0]
     final fun component12(): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component12|component12(){}[0]
     final fun component13(): kotlin.collections/Set<kotlin/Int> // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component13|component13(){}[0]
     final fun component2(): kotlin/Int // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component2|component2(){}[0]
@@ -16174,7 +16140,7 @@ final class com.eignex.klause.solver.pipeline/TranscendentalTheoryParams { // co
     final fun component7(): com.eignex.klause.util/ExecutionControl // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component7|component7(){}[0]
     final fun component8(): com.eignex.klause.solver.pipeline/PolynomialStrategyParams // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component8|component8(){}[0]
     final fun component9(): com.eignex.klause.backtrack/NodeBudget? // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.component9|component9(){}[0]
-    final fun copy(kotlin/Long? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Long? = ..., com.eignex.klause.util/ExecutionControl = ..., com.eignex.klause.util/ExecutionControl = ..., com.eignex.klause.solver.pipeline/PolynomialStrategyParams = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Map<kotlin/Int, com.eignex.klause.simplex.exact/BigFraction> = ..., kotlin.collections/Set<kotlin/Int> = ..., kotlin.collections/Set<kotlin/Int> = ...): com.eignex.klause.solver.pipeline/TranscendentalTheoryParams // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.copy|copy(kotlin.Long?;kotlin.Int;kotlin.Int;kotlin.Int?;kotlin.Long?;com.eignex.klause.util.ExecutionControl;com.eignex.klause.util.ExecutionControl;com.eignex.klause.solver.pipeline.PolynomialStrategyParams;com.eignex.klause.backtrack.NodeBudget?;kotlin.collections.Map<kotlin.Int,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Map<kotlin.Int,com.eignex.klause.simplex.exact.BigFraction>;kotlin.collections.Set<kotlin.Int>;kotlin.collections.Set<kotlin.Int>){}[0]
+    final fun copy(kotlin/Long? = ..., kotlin/Int = ..., kotlin/Int = ..., kotlin/Int? = ..., kotlin/Long? = ..., com.eignex.klause.util/ExecutionControl = ..., com.eignex.klause.util/ExecutionControl = ..., com.eignex.klause.solver.pipeline/PolynomialStrategyParams = ..., com.eignex.klause.backtrack/NodeBudget? = ..., kotlin.collections/Map<kotlin/Int, com.eignex.util.numbers/BigFraction> = ..., kotlin.collections/Map<kotlin/Int, com.eignex.util.numbers/BigFraction> = ..., kotlin.collections/Set<kotlin/Int> = ..., kotlin.collections/Set<kotlin/Int> = ...): com.eignex.klause.solver.pipeline/TranscendentalTheoryParams // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.copy|copy(kotlin.Long?;kotlin.Int;kotlin.Int;kotlin.Int?;kotlin.Long?;com.eignex.klause.util.ExecutionControl;com.eignex.klause.util.ExecutionControl;com.eignex.klause.solver.pipeline.PolynomialStrategyParams;com.eignex.klause.backtrack.NodeBudget?;kotlin.collections.Map<kotlin.Int,com.eignex.util.numbers.BigFraction>;kotlin.collections.Map<kotlin.Int,com.eignex.util.numbers.BigFraction>;kotlin.collections.Set<kotlin.Int>;kotlin.collections.Set<kotlin.Int>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.pipeline/TranscendentalTheoryParams.toString|toString(){}[0]
@@ -16480,7 +16446,7 @@ final class com.eignex.klause.solver.result/LinearOptimizationResult { // com.ei
     final val terminal // com.eignex.klause.solver.result/LinearOptimizationResult.terminal|{}terminal[0]
         final fun <get-terminal>(): com.eignex.klause.solver.evidence/SourceEvidence? // com.eignex.klause.solver.result/LinearOptimizationResult.terminal.<get-terminal>|<get-terminal>(){}[0]
     final val value // com.eignex.klause.solver.result/LinearOptimizationResult.value|{}value[0]
-        final fun <get-value>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.result/LinearOptimizationResult.value.<get-value>|<get-value>(){}[0]
+        final fun <get-value>(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.solver.result/LinearOptimizationResult.value.<get-value>|<get-value>(){}[0]
 }
 
 final class com.eignex.klause.solver.result/LocalSearchResidual { // com.eignex.klause.solver.result/LocalSearchResidual|null[0]
@@ -18133,10 +18099,10 @@ final class com.eignex.klause.solver.search/BooleanCube { // com.eignex.klause.s
 }
 
 final class com.eignex.klause.solver.search/BooleanProofContext { // com.eignex.klause.solver.search/BooleanProofContext|null[0]
-    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, kotlin/String, com.eignex.klause.simplex.exact/BigFraction? = ...) // com.eignex.klause.solver.search/BooleanProofContext.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;kotlin.String;com.eignex.klause.simplex.exact.BigFraction?){}[0]
+    constructor <init>(com.eignex.klause.solver.evidence/SourceScope, kotlin/String, com.eignex.util.numbers/BigFraction? = ...) // com.eignex.klause.solver.search/BooleanProofContext.<init>|<init>(com.eignex.klause.solver.evidence.SourceScope;kotlin.String;com.eignex.util.numbers.BigFraction?){}[0]
 
     final val cutoff // com.eignex.klause.solver.search/BooleanProofContext.cutoff|{}cutoff[0]
-        final fun <get-cutoff>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.search/BooleanProofContext.cutoff.<get-cutoff>|<get-cutoff>(){}[0]
+        final fun <get-cutoff>(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.solver.search/BooleanProofContext.cutoff.<get-cutoff>|<get-cutoff>(){}[0]
     final val mapping // com.eignex.klause.solver.search/BooleanProofContext.mapping|{}mapping[0]
         final fun <get-mapping>(): kotlin/String // com.eignex.klause.solver.search/BooleanProofContext.mapping.<get-mapping>|<get-mapping>(){}[0]
     final val scope // com.eignex.klause.solver.search/BooleanProofContext.scope|{}scope[0]
@@ -18144,8 +18110,8 @@ final class com.eignex.klause.solver.search/BooleanProofContext { // com.eignex.
 
     final fun component1(): com.eignex.klause.solver.evidence/SourceScope // com.eignex.klause.solver.search/BooleanProofContext.component1|component1(){}[0]
     final fun component2(): kotlin/String // com.eignex.klause.solver.search/BooleanProofContext.component2|component2(){}[0]
-    final fun component3(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.search/BooleanProofContext.component3|component3(){}[0]
-    final fun copy(com.eignex.klause.solver.evidence/SourceScope = ..., kotlin/String = ..., com.eignex.klause.simplex.exact/BigFraction? = ...): com.eignex.klause.solver.search/BooleanProofContext // com.eignex.klause.solver.search/BooleanProofContext.copy|copy(com.eignex.klause.solver.evidence.SourceScope;kotlin.String;com.eignex.klause.simplex.exact.BigFraction?){}[0]
+    final fun component3(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.solver.search/BooleanProofContext.component3|component3(){}[0]
+    final fun copy(com.eignex.klause.solver.evidence/SourceScope = ..., kotlin/String = ..., com.eignex.util.numbers/BigFraction? = ...): com.eignex.klause.solver.search/BooleanProofContext // com.eignex.klause.solver.search/BooleanProofContext.copy|copy(com.eignex.klause.solver.evidence.SourceScope;kotlin.String;com.eignex.util.numbers.BigFraction?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/BooleanProofContext.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/BooleanProofContext.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.search/BooleanProofContext.toString|toString(){}[0]
@@ -18380,11 +18346,11 @@ final class com.eignex.klause.solver.search/SearchExactRealExpressionValue : com
     final fun toString(): kotlin/String // com.eignex.klause.solver.search/SearchExactRealExpressionValue.toString|toString(){}[0]
 }
 
-final class com.eignex.klause.solver.search/SearchExactRealValue : com.eignex.klause.solver.search/TypedSearchValueKey<com.eignex.klause.simplex.exact/BigFraction> { // com.eignex.klause.solver.search/SearchExactRealValue|null[0]
+final class com.eignex.klause.solver.search/SearchExactRealValue : com.eignex.klause.solver.search/TypedSearchValueKey<com.eignex.util.numbers/BigFraction> { // com.eignex.klause.solver.search/SearchExactRealValue|null[0]
     constructor <init>(com.eignex.klause.ir/SourceRealId) // com.eignex.klause.solver.search/SearchExactRealValue.<init>|<init>(com.eignex.klause.ir.SourceRealId){}[0]
 
     final val valueType // com.eignex.klause.solver.search/SearchExactRealValue.valueType|{}valueType[0]
-        final fun <get-valueType>(): kotlin.reflect/KClass<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.search/SearchExactRealValue.valueType.<get-valueType>|<get-valueType>(){}[0]
+        final fun <get-valueType>(): kotlin.reflect/KClass<com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.search/SearchExactRealValue.valueType.<get-valueType>|<get-valueType>(){}[0]
     final val variable // com.eignex.klause.solver.search/SearchExactRealValue.variable|{}variable[0]
         final fun <get-variable>(): com.eignex.klause.ir/SourceRealId // com.eignex.klause.solver.search/SearchExactRealValue.variable.<get-variable>|<get-variable>(){}[0]
 
@@ -18568,7 +18534,7 @@ final class com.eignex.klause.solver.search/SourceBoundAtom : com.eignex.klause.
     final val terms // com.eignex.klause.solver.search/SourceBoundAtom.terms|{}terms[0]
         final fun <get-terms>(): kotlin.collections/List<com.eignex.klause.solver.search/SourceBoundTerm> // com.eignex.klause.solver.search/SourceBoundAtom.terms.<get-terms>|<get-terms>(){}[0]
     final val threshold // com.eignex.klause.solver.search/SourceBoundAtom.threshold|{}threshold[0]
-        final fun <get-threshold>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.search/SourceBoundAtom.threshold.<get-threshold>|<get-threshold>(){}[0]
+        final fun <get-threshold>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.search/SourceBoundAtom.threshold.<get-threshold>|<get-threshold>(){}[0]
     final val upper // com.eignex.klause.solver.search/SourceBoundAtom.upper|{}upper[0]
         final fun <get-upper>(): kotlin/Boolean // com.eignex.klause.solver.search/SourceBoundAtom.upper.<get-upper>|<get-upper>(){}[0]
 
@@ -18576,8 +18542,8 @@ final class com.eignex.klause.solver.search/SourceBoundAtom : com.eignex.klause.
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SourceBoundAtom.hashCode|hashCode(){}[0]
 
     final object Companion { // com.eignex.klause.solver.search/SourceBoundAtom.Companion|null[0]
-        final fun integerSplit(com.eignex.klause.solver.search/SearchContext, kotlin.collections/List<com.eignex.klause.solver.search/SourceBoundTerm>, com.eignex.klause.simplex.exact/BigFraction, com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.search/SourceBoundLimits = ...): com.eignex.klause.solver.search/SearchTheoryAtom? // com.eignex.klause.solver.search/SourceBoundAtom.Companion.integerSplit|integerSplit(com.eignex.klause.solver.search.SearchContext;kotlin.collections.List<com.eignex.klause.solver.search.SourceBoundTerm>;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.search.SourceBoundLimits){}[0]
-        final fun rationalSplit(com.eignex.klause.solver.search/SearchContext, kotlin.collections/List<com.eignex.klause.solver.search/SourceBoundTerm>, com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ..., com.eignex.klause.simplex.exact/BigFraction = ..., com.eignex.klause.solver.search/SourceBoundLimits = ...): com.eignex.klause.solver.search/SearchTheoryAtom? // com.eignex.klause.solver.search/SourceBoundAtom.Companion.rationalSplit|rationalSplit(com.eignex.klause.solver.search.SearchContext;kotlin.collections.List<com.eignex.klause.solver.search.SourceBoundTerm>;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean;com.eignex.klause.simplex.exact.BigFraction;com.eignex.klause.solver.search.SourceBoundLimits){}[0]
+        final fun integerSplit(com.eignex.klause.solver.search/SearchContext, kotlin.collections/List<com.eignex.klause.solver.search/SourceBoundTerm>, com.eignex.util.numbers/BigFraction, com.eignex.util.numbers/BigFraction = ..., com.eignex.klause.solver.search/SourceBoundLimits = ...): com.eignex.klause.solver.search/SearchTheoryAtom? // com.eignex.klause.solver.search/SourceBoundAtom.Companion.integerSplit|integerSplit(com.eignex.klause.solver.search.SearchContext;kotlin.collections.List<com.eignex.klause.solver.search.SourceBoundTerm>;com.eignex.util.numbers.BigFraction;com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.search.SourceBoundLimits){}[0]
+        final fun rationalSplit(com.eignex.klause.solver.search/SearchContext, kotlin.collections/List<com.eignex.klause.solver.search/SourceBoundTerm>, com.eignex.util.numbers/BigFraction, kotlin/Boolean = ..., com.eignex.util.numbers/BigFraction = ..., com.eignex.klause.solver.search/SourceBoundLimits = ...): com.eignex.klause.solver.search/SearchTheoryAtom? // com.eignex.klause.solver.search/SourceBoundAtom.Companion.rationalSplit|rationalSplit(com.eignex.klause.solver.search.SearchContext;kotlin.collections.List<com.eignex.klause.solver.search.SourceBoundTerm>;com.eignex.util.numbers.BigFraction;kotlin.Boolean;com.eignex.util.numbers.BigFraction;com.eignex.klause.solver.search.SourceBoundLimits){}[0]
     }
 }
 
@@ -18598,16 +18564,16 @@ final class com.eignex.klause.solver.search/SourceBoundLimits { // com.eignex.kl
 }
 
 final class com.eignex.klause.solver.search/SourceBoundTerm { // com.eignex.klause.solver.search/SourceBoundTerm|null[0]
-    constructor <init>(com.eignex.klause.solver.search/SearchValueKey, com.eignex.klause.simplex.exact/BigFraction) // com.eignex.klause.solver.search/SourceBoundTerm.<init>|<init>(com.eignex.klause.solver.search.SearchValueKey;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    constructor <init>(com.eignex.klause.solver.search/SearchValueKey, com.eignex.util.numbers/BigFraction) // com.eignex.klause.solver.search/SourceBoundTerm.<init>|<init>(com.eignex.klause.solver.search.SearchValueKey;com.eignex.util.numbers.BigFraction){}[0]
 
     final val coefficient // com.eignex.klause.solver.search/SourceBoundTerm.coefficient|{}coefficient[0]
-        final fun <get-coefficient>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.search/SourceBoundTerm.coefficient.<get-coefficient>|<get-coefficient>(){}[0]
+        final fun <get-coefficient>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.search/SourceBoundTerm.coefficient.<get-coefficient>|<get-coefficient>(){}[0]
     final val source // com.eignex.klause.solver.search/SourceBoundTerm.source|{}source[0]
         final fun <get-source>(): com.eignex.klause.solver.search/SearchValueKey // com.eignex.klause.solver.search/SourceBoundTerm.source.<get-source>|<get-source>(){}[0]
 
     final fun component1(): com.eignex.klause.solver.search/SearchValueKey // com.eignex.klause.solver.search/SourceBoundTerm.component1|component1(){}[0]
-    final fun component2(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.solver.search/SourceBoundTerm.component2|component2(){}[0]
-    final fun copy(com.eignex.klause.solver.search/SearchValueKey = ..., com.eignex.klause.simplex.exact/BigFraction = ...): com.eignex.klause.solver.search/SourceBoundTerm // com.eignex.klause.solver.search/SourceBoundTerm.copy|copy(com.eignex.klause.solver.search.SearchValueKey;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    final fun component2(): com.eignex.util.numbers/BigFraction // com.eignex.klause.solver.search/SourceBoundTerm.component2|component2(){}[0]
+    final fun copy(com.eignex.klause.solver.search/SearchValueKey = ..., com.eignex.util.numbers/BigFraction = ...): com.eignex.klause.solver.search/SourceBoundTerm // com.eignex.klause.solver.search/SourceBoundTerm.copy|copy(com.eignex.klause.solver.search.SearchValueKey;com.eignex.util.numbers.BigFraction){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver.search/SourceBoundTerm.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver.search/SourceBoundTerm.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.solver.search/SourceBoundTerm.toString|toString(){}[0]
@@ -18636,11 +18602,11 @@ final class com.eignex.klause.solver.validation/LinearSourceWitness { // com.eig
     final val exact // com.eignex.klause.solver.validation/LinearSourceWitness.exact|{}exact[0]
         final fun <get-exact>(): kotlin/Boolean // com.eignex.klause.solver.validation/LinearSourceWitness.exact.<get-exact>|<get-exact>(){}[0]
     final val objective // com.eignex.klause.solver.validation/LinearSourceWitness.objective|{}objective[0]
-        final fun <get-objective>(): com.eignex.klause.simplex.exact/BigFraction? // com.eignex.klause.solver.validation/LinearSourceWitness.objective.<get-objective>|<get-objective>(){}[0]
+        final fun <get-objective>(): com.eignex.util.numbers/BigFraction? // com.eignex.klause.solver.validation/LinearSourceWitness.objective.<get-objective>|<get-objective>(){}[0]
     final val source // com.eignex.klause.solver.validation/LinearSourceWitness.source|{}source[0]
         final fun <get-source>(): com.eignex.klause.ir/LinearSourceProblem // com.eignex.klause.solver.validation/LinearSourceWitness.source.<get-source>|<get-source>(){}[0]
     final val values // com.eignex.klause.solver.validation/LinearSourceWitness.values|{}values[0]
-        final fun <get-values>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.solver.validation/LinearSourceWitness.values.<get-values>|<get-values>(){}[0]
+        final fun <get-values>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction> // com.eignex.klause.solver.validation/LinearSourceWitness.values.<get-values>|<get-values>(){}[0]
 }
 
 final class com.eignex.klause.solver/Assignment { // com.eignex.klause.solver/Assignment|null[0]
@@ -18728,7 +18694,7 @@ final class com.eignex.klause.solver/ProblemProfile { // com.eignex.klause.solve
 }
 
 final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample|null[0]
-    constructor <init>(kotlin/BooleanArray, kotlin/LongArray, kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ..., kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealValue>? = ...) // com.eignex.klause.solver/Sample.<init>|<init>(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?;kotlin.collections.List<com.ionspin.kotlin.bignum.integer.BigInteger>?;kotlin.collections.List<com.eignex.klause.arithmetic.polynomial.AlgebraicReal>?;kotlin.collections.List<com.eignex.klause.arithmetic.real.ExactRealValue>?){}[0]
+    constructor <init>(kotlin/BooleanArray, kotlin/LongArray, kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.util.numbers/BigFraction>? = ..., kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealValue>? = ...) // com.eignex.klause.solver/Sample.<init>|<init>(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.util.numbers.BigFraction>?;kotlin.collections.List<com.ionspin.kotlin.bignum.integer.BigInteger>?;kotlin.collections.List<com.eignex.klause.arithmetic.polynomial.AlgebraicReal>?;kotlin.collections.List<com.eignex.klause.arithmetic.real.ExactRealValue>?){}[0]
 
     final val algebraicReals // com.eignex.klause.solver/Sample.algebraicReals|{}algebraicReals[0]
         final fun <get-algebraicReals>(): kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? // com.eignex.klause.solver/Sample.algebraicReals.<get-algebraicReals>|<get-algebraicReals>(){}[0]
@@ -18739,7 +18705,7 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
     final val exactInts // com.eignex.klause.solver/Sample.exactInts|{}exactInts[0]
         final fun <get-exactInts>(): kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? // com.eignex.klause.solver/Sample.exactInts.<get-exactInts>|<get-exactInts>(){}[0]
     final val exactReals // com.eignex.klause.solver/Sample.exactReals|{}exactReals[0]
-        final fun <get-exactReals>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? // com.eignex.klause.solver/Sample.exactReals.<get-exactReals>|<get-exactReals>(){}[0]
+        final fun <get-exactReals>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction>? // com.eignex.klause.solver/Sample.exactReals.<get-exactReals>|<get-exactReals>(){}[0]
     final val ints // com.eignex.klause.solver/Sample.ints|{}ints[0]
         final fun <get-ints>(): kotlin/LongArray // com.eignex.klause.solver/Sample.ints.<get-ints>|<get-ints>(){}[0]
     final val numBoolVars // com.eignex.klause.solver/Sample.numBoolVars|{}numBoolVars[0]
@@ -18757,7 +18723,7 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
 
     final fun approximateRealValue(kotlin/Int): kotlin/Double // com.eignex.klause.solver/Sample.approximateRealValue|approximateRealValue(kotlin.Int){}[0]
     final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.solver/Sample.boolValue|boolValue(kotlin.Int){}[0]
-    final fun copy(kotlin/BooleanArray = ..., kotlin/LongArray = ..., kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ..., kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealValue>? = ...): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Sample.copy|copy(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?;kotlin.collections.List<com.ionspin.kotlin.bignum.integer.BigInteger>?;kotlin.collections.List<com.eignex.klause.arithmetic.polynomial.AlgebraicReal>?;kotlin.collections.List<com.eignex.klause.arithmetic.real.ExactRealValue>?){}[0]
+    final fun copy(kotlin/BooleanArray = ..., kotlin/LongArray = ..., kotlin/DoubleArray = ..., kotlin.collections/List<com.eignex.util.numbers/BigFraction>? = ..., kotlin.collections/List<com.ionspin.kotlin.bignum.integer/BigInteger>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.polynomial/AlgebraicReal>? = ..., kotlin.collections/List<com.eignex.klause.arithmetic.real/ExactRealValue>? = ...): com.eignex.klause.solver/Sample // com.eignex.klause.solver/Sample.copy|copy(kotlin.BooleanArray;kotlin.LongArray;kotlin.DoubleArray;kotlin.collections.List<com.eignex.util.numbers.BigFraction>?;kotlin.collections.List<com.ionspin.kotlin.bignum.integer.BigInteger>?;kotlin.collections.List<com.eignex.klause.arithmetic.polynomial.AlgebraicReal>?;kotlin.collections.List<com.eignex.klause.arithmetic.real.ExactRealValue>?){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.solver/Sample.equals|equals(kotlin.Any?){}[0]
     final fun exactIntValue(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.solver/Sample.exactIntValue|exactIntValue(kotlin.Int){}[0]
     final fun hammingDistanceTo(com.eignex.klause.solver/Sample): kotlin/Int // com.eignex.klause.solver/Sample.hammingDistanceTo|hammingDistanceTo(com.eignex.klause.solver.Sample){}[0]
@@ -18814,20 +18780,20 @@ final class com.eignex.klause.theory.difference/DifferenceTheorySolver : com.eig
 }
 
 final class com.eignex.klause.theory.qflra/ExactLiraAssignment { // com.eignex.klause.theory.qflra/ExactLiraAssignment|null[0]
-    constructor <init>(kotlin/BooleanArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>) // com.eignex.klause.theory.qflra/ExactLiraAssignment.<init>|<init>(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]
+    constructor <init>(kotlin/BooleanArray, kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger>, kotlin.collections/List<com.eignex.util.numbers/BigFraction>) // com.eignex.klause.theory.qflra/ExactLiraAssignment.<init>|<init>(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;kotlin.collections.List<com.eignex.util.numbers.BigFraction>){}[0]
 
     final val bools // com.eignex.klause.theory.qflra/ExactLiraAssignment.bools|{}bools[0]
         final fun <get-bools>(): kotlin/BooleanArray // com.eignex.klause.theory.qflra/ExactLiraAssignment.bools.<get-bools>|<get-bools>(){}[0]
     final val ints // com.eignex.klause.theory.qflra/ExactLiraAssignment.ints|{}ints[0]
         final fun <get-ints>(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.theory.qflra/ExactLiraAssignment.ints.<get-ints>|<get-ints>(){}[0]
     final val reals // com.eignex.klause.theory.qflra/ExactLiraAssignment.reals|{}reals[0]
-        final fun <get-reals>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLiraAssignment.reals.<get-reals>|<get-reals>(){}[0]
+        final fun <get-reals>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction> // com.eignex.klause.theory.qflra/ExactLiraAssignment.reals.<get-reals>|<get-reals>(){}[0]
 
     final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLiraAssignment.boolValue|boolValue(kotlin.Int){}[0]
     final fun component1(): kotlin/BooleanArray // com.eignex.klause.theory.qflra/ExactLiraAssignment.component1|component1(){}[0]
     final fun component2(): kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> // com.eignex.klause.theory.qflra/ExactLiraAssignment.component2|component2(){}[0]
-    final fun component3(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLiraAssignment.component3|component3(){}[0]
-    final fun copy(kotlin/BooleanArray = ..., kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ...): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.theory.qflra/ExactLiraAssignment.copy|copy(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]
+    final fun component3(): kotlin.collections/List<com.eignex.util.numbers/BigFraction> // com.eignex.klause.theory.qflra/ExactLiraAssignment.component3|component3(){}[0]
+    final fun copy(kotlin/BooleanArray = ..., kotlin/Array<com.ionspin.kotlin.bignum.integer/BigInteger> = ..., kotlin.collections/List<com.eignex.util.numbers/BigFraction> = ...): com.eignex.klause.theory.qflra/ExactLiraAssignment // com.eignex.klause.theory.qflra/ExactLiraAssignment.copy|copy(kotlin.BooleanArray;kotlin.Array<com.ionspin.kotlin.bignum.integer.BigInteger>;kotlin.collections.List<com.eignex.util.numbers.BigFraction>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLiraAssignment.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.theory.qflra/ExactLiraAssignment.hashCode|hashCode(){}[0]
     final fun intValue(kotlin/Int): com.ionspin.kotlin.bignum.integer/BigInteger // com.eignex.klause.theory.qflra/ExactLiraAssignment.intValue|intValue(kotlin.Int){}[0]
@@ -18859,17 +18825,17 @@ final class com.eignex.klause.theory.qflra/ExactLiraSearchComponent : com.eignex
 }
 
 final class com.eignex.klause.theory.qflra/ExactLraAssignment { // com.eignex.klause.theory.qflra/ExactLraAssignment|null[0]
-    constructor <init>(kotlin/BooleanArray, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>) // com.eignex.klause.theory.qflra/ExactLraAssignment.<init>|<init>(kotlin.BooleanArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]
+    constructor <init>(kotlin/BooleanArray, kotlin.collections/List<com.eignex.util.numbers/BigFraction>) // com.eignex.klause.theory.qflra/ExactLraAssignment.<init>|<init>(kotlin.BooleanArray;kotlin.collections.List<com.eignex.util.numbers.BigFraction>){}[0]
 
     final val bools // com.eignex.klause.theory.qflra/ExactLraAssignment.bools|{}bools[0]
         final fun <get-bools>(): kotlin/BooleanArray // com.eignex.klause.theory.qflra/ExactLraAssignment.bools.<get-bools>|<get-bools>(){}[0]
     final val reals // com.eignex.klause.theory.qflra/ExactLraAssignment.reals|{}reals[0]
-        final fun <get-reals>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLraAssignment.reals.<get-reals>|<get-reals>(){}[0]
+        final fun <get-reals>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction> // com.eignex.klause.theory.qflra/ExactLraAssignment.reals.<get-reals>|<get-reals>(){}[0]
 
     final fun boolValue(kotlin/Int): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLraAssignment.boolValue|boolValue(kotlin.Int){}[0]
     final fun component1(): kotlin/BooleanArray // com.eignex.klause.theory.qflra/ExactLraAssignment.component1|component1(){}[0]
-    final fun component2(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> // com.eignex.klause.theory.qflra/ExactLraAssignment.component2|component2(){}[0]
-    final fun copy(kotlin/BooleanArray = ..., kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction> = ...): com.eignex.klause.theory.qflra/ExactLraAssignment // com.eignex.klause.theory.qflra/ExactLraAssignment.copy|copy(kotlin.BooleanArray;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>){}[0]
+    final fun component2(): kotlin.collections/List<com.eignex.util.numbers/BigFraction> // com.eignex.klause.theory.qflra/ExactLraAssignment.component2|component2(){}[0]
+    final fun copy(kotlin/BooleanArray = ..., kotlin.collections/List<com.eignex.util.numbers/BigFraction> = ...): com.eignex.klause.theory.qflra/ExactLraAssignment // com.eignex.klause.theory.qflra/ExactLraAssignment.copy|copy(kotlin.BooleanArray;kotlin.collections.List<com.eignex.util.numbers.BigFraction>){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.theory.qflra/ExactLraAssignment.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.theory.qflra/ExactLraAssignment.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.theory.qflra/ExactLraAssignment.toString|toString(){}[0]
@@ -18907,10 +18873,10 @@ final class com.eignex.klause.theory/Encoder { // com.eignex.klause.theory/Encod
 }
 
 final class com.eignex.klause.theory/EncodingAffineExpression { // com.eignex.klause.theory/EncodingAffineExpression|null[0]
-    constructor <init>(kotlin.collections/List<com.eignex.klause.theory/EncodingLinearTerm>, com.eignex.klause.simplex.exact/BigFraction = ...) // com.eignex.klause.theory/EncodingAffineExpression.<init>|<init>(kotlin.collections.List<com.eignex.klause.theory.EncodingLinearTerm>;com.eignex.klause.simplex.exact.BigFraction){}[0]
+    constructor <init>(kotlin.collections/List<com.eignex.klause.theory/EncodingLinearTerm>, com.eignex.util.numbers/BigFraction = ...) // com.eignex.klause.theory/EncodingAffineExpression.<init>|<init>(kotlin.collections.List<com.eignex.klause.theory.EncodingLinearTerm>;com.eignex.util.numbers.BigFraction){}[0]
 
     final val constant // com.eignex.klause.theory/EncodingAffineExpression.constant|{}constant[0]
-        final fun <get-constant>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.theory/EncodingAffineExpression.constant.<get-constant>|<get-constant>(){}[0]
+        final fun <get-constant>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.theory/EncodingAffineExpression.constant.<get-constant>|<get-constant>(){}[0]
     final val terms // com.eignex.klause.theory/EncodingAffineExpression.terms|{}terms[0]
         final fun <get-terms>(): kotlin.collections/List<com.eignex.klause.theory/EncodingLinearTerm> // com.eignex.klause.theory/EncodingAffineExpression.terms.<get-terms>|<get-terms>(){}[0]
 }
@@ -18954,16 +18920,16 @@ final class com.eignex.klause.theory/EncodingLinearTerm { // com.eignex.klause.t
     final val auxiliary // com.eignex.klause.theory/EncodingLinearTerm.auxiliary|{}auxiliary[0]
         final fun <get-auxiliary>(): com.eignex.klause.theory/EncodingAuxiliary? // com.eignex.klause.theory/EncodingLinearTerm.auxiliary.<get-auxiliary>|<get-auxiliary>(){}[0]
     final val coefficient // com.eignex.klause.theory/EncodingLinearTerm.coefficient|{}coefficient[0]
-        final fun <get-coefficient>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.theory/EncodingLinearTerm.coefficient.<get-coefficient>|<get-coefficient>(){}[0]
+        final fun <get-coefficient>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.theory/EncodingLinearTerm.coefficient.<get-coefficient>|<get-coefficient>(){}[0]
     final val realAuxiliary // com.eignex.klause.theory/EncodingLinearTerm.realAuxiliary|{}realAuxiliary[0]
         final fun <get-realAuxiliary>(): com.eignex.klause.theory/EncodingRealAuxiliary? // com.eignex.klause.theory/EncodingLinearTerm.realAuxiliary.<get-realAuxiliary>|<get-realAuxiliary>(){}[0]
     final val reference // com.eignex.klause.theory/EncodingLinearTerm.reference|{}reference[0]
         final fun <get-reference>(): kotlin/Int? // com.eignex.klause.theory/EncodingLinearTerm.reference.<get-reference>|<get-reference>(){}[0]
 
     final object Companion { // com.eignex.klause.theory/EncodingLinearTerm.Companion|null[0]
-        final fun auxiliary(com.eignex.klause.theory/EncodingAuxiliary, com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.theory/EncodingLinearTerm // com.eignex.klause.theory/EncodingLinearTerm.Companion.auxiliary|auxiliary(com.eignex.klause.theory.EncodingAuxiliary;com.eignex.klause.simplex.exact.BigFraction){}[0]
-        final fun auxiliary(com.eignex.klause.theory/EncodingRealAuxiliary, com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.theory/EncodingLinearTerm // com.eignex.klause.theory/EncodingLinearTerm.Companion.auxiliary|auxiliary(com.eignex.klause.theory.EncodingRealAuxiliary;com.eignex.klause.simplex.exact.BigFraction){}[0]
-        final fun source(kotlin/Int, com.eignex.klause.simplex.exact/BigFraction): com.eignex.klause.theory/EncodingLinearTerm // com.eignex.klause.theory/EncodingLinearTerm.Companion.source|source(kotlin.Int;com.eignex.klause.simplex.exact.BigFraction){}[0]
+        final fun auxiliary(com.eignex.klause.theory/EncodingAuxiliary, com.eignex.util.numbers/BigFraction): com.eignex.klause.theory/EncodingLinearTerm // com.eignex.klause.theory/EncodingLinearTerm.Companion.auxiliary|auxiliary(com.eignex.klause.theory.EncodingAuxiliary;com.eignex.util.numbers.BigFraction){}[0]
+        final fun auxiliary(com.eignex.klause.theory/EncodingRealAuxiliary, com.eignex.util.numbers/BigFraction): com.eignex.klause.theory/EncodingLinearTerm // com.eignex.klause.theory/EncodingLinearTerm.Companion.auxiliary|auxiliary(com.eignex.klause.theory.EncodingRealAuxiliary;com.eignex.util.numbers.BigFraction){}[0]
+        final fun source(kotlin/Int, com.eignex.util.numbers/BigFraction): com.eignex.klause.theory/EncodingLinearTerm // com.eignex.klause.theory/EncodingLinearTerm.Companion.source|source(kotlin.Int;com.eignex.util.numbers.BigFraction){}[0]
     }
 }
 
@@ -19262,7 +19228,7 @@ sealed class com.eignex.klause.ir/LinearForm { // com.eignex.klause.ir/LinearFor
 
 sealed class com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eignex.klause.solver.pipeline/FiniteSolveOutcome|null[0]
     final class Completed : com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed|null[0]
-        constructor <init>(com.eignex.klause.solver.pipeline/FiniteSolveVerdict, com.eignex.klause.solver.result/SolveStats, kotlin/Long, com.eignex.klause.solver/Sample?, kotlin/Long, kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? = ...) // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteSolveVerdict;com.eignex.klause.solver.result.SolveStats;kotlin.Long;com.eignex.klause.solver.Sample?;kotlin.Long;kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>?){}[0]
+        constructor <init>(com.eignex.klause.solver.pipeline/FiniteSolveVerdict, com.eignex.klause.solver.result/SolveStats, kotlin/Long, com.eignex.klause.solver/Sample?, kotlin/Long, kotlin.collections/List<com.eignex.util.numbers/BigFraction>? = ...) // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.<init>|<init>(com.eignex.klause.solver.pipeline.FiniteSolveVerdict;com.eignex.klause.solver.result.SolveStats;kotlin.Long;com.eignex.klause.solver.Sample?;kotlin.Long;kotlin.collections.List<com.eignex.util.numbers.BigFraction>?){}[0]
 
         final val bestSample // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.bestSample|{}bestSample[0]
             final fun <get-bestSample>(): com.eignex.klause.solver/Sample? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.bestSample.<get-bestSample>|<get-bestSample>(){}[0]
@@ -19273,7 +19239,7 @@ sealed class com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eigne
         final val stats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats.<get-stats>|<get-stats>(){}[0]
         final val unboundedDirection // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.unboundedDirection|{}unboundedDirection[0]
-            final fun <get-unboundedDirection>(): kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.unboundedDirection.<get-unboundedDirection>|<get-unboundedDirection>(){}[0]
+            final fun <get-unboundedDirection>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction>? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.unboundedDirection.<get-unboundedDirection>|<get-unboundedDirection>(){}[0]
         final val verdict // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.verdict|{}verdict[0]
             final fun <get-verdict>(): com.eignex.klause.solver.pipeline/FiniteSolveVerdict // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.verdict.<get-verdict>|<get-verdict>(){}[0]
     }
@@ -19385,10 +19351,10 @@ sealed class com.eignex.klause.theory/LinearEncodingFormula { // com.eignex.klau
     }
 
     final class Comparison : com.eignex.klause.theory/LinearEncodingFormula { // com.eignex.klause.theory/LinearEncodingFormula.Comparison|null[0]
-        constructor <init>(com.eignex.klause.theory/EncodingAffineExpression, com.eignex.klause.ir/LinearOp, com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ...) // com.eignex.klause.theory/LinearEncodingFormula.Comparison.<init>|<init>(com.eignex.klause.theory.EncodingAffineExpression;com.eignex.klause.ir.LinearOp;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean){}[0]
+        constructor <init>(com.eignex.klause.theory/EncodingAffineExpression, com.eignex.klause.ir/LinearOp, com.eignex.util.numbers/BigFraction, kotlin/Boolean = ...) // com.eignex.klause.theory/LinearEncodingFormula.Comparison.<init>|<init>(com.eignex.klause.theory.EncodingAffineExpression;com.eignex.klause.ir.LinearOp;com.eignex.util.numbers.BigFraction;kotlin.Boolean){}[0]
 
         final val bound // com.eignex.klause.theory/LinearEncodingFormula.Comparison.bound|{}bound[0]
-            final fun <get-bound>(): com.eignex.klause.simplex.exact/BigFraction // com.eignex.klause.theory/LinearEncodingFormula.Comparison.bound.<get-bound>|<get-bound>(){}[0]
+            final fun <get-bound>(): com.eignex.util.numbers/BigFraction // com.eignex.klause.theory/LinearEncodingFormula.Comparison.bound.<get-bound>|<get-bound>(){}[0]
         final val expression // com.eignex.klause.theory/LinearEncodingFormula.Comparison.expression|{}expression[0]
             final fun <get-expression>(): com.eignex.klause.theory/EncodingAffineExpression // com.eignex.klause.theory/LinearEncodingFormula.Comparison.expression.<get-expression>|<get-expression>(){}[0]
         final val relation // com.eignex.klause.theory/LinearEncodingFormula.Comparison.relation|{}relation[0]
@@ -19864,7 +19830,7 @@ final fun (com.eignex.klause.ir/IntDomain).com.eignex.klause.ir/randomValue(kotl
 final fun (com.eignex.klause.ir/LinearObjectiveSpec).com.eignex.klause.solver.objective/toLinearObjective(): com.eignex.klause.solver.objective/LinearObjective // com.eignex.klause.solver.objective/toLinearObjective|toLinearObjective@com.eignex.klause.ir.LinearObjectiveSpec(){}[0]
 final fun (com.eignex.klause.ir/LinearObjectiveSpec).com.eignex.klause.solver.objective/toQuadraticObjectiveSpec(): com.eignex.klause.ir/QuadraticObjectiveSpec // com.eignex.klause.solver.objective/toQuadraticObjectiveSpec|toQuadraticObjectiveSpec@com.eignex.klause.ir.LinearObjectiveSpec(){}[0]
 final fun (com.eignex.klause.ir/LinearOp).com.eignex.klause.ir/complemented(): com.eignex.klause.ir/LinearOp // com.eignex.klause.ir/complemented|complemented@com.eignex.klause.ir.LinearOp(){}[0]
-final fun (com.eignex.klause.ir/LinearSourceProblem).com.eignex.klause.formats.mps/checkMpsWitness(kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.solver.validation/LinearSourceWitness? // com.eignex.klause.formats.mps/checkMpsWitness|checkMpsWitness@com.eignex.klause.ir.LinearSourceProblem(kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;com.eignex.klause.util.ExecutionControl){}[0]
+final fun (com.eignex.klause.ir/LinearSourceProblem).com.eignex.klause.formats.mps/checkMpsWitness(kotlin.collections/List<com.eignex.util.numbers/BigFraction>, com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.solver.validation/LinearSourceWitness? // com.eignex.klause.formats.mps/checkMpsWitness|checkMpsWitness@com.eignex.klause.ir.LinearSourceProblem(kotlin.collections.List<com.eignex.util.numbers.BigFraction>;com.eignex.klause.util.ExecutionControl){}[0]
 final fun (com.eignex.klause.ir/NonlinearIntegerProblem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/NonlinearIntegerTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.NonlinearIntegerProblem(){}[0]
 final fun (com.eignex.klause.ir/NonlinearIntegerProblem).com.eignex.klause.solver.pipeline/prepareExecutionPlan(): com.eignex.klause.solver.pipeline/PreparedSourcePlan // com.eignex.klause.solver.pipeline/prepareExecutionPlan|prepareExecutionPlan@com.eignex.klause.ir.NonlinearIntegerProblem(){}[0]
 final fun (com.eignex.klause.ir/PolynomialRealProblem).com.eignex.klause.solver.pipeline/pipelineRequest(): com.eignex.klause.solver.pipeline/PolynomialTheoryRequest // com.eignex.klause.solver.pipeline/pipelineRequest|pipelineRequest@com.eignex.klause.ir.PolynomialRealProblem(){}[0]
@@ -19985,7 +19951,6 @@ final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/times(ko
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/toContinuousRealExpr(): com.eignex.klause.model/ContinuousRealExpr // com.eignex.klause.schema/toContinuousRealExpr|toContinuousRealExpr@com.eignex.klause.schema.FloatTerm(){}[0]
 final fun (com.eignex.klause.schema/FloatTerm).com.eignex.klause.schema/unaryMinus(): com.eignex.klause.schema/FloatExpr // com.eignex.klause.schema/unaryMinus|unaryMinus@com.eignex.klause.schema.FloatTerm(){}[0]
 final fun (com.eignex.klause.schema/VariableSchema).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ..., com.eignex.klause.ir/SemanticOverrides = ..., com.eignex.klause.factor.codec/FactorCodecs = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.klause.schema.VariableSchema(com.eignex.klause.config.KlauseConfig;com.eignex.klause.ir.SemanticOverrides;com.eignex.klause.factor.codec.FactorCodecs){}[0]
-final fun (com.eignex.klause.simplex.exact/BigFraction).com.eignex.klause.arithmetic.real/toExactRealValue(): com.eignex.klause.arithmetic.real/ExactRealValue // com.eignex.klause.arithmetic.real/toExactRealValue|toExactRealValue@com.eignex.klause.simplex.exact.BigFraction(){}[0]
 final fun (com.eignex.klause.solver.evidence/SourceProofContext).com.eignex.klause.lp.optimization/withLinearAuthority(): com.eignex.klause.solver.evidence/SourceProofContext // com.eignex.klause.lp.optimization/withLinearAuthority|withLinearAuthority@com.eignex.klause.solver.evidence.SourceProofContext(){}[0]
 final fun (com.eignex.klause.solver.incumbent/IncumbentSource<*, kotlin/Double>).com.eignex.klause.solver.incumbent/bound(): kotlin/Double // com.eignex.klause.solver.incumbent/bound|bound@com.eignex.klause.solver.incumbent.IncumbentSource<*,kotlin.Double>(){}[0]
 final fun (com.eignex.klause.solver.objective/LinearObjective).com.eignex.klause.solver.objective/toQuadraticObjectiveSpec(): com.eignex.klause.ir/QuadraticObjectiveSpec // com.eignex.klause.solver.objective/toQuadraticObjectiveSpec|toQuadraticObjectiveSpec@com.eignex.klause.solver.objective.LinearObjective(){}[0]
@@ -20016,7 +19981,7 @@ final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klau
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/optimize(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams = ..., com.eignex.klause.solver.pipeline/FiniteEngine = ..., com.eignex.klause.ir/ObjectiveSense = ...): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/optimize|optimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.ir.ObjectiveSense){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/optimize(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.ir/ObjectiveSense, kotlin/Int): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/optimize|optimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.ir.ObjectiveSense;kotlin.Int){}[0]
 final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/optimize(com.eignex.klause.solver.pipeline/PolynomialTheoryRequest, com.eignex.klause.solver.objective/LinearObjective, com.eignex.klause.solver.pipeline/PolynomialTheoryParams, com.eignex.klause.solver.pipeline/FiniteEngine, com.eignex.klause.ir/ObjectiveSense, kotlin/Int, kotlin/Function1<com.eignex.klause.solver.pipeline/QuadraticIncumbentPublication, kotlin/Unit>?): com.eignex.klause.solver.pipeline/QuadraticOptimizationExecution // com.eignex.klause.solver.pipeline/optimize|optimize@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.pipeline.PolynomialTheoryRequest;com.eignex.klause.solver.objective.LinearObjective;com.eignex.klause.solver.pipeline.PolynomialTheoryParams;com.eignex.klause.solver.pipeline.FiniteEngine;com.eignex.klause.ir.ObjectiveSense;kotlin.Int;kotlin.Function1<com.eignex.klause.solver.pipeline.QuadraticIncumbentPublication,kotlin.Unit>?){}[0]
-final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/optimizeLinear(com.eignex.klause.solver.evidence/SourceProofContext, com.eignex.klause.solver.pipeline/TheoryParams = ..., kotlin/Function2<com.eignex.klause.solver/Sample, com.eignex.klause.simplex.exact/BigFraction, kotlin/Unit> = ...): com.eignex.klause.solver.result/LinearOptimizationResult // com.eignex.klause.solver.pipeline/optimizeLinear|optimizeLinear@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.evidence.SourceProofContext;com.eignex.klause.solver.pipeline.TheoryParams;kotlin.Function2<com.eignex.klause.solver.Sample,com.eignex.klause.simplex.exact.BigFraction,kotlin.Unit>){}[0]
+final fun (com.eignex.klause.solver.pipeline/OpenTheoryPipeline).com.eignex.klause.solver.pipeline/optimizeLinear(com.eignex.klause.solver.evidence/SourceProofContext, com.eignex.klause.solver.pipeline/TheoryParams = ..., kotlin/Function2<com.eignex.klause.solver/Sample, com.eignex.util.numbers/BigFraction, kotlin/Unit> = ...): com.eignex.klause.solver.result/LinearOptimizationResult // com.eignex.klause.solver.pipeline/optimizeLinear|optimizeLinear@com.eignex.klause.solver.pipeline.OpenTheoryPipeline(com.eignex.klause.solver.evidence.SourceProofContext;com.eignex.klause.solver.pipeline.TheoryParams;kotlin.Function2<com.eignex.klause.solver.Sample,com.eignex.util.numbers.BigFraction,kotlin.Unit>){}[0]
 final fun (com.eignex.klause.solver.pipeline/PreparedSourcePlan).com.eignex.klause.solver.evidence/sourceResultCapture(com.eignex.klause.solver.evidence/SourceRevision, com.eignex.klause.propagation/Assumptions = ..., kotlin/String? = ..., com.eignex.klause.util/ExecutionControl = ...): com.eignex.klause.solver.evidence/SourceResultCapture? // com.eignex.klause.solver.evidence/sourceResultCapture|sourceResultCapture@com.eignex.klause.solver.pipeline.PreparedSourcePlan(com.eignex.klause.solver.evidence.SourceRevision;com.eignex.klause.propagation.Assumptions;kotlin.String?;com.eignex.klause.util.ExecutionControl){}[0]
 final fun (com.eignex.klause.solver.pipeline/SourceSetup).com.eignex.klause.solver.pipeline/execute(com.eignex.klause.solver.pipeline/SourceExecutionRequest, com.eignex.klause.solver.pipeline/SourceExecutionCallbacks = ...): com.eignex.klause.solver.pipeline/SourceExecutionResult // com.eignex.klause.solver.pipeline/execute|execute@com.eignex.klause.solver.pipeline.SourceSetup(com.eignex.klause.solver.pipeline.SourceExecutionRequest;com.eignex.klause.solver.pipeline.SourceExecutionCallbacks){}[0]
 final fun (com.eignex.klause.solver.pipeline/SourceSetup).com.eignex.klause.solver.pipeline/executionKind(com.eignex.klause.solver.pipeline/PreparedSourceInvocation): com.eignex.klause.solver.pipeline/SourceExecutionKind // com.eignex.klause.solver.pipeline/executionKind|executionKind@com.eignex.klause.solver.pipeline.SourceSetup(com.eignex.klause.solver.pipeline.PreparedSourceInvocation){}[0]
@@ -20029,6 +19994,7 @@ final fun (com.eignex.klause.solver/SourceStrategy).com.eignex.klause.solver/sol
 final fun (com.eignex.klause.util/ExecutionControl).com.eignex.klause.util/withBoundedPolling(): com.eignex.klause.util/ExecutionControl // com.eignex.klause.util/withBoundedPolling|withBoundedPolling@com.eignex.klause.util.ExecutionControl(){}[0]
 final fun (com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry>).com.eignex.klause.compile/compile(com.eignex.klause.config/KlauseConfig = ..., com.eignex.klause.ir/SemanticOverrides = ..., com.eignex.klause.factor.codec/FactorCodecs = ...): com.eignex.klause.compile/CompiledSchema // com.eignex.klause.compile/compile|compile@com.eignex.skema.SchemaDef<com.eignex.klause.model.SchemaEntry>(com.eignex.klause.config.KlauseConfig;com.eignex.klause.ir.SemanticOverrides;com.eignex.klause.factor.codec.FactorCodecs){}[0]
 final fun (com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry>).com.eignex.klause.model/renameDeclarations(kotlin/Function1<kotlin/String, kotlin/String>): com.eignex.skema/SchemaDef<com.eignex.klause.model/SchemaEntry> // com.eignex.klause.model/renameDeclarations|renameDeclarations@com.eignex.skema.SchemaDef<com.eignex.klause.model.SchemaEntry>(kotlin.Function1<kotlin.String,kotlin.String>){}[0]
+final fun (com.eignex.util.numbers/BigFraction).com.eignex.klause.arithmetic.real/toExactRealValue(): com.eignex.klause.arithmetic.real/ExactRealValue // com.eignex.klause.arithmetic.real/toExactRealValue|toExactRealValue@com.eignex.util.numbers.BigFraction(){}[0]
 final fun (kotlin/Double).com.eignex.klause.schema/eq(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/eq|eq@kotlin.Double(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (kotlin/Double).com.eignex.klause.schema/ge(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/ge|ge@kotlin.Double(com.eignex.klause.schema.FloatTerm){}[0]
 final fun (kotlin/Double).com.eignex.klause.schema/gt(com.eignex.klause.schema/FloatTerm): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/gt|gt@kotlin.Double(com.eignex.klause.schema.FloatTerm){}[0]
@@ -20072,7 +20038,7 @@ final fun com.eignex.klause.formats.flatzinc/writeFlatZincSolution(com.eignex.kl
 final fun com.eignex.klause.formats.flatzinc/writeFlatZincSolution(com.eignex.klause.formats.flatzinc/FlatZincProgram, com.eignex.klause.solver/Sample, kotlin/Boolean = ...): kotlin/String // com.eignex.klause.formats.flatzinc/writeFlatZincSolution|writeFlatZincSolution(com.eignex.klause.formats.flatzinc.FlatZincProgram;com.eignex.klause.solver.Sample;kotlin.Boolean){}[0]
 final fun com.eignex.klause.formats.smtlib/smtAlgebraicTerm(com.eignex.klause.arithmetic.polynomial/AlgebraicReal, com.eignex.klause.util/ExecutionControl = ...): kotlin/String // com.eignex.klause.formats.smtlib/smtAlgebraicTerm|smtAlgebraicTerm(com.eignex.klause.arithmetic.polynomial.AlgebraicReal;com.eignex.klause.util.ExecutionControl){}[0]
 final fun com.eignex.klause.formats.smtlib/smtRealTerm(kotlin/String): kotlin/String // com.eignex.klause.formats.smtlib/smtRealTerm|smtRealTerm(kotlin.String){}[0]
-final fun com.eignex.klause.formats.smtlib/smtRootTerm(kotlin.collections/List<com.eignex.klause.simplex.exact/BigFraction>, kotlin/Int, com.eignex.klause.util/ExecutionControl = ...): kotlin/String // com.eignex.klause.formats.smtlib/smtRootTerm|smtRootTerm(kotlin.collections.List<com.eignex.klause.simplex.exact.BigFraction>;kotlin.Int;com.eignex.klause.util.ExecutionControl){}[0]
+final fun com.eignex.klause.formats.smtlib/smtRootTerm(kotlin.collections/List<com.eignex.util.numbers/BigFraction>, kotlin/Int, com.eignex.klause.util/ExecutionControl = ...): kotlin/String // com.eignex.klause.formats.smtlib/smtRootTerm|smtRootTerm(kotlin.collections.List<com.eignex.util.numbers.BigFraction>;kotlin.Int;com.eignex.klause.util.ExecutionControl){}[0]
 final fun com.eignex.klause.formats.smtlib/smtSymbolicTerm(com.eignex.klause.arithmetic.real/ExactRealValue, com.eignex.klause.util/ExecutionControl = ...): kotlin/String // com.eignex.klause.formats.smtlib/smtSymbolicTerm|smtSymbolicTerm(com.eignex.klause.arithmetic.real.ExactRealValue;com.eignex.klause.util.ExecutionControl){}[0]
 final fun com.eignex.klause.formats.xcsp3/parseXml(kotlin/String): com.eignex.klause.formats.xcsp3/XmlElement // com.eignex.klause.formats.xcsp3/parseXml|parseXml(kotlin.String){}[0]
 final fun com.eignex.klause.ir/constsOf(kotlin/IntArray): com.eignex.klause.ir/LongConstList // com.eignex.klause.ir/constsOf|constsOf(kotlin.IntArray){}[0]
@@ -20106,7 +20072,7 @@ final fun com.eignex.klause.schema/disjunctive(kotlin.collections/List<com.eigne
 final fun com.eignex.klause.schema/disjunctiveOpt(kotlin.collections/List<com.eignex.klause.model/IntTerm>, kotlin.collections/List<kotlin/Int>, kotlin.collections/List<com.eignex.klause.model/BoolTerm>): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/disjunctiveOpt|disjunctiveOpt(kotlin.collections.List<com.eignex.klause.model.IntTerm>;kotlin.collections.List<kotlin.Int>;kotlin.collections.List<com.eignex.klause.model.BoolTerm>){}[0]
 final fun com.eignex.klause.schema/distinct(kotlin.collections/List<com.eignex.klause.schema/AffineOperand>): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/distinct|distinct(kotlin.collections.List<com.eignex.klause.schema.AffineOperand>){}[0]
 final fun com.eignex.klause.schema/element(com.eignex.klause.model/IntTerm, kotlin.collections/List<com.eignex.klause.model/IntTerm>): com.eignex.klause.model/IntExpr // com.eignex.klause.schema/element|element(com.eignex.klause.model.IntTerm;kotlin.collections.List<com.eignex.klause.model.IntTerm>){}[0]
-final fun com.eignex.klause.schema/exactLinear(kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/IntTerm, com.eignex.klause.simplex.exact/BigFraction>>, kotlin.collections/List<kotlin/Pair<com.eignex.klause.schema/FloatHandle, com.eignex.klause.simplex.exact/BigFraction>>, com.eignex.klause.ir/LinearOp, com.eignex.klause.simplex.exact/BigFraction, kotlin/Boolean = ...): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/exactLinear|exactLinear(kotlin.collections.List<kotlin.Pair<com.eignex.klause.model.IntTerm,com.eignex.klause.simplex.exact.BigFraction>>;kotlin.collections.List<kotlin.Pair<com.eignex.klause.schema.FloatHandle,com.eignex.klause.simplex.exact.BigFraction>>;com.eignex.klause.ir.LinearOp;com.eignex.klause.simplex.exact.BigFraction;kotlin.Boolean){}[0]
+final fun com.eignex.klause.schema/exactLinear(kotlin.collections/List<kotlin/Pair<com.eignex.klause.model/IntTerm, com.eignex.util.numbers/BigFraction>>, kotlin.collections/List<kotlin/Pair<com.eignex.klause.schema/FloatHandle, com.eignex.util.numbers/BigFraction>>, com.eignex.klause.ir/LinearOp, com.eignex.util.numbers/BigFraction, kotlin/Boolean = ...): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/exactLinear|exactLinear(kotlin.collections.List<kotlin.Pair<com.eignex.klause.model.IntTerm,com.eignex.util.numbers.BigFraction>>;kotlin.collections.List<kotlin.Pair<com.eignex.klause.schema.FloatHandle,com.eignex.util.numbers.BigFraction>>;com.eignex.klause.ir.LinearOp;com.eignex.util.numbers.BigFraction;kotlin.Boolean){}[0]
 final fun com.eignex.klause.schema/factor(com.eignex.klause.ir/Factor, kotlin.collections/List<com.eignex.klause.model/BoolTerm> = ..., kotlin.collections/List<com.eignex.klause.model/IntTerm> = ..., kotlin.collections/List<com.eignex.klause.schema/FloatHandle> = ..., com.eignex.klause.factor.codec/FactorCodecs = ...): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/factor|factor(com.eignex.klause.ir.Factor;kotlin.collections.List<com.eignex.klause.model.BoolTerm>;kotlin.collections.List<com.eignex.klause.model.IntTerm>;kotlin.collections.List<com.eignex.klause.schema.FloatHandle>;com.eignex.klause.factor.codec.FactorCodecs){}[0]
 final fun com.eignex.klause.schema/factor(kotlinx.serialization.json/JsonElement, kotlin.collections/List<com.eignex.klause.model/BoolTerm> = ..., kotlin.collections/List<com.eignex.klause.model/IntTerm> = ..., kotlin.collections/List<com.eignex.klause.schema/FloatHandle> = ...): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/factor|factor(kotlinx.serialization.json.JsonElement;kotlin.collections.List<com.eignex.klause.model.BoolTerm>;kotlin.collections.List<com.eignex.klause.model.IntTerm>;kotlin.collections.List<com.eignex.klause.schema.FloatHandle>){}[0]
 final fun com.eignex.klause.schema/gcc(kotlin.collections/List<com.eignex.klause.model/IntTerm>, kotlin.collections/Map<kotlin/Int, kotlin.ranges/IntRange>): com.eignex.klause.model/BoolExpr // com.eignex.klause.schema/gcc|gcc(kotlin.collections.List<com.eignex.klause.model.IntTerm>;kotlin.collections.Map<kotlin.Int,kotlin.ranges.IntRange>){}[0]

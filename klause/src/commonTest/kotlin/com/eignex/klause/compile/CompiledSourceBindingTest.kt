@@ -23,7 +23,6 @@ import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.VariableSchema
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceObjective
@@ -41,6 +40,7 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.skema.SchemaDef
+import com.eignex.util.numbers.BigFraction
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals

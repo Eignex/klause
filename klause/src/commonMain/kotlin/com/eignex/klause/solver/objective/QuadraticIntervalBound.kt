@@ -2,7 +2,7 @@ package com.eignex.klause.solver.objective
 
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal fun QuadraticObjectiveSpec.intervalBounds(
     range: (QuadraticVariable) -> Pair<BigFraction, BigFraction>?,

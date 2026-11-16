@@ -9,7 +9,6 @@ import com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery
 import com.eignex.klause.lp.optimization.LinearAuthorityCutViolation
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext

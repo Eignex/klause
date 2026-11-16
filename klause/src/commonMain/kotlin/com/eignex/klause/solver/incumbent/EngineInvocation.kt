@@ -3,7 +3,6 @@ package com.eignex.klause.solver.incumbent
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.DeducedRestrictions
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate

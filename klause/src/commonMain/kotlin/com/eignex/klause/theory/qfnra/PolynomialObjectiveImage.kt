@@ -13,8 +13,8 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.remap
 import com.eignex.klause.ir.requireVariableCounts
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ArithmeticBudget
+import com.eignex.util.numbers.BigFraction
 
 internal class PolynomialObjectiveEvidence(
     val formula: PolynomialRealFormula,

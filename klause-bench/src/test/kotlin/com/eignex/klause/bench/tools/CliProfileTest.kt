@@ -155,7 +155,7 @@ class CliProfileTest {
             "com.eignex.klause.bench.tools.CliProfile.summarizeCli",
             "com.eignex.klause.lp.engine.LpExactState.<init>",
             "com.eignex.klause.lp.lattice.IntegerEchelon.reduce",
-            "com.eignex.klause.simplex.exact.BigFraction.plus",
+            "com.eignex.util.numbers.BigFraction.plus",
             "com.eignex.klause.arithmetic.difference.DifferenceGraph.potentials",
             "com.eignex.klause.theory.qflra.LiveQfLraSystem.assertComparison",
             "com.eignex.klause.solver.search.SearchSession.propagate",
@@ -190,7 +190,7 @@ class CliProfileTest {
             "com.eignex.klause.bound.KnapsackLagrangianBound.compute",
         )) {
             val callers = CliProfile.cliModelCallers(listOf(
-                "com.eignex.klause.simplex.exact.BigFraction.plus",
+                "com.eignex.util.numbers.BigFraction.plus",
                 frame,
             ))
 
@@ -204,7 +204,7 @@ class CliProfileTest {
             "com.eignex.klause.util.OrCancellation.isCancelled",
             "com.eignex.klause.lp.engine.LpExactState.<init>",
             "com.eignex.klause.lp.lattice.IntegerEchelon.reduce",
-            "com.eignex.klause.simplex.exact.BigFraction.plus",
+            "com.eignex.util.numbers.BigFraction.plus",
             "com.eignex.klause.arithmetic.difference.DifferenceGraph.potentials",
         ))) {
             val callers = CliProfile.cliModelCallers(stack)

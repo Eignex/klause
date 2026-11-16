@@ -12,12 +12,12 @@ import com.eignex.klause.lp.OpenIntBounds
 import com.eignex.klause.lp.openLpInfeasible
 import com.eignex.klause.lp.relaxation.LeafRealSolver
 import com.eignex.klause.lp.relaxation.leafRealFeasibility
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStatsSink
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

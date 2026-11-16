@@ -1,11 +1,11 @@
 package com.eignex.klause.lp.lattice
 
-import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.ceilDiv
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
-import com.eignex.util.numbers.isZero
+import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
@@ -89,18 +89,4 @@ internal fun triangularBounds(
         }
     }
     return TriangularBounds(lo, hi)
-}
-
-/** `⌊a / b⌋`; the bignum division truncates toward zero, so a negative exact quotient adjusts down. */
-private fun floorDiv(a: BigInt, b: BigInt): BigInt {
-    val q = a / b
-    val r = a - q * b
-    return if (!r.isZero() && (r < BIG_ZERO) != (b < BIG_ZERO)) q - BIG_ONE else q
-}
-
-/** `⌈a / b⌉`; a positive exact quotient with a remainder adjusts up. */
-private fun ceilDiv(a: BigInt, b: BigInt): BigInt {
-    val q = a / b
-    val r = a - q * b
-    return if (!r.isZero() && (r < BIG_ZERO) == (b < BIG_ZERO)) q + BIG_ONE else q
 }

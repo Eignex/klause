@@ -30,7 +30,6 @@ import com.eignex.klause.lp.engine.continueExactLp
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.RelaxationCapability

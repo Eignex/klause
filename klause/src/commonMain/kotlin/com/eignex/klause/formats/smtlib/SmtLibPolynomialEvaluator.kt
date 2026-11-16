@@ -21,19 +21,19 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.rational
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.relation
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.sum
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.parseBigInt
+import com.eignex.util.numbers.remainderOf as bigRemainder
 import com.eignex.util.numbers.shr
 import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.toLong
-import com.eignex.util.numbers.remainderOf as bigRemainder
 
 internal sealed interface PolynomialValue {
     data class Boolean(val formula: PolynomialRealFormula) : PolynomialValue {

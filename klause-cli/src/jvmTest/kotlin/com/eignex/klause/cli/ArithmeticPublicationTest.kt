@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.util.numbers.BigFraction
 import java.io.IOException
 import java.io.OutputStream
 import java.io.PrintStream

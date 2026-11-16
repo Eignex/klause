@@ -1,6 +1,5 @@
 package com.eignex.klause.arithmetic.quadratic
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ArithmeticExecution
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.magnitudeBitLength

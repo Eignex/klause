@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.transcendental
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal data class RationalEnclosure(val lower: BigFraction, val upper: BigFraction) {
     init { require(lower <= upper) }

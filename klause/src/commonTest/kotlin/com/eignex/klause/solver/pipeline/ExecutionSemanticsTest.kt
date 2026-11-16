@@ -18,7 +18,6 @@ import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.numericContext
 import com.eignex.klause.lp.optimization.withLinearAuthority
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceObjective

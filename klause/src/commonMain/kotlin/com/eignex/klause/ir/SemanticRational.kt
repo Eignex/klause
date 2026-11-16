@@ -1,48 +1,39 @@
 package com.eignex.klause.ir
 
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
-import com.eignex.util.numbers.bigIntOf
-import com.eignex.util.numbers.compareTo
-import com.eignex.util.numbers.div
-import com.eignex.util.numbers.gcd
-import com.eignex.util.numbers.isZero
-import com.eignex.util.numbers.signum
-import com.eignex.util.numbers.times
-import com.eignex.util.numbers.unaryMinus
 
 /** Normalized rational source-semantic metadata, independent of execution arithmetic types. */
 class SemanticRational private constructor(
-    /** Reduced signed numerator. */
-    val numerator: BigInt,
-    /** Reduced positive denominator. */
-    val denominator: BigInt,
+    private val value: BigFraction,
 ) : Comparable<SemanticRational> {
-    override fun compareTo(other: SemanticRational): Int =
-        (numerator * other.denominator).compareTo(other.numerator * denominator)
+    /** Reduced signed numerator. */
+    val numerator: BigInt get() = value.num
+
+    /** Reduced positive denominator. */
+    val denominator: BigInt get() = value.den
+
+    override fun compareTo(other: SemanticRational): Int = value.compareTo(other.value)
 
     override fun equals(other: Any?): Boolean = other is SemanticRational &&
-        numerator == other.numerator && denominator == other.denominator
+        value == other.value
 
-    override fun hashCode(): Int = 31 * numerator.hashCode() + denominator.hashCode()
+    override fun hashCode(): Int = value.hashCode()
 
     /** Exact semantic-value construction. */
     companion object {
         /** Additive identity. */
-        val ZERO: SemanticRational = ofLong(0)
+        val ZERO: SemanticRational = SemanticRational(BigFraction.ZERO)
 
         /** Multiplicative identity. */
-        val ONE: SemanticRational = ofLong(1)
+        val ONE: SemanticRational = SemanticRational(BigFraction.ONE)
 
         /** Capture an exact integer value. */
-        fun ofLong(value: Long): SemanticRational = of(bigIntOf(value))
+        fun ofLong(value: Long): SemanticRational = SemanticRational(BigFraction.ofLong(value))
 
         /** Capture an exact rational, normalizing sign and common factors. */
-        fun of(numerator: BigInt, denominator: BigInt = BIG_ONE): SemanticRational {
-            require(!denominator.isZero()) { "zero semantic rational denominator" }
-            val divisor = numerator.gcd(denominator)
-            val sign = if (denominator.signum() < 0) -divisor else divisor
-            return SemanticRational(numerator / sign, denominator / sign)
-        }
+        fun of(numerator: BigInt, denominator: BigInt = BIG_ONE): SemanticRational =
+            SemanticRational(BigFraction.of(numerator, denominator))
     }
 }

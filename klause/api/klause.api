@@ -8,10 +8,10 @@ public final class com/eignex/klause/arithmetic/json/ExactRealJson {
 
 public final class com/eignex/klause/arithmetic/polynomial/AlgebraicReal {
 	public final fun getDefiningCoefficients ()Ljava/util/List;
-	public final fun getLowerBound ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun getRational ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getLowerBound ()Lcom/eignex/util/numbers/BigFraction;
+	public final fun getRational ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getRootIndex ()I
-	public final fun getUpperBound ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getUpperBound ()Lcom/eignex/util/numbers/BigFraction;
 }
 
 public abstract interface class com/eignex/klause/arithmetic/real/ExactRealExpression {
@@ -79,14 +79,14 @@ public final class com/eignex/klause/arithmetic/real/ExactRealFunction : java/la
 public final class com/eignex/klause/arithmetic/real/ExactRealValue {
 	public final fun getAlgebraic ()Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;
 	public final fun getExpression ()Lcom/eignex/klause/arithmetic/real/ExactRealExpression;
-	public final fun getRational ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getRational ()Lcom/eignex/util/numbers/BigFraction;
 }
 
 public final class com/eignex/klause/arithmetic/real/ExactRealValuesKt {
 	public static final fun approximate (Lcom/eignex/klause/arithmetic/real/ExactRealValue;)D
 	public static final fun compareExactly (Lcom/eignex/klause/arithmetic/real/ExactRealValue;Lcom/eignex/klause/arithmetic/real/ExactRealValue;)Ljava/lang/Integer;
 	public static final fun toExactRealValue (Lcom/eignex/klause/arithmetic/polynomial/AlgebraicReal;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
-	public static final fun toExactRealValue (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public static final fun toExactRealValue (Lcom/eignex/util/numbers/BigFraction;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
 }
 
 public final class com/eignex/klause/backtrack/BacktrackParams : com/eignex/klause/solver/SolverParams {
@@ -1339,8 +1339,8 @@ public final class com/eignex/klause/factor/arithmetic/ExactLinear : com/eignex/
 }
 
 public final class com/eignex/klause/factor/arithmetic/ExactLinear$Companion {
-	public final fun of ([ILjava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZI)Lcom/eignex/klause/factor/arithmetic/ExactLinear;
-	public static synthetic fun of$default (Lcom/eignex/klause/factor/arithmetic/ExactLinear$Companion;[ILjava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZIILjava/lang/Object;)Lcom/eignex/klause/factor/arithmetic/ExactLinear;
+	public final fun of ([ILjava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/util/numbers/BigFraction;ZI)Lcom/eignex/klause/factor/arithmetic/ExactLinear;
+	public static synthetic fun of$default (Lcom/eignex/klause/factor/arithmetic/ExactLinear$Companion;[ILjava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/util/numbers/BigFraction;ZIILjava/lang/Object;)Lcom/eignex/klause/factor/arithmetic/ExactLinear;
 }
 
 public final class com/eignex/klause/factor/arithmetic/ExactRealEquality : com/eignex/klause/ir/Factor {
@@ -1927,10 +1927,10 @@ public final class com/eignex/klause/factor/global/Distinct : com/eignex/klause/
 }
 
 public final class com/eignex/klause/factor/global/Distinct$Operand {
-	public fun <init> ([ILjava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;)V
-	public synthetic fun <init> ([ILjava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> ([ILjava/util/List;Lcom/eignex/util/numbers/BigFraction;)V
+	public synthetic fun <init> ([ILjava/util/List;Lcom/eignex/util/numbers/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCoefficients ()Ljava/util/List;
-	public final fun getConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getConstant ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getReferences ()[I
 	public final fun getSize ()I
 }
@@ -10751,10 +10751,10 @@ public final class com/eignex/klause/propagation/VarKind : java/lang/Enum {
 
 public final class com/eignex/klause/schema/AffineOperand {
 	public fun <init> ()V
-	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;)V
-	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/util/numbers/BigFraction;)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/util/numbers/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getBools ()Ljava/util/List;
-	public final fun getConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getConstant ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getInts ()Ljava/util/List;
 	public final fun getReals ()Ljava/util/List;
 }
@@ -10947,8 +10947,8 @@ public final class com/eignex/klause/schema/NativeFactorsKt {
 	public static synthetic fun allDifferentExcept$default (Ljava/util/List;Ljava/util/Collection;ZILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun allDifferentTuples (Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun distinct (Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
-	public static final fun exactLinear (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;Z)Lcom/eignex/klause/model/BoolExpr;
-	public static synthetic fun exactLinear$default (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
+	public static final fun exactLinear (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/util/numbers/BigFraction;Z)Lcom/eignex/klause/model/BoolExpr;
+	public static synthetic fun exactLinear$default (Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/util/numbers/BigFraction;ZILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun factor (Lcom/eignex/klause/ir/Factor;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/factor/codec/FactorCodecs;)Lcom/eignex/klause/model/BoolExpr;
 	public static final fun factor (Lkotlinx/serialization/json/JsonElement;Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lcom/eignex/klause/model/BoolExpr;
 	public static synthetic fun factor$default (Lcom/eignex/klause/ir/Factor;Ljava/util/List;Ljava/util/List;Ljava/util/List;Lcom/eignex/klause/factor/codec/FactorCodecs;ILjava/lang/Object;)Lcom/eignex/klause/model/BoolExpr;
@@ -11124,33 +11124,6 @@ public class com/eignex/klause/schema/VariableSchema : com/eignex/skema/Schema {
 	protected final fun setVar (Ljava/util/List;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun setVar (Lkotlin/ranges/IntRange;)Lkotlin/properties/PropertyDelegateProvider;
 	protected final fun symmetryBreakingConstraint (Lkotlin/jvm/functions/Function0;)Lkotlin/properties/PropertyDelegateProvider;
-}
-
-public final class com/eignex/klause/simplex/exact/BigFraction {
-	public static final field Companion Lcom/eignex/klause/simplex/exact/BigFraction$Companion;
-	public final fun compareTo (Lcom/eignex/klause/simplex/exact/BigFraction;)I
-	public fun equals (Ljava/lang/Object;)Z
-	public final fun getDen ()Ljava/math/BigInteger;
-	public final fun getNum ()Ljava/math/BigInteger;
-	public fun hashCode ()I
-	public final fun isZero ()Z
-	public final fun minus (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun negated ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun plus (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun reciprocal ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun signum ()I
-	public final fun times (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun toDouble ()D
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/eignex/klause/simplex/exact/BigFraction$Companion {
-	public final fun getMINUS_ONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun getONE ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun getZERO ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun of (Ljava/math/BigInteger;Ljava/math/BigInteger;)Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun ofDouble (D)Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun ofLong (J)Lcom/eignex/klause/simplex/exact/BigFraction;
 }
 
 public final class com/eignex/klause/solver/Assignment {
@@ -11645,8 +11618,8 @@ public class com/eignex/klause/solver/StatelessSession : com/eignex/klause/solve
 }
 
 public final class com/eignex/klause/solver/evidence/LinearSourceSemanticsChecker : com/eignex/klause/solver/evidence/SourceSemanticsChecker {
-	public fun <init> (Ljava/util/Set;Ljava/util/List;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;)V
-	public synthetic fun <init> (Ljava/util/Set;Ljava/util/List;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/Set;Ljava/util/List;Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;)V
+	public synthetic fun <init> (Ljava/util/Set;Ljava/util/List;Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun derivation (Lcom/eignex/klause/solver/evidence/SourceClaim;Lcom/eignex/klause/solver/evidence/SourceDerivation$Extension;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
 	public fun objectiveEquals (Lcom/eignex/klause/solver/Sample;Lcom/eignex/klause/solver/evidence/SourceValue;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
 	public fun ray (Lcom/eignex/klause/solver/evidence/SourceClaim$Ray;Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/util/ExecutionControl;)Lcom/eignex/klause/solver/evidence/SourceEvidenceCheck;
@@ -11665,20 +11638,20 @@ public final class com/eignex/klause/solver/evidence/ProblemSourceEvidenceKt {
 }
 
 public final class com/eignex/klause/solver/evidence/SourceAffineImage {
-	public fun <init> (Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;)V
-	public synthetic fun <init> (Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;)V
+	public synthetic fun <init> (Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCoefficients ()Ljava/util/Map;
-	public final fun getConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getConstant ()Lcom/eignex/util/numbers/BigFraction;
 }
 
 public abstract interface class com/eignex/klause/solver/evidence/SourceClaim {
 }
 
 public final class com/eignex/klause/solver/evidence/SourceClaim$Bound : com/eignex/klause/solver/evidence/SourceClaim {
-	public fun <init> (Lcom/eignex/klause/simplex/exact/BigFraction;Z)V
-	public synthetic fun <init> (Lcom/eignex/klause/simplex/exact/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceValue;Z)V
 	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceValue;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/util/numbers/BigFraction;Z)V
+	public synthetic fun <init> (Lcom/eignex/util/numbers/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceValue;
 	public final fun component2 ()Z
 	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceValue;Z)Lcom/eignex/klause/solver/evidence/SourceClaim$Bound;
@@ -11842,14 +11815,14 @@ public final class com/eignex/klause/solver/evidence/SourceDerivation$Combinatio
 }
 
 public final class com/eignex/klause/solver/evidence/SourceDerivation$Combination$Term {
-	public fun <init> (Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
-	public final fun component1 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public fun <init> (Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public final fun component1 ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun component2 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
-	public final fun copy (Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Combination$Term;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$Combination$Term;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Combination$Term;
+	public final fun copy (Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Combination$Term;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$Combination$Term;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$Combination$Term;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDerivation ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
-	public final fun getWeight ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getWeight ()Lcom/eignex/util/numbers/BigFraction;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -11891,18 +11864,18 @@ public final class com/eignex/klause/solver/evidence/SourceDerivation$IntegerRou
 }
 
 public final class com/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit : com/eignex/klause/solver/evidence/SourceDerivation {
-	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceCoordinate;
-	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun component2 ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun component3 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
 	public final fun component4 ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
-	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit;Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;)Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit;Lcom/eignex/klause/solver/evidence/SourceCoordinate;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/evidence/SourceDerivation;Lcom/eignex/klause/solver/evidence/SourceDerivation;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceDerivation$IntegerSplit;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAbove ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
 	public final fun getBelow ()Lcom/eignex/klause/solver/evidence/SourceDerivation;
 	public final fun getCoordinate ()Lcom/eignex/klause/solver/evidence/SourceCoordinate;
-	public final fun getThreshold ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getThreshold ()Lcom/eignex/util/numbers/BigFraction;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -12030,11 +12003,11 @@ public final class com/eignex/klause/solver/evidence/SourceEvidenceVerifier {
 }
 
 public final class com/eignex/klause/solver/evidence/SourceInequality {
-	public fun <init> (Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Z)V
-	public synthetic fun <init> (Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;Z)V
+	public synthetic fun <init> (Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getCoefficients ()Ljava/util/Map;
-	public final fun getRhs ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getRhs ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getStrict ()Z
 	public fun hashCode ()I
 }
@@ -12071,11 +12044,11 @@ public final class com/eignex/klause/solver/evidence/SourcePremise {
 }
 
 public final class com/eignex/klause/solver/evidence/SourceProofContext {
-	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Set;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/evidence/SourceSemanticsChecker;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getCoordinates ()Ljava/util/Set;
 	public final fun getObjective ()Ljava/util/Map;
-	public final fun getObjectiveConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getObjectiveConstant ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getPremises ()Ljava/util/Map;
 	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
 	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
@@ -12165,11 +12138,11 @@ public final class com/eignex/klause/solver/evidence/SourceSemanticsChecker$Defa
 }
 
 public final class com/eignex/klause/solver/evidence/SourceTransformation {
-	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/util/numbers/BigFraction;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/util/Map;Ljava/util/Map;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/util/numbers/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun getImages ()Ljava/util/Map;
-	public final fun getObjectiveOffset ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun getObjectiveScale ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getObjectiveOffset ()Lcom/eignex/util/numbers/BigFraction;
+	public final fun getObjectiveScale ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getPremiseDerivations ()Ljava/util/Map;
 	public final fun getSource ()Lcom/eignex/klause/solver/evidence/SourceScope;
 	public final fun getTarget ()Lcom/eignex/klause/solver/evidence/SourceScope;
@@ -12193,12 +12166,12 @@ public abstract interface class com/eignex/klause/solver/evidence/SourceValue$Ex
 }
 
 public final class com/eignex/klause/solver/evidence/SourceValue$Rational : com/eignex/klause/solver/evidence/SourceValue {
-	public fun <init> (Lcom/eignex/klause/simplex/exact/BigFraction;)V
-	public final fun component1 ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun copy (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/solver/evidence/SourceValue$Rational;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceValue$Rational;Lcom/eignex/klause/simplex/exact/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceValue$Rational;
+	public fun <init> (Lcom/eignex/util/numbers/BigFraction;)V
+	public final fun component1 ()Lcom/eignex/util/numbers/BigFraction;
+	public final fun copy (Lcom/eignex/util/numbers/BigFraction;)Lcom/eignex/klause/solver/evidence/SourceValue$Rational;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/evidence/SourceValue$Rational;Lcom/eignex/util/numbers/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/solver/evidence/SourceValue$Rational;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getValue ()Lcom/eignex/util/numbers/BigFraction;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -12363,7 +12336,7 @@ public final class com/eignex/klause/solver/objective/LinearObjective : com/eign
 	public fun equals (Ljava/lang/Object;)Z
 	public fun evaluate (Lcom/eignex/klause/solver/Assignment;)D
 	public fun evaluate (Lcom/eignex/klause/solver/Sample;)D
-	public final fun evaluateExact (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun evaluateExact (Lcom/eignex/klause/solver/Sample;)Lcom/eignex/util/numbers/BigFraction;
 	public final fun evaluateLong (Lcom/eignex/klause/solver/Assignment;)J
 	public final fun evaluateLong (Lcom/eignex/klause/solver/Sample;)J
 	public final fun getBoolWeights ()[J
@@ -12966,7 +12939,7 @@ public final class com/eignex/klause/solver/pipeline/LinearOptimizationExecution
 public final class com/eignex/klause/solver/pipeline/LinearSourceBound {
 	public final fun getSense ()Lcom/eignex/klause/ir/ObjectiveSense;
 	public final fun getStrict ()Z
-	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getValue ()Lcom/eignex/util/numbers/BigFraction;
 }
 
 public final class com/eignex/klause/solver/pipeline/LinearSourceConclusion : java/lang/Enum {
@@ -12982,7 +12955,7 @@ public final class com/eignex/klause/solver/pipeline/LinearSourceConclusion : ja
 }
 
 public final class com/eignex/klause/solver/pipeline/LinearSourceOutcome {
-	public final fun getAcceptedObjectiveBound ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getAcceptedObjectiveBound ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getClaimsCoverTolerance ()Z
 	public final fun getConclusion ()Lcom/eignex/klause/solver/pipeline/LinearSourceConclusion;
 	public final fun getIncumbent ()Lcom/eignex/klause/solver/validation/LinearSourceWitness;
@@ -12992,7 +12965,7 @@ public final class com/eignex/klause/solver/pipeline/LinearSourceOutcome {
 	public final fun getNominalConstraintsExact ()Z
 	public final fun getNominalSourceExact ()Z
 	public final fun getNumericalClaims ()Z
-	public final fun getObjectiveScale ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getObjectiveScale ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getSource ()Lcom/eignex/klause/ir/LinearSourceProblem;
 }
 
@@ -13286,23 +13259,23 @@ public abstract interface class com/eignex/klause/solver/pipeline/OpenTheoryOpti
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
-	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun component2 ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component5 ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public final fun component6 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/TerminationReason;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Bounded;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getIncumbent ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public fun getLinearResult ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public final fun getReason ()Lcom/eignex/klause/solver/result/TerminationReason;
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getValue ()Lcom/eignex/util/numbers/BigFraction;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -13328,40 +13301,40 @@ public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Infeasibl
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
-	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun component2 ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public final fun component5 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Optimal;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getAssignment ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public fun getLinearResult ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getValue ()Lcom/eignex/util/numbers/BigFraction;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
 
 public final class com/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded : com/eignex/klause/solver/pipeline/OpenTheoryOptimum {
-	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
-	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun component2 ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun component3 ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun component4 ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public final fun component5 ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
-	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
+	public final fun copy (Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/result/SolveStats;Lcom/eignex/klause/solver/result/LinearOptimizationResult;Lcom/eignex/klause/ir/EffectiveSourceSemantics;ILjava/lang/Object;)Lcom/eignex/klause/solver/pipeline/OpenTheoryOptimum$Unbounded;
 	public fun equals (Ljava/lang/Object;)Z
 	public fun getLinearResult ()Lcom/eignex/klause/solver/result/LinearOptimizationResult;
 	public fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
-	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getValue ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getWitness ()Lcom/eignex/klause/solver/pipeline/OpenTheoryAssignment;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -14519,7 +14492,7 @@ public final class com/eignex/klause/solver/result/LinearOptimizationResult {
 	public final fun getSemantics ()Lcom/eignex/klause/ir/EffectiveSourceSemantics;
 	public final fun getStats ()Lcom/eignex/klause/solver/result/SolveStats;
 	public final fun getTerminal ()Lcom/eignex/klause/solver/evidence/SourceEvidence;
-	public final fun getValue ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getValue ()Lcom/eignex/util/numbers/BigFraction;
 }
 
 public final class com/eignex/klause/solver/result/LocalSearchResidual {
@@ -16383,15 +16356,15 @@ public final class com/eignex/klause/solver/search/BooleanCube {
 }
 
 public final class com/eignex/klause/solver/search/BooleanProofContext {
-	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/lang/String;Lcom/eignex/klause/simplex/exact/BigFraction;)V
-	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/lang/String;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/lang/String;Lcom/eignex/util/numbers/BigFraction;)V
+	public synthetic fun <init> (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/lang/String;Lcom/eignex/util/numbers/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/evidence/SourceScope;
 	public final fun component2 ()Ljava/lang/String;
-	public final fun component3 ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/lang/String;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/solver/search/BooleanProofContext;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/BooleanProofContext;Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/lang/String;Lcom/eignex/klause/simplex/exact/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/BooleanProofContext;
+	public final fun component3 ()Lcom/eignex/util/numbers/BigFraction;
+	public final fun copy (Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/lang/String;Lcom/eignex/util/numbers/BigFraction;)Lcom/eignex/klause/solver/search/BooleanProofContext;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/BooleanProofContext;Lcom/eignex/klause/solver/evidence/SourceScope;Ljava/lang/String;Lcom/eignex/util/numbers/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/BooleanProofContext;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCutoff ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getCutoff ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getMapping ()Ljava/lang/String;
 	public final fun getScope ()Lcom/eignex/klause/solver/evidence/SourceScope;
 	public fun hashCode ()I
@@ -17014,7 +16987,7 @@ public final class com/eignex/klause/solver/search/SearchExactRealValue : com/ei
 	public fun getValueType ()Lkotlin/reflect/KClass;
 	public final fun getVariable-P0Uu7zc ()I
 	public fun hashCode ()I
-	public fun snapshot (Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/simplex/exact/BigFraction;
+	public fun snapshot (Lcom/eignex/util/numbers/BigFraction;)Lcom/eignex/util/numbers/BigFraction;
 	public synthetic fun snapshot (Ljava/lang/Object;)Ljava/lang/Object;
 	public fun toString ()Ljava/lang/String;
 }
@@ -17661,16 +17634,16 @@ public final class com/eignex/klause/solver/search/SourceBoundAtom : com/eignex/
 	public fun getSourceBound ()Lcom/eignex/klause/solver/search/SourceBoundAtom;
 	public final fun getStrict ()Z
 	public final fun getTerms ()Ljava/util/List;
-	public final fun getThreshold ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getThreshold ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getUpper ()Z
 	public fun hashCode ()I
 }
 
 public final class com/eignex/klause/solver/search/SourceBoundAtom$Companion {
-	public final fun integerSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
-	public static synthetic fun integerSplit$default (Lcom/eignex/klause/solver/search/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
-	public final fun rationalSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZLcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
-	public static synthetic fun rationalSplit$default (Lcom/eignex/klause/solver/search/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ZLcom/eignex/klause/simplex/exact/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public final fun integerSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public static synthetic fun integerSplit$default (Lcom/eignex/klause/solver/search/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public final fun rationalSplit (Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/util/numbers/BigFraction;ZLcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
+	public static synthetic fun rationalSplit$default (Lcom/eignex/klause/solver/search/SourceBoundAtom$Companion;Lcom/eignex/klause/solver/search/SearchContext;Ljava/util/List;Lcom/eignex/util/numbers/BigFraction;ZLcom/eignex/util/numbers/BigFraction;Lcom/eignex/klause/solver/search/SourceBoundLimits;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SearchTheoryAtom;
 }
 
 public final class com/eignex/klause/solver/search/SourceBoundLimits {
@@ -17693,13 +17666,13 @@ public abstract interface class com/eignex/klause/solver/search/SourceBoundPredi
 }
 
 public final class com/eignex/klause/solver/search/SourceBoundTerm {
-	public fun <init> (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;)V
+	public fun <init> (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/util/numbers/BigFraction;)V
 	public final fun component1 ()Lcom/eignex/klause/solver/search/SearchValueKey;
-	public final fun component2 ()Lcom/eignex/klause/simplex/exact/BigFraction;
-	public final fun copy (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/solver/search/SourceBoundTerm;
-	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/SourceBoundTerm;Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/klause/simplex/exact/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SourceBoundTerm;
+	public final fun component2 ()Lcom/eignex/util/numbers/BigFraction;
+	public final fun copy (Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/util/numbers/BigFraction;)Lcom/eignex/klause/solver/search/SourceBoundTerm;
+	public static synthetic fun copy$default (Lcom/eignex/klause/solver/search/SourceBoundTerm;Lcom/eignex/klause/solver/search/SearchValueKey;Lcom/eignex/util/numbers/BigFraction;ILjava/lang/Object;)Lcom/eignex/klause/solver/search/SourceBoundTerm;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getCoefficient ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getCoefficient ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getSource ()Lcom/eignex/klause/solver/search/SearchValueKey;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -17797,7 +17770,7 @@ public final class com/eignex/klause/solver/search/Vsids : com/eignex/klause/sol
 
 public final class com/eignex/klause/solver/validation/LinearSourceWitness {
 	public final fun getExact ()Z
-	public final fun getObjective ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getObjective ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getSource ()Lcom/eignex/klause/ir/LinearSourceProblem;
 	public final fun getValues ()Ljava/util/List;
 }
@@ -17842,9 +17815,9 @@ public final class com/eignex/klause/theory/EncoderSupport : java/lang/Enum {
 }
 
 public final class com/eignex/klause/theory/EncodingAffineExpression {
-	public fun <init> (Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;)V
-	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/klause/simplex/exact/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getConstant ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public fun <init> (Ljava/util/List;Lcom/eignex/util/numbers/BigFraction;)V
+	public synthetic fun <init> (Ljava/util/List;Lcom/eignex/util/numbers/BigFraction;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getConstant ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getTerms ()Ljava/util/List;
 }
 
@@ -17873,15 +17846,15 @@ public final class com/eignex/klause/theory/EncodingGuard {
 public final class com/eignex/klause/theory/EncodingLinearTerm {
 	public static final field Companion Lcom/eignex/klause/theory/EncodingLinearTerm$Companion;
 	public final fun getAuxiliary ()Lcom/eignex/klause/theory/EncodingAuxiliary;
-	public final fun getCoefficient ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public final fun getCoefficient ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getRealAuxiliary ()Lcom/eignex/klause/theory/EncodingRealAuxiliary;
 	public final fun getReference ()Ljava/lang/Integer;
 }
 
 public final class com/eignex/klause/theory/EncodingLinearTerm$Companion {
-	public final fun auxiliary (Lcom/eignex/klause/theory/EncodingAuxiliary;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/theory/EncodingLinearTerm;
-	public final fun auxiliary (Lcom/eignex/klause/theory/EncodingRealAuxiliary;Lcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/theory/EncodingLinearTerm;
-	public final fun source (ILcom/eignex/klause/simplex/exact/BigFraction;)Lcom/eignex/klause/theory/EncodingLinearTerm;
+	public final fun auxiliary (Lcom/eignex/klause/theory/EncodingAuxiliary;Lcom/eignex/util/numbers/BigFraction;)Lcom/eignex/klause/theory/EncodingLinearTerm;
+	public final fun auxiliary (Lcom/eignex/klause/theory/EncodingRealAuxiliary;Lcom/eignex/util/numbers/BigFraction;)Lcom/eignex/klause/theory/EncodingLinearTerm;
+	public final fun source (ILcom/eignex/util/numbers/BigFraction;)Lcom/eignex/klause/theory/EncodingLinearTerm;
 }
 
 public final class com/eignex/klause/theory/EncodingNamespace {
@@ -17928,9 +17901,9 @@ public final class com/eignex/klause/theory/LinearEncodingFormula$And : com/eign
 }
 
 public final class com/eignex/klause/theory/LinearEncodingFormula$Comparison : com/eignex/klause/theory/LinearEncodingFormula {
-	public fun <init> (Lcom/eignex/klause/theory/EncodingAffineExpression;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;Z)V
-	public synthetic fun <init> (Lcom/eignex/klause/theory/EncodingAffineExpression;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/klause/simplex/exact/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun getBound ()Lcom/eignex/klause/simplex/exact/BigFraction;
+	public fun <init> (Lcom/eignex/klause/theory/EncodingAffineExpression;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/util/numbers/BigFraction;Z)V
+	public synthetic fun <init> (Lcom/eignex/klause/theory/EncodingAffineExpression;Lcom/eignex/klause/ir/LinearOp;Lcom/eignex/util/numbers/BigFraction;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getBound ()Lcom/eignex/util/numbers/BigFraction;
 	public final fun getExpression ()Lcom/eignex/klause/theory/EncodingAffineExpression;
 	public final fun getRelation ()Lcom/eignex/klause/ir/LinearOp;
 	public final fun getStrict ()Z

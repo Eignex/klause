@@ -1,6 +1,5 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
 

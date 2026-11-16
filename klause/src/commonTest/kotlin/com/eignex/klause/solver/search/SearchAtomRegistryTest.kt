@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.factor.bool.Clause
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

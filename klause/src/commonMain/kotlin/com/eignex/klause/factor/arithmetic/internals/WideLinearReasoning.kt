@@ -4,13 +4,14 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.util.collections.IntArrayList
-import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.ceilDiv
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.fitsLong
+import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
@@ -189,19 +190,4 @@ internal fun integralQuotientOrNull(value: BigInt, divisor: BigInt): Long? {
     if (divisor == BIG_ZERO) return null
     val quotient = value / divisor
     return if (quotient * divisor == value && quotient.fitsLong()) quotient.toLongExact() else null
-}
-
-/** `⌊a / b⌋` (BigInt division truncates toward zero; adjust down when the exact quotient is negative
- *  with a nonzero remainder). */
-internal fun floorDiv(a: BigInt, b: BigInt): BigInt {
-    val q = a / b
-    val r = a - q * b
-    return if (r != BIG_ZERO && (r < BIG_ZERO) != (b < BIG_ZERO)) q - BIG_ONE else q
-}
-
-/** `⌈a / b⌉` (adjust up when the exact quotient is positive with a nonzero remainder). */
-internal fun ceilDiv(a: BigInt, b: BigInt): BigInt {
-    val q = a / b
-    val r = a - q * b
-    return if (r != BIG_ZERO && (r < BIG_ZERO) == (b < BIG_ZERO)) q + BIG_ONE else q
 }

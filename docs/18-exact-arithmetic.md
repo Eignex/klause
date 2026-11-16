@@ -28,7 +28,8 @@ reserve credit; opaque work sinks receive completed unit charges without evaluat
 ## Exact quadratic certificates
 
 `arithmetic.quadratic` checks rational evidence for bounds, attainment, approach
-paths and improving rays. Its exact operations read only `simplex.exact` and `util`;
+paths and improving rays. Its exact operations use Eignex Util rational arithmetic
+and Klause `util` execution controls;
 floating candidate generation also uses Koblas. Its model
 denotes `constant + linear^T x + x^T Hessian x / 2` with an exactly symmetric
 Hessian; callers own conversion from the
@@ -77,7 +78,8 @@ owns traversal, reconstruction and publication.
 ## Exact polynomial and algebraic arithmetic
 
 `arithmetic.polynomial` performs exact polynomial operations and represents real
-roots without rounding them. It depends only on `simplex.exact` and `util`.
+roots without rounding them. It uses Eignex Util rational arithmetic and Klause
+`util` execution controls.
 [Polynomial theory](16-nonlinear-arithmetic.md#polynomial-real-arithmetic) owns formula decisions and projection
 policy, and [API value ownership](19-api.md#exact-assignment-values) owns public
 witness access.
@@ -182,8 +184,8 @@ callers translate declines into an unknown resource outcome.
 ## Certified transcendental enclosures
 
 `arithmetic.transcendental` supplies rational enclosures for real exp, natural log,
-sin and cos, depending only on `simplex.exact` and `util`. An enclosure can
-establish separation or supply a relaxation; it never certifies a source equality
+sin and cos, using Eignex Util rational arithmetic and Klause `util` execution
+controls. An enclosure can establish separation or supply a relaxation; it never certifies a source equality
 from overlapping endpoints.
 
 ### Arithmetic and domain
@@ -276,12 +278,13 @@ outlive the invocation that checked them.
 
 ## Numerical dependencies
 
-Klause owns LU, reach, pivot policy, Forrest–Tomlin updates, checked arithmetic,
+Klause owns LU, reach, pivot policy, Forrest–Tomlin updates, arithmetic admission,
 scratch lifetime, the norm over indexed dense workspace storage, and the workspace
 scatter, gather and pivot-candidate slices in `util.SparseSlices`. Koblas supplies
 validated CSC containers, structural transposes and vector/indexed kernels; Kumulant
 supplies online statistics and adaptive bandits. Eignex Util supplies primitive
-collections, array algorithms, exact integer primitives and synchronous locks.
+collections, array algorithms, exact integer and rational primitives, signed integer
+division, saturating arithmetic and synchronous locks.
 They do not select models, routes or result semantics.
 
 The [root build](../build.gradle.kts) pins immutable timestamps for KMP roots and

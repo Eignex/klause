@@ -2,7 +2,6 @@ package com.eignex.klause.theory.qfnia
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.NonlinearIntegerProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.search.ComponentCheck
@@ -23,6 +22,7 @@ import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.plus

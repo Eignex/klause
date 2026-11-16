@@ -3,7 +3,6 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.Term
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
@@ -14,6 +13,7 @@ import com.eignex.klause.solver.validation.capturedSourceSlack
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 
 /** Conclusion under the captured linear source certification and acceptance policy. */

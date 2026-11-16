@@ -2,7 +2,6 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.ExactComparison
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride

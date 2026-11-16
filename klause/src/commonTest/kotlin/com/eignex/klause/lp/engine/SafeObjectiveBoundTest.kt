@@ -8,7 +8,7 @@ import com.eignex.klause.lp.engine.exactVariableBound
 import com.eignex.klause.lp.engine.safeObjectiveLowerBound
 import com.eignex.klause.lp.engine.safeVariableBound
 import com.eignex.klause.lp.engine.tightVariableBound
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

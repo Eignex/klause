@@ -1,7 +1,6 @@
 package com.eignex.klause.theory.transcendental
 
 import com.eignex.klause.ir.TranscendentalProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBranchKind

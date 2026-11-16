@@ -12,8 +12,8 @@ import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.CnfLowering
 import com.eignex.klause.lowering.IntComb
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /** Reject an unsupported construct with a clean [UnsupportedSmtException]. */
 internal fun smtUnsupported(msg: String): Nothing = throw UnsupportedSmtException(msg)

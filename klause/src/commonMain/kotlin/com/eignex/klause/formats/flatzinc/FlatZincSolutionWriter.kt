@@ -1,11 +1,11 @@
 package com.eignex.klause.formats.flatzinc
 
 import com.eignex.klause.lowering.FloatBucketing
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 
 /** Render one solved sample in FlatZinc output format. */

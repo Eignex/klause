@@ -1,8 +1,6 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.factor.distance
-import com.eignex.klause.factor.saturatedAdd
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
@@ -17,6 +15,8 @@ import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.negate
 import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.saturatedAdd
+import com.eignex.util.numbers.saturatedDistance
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 
@@ -27,14 +27,14 @@ internal class DivModInvariant(private val relation: DivMod) : Invariant {
         if (wordDivisor != null) {
             val outputs = relation.wordOutputs(value(relation.dividend), wordDivisor)
                 ?: return compressViolation(Long.MAX_VALUE, state.violationSoftCap)
-            return compressViolation(saturatedAdd(distance(outputs.first, value(relation.quotient)),
-                distance(outputs.second, value(relation.remainder))), state.violationSoftCap)
+            return compressViolation(saturatedAdd(saturatedDistance(outputs.first, value(relation.quotient)),
+                saturatedDistance(outputs.second, value(relation.remainder))), state.violationSoftCap)
         }
         val outputs = relation.outputs(bigIntOf(value(relation.dividend)),
             relation.divisor?.let { bigIntOf(value(it)) } ?: checkNotNull(relation.constantDivisor))
             ?: return compressViolation(Long.MAX_VALUE, state.violationSoftCap)
         fun error(expected: BigInt, actual: Long): Long =
-            if (expected.fitsLong()) distance(expected.toLongExact(), actual) else Long.MAX_VALUE
+            if (expected.fitsLong()) saturatedDistance(expected.toLongExact(), actual) else Long.MAX_VALUE
         return compressViolation(saturatedAdd(error(outputs.first, value(relation.quotient)),
             error(outputs.second, value(relation.remainder))), state.violationSoftCap)
     }

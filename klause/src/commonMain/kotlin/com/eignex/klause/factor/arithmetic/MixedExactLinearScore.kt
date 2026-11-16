@@ -7,8 +7,8 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.collections.IntIntMap
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo

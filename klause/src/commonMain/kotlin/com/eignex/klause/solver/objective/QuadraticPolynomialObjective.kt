@@ -5,8 +5,8 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.util.numbers.BigFraction
 
 internal fun QuadraticObjectiveSpec.polynomialFor(finite: Sample): PolynomialExpression {
     fun coordinate(variable: QuadraticVariable): PolynomialExpression = when (variable) {

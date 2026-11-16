@@ -9,8 +9,8 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.Term
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 internal fun polynomialRow(
     row: LinearRow,

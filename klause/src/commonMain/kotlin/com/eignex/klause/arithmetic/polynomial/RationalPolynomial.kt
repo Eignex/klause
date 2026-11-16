@@ -1,8 +1,8 @@
 package com.eignex.klause.arithmetic.polynomial
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.magnitudeBitLength

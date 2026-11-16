@@ -2,7 +2,6 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.lp.admittedSourcePoint
 import com.eignex.klause.lp.engine.reconstructRational
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.bigIntOf

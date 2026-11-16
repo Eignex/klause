@@ -1,12 +1,10 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.factor.distance
 import com.eignex.klause.factor.global.internals.GccState
 import com.eignex.klause.factor.global.internals.countPresentOccurrences
 import com.eignex.klause.factor.global.internals.proposeRandomRotations
 import com.eignex.klause.factor.global.internals.proposeRandomSwaps
-import com.eignex.klause.factor.saturatedAdd
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.localsearch.Invariant
@@ -16,6 +14,8 @@ import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableLongIntMap
+import com.eignex.util.numbers.saturatedAdd
+import com.eignex.util.numbers.saturatedDistance
 
 internal class GlobalCardinalityInvariant(
     private val xs: IntArray,
@@ -335,7 +335,7 @@ internal class GlobalCardinalityInvariant(
         for (k in cover.indices) {
             if (cvArr != null) {
                 val expected = if (cvArr[k] == ovVar) ovVal else state.assignment.intValue(cvArr[k])
-                deg = saturatedAdd(deg, distance(expected, simCounts[k].toLong()))
+                deg = saturatedAdd(deg, saturatedDistance(expected, simCounts[k].toLong()))
             } else {
                 val cnt = simCounts[k]
                 val lo = requireNotNull(countLow)[k]

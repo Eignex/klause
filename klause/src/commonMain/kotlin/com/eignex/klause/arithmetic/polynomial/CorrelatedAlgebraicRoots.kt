@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.polynomial
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal class AlgebraicSpecialization(val base: AlgebraicReal, coefficients: List<RationalPolynomial>) {
     private val captured = coefficients.toList()

@@ -3,10 +3,10 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.toleranceQualification
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals

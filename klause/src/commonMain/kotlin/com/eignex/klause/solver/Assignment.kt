@@ -6,10 +6,10 @@ import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.indices
 import com.eignex.klause.ir.randomValue
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong

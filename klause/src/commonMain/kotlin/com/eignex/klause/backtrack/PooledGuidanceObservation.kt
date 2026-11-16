@@ -1,8 +1,8 @@
 package com.eignex.klause.backtrack
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal enum class PooledGuidanceKind { IMPORT, LOCAL, ATTEMPT, COMMIT }

@@ -2,7 +2,6 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.optimization.LinearPinnedObjective
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate

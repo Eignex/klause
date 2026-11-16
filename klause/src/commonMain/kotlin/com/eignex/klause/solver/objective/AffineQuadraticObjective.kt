@@ -8,7 +8,7 @@ import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 /**
  * Capture this affine objective in the exact quadratic source representation.

@@ -1,7 +1,6 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SmtStatsSink

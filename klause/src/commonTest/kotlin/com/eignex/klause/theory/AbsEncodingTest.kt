@@ -18,7 +18,6 @@ import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.absSourceWitnessContext
 import com.eignex.klause.solver.incumbent.Candidate
@@ -39,6 +38,7 @@ import com.eignex.klause.solver.pipeline.toSample
 import com.eignex.klause.theory.qfnra.PolynomialFormula
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals

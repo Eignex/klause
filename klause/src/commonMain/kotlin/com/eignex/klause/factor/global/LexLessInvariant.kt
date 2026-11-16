@@ -1,13 +1,13 @@
 package com.eignex.klause.factor.global
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.localsearch.forEachCandidate
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.saturatedSub
 
 internal class LexLessInvariant(private val xs: IntArray, private val ys: IntArray, private val strict: Boolean) :
     Invariant {

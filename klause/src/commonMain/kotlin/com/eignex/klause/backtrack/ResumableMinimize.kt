@@ -31,7 +31,6 @@ import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.baked
 import com.eignex.klause.propagation.conditionedRoot
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ReseedGuard
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.Sample
@@ -84,6 +83,7 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.bindStopControl
 import com.eignex.klause.util.cancelledWhen
 import com.eignex.klause.util.workScheduled
+import com.eignex.util.numbers.BigFraction
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds

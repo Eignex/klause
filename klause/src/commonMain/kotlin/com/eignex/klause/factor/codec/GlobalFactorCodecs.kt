@@ -14,7 +14,7 @@ import com.eignex.klause.factor.global.Sort
 import com.eignex.klause.factor.global.SymmetricAllDifferent
 import com.eignex.klause.factor.global.ValuePrecede
 import com.eignex.klause.ir.LinearRow
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import kotlinx.serialization.Serializable
 
 // `presents` are the optional-presence literals of an optional global, aligned with its operands.

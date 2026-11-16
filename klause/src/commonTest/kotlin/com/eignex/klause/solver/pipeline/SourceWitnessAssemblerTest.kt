@@ -14,7 +14,6 @@ import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.SourceRebuilds
 import com.eignex.klause.presolve.TransformationGuarantees
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.search.AssembledSearchModel
 import com.eignex.klause.solver.search.SearchBoolValue
@@ -28,6 +27,7 @@ import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.solver.search.TypedSearchValueKey
 import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals

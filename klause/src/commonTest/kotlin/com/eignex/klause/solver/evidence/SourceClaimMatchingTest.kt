@@ -2,7 +2,6 @@ package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test

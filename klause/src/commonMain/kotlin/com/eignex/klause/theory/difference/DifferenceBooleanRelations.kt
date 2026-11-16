@@ -5,8 +5,8 @@ import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.ExactWitness
 import com.eignex.klause.lp.exactComparison
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal fun Problem.checkDifferenceBooleans(bools: BooleanArray, cancellation: ExecutionControl): Boolean? {
     val witness = object : ExactWitness {

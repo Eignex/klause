@@ -12,7 +12,6 @@ import com.eignex.klause.arithmetic.quadratic.QuadraticStop
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.QuadraticObjectiveSpec
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
 import com.eignex.klause.solver.evidence.SourceDerivation

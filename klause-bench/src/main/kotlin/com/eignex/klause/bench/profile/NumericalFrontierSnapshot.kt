@@ -2,7 +2,6 @@ package com.eignex.klause.bench.profile
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.optimization.LinearAuthoritySemantics
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
@@ -18,13 +17,13 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
-import java.lang.reflect.Constructor
-import java.util.IdentityHashMap
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.lang.reflect.Constructor
+import java.util.IdentityHashMap
 
 internal class NumericalFrontierSnapshot(
     private val context: SourceProofContext,

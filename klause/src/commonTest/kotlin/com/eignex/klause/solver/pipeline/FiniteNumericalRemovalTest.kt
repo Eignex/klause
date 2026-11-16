@@ -16,7 +16,6 @@ import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.meta.alns.DestroyOperator
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.FunctionalObjective

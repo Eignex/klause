@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.result
 
 import com.eignex.klause.ir.EffectiveSourceSemantics
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceResultEvidence
 import com.eignex.klause.util.ExecutionControl

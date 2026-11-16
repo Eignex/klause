@@ -1,13 +1,13 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.search.RegisteredTheoryDecision
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.SearchIntValue
 import com.eignex.klause.solver.search.SourceBoundPredicate
+import com.eignex.util.numbers.BigFraction
 
 internal fun linearRefutationSupport(
     opening: SourceCondition,

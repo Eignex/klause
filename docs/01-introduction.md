@@ -96,12 +96,12 @@ Packages below are under `com.eignex.klause` in
 | `formats` | Parsing and lowering source syntax | Uses shared lowering; no compiler or concrete theory dependency |
 | `factor` | Constraint semantics and factor operations | Supplies mechanisms used by propagation, relaxations and search |
 | `propagation` | Finite domains, explanations and incremental propagators | May use immutable arithmetic representations |
-| `arithmetic.polynomial` | Exact sparse polynomials, elimination and real-root isolation | Only `simplex.exact` and `util` |
-| `arithmetic.quadratic` | Exact convex quadratic bounds, attainment and rays | Only `simplex.exact` and `util` |
-| `arithmetic.transcendental` | Certified rational function enclosures and affine relaxations | Only `simplex.exact` and `util` |
+| `arithmetic.polynomial` | Exact sparse polynomials, elimination and real-root isolation | Shared Util arithmetic and Klause `util` execution controls |
+| `arithmetic.quadratic` | Exact convex quadratic bounds, attainment and rays | Shared Util arithmetic, Klause `util` execution controls and Koblas proposals |
+| `arithmetic.transcendental` | Certified rational function enclosures and affine relaxations | Shared Util arithmetic and Klause `util` execution controls |
 | `arithmetic.real` | Exact symbolic real values with certified comparison | Only numerical kernels; no model or solver state |
 | `arithmetic.difference` | Difference constraints, extraction and non-incremental graph operations | No propagation or search state |
-| `simplex.exact` | Rational arithmetic and exact feasibility primitives | Reusable numerical mechanism |
+| `simplex.exact` | Fixed-width rational arithmetic and exact feasibility primitives | Uses shared exact rationals from Eignex Util |
 | `simplex.basis` | Sparse floating and rational basis operations | Numerical types, `util` and koblas; no search policy |
 | `lp.lattice` | Exact integer echelon/Hermite reduction, transforms and triangular bounds | Leaf depending only on `util` |
 | `lp.engine` | LP solving, basis state and exact certificates | Only `util`, `simplex.exact`, `lp.lattice` and `simplex.basis` among Klause packages |

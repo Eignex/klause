@@ -3,7 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.formats.smtlib.smtAlgebraicTerm
 import com.eignex.klause.formats.smtlib.smtRootTerm
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal fun smtAlgebraicValue(value: AlgebraicReal): String = smtAlgebraicTerm(value)
 

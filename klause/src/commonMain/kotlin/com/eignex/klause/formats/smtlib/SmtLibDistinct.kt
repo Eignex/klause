@@ -7,7 +7,7 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.lowering.trueLit
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal fun Compiler.Builder.assertDistinct(args: List<SExpr>) {
     val values = args.map { argument ->

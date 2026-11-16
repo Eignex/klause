@@ -1,7 +1,7 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.mulExact

@@ -8,15 +8,16 @@ import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.ceilDiv
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
+import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.negate
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.remainderOf
-import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.unaryMinus
 
@@ -239,13 +240,3 @@ private const val MAX_ELIMINATIONS = 4096
 
 /** Substitution densifies rows; past this width the reduction costs more than the refutation is worth. */
 private const val MAX_ROW_TERMS = 512
-
-private fun floorDiv(a: BigInt, b: BigInt): BigInt {
-    val q = a / b
-    return if (a.remainderOf(b) != BIG_ZERO && (a.signum() < 0) != (b.signum() < 0)) q - BIG_ONE else q
-}
-
-private fun ceilDiv(a: BigInt, b: BigInt): BigInt {
-    val q = a / b
-    return if (a.remainderOf(b) != BIG_ZERO && (a.signum() < 0) == (b.signum() < 0)) q + BIG_ONE else q
-}

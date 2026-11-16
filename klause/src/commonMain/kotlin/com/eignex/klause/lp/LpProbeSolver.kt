@@ -11,8 +11,8 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.RetainedLpSolver
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.newRetainedLpSolver
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
 
 internal class LpProbeSolver(

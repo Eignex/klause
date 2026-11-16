@@ -5,11 +5,11 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.polynomial.ceilInteger
 import com.eignex.klause.ir.PolynomialRealFormula
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.CheckedPolynomialCell
 import com.eignex.klause.theory.qfnra.PolynomialCellScope
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.minus

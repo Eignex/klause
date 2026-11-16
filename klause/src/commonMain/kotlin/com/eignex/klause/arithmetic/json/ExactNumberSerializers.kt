@@ -1,8 +1,8 @@
 package com.eignex.klause.arithmetic.json
 
 import com.eignex.klause.ir.SemanticRational
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.parseBigInt

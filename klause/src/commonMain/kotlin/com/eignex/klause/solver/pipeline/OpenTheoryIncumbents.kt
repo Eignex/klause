@@ -1,9 +1,9 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.IncumbentSource
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.compareTo
 

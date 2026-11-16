@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.polynomial
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 /** An owned exact real root of a rational polynomial, independent of arithmetic context lifetime. */
 class AlgebraicReal internal constructor(

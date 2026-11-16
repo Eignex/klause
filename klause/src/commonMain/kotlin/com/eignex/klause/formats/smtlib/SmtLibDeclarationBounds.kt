@@ -10,8 +10,8 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal fun Compiler.Builder.retainDeclarationBounds() {
     visitSmtDeclarationBounds(

@@ -1,6 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 /**
  * An exact rational linear combination over integer and LP-only real variables — the folded form of

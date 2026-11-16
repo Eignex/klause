@@ -3,9 +3,9 @@ package com.eignex.klause.theory.qfnia
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertFalse

@@ -2,7 +2,6 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.factor.arithmetic.ExactRealEquality
 import com.eignex.klause.ir.*
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.*
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigInt

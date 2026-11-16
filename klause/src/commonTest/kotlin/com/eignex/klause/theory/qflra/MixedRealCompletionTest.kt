@@ -2,7 +2,6 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.satisfiesSourceRows
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test

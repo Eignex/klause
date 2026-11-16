@@ -1,14 +1,14 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.factor.distance
-import com.eignex.klause.factor.saturatedAdd
-import com.eignex.klause.factor.saturatedMul
-import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.util.numbers.Int128
+import com.eignex.util.numbers.saturatedAdd
+import com.eignex.util.numbers.saturatedDistance
+import com.eignex.util.numbers.saturatedMul
+import com.eignex.util.numbers.saturatedSub
 
 internal class ProductInvariant(private val a: Int, private val b: Int, private val result: Int) : Invariant {
 
@@ -98,7 +98,7 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
     private fun residual(x: Long, y: Long, r: Long): Long {
         val product = x * y
         if (x == 0L || (product / x == y && !(x == -1L && y == Long.MIN_VALUE))) {
-            return distance(product, r)
+            return saturatedDistance(product, r)
         }
         val exact = Int128()
         exact.addProduct(x, y)
@@ -108,7 +108,7 @@ internal class ProductInvariant(private val a: Int, private val b: Int, private 
         } else {
             exact.addLong(-r)
         }
-        return if (exact.fitsLong()) distance(exact.toLong(), 0L) else Long.MAX_VALUE
+        return if (exact.fitsLong()) saturatedDistance(exact.toLong(), 0L) else Long.MAX_VALUE
     }
 
     private fun residualAfterSet(state: LocalSearchState, intVar: Int, value: Long): Long = residual(

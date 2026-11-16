@@ -19,7 +19,7 @@ import com.eignex.klause.lowering.PolynomialRealLowering.Companion.not
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.or
 import com.eignex.klause.lowering.PolynomialRealLowering.Companion.relation
 import com.eignex.klause.lowering.transcendentalDistinctEncoding
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal class TranscendentalRelaxationModel(
     firstAuxiliary: Int,

@@ -3,7 +3,6 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.SparseSourceLpPolicy
 import com.eignex.klause.lp.engine.LpClaim
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.IntegerPinStatus
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition

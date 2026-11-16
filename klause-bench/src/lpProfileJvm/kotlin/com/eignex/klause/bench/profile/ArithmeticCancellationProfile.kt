@@ -29,7 +29,6 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.localsearch.LocalSearchSolver
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.PolynomialTheoryParams
@@ -39,6 +38,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 import java.lang.management.ManagementFactory
 import java.util.concurrent.CountDownLatch

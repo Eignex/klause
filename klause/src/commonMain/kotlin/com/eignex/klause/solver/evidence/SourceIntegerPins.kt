@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.evidence
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 internal enum class IntegerPinStatus { Established, Inactive, Unresolved }
 

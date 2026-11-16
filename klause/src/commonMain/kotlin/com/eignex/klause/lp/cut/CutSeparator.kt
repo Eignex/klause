@@ -16,7 +16,7 @@ import com.eignex.klause.lp.statesBothBounds
 import com.eignex.klause.lp.statesLowerBound
 import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 /** Everything a separator needs: the problem, the current relaxation, its LP solution, the session. */
 internal class CutContext(

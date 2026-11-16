@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.quadratic
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal class QuadraticCertification(private val control: QuadraticControl = QuadraticControl()) {
     private val half = BigFraction.ofLong(2).reciprocal()

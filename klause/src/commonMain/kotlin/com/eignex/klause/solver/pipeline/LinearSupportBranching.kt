@@ -3,7 +3,6 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthorityCutViolation
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.ExecutionControl
 import kotlin.math.abs

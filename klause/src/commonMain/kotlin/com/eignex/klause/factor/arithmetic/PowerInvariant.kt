@@ -1,14 +1,14 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.factor.distance
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.util.numbers.saturatedDistance
 
 internal class PowerInvariant(private val base: Int, private val exponent: Int, private val result: Int) : Invariant {
     private fun residual(input: Long, output: Long): Long =
-        integerPowerOrNull(input, exponent)?.let { distance(it, output) } ?: Long.MAX_VALUE
+        integerPowerOrNull(input, exponent)?.let { saturatedDistance(it, output) } ?: Long.MAX_VALUE
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =
         residual(state.assignment.intValue(base), state.assignment.intValue(result)) != 0L

@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.real
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 /** Real analytic functions with exact real arguments; log requires a positive argument. */
 enum class ExactRealFunction {

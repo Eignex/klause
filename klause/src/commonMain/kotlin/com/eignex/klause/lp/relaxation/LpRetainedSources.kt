@@ -22,8 +22,8 @@ import com.eignex.klause.lp.engine.LpStructuralColumn
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.authoritativeModel
 import com.eignex.klause.lp.engine.strongerThan
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class LpSourceEdit(
     val sourceState: LpExactState,

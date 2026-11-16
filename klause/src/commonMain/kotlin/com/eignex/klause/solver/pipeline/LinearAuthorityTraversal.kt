@@ -13,7 +13,6 @@ import com.eignex.klause.lp.optimization.atScope
 import com.eignex.klause.lp.optimization.floorSplit
 import com.eignex.klause.lp.optimization.strongerLinearBound
 import com.eignex.klause.lp.optimization.withLinearAuthority
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition

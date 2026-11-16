@@ -11,8 +11,8 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExactSearchRow
+import com.eignex.util.numbers.BigFraction
 
 internal fun continuousProductEncoder(factor: ContinuousProduct, target: EncodingTarget): Encoder = when {
     target == EncodingTarget.POLYNOMIAL -> polynomialProduct

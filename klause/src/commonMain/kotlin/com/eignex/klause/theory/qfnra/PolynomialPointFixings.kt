@@ -3,7 +3,7 @@ package com.eignex.klause.theory.qfnra
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal fun polynomialPointFixings(
     formula: PolynomialRealFormula,

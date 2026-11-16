@@ -1,7 +1,5 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.factor.arithmetic.internals.ceilDiv
-import com.eignex.klause.factor.arithmetic.internals.floorDiv
 import com.eignex.klause.factor.arithmetic.internals.wideNeverHolds
 import com.eignex.klause.factor.arithmetic.internals.wideSumRange
 import com.eignex.klause.ir.LinearOp
@@ -15,7 +13,9 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.ceilDiv
 import com.eignex.util.numbers.compareTo
+import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact

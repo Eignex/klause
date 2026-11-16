@@ -3,7 +3,6 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.lp.SourceLpFunding
 import com.eignex.klause.lp.optimization.LinearAuthorityCapturedCut
 import com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality

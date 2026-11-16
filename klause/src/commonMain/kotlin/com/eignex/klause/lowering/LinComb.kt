@@ -1,5 +1,9 @@
 package com.eignex.klause.lowering
 
+import com.eignex.util.numbers.addExact
+import com.eignex.util.numbers.mulExact
+import com.eignex.util.numbers.subExact
+
 /**
  * An integer linear combination `Σ coeffs(v)·v + constant` over variable ids, the term the SMT-LIB and
  * XCSP3 parsers fold expressions into before lowering a relation to a `Factor`.
@@ -30,29 +34,4 @@ internal fun linCombDiff(a: LinComb, b: LinComb, delta: Long = 0L): Triple<IntAr
     val bound = addExact(subExact(b.constant, a.constant), delta)
     val vars = combined.keys.toIntArray()
     return Triple(vars, LongArray(vars.size) { combined.getValue(vars[it]) }, bound)
-}
-
-/**
- * Checked 64-bit arithmetic for term folding. Integer terms in SMT-LIB and XCSP3 are unbounded, so a
- * wrapped `Long` would silently corrupt the folded value; these throw [ArithmeticException] on overflow
- * so the caller can promote the fold to [IntComb.Wide] or reject the term.
- */
-internal fun addExact(a: Long, b: Long): Long {
-    val r = a + b
-    if (((a xor r) and (b xor r)) < 0L) throw ArithmeticException("long overflow: $a + $b")
-    return r
-}
-
-internal fun subExact(a: Long, b: Long): Long {
-    val r = a - b
-    if (((a xor b) and (a xor r)) < 0L) throw ArithmeticException("long overflow: $a - $b")
-    return r
-}
-
-internal fun mulExact(a: Long, b: Long): Long {
-    val r = a * b
-    if (a != 0L && (r / a != b || (a == -1L && b == Long.MIN_VALUE))) {
-        throw ArithmeticException("long overflow: $a * $b")
-    }
-    return r
 }

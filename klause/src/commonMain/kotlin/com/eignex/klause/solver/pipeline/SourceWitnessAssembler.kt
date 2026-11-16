@@ -6,13 +6,13 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.presolve.SourceMapping
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.AssembledSearchModel
 import com.eignex.klause.solver.search.SearchBoolValue
 import com.eignex.klause.solver.search.SearchExactAlgebraicRealValue
 import com.eignex.klause.solver.search.SearchExactIntValue
 import com.eignex.klause.solver.search.SearchExactRealExpressionValue
 import com.eignex.klause.solver.search.SearchExactRealValue
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 
 internal class SourceWitnessAssembler(

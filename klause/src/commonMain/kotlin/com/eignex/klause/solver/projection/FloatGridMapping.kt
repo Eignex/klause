@@ -8,7 +8,6 @@ import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.factor.arithmetic.GridCoordinate
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.util.ExecutionControl

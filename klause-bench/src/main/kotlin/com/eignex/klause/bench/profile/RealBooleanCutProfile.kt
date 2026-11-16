@@ -12,7 +12,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.lp.optimization.LinearAuthoritySemantics
 import com.eignex.klause.lp.optimization.withLinearAuthority
 import com.eignex.klause.presolve.PresolveBudget
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition

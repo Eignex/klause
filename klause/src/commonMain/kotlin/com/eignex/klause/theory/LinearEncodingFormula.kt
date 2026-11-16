@@ -2,7 +2,7 @@ package com.eignex.klause.theory
 
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 /** A private affine value, allocated and defined by one receiving installation scope. */
 class EncodingAuxiliary internal constructor(
