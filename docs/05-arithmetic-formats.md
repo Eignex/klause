@@ -348,7 +348,11 @@ see [real graph admission](14-theories.md#real-graph-admission-and-checks).
 
 ### Integer division
 
-Integer `div` and `mod` introduce open integer quotient and remainder coordinates.
+Supported constant-divisor `div` and `mod` retain their native division factors,
+and supported absolute values retain `Abs` or `AffineAbs`. Source admission tries
+these factor representations and exact polynomial capture before applying general
+arithmetic reduction to an otherwise unrepresentable term.
+The general reduction introduces open integer quotient and remainder coordinates.
 A nonzero divisor requires the exact equation `a = b*q + r` and
 `0 <= r < abs(b)`, including negative divisors. A zero divisor leaves the two
 results independently unspecified; application congruence requires equal arguments
@@ -359,7 +363,8 @@ No range for the operands or outputs is guessed.
 `to_int` introduces an open integer coordinate `q` with `q <= x < q+1`, and
 `is_int` compares the original value to that floor. The operands may be nonlinear.
 Indexed divisibility uses the exact Euclidean remainder relation for any positive
-numeral index. Integer absolute values use a sign conditional.
+numeral index. General arithmetic reduction expresses integer absolute values as a
+sign conditional.
 
 The standard integer operator `**` retains an integer output and its full integer
 semantics. Zero exponents give one, including `0**0`; negative exponents give zero

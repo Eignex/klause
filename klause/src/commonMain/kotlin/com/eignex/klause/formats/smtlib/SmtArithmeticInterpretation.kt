@@ -1,5 +1,10 @@
 package com.eignex.klause.formats.smtlib
 
+internal fun defaultSmtArithmeticInterpretations(): Map<String, SmtReconstruction> = mapOf(
+    "@operation:div" to SmtArithmeticInterpretation(emptyList(), 2, false),
+    "@operation:mod" to SmtArithmeticInterpretation(emptyList(), 3, false),
+    "@operation:/" to SmtArithmeticInterpretation(emptyList(), 2, true))
+
 internal class SmtArithmeticInterpretation(private val applications: List<SmtArithmeticApplication>,
     private val resultIndex: Int, private val real: Boolean) : SmtReconstruction {
     override fun reconstruct(values: SmtModelValues): SmtValue {

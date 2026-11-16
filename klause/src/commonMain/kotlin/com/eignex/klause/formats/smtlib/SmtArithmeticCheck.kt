@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
+import com.eignex.klause.arithmetic.real.ExactRealArithmetic
 import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.arithmetic.real.RealCertificationUnavailable
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
@@ -31,11 +32,15 @@ internal class SmtArithmeticCheck(private val operation: SmtArithmeticOperation,
     catch (_: TranscendentalInterrupted) { throw CancellationException("SMT arithmetic source checking interrupted") }
     catch (_: PolynomialResourceLimit) { throw SmtSourceCheckingUnavailable() }
     catch (_: PolynomialInterrupted) { throw CancellationException("SMT arithmetic source checking interrupted") }
+    catch (_: RealCertificationUnavailable) { throw SmtSourceCheckingUnavailable() }
 
     private fun checkOperation(values: SmtModelValues): Boolean = when (operation) {
         SmtArithmeticOperation.DIV_MOD -> {
-            val (a, b, q, r) = coordinates.map { parseBigInt(values.integer(it)) }
-            b == BIG_ZERO || a == b * q + r && r >= BIG_ZERO && r < b.abs()
+            val integers = coordinates.map { parseBigInt(values.integer(it)) }
+            val (a, b) = integers
+            val q = integers[2]
+            val r = integers[3]
+            b == BIG_ZERO || (a == b * q + r && r >= BIG_ZERO && r < b.abs())
         }
         SmtArithmeticOperation.POWER -> {
             val (base, exponent, actual) = coordinates.map { parseBigInt(values.integer(it)) }
@@ -67,27 +72,24 @@ internal class SmtArithmeticCheck(private val operation: SmtArithmeticOperation,
 
     private fun checkReals(values: SmtModelValues): Boolean {
         val arithmetic = smtExactArithmetic(values.cancellation)
-        fun real(name: String): ExactRealValue = values.exactReal(name) ?: throw RealCertificationUnavailable()
-        return try {
-            val a = real(coordinates[0])
-            if (operation == SmtArithmeticOperation.REAL_DIV) {
-                val b = real(coordinates[1])
-                val zero = arithmetic.rational(BigFraction.ZERO)
-                if (arithmetic.compare(b, zero) == 0) true
-                else (arithmetic.compare(a, arithmetic.multiply(listOf(b, real(coordinates[2]))))
-                    ?: throw SmtSourceCheckingUnavailable()) == 0
-            } else {
-                val q = arithmetic.rational(BigFraction.of(parseBigInt(values.integer(coordinates[1])), BIG_ONE))
-                val next = arithmetic.add(listOf(q, arithmetic.rational(BigFraction.ONE)))
-                val lower = arithmetic.compare(q, a)
-                val upper = arithmetic.compare(a, next)
-                if (lower == null || upper == null) throw SmtSourceCheckingUnavailable()
-                lower <= 0 && upper < 0
-            }
-        } catch (_: RealCertificationUnavailable) {
-            throw SmtSourceCheckingUnavailable()
+        val a = real(values, coordinates[0])
+        return if (operation == SmtArithmeticOperation.REAL_DIV) {
+            val b = real(values, coordinates[1])
+            val zero = arithmetic.rational(BigFraction.ZERO)
+            if (compare(arithmetic, b, zero) == 0) true
+            else compare(arithmetic, a, arithmetic.multiply(listOf(b, real(values, coordinates[2])))) == 0
+        } else {
+            val q = arithmetic.rational(BigFraction.of(parseBigInt(values.integer(coordinates[1])), BIG_ONE))
+            val next = arithmetic.add(listOf(q, arithmetic.rational(BigFraction.ONE)))
+            compare(arithmetic, q, a) <= 0 && compare(arithmetic, a, next) < 0
         }
     }
+
+    private fun real(values: SmtModelValues, name: String): ExactRealValue =
+        values.exactReal(name) ?: throw SmtSourceCheckingUnavailable()
+
+    private fun compare(arithmetic: ExactRealArithmetic, left: ExactRealValue, right: ExactRealValue): Int =
+        arithmetic.compare(left, right) ?: throw SmtSourceCheckingUnavailable()
 }
 
 internal data class SmtArithmeticApplication(val coordinates: List<String>, val activation: String?)

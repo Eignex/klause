@@ -322,7 +322,7 @@ class SmtArithmeticReductionTest {
             "(declare-const |#b1| Int) (assert (= |#b1| 2)) (assert (= #b1 #b0))")
 
         for (script in scripts) {
-            val result = solve(SmtLib.parse(script))
+            val result = solve(SmtLib.parse("$script (assert (= (** 1 0) 1))"))
 
             assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
         }
@@ -331,10 +331,33 @@ class SmtArithmeticReductionTest {
     @Test
     fun `quoted numeric coordinates should retain their independently checked source value`() {
         val original = SmtLib.parse("(declare-const |1| Int) (declare-const |2| Int) " +
-            "(assert (= |1| 2)) (assert (= |2| 3)) (assert (= (+ 1 |1| |2|) 6))")
+            "(assert (= |1| 2)) (assert (= |2| 3)) (assert (= (+ 1 |1| |2|) 6)) " +
+            "(assert (= (** 1 0) 1))")
         val input = original.copy(sourceChecks = original.sourceChecks + SmtSourceCheck { values ->
             values.integer("1") == "2" && values.integer("2") == "3"
         }).withSourceWitnessValidation()
+
+        val result = solve(input)
+
+        assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
+    }
+
+    @Test
+    fun `general division should retain independently refuted integer premises`() {
+        for (term in listOf("(/ x x)", "(div (* x x) 2)")) {
+            val input = SmtLib.parse("(declare-const x Int) (declare-const y Int) " +
+                "(assert (= (* 2 x) (+ (* 2 y) 1))) (assert (= $term 0))")
+
+            val result = solve(input)
+
+            assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
+        }
+    }
+
+    @Test
+    fun `zero real division should remain total in an absorbed Boolean branch`() {
+        val input = SmtLib.parse("(declare-const b Bool) " +
+            "(assert (= b (or true (> (/ 1.0 0.0) 0.0)))) (assert b)")
 
         val result = solve(input)
 
