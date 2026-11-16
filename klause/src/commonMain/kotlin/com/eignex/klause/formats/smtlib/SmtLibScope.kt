@@ -282,6 +282,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                         val qualified = (identifier as? SExpr.SList)?.takeIf {
                             (it.items.firstOrNull() as? SExpr.Atom)?.text == "as"
                         }
+                        if (qualified != null && qualified.items.size != 3) return null
                         val qualification = qualified?.let { sourceSort(it.items[2]) }
                         val selected = qualified?.items?.get(1) ?: identifier
                         val indexed = selected as? SExpr.SList
@@ -296,6 +297,15 @@ internal class SmtLibScope(private val cancellation: ExecutionControl, private v
                         val head = polynomialSymbol((selected as? SExpr.Atom)?.text ?: return null)
                         if (head == "as" && qualified == null) {
                             if (node.items.size != 3) return null
+                            val selectedIndex = node.items[1] as? SExpr.SList
+                            if (selectedIndex != null) {
+                                val type = smtIndexedBitVectorSort(selectedIndex, emptyList()) ?: return null
+                                if (type != sourceSort(node.items[2])) return null
+                                val key = selectedIndex.items.map { (it as? SExpr.Atom)?.text ?: return null }
+                                    .joinToString(" ")
+                                values.addLast(term("($key)", emptyList(), type))
+                                continue
+                            }
                             val name = node.polynomialName(1)
                             val signature = globals[name]
                             val result = signature?.takeIf { it.parameters.isEmpty() }?.result

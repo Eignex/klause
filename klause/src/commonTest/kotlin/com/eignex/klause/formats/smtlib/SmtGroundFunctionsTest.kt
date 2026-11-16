@@ -332,6 +332,33 @@ class SmtGroundFunctionsTest {
     }
 
     @Test
+    fun `qualified indexed bitvector operators preserve function congruence`() {
+        val parsed = SmtLib.parse("""
+            (declare-const x (_ BitVec 8))
+            (declare-fun p ((_ BitVec 4)) Bool)
+            (assert (p ((as (_ extract 3 0) (_ BitVec 4)) x)))
+            (assert (not (p ((_ extract 3 0) x))))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `qualified indexed literals retain their fixed width`() {
+        val parsed = SmtLib.parse("""
+            (declare-fun p ((_ BitVec 4)) Bool)
+            (assert (p (as (_ bv1 4) (_ BitVec 4))))
+            (assert (not (p #b0001)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
     fun `ground exposure retains domains of unused helper arguments and let values`() {
         val cases = listOf(
             "(define-fun f ((x Real)) Real 1) (assert (= (f (log 0)) 1))",
