@@ -284,7 +284,7 @@ class ResumableMinimizeRealLeafTest {
                 assertIs<MinimizeResult.Optimal>(result).sample
             } else {
                 val incomplete = assertIs<MinimizeResult.BestFound>(result)
-                assertEquals(TerminationReason.Unsupported, incomplete.reason)
+                assertEquals(TerminationReason.RepresentationDeclined, incomplete.reason)
                 incomplete.sample
             }
             assertEquals(0.5, sample.reals.single())
