@@ -240,7 +240,7 @@ at their command. Compiler binding tables are discarded after lowering; the owne
 typed source and original declaration order and spellings remain attached.
 
 Reduction passes carry transformed commands, original declarations, named private
-recipes and original-source checks together. Every pass and fallback charges the
+recipes and original-source checks together. Every pass and fallback shares the
 same execution control, so representation changes do not reset an encoding
 budget. Caller endpoint overrides apply only to original scalar declarations;
 private reduction coordinates keep the bounds supplied by their encoding. Only
@@ -280,6 +280,8 @@ validate reads, stores, conditionals and equality through certified semantic val
 comparison, including native algebraic real indexes. An unavailable comparison
 withholds the witness. Model rendering uses store/constant-array terms; the
 constant-array input extension is unsupported.
+Polymorphic family queries instantiate unobserved array ranks as typed total
+arrays, carrying the same semantic comparison and element-point interpretation.
 
 ### Linear and conditional lowering
 

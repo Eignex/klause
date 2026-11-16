@@ -2,6 +2,9 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.solver.Sample
+import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
@@ -15,6 +18,7 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -63,6 +67,18 @@ class SmtGroundArraysTest {
     }
 
     @Test
+    fun `invalid array witnesses should withhold source publication authority`() {
+        val source = source("(declare-const a (Array Bool Bool)) (declare-const b (Array Bool Bool)) " +
+            "(assert (distinct a b))")
+        val sample = Sample(BooleanArray(source.model.numBoolVars), longArrayOf())
+
+        val checked = source.source.witnessValidators.single().validate(OpenTheoryAssignment.Sampled(sample),
+            ExecutionControl.Never)
+
+        assertIs<SourceEvidenceCheck.Rejected>(checked)
+    }
+
+    @Test
     fun `unused array functions should reconstruct a total typed default`() {
         val source = source("(declare-fun f (Bool) (Array Bool Bool))")
 
@@ -86,7 +102,8 @@ class SmtGroundArraysTest {
         val result = SourceSetup.execute(SourceExecutionRequest(invocation), SourceExecutionCallbacks(
             finite = FiniteSolveCallbacks({ models += source.reconstructModel(it) }, {})))
 
-        val completed = assertIs<FiniteSolveOutcome.Completed>(assertIs<SourceExecutionResult.Finite>(result).result.outcome)
+        val completed = assertIs<FiniteSolveOutcome.Completed>(
+            assertIs<SourceExecutionResult.Finite>(result).result.outcome)
         assertEquals(FiniteSolveVerdict.SAT, completed.verdict)
         val array = assertIs<SmtValue.Array>(models.single().values.single().second)
         assertEquals(SmtValue.Boolean(false), array.entries.last { it.first == SmtValue.Boolean(false) }.second)
@@ -210,11 +227,50 @@ class SmtGroundArraysTest {
     }
 
     @Test
+    fun `bitvector stores should reconstruct source words without address enumeration`() {
+        val source = source("(declare-const a (Array (_ BitVec 2) (_ BitVec 3))) " +
+            "(assert (distinct (select a #b01) #b101)) " +
+            "(assert (= (select (store a #b01 #b101) #b01) #b101))")
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(source.model).solve()).assignment
+        val model = source.reconstructModel(assignment)
+
+        val array = assertIs<SmtValue.Array>(model.values.single().second)
+        assertTrue(array.entries.all { (it.first as SmtValue.BitVector).bits.length == 2 })
+        assertTrue(array.entries.last { it.first == SmtValue.BitVector("01") }.second != SmtValue.BitVector("101"))
+    }
+
+    @Test
+    fun `wide bitvector indexes should admit total source values from finite reads`() {
+        val source = source("(declare-const a (Array (_ BitVec 64) Bool)) " +
+            "(assert (not (select a #x0000000000000000)))")
+
+        val model = source.reconstructModel({ false }, { "0" }, { "0.0" })
+
+        val array = assertIs<SmtValue.Array>(model.values.single().second)
+        assertEquals(listOf(SmtValue.BitVector("0".repeat(64)) to SmtValue.Boolean(false)), array.entries)
+    }
+
+    @Test
+    fun `polymorphic array instances should preserve separate reconstruction keys`() {
+        val source = source("(declare-sort-parameter A) (declare-const a A) " +
+            "(assert (= (as a (Array Bool Bool)) (as a (Array Bool Bool)))) " +
+            "(assert (= (as a (Array Int Int)) (as a (Array Int Int))))")
+
+        val model = source.reconstructModel({ true }, { "0" }, { "0.0" })
+
+        assertEquals(setOf(SmtSort.Array(SmtSort.Bool, SmtSort.Bool), SmtSort.Array(SmtSort.Int, SmtSort.Int)),
+            model.values.map { it.first.result }.toSet())
+        assertTrue(model.values.all { it.first.name == "a" && it.second is SmtValue.Array })
+    }
+
+    @Test
     fun `cancellation should interrupt array closure before publication`() {
-        val input = captureSmtSource(SExprReader("(declare-const a (Array Bool Bool))").readAll(), Cancellation.Never)
+        val input = captureSmtSource(SExprReader("(declare-const a (Array Bool Bool))").readAll(),
+            ExecutionControl.Never)
 
         assertFailsWith<PolynomialSourceInterrupted> {
-            reduceSmtGroundArrays(input, Cancellation { true })
+            reduceSmtGroundArrays(input, ExecutionControl(Cancellation { true }))
         }
     }
 

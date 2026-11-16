@@ -3,6 +3,7 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.solver.Sample
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -36,7 +37,8 @@ class SmtArrayValuesTest {
         val source = SmtLib.parse("(declare-const b Bool)").copy(sourceChecks = listOf(SmtSourceCheck { values ->
             val sort = SmtSort.Array(SmtSort.Int, SmtSort.Bool)
             val a = SmtValue.Array(sort, SmtValue.Boolean(false), emptyList())
-            val b = SmtValue.Array(sort, SmtValue.Boolean(true), listOf(SmtValue.Integer("0") to SmtValue.Boolean(false)))
+            val b = SmtValue.Array(sort, SmtValue.Boolean(true),
+                listOf(SmtValue.Integer("0") to SmtValue.Boolean(false)))
             values.equal(a, b) == false
         }))
 
@@ -81,11 +83,13 @@ class SmtArrayValuesTest {
         val arithmetic = AlgebraicArithmetic()
         val first = arithmetic.roots(RationalPolynomial.of(-2, 0, 1)).last()
         val second = arithmetic.roots(RationalPolynomial.of(-4, 0, 0, 0, 1)).last()
-        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0, 2.0), algebraicReals = listOf(first, second))
+        val sample = Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(1.0, 2.0),
+            algebraicReals = listOf(first, second))
         val source = SmtLib.parse("(declare-const x Real) (declare-const y Real)").copy(
             sourceChecks = listOf(SmtSourceCheck { values ->
                 val sort = SmtSort.Array(SmtSort.Real, SmtSort.Bool)
-                val array = SmtValue.Array(sort, SmtValue.Boolean(false), listOf(values.value("x") to SmtValue.Boolean(true)))
+                val array = SmtValue.Array(sort, SmtValue.Boolean(false),
+                    listOf(values.value("x") to SmtValue.Boolean(true)))
                 smtArraySelect(array, values.value("y"), values) == SmtValue.Boolean(true)
             }))
 
@@ -109,5 +113,24 @@ class SmtArrayValuesTest {
         val model = source.reconstructModel({ false }, { "0" }, { "0.0" })
 
         assertEquals(1, model.values.size)
+    }
+
+    @Test
+    fun `unobserved array ranks should instantiate typed total polymorphic models`() {
+        val source = SmtLib.parse("(declare-sort-parameter A) (declare-const a A) " +
+            "(declare-fun f (A) A) (assert (= (f a) a))")
+        val family = source.originalSource!!.polymorphicModel!!
+        val sort = SmtSort.Array(SmtSort.Bool, SmtSort.Bool)
+
+        val model = withSmtModelValues(source, { false }, { "0" }, { "0.0" }, ExecutionControl.Never) { values, _ ->
+            val constant = family.instantiate("a", emptyList(), sort, values)
+            val function = family.instantiate("f", listOf(sort), sort, values) as SmtValue.Function
+            val images = function.entries.map { it.first.single() }
+            assertEquals(false, values.equal(images[0], images[1]))
+            assertTrue(images.all { it is SmtValue.Array })
+            constant
+        }
+
+        assertTrue(model is SmtValue.Array)
     }
 }

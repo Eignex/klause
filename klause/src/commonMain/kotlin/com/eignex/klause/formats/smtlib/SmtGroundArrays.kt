@@ -1,9 +1,9 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.util.Cancellation
+import com.eignex.klause.util.ExecutionControl
 
-internal fun reduceSmtGroundArrays(input: SmtReduction, cancellation: Cancellation): SmtReduction {
+internal fun reduceSmtGroundArrays(input: SmtReduction, cancellation: ExecutionControl): SmtReduction {
     val work = ArrayDeque<SExpr>()
     for (expression in input.commands) {
         cancellation.polynomialSourceCheckpoint(1)
@@ -23,7 +23,7 @@ internal fun reduceSmtGroundArrays(input: SmtReduction, cancellation: Cancellati
     return input
 }
 
-private class SmtGroundArrayReducer(private val input: SmtReduction, private val cancellation: Cancellation) {
+private class SmtGroundArrayReducer(private val input: SmtReduction, private val cancellation: ExecutionControl) {
     private data class Term(val id: Int, val sort: SmtSort, val expression: SExpr)
     private data class Node(val head: SExpr, val arguments: List<Int>)
     private data class ArrayTerm(val term: Term, val operator: String, val arguments: List<Term>)
@@ -48,7 +48,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     private val processedWitnesses = HashSet<String>()
     private val processedAgreements = HashSet<Pair<String, Int>>()
     private val processedCongruences = HashSet<PairKey>()
-    private val sourceBindings = input.bindings.associateByTo(LinkedHashMap()) { polynomialSymbol(it.declaration.name) }
+    private val sourceBindings = input.bindings.associateByTo(LinkedHashMap()) { polynomialSymbol(it.key) }
     private val privateBindings = input.privateBindings.toMutableMap()
     private val usedNames = HashSet<String>()
     private var nextTerm = 0
@@ -62,7 +62,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
             val command = expression as SExpr.SList
             when (command.polynomialHead()) {
                 "declare-const", "declare-fun" -> declare(command)
-                "assert", "minimize", "maximize" -> output += form(command.items[0], rewrite(command.items[1]).expression)
+                "assert", "minimize", "maximize" ->
+                    output += form(command.items[0], rewrite(command.items[1]).expression)
                 "check-sat-assuming", "get-value" -> {
                     val values = (command.items[1] as SExpr.SList).items.map { rewrite(it).expression }
                     append(form(command.items[0], SExpr.SList(values)))
@@ -92,7 +93,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         }
         val operationChecks = arrays.values.filter { step(); it.operator != "base" }.map { array ->
             step()
-            SmtArrayOperationCheck(array.term.expressionName(), array.operator, array.arguments.map { it.expressionName() })
+            SmtArrayOperationCheck(array.term.expressionName(), array.operator,
+                array.arguments.map { it.expressionName() })
         }
         val readChecks = allReads.map { read ->
             step()
@@ -104,7 +106,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
 
     private fun declare(command: SExpr.SList) {
         val name = command.polynomialName(1)
-        val args = if (command.polynomialHead() == "declare-fun") (command.items[2] as SExpr.SList).items else emptyList()
+        val args = if (command.polynomialHead() == "declare-fun") (command.items[2] as SExpr.SList).items
+            else emptyList()
         if (args.isNotEmpty()) smtUnsupported("array reduction requires eliminated ground function applications")
         val sort = parseSort(command.items.last(), cancellation)
         val term = atom((command.items[1] as SExpr.Atom).text, sort)
@@ -125,8 +128,10 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 is SExpr.Atom -> values.addLast(if (arrayLexicalLiteral(expression.text)) literal(expression)
                     else symbols[polynomialSymbol(expression.text)] ?: literal(expression))
                 is SExpr.SList -> if (expression.polynomialHead() == "_") {
-                    val width = expression.polynomialAtom(2).toInt()
-                    values.addLast(raw(expression, SmtSort.BitVector(width)))
+                    val normalized = arrayBuiltinIdentifier(expression) as SExpr.SList
+                    val sort = smtIndexedBitVectorSort(normalized, emptyList())
+                        ?: smtUnsupported("invalid indexed bitvector literal")
+                    values.addLast(raw(normalized, sort))
                 } else if (frame.combine) {
                     val args = List(expression.items.size - 1) { values.removeLast() }.reversed()
                     values.addLast(combine(expression.items[0], args))
@@ -157,7 +162,9 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 listOf(capture(args[0]), args[1], args[2]), args[1].sort as SmtSort.Array, "ite")
             name in setOf("=", "distinct") && args[0].sort is SmtSort.Array -> {
                 val comparisons = if (name == "=") args.zipWithNext().map { equal(it.first, it.second) }
-                    else args.indices.flatMap { i -> (i + 1 until args.size).map { j -> form("not", equal(args[i], args[j])) } }
+                    else args.indices.flatMap { i ->
+                        (i + 1 until args.size).map { j -> form("not", equal(args[i], args[j])) }
+                    }
                 intern(SExpr.Atom("and"), comparisons.map { raw(it, SmtSort.Bool) }, SmtSort.Bool)
             }
             else -> intern(resolved, args, resultSort(resolved, args.map { it.sort }))
@@ -199,7 +206,9 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 if (it.sort is SmtSort.Array) arrays[it.id] = ArrayTerm(it, "base", emptyList())
                 registerIndex(it, left.sort)
             } else null
-            if (witness == null) axioms += assertion(form("=", flag.expression, form("=", left.expression, right.expression)))
+            if (witness == null) {
+                axioms += assertion(form("=", flag.expression, form("=", left.expression, right.expression)))
+            }
             Equality(left, right, flag.expressionName(), witness)
         }.name)
     }
@@ -221,7 +230,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                     "store" -> {
                         val same = equal(read.index, array.arguments[1])
                         val base = read(array.arguments[0], read.index)
-                        axioms += assertion(form("ite", same, equal(read.value, array.arguments[2]), equal(read.value, base)))
+                        axioms += assertion(form("ite", same,
+                            equal(read.value, array.arguments[2]), equal(read.value, base)))
                     }
                     "ite" -> axioms += assertion(form("ite", array.arguments[0].expression,
                         equal(read.value, read(array.arguments[1], read.index)),
@@ -236,7 +246,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 for (index in indexes[equality.left.sort]?.values?.toList().orEmpty()) {
                     step()
                     if (processedAgreements.add(equality.name to index.id)) {
-                        axioms += assertion(form("=>", flag, equal(read(equality.left, index), read(equality.right, index))))
+                        axioms += assertion(form("=>", flag,
+                            equal(read(equality.left, index), read(equality.right, index))))
                     }
                 }
             }
@@ -245,7 +256,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 step()
                 val left = readList[i]
                 val right = readList[j]
-                if (left.array.id == right.array.id && processedCongruences.add(PairKey(left.value.id, right.value.id))) {
+                if (left.array.id == right.array.id &&
+                    processedCongruences.add(PairKey(left.value.id, right.value.id))) {
                     axioms += assertion(form("=>", equal(left.index, right.index), equal(left.value, right.value)))
                 }
             }
@@ -279,10 +291,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
 
     private fun literal(expression: SExpr.Atom): Term {
         val text = expression.text
-        val sort = when {
+        val sort = smtBitVectorLiteralSort(text) ?: when {
             text in setOf("true", "false") -> SmtSort.Bool
-            text.startsWith("#b") -> SmtSort.BitVector(text.length - 2)
-            text.startsWith("#x") -> SmtSort.BitVector((text.length - 2) * 4)
             text == "pi" || '.' in text -> SmtSort.Real
             text.all { it in '0'..'9' } -> SmtSort.Int
             else -> smtUnsupported("unbound array-lowering symbol '$text'")
@@ -297,7 +307,9 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     }
     private fun raw(expression: SExpr, sort: SmtSort): Term = Term(nextTerm++, sort, expression)
     private fun intern(head: SExpr, arguments: List<Term>, sort: SmtSort): Term =
-        nodes.getOrPut(Node(head, arguments.map { it.id })) { raw(SExpr.SList(listOf(head) + arguments.map { it.expression }), sort) }
+        nodes.getOrPut(Node(head, arguments.map { it.id })) {
+            raw(SExpr.SList(listOf(head) + arguments.map { it.expression }), sort)
+        }
     private fun Term.expressionName(): String = (expression as SExpr.Atom).text
     private fun step() = cancellation.polynomialSourceCheckpoint(1)
 
@@ -355,7 +367,7 @@ private data class SmtArrayOperationCheck(val result: String, val operator: Stri
     }
 }
 
-private fun parseSort(expression: SExpr, cancellation: Cancellation): SmtSort {
+private fun parseSort(expression: SExpr, cancellation: ExecutionControl): SmtSort {
     val work = ArrayDeque<Pair<SExpr, Boolean>>()
     val sorts = ArrayDeque<SmtSort>()
     work.addLast(expression to false)
@@ -385,28 +397,17 @@ private fun parseSort(expression: SExpr, cancellation: Cancellation): SmtSort {
 }
 
 private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
+    smtBitVectorBuiltinSort(head, args)?.let { return it }
     val name = (head as? SExpr.Atom)?.text
     if (head is SExpr.SList) {
-        val operator = head.polynomialAtom(1)
-        val base = args.firstOrNull() as? SmtSort.BitVector
-        return when (operator) {
-            "divisible" -> SmtSort.Bool
-            "extract" -> SmtSort.BitVector(head.polynomialAtom(2).toInt() - head.polynomialAtom(3).toInt() + 1)
-            "zero_extend", "sign_extend" -> SmtSort.BitVector(checkNotNull(base).width + head.polynomialAtom(2).toInt())
-            "repeat" -> SmtSort.BitVector(checkNotNull(base).width * head.polynomialAtom(2).toInt())
-            "int_to_bv", "int2bv" -> SmtSort.BitVector(head.polynomialAtom(2).toInt())
-            else -> checkNotNull(base)
-        }
+        if (head.polynomialAtom(1) == "divisible") return SmtSort.Bool
+        smtUnsupported("unsupported indexed scalar expression")
     }
     return when (name) {
-        "=", "distinct", "and", "or", "xor", "not", "=>", "<", "<=", ">", ">=", "is_int",
-        "bvult", "bvule", "bvugt", "bvuge", "bvslt", "bvsle", "bvsgt", "bvsge",
-        "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvnego", "bvusubo", "bvssubo", "bvsdivo" -> SmtSort.Bool
+        "=", "distinct", "and", "or", "xor", "not", "=>", "<", "<=", ">", ">=", "is_int" -> SmtSort.Bool
         "ite" -> if (SmtSort.Real in args.drop(1)) SmtSort.Real else args[1]
-        "to_int", "div", "mod", "ubv_to_int", "sbv_to_int", "bv2nat", "bv2int" -> SmtSort.Int
+        "to_int", "div", "mod" -> SmtSort.Int
         "to_real", "/", "exp", "log", "sin", "cos", "pi" -> SmtSort.Real
-        "concat" -> SmtSort.BitVector(args.sumOf { (it as SmtSort.BitVector).width })
-        "bvcomp", "bvredor", "bvredand" -> SmtSort.BitVector(1)
         else -> if (SmtSort.Real in args) SmtSort.Real else args.firstOrNull() ?: SmtSort.Int
     }
 }

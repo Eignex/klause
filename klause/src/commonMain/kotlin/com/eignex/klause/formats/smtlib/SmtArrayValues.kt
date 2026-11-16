@@ -41,7 +41,8 @@ internal fun smtArraysEqual(left: SmtValue.Array, right: SmtValue.Array, values:
     if (covered) return if (unavailable) null else true
     return when (values.equal(left.default, right.default)) {
         true -> if (unavailable) null else true
-        false -> if (unavailable || arrayIndexCardinality(left.sort.index, indexes.size + 1, values) == null) null else false
+        false -> if (unavailable || arrayIndexCardinality(left.sort.index, indexes.size + 1, values) == null) null
+            else false
         null -> null
     }
 }

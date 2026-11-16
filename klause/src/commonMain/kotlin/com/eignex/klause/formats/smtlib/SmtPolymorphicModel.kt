@@ -53,7 +53,7 @@ internal class SmtPolymorphicModel(
             }) return externalPoint?.invoke(sort, second)
         if (sort is SmtSort.Array) {
             val element = modelPoint(sort.element, second, values, externalPoint) ?: return null
-            return SmtValue.Application("(as const ${sort.toSmtLib()})", listOf(element))
+            return SmtValue.Array(sort, element, emptyList())
         }
         return smtPolymorphicPoint(sort, second, values)
     }
@@ -180,7 +180,7 @@ internal fun smtPolymorphicPoint(sort: SmtSort, second: Boolean, values: SmtMode
             }
             SmtValue.Uninterpreted(sort, identity)
         }
-        is SmtSort.Array -> SmtValue.Application("(as const ${sort.toSmtLib()})",
-            listOf(smtPolymorphicPoint(sort.element, second, values, externalPoint)))
+        is SmtSort.Array -> SmtValue.Array(sort,
+            smtPolymorphicPoint(sort.element, second, values, externalPoint), emptyList())
     }
 }
