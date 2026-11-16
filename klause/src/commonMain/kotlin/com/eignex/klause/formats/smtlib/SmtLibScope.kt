@@ -234,7 +234,12 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     if ((node.items.firstOrNull() as? SExpr.Atom)?.text == "_") {
                         node.polynomialSize(3)
                         if (node.polynomialAtom(1) != "BitVec") smtUnsupported("unsupported indexed source sort")
-                        val width = node.polynomialAtom(2).toIntOrNull()
+                        val widthText = (node.items[2] as? SExpr.Atom)?.text
+                            ?: smtUnsupported("invalid bitvector width")
+                        if (widthText.isEmpty() || widthText.any { it !in '0'..'9' }) {
+                            smtUnsupported("invalid bitvector width")
+                        }
+                        val width = widthText.toIntOrNull()
                         if (width == null || width <= 0) smtUnsupported("invalid bitvector width")
                         values.addLast(SmtSort.BitVector(width))
                     } else if (combine) {

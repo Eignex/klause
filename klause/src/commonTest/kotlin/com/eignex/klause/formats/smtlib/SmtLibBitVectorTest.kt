@@ -183,6 +183,8 @@ class SmtLibBitVectorTest {
     fun `quoted numeral indexes should remain invalid bitvector syntax`() {
         val sources = listOf(
             "(declare-const b (_ |BitVec| |1|))",
+            "(declare-const a (Array Bool (_ |BitVec| |1|)))",
+            "(define-sort Word () (_ |BitVec| |1|))",
             "(assert (= (_ |bv1| |1|) #b1))",
             "(assert (= ((_ |extract| |0| 0) #b1) #b1))",
             "(assert (= ((_ |rotate_left| |1|) #b1) #b1))",
