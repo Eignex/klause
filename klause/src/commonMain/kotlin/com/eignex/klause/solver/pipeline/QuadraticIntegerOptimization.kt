@@ -611,7 +611,9 @@ internal class QuadraticIntegerOptimization(
         val worker = controls.strategy.localSearch
         val maximum = minOf(params.maximumMoves,
             if (adaptive) controls.strategy.alnsIterations.toLong() else Long.MAX_VALUE)
-        val stop = native.polynomial or worker.cancellation or ExecutionControl { budget?.allowance?.exhausted() == true }
+        val stop = native.polynomial or worker.cancellation or ExecutionControl {
+            budget?.allowance?.exhausted() == true
+        }
         val seeds = source.integerSeeds(stop, relaxation.arithmetic::step).mapIndexed { id, value ->
             relaxation.arithmetic.step()
             val coordinate = source.integerCoordinates[id]
