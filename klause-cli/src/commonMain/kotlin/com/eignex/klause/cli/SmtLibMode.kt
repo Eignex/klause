@@ -76,7 +76,8 @@ internal object SmtLibMode : CliMode {
                 initialized = true
                 session.execute(SExprReader(source))
             } catch (_: CancellationException) {
-                if (initialized) session.comment("session interrupted")
+                if (initialized) session.interrupt(if (common.timeLimitMs != null && stop()) "wall timeout"
+                    else "session interrupted")
             } finally {
                 if (initialized) session.close()
                 if (source is AutoCloseable) source.close()

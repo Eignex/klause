@@ -165,7 +165,7 @@ fun solveSmtRecursiveSession(
                 smtSessionSymbol(((it as SExpr.SList).items[0] as SExpr.Atom).text)
             }
             substitute(relaxed.items[4], formals.zip(definition.parameters.map {
-                SExpr.Atom(it.first)
+                definition.parameterTerm(it.first)
             }).toMap())
         } else null
         (definition.candidates(names) + listOfNotNull(proposed)).distinct()
@@ -261,11 +261,14 @@ private data class RecursiveDefinition(val fields: List<SExpr>) {
     }
     val sort: SExpr get() = fields[2]
     val body: SExpr get() = fields[3]
+    fun parameterTerm(name: String): SExpr.Atom = (fields[1] as SExpr.SList).items.first {
+        smtSessionSymbol(((it as SExpr.SList).items[0] as SExpr.Atom).text) == name
+    }.let { (it as SExpr.SList).items[0] as SExpr.Atom }
     fun define(candidate: SExpr): SExpr.SList =
         SExpr.SList(listOf(SExpr.Atom("define-fun")) + fields.take(3) + candidate)
     fun candidates(recursiveNames: Set<String>): List<SExpr> {
         val values = ArrayList<SExpr>()
-        val scalar = (sort as? SExpr.Atom)?.text
+        val scalar = (sort as? SExpr.Atom)?.text?.let(::smtSessionSymbol)
         when (scalar) {
             "Bool" -> values += listOf(SExpr.Atom("false"), SExpr.Atom("true"))
             "Int", "Real" -> values += listOf(SExpr.Atom("0"), SExpr.Atom("1"), recList("-", SExpr.Atom("1")))
@@ -277,7 +280,7 @@ private data class RecursiveDefinition(val fields: List<SExpr>) {
                 }
             }
         }
-        parameters.filter { it.second == sort }.forEach { values += SExpr.Atom(it.first) }
+        parameters.filter { it.second == sort }.forEach { values += parameterTerm(it.first) }
         val work = ArrayDeque<SExpr>()
         work += body
         while (work.isNotEmpty()) {

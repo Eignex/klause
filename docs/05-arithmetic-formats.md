@@ -152,18 +152,17 @@ maps and the original objective and direction. Callers pass
 the frontend never classifies a source by the solver it will need. Interruption
 throws `CancellationException` before any source is published.
 
-The frontend admits ground free sorts and functions, quantifier-free bitvectors,
-and linear integer and real arithmetic with Boolean structure and supported
-`minimize`/`maximize` objectives, polynomial Int/Real/Bool satisfaction with products,
-integer exponentiation and fixed nonnegative real powers, and a real-function
-extension with unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
-`check-sat` or `check-sat-assuming` query is accepted by `SmtLib.parse`, with Boolean formula
-assumptions conjoined to the assertions; `get-model` and `get-objectives` are
+The frontend admits quantifier-free Boolean structure, free sorts and functions,
+bitvectors, arrays, algebraic datatypes and exact integer and real arithmetic.
+Supported `minimize`/`maximize` objectives include affine and quadratic arithmetic.
+The real-function extension admits unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
+`check-sat` or `check-sat-assuming` query is accepted by `SmtLib.parse`, with Boolean
+formula assumptions conjoined to the assertions; `get-model` and `get-objectives` are
 accepted requests. Ground extensional arrays compose with admitted scalar sorts,
 including nested arrays and arrays used as indexes or function arguments and results.
-Strings, quantifiers, negative or noninteger real powers, multiple or nonquadratic objectives, incremental
-commands, multiple queries and `get-value` decline explicitly, even inside a
-constant Boolean branch.
+Floating point, strings, regular expressions, quantifiers and higher-order maps
+are outside the supported source language. Negative or noninteger real powers and
+multiple or nonquadratic objectives decline explicitly, including in constant branches.
 
 ### Bitvector lowering
 
@@ -296,7 +295,7 @@ bare token.
 
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun`
 macros capture their definition scope and check argument sorts even for unused
-arguments; recursive helpers decline. Assertions see only the declarations visible
+arguments. Recursive definitions belong to command sessions. Assertions see only the declarations visible
 at their command. Compiler binding tables are discarded after lowering; the owned
 typed source and original declaration order and spellings remain attached.
 
@@ -457,8 +456,8 @@ approximation never replaces their authority.
 
 Optimization emits `; objective=<value>` for each published incumbent and
 `; optimizationStatus=<status>` at completion (`optimal`, `best-found`, `unbounded`),
-without needing `-s`; `sat` alone never claims optimality. Incumbents stream as they
-are accepted, each with its complete model. Exact objectives print as
+without needing `-s`; `sat` alone never claims optimality. Model output requires
+enabled model production and an explicit query after the check response. Exact objectives print as
 arbitrary-precision integers or reduced `numerator/denominator` text. Linear
 integer optimization uses the complete theory route when its objective range
 exceeds binary64's consecutive integers.

@@ -23,7 +23,7 @@ the optimizing tier for long runs.
 |---|---|---|
 | `minizinc` | `.fzn` | FlatZinc solution separators and verdicts; `%%%mzn-stat` statistics |
 | `xcsp3` | `.xml`, `.xcsp`, `.xcsp3` | XCSP3 status, objective and named instantiation |
-| `smtlib` | `.smt2`, `.smt` | `sat` / `unsat` / `unknown` and model definitions |
+| `smtlib` | `.smt2`, `.smt` | Command responses, queried model values and `;` statistics |
 | `dimacs` | `.cnf` | SAT status and Boolean assignment |
 | `opb` | `.opb`, `.wbo` | Pseudo-Boolean status, objective and assignment |
 | `wcnf` | `.wcnf` | Weighted MaxSAT status, objective and assignment |
@@ -47,7 +47,10 @@ SMT-LIB scripts execute commands in order. Every `check-sat` or
 the shared solve driver. Status responses belong to the check command; enabled
 `get-model` and `get-value` requests inspect its retained interpretation. Stack
 operations, resets, model-production options and optional capability responses
-belong to the [SMT session](05-arithmetic-formats.md#supported-models).
+belong to the [SMT session](05-arithmetic-formats.md#command-sessions). Regular and
+diagnostic output channels can append to files; the session closes its owned
+destinations when switching, resetting or exiting. A script without a check
+command emits no solver result.
 
 Exact objective and unattained-limit rendering follow the
 [arithmetic format contracts](05-arithmetic-formats.md#results-and-objectives);
@@ -66,7 +69,8 @@ until the terminal status.
 
 `OutputProtocol.onArithmeticIncumbent` accepts an already checked source witness and
 its value in original objective units and direction; it carries no terminal claim.
-SMT precedes each model with `sat`, and MiniZinc keeps its solution separators.
+SMT retains the checked final interpretation for explicit model queries, and
+MiniZinc keeps its solution separators.
 `optimizationStatus` and checked bounds arrive separately at completion, so a
 terminal never repeats an emitted model and an incomplete result's incumbent keeps
 `best-found` status.

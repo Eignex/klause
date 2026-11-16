@@ -277,12 +277,12 @@ class SmtLibSession(
         val source = commands() + prepared.terms.map { SExpr.SList(listOf(SExpr.Atom("assert"), it)) }
         validate(source, cancellation)
         val solved = solve((source + SExpr.SList(listOf(SExpr.Atom("check-sat")))).joinToString("\n") { it.smtText() })
-        checkpoint()
         result = solved
         queryDefinitions.clear()
         started = true
         channels.regular(solved.status)
         solved.observations.forEach(::comment)
+        if (cancellation()) exited = true
     }
 
     private fun getValue(command: SExpr.SList) {
@@ -355,6 +355,15 @@ class SmtLibSession(
         queryDefinitions.clear(); queryDefinitions.addAll(saved.queryDefinitions)
     }
     override fun close() = channels.close()
+    /** End an interrupted invocation while preserving any status already returned for the current context. */
+    fun interrupt(reason: String) {
+        if (result == null) {
+            result = SmtSessionResult("unknown", reasonUnknown = reason)
+            channels.regular("unknown")
+        }
+        comment(reason)
+        exited = true
+    }
     /** Emit a solver observation on the current regular channel without adding a protocol response. */
     fun comment(text: String) {
         text.lineSequence().forEach { channels.regular(if (it.startsWith(';')) it else "; $it") }

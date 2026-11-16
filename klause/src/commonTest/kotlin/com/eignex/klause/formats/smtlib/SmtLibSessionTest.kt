@@ -178,7 +178,8 @@ class SmtLibSessionTest {
         val replies = ArrayList<String>()
         val session = SmtLibSession({ SmtSessionResult("sat") }, replies::add)
 
-        session.execute(SExprReader("(declare-const p Bool) (set-option :print-success true) (push 0) (set-option :print-success false)"))
+        session.execute(SExprReader("(declare-const p Bool) (set-option :print-success true) " +
+            "(push 0) (set-option :print-success false)"))
 
         assertEquals(listOf("success", "success"), replies)
     }
@@ -199,7 +200,8 @@ class SmtLibSessionTest {
         val replies = ArrayList<String>()
         val session = SmtLibSession({ SmtSessionResult("sat") }, replies::add)
 
-        session.execute(SExprReader("(declare-const p Bool) (set-option :produce-models true) (get-option :produce-models)"))
+        session.execute(SExprReader("(declare-const p Bool) (set-option :produce-models true) " +
+            "(get-option :produce-models)"))
 
         assertTrue(replies[0].startsWith("(error "))
         assertEquals("false", replies[1])
