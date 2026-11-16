@@ -76,6 +76,7 @@ internal class SharedPolynomialModel private constructor(
             sourceFormula: PolynomialRealFormula?,
             projections: PreparedFactorProjections,
             cancellation: ExecutionControl,
+            widening: PolynomialTolerance? = null,
             onDecline: (EncoderDecline) -> Unit,
         ): SharedPolynomialModel? {
             projections.requireSource(source)
@@ -140,7 +141,7 @@ internal class SharedPolynomialModel private constructor(
             val kept = ArrayList<Int>()
             val attributions = ArrayList<EncodingAttribution>()
             val installationStop = request.cancellation
-            val tolerance = if (sourceFormula == null) PolynomialTolerance.of(source) else null
+            val tolerance = widening?.takeIf { sourceFormula == null }
             var selectedIndex = 0
             for ((index, factor) in source.factors.withIndex()) {
                 if (stopped()) return null

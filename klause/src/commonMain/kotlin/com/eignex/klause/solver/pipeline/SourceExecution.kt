@@ -14,6 +14,7 @@ import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.effortStats
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
+import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.includingStop
@@ -550,32 +551,46 @@ private fun executeCapturedSource(
                 invocation.cancellation.includingStop( params.cancellation ).includingStop( params.timeout),
                 request.presolveBudget,
             )
-            if (source.infeasible) return SourceExecutionResult.Refuted(invocation).also {
-                it.preparationStats = source.stats
+            val sense = if (invocation.maximizeSourceObjective) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
+            // The exact formula decides first; only its refutation hands a declared tolerance the widened formula.
+            val widens = invocation.linearSource == null
+            if (source.infeasible) {
+                val widened = when {
+                    !widens -> null
+                    objective == null -> original.executeWidened(params, engine, request.cores,
+                        PolynomialTheoryStats())?.let { SourceExecutionResult.Polynomial(invocation, it) }
+                    else -> original.optimizeWidened(objective, params, engine, sense, request.cores, 0L,
+                        callbacks.onQuadraticIncumbent)?.let { SourceExecutionResult.Quadratic(invocation, it) }
+                }
+                return (widened ?: SourceExecutionResult.Refuted(invocation)).also {
+                    it.preparationStats = source.stats
+                }
             }
             val prepared = original.afterSourcePreparation(source, params.cancellation.includingStop( params.timeout))
                 ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
                     it.preparationStats = source.stats
                 }
             val result = if (objective == null) {
-                SourceExecutionResult.Polynomial(
-                    invocation,
-                    OpenTheoryPipeline.execute(prepared, params, engine, request.cores),
-                )
+                val exact = OpenTheoryPipeline.execute(prepared, params, engine, request.cores)
+                val widened = if (widens && exact.result is OpenTheoryResult.Unsat) {
+                    original.executeWidened(params, engine, request.cores, exact.stats)
+                } else null
+                SourceExecutionResult.Polynomial(invocation, widened ?: exact)
             } else {
-                val sense = if (invocation.maximizeSourceObjective) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
-                SourceExecutionResult.Quadratic(
-                    invocation,
-                    OpenTheoryPipeline.optimize(
-                        prepared,
-                        objective,
-                        params,
-                        engine,
-                        sense,
-                        request.cores,
-                        callbacks.onQuadraticIncumbent,
-                    ),
+                val exact = OpenTheoryPipeline.optimize(
+                    prepared,
+                    objective,
+                    params,
+                    engine,
+                    sense,
+                    request.cores,
+                    callbacks.onQuadraticIncumbent,
                 )
+                val widened = if (widens && exact.result is QuadraticOptimizationResult.Infeasible) {
+                    original.optimizeWidened(objective, params, engine, sense, request.cores, exact.nativeWork,
+                        callbacks.onQuadraticIncumbent)
+                } else null
+                SourceExecutionResult.Quadratic(invocation, widened ?: exact)
             }
             result.also { it.preparationStats = source.stats }
         }
