@@ -3,6 +3,7 @@ package com.eignex.klause.lp
 import com.eignex.klause.factor.table.Regular
 import com.eignex.klause.ir.IntDomain
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.storage.forEachSlot
 
 /**
  * Layer-expanded DFA flow hull — the exact convex hull of the automaton's accepting strings. An arc

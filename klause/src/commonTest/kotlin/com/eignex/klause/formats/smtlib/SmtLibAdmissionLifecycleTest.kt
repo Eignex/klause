@@ -33,7 +33,7 @@ class SmtLibAdmissionLifecycleTest {
     fun `a provided closeable source should close when admission is already interrupted`() {
         var reads = 0
         var closes = 0
-        val source = object : CharSource, AutoCloseable {
+        val source = object : CharSource {
             override fun next(): String? {
                 reads++
                 return null
@@ -54,7 +54,12 @@ class SmtLibAdmissionLifecycleTest {
     fun `a source cancellation exception should not drain a borrowed stream`() {
         var reads = 0
         val source = object : CharSource {
+            private var closed = false
+            override fun close() {
+                closed = true
+            }
             override fun next(): String? {
+                if (closed) return null
                 if (++reads == 1) return "(declare-const x Real)"
                 throw CancellationException("source stopped")
             }
@@ -82,7 +87,7 @@ class SmtLibAdmissionLifecycleTest {
                             "(assert (and (>= m 0) (<= m 1) (= n (+ m 1)))) " +
                             "(assert (= (* (to_real n) x) 4)) (check-sat)",
                     )
-                    object : CharSource, AutoCloseable {
+                    object : CharSource {
                         override fun next(): String? = source.next()
                         override fun close() {
                             capturedWork = work
@@ -144,7 +149,7 @@ class SmtLibAdmissionLifecycleTest {
                         "(define-fun f ((y Real)) Real (+ y 1)) " +
                             "(declare-const x Real) (assert (= x 2)) (check-sat)",
                     )
-                    object : CharSource {
+                    object : CharSource by source {
                         override fun next(): String? = source.next().also { if (it == null) exhausted = true }
                     }
                 },
@@ -166,7 +171,7 @@ class SmtLibAdmissionLifecycleTest {
             opens++
             check(opens == 1)
             val source = StringCharSource(text)
-            object : CharSource, AutoCloseable {
+            object : CharSource {
                 override fun next(): String? = source.next()
                 override fun close() {
                     closes++
@@ -180,7 +185,7 @@ class SmtLibAdmissionLifecycleTest {
     }
 
     @Test
-    fun `polynomial admission should exhaust its non closeable source once`() {
+    fun `polynomial admission should exhaust its in memory source once`() {
         var opens = 0
         var exhausted = false
 
@@ -191,6 +196,7 @@ class SmtLibAdmissionLifecycleTest {
                 listOf("(declare-const x Real) (assert (= (* x x) 2))", "(check-sat)"),
             )
             object : CharSource {
+                override fun close() = chunks.clear()
                 override fun next(): String? = chunks.removeFirstOrNull().also {
                     if (it == null) exhausted = true
                 }
@@ -224,7 +230,7 @@ class SmtLibAdmissionLifecycleTest {
             SmtLib.parse(
                 {
                     opens++
-                    object : CharSource, AutoCloseable {
+                    object : CharSource {
                         override fun next(): String? {
                             stopped = true
                             return "(declare-const x Real)"
@@ -244,7 +250,7 @@ class SmtLibAdmissionLifecycleTest {
     }
 
     @Test
-    fun `interrupted admission should not drain a non closeable tail`() {
+    fun `interrupted admission should not drain an in memory tail`() {
         var reads = 0
         var stopped = false
         var opens = 0
@@ -254,7 +260,12 @@ class SmtLibAdmissionLifecycleTest {
                 {
                     opens++
                     object : CharSource {
+                        private var closed = false
+                        override fun close() {
+                            closed = true
+                        }
                         override fun next(): String? {
+                            if (closed) return null
                             reads++
                             stopped = true
                             return "(declare-const x Real)"
@@ -288,7 +299,7 @@ class SmtLibAdmissionLifecycleTest {
                         "(declare-const x Real) (define-fun f ((y Real)) Real (* x y)) " +
                             "(assert (let ((x 7)) (= (f (+ 1 1)) 14))) (check-sat)",
                     )
-                    object : CharSource, AutoCloseable {
+                    object : CharSource {
                         override fun next(): String? = source.next()
                         override fun close() {
                             closes++
@@ -330,7 +341,7 @@ class SmtLibAdmissionLifecycleTest {
                 opens++
                 check(opens == 1)
                 val source = StringCharSource(")")
-                object : CharSource, AutoCloseable {
+                object : CharSource {
                     override fun next(): String? = source.next()
                     override fun close() {
                         closes++
@@ -343,7 +354,7 @@ class SmtLibAdmissionLifecycleTest {
     }
 
     @Test
-    fun `an observed transient cancellation should not drain a non closeable source`() {
+    fun `an observed transient cancellation should not drain an in memory source`() {
         var opens = 0
         var reads = 0
         var observed = false
@@ -356,7 +367,12 @@ class SmtLibAdmissionLifecycleTest {
                 {
                     opens++
                     object : CharSource {
+                        private var closed = false
+                        override fun close() {
+                            closed = true
+                        }
                         override fun next(): String? {
+                            if (closed) return null
                             reads++
                             check(reads == 1)
                             return "(declare-const x Real)"
@@ -389,7 +405,7 @@ class SmtLibAdmissionLifecycleTest {
                     val source = StringCharSource(
                         "(declare-const x Real) (assert (= (exp x) 1)) (check-sat)",
                     )
-                    object : CharSource, AutoCloseable {
+                    object : CharSource {
                         override fun next(): String? = source.next()
                         override fun close() {
                             closes++

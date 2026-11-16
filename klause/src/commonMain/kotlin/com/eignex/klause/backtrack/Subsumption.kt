@@ -8,6 +8,8 @@ import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.arrays.binarySearchInt
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.storage.borrowBackingArray
+import com.eignex.util.collections.storage.primitiveCapacityBytes
 
 // Retained preparation avoids buying the same occurrence index on each short slice.
 internal class Subsumption : InprocessingPass {
@@ -100,18 +102,18 @@ private class SubsumptionSlice(session: PropagationSession, start: Int, batch: I
         sample.ownedReferences(occurrences, 2L * occurrences.size, protected)
         for (list in occurrences.values) {
             sample.step()
-            val data = list.backingData
+            val data = list.borrowBackingArray()
             sample.owned(data, data.size.toLong() * Int.SIZE_BYTES, protected)
         }
         strengthened?.let { sample.owned(it, it.size.toLong() * Int.SIZE_BYTES, protected) }
-        sample.owned(dropped, dropped.allocatedBytes, protected)
+        sample.owned(dropped, dropped.primitiveCapacityBytes, protected)
         sample.ownedReferences(replacements, replacements.size.toLong(), protected)
         for (row in replacements) {
             sample.step()
             sample.owned(row, row.size.toLong() * Int.SIZE_BYTES, protected)
         }
-        val lbdData = lbds.backingData
-        val originData = origins.backingData
+        val lbdData = lbds.borrowBackingArray()
+        val originData = origins.borrowBackingArray()
         sample.owned(lbdData, lbdData.size.toLong() * Int.SIZE_BYTES, protected)
         sample.owned(originData, originData.size.toLong() * Int.SIZE_BYTES, protected)
     }

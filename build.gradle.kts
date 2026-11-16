@@ -14,22 +14,29 @@ val koblasJvmArgs = buildList {
 }
 
 val koblasPins = mapOf(
-    "koblas" to "0.1.1-20261105.140327-312",
-    "koblas-jvm" to "0.1.1-20261105.140327-315",
-    "koblas-linuxx64" to "0.1.1-20261105.140327-310",
-    "koblas-linuxarm64" to "0.1.1-20261105.140327-312",
-    "koblas-macosarm64" to "0.1.1-20261105.140327-334",
+    "koblas" to "0.1.1-20261116.224320-351",
+    "koblas-jvm" to "0.1.1-20261116.224320-354",
+    "koblas-linuxx64" to "0.1.1-20261116.224320-349",
+    "koblas-linuxarm64" to "0.1.1-20261116.224320-351",
+    "koblas-macosarm64" to "0.1.1-20261116.224320-373",
 )
 
 val skemaPins = listOf("skema", "skema-jvm", "skema-linuxx64", "skema-linuxarm64", "skema-macosarm64")
-    .associateWith { "0.4.0" }
+    .associateWith { "0.4.1-20261116.152019-3" }
 
-val kumulantPins = mapOf("jvm" to 130, "linuxx64" to 130, "linuxarm64" to 130, "macosarm64" to 129)
-    .mapKeys { (module, _) -> "kumulant-$module" }
-    .mapValues { (_, build) -> "0.3.4-20261105.142345-$build" }
+val kumulantPins = mapOf(
+    "kumulant" to "0.3.4-20261116.231003-146",
+    "kumulant-jvm" to "0.3.4-20261116.231003-146",
+    "kumulant-linuxx64" to "0.3.4-20261116.231003-146",
+    "kumulant-linuxarm64" to "0.3.4-20261116.231003-146",
+    "kumulant-macosarm64" to "0.3.4-20261116.231003-145",
+)
 
 val utilPins = listOf("util", "util-jvm", "util-linuxx64", "util-linuxarm64", "util-macosarm64")
-    .associateWith { "0.0.1-20261116.114943-24" }
+    .associateWith { "0.0.1-ci.43969094073.1-20261116.222329-1" }
+
+val kpermutePins = listOf("kpermute", "kpermute-jvm", "kpermute-linuxx64", "kpermute-linuxarm64", "kpermute-macosarm64")
+    .associateWith { "1.3.1-20261116.152032-8" }
 
 if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     // Lab builds retain complete distributions; each fresh tree discards its incremental indexes.
@@ -42,7 +49,7 @@ if (providers.environmentVariable("LAB_SOURCE_COMMIT").isPresent) {
     }
 }
 
-// Koblas, Kumulant and Util use timestamped snapshots; this endpoint is outside the conventions'
+// Eignex libraries use timestamped snapshots; this endpoint is outside the conventions'
 // default repository set.
 allprojects {
     val targetProject = this
@@ -50,7 +57,7 @@ allprojects {
     configurations.matching {
         it.name == "commonMainApi" || it.name == "commonMainImplementation" || it.name == "implementation"
     }.all {
-        val pins = if (name == "commonMainApi") utilPins else koblasPins + skemaPins + kumulantPins + utilPins
+        val pins = if (name == "commonMainApi") utilPins else koblasPins + skemaPins + kumulantPins + utilPins + kpermutePins
         for ((module, pinned) in pins) {
             targetProject.dependencies.constraints.add(name, "com.eignex:$module:$pinned") {
                 version { strictly(pinned) }

@@ -10,6 +10,7 @@ import com.eignex.klause.solver.result.SearchStatsSink
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.storage.borrowBackingArray
 
 internal class RootSimplificationPass : InprocessingPass {
     override val preservesVariables: Boolean get() = true
@@ -34,7 +35,7 @@ internal class RootSimplificationPass : InprocessingPass {
             sample.step()
             sample.ownedReferences(candidate, 2L, protected)
             sample.owned(candidate.literals, candidate.literals.size.toLong() * Int.SIZE_BYTES, protected)
-            val residual = candidate.residual.backingData
+            val residual = candidate.residual.borrowBackingArray()
             sample.owned(residual, residual.size.toLong() * Int.SIZE_BYTES, protected)
         }
     }

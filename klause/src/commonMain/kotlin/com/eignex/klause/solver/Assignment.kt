@@ -9,6 +9,9 @@ import com.eignex.klause.ir.randomValue
 import com.eignex.klause.solver.incumbent.EvidenceCertificate
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.collections.Bits
+import com.eignex.util.collections.storage.copyWordsFrom
+import com.eignex.util.collections.storage.setWord
+import com.eignex.util.collections.storage.wordCount
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf

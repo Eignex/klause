@@ -1,5 +1,6 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.koblas.DenseVector
 import com.eignex.koblas.koblas
 
 internal class SimplexBasicValues {
@@ -97,7 +98,7 @@ internal class SimplexBasicValues {
             val change = workspace.boundChange
             solve(rhs, change)
             work.add(m)
-            koblas.axpy(out, 0, 1.0, change, 0, m)
+            koblas.axpy(1.0, DenseVector.wrap(change, size = m), DenseVector.wrap(out, size = m))
         }
         return out.all { it.isFinite() }
     }

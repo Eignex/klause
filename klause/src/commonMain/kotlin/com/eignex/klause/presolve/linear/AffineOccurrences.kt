@@ -260,7 +260,7 @@ internal class AffineWorkingSet(
     fun drop(id: Int) {
         val f = slots[id] ?: return
         if (absorbed[id] >= FOLD_ABSORB_CAP && isCappable(f)) for (v in f.intVars) atCapCount[v]--
-        for (v in f.intVars) intOcc[v].removeValue(id)
+        for (v in f.intVars) intOcc[v].removeValueSwap(id)
         slots[id] = null
     }
 
@@ -270,7 +270,7 @@ internal class AffineWorkingSet(
         val was = absorbed[id]
         if (was >= FOLD_ABSORB_CAP && isCappable(prev)) for (v in prev.intVars) atCapCount[v]--
         absorbed[id] = was + 1
-        for (v in prev.intVars) intOcc[v].removeValue(id)
+        for (v in prev.intVars) intOcc[v].removeValueSwap(id)
         slots[id] = next
         for (v in next.intVars) intOcc[v].add(id)
         if (was + 1 >= FOLD_ABSORB_CAP && isCappable(next)) for (v in next.intVars) atCapCount[v]++
@@ -460,7 +460,7 @@ internal class AffineWorkingSet(
             val atCap = absorbed[id] >= FOLD_ABSORB_CAP && isCappable(f)
             val remapped = f.remap(mapping)
             slots[id] = remapped
-            intOcc[y].removeValue(id)
+            intOcc[y].removeValueSwap(id)
             val hasY = remapped.intVars.contains(y)
             if (hasY) intOcc[y].add(id)
             if (atCap) {

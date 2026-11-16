@@ -11,10 +11,10 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.ScanMeter
-import com.eignex.util.collections.Bits
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.LongHashSet
 import com.eignex.util.collections.MutableLongIntMap
+import com.eignex.util.collections.storage.PackedBits
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.isZero
@@ -58,7 +58,7 @@ internal object XorUnits {
         val rows = Array(rowCount) { LongArray(words) }
         val rhs = IntArray(rowCount)
         for (r in 0 until rowCount) {
-            system.rows[r].forEach { column -> Bits.set(rows[r], indexOf.getOrDefault(column, -1)) }
+            system.rows[r].forEach { column -> PackedBits.set(rows[r], indexOf.getOrDefault(column, -1)) }
             rhs[r] = system.rhs[r]
         }
 
@@ -69,7 +69,7 @@ internal object XorUnits {
             cancellation.charge(rowCount.toLong() * words)
             var sel = -1
             for (r in pivotRow until rows.size) {
-                if (Bits.has(rows[r], col)) {
+                if (PackedBits.has(rows[r], col)) {
                     sel = r
                     break
                 }
@@ -84,8 +84,8 @@ internal object XorUnits {
                 rhs[sel] = tmpRhs
             }
             for (r in rows.indices) {
-                if (r != pivotRow && Bits.has(rows[r], col)) {
-                    Bits.xorInto(rows[r], rows[pivotRow])
+                if (r != pivotRow && PackedBits.has(rows[r], col)) {
+                    PackedBits.xorInto(rows[r], rows[pivotRow])
                     rhs[r] = rhs[r] xor rhs[pivotRow]
                 }
             }
@@ -96,11 +96,11 @@ internal object XorUnits {
         if (cancellation()) return SourceDelta()
         val forced = HashMap<Long, Boolean>()
         for (r in rows.indices) {
-            when (Bits.popcount(rows[r])) {
+            when (PackedBits.popcount(rows[r])) {
                 0 -> if (rhs[r] == 1) return SourceDelta(infeasible = true)
 
                 1 -> {
-                    val column = vars[Bits.firstSet(rows[r])]
+                    val column = vars[PackedBits.firstSet(rows[r])]
                     val value = rhs[r] == 1
                     if ((forced.put(column, value) ?: value) != value) return SourceDelta(infeasible = true)
                 }

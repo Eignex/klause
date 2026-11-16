@@ -8,6 +8,8 @@ import com.eignex.klause.util.OriginCounts
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.collections.storage.borrowBackingArray
+import com.eignex.util.collections.storage.primitiveCapacityBytes
 
 /**
  * Two-watched-literal BCP (Moskewicz et al., "Chaff: engineering an efficient SAT solver", DAC 2001,
@@ -496,7 +498,7 @@ internal class NativeSatState(private val state: PropagationState) {
         if (permanent) {
             permanentCount++
         } else {
-            if (capCandidates.size == capCandidates.backingData.size) state.work += capCandidates.size * 3L
+            if (capCandidates.size == capCandidates.borrowBackingArray().size) state.work += capCandidates.size * 3L
             capCandidates.add(i)
         }
         state.work += 2L
@@ -533,8 +535,12 @@ internal class NativeSatState(private val state: PropagationState) {
         }
         for (column in columns) {
             sample.step()
-            metadataBytes += column.backingData.size.toLong() * Int.SIZE_BYTES
-            sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, protectedRows)
+            metadataBytes += column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES
+            sample.owned(
+                column.borrowBackingArray(),
+                column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+                protectedRows,
+            )
         }
         learnedPayloads.sharingMemory(sample, protectedRows, permanentCount == learnedCount) { index ->
             metadata[index, NativeLearnedMetadata.PERMANENT] == 1 || sample.contains(protected, index)
@@ -543,7 +549,11 @@ internal class NativeSatState(private val state: PropagationState) {
         sample.owned(arena.starts, arena.starts.size.toLong() * Int.SIZE_BYTES, true, shared = true)
         sample.owned(watchSizes, watchSizes.size.toLong() * Int.SIZE_BYTES, true)
         sample.owned(watchPos, watchPos.size.toLong() * Int.SIZE_BYTES, true)
-        sample.owned(baseUnits.backingData, baseUnits.backingData.size.toLong() * Int.SIZE_BYTES, true)
+        sample.owned(
+            baseUnits.borrowBackingArray(),
+            baseUnits.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            true,
+        )
         sample.ownedReferences(watchEntries, watchEntries.size.toLong(), true)
         var watchBytes = 0L
         var watchPostings = 0L
@@ -575,8 +585,8 @@ internal class NativeSatState(private val state: PropagationState) {
             "sessionWatchEntries" to watchPostings,
             "sessionWatchCapacityBytes" to watchBytes +
                 (watchSizes.size.toLong() + watchPos.size) * Int.SIZE_BYTES +
-                baseUnits.backingData.size.toLong() * Int.SIZE_BYTES,
-            "rootRetiredSourceCapacityBytes" to (retiredRootSources?.allocatedBytes ?: 0L),
+                baseUnits.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            "rootRetiredSourceCapacityBytes" to (retiredRootSources?.primitiveCapacityBytes ?: 0L),
             "pendingAttachments" to (rechecks.size - recheckHead).toLong(),
             "importUseCapacityBytes" to importUses.allocatedBytes,
             "retainedPeerImports" to peerImports.toLong(),
@@ -584,7 +594,7 @@ internal class NativeSatState(private val state: PropagationState) {
             "retainedConsumed" to consumed.toLong(),
             "learnedPayloadCacheReferenceCapacity" to learnedPayloads.cacheReferenceCapacity,
         ))
-        retiredRootSources?.let { sample.owned(it, it.allocatedBytes, true) }
+        retiredRootSources?.let { sample.owned(it, it.primitiveCapacityBytes, true) }
         sample.owned(importUses, importUses.allocatedBytes)
     }
 
@@ -942,7 +952,10 @@ internal class NativeSatState(private val state: PropagationState) {
         budget.atomic(1L)
         defaultCapIndex?.let { budget.atomic(it.resetWork + learnedCount.toLong() * 8L) }
         for (column in listOf(learnedUnits, rechecks, capCandidates)) {
-            budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
+            budget.atomic(
+                column.borrowBackingArray().size.toLong(),
+                column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES,
+            )
         }
         for (entries in watchEntries) {
             budget.visit()

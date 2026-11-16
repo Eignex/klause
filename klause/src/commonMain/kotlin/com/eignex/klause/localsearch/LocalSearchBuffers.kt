@@ -5,6 +5,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.Assignment
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.collections.IntSwapSet
+import com.eignex.util.collections.cooperative.prepareIntSwapSet
 
 internal const val INITIALIZATION_BATCH: Int = 256
 
@@ -33,7 +34,7 @@ internal class LocalSearchBuffers(
             }
             yield(null)
             var violated: IntSwapSet? = null
-            for (part in IntSwapSet.preparation(problem.numFactors, INITIALIZATION_BATCH)) {
+            for (part in prepareIntSwapSet(problem.numFactors, INITIALIZATION_BATCH)) {
                 if (part == null) yield(null) else violated = part
             }
             yield(null)

@@ -263,9 +263,9 @@ internal class ClauseMinimizer(private val state: PropagationState, private val 
             }
             cache.put(v, 1) // all antecedents resolved redundant
             if (v < onPath.size) onPath[v] = false
-            redVarStack.removeAt(top)
+            redVarStack.removeAtSwap(top)
             redAntStack.removeAt(redAntStack.size - 1)
-            redIdxStack.removeAt(top)
+            redIdxStack.removeAtSwap(top)
         }
         return true
     }

@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryStatus
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.storage.borrowBackingArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -348,9 +349,9 @@ class LearnedReclamationTest {
 
         assertFailsWith<ReclamationPreparation.Deferred> { trimLearnedCandidates(candidates, cancelled) }
 
-        assertEquals(64, candidates.backingData.size)
+        assertEquals(64, candidates.borrowBackingArray().size)
         trimLearnedCandidates(candidates, ReclamationPreparation(11L, 12L, { false }, {}))
-        assertEquals(3, candidates.backingData.size)
+        assertEquals(3, candidates.borrowBackingArray().size)
         assertEquals(listOf(7, 2, 9), candidates.toIntArray().toList())
     }
 

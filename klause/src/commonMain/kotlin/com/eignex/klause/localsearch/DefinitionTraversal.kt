@@ -2,6 +2,7 @@ package com.eignex.klause.localsearch
 
 import com.eignex.util.collections.Bits
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.storage.getWord
 
 // A state borrows the live node prefix until its synchronous move or probe returns.
 internal class DefinitionTraversal(val network: InvariantNetwork) {

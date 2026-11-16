@@ -307,7 +307,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         stack.add(source)
         while (!stack.isEmpty()) {
             val u = stack[stack.size - 1]
-            stack.removeAt(stack.size - 1)
+            stack.removeAtSwap(stack.size - 1)
             val a = succAdj[u]
             for (j in 0 until a.size) {
                 val w = a[j]
@@ -346,7 +346,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
                 }
             } else {
                 order.add(u)
-                stack.removeAt(stack.size - 1)
+                stack.removeAtSwap(stack.size - 1)
             }
         }
         val rpoNum = IntArray(total) { -1 }
@@ -434,7 +434,7 @@ internal class CircuitPropagator(private val succ: IntArray, private val n: Int)
         stack.add(0)
         while (!stack.isEmpty()) {
             val u = stack[stack.size - 1]
-            stack.removeAt(stack.size - 1)
+            stack.removeAtSwap(stack.size - 1)
             if (forward) {
                 state.intDomains[succ[u]].values.forEach { t ->
                     if (t in 0 until n && !seen[t.toInt()]) {

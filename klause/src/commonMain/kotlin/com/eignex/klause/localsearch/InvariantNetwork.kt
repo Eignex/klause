@@ -8,6 +8,7 @@ import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.collections.storage.borrowBackingArray
 import com.eignex.util.collections.toSortedIntArray
 
 /**
@@ -231,9 +232,9 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
         assignment: Assignment,
         traversal: DefinitionTraversal,
     ): IntArrayList = findAffectedNodes(
-        seedInts.backingData,
+        seedInts.borrowBackingArray(),
         seedInts.size,
-        seedBools.backingData,
+        seedBools.borrowBackingArray(),
         seedBools.size,
         assignment,
         traversal,
@@ -269,7 +270,7 @@ class InvariantNetwork private constructor(data: DefinitionIndex) {
             val n = nodeArr[work[position++]]
             if (n.outIsBool) seedBool(n.out) else seedInt(n.out)
         }
-        work.backingData.sort(0, work.size)
+        work.borrowBackingArray().sort(0, work.size)
         traversal.remember(seedInts, intCount, seedBools, boolCount)
         return work
     }
