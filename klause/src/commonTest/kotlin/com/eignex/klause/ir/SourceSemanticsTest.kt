@@ -136,6 +136,7 @@ class SourceSemanticsTest {
             SemanticOverrides(undeclaredReals = BoundsOverride()),
             SemanticOverrides(feasibilityTolerance = SourceTolerance()),
             SemanticOverrides(pinAbsentOptionalValues = false),
+            SemanticOverrides(optimalityTolerance = OptimalityTolerance()),
         )
 
         for (replacement in replacements) {

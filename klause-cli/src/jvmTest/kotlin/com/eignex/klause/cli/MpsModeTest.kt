@@ -136,6 +136,25 @@ class MpsModeTest {
     }
 
     @Test
+    fun `a large objective optimum should be reported optimal under either certification policy`() {
+        val source = File.createTempFile("mps-large-objective", ".mps").apply {
+            writeText(
+                "ROWS\n N COST\n L R\nCOLUMNS\n X COST -123456789.1 R 0.1\n Y COST 0 R 1\n" +
+                    " W COST 123456789.3\nRHS\n RHS R 81.1\nBOUNDS\n FX BND W 803\nENDATA\n",
+            )
+            deleteOnExit()
+        }
+        for (exact in listOf(false, true)) {
+            val flags = if (exact) arrayOf("--exact") else emptyArray()
+            val text = captureStdout {
+                assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
+            }
+
+            assertTrue("s OPTIMUM FOUND" in text.lines(), text)
+        }
+    }
+
+    @Test
     fun `configured tolerance should retain a completed numerical optimum`() {
         val source = File.createTempFile("mps-tolerant-objective", ".mps").apply {
             writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n LO B X 1\nENDATA\n")

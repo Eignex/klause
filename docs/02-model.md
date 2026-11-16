@@ -33,7 +33,7 @@ enforced by a selected arithmetic encoder.
 
 A source model records how its syntax must be read. `ir.SourceSemantics` describes
 numeric literal authority, float interpretation, default undeclared ranges, source
-feasibility tolerance and absent optional values. A format declares only the
+feasibility tolerance, optimality tolerance and absent optional values. A format declares only the
 policies that apply to it, and a caller cannot introduce an absent one.
 
 `SemanticOverrides` replaces applicable policies before lowering. `BoundsOverride`
@@ -43,6 +43,11 @@ declarations with an explicit range keep it (see
 `max(absolute, relative * scale)`, where a row's scale is the larger of its finite
 bound magnitude and the sum of absolute term activities. Zero components require
 exact checking, and integrality is always exact.
+`OptimalityTolerance` declares when two evaluations of an objective agree: an
+incumbent value `v` and a proved optimum `p` agree when
+`abs(v - p) <= max(absolute, relative * max(abs(v), abs(p)))`. It qualifies a
+reported optimum only; it bounds no search and makes no unproved bound an optimum.
+Zero components require equal values.
 
 `EffectiveSourceSemantics` keeps both the defaults and the effective policy.
 `isApproximate` marks a grid or positive tolerance and `hasOverrides` records any

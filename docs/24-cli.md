@@ -90,8 +90,8 @@ Attribution grants no additional witness or proof authority.
 
 Every prepared MPS invocation emits `c numericalSemantics=` with a versioned JSON
 declaration of the captured declared and effective policy, including rational
-tolerance components, numeric authority, default bounds and exact integrality and
-objective equality. It is emitted even without overrides or statistics. This
+feasibility and optimality tolerance components, numeric authority, default bounds and
+exact integrality and objective evaluation. It is emitted even without overrides or statistics. This
 declaration identifies the source contract; it grants no witness or proof authority.
 
 Frontend solve paths keep a `PreparedSourceInvocation` and consume
@@ -157,8 +157,8 @@ this is separate from heap measurements and diagnostic payload-category sums.
   Earned selective reuse is the default; `preparation=index` selects complete-index reuse.
   Arms choose intensity below it. `--lp-pricing` selects zero-objective
   entering policy. Native arithmetic routes reject explicit LP flags.
-- `--exact`: continuous float interpretation and zero source tolerance for the
-  format's declared policies. MPS and FlatZinc declare a positive tolerance, so their
+- `--exact`: continuous float interpretation and zero source feasibility and optimality
+  tolerances for the format's declared policies. MPS and FlatZinc declare a positive tolerance, so their
   finite LP deductions are [numerical](21-lp-engine.md#numerical-and-exact-deductions)
   and their real completions are accepted within it; zero tolerance certifies both
   exactly. Formats without a declared tolerance are exact either way.
@@ -359,6 +359,7 @@ replaces its default independently, and explicit source bounds stay authoritativ
 | `--float-buckets N` / `--float-scale N` | Default grid point count and float-linear coefficient scale |
 | `--float-grid-lo N` / `--float-grid-hi N` | Finite window for unranged grid floats |
 | `--source-absolute-tolerance N` / `--source-relative-tolerance N` | Source feasibility slack components |
+| `--source-absolute-optimality-tolerance N` / `--source-relative-optimality-tolerance N` | Source optimality gap components |
 
 Values accept exact decimals, scientific notation and rationals; a value that cannot
 be represented is rejected rather than rounded. Tolerance uses
@@ -366,7 +367,10 @@ be represented is rejected rather than rounded. Tolerance uses
 [typed source semantics](02-model.md#typed-source-semantics). MPS and FlatZinc declare
 an absolute slack of `1/10000000` and a zero relative component, so the slack does not
 depend on the magnitude of a row; `--source-relative-tolerance` adds a slack that
-grows with it, and setting both components to zero checks exactly. A nondefault effective
+grows with it, and setting both components to zero checks exactly. The optimality
+gap `max(absolute, relative * max(abs(v), abs(p)))` decides whether an incumbent value
+`v` agrees with a proved optimum `p`; MPS and FlatZinc declare `1/10000000` absolute
+and `1/10000` relative, and zero in both requires equal values. A nondefault effective
 interpretation is printed as a protocol comment before results; it adds no proof
 authority. [FlatZinc floats](04-finite-formats.md#flatzinc-floats) define the grid contract.
 

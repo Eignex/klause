@@ -3,6 +3,7 @@ package com.eignex.klause.cli
 import com.eignex.klause.ir.BoundOverride
 import com.eignex.klause.ir.BoundsOverride
 import com.eignex.klause.ir.FloatSemantics
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceSemantics
@@ -25,6 +26,8 @@ internal class SourceOptions {
     var gridUpper: SemanticRational? = null
     var absoluteTolerance: SemanticRational? = null
     var relativeTolerance: SemanticRational? = null
+    var absoluteOptimalityTolerance: SemanticRational? = null
+    var relativeOptimalityTolerance: SemanticRational? = null
 }
 
 internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticOverrides {
@@ -61,16 +64,34 @@ internal fun CommonOptions.sourceOverrides(declared: SourceSemantics): SemanticO
             fields.relativeTolerance ?: tolerance.relative,
         ))
     }
+    if (fields.absoluteOptimalityTolerance != null || fields.relativeOptimalityTolerance != null) {
+        val gap = resolved.optimalityTolerance ?: if (exact && declared.optimalityTolerance != null) {
+            OptimalityTolerance()
+        } else declared.optimalityTolerance
+        require(gap != null) { "source optimality tolerance does not apply to ${declared.format}" }
+        resolved = resolved.copy(optimalityTolerance = OptimalityTolerance(
+            fields.absoluteOptimalityTolerance ?: gap.absolute,
+            fields.relativeOptimalityTolerance ?: gap.relative,
+        ))
+    }
     if (exact) {
         require((fields.absoluteTolerance == null || fields.absoluteTolerance == SemanticRational.ZERO) &&
             (fields.relativeTolerance == null || fields.relativeTolerance == SemanticRational.ZERO)
         ) {
             "positive source feasibility tolerance conflicts with --exact"
         }
+        require(
+            (fields.absoluteOptimalityTolerance ?: SemanticRational.ZERO) == SemanticRational.ZERO &&
+                (fields.relativeOptimalityTolerance ?: SemanticRational.ZERO) == SemanticRational.ZERO,
+        ) {
+            "positive source optimality tolerance conflicts with --exact"
+        }
         resolved = resolved.copy(
             floats = if (declared.floats == null) resolved.floats else FloatSemantics.Continuous,
             feasibilityTolerance = if (declared.feasibilityTolerance == null) resolved.feasibilityTolerance
             else SourceTolerance(),
+            optimalityTolerance = if (declared.optimalityTolerance == null) resolved.optimalityTolerance
+            else OptimalityTolerance(),
         )
     }
     sourceSemantics = declared.resolve(resolved)
@@ -126,6 +147,12 @@ internal fun sourceFlagSpecs(options: CommonOptions): List<FlagSpec> = listOf(
     },
     sourceFlag("--source-relative-tolerance", "number", "relative source feasibility slack") {
         options.sourceOptions.relativeTolerance = semanticNumber(it)
+    },
+    sourceFlag("--source-absolute-optimality-tolerance", "number", "absolute source optimality gap") {
+        options.sourceOptions.absoluteOptimalityTolerance = semanticNumber(it)
+    },
+    sourceFlag("--source-relative-optimality-tolerance", "number", "relative source optimality gap") {
+        options.sourceOptions.relativeOptimalityTolerance = semanticNumber(it)
     },
     sourceFlag("--pin-absent-optional-values", "true|false", "canonicalize absent optional values") {
         val pin = when (it.lowercase()) {

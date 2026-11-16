@@ -121,10 +121,38 @@ data class SourceTolerance(
     val isExact: Boolean get() = absolute.numerator.isZero() && relative.numerator.isZero()
 }
 
+/**
+ * Optimality gap within which two evaluations of an objective agree: an incumbent value `v` and a proved optimum
+ * `p` agree when `abs(v - p) <= max(absolute, relative * max(abs(v), abs(p)))`. It decides whether an incumbent is
+ * reported as the optimum the solver proved; it bounds no search and makes no unproved bound an optimum. Zero in
+ * both components requires equal values.
+ */
+data class OptimalityTolerance(
+    /** Minimum permitted objective difference in source units. */
+    val absolute: SemanticRational = SemanticRational.ZERO,
+    /** Permitted objective difference relative to the larger objective magnitude. */
+    val relative: SemanticRational = SemanticRational.ZERO,
+) {
+    init {
+        require(absolute.numerator.signum() >= 0) { "absolute optimality tolerance must be nonnegative" }
+        require(relative.numerator.signum() >= 0) { "relative optimality tolerance must be nonnegative" }
+    }
+
+    /** Whether objective values must be equal: both components are zero. */
+    val isExact: Boolean get() = absolute.numerator.isZero() && relative.numerator.isZero()
+}
+
 // Slack of the formats that accept numerical results by default. It is absolute only, so a row's slack does not
 // grow with the magnitude of its terms; a caller who wants a scale-dependent slack overrides the relative part.
 internal val numericalSourceTolerance: SourceTolerance = SourceTolerance(
     absolute = SemanticRational.of(BIG_ONE, bigIntOf(10_000_000L)),
+)
+
+// Optimality gap of the same formats: the customary relative MIP gap. Its absolute floor is the feasibility slack,
+// the amount by which an accepted point's rows, and so a small objective, are already uncertain.
+internal val numericalOptimalityTolerance: OptimalityTolerance = OptimalityTolerance(
+    absolute = numericalSourceTolerance.absolute,
+    relative = SemanticRational.of(BIG_ONE, bigIntOf(10_000L)),
 )
 
 /**
@@ -147,6 +175,8 @@ data class SourceSemantics(
     val feasibilityTolerance: SourceTolerance? = null,
     /** Canonicalization of absent optional values, or null when the source has no optional values. */
     val pinAbsentOptionalValues: Boolean? = null,
+    /** Numerical optimality gap; zero components require equal objective values, null makes this inapplicable. */
+    val optimalityTolerance: OptimalityTolerance? = null,
 ) {
     /** Resolve caller semantics before lowering, rejecting every inapplicable override. */
     fun resolve(overrides: SemanticOverrides = SemanticOverrides()): EffectiveSourceSemantics {
@@ -162,6 +192,9 @@ data class SourceSemantics(
         }
         require(overrides.pinAbsentOptionalValues == null || pinAbsentOptionalValues != null) {
             "absent optional values do not apply to $format"
+        }
+        require(overrides.optimalityTolerance == null || optimalityTolerance != null) {
+            "optimality tolerance does not apply to $format"
         }
         return EffectiveSourceSemantics(
             declared = this,
@@ -181,6 +214,7 @@ data class SourceSemantics(
                 } ?: undeclaredReals,
                 feasibilityTolerance = overrides.feasibilityTolerance ?: feasibilityTolerance,
                 pinAbsentOptionalValues = overrides.pinAbsentOptionalValues ?: pinAbsentOptionalValues,
+                optimalityTolerance = overrides.optimalityTolerance ?: optimalityTolerance,
             ),
         )
     }
@@ -224,6 +258,8 @@ data class SemanticOverrides(
     val feasibilityTolerance: SourceTolerance? = null,
     /** Replacement absent-value canonicalization. */
     val pinAbsentOptionalValues: Boolean? = null,
+    /** Replacement absolute and relative optimality gap. */
+    val optimalityTolerance: OptimalityTolerance? = null,
 )
 
 /** Declared defaults and the effective caller contract retained with a lowered source and its results. */

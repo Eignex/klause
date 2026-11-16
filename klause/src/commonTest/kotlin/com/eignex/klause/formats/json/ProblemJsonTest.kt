@@ -21,6 +21,7 @@ import com.eignex.klause.ir.IntVars
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.NumericAuthority
+import com.eignex.klause.ir.OptimalityTolerance
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticOverrides
@@ -192,6 +193,10 @@ class ProblemJsonTest {
                 SemanticRational.ZERO,
             ),
             pinAbsentOptionalValues = true,
+            optimalityTolerance = OptimalityTolerance(
+                SemanticRational.of(BIG_ONE, bigIntOf(1_000_000)),
+                SemanticRational.of(BIG_ONE, bigIntOf(10_000)),
+            ),
         ).resolve(
             SemanticOverrides(
                 floats = FloatSemantics.Continuous,
