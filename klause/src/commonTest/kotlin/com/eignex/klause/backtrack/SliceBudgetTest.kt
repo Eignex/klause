@@ -9,6 +9,37 @@ import kotlin.test.assertTrue
 class SliceBudgetTest {
 
     @Test
+    fun `an unarmed slice should have no time limit`() {
+        val slice = SliceBudget({ 0L }, { 0L })
+
+        assertFalse(slice.expired())
+        assertEquals(null, slice.deadline)
+    }
+
+    @Test
+    fun `rearming an expired slice should replace its time limit`() {
+        val slice = SliceBudget({ 0L }, { 0L })
+        slice.begin(sliceMillis = 0L, sliceNodes = -1L)
+        assertTrue(slice.expired())
+
+        slice.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = -1L)
+
+        assertFalse(slice.expired())
+        assertFalse(slice.deadline!!.hasPassedNow())
+    }
+
+    @Test
+    fun `rearming an unlimited slice should install its new time limit`() {
+        val slice = SliceBudget({ 0L }, { 0L })
+        slice.begin(sliceMillis = Long.MAX_VALUE, sliceNodes = -1L)
+
+        slice.begin(sliceMillis = 0L, sliceNodes = -1L)
+
+        assertTrue(slice.expired())
+        assertTrue(slice.deadline!!.hasPassedNow())
+    }
+
+    @Test
     fun `debt observations should describe only the current slice repayment`() {
         var work = 0L
         val slice = SliceBudget({ 0L }, { work })

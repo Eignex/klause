@@ -1,6 +1,7 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.solver.result.SearchStatsSink
+import com.eignex.klause.util.Cancellation
 import com.eignex.util.numbers.saturatedAdd
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
@@ -26,6 +27,8 @@ internal class SliceBudget(
     /** The armed slice's wall-clock end; null before the first slice. */
     var deadline: TimeSource.Monotonic.ValueTimeMark? = null
         private set
+
+    private var timeExpired: Cancellation = Cancellation.Never
 
     /** Whether the armed slice is bounded by work rather than by [deadline]. */
     var workBounded: Boolean = false
@@ -61,7 +64,9 @@ internal class SliceBudget(
      */
     fun begin(sliceMillis: Long, sliceNodes: Long): Boolean {
         repaidWork = 0L
-        deadline = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
+        val end = TimeSource.Monotonic.markNow() + sliceMillis.milliseconds
+        deadline = end
+        timeExpired = Cancellation.until(end)
         workBounded = sliceNodes >= 0L
         nodeStart = nodeCount()
         nodeAllowance = sliceNodes.coerceAtLeast(0L)
@@ -104,7 +109,7 @@ internal class SliceBudget(
     /** Whether the armed slice has spent its allowance. */
     fun expired(): Boolean {
         charge()
-        return workExpired() || deadline?.hasPassedNow() == true
+        return workExpired() || timeExpired()
     }
 
     fun workExpired(): Boolean = workBounded && sliceSpent() >= nodeAllowance

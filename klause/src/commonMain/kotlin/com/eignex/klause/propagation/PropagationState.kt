@@ -9,6 +9,7 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.monotonicNanos
 import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.Bits
 import com.eignex.util.collections.IntArrayDeque
@@ -1115,18 +1116,18 @@ class PropagationState private constructor(
         cancellation: ExecutionControl = ExecutionControl.Never,
         skipExpensiveBake: Boolean = false,
     ): IntArray? {
-        val start = TimeSource.Monotonic.markNow()
+        val start = monotonicNanos()
         finiteWork.cancellation = cancellation
         try {
             return drainFixpoint(allFactors, initialFactor, initialFactors, cancellation, skipExpensiveBake)
         } finally {
             while (propQueue.isNotEmpty()) deferLearnedAttachment(propQueue.removeFirst())
-            propagationNanos += start.elapsedNow().inWholeNanoseconds
+            propagationNanos += monotonicNanos() - start
         }
     }
 
     internal fun inprocessingFixpoint(initialFactor: Int, cancellation: ExecutionControl): IntArray? {
-        val start = TimeSource.Monotonic.markNow()
+        val start = monotonicNanos()
         val previousFloor = cancelFloor
         cancelFloor = 0
         finiteWork.cancellation = cancellation
@@ -1137,7 +1138,7 @@ class PropagationState private constructor(
             return fireQueue(cancellation !== ExecutionControl.Never, 0, cancellation, false)
         } finally {
             cancelFloor = previousFloor
-            propagationNanos += start.elapsedNow().inWholeNanoseconds
+            propagationNanos += monotonicNanos() - start
         }
     }
 
@@ -1220,7 +1221,7 @@ class PropagationState private constructor(
 
     internal fun advanceRootFixpoint(cancellation: ExecutionControl): IntArray? {
         check(rootPreparationStarted)
-        val start = TimeSource.Monotonic.markNow()
+        val start = monotonicNanos()
         finiteWork.cancellation = cancellation
         try {
             return fireQueue(
@@ -1228,7 +1229,7 @@ class PropagationState private constructor(
                 maxFires = PROPAGATION_PREPARATION_BATCH_SIZE, cancelIsPause = true,
             )
         } finally {
-            propagationNanos += start.elapsedNow().inWholeNanoseconds
+            propagationNanos += monotonicNanos() - start
         }
     }
 
