@@ -379,7 +379,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
 
     private fun lexicalLiteral(text: String): Boolean = text in setOf("true", "false") ||
         text.startsWith("#b") || text.startsWith("#x") ||
-        text.isNotEmpty() && text.all { it in '0'..'9' } ||
+        (text.isNotEmpty() && text.all { it in '0'..'9' }) ||
         text.indexOf('.').let { dot -> dot > 0 && dot < text.lastIndex &&
             text.indices.all { it == dot || text[it] in '0'..'9' } }
 
@@ -400,7 +400,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
 }
 
 private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
-    val name = (head as? SExpr.Atom)?.text
+    val name = (head as? SExpr.Atom)?.text?.let(::polynomialSymbol)
     if (head is SExpr.SList) {
         val operator = head.polynomialAtom(1)
         val base = args.firstOrNull() as? SmtSort.BitVector

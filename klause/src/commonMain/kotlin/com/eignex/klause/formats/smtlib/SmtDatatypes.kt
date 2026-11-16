@@ -331,7 +331,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
                         work.addLast(Triple(first.arguments[index], second.arguments[index], false))
                     }
                 }
-                first == second || promote && first == SmtSort.Real && second == SmtSort.Int -> Unit
+                first == second || (promote && first == SmtSort.Real && second == SmtSort.Int) -> Unit
                 else -> return false
             }
         }

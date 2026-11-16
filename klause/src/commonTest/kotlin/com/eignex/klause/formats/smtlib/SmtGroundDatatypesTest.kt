@@ -32,6 +32,30 @@ import kotlin.test.assertTrue
 
 class SmtGroundDatatypesTest {
     @Test
+    fun `quoted equality retains boolean sort inside constructors`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Box ((box (field Bool))))
+            (assert (field (box (|=| 1 1))))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `quoted real conversion retains its result sort inside constructors`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Box ((box (field Real))))
+            (assert (= (field (box (|to_real| 1))) 1.0))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
     fun `datatype constructors named log remain productive with global sort parameters`() {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)

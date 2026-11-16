@@ -295,13 +295,13 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
             values.checkpoint()
             if (record.coordinate.sort !in group) continue
             val key = keys.getValue(record.coordinate.name)
-            val tag = values.integer(record.tag).toIntOrNull() ?: throw SmtSourceWitnessRejected()
+            val tag = values.integer(record.tag).toIntOrNull() ?: rejectWitness()
             val alternative = record.alternatives.singleOrNull { it.constructor == tag }
-                ?: throw SmtSourceWitnessRejected()
+                ?: rejectWitness()
             val shape = Shape(tag, alternative.fields)
             val previous = shapes[key]
             if (previous == null) shapes[key] = shape
-            if (previous != null && previous.constructor != shape.constructor) throw SmtSourceWitnessRejected()
+            if (previous != null && previous.constructor != shape.constructor) rejectWitness()
         }
         val reconstructed = LinkedHashMap<Key, SmtValue>()
         val generator = SmtDatatypeTermGenerator(registry, relevant.size.coerceAtLeast(1), values)
@@ -334,12 +334,12 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
                 val term = SmtValue.Application(registry.constructorName(instance, shape.constructor), arguments)
                 if (reconstructed.any { (key, value) ->
                     key.sort == ready.sort && key != ready && values.equivalent(value, term)
-                }) throw SmtSourceWitnessRejected()
+                }) rejectWitness()
                 reconstructed[ready] = term
                 pending.remove(ready)
             } else {
                 val open = pending.filter { it !in shapes }
-                if (open.isEmpty()) throw SmtSourceWitnessRejected()
+                if (open.isEmpty()) rejectWitness()
                 var selected: Pair<Key, SmtValue>? = null
                 var selectedDepth = Int.MAX_VALUE
                 for (key in open) {
@@ -359,6 +359,8 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
         }
         return keys.mapValues { (_, key) -> reconstructed.getValue(key) }
     }
+
+    private fun rejectWitness(): Nothing = throw SmtSourceWitnessRejected()
 
     fun check(values: SmtModelValues): Boolean {
         val registry = state.registry.snapshot(values.cancellation, values::checkpoint)
@@ -408,7 +410,7 @@ private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, priva
         while (true) {
             values.checkpoint()
             val terms = atDepth(sort, depth)
-            if (terms.size >= limit || finite != null && parseBigInt(terms.size.toString()) == finite) return terms
+            if (terms.size >= limit || (finite != null && parseBigInt(terms.size.toString()) == finite)) return terms
             depth++
             if (depth == Int.MAX_VALUE) throw SmtSourceCheckingUnavailable()
         }
