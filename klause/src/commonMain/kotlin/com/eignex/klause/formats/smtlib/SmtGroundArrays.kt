@@ -44,11 +44,16 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     private val reads = LinkedHashMap<PairKey, Read>()
     private val captures = HashMap<Int, Term>()
     private val defaults = LinkedHashMap<SmtSort, Term>()
+    private val processedReads = HashSet<PairKey>()
+    private val processedWitnesses = HashSet<String>()
+    private val processedAgreements = HashSet<Pair<String, Int>>()
+    private val processedCongruences = HashSet<PairKey>()
     private val sourceBindings = input.bindings.associateByTo(LinkedHashMap()) { polynomialSymbol(it.declaration.name) }
     private val privateBindings = input.privateBindings.toMutableMap()
     private val usedNames = HashSet<String>()
     private var nextTerm = 0
     private var nextName = 0
+    private var queryPosition: Int? = null
 
     fun reduce(): SmtReduction {
         collectNames()
@@ -60,10 +65,10 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 "assert", "minimize", "maximize" -> output += form(command.items[0], rewrite(command.items[1]).expression)
                 "check-sat-assuming", "get-value" -> {
                     val values = (command.items[1] as SExpr.SList).items.map { rewrite(it).expression }
-                    output += form(command.items[0], SExpr.SList(values))
+                    append(form(command.items[0], SExpr.SList(values)))
                 }
                 "define-fun" -> smtUnsupported("array reduction requires expanded ground definitions")
-                else -> output += expression
+                else -> append(expression)
             }
         }
         close()
@@ -80,9 +85,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 sourceBindings[polynomialSymbol(name)] = it.copy(reconstruction = recipe)
             }
         }
-        val query = output.indexOfFirst { (it as? SExpr.SList)?.polynomialHead() in
-            setOf("check-sat", "check-sat-assuming", "get-model", "get-value", "exit") }
-        output.addAll(if (query < 0) output.size else query, axioms)
+        output.addAll(queryPosition ?: output.size, axioms)
         val checks = equalities.values.filter { step(); it.witness != null }.map { equality ->
             step()
             SmtArrayEqualityCheck(equality.name, equality.left.expressionName(), equality.right.expressionName())
@@ -103,7 +106,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         val name = command.polynomialName(1)
         val args = if (command.polynomialHead() == "declare-fun") (command.items[2] as SExpr.SList).items else emptyList()
         if (args.isNotEmpty()) smtUnsupported("array reduction requires eliminated ground function applications")
-        val sort = parseSort(command.items.last())
+        val sort = parseSort(command.items.last(), cancellation)
         val term = atom((command.items[1] as SExpr.Atom).text, sort)
         symbols[name] = term
         if (sort is SmtSort.Array) {
@@ -206,25 +209,29 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
             }
             for (read in reads.values.toList()) {
                 step()
+                if (!processedReads.add(PairKey(read.array.id, read.index.id))) continue
                 val array = arrays.getValue(read.array.id)
                 when (array.operator) {
-                        "store" -> {
-                            val same = equal(read.index, array.arguments[1])
-                            val base = read(array.arguments[0], read.index)
-                            axioms += assertion(form("ite", same, equal(read.value, array.arguments[2]), equal(read.value, base)))
-                        }
-                        "ite" -> axioms += assertion(form("ite", array.arguments[0].expression,
-                            equal(read.value, read(array.arguments[1], read.index)),
-                            equal(read.value, read(array.arguments[2], read.index))))
+                    "store" -> {
+                        val same = equal(read.index, array.arguments[1])
+                        val base = read(array.arguments[0], read.index)
+                        axioms += assertion(form("ite", same, equal(read.value, array.arguments[2]), equal(read.value, base)))
+                    }
+                    "ite" -> axioms += assertion(form("ite", array.arguments[0].expression,
+                        equal(read.value, read(array.arguments[1], read.index)),
+                        equal(read.value, read(array.arguments[2], read.index))))
                 }
             }
             for (equality in equalities.values.toList()) {
                 val witness = equality.witness ?: continue
                 val flag = SExpr.Atom(equality.name)
-                axioms += assertion(form("=>", form("not", flag), form("not",
+                if (processedWitnesses.add(equality.name)) axioms += assertion(form("=>", form("not", flag), form("not",
                     equal(read(equality.left, witness), read(equality.right, witness)))))
                 for (index in indexes[equality.left.sort]?.values?.toList().orEmpty()) {
-                    axioms += assertion(form("=>", flag, equal(read(equality.left, index), read(equality.right, index))))
+                    step()
+                    if (processedAgreements.add(equality.name to index.id)) {
+                        axioms += assertion(form("=>", flag, equal(read(equality.left, index), read(equality.right, index))))
+                    }
                 }
             }
             val readList = reads.values.toList()
@@ -232,8 +239,9 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
                 step()
                 val left = readList[i]
                 val right = readList[j]
-                if (left.array.id == right.array.id) axioms += assertion(form("=>", equal(left.index, right.index),
-                    equal(left.value, right.value)))
+                if (left.array.id == right.array.id && processedCongruences.add(PairKey(left.value.id, right.value.id))) {
+                    axioms += assertion(form("=>", equal(left.index, right.index), equal(left.value, right.value)))
+                }
             }
         }
     }
@@ -255,9 +263,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         do { name = "@klause.array.${nextName++}" } while (!usedNames.add(name))
         val term = atom(name, sort)
         if (sort !is SmtSort.Array) {
-            val query = output.indexOfFirst { (it as? SExpr.SList)?.polynomialHead() in
-                setOf("check-sat", "check-sat-assuming", "get-model", "get-value", "exit") }
-            output.add(if (query < 0) output.size else query, form("declare-const", term.expression, sortSyntax(sort)))
+            output.add(queryPosition ?: output.size, form("declare-const", term.expression, sortSyntax(sort)))
+            queryPosition = queryPosition?.plus(1)
             privateBindings[name] = SmtReconstruction.Scalar(name, sort)
         }
         symbols[polynomialSymbol(name)] = term
@@ -285,6 +292,12 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         nodes.getOrPut(Node(head, arguments.map { it.id })) { raw(SExpr.SList(listOf(head) + arguments.map { it.expression }), sort) }
     private fun Term.expressionName(): String = (expression as SExpr.Atom).text
     private fun step() = cancellation.polynomialSourceCheckpoint(1)
+
+    private fun append(expression: SExpr) {
+        if (queryPosition == null && (expression as? SExpr.SList)?.polynomialHead() in
+            setOf("check-sat", "check-sat-assuming", "get-model", "get-value", "exit")) queryPosition = output.size
+        output += expression
+    }
 
     private fun collectNames() {
         val work = ArrayDeque<SExpr>()
@@ -334,18 +347,33 @@ private data class SmtArrayOperationCheck(val result: String, val operator: Stri
     }
 }
 
-private fun parseSort(expression: SExpr): SmtSort = when (expression) {
-    is SExpr.Atom -> when (expression.text) {
-        "Bool" -> SmtSort.Bool
-        "Int" -> SmtSort.Int
-        "Real" -> SmtSort.Real
-        else -> SmtSort.Uninterpreted(expression.text)
+private fun parseSort(expression: SExpr, cancellation: Cancellation): SmtSort {
+    val work = ArrayDeque<Pair<SExpr, Boolean>>()
+    val sorts = ArrayDeque<SmtSort>()
+    work.addLast(expression to false)
+    while (work.isNotEmpty()) {
+        cancellation.polynomialSourceCheckpoint(1)
+        val (node, combine) = work.removeLast()
+        when (node) {
+            is SExpr.Atom -> sorts.addLast(when (node.text) {
+                "Bool" -> SmtSort.Bool
+                "Int" -> SmtSort.Int
+                "Real" -> SmtSort.Real
+                else -> SmtSort.Uninterpreted(node.text)
+            })
+            is SExpr.SList -> if (node.polynomialHead() == "_") {
+                sorts.addLast(SmtSort.BitVector(node.polynomialAtom(2).toInt()))
+            } else if (combine) {
+                val arguments = List(node.items.size - 1) { sorts.removeLast() }.reversed()
+                sorts.addLast(if (node.polynomialHead() == "Array") SmtSort.Array(arguments[0], arguments[1])
+                    else SmtSort.Uninterpreted(node.polynomialHead(), arguments))
+            } else {
+                work.addLast(node to true)
+                for (argument in node.items.drop(1).asReversed()) work.addLast(argument to false)
+            }
+        }
     }
-    is SExpr.SList -> when (expression.polynomialHead()) {
-        "Array" -> SmtSort.Array(parseSort(expression.items[1]), parseSort(expression.items[2]))
-        "_" -> SmtSort.BitVector(expression.polynomialAtom(2).toInt())
-        else -> SmtSort.Uninterpreted(expression.polynomialHead(), expression.items.drop(1).map(::parseSort))
-    }
+    return sorts.single()
 }
 
 private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
@@ -354,6 +382,7 @@ private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
         val operator = head.polynomialAtom(1)
         val base = args.firstOrNull() as? SmtSort.BitVector
         return when (operator) {
+            "divisible" -> SmtSort.Bool
             "extract" -> SmtSort.BitVector(head.polynomialAtom(2).toInt() - head.polynomialAtom(3).toInt() + 1)
             "zero_extend", "sign_extend" -> SmtSort.BitVector(checkNotNull(base).width + head.polynomialAtom(2).toInt())
             "repeat" -> SmtSort.BitVector(checkNotNull(base).width * head.polynomialAtom(2).toInt())
@@ -365,11 +394,11 @@ private fun resultSort(head: SExpr, args: List<SmtSort>): SmtSort {
         "=", "distinct", "and", "or", "xor", "not", "=>", "<", "<=", ">", ">=", "is_int",
         "bvult", "bvule", "bvugt", "bvuge", "bvslt", "bvsle", "bvsgt", "bvsge",
         "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvnego", "bvusubo", "bvssubo", "bvsdivo" -> SmtSort.Bool
-        "ite" -> args[1]
+        "ite" -> if (SmtSort.Real in args.drop(1)) SmtSort.Real else args[1]
         "to_int", "div", "mod", "ubv_to_int", "sbv_to_int", "bv2nat", "bv2int" -> SmtSort.Int
         "to_real", "/", "exp", "log", "sin", "cos", "pi" -> SmtSort.Real
         "concat" -> SmtSort.BitVector(args.sumOf { (it as SmtSort.BitVector).width })
-        "bvcomp" -> SmtSort.BitVector(1)
+        "bvcomp", "bvredor", "bvredand" -> SmtSort.BitVector(1)
         else -> if (SmtSort.Real in args) SmtSort.Real else args.firstOrNull() ?: SmtSort.Int
     }
 }
