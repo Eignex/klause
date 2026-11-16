@@ -4,8 +4,23 @@ import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.Cancellation
 
 internal fun reduceSmtGroundArrays(input: SmtReduction, cancellation: Cancellation): SmtReduction {
-    val sorts = input.declarations.flatMap { it.parameters + it.result }
-    return if (sorts.any { it is SmtSort.Array }) SmtGroundArrayReducer(input, cancellation).reduce() else input
+    val work = ArrayDeque<SExpr>()
+    for (expression in input.commands) {
+        cancellation.polynomialSourceCheckpoint(1)
+        val command = expression as? SExpr.SList ?: continue
+        if (command.polynomialHead() in setOf("declare-const", "declare-fun")) work.addLast(command.items.last())
+    }
+    while (work.isNotEmpty()) {
+        cancellation.polynomialSourceCheckpoint(1)
+        when (val sort = work.removeLast()) {
+            is SExpr.Atom -> Unit
+            is SExpr.SList -> {
+                if (sort.polynomialHead() == "Array") return SmtGroundArrayReducer(input, cancellation).reduce()
+                sort.items.drop(1).forEach(work::addLast)
+            }
+        }
+    }
+    return input
 }
 
 private class SmtGroundArrayReducer(private val input: SmtReduction, private val cancellation: Cancellation) {
@@ -28,6 +43,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     private val equalities = LinkedHashMap<PairKey, Equality>()
     private val reads = LinkedHashMap<PairKey, Read>()
     private val captures = HashMap<Int, Term>()
+    private val defaults = LinkedHashMap<SmtSort, Term>()
     private val sourceBindings = input.bindings.associateByTo(LinkedHashMap()) { polynomialSymbol(it.declaration.name) }
     private val privateBindings = input.privateBindings.toMutableMap()
     private val usedNames = HashSet<String>()
@@ -55,9 +71,10 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         for ((_, array) in arrays) {
             step()
             val sort = array.term.sort as SmtSort.Array
-            val entries = allReads.filter { it.array.id == array.term.id }.map { it.index.expressionName() to it.value.expressionName() }
+            val entries = allReads.filter { step(); it.array.id == array.term.id }
+                .map { step(); it.index.expressionName() to it.value.expressionName() }
             val name = array.term.expressionName()
-            val recipe = SmtArrayReconstruction(sort, entries)
+            val recipe = SmtArrayReconstruction(sort, defaults.getValue(sort.element).expressionName(), entries)
             privateBindings[name] = recipe
             sourceBindings[polynomialSymbol(name)]?.let {
                 sourceBindings[polynomialSymbol(name)] = it.copy(reconstruction = recipe)
@@ -66,39 +83,20 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         val query = output.indexOfFirst { (it as? SExpr.SList)?.polynomialHead() in
             setOf("check-sat", "check-sat-assuming", "get-model", "get-value", "exit") }
         output.addAll(if (query < 0) output.size else query, axioms)
-        val checks = equalities.values.mapNotNull { equality ->
-            if (equality.witness == null) return@mapNotNull null
-            val left = equality.left.expressionName()
-            val right = equality.right.expressionName()
-            SmtSourceCheck { values ->
-                val selected = values.boolean(equality.name)
-                val a = values.value(left) as SmtValue.Array
-                val b = values.value(right) as SmtValue.Array
-                val positions = allReads.filter { it.array.id == equality.left.id }
-                val agreements = positions.all { read ->
-                    val other = reads.getValue(PairKey(equality.right.id, read.index.id))
-                    encodedEqual(read.value, other.value, values)
-                }
-                selected == agreements && a.sort == b.sort
-            }
+        val checks = equalities.values.filter { step(); it.witness != null }.map { equality ->
+            step()
+            SmtArrayEqualityCheck(equality.name, equality.left.expressionName(), equality.right.expressionName())
         }
-        val operationChecks = allReads.mapNotNull { read ->
-            val array = arrays.getValue(read.array.id)
-            when (array.operator) {
-                "store" -> SmtSourceCheck { values ->
-                    val expected = if (encodedEqual(read.index, array.arguments[1], values)) array.arguments[2]
-                        else reads.getValue(PairKey(array.arguments[0].id, read.index.id)).value
-                    encodedEqual(read.value, expected, values)
-                }
-                "ite" -> SmtSourceCheck { values ->
-                    val branch = array.arguments[if (values.boolean(array.arguments[0].expressionName())) 1 else 2]
-                    encodedEqual(read.value, reads.getValue(PairKey(branch.id, read.index.id)).value, values)
-                }
-                else -> null
-            }
+        val operationChecks = arrays.values.filter { step(); it.operator != "base" }.map { array ->
+            step()
+            SmtArrayOperationCheck(array.term.expressionName(), array.operator, array.arguments.map { it.expressionName() })
+        }
+        val readChecks = allReads.map { read ->
+            step()
+            SmtArrayReadCheck(read.array.expressionName(), read.index.expressionName(), read.value.expressionName())
         }
         return input.copy(commands = output.toList(), bindings = sourceBindings.values.toList(),
-            privateBindings = privateBindings.toMap(), checks = input.checks + checks + operationChecks)
+            privateBindings = privateBindings.toMap(), checks = input.checks + checks + operationChecks + readChecks)
     }
 
     private fun declare(command: SExpr.SList) {
@@ -203,6 +201,7 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
             previous = arrays.size + reads.size + equalities.size
             for (array in arrays.values.toList()) {
                 val sort = array.term.sort as SmtSort.Array
+                default(sort.element)
                 for (index in indexes[sort]?.values?.toList().orEmpty()) read(array.term, index)
             }
             for (read in reads.values.toList()) {
@@ -239,10 +238,8 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
         }
     }
 
-    private fun encodedEqual(left: Term, right: Term, values: SmtModelValues): Boolean {
-        if (left.id == right.id) return true
-        val key = if (left.id < right.id) PairKey(left.id, right.id) else PairKey(right.id, left.id)
-        return values.boolean(equalities.getValue(key).name)
+    private fun default(sort: SmtSort): Term = defaults.getOrPut(sort) {
+        fresh(sort).also { if (sort is SmtSort.Array) arrays[it.id] = ArrayTerm(it, "base", emptyList()) }
     }
 
     private fun capture(term: Term): Term {
@@ -302,18 +299,39 @@ private class SmtGroundArrayReducer(private val input: SmtReduction, private val
     }
 }
 
-private data class SmtArrayReconstruction(val sort: SmtSort.Array, val entries: List<Pair<String, String>>) : SmtReconstruction {
-    override fun reconstruct(values: SmtModelValues): SmtValue = SmtValue.Array(sort, smtArrayDefault(sort.element),
-        entries.map { (index, value) -> values.value(index) to values.value(value) })
+private data class SmtArrayReconstruction(val sort: SmtSort.Array, val default: String,
+    val entries: List<Pair<String, String>>) : SmtReconstruction {
+    override fun reconstruct(values: SmtModelValues): SmtValue {
+        values.checkpoint()
+        return SmtValue.Array(sort, values.value(default), entries.map { (index, value) ->
+            values.checkpoint()
+            values.value(index) to values.value(value)
+        })
+    }
 }
 
-private fun smtArrayDefault(sort: SmtSort): SmtValue = when (sort) {
-    SmtSort.Bool -> SmtValue.Boolean(false)
-    SmtSort.Int -> SmtValue.Integer("0")
-    SmtSort.Real -> SmtValue.Real("0.0")
-    is SmtSort.BitVector -> SmtValue.BitVector("0".repeat(sort.width))
-    is SmtSort.Uninterpreted -> SmtValue.Uninterpreted(sort, "@klause.array.default")
-    is SmtSort.Array -> SmtValue.Array(sort, smtArrayDefault(sort.element), emptyList())
+private data class SmtArrayEqualityCheck(val flag: String, val left: String, val right: String) : SmtSourceCheck {
+    override fun check(values: SmtModelValues): Boolean = values.boolean(flag) ==
+        (values.equal(left, right) ?: throw SmtSourceCheckingUnavailable())
+}
+
+private data class SmtArrayReadCheck(val array: String, val index: String, val value: String) : SmtSourceCheck {
+    override fun check(values: SmtModelValues): Boolean {
+        val selected = smtArraySelect(values.value(array) as SmtValue.Array, values.value(index), values)
+            ?: throw SmtSourceCheckingUnavailable()
+        return values.equal(selected, values.value(value)) ?: throw SmtSourceCheckingUnavailable()
+    }
+}
+
+private data class SmtArrayOperationCheck(val result: String, val operator: String,
+    val arguments: List<String>) : SmtSourceCheck {
+    override fun check(values: SmtModelValues): Boolean {
+        val expected = if (operator == "store") {
+            val base = values.value(arguments[0]) as SmtValue.Array
+            base.copy(entries = base.entries + (values.value(arguments[1]) to values.value(arguments[2])))
+        } else values.value(arguments[if (values.boolean(arguments[0])) 1 else 2])
+        return values.equal(values.value(result), expected) ?: throw SmtSourceCheckingUnavailable()
+    }
 }
 
 private fun parseSort(expression: SExpr): SmtSort = when (expression) {

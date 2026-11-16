@@ -104,7 +104,10 @@ sealed interface SmtValue {
         val default: SmtValue,
         /** Finite updates in source store order. */
         val entries: List<Pair<SmtValue, SmtValue>>,
-    ) : SmtValue
+    ) : SmtValue {
+        override fun semanticEquals(other: SmtValue, values: SmtModelValues): kotlin.Boolean? =
+            if (other is Array) smtArraysEqual(this, other, values) else false
+    }
 }
 
 /** Named access to retained coordinates and composed reconstruction bindings. */
