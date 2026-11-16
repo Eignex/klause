@@ -496,9 +496,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     else null
                     val result = if (frame.indexed != null) {
                         val indexed = frame.indexed
-                        if (indexed.items.size == 3 && indexed.polynomialHead() == "_" &&
+                        if (indexed.items.size == 3 && (indexed.items[0] as? SExpr.Atom)?.text == "_" &&
                             indexed.polynomialAtom(1) == "divisible" && args == listOf(SmtSort.Int)) {
-                            val index = indexed.polynomialAtom(2)
+                            val index = (indexed.items[2] as? SExpr.Atom)?.text ?: return null
                             if (index.isNotEmpty() && index.any { it != '0' } && index.all { it in '0'..'9' })
                                 SmtSort.Bool else null
                         } else smtIndexedBitVectorSort(indexed, args)

@@ -197,9 +197,11 @@ class SmtArithmeticReductionTest {
     }
 
     @Test
-    fun `divisibility should reject a zero index in dead branches`() {
-        assertFailsWith<UnsupportedSmtException> {
-            SmtLib.parse("(assert (or true ((_ divisible 0) 2)))")
+    fun `divisibility should reject invalid indexes in dead branches`() {
+        for (operator in listOf("(_ divisible 0)", "(_ divisible |3|)", "(|_| divisible 3)")) {
+            assertFailsWith<UnsupportedSmtException> {
+                SmtLib.parse("(assert (or true ($operator 2)))")
+            }
         }
     }
 
