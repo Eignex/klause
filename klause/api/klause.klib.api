@@ -1488,11 +1488,18 @@ abstract interface com.eignex.klause.factor/ReifiedFactor : com.eignex.klause.ir
 }
 
 abstract interface com.eignex.klause.formats.smtlib/SmtModelValues { // com.eignex.klause.formats.smtlib/SmtModelValues|null[0]
+    open val cancellation // com.eignex.klause.formats.smtlib/SmtModelValues.cancellation|{}cancellation[0]
+        open fun <get-cancellation>(): com.eignex.klause.util/ExecutionControl // com.eignex.klause.formats.smtlib/SmtModelValues.cancellation.<get-cancellation>|<get-cancellation>(){}[0]
+
     abstract fun boolean(kotlin/String): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtModelValues.boolean|boolean(kotlin.String){}[0]
     abstract fun checkpoint(kotlin/Long = ...) // com.eignex.klause.formats.smtlib/SmtModelValues.checkpoint|checkpoint(kotlin.Long){}[0]
     abstract fun integer(kotlin/String): kotlin/String // com.eignex.klause.formats.smtlib/SmtModelValues.integer|integer(kotlin.String){}[0]
     abstract fun real(kotlin/String): kotlin/String // com.eignex.klause.formats.smtlib/SmtModelValues.real|real(kotlin.String){}[0]
     abstract fun value(kotlin/String): com.eignex.klause.formats.smtlib/SmtValue // com.eignex.klause.formats.smtlib/SmtModelValues.value|value(kotlin.String){}[0]
+    open fun equal(com.eignex.klause.formats.smtlib/SmtValue, com.eignex.klause.formats.smtlib/SmtValue): kotlin/Boolean? // com.eignex.klause.formats.smtlib/SmtModelValues.equal|equal(com.eignex.klause.formats.smtlib.SmtValue;com.eignex.klause.formats.smtlib.SmtValue){}[0]
+    open fun equal(kotlin/String, kotlin/String): kotlin/Boolean? // com.eignex.klause.formats.smtlib/SmtModelValues.equal|equal(kotlin.String;kotlin.String){}[0]
+    open fun exactReal(com.eignex.klause.formats.smtlib/SmtValue.Real): com.eignex.klause.arithmetic.real/ExactRealValue? // com.eignex.klause.formats.smtlib/SmtModelValues.exactReal|exactReal(com.eignex.klause.formats.smtlib.SmtValue.Real){}[0]
+    open fun exactReal(kotlin/String): com.eignex.klause.arithmetic.real/ExactRealValue? // com.eignex.klause.formats.smtlib/SmtModelValues.exactReal|exactReal(kotlin.String){}[0]
 }
 
 abstract interface com.eignex.klause.ir/Factor { // com.eignex.klause.ir/Factor|null[0]
@@ -2611,6 +2618,8 @@ sealed interface com.eignex.klause.formats.smtlib/SmtSort { // com.eignex.klause
 }
 
 sealed interface com.eignex.klause.formats.smtlib/SmtValue { // com.eignex.klause.formats.smtlib/SmtValue|null[0]
+    open fun semanticEquals(com.eignex.klause.formats.smtlib/SmtValue, com.eignex.klause.formats.smtlib/SmtModelValues): kotlin/Boolean? // com.eignex.klause.formats.smtlib/SmtValue.semanticEquals|semanticEquals(com.eignex.klause.formats.smtlib.SmtValue;com.eignex.klause.formats.smtlib.SmtModelValues){}[0]
+
     final class Application : com.eignex.klause.formats.smtlib/SmtValue { // com.eignex.klause.formats.smtlib/SmtValue.Application|null[0]
         constructor <init>(kotlin/String, kotlin.collections/List<com.eignex.klause.formats.smtlib/SmtValue>) // com.eignex.klause.formats.smtlib/SmtValue.Application.<init>|<init>(kotlin.String;kotlin.collections.List<com.eignex.klause.formats.smtlib.SmtValue>){}[0]
 
@@ -8989,16 +8998,19 @@ final class com.eignex.klause.formats.smtlib/SmtLibProblem : com.eignex.klause.i
 }
 
 final class com.eignex.klause.formats.smtlib/SmtSourceBinding { // com.eignex.klause.formats.smtlib/SmtSourceBinding|null[0]
-    constructor <init>(com.eignex.klause.formats.smtlib/SmtSourceDeclaration, com.eignex.klause.formats.smtlib/SmtReconstruction) // com.eignex.klause.formats.smtlib/SmtSourceBinding.<init>|<init>(com.eignex.klause.formats.smtlib.SmtSourceDeclaration;com.eignex.klause.formats.smtlib.SmtReconstruction){}[0]
+    constructor <init>(com.eignex.klause.formats.smtlib/SmtSourceDeclaration, com.eignex.klause.formats.smtlib/SmtReconstruction, kotlin/String = ...) // com.eignex.klause.formats.smtlib/SmtSourceBinding.<init>|<init>(com.eignex.klause.formats.smtlib.SmtSourceDeclaration;com.eignex.klause.formats.smtlib.SmtReconstruction;kotlin.String){}[0]
 
     final val declaration // com.eignex.klause.formats.smtlib/SmtSourceBinding.declaration|{}declaration[0]
         final fun <get-declaration>(): com.eignex.klause.formats.smtlib/SmtSourceDeclaration // com.eignex.klause.formats.smtlib/SmtSourceBinding.declaration.<get-declaration>|<get-declaration>(){}[0]
+    final val key // com.eignex.klause.formats.smtlib/SmtSourceBinding.key|{}key[0]
+        final fun <get-key>(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSourceBinding.key.<get-key>|<get-key>(){}[0]
     final val reconstruction // com.eignex.klause.formats.smtlib/SmtSourceBinding.reconstruction|{}reconstruction[0]
         final fun <get-reconstruction>(): com.eignex.klause.formats.smtlib/SmtReconstruction // com.eignex.klause.formats.smtlib/SmtSourceBinding.reconstruction.<get-reconstruction>|<get-reconstruction>(){}[0]
 
     final fun component1(): com.eignex.klause.formats.smtlib/SmtSourceDeclaration // com.eignex.klause.formats.smtlib/SmtSourceBinding.component1|component1(){}[0]
     final fun component2(): com.eignex.klause.formats.smtlib/SmtReconstruction // com.eignex.klause.formats.smtlib/SmtSourceBinding.component2|component2(){}[0]
-    final fun copy(com.eignex.klause.formats.smtlib/SmtSourceDeclaration = ..., com.eignex.klause.formats.smtlib/SmtReconstruction = ...): com.eignex.klause.formats.smtlib/SmtSourceBinding // com.eignex.klause.formats.smtlib/SmtSourceBinding.copy|copy(com.eignex.klause.formats.smtlib.SmtSourceDeclaration;com.eignex.klause.formats.smtlib.SmtReconstruction){}[0]
+    final fun component3(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSourceBinding.component3|component3(){}[0]
+    final fun copy(com.eignex.klause.formats.smtlib/SmtSourceDeclaration = ..., com.eignex.klause.formats.smtlib/SmtReconstruction = ..., kotlin/String = ...): com.eignex.klause.formats.smtlib/SmtSourceBinding // com.eignex.klause.formats.smtlib/SmtSourceBinding.copy|copy(com.eignex.klause.formats.smtlib.SmtSourceDeclaration;com.eignex.klause.formats.smtlib.SmtReconstruction;kotlin.String){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtSourceBinding.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtSourceBinding.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtSourceBinding.toString|toString(){}[0]

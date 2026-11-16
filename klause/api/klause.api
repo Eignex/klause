@@ -3245,6 +3245,11 @@ public abstract interface class com/eignex/klause/formats/smtlib/SmtModelValues 
 	public abstract fun boolean (Ljava/lang/String;)Z
 	public abstract fun checkpoint (J)V
 	public static synthetic fun checkpoint$default (Lcom/eignex/klause/formats/smtlib/SmtModelValues;JILjava/lang/Object;)V
+	public fun equal (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtValue;)Ljava/lang/Boolean;
+	public fun equal (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Boolean;
+	public fun exactReal (Lcom/eignex/klause/formats/smtlib/SmtValue$Real;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public fun exactReal (Ljava/lang/String;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public fun getCancellation ()Lcom/eignex/klause/util/ExecutionControl;
 	public abstract fun integer (Ljava/lang/String;)Ljava/lang/String;
 	public abstract fun real (Ljava/lang/String;)Ljava/lang/String;
 	public abstract fun value (Ljava/lang/String;)Lcom/eignex/klause/formats/smtlib/SmtValue;
@@ -3252,6 +3257,11 @@ public abstract interface class com/eignex/klause/formats/smtlib/SmtModelValues 
 
 public final class com/eignex/klause/formats/smtlib/SmtModelValues$DefaultImpls {
 	public static synthetic fun checkpoint$default (Lcom/eignex/klause/formats/smtlib/SmtModelValues;JILjava/lang/Object;)V
+	public static fun equal (Lcom/eignex/klause/formats/smtlib/SmtModelValues;Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtValue;)Ljava/lang/Boolean;
+	public static fun equal (Lcom/eignex/klause/formats/smtlib/SmtModelValues;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Boolean;
+	public static fun exactReal (Lcom/eignex/klause/formats/smtlib/SmtModelValues;Lcom/eignex/klause/formats/smtlib/SmtValue$Real;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public static fun exactReal (Lcom/eignex/klause/formats/smtlib/SmtModelValues;Ljava/lang/String;)Lcom/eignex/klause/arithmetic/real/ExactRealValue;
+	public static fun getCancellation (Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Lcom/eignex/klause/util/ExecutionControl;
 }
 
 public abstract interface class com/eignex/klause/formats/smtlib/SmtReconstruction {
@@ -3347,13 +3357,16 @@ public final class com/eignex/klause/formats/smtlib/SmtSort$Uninterpreted : com/
 }
 
 public final class com/eignex/klause/formats/smtlib/SmtSourceBinding {
-	public fun <init> (Lcom/eignex/klause/formats/smtlib/SmtSourceDeclaration;Lcom/eignex/klause/formats/smtlib/SmtReconstruction;)V
+	public fun <init> (Lcom/eignex/klause/formats/smtlib/SmtSourceDeclaration;Lcom/eignex/klause/formats/smtlib/SmtReconstruction;Ljava/lang/String;)V
+	public synthetic fun <init> (Lcom/eignex/klause/formats/smtlib/SmtSourceDeclaration;Lcom/eignex/klause/formats/smtlib/SmtReconstruction;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Lcom/eignex/klause/formats/smtlib/SmtSourceDeclaration;
 	public final fun component2 ()Lcom/eignex/klause/formats/smtlib/SmtReconstruction;
-	public final fun copy (Lcom/eignex/klause/formats/smtlib/SmtSourceDeclaration;Lcom/eignex/klause/formats/smtlib/SmtReconstruction;)Lcom/eignex/klause/formats/smtlib/SmtSourceBinding;
-	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtSourceBinding;Lcom/eignex/klause/formats/smtlib/SmtSourceDeclaration;Lcom/eignex/klause/formats/smtlib/SmtReconstruction;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtSourceBinding;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Lcom/eignex/klause/formats/smtlib/SmtSourceDeclaration;Lcom/eignex/klause/formats/smtlib/SmtReconstruction;Ljava/lang/String;)Lcom/eignex/klause/formats/smtlib/SmtSourceBinding;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtSourceBinding;Lcom/eignex/klause/formats/smtlib/SmtSourceDeclaration;Lcom/eignex/klause/formats/smtlib/SmtReconstruction;Ljava/lang/String;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtSourceBinding;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getDeclaration ()Lcom/eignex/klause/formats/smtlib/SmtSourceDeclaration;
+	public final fun getKey ()Ljava/lang/String;
 	public final fun getReconstruction ()Lcom/eignex/klause/formats/smtlib/SmtReconstruction;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -3400,6 +3413,7 @@ public final class com/eignex/klause/formats/smtlib/SmtSourceSnapshot {
 }
 
 public abstract interface class com/eignex/klause/formats/smtlib/SmtValue {
+	public fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
 }
 
 public final class com/eignex/klause/formats/smtlib/SmtValue$Application : com/eignex/klause/formats/smtlib/SmtValue {
@@ -3412,6 +3426,7 @@ public final class com/eignex/klause/formats/smtlib/SmtValue$Application : com/e
 	public final fun getArguments ()Ljava/util/List;
 	public final fun getConstructor ()Ljava/lang/String;
 	public fun hashCode ()I
+	public fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -3423,6 +3438,7 @@ public final class com/eignex/klause/formats/smtlib/SmtValue$BitVector : com/eig
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getBits ()Ljava/lang/String;
 	public fun hashCode ()I
+	public fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -3434,7 +3450,12 @@ public final class com/eignex/klause/formats/smtlib/SmtValue$Boolean : com/eigne
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getValue ()Z
 	public fun hashCode ()I
+	public fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/eignex/klause/formats/smtlib/SmtValue$DefaultImpls {
+	public static fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
 }
 
 public final class com/eignex/klause/formats/smtlib/SmtValue$Function : com/eignex/klause/formats/smtlib/SmtValue {
@@ -3449,6 +3470,7 @@ public final class com/eignex/klause/formats/smtlib/SmtValue$Function : com/eign
 	public final fun getEntries ()Ljava/util/List;
 	public final fun getParameters ()Ljava/util/List;
 	public fun hashCode ()I
+	public fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -3460,6 +3482,7 @@ public final class com/eignex/klause/formats/smtlib/SmtValue$Integer : com/eigne
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getValue ()Ljava/lang/String;
 	public fun hashCode ()I
+	public fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -3471,6 +3494,7 @@ public final class com/eignex/klause/formats/smtlib/SmtValue$Real : com/eignex/k
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getTerm ()Ljava/lang/String;
 	public fun hashCode ()I
+	public fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
 	public fun toString ()Ljava/lang/String;
 }
 
@@ -3484,6 +3508,7 @@ public final class com/eignex/klause/formats/smtlib/SmtValue$Uninterpreted : com
 	public final fun getIdentity ()Ljava/lang/String;
 	public final fun getSort ()Lcom/eignex/klause/formats/smtlib/SmtSort;
 	public fun hashCode ()I
+	public fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
 	public fun toString ()Ljava/lang/String;
 }
 
