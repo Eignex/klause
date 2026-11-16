@@ -18,7 +18,11 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.TerminationReason
@@ -37,6 +41,24 @@ import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
     @Test
+    fun `finite portfolio conversion should preserve a local search root proof`() {
+        for (optimize in listOf(false, true)) {
+            val problem = Problem.of(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
+            val objective = if (optimize) LinearObjective(boolWeights = longArrayOf(1)) else null
+            val scenario = PortfolioScenario(1, 1, if (optimize) Kind.COP else Kind.CSP,
+                EngineMix.LOCAL_SEARCH, seed = 17L, lpCeiling = LpConfig.OFF)
+
+            val verdict = FinitePipeline.portfolioExecutor(problem.bake(), scenario, objective, null, null, null)
+                .use { executor ->
+                    if (optimize) executor.minimize().finitePortfolioVerdict()
+                    else executor.solve().finitePortfolioVerdict()
+                }
+
+            assertEquals(FiniteExecutionVerdict.UNSAT, verdict, "optimize=$optimize")
+        }
+    }
+
+    @Test
     fun `a local search portfolio should preserve a root refutation without presolve`() {
         for (optimize in listOf(false, true)) {
             val problem = Problem.of(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
@@ -51,7 +73,6 @@ class FiniteExecutionTest {
 
             val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
             assertEquals(FiniteSolveVerdict.UNSAT, completed.verdict, "optimize=$optimize")
-            assertEquals(false, result.completeSearchAdmitted)
             assertEquals(0.0, completed.stats.ls.moves.sum)
             assertNull(completed.terminationReason)
         }

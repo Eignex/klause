@@ -481,7 +481,7 @@ private sealed class FiniteExecutionResult {
 }
 
 /** Verdict vocabulary shared by finite engines, independent of a frontend protocol. */
-private enum class FiniteExecutionVerdict {
+internal enum class FiniteExecutionVerdict {
     /** A satisfying assignment was found. */
     SAT,
 
@@ -1397,18 +1397,9 @@ private fun executePortfolioSatisfy(
     callbacks: FiniteExecutionCallbacks,
     start: TimeMark,
 ): FiniteExecutionResult.Completed {
-    val verdict = when (result) {
-        is SolveResult.Sat -> {
-            callbacks.onSample(result.assignment)
-            FiniteExecutionVerdict.SAT
-        }
-
-        is SolveResult.Unsat -> FiniteExecutionVerdict.UNSAT
-
-        is SolveResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
-    }
+    if (result is SolveResult.Sat) callbacks.onSample(result.assignment)
     return FiniteExecutionResult.Completed(
-        verdict = verdict,
+        verdict = result.finitePortfolioVerdict(),
         stats = result.stats,
         solutions = if (result is SolveResult.Sat) 1 else 0,
         bestSample = null,
@@ -1423,17 +1414,10 @@ private fun executePortfolioOptimize(
     callbacks: FiniteExecutionCallbacks,
     start: TimeMark,
 ): FiniteExecutionResult.Completed {
-    val verdict = when (result) {
-        is MinimizeResult.Optimal -> FiniteExecutionVerdict.OPTIMAL
-        is MinimizeResult.Unbounded -> FiniteExecutionVerdict.UNBOUNDED
-        is MinimizeResult.BestFound -> FiniteExecutionVerdict.BEST_FOUND
-        is MinimizeResult.Infeasible -> FiniteExecutionVerdict.UNSAT
-        is MinimizeResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
-    }
     val sample = (result as? MinimizeResult.WithSample)?.sample
     if (streamed == 0L && sample != null) callbacks.onSample(sample)
     return FiniteExecutionResult.Completed(
-        verdict = verdict,
+        verdict = result.finitePortfolioVerdict(),
         stats = result.stats,
         solutions = if (streamed > 0L) {
             streamed
@@ -1447,6 +1431,20 @@ private fun executePortfolioOptimize(
         unboundedDirection = (result as? MinimizeResult.Unbounded)?.direction,
         terminationReason = result.incompleteReason(),
     )
+}
+
+internal fun SolveResult.finitePortfolioVerdict(): FiniteExecutionVerdict = when (this) {
+    is SolveResult.Sat -> FiniteExecutionVerdict.SAT
+    is SolveResult.Unsat -> FiniteExecutionVerdict.UNSAT
+    is SolveResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
+}
+
+internal fun MinimizeResult.finitePortfolioVerdict(): FiniteExecutionVerdict = when (this) {
+    is MinimizeResult.Optimal -> FiniteExecutionVerdict.OPTIMAL
+    is MinimizeResult.Unbounded -> FiniteExecutionVerdict.UNBOUNDED
+    is MinimizeResult.BestFound -> FiniteExecutionVerdict.BEST_FOUND
+    is MinimizeResult.Infeasible -> FiniteExecutionVerdict.UNSAT
+    is MinimizeResult.Unknown -> FiniteExecutionVerdict.UNKNOWN
 }
 
 private fun FiniteSolveRequest.interruptedReason(): TerminationReason = when {
