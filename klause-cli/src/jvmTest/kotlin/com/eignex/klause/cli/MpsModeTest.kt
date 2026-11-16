@@ -17,9 +17,7 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.executionKind
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.bigIntOf
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -35,7 +33,7 @@ class MpsModeTest {
         val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact",
                 "--presolve", "off,+lp-harvest", "--lp", "aggressive,-cuts,preparation=disabled",
                 "--param", "lp-component-ownership=true", "--param", "bt-arm=lp-aggressive",
@@ -55,7 +53,7 @@ class MpsModeTest {
         val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact",
                 "--presolve", "off,+lp-harvest", "--lp", "aggressive,-cuts",
                 "--param", "lp-component-ownership=true", "--param", "bt-arm=lp-aggressive",
@@ -85,7 +83,7 @@ class MpsModeTest {
         val relative = "klause-bench/smoke-corpus/lp-component-split/cover-2x3.mps"
         val source = listOf(File(relative), File("../$relative")).first { it.isFile }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "-s", "--exact", "--presolve", "off",
                 "--lp", "aggressive,-cuts", "--param", "lp-component-ownership=true",
                 "--param", "bt-arm=lp-aggressive", "--param", "arms=1", "-r", "3",
@@ -103,7 +101,7 @@ class MpsModeTest {
     fun `an exact nominal unbounded ray should remain valid in the tolerance accepted superset`() {
         val output = MpsOutput(exactSourceWitness = { true })
 
-        val text = capture {
+        val text = captureStdout {
             output.onExactSolution("v X=1", BigFraction.ONE)
             output.onComplete(Verdict.UNBOUNDED)
         }
@@ -120,7 +118,7 @@ class MpsModeTest {
         }
         for (exact in listOf(false, true)) {
             val flags = if (exact) arrayOf("--exact") else emptyArray()
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
             }
 
@@ -135,7 +133,7 @@ class MpsModeTest {
             writeText("ROWS\n N COST\nCOLUMNS\n X COST 1\nBOUNDS\n LO B X 1\nENDATA\n")
             deleteOnExit()
         }
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--source-absolute-tolerance", "1",
                 "--source-relative-tolerance", "0", source.absolutePath)))
         }
@@ -182,7 +180,7 @@ class MpsModeTest {
         val source = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
         val point = assertNotNull(source.checkMpsWitness(listOf(BigFraction.ofLong(2))))
 
-        val text = capture {
+        val text = captureStdout {
             ArithmeticPublication(output).publish(
                 pipeline.render(point), SourceValue.Rational(checkNotNull(point.objective)),
             )
@@ -209,7 +207,7 @@ class MpsModeTest {
         val session = MpsMode.newSession()
         val loaded = session.load(input.absolutePath, common)
 
-        val text = capture { session.output(common).onComplete(Verdict.UNSATISFIABLE) }
+        val text = captureStdout { session.output(common).onComplete(Verdict.UNSATISFIABLE) }
 
         val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
         assertEquals(SourceExecutionKind.REFUTED, SourceSetup.executionKind(invocation))
@@ -235,7 +233,7 @@ class MpsModeTest {
         val source = assertIs<LinearSourceProblem>(pipeline.invocation.source.originalSource)
         val point = assertNotNull(source.checkMpsWitness(listOf(value)))
 
-        val text = capture {
+        val text = captureStdout {
             ArithmeticPublication(output).publish(
                 pipeline.render(point), SourceValue.Rational(checkNotNull(point.objective)),
             )
@@ -294,7 +292,7 @@ class MpsModeTest {
         val point = assertNotNull(original.checkMpsWitness(listOf(value)))
         val output = session.output(common)
 
-        val text = capture {
+        val text = captureStdout {
             ArithmeticPublication(output).publish(
                 pipeline.render(point), SourceValue.Rational(checkNotNull(point.objective)),
             )
@@ -381,7 +379,7 @@ class MpsModeTest {
             val point = original.checkMpsWitness(listOf(BigFraction.ofLong(3), value))
             val output = session.output(common)
 
-            val text = capture {
+            val text = captureStdout {
                 point?.let {
                     ArithmeticPublication(output).publish(
                         pipeline.render(it), SourceValue.Rational(checkNotNull(it.objective)),
@@ -466,7 +464,7 @@ class MpsModeTest {
             deleteOnExit()
         }
         val arguments = arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=100", *flags, source.absolutePath)
-        val text = capture { assertEquals(0, runCli(arguments)) }
+        val text = captureStdout { assertEquals(0, runCli(arguments)) }
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("o 2" in text.lines(), text)
         return text
@@ -516,7 +514,7 @@ class MpsModeTest {
             deleteOnExit()
         }
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(0, runCli(arrayOf("-s", "-p", "1", *flags, source.absolutePath)))
             }
 
@@ -543,7 +541,7 @@ class MpsModeTest {
                 source.absolutePath,
                 CommonOptions().apply { exact = flags.isNotEmpty() },
             )
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(0, runCli(arrayOf("-s", "-p", "1", *flags, source.absolutePath)))
             }
 
@@ -566,7 +564,7 @@ class MpsModeTest {
             deleteOnExit()
         }
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
             }
 
@@ -588,7 +586,7 @@ class MpsModeTest {
         for (exact in listOf(false, true)) {
             val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { this.exact = exact })
             val flags = if (exact) arrayOf("--exact") else emptyArray()
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, source.absolutePath)))
             }
 
@@ -610,7 +608,7 @@ class MpsModeTest {
                 source.absolutePath,
                 CommonOptions().apply { exact = flags.isNotEmpty() },
             )
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(
                     0,
                     runCli(
@@ -642,7 +640,7 @@ class MpsModeTest {
             deleteOnExit()
         }
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(0, runCli(arrayOf("-s", "-e", "cp", "-p", "1", *flags, source.absolutePath)))
             }
 
@@ -667,7 +665,7 @@ class MpsModeTest {
         assertFalse(Mps.parse(source.readText()).toProblem().sourceExact)
         val loaded = MpsMode.newSession().load(source.absolutePath, CommonOptions().apply { exact = true })
 
-        val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--exact", source.absolutePath))) }
+        val text = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--exact", source.absolutePath))) }
 
         val invocation = assertIs<SourceRendering.LinearSource>(loaded.rendering).invocation
         assertEquals(SourceExecutionKind.FINITE, SourceSetup.executionKind(invocation))
@@ -684,7 +682,7 @@ class MpsModeTest {
             deleteOnExit()
         }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--exact", source.absolutePath)))
         }
 
@@ -705,7 +703,7 @@ class MpsModeTest {
             deleteOnExit()
         }
 
-        val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", source.absolutePath))) }
+        val text = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", source.absolutePath))) }
 
         assertTrue("s OPTIMUM FOUND" in text.lines(), text)
         assertTrue("optimizationStatus=tolerance-optimum" in text, text)
@@ -724,7 +722,7 @@ class MpsModeTest {
         for (exact in listOf(false, true)) {
             for (engine in listOf("cp", "ls")) {
                 val flags = if (exact) arrayOf("--exact") else emptyArray()
-                val text = capture {
+                val text = captureStdout {
                     assertEquals(
                         0,
                         runCli(
@@ -797,7 +795,7 @@ class MpsModeTest {
         }
 
         for (flags in listOf(emptyArray(), arrayOf("--exact"))) {
-            val text = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1") + flags + source.absolutePath)) }
+            val text = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1") + flags + source.absolutePath)) }
 
             assertTrue("s UNSATISFIABLE" in text.lines(), text)
         }
@@ -864,7 +862,7 @@ class MpsModeTest {
     fun `accepted MPS objectives should retain original units and decimal formatting`() {
         val output = MpsOutput()
 
-        val text = capture {
+        val text = captureStdout {
             output.onArithmeticIncumbent(
                 "v X=1/2",
                 SourceValue.Rational(
@@ -875,18 +873,6 @@ class MpsModeTest {
         }
 
         assertEquals("o 0.5\nv X=1/2\n", text)
-    }
-
-    private fun capture(block: () -> Unit): String {
-        val output = ByteArrayOutputStream()
-        val previous = System.out
-        System.setOut(PrintStream(output))
-        try {
-            block()
-        } finally {
-            System.setOut(previous)
-        }
-        return output.toString()
     }
 
     @Test
@@ -901,7 +887,7 @@ class MpsModeTest {
                 deleteOnExit()
             }
 
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(0, runCli(arrayOf("--exact", "-e", "cp", "-p", "1", mps.absolutePath)))
             }
 
@@ -943,7 +929,7 @@ class MpsModeTest {
             deleteOnExit()
         }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(
                 0,
                 runCli(
@@ -1022,7 +1008,7 @@ class MpsModeTest {
         val rendered = pipeline.render(point)
         val output = session.output(CommonOptions())
 
-        val text = capture {
+        val text = captureStdout {
             ArithmeticPublication(output).publish(rendered, SourceValue.Rational(checkNotNull(point.objective)))
             output.onComplete(Verdict.BEST_FOUND)
         }
@@ -1050,7 +1036,7 @@ class MpsModeTest {
         val point = source.checkMpsWitness(listOf(BigFraction.ONE, BigFraction.ZERO))
         val output = session.output(CommonOptions())
 
-        val text = capture {
+        val text = captureStdout {
             point?.let {
                 ArithmeticPublication(output).publish(
                     pipeline.render(it), SourceValue.Rational(checkNotNull(it.objective)),
@@ -1069,7 +1055,7 @@ class MpsModeTest {
         val third = BigFraction.ofLong(3L).reciprocal()
         val output = MpsOutput()
 
-        val text = capture { output.onExactSolution("v X=1/3", third) }
+        val text = captureStdout { output.onExactSolution("v X=1/3", third) }
 
         assertTrue("o 1/3" in text, text)
     }
@@ -1079,7 +1065,7 @@ class MpsModeTest {
         val half = BigFraction.ofLong(2L).reciprocal()
         val output = MpsOutput()
 
-        val text = capture { output.onExactSolution("v X=0.5", half) }
+        val text = captureStdout { output.onExactSolution("v X=0.5", half) }
 
         assertTrue("o 0.5" in text, text)
     }
@@ -1088,7 +1074,7 @@ class MpsModeTest {
     fun `a feasible verdict without a verified source witness should be unknown`() {
         val output = MpsOutput()
 
-        val text = capture { output.onComplete(Verdict.OPTIMAL) }
+        val text = captureStdout { output.onComplete(Verdict.OPTIMAL) }
 
         assertTrue("s UNKNOWN" in text, text)
         assertTrue("s SATISFIABLE" !in text, text)
@@ -1104,7 +1090,7 @@ class MpsModeTest {
             )
             deleteOnExit()
         }
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", "--param", "node-limit=10000", mps.absolutePath)))
         }
 
@@ -1125,7 +1111,7 @@ class MpsModeTest {
             deleteOnExit()
         }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "fixed", "-p", "1", mps.absolutePath)))
         }
 
@@ -1146,7 +1132,7 @@ class MpsModeTest {
 
         for (exact in listOf(false, true)) {
             val flags = if (exact) arrayOf("--exact") else emptyArray()
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", *flags, mps.absolutePath)))
             }
 
@@ -1167,7 +1153,7 @@ class MpsModeTest {
             deleteOnExit()
         }
         for (engine in listOf("ls", "alns")) {
-            val text = capture {
+            val text = captureStdout {
                 assertEquals(
                     0,
                     runCli(
@@ -1197,7 +1183,7 @@ class MpsModeTest {
             deleteOnExit()
         }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("--exact", "-e", "cp", "-p", "1", mps.absolutePath)))
         }
 
@@ -1213,7 +1199,7 @@ class MpsModeTest {
             deleteOnExit()
         }
 
-        val text = capture {
+        val text = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)))
         }
 
@@ -1247,7 +1233,7 @@ class MpsModeTest {
         val later = assertIs<LinearSourceProblem>(next.invocation.source.originalSource)
         next.render(assertNotNull(later.checkMpsWitness(point.values)))
 
-        val text = capture {
+        val text = captureStdout {
             output.onExactSolution(rendered, checkNotNull(point.objective))
             output.onComplete(Verdict.BEST_FOUND)
         }
@@ -1260,7 +1246,7 @@ class MpsModeTest {
     fun `a tolerance witness should not support source unboundedness`() {
         val output = MpsOutput(exactSourceWitness = { false })
 
-        val text = capture {
+        val text = captureStdout {
             output.onSolution("v X=0", objective = 0)
             output.onComplete(Verdict.UNBOUNDED)
         }

@@ -2,9 +2,7 @@ package com.eignex.klause.cli
 
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.PrintStream
 import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,7 +19,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
+        val output = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-residues=true", source.absolutePath)))
         }
 
@@ -38,7 +36,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
+        val output = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-residues=true", source.absolutePath)))
         }
 
@@ -55,7 +53,7 @@ class CliModeSmtTest {
         }
 
         for (steering in listOf(false, true)) {
-            val output = capture {
+            val output = captureStdout {
                 assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-candidates=12",
                     "--param", "nia-cell-refinement=true", "--param", "nia-cell-reuse=true",
                     "--param", "nia-cell-steering=$steering", source.absolutePath)))
@@ -77,7 +75,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
+        val output = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nia-integer-roots=true", source.absolutePath)))
         }
 
@@ -110,7 +108,7 @@ class CliModeSmtTest {
         }
 
         val output = try {
-            capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
+            captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
         } finally {
             source.delete()
         }
@@ -127,7 +125,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
 
         assertTrue("sat" in output.lines(), output)
         assertTrue("(define-fun x () Real ((_ klause-real log) 2.0))" in output, output)
@@ -142,7 +140,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
 
         assertTrue("unsat" in output.lines(), output)
     }
@@ -154,7 +152,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
+        val output = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nra-work-limit=0", source.absolutePath)))
         }
 
@@ -170,7 +168,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
 
         assertTrue("unknown" in output.lines(), output)
         assertFalse("sat" in output.lines(), output)
@@ -184,7 +182,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", "-s", source.absolutePath))) }
 
         assertTrue("sat" in output.lines(), output)
         assertTrue("; objective=0.0" in output.lines(), output)
@@ -200,7 +198,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
 
         assertTrue("; optimizationStatus=unattained-infimum" in output.lines(), output)
         assertTrue("; objectiveBound=0.0" in output.lines(), output)
@@ -216,7 +214,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
 
         assertTrue("; optimizationStatus=unattained-supremum" in output.lines(), output)
         assertTrue("; objectiveBoundDirection=upper" in output.lines(), output)
@@ -231,7 +229,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
+        val output = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "ls", "-s", "--param", "nia-moves=1", source.absolutePath)))
         }
 
@@ -248,7 +246,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
+        val output = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nra-work-limit=0", source.absolutePath)))
         }
 
@@ -288,7 +286,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
 
         assertTrue("sat\n" in output, output)
         assertTrue("(define-fun |source x| () Real (root-obj (+ (- 2) (* 1 (^ x 2))) 2))" in output, output)
@@ -304,7 +302,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "ls", "-s", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "ls", "-s", source.absolutePath))) }
 
         assertTrue(output.startsWith("sat\n"), output)
         assertTrue("(define-fun |source n| () Int 100000000000000000000)" in output, output)
@@ -319,7 +317,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
+        val output = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "--param", "nia-candidates=2", source.absolutePath)))
         }
 
@@ -335,7 +333,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
 
         assertTrue(output.startsWith("sat\n"), output)
     }
@@ -347,7 +345,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
+        val output = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", source.absolutePath))) }
 
         assertEquals("unsat", output.trim())
     }
@@ -359,7 +357,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
+        val output = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-s", "--param", "nra-work-limit=0", source.absolutePath)))
         }
 
@@ -382,7 +380,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture {
+        val output = captureStdout {
             assertEquals(0, runCli(arrayOf("--param", "open-bound-proof=false", source.absolutePath)))
         }
 
@@ -398,7 +396,7 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val output = capture { runCli(arrayOf("-s", smt.absolutePath)) }
+        val output = captureStdout { runCli(arrayOf("-s", smt.absolutePath)) }
 
         assertTrue("; smtTheoryChecks=" in output, output)
         assertTrue("; smtWitnessCandidates=1" in output, output)
@@ -419,8 +417,8 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val measured = capture { runCli(arrayOf("-s", "-e", "backtrack", smt.absolutePath)) }
-        val ordinary = capture { runCli(arrayOf("-e", "backtrack", smt.absolutePath)) }
+        val measured = captureStdout { runCli(arrayOf("-s", "-e", "backtrack", smt.absolutePath)) }
+        val ordinary = captureStdout { runCli(arrayOf("-e", "backtrack", smt.absolutePath)) }
 
         assertEquals("sat", measured.lineSequence().first())
         assertEquals("sat", ordinary.lineSequence().first())
@@ -456,7 +454,7 @@ class CliModeSmtTest {
                     deleteOnExit()
                 }
 
-                val out = capture { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
+                val out = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
 
                 val magnitude = if (sort == "Real") "3/2" else bound
                 val expected = if (direction == "minimize") "-$magnitude" else magnitude
@@ -484,7 +482,7 @@ class CliModeSmtTest {
                 deleteOnExit()
             }
 
-            val out = capture { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
+            val out = captureStdout { assertEquals(0, runCli(arrayOf("-e", "cp", smt.absolutePath))) }
             val expected = if (direction == "minimize") lower else upper
 
             assertEquals("; objective=$expected", out.lines().last { it.startsWith("; objective=") }, out)
@@ -501,22 +499,10 @@ class CliModeSmtTest {
             deleteOnExit()
         }
 
-        val out = capture { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
+        val out = captureStdout { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
 
         assertTrue("sat" in out.lines(), out)
         assertTrue("; optimizationStatus=unbounded" in out.lines(), out)
         assertTrue("(define-fun x () Int" in out, out)
-    }
-
-    private fun capture(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.out
-        System.setOut(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setOut(old)
-        }
-        return buf.toString()
     }
 }

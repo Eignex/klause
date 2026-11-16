@@ -81,3 +81,27 @@ internal fun splitTerms(f: Linear, posCol: IntArray, negCol: IntArray): Pair<Int
 }
 
 private val EmptyIntArrayLocal = IntArray(0)
+
+internal fun addRealColumns(
+    builder: LpBuilder,
+    rv: Int,
+    realLower: DoubleArray,
+    realUpper: DoubleArray,
+    realPos: HashMap<Int, Int>,
+    realNeg: HashMap<Int, Int>,
+) {
+    val lo = realLower.getOrNull(rv)?.takeIf { it.isFinite() }
+    val hi = realUpper.getOrNull(rv)?.takeIf { it.isFinite() }
+    if (lo != null) {
+        realPos[rv] = builder.addRealVar(lo, hi)
+        return
+    }
+    val pos = if (hi != null && hi >= 0.0) builder.addRealVar(0.0, hi) else builder.addRealVar(0.0, null)
+    val neg = builder.addRealVar(0.0, null)
+    realPos[rv] = pos
+    realNeg[rv] = neg
+    if (hi != null && hi < 0.0) {
+        // The positive half is pinned to 0 above; the finite negative upper bound survives as a row.
+        builder.addRealRow(intArrayOf(pos, neg), doubleArrayOf(1.0, -1.0), Relation.LE, hi)
+    }
+}

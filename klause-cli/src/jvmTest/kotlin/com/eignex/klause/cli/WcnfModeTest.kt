@@ -5,9 +5,7 @@ import com.eignex.klause.formats.dimacs.toProblem
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.PrintStream
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -38,18 +36,6 @@ class WcnfModeTest {
         assertEquals(7L, objective.evaluateLong(state.assignment))
     }
 
-    private fun capture(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.out
-        System.setOut(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setOut(old)
-        }
-        return buf.toString()
-    }
-
     private fun wcnf(text: String): String = File.createTempFile("wcnf", ".wcnf").apply {
         writeText(text)
         deleteOnExit()
@@ -57,7 +43,7 @@ class WcnfModeTest {
 
     @Test
     fun `a new-format weighted instance should prove the minimum-cost solution`() {
-        val out = capture { main(arrayOf("-e", "bt", wcnf("h 1 2 0\n3 -1 0\n1 -2 0\n"))) }
+        val out = captureStdout { main(arrayOf("-e", "bt", wcnf("h 1 2 0\n3 -1 0\n1 -2 0\n"))) }
         assertTrue("s OPTIMUM FOUND" in out, out)
         assertTrue("o 1" in out.lines().map { it.trim() }, "expected optimum cost 1: $out")
         val model = out.lines().last { it.startsWith("v ") }.removePrefix("v ").trim()
@@ -66,22 +52,22 @@ class WcnfModeTest {
 
     @Test
     fun `an old-format p wcnf instance should route and prove its optimum`() {
-        val out = capture { main(arrayOf("-e", "bt", wcnf("p wcnf 3 4 10\n10 1 2 3 0\n1 -1 0\n2 -2 0\n3 -3 0\n"))) }
+        val out = captureStdout { main(arrayOf("-e", "bt", wcnf("p wcnf 3 4 10\n10 1 2 3 0\n1 -1 0\n2 -2 0\n3 -3 0\n"))) }
         assertTrue("s OPTIMUM FOUND" in out, out)
         assertTrue("o 1" in out.lines().map { it.trim() }, "expected optimum cost 1: $out")
     }
 
     @Test
     fun `infeasible hard clauses should print s UNSATISFIABLE`() {
-        val out = capture { main(arrayOf(wcnf("h 1 0\nh -1 0\n2 -2 0\n"))) }
+        val out = captureStdout { main(arrayOf(wcnf("h 1 0\nh -1 0\n2 -2 0\n"))) }
         assertTrue("s UNSATISFIABLE" in out, out)
     }
 
     @Test
     fun `the wcnf extension and the explicit format should both route to the WCNF front-end`() {
         val path = wcnf("h 1 0\n1 -1 0\n")
-        val byExt = capture { main(arrayOf("-e", "bt", path)) }
-        val byFormat = capture { main(arrayOf("-e", "bt", "--format", "wcnf", path)) }
+        val byExt = captureStdout { main(arrayOf("-e", "bt", path)) }
+        val byFormat = captureStdout { main(arrayOf("-e", "bt", "--format", "wcnf", path)) }
         assertTrue("s OPTIMUM FOUND" in byExt && "s OPTIMUM FOUND" in byFormat, "$byExt\n---\n$byFormat")
     }
 }

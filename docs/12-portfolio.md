@@ -1031,7 +1031,10 @@ terminal verdicts, and a closed handle's totals merge into its arm once.
 
 Ordinary arm exceptions retire their producer and leave siblings running; the
 schedule keeps one truncated diagnostic per arm. Output callback exceptions still
-propagate, and source-refuted claims remain quarantine faults.
+propagate, and source-refuted claims remain quarantine faults. Source and quadratic
+publication records share an invocation-local observer: it installs the latest
+record and version before calling the output callback, retains a callback failure
+as the primary exception, and suppresses a distinct later execution failure.
 
 ### Incumbent guidance
 
