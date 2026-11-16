@@ -2,7 +2,6 @@ package com.eignex.klause.lp.optimization
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.lp.engine.CutFamily
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.IntegerPinStatus
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -16,6 +15,7 @@ import com.eignex.klause.solver.evidence.SourceIntegerRowAssumption
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 internal class LinearAuthorityQuery private constructor(
     private val source: SourceProofContext,
     val coordinates: List<SourceCoordinate>,

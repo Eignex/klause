@@ -1,13 +1,13 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /**
  * Optimize a complete exact affine source context through the shared Boolean and integer traversal.

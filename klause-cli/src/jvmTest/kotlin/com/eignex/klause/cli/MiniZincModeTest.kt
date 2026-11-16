@@ -8,7 +8,6 @@ import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.ExecutionOperation
@@ -19,6 +18,7 @@ import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.util.numbers.BigFraction
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import java.io.ByteArrayOutputStream

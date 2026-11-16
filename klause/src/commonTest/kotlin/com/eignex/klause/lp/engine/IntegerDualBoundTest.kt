@@ -4,8 +4,8 @@ import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

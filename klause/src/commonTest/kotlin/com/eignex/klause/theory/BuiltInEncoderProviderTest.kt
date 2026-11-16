@@ -23,12 +23,12 @@ import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.localsearch.LocalSearchProblem
 import com.eignex.klause.localsearch.LocalSearchState
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.solver.pipeline.preparePolynomialExecutionPlan
 import com.eignex.klause.theory.qfnra.PolynomialFormula
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.random.Random
 import kotlin.test.Test

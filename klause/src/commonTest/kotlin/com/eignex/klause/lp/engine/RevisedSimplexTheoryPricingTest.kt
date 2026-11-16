@@ -5,11 +5,11 @@ import com.eignex.klause.simplex.basis.BasisSolver
 import com.eignex.klause.simplex.basis.BasisUpdate
 import com.eignex.klause.simplex.basis.IndexedVector
 import com.eignex.klause.simplex.basis.KotlinBasisSolver
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.StopPolling
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.serialArithmeticSource
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

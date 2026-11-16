@@ -7,9 +7,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.complemented
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 
 /** Exact values of the mixed columns an [ExactComparison] states its terms over. */

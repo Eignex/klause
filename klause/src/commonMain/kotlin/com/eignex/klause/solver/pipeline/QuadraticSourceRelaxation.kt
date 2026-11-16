@@ -12,7 +12,6 @@ import com.eignex.klause.arithmetic.quadratic.QuadraticInterrupted
 import com.eignex.klause.arithmetic.quadratic.QuadraticStop
 import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.theory.qfnra.PolynomialBooleanCondition
@@ -26,6 +25,7 @@ import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
 import com.eignex.klause.theory.qfnra.tryPolynomialIntegerRecession
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal sealed interface QuadraticRelaxationResult {
     data class Minimum(

@@ -13,10 +13,10 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.baked
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

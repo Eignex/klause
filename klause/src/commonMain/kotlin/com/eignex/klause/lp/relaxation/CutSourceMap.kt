@@ -13,8 +13,8 @@ import com.eignex.klause.lp.engine.LpLayoutWeight
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.exactBounds
 import com.eignex.klause.lp.engine.exactShift
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 internal data class CutColumnSource(
     val source: CutSource,

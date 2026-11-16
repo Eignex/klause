@@ -5,7 +5,6 @@ import com.eignex.klause.bench.report.Reports
 import com.eignex.klause.formats.smtlib.SmtLibProblem
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.linearRows
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -21,6 +20,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchNodeDisposition
 import com.eignex.klause.solver.search.SearchNodePolicy
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull

@@ -9,7 +9,7 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.polynomialRow
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal object LinearIndicatorEncoder {
     val linear = Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->

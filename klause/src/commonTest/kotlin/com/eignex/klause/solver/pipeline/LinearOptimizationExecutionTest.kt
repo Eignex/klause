@@ -6,7 +6,6 @@ import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.optimization.withLinearAuthority
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -24,6 +23,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals

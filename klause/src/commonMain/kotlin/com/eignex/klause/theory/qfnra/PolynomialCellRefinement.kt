@@ -9,10 +9,10 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.ir.PolynomialRealFormula
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.serialArithmeticSource
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal sealed interface PolynomialCellScope {

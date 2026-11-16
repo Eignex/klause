@@ -8,7 +8,6 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.lowering.IntComb
 import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.LinRelation
-import com.eignex.klause.lowering.addExact
 import com.eignex.klause.lowering.constRelationHolds
 import com.eignex.klause.lowering.intCombDiff
 import com.eignex.klause.lowering.linCombDiff
@@ -16,6 +15,7 @@ import com.eignex.klause.lowering.reifyDifferenceLinear
 import com.eignex.klause.lowering.reifyLinear
 import com.eignex.klause.lowering.trueLit
 import com.eignex.klause.lowering.wideConstHolds
+import com.eignex.util.numbers.addExact
 
 /** Whether a relation node is arithmetic rather than boolean, decided by its first operand's sort via the
  *  scope- and `ite`-aware [isBoolExpr]: head-op matching alone misjudges an int-sorted `ite`/`let` operand. */

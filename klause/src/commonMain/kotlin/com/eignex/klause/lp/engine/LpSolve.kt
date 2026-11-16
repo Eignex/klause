@@ -1,7 +1,6 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.RationalBasisLimits
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.BigRationalConflict
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
@@ -10,6 +9,7 @@ import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.magnitudeBitLength

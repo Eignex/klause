@@ -30,7 +30,6 @@ import com.eignex.klause.lp.relaxation.LpExplanation
 import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.search.SearchDecision
@@ -38,6 +37,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

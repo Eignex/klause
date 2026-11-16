@@ -9,7 +9,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.localsearch.LocalSearchModel
 import com.eignex.klause.portfolio.PortfolioIncumbents
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.incumbent.Candidate
@@ -26,6 +25,7 @@ import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.theory.qflra.ExactLiraAssignment
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.parseBigInt

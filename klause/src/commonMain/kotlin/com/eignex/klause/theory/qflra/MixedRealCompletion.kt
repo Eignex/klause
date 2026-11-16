@@ -3,10 +3,10 @@ package com.eignex.klause.theory.qflra
 import com.eignex.klause.lp.SourceLp
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.admittedSourcePoint
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntDisjointSet
+import com.eignex.util.numbers.BigFraction
 
 internal fun completeMixedRealComponents(
     columns: Int,

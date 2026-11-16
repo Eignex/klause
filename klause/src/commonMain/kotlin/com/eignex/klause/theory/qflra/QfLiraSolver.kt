@@ -49,7 +49,6 @@ import com.eignex.klause.lp.exactMixedTriangularBounds
 import com.eignex.klause.lp.satisfiesSourceRows
 import com.eignex.klause.lp.sourceDoubleBoundedSplit
 import com.eignex.klause.lp.sourceEqualityRows
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
@@ -101,6 +100,7 @@ import com.eignex.util.collections.MutableIntObjectMap
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf

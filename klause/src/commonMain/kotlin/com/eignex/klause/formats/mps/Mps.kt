@@ -3,13 +3,13 @@ package com.eignex.klause.formats.mps
 import com.eignex.klause.formats.FormatException
 import com.eignex.klause.formats.splitWhitespace
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
 import com.eignex.util.io.lineSequence
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TEN
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.times

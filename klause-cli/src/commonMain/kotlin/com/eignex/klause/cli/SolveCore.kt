@@ -7,7 +7,6 @@ import com.eignex.klause.lp.bounding.LpConfig
 import com.eignex.klause.portfolio.ArmFault
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.ExecutionOptions
@@ -35,6 +34,7 @@ import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.platform.sampleHeap
 import com.eignex.util.process.printErrorLine
 import com.eignex.util.process.processProperty

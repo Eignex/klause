@@ -9,12 +9,12 @@ import com.eignex.klause.lp.optimization.LinearAuthorityCapturedQuery
 import com.eignex.klause.lp.optimization.LinearAuthorityCutViolation
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.lp.optimization.LinearAuthorityResult
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class SourceNumericalCutoff(val value: BigFraction, val premise: String) {

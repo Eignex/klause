@@ -2,11 +2,11 @@ package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.presolve.SourceMapping
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.evidence.SourceValue
+import com.eignex.util.numbers.BigFraction
 
 /** Native global bound over the nominal source, in its original objective units. */
 class LinearSourceBound internal constructor(

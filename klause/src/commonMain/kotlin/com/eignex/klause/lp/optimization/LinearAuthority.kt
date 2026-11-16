@@ -8,7 +8,6 @@ import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.lp.engine.LpClaim
 import com.eignex.klause.lp.engine.LpSolvePhase
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -20,6 +19,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.magnitudeBitLength

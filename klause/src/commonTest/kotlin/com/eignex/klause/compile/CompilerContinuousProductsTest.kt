@@ -17,8 +17,8 @@ import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.plus
 import com.eignex.klause.schema.pow
 import com.eignex.klause.schema.times
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.skema.SchemaDef
+import com.eignex.util.numbers.BigFraction
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.test.Test

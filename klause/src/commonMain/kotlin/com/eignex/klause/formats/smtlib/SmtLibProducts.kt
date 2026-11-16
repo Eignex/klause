@@ -10,7 +10,7 @@ import com.eignex.klause.lowering.LinComb
 import com.eignex.klause.lowering.isConstant
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.lowering.scaleByConst
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.plus

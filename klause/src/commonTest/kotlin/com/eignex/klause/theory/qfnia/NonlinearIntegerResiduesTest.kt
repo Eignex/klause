@@ -5,12 +5,12 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.NonlinearIntegerProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

@@ -10,7 +10,7 @@ import com.eignex.klause.ir.TranscendentalDistinct
 import com.eignex.klause.ir.TranscendentalExpression
 import com.eignex.klause.ir.TranscendentalFormula
 import com.eignex.klause.lowering.transcendentalDistinctEncoding
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal enum class SourceTruth { TRUE, FALSE, UNKNOWN, DOMAIN_INVALID, DOMAIN_UNKNOWN }
 

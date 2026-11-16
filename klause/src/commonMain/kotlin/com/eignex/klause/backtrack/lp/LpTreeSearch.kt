@@ -26,7 +26,6 @@ import com.eignex.klause.propagation.CpBranching
 import com.eignex.klause.propagation.CpSearchComponent
 import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.search.BooleanBranching
@@ -40,6 +39,7 @@ import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 // Only a primal candidate: exhausting the probe proves no verdict, bound or unbounded direction.
 internal class LpTreeSeed(val sample: Sample)

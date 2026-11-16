@@ -15,10 +15,10 @@ import com.eignex.klause.lp.engine.exactShift
 import com.eignex.klause.lp.engine.forEachRationalColumn
 import com.eignex.klause.lp.engine.integerFarkasRay
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.Int128
 import com.eignex.util.numbers.bigIntOf

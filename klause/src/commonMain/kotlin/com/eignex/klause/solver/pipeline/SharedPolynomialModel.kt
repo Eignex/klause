@@ -11,7 +11,6 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.PolynomialRealLowering
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.PropagationCapability
 import com.eignex.klause.solver.Sample
@@ -23,6 +22,7 @@ import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.qfnra.PolynomialTheoryService
 import com.eignex.klause.theory.qfnra.QfNraAssignment
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 

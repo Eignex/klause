@@ -1,7 +1,6 @@
 package com.eignex.klause.backtrack
 
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.CandidateVerifier
@@ -9,6 +8,7 @@ import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
+import com.eignex.util.numbers.BigFraction
 import kotlin.math.nextDown
 import kotlin.math.nextUp
 

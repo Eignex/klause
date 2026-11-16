@@ -19,13 +19,13 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.verifyRealCoordinates
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals

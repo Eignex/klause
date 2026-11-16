@@ -14,7 +14,6 @@ import com.eignex.klause.lp.engine.LpZeroObjectivePricing
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveEmphasis
 import com.eignex.klause.presolve.PresolvePass
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.IncrementalObjective
@@ -31,6 +30,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.process.printErrorLine
 import com.eignex.util.process.processProperty
 import kotlin.time.Duration.Companion.milliseconds

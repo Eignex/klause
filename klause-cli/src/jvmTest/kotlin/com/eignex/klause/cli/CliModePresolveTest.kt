@@ -7,10 +7,10 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.presolve.PresolveBudget
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -11,7 +11,6 @@ import com.eignex.klause.formats.flatzinc.sourceAttachment
 import com.eignex.klause.formats.flatzinc.writeFlatZincSolution
 import com.eignex.klause.ir.EffectiveSourceSemantics
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
@@ -26,6 +25,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.util.io.openTextFile
 import com.eignex.util.io.readTextFile
 import com.eignex.util.io.useSource
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.process.flushStandardOutput
 import kotlin.time.TimeSource
 

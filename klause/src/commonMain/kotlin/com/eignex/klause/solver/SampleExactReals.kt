@@ -2,7 +2,7 @@ package com.eignex.klause.solver
 
 import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.arithmetic.real.toExactRealValue
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 /** Authoritative real coordinate, widening a finite binary64 value only when no exact witness exists. */
 fun Sample.exactRealValue(id: Int): ExactRealValue = symbolicReals?.get(id)

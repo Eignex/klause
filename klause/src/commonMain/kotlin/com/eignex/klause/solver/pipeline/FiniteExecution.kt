@@ -36,7 +36,6 @@ import com.eignex.klause.presolve.RebuildStep
 import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.presolve.effortStats
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
@@ -57,6 +56,7 @@ import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.theory.SourceToleranceSearch
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.includingStop
+import com.eignex.util.numbers.BigFraction
 import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource

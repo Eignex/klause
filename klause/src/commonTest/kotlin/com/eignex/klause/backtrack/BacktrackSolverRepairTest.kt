@@ -15,11 +15,11 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

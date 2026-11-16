@@ -13,7 +13,6 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lp.engine.LpSolveContext
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.solver.search.ComponentResult
@@ -31,6 +30,7 @@ import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 // Completes the real coordinates of a fixed discrete point by an exact search over the linear encodings of the
 // source's real relations. With a positive tolerance it searches the `ToleranceLinearLayout` model instead, in which

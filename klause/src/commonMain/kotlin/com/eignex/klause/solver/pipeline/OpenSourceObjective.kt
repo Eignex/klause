@@ -1,7 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
 import com.eignex.klause.portfolio.PortfolioIncumbents
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceProofContext
@@ -11,6 +10,7 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal data class OpenIncumbentValue(val source: BigFraction, val execution: BigFraction)
 

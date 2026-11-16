@@ -6,13 +6,13 @@ import com.eignex.klause.factor.arithmetic.ContinuousProduct
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.objective.toQuadraticObjectiveSpec
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test

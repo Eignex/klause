@@ -11,7 +11,7 @@ import com.eignex.klause.localsearch.MoveSink
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 
 internal fun Distinct.propagationView(): Propagator {

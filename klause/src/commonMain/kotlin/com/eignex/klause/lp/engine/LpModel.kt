@@ -1,6 +1,5 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactSimplexDoubleView
 import com.eignex.klause.simplex.exact.ExactSimplexModel
 import com.eignex.util.arrays.binarySearchInt
@@ -13,6 +12,7 @@ import com.eignex.util.collections.MutableIntDoubleMap
 import com.eignex.util.collections.MutableIntLongMap
 import com.eignex.util.collections.toSortedIntArray
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo

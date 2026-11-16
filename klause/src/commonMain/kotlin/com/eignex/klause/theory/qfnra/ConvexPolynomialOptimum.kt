@@ -17,7 +17,7 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.ir.requireVariableCounts
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal class ConvexPolynomialOptimum(
     val formula: PolynomialRealFormula,

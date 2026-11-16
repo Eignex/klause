@@ -20,7 +20,6 @@ import com.eignex.klause.propagation.BuiltInPropagationProjectionProvider
 import com.eignex.klause.propagation.NoPropagator
 import com.eignex.klause.propagation.PropagationProjection
 import com.eignex.klause.propagation.PropagationProjectionProvider
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.InstructionSlicedSearch
@@ -29,6 +28,7 @@ import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.test.Test
 import kotlin.test.assertEquals

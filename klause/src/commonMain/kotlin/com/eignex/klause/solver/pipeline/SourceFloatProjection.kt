@@ -4,8 +4,8 @@ import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.util.numbers.BigFraction
 
 /** One original real coordinate represented by a private integer bucket. */
 class SourceFloatGridCoordinate internal constructor(

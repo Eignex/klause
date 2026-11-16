@@ -2,6 +2,7 @@ package com.eignex.klause.simplex.exact
 
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull

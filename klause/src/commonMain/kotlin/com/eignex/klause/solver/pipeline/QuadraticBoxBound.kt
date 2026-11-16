@@ -5,8 +5,8 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.intervalBounds
+import com.eignex.util.numbers.BigFraction
 
 internal data class QuadraticBoxBound(val lower: BigFraction, val upper: BigFraction)
 

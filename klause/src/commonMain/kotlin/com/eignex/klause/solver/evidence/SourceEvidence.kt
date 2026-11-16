@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.evidence
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
+import com.eignex.util.numbers.BigFraction
 
 /** An exact affine inequality `sum(coefficients * coordinates) <= rhs`. */
 class SourceInequality(

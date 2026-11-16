@@ -14,9 +14,9 @@ import com.eignex.klause.ir.RealConstants
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.complemented
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.minus

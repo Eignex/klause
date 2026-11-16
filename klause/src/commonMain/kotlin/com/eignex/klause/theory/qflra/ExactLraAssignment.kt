@@ -1,7 +1,7 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.snapshotValues
+import com.eignex.util.numbers.BigFraction
 
 /** An exact QF_LRA assignment, independent of the finite CP [com.eignex.klause.solver.Sample]. */
 class ExactLraAssignment(

@@ -5,8 +5,8 @@ import com.eignex.klause.ir.QuadraticCoefficient
 import com.eignex.klause.ir.QuadraticObjectiveSpec
 import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 private typealias QuadraticTerms = Map<List<Int>, BigFraction>
 

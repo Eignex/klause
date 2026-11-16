@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal enum class LogicalBasisLayoutDecline { INVALID_BASIS, SINGULAR }
 

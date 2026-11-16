@@ -17,10 +17,10 @@ import com.eignex.klause.propagation.domainAt
 import com.eignex.klause.propagation.exclusionLiteral
 import com.eignex.klause.propagation.inDomainAt
 import com.eignex.klause.propagation.lazyReason
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableLongIntMap
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo

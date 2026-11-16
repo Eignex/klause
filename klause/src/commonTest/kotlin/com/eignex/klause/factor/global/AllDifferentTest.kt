@@ -6,13 +6,13 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodCondition
 import com.eignex.klause.solver.pipeline.ExactNeighborhoodResult
 import com.eignex.klause.solver.pipeline.OpenExactNeighborhood
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

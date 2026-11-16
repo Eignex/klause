@@ -10,9 +10,9 @@ import com.eignex.klause.ir.QuadraticObjectiveTerm
 import com.eignex.klause.ir.QuadraticVariable
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
+import com.eignex.util.numbers.BigFraction
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test

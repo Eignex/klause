@@ -1,10 +1,10 @@
 package com.eignex.klause.factor.arithmetic
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.factor.distance
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.util.numbers.saturatedDistance
 import kotlin.math.abs
 import kotlin.math.pow
 import kotlin.math.sqrt
@@ -15,7 +15,7 @@ internal class GridArithmeticInvariant(private val relation: GridArithmetic) : I
             !relation.output.contains(value(relation.output.variable))) return state.violationSoftCap
         val image = relation.image(value) ?: return maxOf(1, numericalEqualityDegree(relation.evaluate(value),
             relation.output.value(value(relation.output.variable)), state.violationSoftCap))
-        return compressViolation(distance(image, value(relation.output.variable)), state.violationSoftCap)
+        return compressViolation(saturatedDistance(image, value(relation.output.variable)), state.violationSoftCap)
     }
 
     override fun isViolated(state: LocalSearchState, factorId: Int): Boolean =

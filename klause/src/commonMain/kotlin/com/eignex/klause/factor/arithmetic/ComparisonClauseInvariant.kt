@@ -1,7 +1,5 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.factor.distance
-import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.ir.floorOrNull
@@ -10,6 +8,8 @@ import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.saturatedDistance
+import com.eignex.util.numbers.saturatedSub
 
 /**
  * Local-search invariant for [ComparisonClause]: violated iff no literal holds under the current
@@ -86,7 +86,7 @@ internal class ComparisonClauseInvariant(
         return when (ops[i]) {
             LinearOp.LE -> if (x <= c) 0L else saturatedSub(x, c)
             LinearOp.GE -> if (x >= c) 0L else saturatedSub(c, x)
-            LinearOp.EQ -> distance(x, c)
+            LinearOp.EQ -> saturatedDistance(x, c)
             LinearOp.NE -> if (x != c) 0L else 1L
         }
     }

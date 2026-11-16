@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.transcendental.RationalEnclosure
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal class RealCertificationUnavailable : RuntimeException()
 internal class RealDomainInvalid : RuntimeException()

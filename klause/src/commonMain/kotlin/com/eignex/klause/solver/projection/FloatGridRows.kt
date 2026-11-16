@@ -11,10 +11,10 @@ import com.eignex.klause.factor.table.Element
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.div
@@ -22,12 +22,12 @@ import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.isZero
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.remainderOf as bigRemainder
 import com.eignex.util.numbers.toLongExact
 import com.eignex.util.numbers.unaryMinus
 import kotlin.math.abs
 import kotlin.math.round
 import kotlin.math.roundToLong
-import com.eignex.util.numbers.remainderOf as bigRemainder
 
 private class FloatGridRow(
     val integers: IntArray,

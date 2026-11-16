@@ -29,7 +29,6 @@ import com.eignex.klause.propagation.PropagationProjectionProvider
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
@@ -45,6 +44,7 @@ import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.workScheduled
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith

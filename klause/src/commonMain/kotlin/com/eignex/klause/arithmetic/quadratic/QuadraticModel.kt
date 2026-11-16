@@ -1,6 +1,6 @@
 package com.eignex.klause.arithmetic.quadratic
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal enum class QuadraticRowRelation { LE, LT, EQ }
 

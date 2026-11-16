@@ -8,8 +8,8 @@ import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.PolynomialSelection
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.QfNraAssignment
+import com.eignex.util.numbers.BigFraction
 
 internal fun checkNonlinearSource(
     formula: PolynomialRealFormula,

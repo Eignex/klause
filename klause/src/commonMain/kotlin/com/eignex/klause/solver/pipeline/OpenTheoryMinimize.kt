@@ -14,7 +14,6 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.presolve.PresolvePipeline
 import com.eignex.klause.presolve.closeOpenBounds
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Publication
@@ -29,6 +28,7 @@ import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo

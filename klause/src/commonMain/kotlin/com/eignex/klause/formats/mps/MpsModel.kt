@@ -4,8 +4,8 @@ import com.eignex.klause.ir.NumericAuthority
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 
 internal class MpsSourceNumber private constructor(

@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.evidence
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /** Reduced-source evidence and optional ordered lowering or presolve justifications. */
 class SourceMappingEvidence(

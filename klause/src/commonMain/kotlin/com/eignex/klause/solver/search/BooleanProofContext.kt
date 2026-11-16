@@ -1,8 +1,8 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.ir.Lit
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceScope
+import com.eignex.util.numbers.BigFraction
 
 /** Exact authority and coordinate identity for Boolean coverage observations and tasks. */
 data class BooleanProofContext(

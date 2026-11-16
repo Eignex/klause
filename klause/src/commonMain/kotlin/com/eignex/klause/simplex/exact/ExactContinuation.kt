@@ -1,6 +1,7 @@
 package com.eignex.klause.simplex.exact
 
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo

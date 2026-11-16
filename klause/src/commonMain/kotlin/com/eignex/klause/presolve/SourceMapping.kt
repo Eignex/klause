@@ -3,11 +3,11 @@ package com.eignex.klause.presolve
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.VarRemap
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceTransformation
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class ObjectiveAdjustment(
     val scale: BigFraction = BigFraction.ONE,

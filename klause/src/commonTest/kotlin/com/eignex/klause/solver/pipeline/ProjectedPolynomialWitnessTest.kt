@@ -8,11 +8,11 @@ import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue

@@ -6,7 +6,6 @@ import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.ir.PolynomialDistinct
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
@@ -15,6 +14,7 @@ import com.eignex.klause.solver.pipeline.TheoryCompletion
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test

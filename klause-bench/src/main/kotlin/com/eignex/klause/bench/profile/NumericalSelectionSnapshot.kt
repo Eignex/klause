@@ -7,7 +7,6 @@ import com.eignex.klause.bench.profile.NumericalFrontierSnapshot.Companion.syste
 import com.eignex.klause.lp.optimization.LinearPinnedObjective
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
 import com.eignex.klause.lp.optimization.withLinearAuthority
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
@@ -18,6 +17,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive

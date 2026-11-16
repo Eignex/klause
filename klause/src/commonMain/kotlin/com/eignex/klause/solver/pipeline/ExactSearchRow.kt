@@ -11,8 +11,8 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.ir.WideConstants
 import com.eignex.klause.ir.WideConsts
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.gcd

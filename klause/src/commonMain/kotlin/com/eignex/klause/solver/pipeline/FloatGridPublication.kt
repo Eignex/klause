@@ -1,6 +1,5 @@
 package com.eignex.klause.solver.pipeline
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Verification
@@ -8,6 +7,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.verifyProjectedSourceWitness
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class FloatGridPublication(
     private val binding: SelectedFloatGridBinding,

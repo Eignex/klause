@@ -9,12 +9,12 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.prepareOpenSource
 import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals

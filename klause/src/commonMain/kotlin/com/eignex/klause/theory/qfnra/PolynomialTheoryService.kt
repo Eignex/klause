@@ -7,8 +7,8 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class PolynomialCondition(
     bools: Map<Int, Boolean> = emptyMap(),

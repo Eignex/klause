@@ -14,7 +14,6 @@ import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioRewardPolicy
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioWorker
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.SolveResult
@@ -24,6 +23,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.includingStop
+import com.eignex.util.numbers.BigFraction
 import kotlin.time.TimeSource
 
 internal data class PortfolioInvocationControls(

@@ -85,11 +85,11 @@ import com.eignex.klause.model.TableConstraint
 import com.eignex.klause.model.VariableCumulativeExpr
 import com.eignex.klause.model.XorExpr
 import com.eignex.klause.schema.VariableSchema
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.projection.FloatGridAbsentPin
 import com.eignex.klause.solver.projection.FloatGridVariable
 import com.eignex.skema.SchemaDef
 import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.numbers.BigFraction
 
 internal class Compiler(
     config: KlauseConfig,

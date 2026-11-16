@@ -1,6 +1,5 @@
 package com.eignex.klause.lp.optimization
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.LinearSourceSemanticsChecker
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -17,6 +16,7 @@ import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceSemanticsChecker
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /** A checked affine path `endpoint + t * (base - endpoint)` for rational `0 < t <= 1`. */
 class LinearApproach(

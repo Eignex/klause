@@ -5,7 +5,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.ir.PolynomialRelation
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal class PolynomialWitnessSupports(
     private val arithmetic: PolynomialArithmetic,

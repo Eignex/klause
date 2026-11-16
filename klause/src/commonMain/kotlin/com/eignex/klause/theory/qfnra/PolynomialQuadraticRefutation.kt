@@ -11,7 +11,7 @@ import com.eignex.klause.arithmetic.quadratic.QuadraticModel
 import com.eignex.klause.arithmetic.quadratic.QuadraticRow
 import com.eignex.klause.arithmetic.quadratic.QuadraticRowRelation
 import com.eignex.klause.ir.PolynomialRelation
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal fun preparePolynomialQuadraticRefutation(
     atoms: List<PolynomialAtom>,

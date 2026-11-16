@@ -1,9 +1,9 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.time.Duration
 import kotlin.time.TimeSource.Monotonic
 

@@ -2,9 +2,9 @@ package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.lp.optimization.LinearPinnedRefutation
 import com.eignex.klause.lp.optimization.withLinearAuthority
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

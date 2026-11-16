@@ -3,9 +3,9 @@ package com.eignex.klause.solver.validation
 import com.eignex.klause.ir.LinearSourceProblem
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 /** Checked declaration-order coordinates and their original source objective value. */
 class LinearSourceWitness internal constructor(

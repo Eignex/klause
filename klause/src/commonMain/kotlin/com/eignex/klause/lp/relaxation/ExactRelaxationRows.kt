@@ -10,8 +10,8 @@ import com.eignex.klause.lp.engine.LpProjectionMeter
 import com.eignex.klause.lp.engine.LpRowPremises
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.authoritativeModel
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class ExactRelaxationRows {
     private class Row(val columns: IntArray, val coefficients: List<BigFraction>, val rhs: BigFraction)

@@ -7,10 +7,10 @@ import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.lp.engine.LpDeductionCertificate
 import com.eignex.klause.lp.engine.hasIntegralObjective
 import com.eignex.klause.lp.relaxation.LpRelaxation
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.LpCutRecipe
 import com.eignex.klause.solver.result.LpPhaseStats
 import com.eignex.klause.solver.result.LpRoute
+import com.eignex.util.numbers.BigFraction
 
 internal fun LpEngine.beginCutAttribution(route: LpRoute) {
     sink.lp.cutLifecycle.recipe = route

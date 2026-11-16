@@ -27,7 +27,7 @@ import com.eignex.klause.model.IntTerm
 import com.eignex.klause.model.NValueExpr
 import com.eignex.klause.model.NValueMode
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import kotlinx.serialization.json.JsonElement
 import kotlin.jvm.JvmName

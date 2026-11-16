@@ -3,7 +3,6 @@ package com.eignex.klause.lp.optimization
 import com.eignex.klause.lp.cut.AggregationMirSeparator
 import com.eignex.klause.lp.cut.CutPool
 import com.eignex.klause.lp.engine.CutFamily
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.solver.evidence.SourceInequality
@@ -13,6 +12,7 @@ import com.eignex.klause.solver.evidence.mixedIntegerRounding
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.gcd

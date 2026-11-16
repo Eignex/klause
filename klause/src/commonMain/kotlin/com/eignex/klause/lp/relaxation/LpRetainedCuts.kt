@@ -14,9 +14,9 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpLayoutRemap
 import com.eignex.klause.lp.engine.LpScopedRow
 import com.eignex.klause.lp.engine.Relation
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 internal class LpCutEdit(
     val sourceState: LpExactState,

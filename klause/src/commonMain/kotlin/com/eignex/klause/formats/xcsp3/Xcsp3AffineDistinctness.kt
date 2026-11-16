@@ -4,8 +4,8 @@ import com.eignex.klause.factor.global.Distinct
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.LinRelation
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class AffineDistinctGroup(val vars: IntArray, val offsets: LongArray, val sourceRows: IntArray)
 

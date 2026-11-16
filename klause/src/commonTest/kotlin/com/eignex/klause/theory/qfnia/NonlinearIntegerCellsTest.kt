@@ -4,13 +4,13 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
 import com.eignex.klause.ir.PolynomialRealFormula
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.CheckedPolynomialCell
 import com.eignex.klause.theory.qfnra.PolynomialBooleanRegion
 import com.eignex.klause.theory.qfnra.PolynomialCellScope
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.PolynomialFormula
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.parseBigInt

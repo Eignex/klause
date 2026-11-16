@@ -21,12 +21,12 @@ import com.eignex.klause.lp.engine.LpExactState
 import com.eignex.klause.lp.engine.LpPhaseMetrics
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveMetrics
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal data class LinearAuthorityLpShape(
     val inputRows: Int, val rows: Int, val columns: Int, val admitted: Boolean,

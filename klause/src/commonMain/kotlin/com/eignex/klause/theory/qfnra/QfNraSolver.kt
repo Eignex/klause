@@ -14,7 +14,6 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialTerm
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.requireVariableCounts
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.PolynomialSigns.ALL_SIGNS
 import com.eignex.klause.theory.qfnra.PolynomialSigns.NEGATIVE_SIGN
 import com.eignex.klause.theory.qfnra.PolynomialSigns.POSITIVE_SIGN
@@ -23,6 +22,7 @@ import com.eignex.klause.theory.qfnra.PolynomialSigns.relationSigns
 import com.eignex.klause.util.ArithmeticBudget
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.shl

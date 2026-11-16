@@ -1,7 +1,7 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.SearchAtomPremise
+import com.eignex.util.numbers.BigFraction
 
 internal data class FixedSmtColumn(val value: BigFraction, val premise: SearchAtomPremise)
 

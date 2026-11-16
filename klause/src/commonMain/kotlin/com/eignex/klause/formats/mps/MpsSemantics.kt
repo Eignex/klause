@@ -8,8 +8,8 @@ import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.UndeclaredIntegerBounds
 import com.eignex.klause.ir.UndeclaredRealBounds
 import com.eignex.klause.ir.numericalSourceTolerance
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /** Decimal authority, wholly unranged declaration defaults and an absolute source feasibility slack. */
 val mpsSemantics: SourceSemantics = SourceSemantics(

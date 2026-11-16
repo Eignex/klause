@@ -7,8 +7,8 @@ import com.eignex.klause.ir.PolynomialExpression
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.Term
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExactSearchRow
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 

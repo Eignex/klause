@@ -3,12 +3,12 @@ package com.eignex.klause.solver.objective
 import com.eignex.klause.ir.LinearObjectiveSpec
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.localsearch.Move
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Assignment
 import com.eignex.klause.solver.Sample
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.arrays.emptyLongArray
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times

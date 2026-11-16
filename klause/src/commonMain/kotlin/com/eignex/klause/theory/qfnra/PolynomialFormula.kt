@@ -9,8 +9,8 @@ import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.PolynomialSelection
 import com.eignex.klause.lowering.polynomialDistinctEncoding
 import com.eignex.klause.lowering.polynomialSelectionEncoding
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.collections.IntArrayDeque
+import com.eignex.util.numbers.BigFraction
 
 internal data class PolynomialAtom(val polynomial: Polynomial, val relation: PolynomialRelation) {
     fun holds(sign: Int): Boolean = when (relation) {

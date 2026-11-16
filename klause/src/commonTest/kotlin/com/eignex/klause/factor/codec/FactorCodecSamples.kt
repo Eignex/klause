@@ -59,9 +59,9 @@ import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.model.PbOp
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.shl
 

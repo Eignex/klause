@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.evidence
 
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 /** Exact source scalar retained independently of floating telemetry. */
 sealed interface SourceValue {

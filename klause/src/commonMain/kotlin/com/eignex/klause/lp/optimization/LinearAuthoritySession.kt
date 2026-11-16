@@ -19,10 +19,10 @@ import com.eignex.klause.lp.engine.LpFloatTermination
 import com.eignex.klause.lp.engine.LpRootGuidance
 import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.advanceRootGuidance
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class LinearAuthoritySession(
     private val budget: SourceLpBudget,

@@ -73,7 +73,6 @@ import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.ConflictAnalyzer.AnalysisResult.Learned
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
@@ -86,6 +85,7 @@ import com.eignex.klause.util.constructionLongArray
 import com.eignex.util.arrays.emptyDoubleArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntHashSet
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.CheckedLongOverflowException
 import kotlin.math.abs
 import kotlin.time.TimeSource

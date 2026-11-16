@@ -13,7 +13,6 @@ import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.propagation.conditionedRoot
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Candidate
@@ -36,6 +35,7 @@ import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class PolynomialWorkerAdapter(
     private val model: SharedPolynomialModel,

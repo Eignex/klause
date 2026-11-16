@@ -7,12 +7,12 @@ import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.ir.ProblemSettings
 import com.eignex.klause.ir.SemanticRational
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.SourceAttachment
 import com.eignex.klause.solver.pipeline.SourceExecutionResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized

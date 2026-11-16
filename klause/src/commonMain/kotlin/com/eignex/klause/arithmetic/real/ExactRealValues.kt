@@ -8,8 +8,8 @@ import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
 import com.eignex.klause.arithmetic.transcendental.TranscendentalInterrupted
 import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /** Capture an algebraic scalar as an exact real coordinate. */
 fun AlgebraicReal.toExactRealValue(): ExactRealValue = ExactRealValue(ExactRealExpression.Algebraic(this))

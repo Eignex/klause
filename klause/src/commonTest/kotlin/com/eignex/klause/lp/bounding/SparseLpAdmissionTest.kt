@@ -30,7 +30,6 @@ import com.eignex.klause.lp.engine.continueExactLp
 import com.eignex.klause.lp.relaxation.LpSourcePreparation
 import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ContinuationDecline
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.RelaxationCapability
@@ -38,6 +37,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.CONSTRUCTION_BATCH_SIZE
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

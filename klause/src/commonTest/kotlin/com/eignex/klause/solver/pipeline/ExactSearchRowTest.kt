@@ -3,7 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.WideConstants
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import kotlin.test.Test
 import kotlin.test.assertEquals

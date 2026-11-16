@@ -19,11 +19,11 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.VarRemap
 import com.eignex.klause.lowering.approximateGridValue
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.encodingPreparationScope
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.FloatInterval
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.numbers.BigFraction
 
 internal data class FloatGridVariable(
     val source: SourceRealId,

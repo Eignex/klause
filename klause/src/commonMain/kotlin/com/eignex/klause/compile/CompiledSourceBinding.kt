@@ -8,7 +8,6 @@ import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.lowering.FloatRepresentation
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
@@ -30,6 +29,7 @@ import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 

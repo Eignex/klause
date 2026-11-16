@@ -3,14 +3,14 @@ package com.eignex.klause.factor.global
 import com.eignex.klause.factor.arithmetic.internals.predecessorOrNull
 import com.eignex.klause.factor.arithmetic.internals.successorOrNull
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.factor.saturatedAdd
-import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.ir.floorOrNull
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.util.numbers.saturatedAdd
+import com.eignex.util.numbers.saturatedSub
 
 /**
  * LS invariant for [Increasing]. Violation degree is the summed overshoot `Σ max(0, xs(i)+gap −

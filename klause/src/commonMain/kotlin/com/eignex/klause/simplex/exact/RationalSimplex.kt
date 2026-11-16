@@ -2,6 +2,7 @@ package com.eignex.klause.simplex.exact
 
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.BigFraction
 
 // Multipliers orient the equality so its RHS is below the minimum selected by the cited bounds.
 // Strict rows contribute -multiplier to the infinitesimal RHS; a negative delta breaks an exact tie.

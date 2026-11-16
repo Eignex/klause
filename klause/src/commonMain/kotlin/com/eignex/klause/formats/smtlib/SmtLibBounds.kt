@@ -11,8 +11,8 @@ import com.eignex.klause.lowering.PolynomialSourceInterrupted
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.presolve.OpenPresolveResult
 import com.eignex.klause.presolve.closeOpenBounds
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.BigFraction
 
 /**
  * Single-scan integer bounds from conjunctive relations mentioning one variable.

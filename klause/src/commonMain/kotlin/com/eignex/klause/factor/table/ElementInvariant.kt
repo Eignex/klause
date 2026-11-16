@@ -1,11 +1,11 @@
 package com.eignex.klause.factor.table
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.factor.distance
-import com.eignex.klause.factor.saturatedSub
 import com.eignex.klause.localsearch.Invariant
 import com.eignex.klause.localsearch.LocalSearchState
 import com.eignex.klause.localsearch.MoveSink
+import com.eignex.util.numbers.saturatedDistance
+import com.eignex.util.numbers.saturatedSub
 
 internal class ElementInvariant(
     private val idx: Int,
@@ -152,5 +152,5 @@ internal fun elementDegreeAt(
     if (pos < 0) return compressViolation(saturatedSub(indexOffset.toLong(), idxVal), softCap)
     if (pos >= len) return compressViolation(saturatedSub(idxVal, indexOffset.toLong() + len - 1), softCap)
     val ev = elemAt(pos.toInt())
-    return compressViolation(distance(resultVal, ev), softCap)
+    return compressViolation(saturatedDistance(resultVal, ev), softCap)
 }

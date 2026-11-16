@@ -6,7 +6,6 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.Term
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.solver.search.ComponentResult
@@ -16,6 +15,7 @@ import com.eignex.klause.solver.search.SearchResult
 import com.eignex.klause.theory.qflra.prepareExactLiraSource
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 internal fun privateLinearCompletion(encoded: Problem, sample: Sample, cancellation: ExecutionControl): Boolean? {
     if (cancellation()) return null

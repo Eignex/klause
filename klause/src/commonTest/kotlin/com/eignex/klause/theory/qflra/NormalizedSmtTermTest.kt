@@ -1,7 +1,7 @@
 package com.eignex.klause.theory.qflra
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.SearchAtomPremise
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals

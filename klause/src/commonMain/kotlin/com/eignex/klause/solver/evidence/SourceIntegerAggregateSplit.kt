@@ -1,6 +1,6 @@
 package com.eignex.klause.solver.evidence
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal class SourceIntegerAggregateSplit(
     val below: SourceInequality,

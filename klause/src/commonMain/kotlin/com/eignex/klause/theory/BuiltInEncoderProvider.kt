@@ -36,11 +36,11 @@ import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.polynomialRow
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.hasCompleteDifferenceCoverage
 import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.theory.qflra.exactTheoryOwnable
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 
 /** Built-in encoders for every factor kind, with exact, guarded and finite-conditioned semantics. */
 object BuiltInEncoderProvider : EncoderProvider {

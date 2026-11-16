@@ -3,13 +3,13 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.real.ExactRealExpression
 import com.eignex.klause.arithmetic.real.ExactRealValue
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.pipeline.OpenTheoryAssignment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.symbolicRealValue
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.div
 import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.times

@@ -1,7 +1,6 @@
 package com.eignex.klause.theory.transcendental
 
 import com.eignex.klause.ir.TranscendentalProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchBranchKind
@@ -14,6 +13,7 @@ import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal data class TranscendentalSplit(
     val coordinate: Int,

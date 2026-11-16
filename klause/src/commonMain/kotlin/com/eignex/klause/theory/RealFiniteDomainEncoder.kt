@@ -8,8 +8,8 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.Term
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ExactSearchRow
+import com.eignex.util.numbers.BigFraction
 
 internal fun realFiniteDomainEncoder(target: EncodingTarget): Encoder = when (target) {
     EncodingTarget.LINEAR -> finiteLinearDomain

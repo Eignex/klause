@@ -21,7 +21,6 @@ import com.eignex.klause.lp.relaxation.columnBounds
 import com.eignex.klause.lp.relaxation.withCpBounds
 import com.eignex.klause.lp.relaxation.withModel
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.LpPhaseStats
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
@@ -29,6 +28,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     // CP decisions reach the LP in a bound batch; its scopes are synchronized when that batch is assembled.

@@ -1,9 +1,9 @@
 package com.eignex.klause.localsearch
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.util.numbers.BigFraction
 
 internal enum class RepairEndpoint {
     PolicyLocalOptimum, FeasibleStall, Restarted, Repaired, Unresolved, Censored,

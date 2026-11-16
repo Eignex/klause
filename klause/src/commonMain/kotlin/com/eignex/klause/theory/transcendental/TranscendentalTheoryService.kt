@@ -18,7 +18,6 @@ import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.ir.SourceRealId
 import com.eignex.klause.ir.TranscendentalProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
@@ -30,6 +29,7 @@ import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.WorkReservation
 import com.eignex.klause.util.reserveWork
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 
 internal class TranscendentalCondition(

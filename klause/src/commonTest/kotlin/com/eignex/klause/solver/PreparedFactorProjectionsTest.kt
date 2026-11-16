@@ -37,13 +37,13 @@ import com.eignex.klause.propagation.PropagationSession
 import com.eignex.klause.propagation.PropagationState
 import com.eignex.klause.propagation.Propagator
 import com.eignex.klause.propagation.bake
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.incumbent.Candidate
 import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.validation.finiteWitnessVerifier
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

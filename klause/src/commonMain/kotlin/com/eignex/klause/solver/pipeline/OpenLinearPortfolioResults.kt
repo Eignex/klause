@@ -6,7 +6,6 @@ import com.eignex.klause.portfolio.PortfolioIncumbents
 import com.eignex.klause.portfolio.PortfolioTerminalCheck
 import com.eignex.klause.portfolio.PortfolioTerminalPublication
 import com.eignex.klause.portfolio.PortfolioWorker
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ResumableSearch
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceEvidence
@@ -18,6 +17,7 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 

@@ -1,6 +1,6 @@
 package com.eignex.klause.lp.engine
 
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.nextDown

@@ -7,9 +7,9 @@ import com.eignex.klause.formats.smtlib.realSource
 import com.eignex.klause.ir.PolynomialRealFormula
 import com.eignex.klause.ir.PolynomialRealProblem
 import com.eignex.klause.localsearch.LocalSearchParams
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

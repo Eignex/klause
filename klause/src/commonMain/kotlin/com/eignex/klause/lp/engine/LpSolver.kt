@@ -2,8 +2,8 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.engine.Cut
 import com.eignex.klause.simplex.basis.BasisOperationWork
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 /** Exact checks that may decline a float candidate. Engine-local: consumers adapt it into their own

@@ -1,7 +1,5 @@
 package com.eignex.klause.factor.arithmetic
 
-import com.eignex.klause.factor.arithmetic.internals.ceilDiv
-import com.eignex.klause.factor.arithmetic.internals.floorDiv
 import com.eignex.klause.factor.bool.internals.reifiedDegree
 import com.eignex.klause.factor.compressViolation
 import com.eignex.klause.ir.IntDomain
@@ -17,8 +15,10 @@ import com.eignex.util.numbers.BIG_ZERO
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.Int128
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.ceilDiv
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.div
+import com.eignex.util.numbers.floorDiv
 import com.eignex.util.numbers.magnitudeBitLength
 import com.eignex.util.numbers.minus
 import com.eignex.util.numbers.plus

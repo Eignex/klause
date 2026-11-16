@@ -10,11 +10,11 @@ import com.eignex.klause.ir.LinearSourceVariable
 import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /**
  * Capture original MPS numbers and effective declarations before constructing an engine view.

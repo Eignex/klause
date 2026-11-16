@@ -10,7 +10,6 @@ import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.impliedLinearRows
 import com.eignex.klause.lp.exactComparison
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.Sample
@@ -19,6 +18,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 

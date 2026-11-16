@@ -44,7 +44,7 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            api("com.eignex:util:0.0.1-20261105.212118-9")
+            api("com.eignex:util:0.0.1-20261116.095002-19")
             compileOnly("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
             implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             api("com.eignex:skema:$skemaPin") {

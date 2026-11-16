@@ -6,12 +6,12 @@ import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.WorkerEligibility
 import com.eignex.klause.portfolio.WorkerProofAuthority
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /** Caller choices for the numerical traversal and joint repair arms of a finite linear-source portfolio. */
 internal class FiniteCompanionControls(

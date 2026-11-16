@@ -59,7 +59,6 @@ import com.eignex.klause.lp.statesUpperBound
 import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.CpIntId
 import com.eignex.klause.propagation.PropagationSession
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.Verification
@@ -81,6 +80,7 @@ import com.eignex.util.collections.IntHashSet
 import com.eignex.util.collections.LongArrayList
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableIntLongMap
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.addExact
 import com.eignex.util.numbers.subExact
 import kotlin.time.TimeSource

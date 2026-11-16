@@ -5,13 +5,13 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicReal
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialResource
 import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.incumbent.IncumbentExchange
 import com.eignex.klause.solver.incumbent.VerifiedIncumbent
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.util.concurrent.Mutex
+import com.eignex.util.numbers.BigFraction
 
 internal class PortfolioIncumbents<V>(
     val valueOf: (MinimizeResult.WithSample) -> V?,

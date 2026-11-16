@@ -4,7 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.Monomial
 import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.ir.PolynomialRelation
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 
 internal fun preparePolynomialAffineConsequences(
     atoms: List<PolynomialAtom>,

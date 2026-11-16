@@ -1,7 +1,7 @@
 package com.eignex.klause.arithmetic.quadratic
 
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.koblas.koblas
+import com.eignex.util.numbers.BigFraction
 import kotlin.math.max
 
 internal class QuadraticCandidates(private val control: QuadraticControl = QuadraticControl()) {

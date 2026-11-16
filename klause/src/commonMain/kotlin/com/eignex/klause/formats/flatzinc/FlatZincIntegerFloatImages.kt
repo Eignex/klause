@@ -5,8 +5,8 @@ import com.eignex.klause.factor.arithmetic.RealProduct
 import com.eignex.klause.formats.flatzinc.FlatZincCompiler.IntegerFloatImage
 import com.eignex.klause.formats.flatzinc.FlatZincCompiler.IntegerFloatProduct
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.validation.capturedSourceSlack
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.fitsLong

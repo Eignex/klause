@@ -41,7 +41,6 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.schema.FloatHandle
 import com.eignex.klause.schema.eq
 import com.eignex.klause.schema.times
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.AssignmentCheckCapability
 import com.eignex.klause.solver.FactorProjectionProviders
 import com.eignex.klause.solver.PropagationCapability
@@ -79,6 +78,7 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.skema.SchemaDef
 import com.eignex.util.collections.Bits
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.toLongExact
 import kotlin.test.Test

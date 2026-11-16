@@ -16,9 +16,9 @@ import com.eignex.klause.lp.engine.acceptNullable
 import com.eignex.klause.lp.engine.reconstructCertificate
 import com.eignex.klause.lp.engine.verifyExactBasis
 import com.eignex.klause.simplex.basis.RationalBasisLimits
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 // One residual owns its continuation and terminal result; changed exact rows retire both.
 internal class LinearResidualCompletion(

@@ -2,9 +2,9 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.lp.satisfiesSourceRows
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull

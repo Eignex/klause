@@ -15,8 +15,8 @@ import com.eignex.klause.propagation.BakedProblem
 import com.eignex.klause.propagation.difference.DifferenceIndexGuard
 import com.eignex.klause.propagation.difference.DifferenceSystem
 import com.eignex.klause.propagation.withAppendedFactor
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact

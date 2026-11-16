@@ -22,7 +22,6 @@ import com.eignex.klause.portfolio.binaryIntegers
 import com.eignex.klause.portfolio.continuousMajority
 import com.eignex.klause.propagation.Assumptions
 import com.eignex.klause.propagation.BakedProblem
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.ProblemClass
 import com.eignex.klause.solver.ProblemProfile
 import com.eignex.klause.solver.Sample
@@ -34,6 +33,7 @@ import com.eignex.klause.solver.objective.IncrementalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /** Materializes [scenario] over [problem] and schedules it on one lane per core, checking every result an arm
  *  claims against [problem] and reporting each arm quarantined for a refuted claim to [onFault]. */

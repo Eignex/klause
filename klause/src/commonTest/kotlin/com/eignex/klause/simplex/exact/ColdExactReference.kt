@@ -7,6 +7,7 @@ import com.eignex.util.arrays.emptyIntArray
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 
 internal enum class RationalFeasibility { FEASIBLE, INFEASIBLE, UNKNOWN }

@@ -22,7 +22,6 @@ import com.eignex.klause.lp.engine.LpScopedSolver
 import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.lp.engine.LpSolveMetrics
 import com.eignex.klause.lp.engine.LpVerdict
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedRow
 import com.eignex.klause.simplex.exact.ExactDoubleBoundedSplit
@@ -30,6 +29,7 @@ import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.solver.result.SourceLpWorkStats
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.cancelledWhen
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.nanoseconds

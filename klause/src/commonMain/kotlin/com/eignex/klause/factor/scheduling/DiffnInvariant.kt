@@ -1,7 +1,6 @@
 package com.eignex.klause.factor.scheduling
 
 import com.eignex.klause.factor.compressViolation
-import com.eignex.klause.factor.saturatedAdd
 import com.eignex.klause.factor.scheduling.internals.DiffnLsState
 import com.eignex.klause.ir.ceilingOrNull
 import com.eignex.klause.localsearch.Invariant
@@ -10,6 +9,7 @@ import com.eignex.klause.localsearch.Move
 import com.eignex.klause.localsearch.Move.IntSet
 import com.eignex.klause.localsearch.MoveSink
 import com.eignex.util.arrays.argsortBy
+import com.eignex.util.numbers.saturatedAdd
 
 /** LS invariant for [Diffn]: maintains the overlapping-pair count, with affected-pair deltas. */
 internal class DiffnInvariant(

@@ -15,7 +15,6 @@ import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.TaggedLinearRow
 import com.eignex.klause.ir.Term
 import com.eignex.klause.ir.constsOf
-import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.result.SmtStatsSink
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.SearchAtomRegistry
@@ -29,6 +28,7 @@ import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.util.collections.Bits
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_ZERO
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.plus
 import kotlin.test.Test

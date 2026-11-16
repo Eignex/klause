@@ -1,7 +1,7 @@
 package com.eignex.klause.solver.search
 
 import com.eignex.klause.ir.SourceRealId
-import com.eignex.klause.simplex.exact.BigFraction
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertIs
 
