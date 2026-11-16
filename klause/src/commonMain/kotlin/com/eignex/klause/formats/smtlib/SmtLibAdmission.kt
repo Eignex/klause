@@ -50,6 +50,7 @@ internal fun lowerSmtReduction(
     settings: ProblemSettings,
     cancellation: ExecutionControl,
     semantics: EffectiveSourceSemantics,
+    arithmeticReduced: Boolean = false,
 ): SmtLibProblem {
     val loweredCommands = reduction.commands
     val semanticDeclarations = reduction.declarations.filter {
@@ -111,6 +112,11 @@ internal fun lowerSmtReduction(
                     captured.objectiveSense, captured.objective)
             }
         } catch (_: UnsupportedSmtException) {
+            if (!arithmeticReduced) {
+                val arithmetic = reduceSmtArithmetic(reduction, cancellation)
+                return lowerSmtReduction(arithmetic, unboundedIntLo, unboundedIntHi, settings,
+                    cancellation, semantics, arithmeticReduced = true)
+            }
             throw factorFailure
         }
     }
@@ -122,7 +128,7 @@ internal fun lowerSmtReduction(
     val originalBooleans = originals(SmtSort.Bool)
     val originalReals = originals(SmtSort.Real)
     return result.copy(sourceBindings = reduction.polymorphicModel?.bindings(reduction.bindings) ?: reduction.bindings,
-        privateBindings = reduction.privateBindings,
+        privateBindings = defaultSmtArithmeticInterpretations() + reduction.privateBindings,
         originalSource = reduction.original?.let { SmtSourceSnapshot(it, reduction.polymorphicModel) },
         sourceChecks = reduction.checks,
         intVarNames = result.intVarNames.filterKeys { polynomialSymbol(it) in originalIntegers },

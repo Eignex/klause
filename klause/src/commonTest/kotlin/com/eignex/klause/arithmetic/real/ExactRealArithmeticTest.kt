@@ -3,6 +3,7 @@ package com.eignex.klause.arithmetic.real
 import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.arithmetic.transcendental.TranscendentalArithmetic
+import com.eignex.klause.arithmetic.transcendental.TranscendentalResourceLimit
 import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -31,6 +32,39 @@ class ExactRealArithmeticTest {
         val reconstructed = arithmetic.function(ExactRealFunction.EXP, logarithm)
 
         assertEquals(0, arithmetic.compare(original, reconstructed))
+    }
+
+    @Test
+    fun `exponentials of integral log multiples should retain exact powers`() {
+        val arithmetic = arithmetic()
+        val logarithm = arithmetic.function(ExactRealFunction.LOG, arithmetic.rational(q(2)))
+        val multiple = arithmetic.multiply(listOf(arithmetic.rational(q(65)), logarithm))
+
+        val reconstructed = arithmetic.function(ExactRealFunction.EXP, multiple)
+
+        assertEquals("36893488147419103232", reconstructed.rational?.num.toString())
+    }
+
+    @Test
+    fun `fractional log multiples should not be treated as integral powers`() {
+        val arithmetic = arithmetic()
+        val logarithm = arithmetic.function(ExactRealFunction.LOG, arithmetic.rational(q(2)))
+        val multiple = arithmetic.multiply(listOf(arithmetic.rational(q(2).reciprocal()), logarithm))
+
+        val reconstructed = arithmetic.function(ExactRealFunction.EXP, multiple)
+
+        assertNull(reconstructed.rational)
+    }
+
+    @Test
+    fun `integral log powers should respect coefficient resources before allocation`() {
+        val arithmetic = ExactRealArithmetic(TranscendentalArithmetic(maximumBits = 64), AlgebraicArithmetic())
+        val logarithm = arithmetic.function(ExactRealFunction.LOG, arithmetic.rational(q(2)))
+        val multiple = arithmetic.multiply(listOf(arithmetic.rational(q(1000000000)), logarithm))
+
+        assertFailsWith<TranscendentalResourceLimit> {
+            arithmetic.function(ExactRealFunction.EXP, multiple)
+        }
     }
 
     @Test

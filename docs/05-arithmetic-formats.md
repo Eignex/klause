@@ -153,15 +153,15 @@ the frontend never classifies a source by the solver it will need. Interruption
 throws `CancellationException` before any source is published.
 
 The frontend admits ground free sorts and functions, quantifier-free bitvectors,
-and linear integer and real arithmetic with Boolean structure and supported `minimize`/`maximize` objectives, polynomial Int/Real/Bool
-satisfaction with products and fixed nonnegative integral powers, and a real-function
+and linear integer and real arithmetic with Boolean structure and supported
+`minimize`/`maximize` objectives, polynomial Int/Real/Bool satisfaction with products,
+integer exponentiation and fixed nonnegative real powers, and a real-function
 extension with unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
 `check-sat` or `check-sat-assuming` query is accepted, with Boolean literal
 assumptions conjoined to the assertions; `get-model` and `get-objectives` are
 accepted requests. Ground extensional arrays compose with admitted scalar sorts,
 including nested arrays and arrays used as indexes or function arguments and results.
-Strings, quantifiers, symbolic or zero division, negative or noninteger powers, nonlinear
-integer `div`/`mod`/`to_int`, multiple or nonquadratic objectives, incremental
+Strings, quantifiers, negative or noninteger real powers, multiple or nonquadratic objectives, incremental
 commands, multiple queries and `get-value` decline explicitly, even inside a
 constant Boolean branch.
 
@@ -348,12 +348,44 @@ see [real graph admission](14-theories.md#real-graph-admission-and-checks).
 
 ### Integer division
 
-Constant-divisor `div` and `mod` retain a shared Euclidean `DivMod`, with
-`0 <= remainder < abs(divisor)`, including negative divisors and arbitrary-width
-constants; wide digit expressions keep the affine `WideDivMod`. Open sides stay open,
-and variable or zero divisors are unsupported (see
-[integer division relations](02-model.md#integer-division-relations)).
-Integer absolute values retain `Abs`, or `AffineAbs` for wide affine values.
+Supported constant-divisor `div` and `mod` retain their native division factors,
+and supported absolute values retain `Abs` or `AffineAbs`. Source admission tries
+these factor representations and exact polynomial capture before applying general
+arithmetic reduction to an otherwise unrepresentable term.
+The general reduction introduces open integer quotient and remainder coordinates.
+A nonzero divisor requires the exact equation `a = b*q + r` and
+`0 <= r < abs(b)`, including negative divisors. A zero divisor leaves the two
+results independently unspecified; application congruence requires equal arguments
+to give equal quotient values and equal remainder values. Real division similarly
+requires `b*q = a` for nonzero `b` and retains total function consistency at zero.
+No range for the operands or outputs is guessed.
+
+`to_int` introduces an open integer coordinate `q` with `q <= x < q+1`, and
+`is_int` compares the original value to that floor. The operands may be nonlinear.
+Indexed divisibility uses the exact Euclidean remainder relation for any positive
+numeral index. General arithmetic reduction expresses integer absolute values as a
+sign conditional.
+
+The standard integer operator `**` retains an integer output and its full integer
+semantics. Zero exponents give one, including `0**0`; negative exponents give zero
+except at bases one and minus one. Fixed negative exponents use integer conditions
+on those two unit bases and retain the independent power witness check.
+Positive exponents at other bases use the existing exact exponential and logarithm
+expressions for the absolute magnitude,
+with Euclidean parity controlling the sign. The logarithm's argument is positive
+on every branch. The `^` extension keeps fixed nonnegative powers. Original
+operation checks independently validate retained quotient, floor and power values
+before a witness is published.
+Arithmetic operands containing the partial logarithm extension retain their
+conditional activation, including the auxiliary equations and original checks.
+Mandatory constant equalities can substitute exact source coordinates before
+arithmetic reduction; their original defining equalities remain in the encoded
+source. Closed arithmetic and certified function enclosures simplify exact floors
+without introducing a finite search window. Zero-division interpretations retain
+the selected ground results and one total default for later fixed-model queries.
+Constant substitution distinguishes lexical literals from quoted source names.
+Rational recognition uses an explicit work stack and the containing execution
+control for every node, including deeply nested negations and divisions.
 
 ### Polynomial source lowering
 

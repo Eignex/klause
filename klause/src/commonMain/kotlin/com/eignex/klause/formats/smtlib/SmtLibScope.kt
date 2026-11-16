@@ -494,8 +494,15 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     val datatype = if (signature == null && frame.indexed == null)
                         datatypes.resolve(polynomialSymbol(frame.head), args, frame.qualification, frame.tester)
                     else null
-                    val result = if (frame.indexed != null) smtIndexedBitVectorSort(frame.indexed, args)
-                    else if (signature == null) datatype?.result
+                    val result = if (frame.indexed != null) {
+                        val indexed = frame.indexed
+                        if (indexed.items.size == 3 && (indexed.items[0] as? SExpr.Atom)?.text == "_" &&
+                            indexed.polynomialAtom(1) == "divisible" && args == listOf(SmtSort.Int)) {
+                            val index = (indexed.items[2] as? SExpr.Atom)?.text ?: return null
+                            if (index.isNotEmpty() && index.any { it != '0' } && index.all { it in '0'..'9' })
+                                SmtSort.Bool else null
+                        } else smtIndexedBitVectorSort(indexed, args)
+                    } else if (signature == null) datatype?.result
                         ?: if (frame.tester) null else operator(polynomialSymbol(frame.head), args) else {
                         instantiateSmtRank(signature.parameters, signature.result, globalSortParameters, args,
                             frame.qualification, cancellation)?.second ?: return null
@@ -528,6 +535,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
         "-" -> if (args.isEmpty()) null else numericResult(args)
         "/" -> if (args.size >= 2 && args.all(::numeric)) SmtSort.Real else null
         "^" -> if (args.size == 2 && numeric(args[0]) && args[1] == SmtSort.Int) args[0] else null
+        "**" -> if (args == listOf(SmtSort.Int, SmtSort.Int)) SmtSort.Int else null
         "and", "or" -> if (args.all { it == SmtSort.Bool }) SmtSort.Bool else null
         "xor", "=>" -> if (args.size >= 2 && args.all { it == SmtSort.Bool }) SmtSort.Bool else null
         "not" -> if (args == listOf(SmtSort.Bool)) SmtSort.Bool else null
@@ -543,7 +551,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
         "to_int" -> if (args.size == 1 && numeric(args[0])) SmtSort.Int else null
         "is_int" -> if (args.size == 1 && numeric(args[0])) SmtSort.Bool else null
         "abs" -> if (args.size == 1 && numeric(args[0])) args[0] else null
-        "div", "mod" -> if (args == listOf(SmtSort.Int, SmtSort.Int)) SmtSort.Int else null
+        "div" -> if (args.size >= 2 && args.all { it == SmtSort.Int }) SmtSort.Int else null
+        "mod" -> if (args == listOf(SmtSort.Int, SmtSort.Int)) SmtSort.Int else null
         "exp", "log", "sin", "cos" -> if (args.size == 1 && numeric(args[0])) SmtSort.Real else null
         "pi" -> if (args.isEmpty()) SmtSort.Real else null
         "select" -> (args.firstOrNull() as? SmtSort.Array)?.let {

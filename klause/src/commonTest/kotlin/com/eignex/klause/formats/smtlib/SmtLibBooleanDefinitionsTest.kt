@@ -126,7 +126,7 @@ class SmtLibBooleanDefinitionsTest {
     @Test
     fun `Boolean simplification should retain child source validation`() {
         assertFailsWith<UnsupportedSmtException> {
-            SmtLib.parse("(declare-const b Bool) (assert (= b (or true (> (/ 1.0 0.0) 0.0))))")
+            SmtLib.parse("(declare-const b Bool) (assert (= b (or true (> (/ true 0.0) 0.0))))")
         }
     }
 }
