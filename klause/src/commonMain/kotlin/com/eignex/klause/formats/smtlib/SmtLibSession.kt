@@ -270,7 +270,11 @@ class SmtLibSession(
         command.size(if (head == "check-sat") 1 else 2)
         val assumptions = if (head == "check-sat") emptyList() else
             (command.items[1] as? SExpr.SList)?.items ?: fail("expected assumption formulas")
-        val source = commands() + assumptions.map { SExpr.SList(listOf(SExpr.Atom("assert"), it)) }
+        val prepared = prepareSmtSessionQueries(commands(), assumptions, cancellation)
+        scopes.last().entries += prepared.definitions.map {
+            Entry(it, enabled(":global-declarations"), named = true)
+        }
+        val source = commands() + prepared.terms.map { SExpr.SList(listOf(SExpr.Atom("assert"), it)) }
         validate(source, cancellation)
         val solved = solve((source + SExpr.SList(listOf(SExpr.Atom("check-sat")))).joinToString("\n") { it.smtText() })
         checkpoint()

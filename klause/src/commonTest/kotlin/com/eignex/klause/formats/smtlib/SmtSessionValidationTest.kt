@@ -6,6 +6,53 @@ import kotlin.test.assertTrue
 
 class SmtSessionValidationTest {
     @Test
+    fun `named assumption terms introduce definitions without retaining the assumption`() {
+        val snapshots = ArrayList<String>()
+        val replies = ArrayList<String>()
+        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, replies::add)
+
+        session.execute(SExprReader("""
+            (check-sat-assuming ((! true :named label)))
+            (assert label)
+            (check-sat)
+        """.trimIndent()))
+
+        assertEquals(listOf("sat", "sat"), replies)
+        assertTrue("(define-fun label () Bool true)" in snapshots.last())
+        assertTrue("(assert true)" !in snapshots.last())
+    }
+
+    @Test
+    fun `closed named terms in recursive definitions enter the command scope`() {
+        val replies = ArrayList<String>()
+        val session = SmtLibSession({ SmtSessionResult("sat") }, replies::add)
+
+        session.execute(SExprReader("""
+            (define-fun-rec f ((x Int)) Int (ite (! true :named ready) 0 (f x)))
+            (assert ready)
+            (check-sat)
+        """.trimIndent()))
+
+        assertEquals(listOf("sat"), replies)
+    }
+
+    @Test
+    fun `named terms cannot capture match variables with global names`() {
+        val replies = ArrayList<String>()
+        val session = SmtLibSession({ SmtSessionResult("sat") }, replies::add)
+
+        session.execute(SExprReader("""
+            (declare-const y Int)
+            (declare-datatype D ((box (field Int))))
+            (define-fun f ((x D)) Int (match x (((box y) (! y :named captured)))))
+            (assert (= captured 0))
+        """.trimIndent()))
+
+        assertEquals(2, replies.size)
+        assertTrue(replies.all { it.startsWith("(error ") })
+    }
+
+    @Test
     fun `invalid assertions preserve the previous checked model`() {
         val replies = ArrayList<String>()
         val model = object : SmtSessionModel {

@@ -16,7 +16,6 @@ import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.remainderOf
 import com.eignex.util.numbers.signum
 import com.eignex.util.numbers.times
-import com.eignex.util.numbers.toInt
 import com.eignex.util.numbers.unaryMinus
 
 internal class SmtFixedModel(
@@ -26,7 +25,9 @@ internal class SmtFixedModel(
     private val control: ExecutionControl,
     private val originalSource: SmtSourceSnapshot? = null,
 ) : SmtSessionModel {
-    private data class Definition(val parameters: List<String>, val body: SExpr)
+    private data class Definition(
+        val parameters: List<String>, val declaration: SmtSourceDeclaration, val body: SExpr,
+    )
     private val definitions = LinkedHashMap<String, Definition>()
     private val constructors = HashSet<String>()
     private val selectors = HashMap<String, List<Pair<String, Int>>>()
@@ -34,6 +35,7 @@ internal class SmtFixedModel(
     private val queryValues = ArrayList<SmtValue>()
     private var queryWork = 0L
     private val arithmetic by lazy { smtExactArithmetic(control) }
+    private val sourceScope by lazy { smtSessionScope(source, control) }
     private val values = object : SmtModelValues by retained, SmtSortCardinalities {
         override val cancellation: ExecutionControl get() = control
         override fun checkpoint(units: Long) = this@SmtFixedModel.checkpoint(units)
@@ -57,7 +59,11 @@ internal class SmtFixedModel(
                             symbol(((it as SExpr.SList).items[0] as SExpr.Atom).text)
                         }
                     definitions[symbol((command.items[1] as SExpr.Atom).text)] =
-                        Definition(parameters, command.items[if (constant) 3 else 4])
+                        Definition(parameters, SmtSourceDeclaration((command.items[1] as SExpr.Atom).text,
+                            if (constant) emptyList() else (command.items[2] as SExpr.SList).items.map {
+                                sourceScope.sourceSort((it as SExpr.SList).items[1])
+                            }, sourceScope.sourceSort(command.items[if (constant) 2 else 3])),
+                            command.items[if (constant) 3 else 4])
                 }
                 "define-funs-rec" -> {
                     val signatures = (command.items[1] as SExpr.SList).items
@@ -68,7 +74,10 @@ internal class SmtFixedModel(
                             symbol(((it as SExpr.SList).items[0] as SExpr.Atom).text)
                         }
                         definitions[symbol((signature.items[0] as SExpr.Atom).text)] =
-                            Definition(parameters, bodies[index])
+                            Definition(parameters, SmtSourceDeclaration((signature.items[0] as SExpr.Atom).text,
+                                (signature.items[1] as SExpr.SList).items.map {
+                                    sourceScope.sourceSort((it as SExpr.SList).items[1])
+                                }, sourceScope.sourceSort(signature.items[2])), bodies[index])
                     }
                 }
                 "declare-datatype" -> datatype(command.items[2])
@@ -161,11 +170,21 @@ internal class SmtFixedModel(
         val stack = ArrayDeque<SmtValue>()
         fun take(count: Int): List<SmtValue> = List(count) { stack.removeLast() }.reversed()
         fun apply(head: SExpr, args: List<SmtValue>) {
-            val name = if (head is SExpr.Atom) symbol(head.text) else (head as SExpr.SList).head()
+            val qualified = (head as? SExpr.SList)?.takeIf { it.syntaxHead() == "as" }
+            val selected = qualified?.items?.get(1) ?: head
+            val name = (selected as? SExpr.Atom)?.text?.let(::symbol)
             val definition = definitions[name]
             if (definition != null) {
                 if (args.size != definition.parameters.size) unavailable("function arity mismatch")
-                work += FixedFrame.Evaluate(definition.body, definition.parameters.zip(args).toMap())
+                val qualification = qualified?.let { sourceScope.sourceSort(it.items[2]) }
+                val declaration = definition.declaration
+                val rank = instantiateSmtRank(declaration.parameters, declaration.result,
+                    sourceScope.sortParameters, args.map(::valueSort), qualification, control)
+                    ?: unavailable("helper rank cannot be instantiated")
+                val substitution = sourceScope.sortParameters.associateWith { SmtSort.Bool } +
+                    smtRankSubstitution(declaration, rank.first, rank.second, sourceScope.sortParameters, control)
+                val body = specializeBody(definition.body, substitution)
+                work += FixedFrame.Evaluate(body, definition.parameters.zip(args).toMap())
             } else stack += operation(head, args)
         }
         work += FixedFrame.Evaluate(term, emptyMap())
@@ -179,8 +198,8 @@ internal class SmtFixedModel(
                         when {
                             local != null -> stack += local
                             name in definitions -> apply(expression, emptyList())
-                            expression.text == "true" -> stack += SmtValue.Boolean(true)
-                            expression.text == "false" -> stack += SmtValue.Boolean(false)
+                            name == "true" -> stack += SmtValue.Boolean(true)
+                            name == "false" -> stack += SmtValue.Boolean(false)
                             expression.text.matches(INTEGER) -> stack += SmtValue.Integer(expression.text)
                             expression.text.matches(DECIMAL) -> stack += real(exactLiteral(expression.text))
                             expression.text.startsWith("#b") -> stack += SmtValue.BitVector(expression.text.drop(2))
@@ -190,7 +209,9 @@ internal class SmtFixedModel(
                             else -> stack += function(name, emptyList(), null)
                         }
                     }
-                    is SExpr.SList -> when (expression.head()) {
+                    is SExpr.SList -> when (expression.syntaxHead().let {
+                        if (symbol(it) == "ite") "ite" else it
+                    }) {
                         "let" -> {
                             val bindings = (expression.items[1] as SExpr.SList).items.map { it as SExpr.SList }
                             work += FixedFrame.Let(bindings.map { symbol((it.items[0] as SExpr.Atom).text) },
@@ -206,7 +227,11 @@ internal class SmtFixedModel(
                             work += FixedFrame.Evaluate(expression.items[1], frame.locals)
                         }
                         "!" -> work += FixedFrame.Evaluate(expression.items[1], frame.locals)
-                        "as" -> stack += qualifiedConstant(expression)
+                        "as" -> {
+                            val selected = expression.items[1] as? SExpr.Atom
+                            if (selected != null && symbol(selected.text) in definitions) apply(expression, emptyList())
+                            else stack += qualifiedConstant(expression)
+                        }
                         "_" -> stack += indexed(expression, emptyList())
                         else -> {
                             work += FixedFrame.Apply(expression.items[0], expression.items.size - 1)
@@ -253,11 +278,10 @@ internal class SmtFixedModel(
 
     private fun operation(head: SExpr, args: List<SmtValue>): SmtValue {
         if (head is SExpr.SList) {
-            if (head.head() == "_") return indexed(head, args)
-            if (head.head() == "as") {
+            if (head.syntaxHead() == "_") return indexed(head, args)
+            if (head.syntaxHead() == "as") {
                 val selected = head.items[1]
-                val scope = smtSessionScope(source, control)
-                val qualification = scope.sourceSort(head.items[2])
+                val qualification = sourceScope.sourceSort(head.items[2])
                 if (selected is SExpr.SList) return indexed(selected, args)
                 val name = symbol((selected as SExpr.Atom).text)
                 if (name in constructors) return constructorValue(name, args, qualification)
@@ -345,7 +369,7 @@ internal class SmtFixedModel(
     }
 
     private fun constructorValue(name: String, args: List<SmtValue>, qualification: SmtSort?): SmtValue {
-        val registry = smtSessionScope(source, control).datatypes
+        val registry = sourceScope.datatypes
         val selected = registry.resolve(name, args.map(::valueSort), qualification)
             ?: unavailable("constructor rank is not determined")
         return SmtValue.Application(registry.constructorName(selected.instance, selected.constructor), args)
@@ -375,9 +399,8 @@ internal class SmtFixedModel(
             val rank = instantiateSmtRank(schema.parameters, schema.result,
                 snapshot.typed.sortParameters, parameters, result, control)
             if (rank != null) {
-                val value = snapshot.polymorphicModel?.instantiate(name, rank.first, rank.second, values) {
-                        sort, second -> snapshot.typed.datatypes?.modelPoint(sort, second, values)
-                }
+                val value = snapshot.polymorphicModel?.instantiate(name, rank.first, rank.second, values,
+                    ::familyPoint)
                 if (value != null) return if (value is SmtValue.Function) table(value, args) else value
             }
         }
@@ -393,12 +416,52 @@ internal class SmtFixedModel(
         is SmtValue.Uninterpreted -> value.sort
         is SmtValue.Application -> {
             val identifier = SExprReader(value.constructor).readAll().single()
-            val scope = smtSessionScope(source, control)
-            if (identifier is SExpr.SList && identifier.head() == "as") scope.sourceSort(identifier.items[2])
-            else scope.datatypes.resolve(symbol((identifier as SExpr.Atom).text), value.arguments.map(::valueSort))
+            if (identifier is SExpr.SList && identifier.syntaxHead() == "as")
+                sourceScope.sourceSort(identifier.items[2])
+            else sourceScope.datatypes.resolve(symbol((identifier as SExpr.Atom).text),
+                value.arguments.map(::valueSort))
                 ?.result ?: unavailable("constructor result sort is not determined")
         }
         is SmtValue.Function -> unavailable("functions cannot be first-order arguments")
+    }
+
+    private fun familyPoint(sort: SmtSort, second: Boolean): SmtValue? {
+        checkpoint()
+        return when (sort) {
+            is SmtSort.Array -> familyPoint(sort.element, second)?.let { SmtValue.Array(sort, it, emptyList()) }
+            is SmtSort.Uninterpreted -> {
+                val registry = originalSource?.typed?.datatypes
+                if (registry?.instance(sort) != null) registry.modelPoint(sort, second, values)
+                else smtPolymorphicPoint(sort, second, values)
+            }
+            else -> smtPolymorphicPoint(sort, second, values)
+        }
+    }
+
+    private fun specializeBody(root: SExpr, substitution: Map<String, SmtSort>): SExpr {
+        if (substitution.isEmpty()) return root
+        val work = ArrayDeque<Pair<SExpr, Boolean>>()
+        val expressions = ArrayDeque<SExpr>()
+        work += root to false
+        while (work.isNotEmpty()) {
+            checkpoint()
+            val (expression, combine) = work.removeLast()
+            when (expression) {
+                is SExpr.Atom -> expressions += expression
+                is SExpr.SList -> if (combine) {
+                    val items = List(expression.items.size) { expressions.removeLast() }.reversed().toMutableList()
+                    if (expression.syntaxHead() == "as") {
+                        val sort = substituteSmtSort(sourceScope.sourceSort(items[2]), substitution, control)
+                        items[2] = SExprReader(sort.toSmtLib()).readAll().single()
+                    }
+                    expressions += SExpr.SList(items)
+                } else {
+                    work += expression to true
+                    expression.items.asReversed().forEach { work += it to false }
+                }
+            }
+        }
+        return expressions.single()
     }
 
     private fun table(table: SmtValue.Function, args: List<SmtValue>): SmtValue {
@@ -416,7 +479,7 @@ internal class SmtFixedModel(
     }
 
     private fun underspecified(name: String, args: List<SmtValue>): SmtValue {
-        val key = if (name.startsWith("selector:")) name else "operation:$name"
+        val key = if (name.startsWith("selector:")) "@$name" else "@operation:$name"
         val interpretation = runCatching { retained.value(key) }.getOrNull() as? SmtValue.Function
             ?: unavailable("the retained model has no total '$name' interpretation")
         return table(interpretation, args)
@@ -432,8 +495,7 @@ internal class SmtFixedModel(
 
     private fun qualifiedConstant(expression: SExpr.SList): SmtValue {
         val selected = expression.items[1]
-        val scope = smtSessionScope(source, control)
-        val sort = scope.sourceSort(expression.items[2])
+        val sort = sourceScope.sourceSort(expression.items[2])
         if (selected is SExpr.SList) return indexed(selected, emptyList())
         val name = symbol((selected as SExpr.Atom).text)
         if (name.startsWith('@')) return SmtValue.Uninterpreted(sort, selected.text)
@@ -597,6 +659,7 @@ internal class SmtFixedModel(
     private fun numeric(value: SmtValue): Boolean = value is SmtValue.Integer || value is SmtValue.Real
     private fun symbol(text: String): String = smtSessionSymbol(text)
     private fun SExpr.SList.head(): String = (items.firstOrNull() as? SExpr.Atom)?.text?.let(::symbol).orEmpty()
+    private fun SExpr.SList.syntaxHead(): String = (items.firstOrNull() as? SExpr.Atom)?.text.orEmpty()
     private fun list(head: String, vararg args: SExpr): SExpr = SExpr.SList(listOf(SExpr.Atom(head)) + args)
     private fun unavailable(message: String): Nothing = throw UnsupportedSmtException(message)
     private fun checkpoint(units: Long = 1) {

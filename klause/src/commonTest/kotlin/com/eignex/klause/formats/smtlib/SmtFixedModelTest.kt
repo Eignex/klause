@@ -10,6 +10,30 @@ import kotlin.test.assertFailsWith
 
 class SmtFixedModelTest {
     @Test
+    fun `qualified helper calls retain quoted grammar-word identities`() {
+        val parsed = SmtLib.parse("(define-fun |let| ((x Int)) Int (+ x 1))")
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+
+        val result = model.evaluate(SExprReader("((as |let| Int) 2)").readAll().single())
+
+        assertEquals("3", result)
+        assertEquals("true", model.evaluate(SExpr.Atom("|true|")))
+    }
+
+    @Test
+    fun `polymorphic helper queries specialize type qualifiers at their actual rank`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (define-fun identity ((x A)) A x)
+        """.trimIndent())
+        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+
+        val result = model.evaluate(SExprReader("((as identity (_ BitVec 4)) #b1010)").readAll().single())
+
+        assertEquals("#b1010", result)
+    }
+
+    @Test
     fun `algebraic queries retain native authority across different root representations`() {
         val roots = AlgebraicArithmetic()
         val first = roots.roots(RationalPolynomial.of(-2, 0, 1)).last()
@@ -31,7 +55,7 @@ class SmtFixedModelTest {
             override fun integer(name: String): String = error(name)
             override fun real(name: String): String = error(name)
             override fun value(name: String): SmtValue = when (name) {
-                "operation:div" -> SmtValue.Function(listOf(SmtSort.Int, SmtSort.Int),
+                "@operation:div" -> SmtValue.Function(listOf(SmtSort.Int, SmtSort.Int),
                     listOf(listOf(SmtValue.Integer("3"), SmtValue.Integer("0")) to SmtValue.Integer("7")),
                     SmtValue.Integer("9"))
                 else -> error(name)

@@ -82,7 +82,7 @@ fun solveSmtRecursiveSession(
             is SExpr.Atom -> byName[smtSessionSymbol(term.text)]?.takeIf { it.parameters.isEmpty() }
                 ?.let { applications += it to emptyList() }
             is SExpr.SList -> {
-                byName[term.recHead()]?.let { applications += it to term.items.drop(1) }
+                byName[smtSessionSymbol(term.recHead())]?.let { applications += it to term.items.drop(1) }
                 pending.addAll(term.items.drop(1))
             }
         }
@@ -228,8 +228,10 @@ private fun recursiveCalls(body: SExpr, names: Set<String>): List<RecursiveCall>
                 calls += RecursiveCall(smtSessionSymbol(term.text), emptyList(), guards)
             }
             is SExpr.SList -> {
-                if (term.recHead() in names) calls += RecursiveCall(term.recHead(), term.items.drop(1), guards)
-                if (term.recHead() == "ite" && term.items.size == 4) {
+                if (smtSessionSymbol(term.recHead()) in names) {
+                    calls += RecursiveCall(smtSessionSymbol(term.recHead()), term.items.drop(1), guards)
+                }
+                if (smtSessionSymbol(term.recHead()) == "ite" && term.items.size == 4) {
                     work += term.items[1] to guards
                     work += term.items[2] to (guards + term.items[1])
                     work += term.items[3] to (guards + recList("not", term.items[1]))
@@ -281,7 +283,7 @@ private data class RecursiveDefinition(val fields: List<SExpr>) {
         while (work.isNotEmpty()) {
             val term = work.removeLast()
             if (term is SExpr.SList) {
-                if (term.recHead() == "ite") {
+                if (smtSessionSymbol(term.recHead()) == "ite") {
                     values += term.items[2]
                     values += term.items[3]
                 }
@@ -381,5 +383,5 @@ private sealed interface RecursiveSubstitutionFrame {
 }
 
 private fun SExpr.SList.recHead(): String =
-    (items.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol).orEmpty()
+    (items.firstOrNull() as? SExpr.Atom)?.text.orEmpty()
 private fun recList(head: String, vararg args: SExpr): SExpr.SList = SExpr.SList(listOf(SExpr.Atom(head)) + args)
