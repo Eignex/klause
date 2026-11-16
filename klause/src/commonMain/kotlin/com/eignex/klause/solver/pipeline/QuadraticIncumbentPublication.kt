@@ -10,34 +10,14 @@ data class QuadraticIncumbentPublication(
     val incumbent: QuadraticIncumbent,
 )
 
-internal class QuadraticPublicationObserver(
-    private val callback: ((QuadraticIncumbentPublication) -> Unit)?,
-) {
-    var latest: QuadraticIncumbentPublication? = null
-        private set
-    private var failure: Throwable? = null
+internal class QuadraticPublicationObserver(callback: ((QuadraticIncumbentPublication) -> Unit)?) {
+    private val observer = IncumbentPublicationObserver(callback)
 
-    @Suppress("TooGenericExceptionCaught")
-    fun accepted(point: QuadraticIncumbent, version: Long = (latest?.version ?: 0) + 1) {
-        val publication = QuadraticIncumbentPublication(version, point)
-        latest = publication
-        try {
-            callback?.invoke(publication)
-        } catch (error: Throwable) {
-            failure = error
-            throw error
-        }
+    val latest: QuadraticIncumbentPublication? get() = observer.latest
+
+    fun accepted(point: QuadraticIncumbent, version: Long = observer.version + 1) {
+        observer.accepted(QuadraticIncumbentPublication(version, point), version)
     }
 
-    @Suppress("TooGenericExceptionCaught")
-    fun <T> execute(action: () -> T): T = try {
-        val result = action()
-        failure?.let { throw it }
-        result
-    } catch (error: Throwable) {
-        val primary = failure ?: error
-        if (primary !== error) primary.addSuppressed(error)
-        throw primary
-    }
-
+    fun <T> execute(action: () -> T): T = observer.execute(action)
 }

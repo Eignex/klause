@@ -28,9 +28,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -44,7 +42,7 @@ class CliModeVerdictTest {
             upper = BoundOverride.Value(SemanticRational.of(bigIntOf(1), bigIntOf(3))),
         )))
 
-        val out = capture {
+        val out = captureStdout {
             SmtLibOutput().sourceQualified(semantics, ";").apply {
                 begin(optimize = false, maximize = false)
                 onComplete(Verdict.UNSATISFIABLE)
@@ -62,7 +60,7 @@ class CliModeVerdictTest {
             SemanticOverrides(undeclaredIntegers = BoundsOverride(lower = BoundOverride.Value(-20))),
         )
         for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED, Verdict.OPTIMAL)) {
-            val out = capture {
+            val out = captureStdout {
                 MiniZincOutput(sourceSemantics = semantics).apply {
                     begin(optimize = verdict != Verdict.UNSATISFIABLE, maximize = false)
                     onComplete(verdict)
@@ -86,7 +84,7 @@ class CliModeVerdictTest {
                 undeclaredReals = BoundsOverride(lower = BoundOverride.Value(lower)),
             ))
             for (verdict in listOf(Verdict.UNSATISFIABLE, Verdict.UNBOUNDED, Verdict.OPTIMAL)) {
-                val out = capture {
+                val out = captureStdout {
                     MiniZincOutput(sourceSemantics = semantics).apply {
                         begin(optimize = verdict != Verdict.UNSATISFIABLE, maximize = false)
                         onComplete(verdict)
@@ -114,7 +112,7 @@ class CliModeVerdictTest {
             )
             val linear = assertNotNull(assertIs<OpenTheoryExecution.Optimize>(result).result.linearResult)
 
-            val out = capture {
+            val out = captureStdout {
                 MiniZincOutput(sourceSemantics = program.semantics).apply {
                     begin(optimize = true, maximize = false)
                     onLinearResult(linear)
@@ -145,7 +143,7 @@ class CliModeVerdictTest {
                 val session = MiniZincMode.newSession()
                 val solvable = session.load(source.absolutePath, common)
 
-                val out = capture { SolveCore.solve(solvable, common, session.output(common)) }
+                val out = captureStdout { SolveCore.solve(solvable, common, session.output(common)) }
 
                 assertTrue(terminal in out.lines(), out)
             }
@@ -170,7 +168,7 @@ class CliModeVerdictTest {
                 val session = MiniZincMode.newSession()
                 val solvable = session.load(source.absolutePath, common)
 
-                val out = capture { SolveCore.solve(solvable, common, session.output(common)) }
+                val out = captureStdout { SolveCore.solve(solvable, common, session.output(common)) }
 
                 assertTrue("y = 2.0;" in out.lines() && "=====UNSATISFIABLE=====" !in out, "$name: $out")
             }
@@ -193,7 +191,7 @@ class CliModeVerdictTest {
             randomSeed = 17
         }
 
-        val out = capture { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
+        val out = captureStdout { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
 
         assertTrue("x = " in out, out)
         assertTrue("declared finite grid" in out, out)
@@ -215,7 +213,7 @@ class CliModeVerdictTest {
             randomSeed = 17
         }
 
-        val out = capture { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
+        val out = captureStdout { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
 
         assertTrue("==========" in out.lines(), out)
         assertTrue("scope=private-grid" in out, out)
@@ -237,7 +235,7 @@ class CliModeVerdictTest {
             randomSeed = 17
         }
 
-        val out = capture { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
+        val out = captureStdout { SolveCore.solve(solvable, common, MiniZincOutput(floatApproximation = true)) }
 
         assertTrue("=====UNSATISFIABLE=====" in out.lines(), out)
         assertTrue("klause-grid-verdict: UNSAT" in out, out)
@@ -247,7 +245,7 @@ class CliModeVerdictTest {
 
     @Test
     fun `a finite grid should withhold an unboundedness claim`() {
-        val out = capture { MiniZincOutput(floatApproximation = true).onComplete(Verdict.UNBOUNDED) }
+        val out = captureStdout { MiniZincOutput(floatApproximation = true).onComplete(Verdict.UNBOUNDED) }
 
         assertTrue("=====UNKNOWN=====" in out.lines(), out)
         assertTrue("=====UNBOUNDED=====" !in out, out)
@@ -255,7 +253,7 @@ class CliModeVerdictTest {
 
     @Test
     fun `an interrupted grid incumbent should withhold an optimum marker`() {
-        val out = capture {
+        val out = captureStdout {
             MiniZincOutput(floatApproximation = true).apply {
                 onSolution("x = 0.5;\n----------\n", 1L, null)
                 onVerdictContext(VerdictContext(budgetExhausted = true))
@@ -276,7 +274,7 @@ class CliModeVerdictTest {
             "-1" to 3,
         )) {
             val objective = BigFraction.of(parseBigInt(numerator), bigIntOf(denominator))
-            val out = capture {
+            val out = captureStdout {
                 SmtLibOutput().apply {
                     begin(optimize = true, maximize = false)
                     onExactSolution("(model)", objective)
@@ -288,19 +286,7 @@ class CliModeVerdictTest {
         }
     }
 
-    private fun capture(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.out
-        System.setOut(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setOut(old)
-        }
-        return buf.toString()
-    }
-
-    private fun smt(context: VerdictContext, verdict: Verdict): String = capture {
+    private fun smt(context: VerdictContext, verdict: Verdict): String = captureStdout {
         SmtLibOutput().apply {
             onVerdictContext(context)
             onComplete(verdict)
@@ -335,7 +321,7 @@ class CliModeVerdictTest {
             TerminationReason.Cancelled,
         )
         for (reason in reasons) {
-            val out = capture {
+            val out = captureStdout {
                 SmtLibOutput().apply {
                     begin(optimize = true, maximize = false)
                     onSolution("(model)", 7L)
@@ -350,7 +336,7 @@ class CliModeVerdictTest {
 
     @Test
     fun `SMT optimization without an incumbent should retain the stop cause`() {
-        val out = capture {
+        val out = captureStdout {
             SmtLibOutput().apply {
                 begin(optimize = true, maximize = false)
                 onVerdictContext(VerdictContext(terminationReason = TerminationReason.Timeout))
@@ -363,7 +349,7 @@ class CliModeVerdictTest {
 
     @Test
     fun `SMT-LIB statistics should distinguish native learning from open theory learning`() {
-        val out = capture {
+        val out = captureStdout {
             SmtLibOutput().onStatistics(
                 SolveStats(
                     run = RunStats(backend = "backtrack"),
@@ -405,7 +391,7 @@ class CliModeVerdictTest {
             "smtlib" to { SmtLibOutput() },
         )
         for ((name, factory) in modes) {
-            val out = capture {
+            val out = captureStdout {
                 factory().apply {
                     onVerdictContext(VerdictContext(budgetExhausted = true))
                     onComplete(Verdict.UNKNOWN)
@@ -417,7 +403,7 @@ class CliModeVerdictTest {
 
     @Test
     fun `the flatzinc mode should name the cause as a comment beside its terminator`() {
-        val out = capture {
+        val out = captureStdout {
             MiniZincOutput().apply {
                 onVerdictContext(VerdictContext(budgetExhausted = true))
                 onComplete(Verdict.UNKNOWN)
@@ -436,7 +422,7 @@ class CliModeVerdictTest {
 
     @Test
     fun `the flatzinc mode should leave a decided verdict alone`() {
-        val out = capture {
+        val out = captureStdout {
             MiniZincOutput().apply {
                 onVerdictContext(VerdictContext(budgetExhausted = true))
                 onComplete(Verdict.SATISFIABLE)
@@ -447,7 +433,7 @@ class CliModeVerdictTest {
 
     @Test
     fun `the flatzinc mode should report LP work without a backend`() {
-        val out = capture {
+        val out = captureStdout {
             MiniZincOutput().onStatistics(
                 SolveStats(lp = LpStats(standalonePasses = SumResult(1.0))),
                 solveTimeMs = 0L,

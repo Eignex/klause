@@ -23,7 +23,9 @@ CP / COP, mixed-integer models, open theories, shared search
 [RevisedSimplex](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/RevisedSimplex.kt)
 is the floating implementation and
 [ProductionLpEngineFactory](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/LpEngineFactory.kt)
-the default factory; `ComponentLpSolver` composes independent blocks for solving and certification.
+the default factory. Production and unscaled rollback factories share construction
+with immutable scaling options; each constructed solver owns its numerical state.
+`ComponentLpSolver` composes independent blocks for solving and certification.
 `lp.engine` depends only on `util`, `simplex.exact`, `lp.lattice` and
 `simplex.basis`; model assembly, factors, propagation, presolve and search stay
 outside it, and consumers use interfaces and factories. See

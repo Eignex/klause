@@ -7,7 +7,6 @@ import com.eignex.klause.lp.engine.LpCertificationObserver
 import com.eignex.klause.lp.engine.LpModel
 import com.eignex.klause.lp.engine.LpNeighborhood
 import com.eignex.klause.lp.engine.LpSolveContext
-import com.eignex.klause.lp.engine.Relation
 import com.eignex.klause.lp.engine.Sense
 import com.eignex.klause.lp.engine.certifiedTightVariableBound
 import com.eignex.klause.lp.engine.columnNeighborhood
@@ -228,31 +227,6 @@ private fun probedBounds(cur: OpenIntBounds, newLo: Long?, newHi: Long?): OpenIn
     } else {
         OpenIntBounds(if (cur.lo != null) newLo else null, if (cur.hi != null) newHi else null)
     }
-
-/** Add the LP column(s) for real variable [rv]: a single column when bounded below, else the same
- *  zero-shift split pair the integer columns use, recorded in [realPos]/[realNeg]. */
-private fun addRealColumns(
-    builder: LpBuilder,
-    rv: Int,
-    realLower: DoubleArray,
-    realUpper: DoubleArray,
-    realPos: HashMap<Int, Int>,
-    realNeg: HashMap<Int, Int>,
-) {
-    val lo = realLower.getOrNull(rv)?.takeIf { it.isFinite() }
-    val hi = realUpper.getOrNull(rv)?.takeIf { it.isFinite() }
-    if (lo != null) {
-        realPos[rv] = builder.addRealVar(lo, hi)
-        return
-    }
-    val pos = if (hi != null && hi >= 0.0) builder.addRealVar(0.0, hi) else builder.addRealVar(0.0, null)
-    val neg = builder.addRealVar(0.0, null)
-    realPos[rv] = pos
-    realNeg[rv] = neg
-    if (hi != null && hi < 0.0) {
-        builder.addRealRow(intArrayOf(pos, neg), doubleArrayOf(1.0, -1.0), Relation.LE, hi)
-    }
-}
 
 /** Cap on the LP-solving pass's per-side solves: presolve-time OBBT runs with no deadline, and each
  *  re-solve refactorizes on a large model — sides past the cap stay open for the caller's clamp. */

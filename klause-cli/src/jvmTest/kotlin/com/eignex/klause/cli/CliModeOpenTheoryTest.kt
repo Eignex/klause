@@ -1,8 +1,6 @@
 package com.eignex.klause.cli
 
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -17,7 +15,7 @@ class CliModeOpenTheoryTest {
         }
         var code = -1
 
-        val out = capture {
+        val out = captureStdout {
             code = runCli(arrayOf("--presolve", "off", "--param", "nra-work-limit=0", smt.absolutePath))
         }
 
@@ -40,7 +38,7 @@ class CliModeOpenTheoryTest {
             }
             var code = -1
 
-            val err = captureErr {
+            val err = captureStderr {
                 code = runCli(arrayOf("-e", "backtrack", "--param", "unknown=1", smt.absolutePath))
             }
 
@@ -57,7 +55,7 @@ class CliModeOpenTheoryTest {
         }
         var code = -1
 
-        val out = capture {
+        val out = captureStdout {
             code = runCli(arrayOf("-s", "-e", "backtrack", "--param", "node-limit=0", smt.absolutePath))
         }
 
@@ -87,7 +85,7 @@ class CliModeOpenTheoryTest {
             }
             var code = -1
 
-            val err = captureErr { code = runCli(arrayOf("-e", "fixed", "-p", "2", smt.absolutePath)) }
+            val err = captureStderr { code = runCli(arrayOf("-e", "fixed", "-p", "2", smt.absolutePath)) }
 
             assertEquals(2, code, err)
             assertTrue("single-core" in err, err)
@@ -109,7 +107,7 @@ class CliModeOpenTheoryTest {
 
         var code = -1
         // A zero wall budget is already spent at the first poll, so the cause is decided rather than raced.
-        val out = capture { code = runCli(arrayOf("-s", "-e", "backtrack", "-t", "0", smt.absolutePath)) }
+        val out = captureStdout { code = runCli(arrayOf("-s", "-e", "backtrack", "-t", "0", smt.absolutePath)) }
 
         assertEquals(0, code, out)
         assertTrue(out.lines().firstOrNull() == "unknown", out)
@@ -130,7 +128,7 @@ class CliModeOpenTheoryTest {
         }
 
         var code = -1
-        val out = capture { code = runCli(arrayOf("-a", "-s", "-t", "10000", mps.absolutePath)) }
+        val out = captureStdout { code = runCli(arrayOf("-a", "-s", "-t", "10000", mps.absolutePath)) }
 
         assertEquals(0, code, out)
         assertFalse("openTheoryChecks=0" in out, out)
@@ -151,7 +149,7 @@ class CliModeOpenTheoryTest {
         }
 
         var code = -1
-        val err = captureErr { code = runCli(arrayOf("-a", smt.absolutePath)) }
+        val err = captureStderr { code = runCli(arrayOf("-a", smt.absolutePath)) }
 
         assertEquals(2, code, err)
         assertTrue("all-solution enumeration is unavailable" in err, err)
@@ -174,7 +172,7 @@ class CliModeOpenTheoryTest {
         }
 
         var code = -1
-        val out = capture {
+        val out = captureStdout {
             code = runCli(arrayOf("-s", "-e", "backtrack", "--param", "open-work-limit=0", smt.absolutePath))
         }
 
@@ -201,17 +199,17 @@ class CliModeOpenTheoryTest {
             deleteOnExit()
         }
 
-        val activity = capture {
+        val activity = captureStdout {
             assertEquals(0, runCli(arrayOf("--param", "open-branching=activity", smt.absolutePath)))
         }
-        val sourceOrder = capture {
+        val sourceOrder = captureStdout {
             assertEquals(0, runCli(arrayOf("--param", "open-branching=source-order", smt.absolutePath)))
         }
-        val automatic = capture {
+        val automatic = captureStdout {
             assertEquals(0, runCli(arrayOf("--param", "open-branching=auto", smt.absolutePath)))
         }
         var code = -1
-        val err = captureErr {
+        val err = captureStderr {
             code = runCli(arrayOf("--param", "open-branching=nope", smt.absolutePath))
         }
 
@@ -240,11 +238,11 @@ class CliModeOpenTheoryTest {
             deleteOnExit()
         }
 
-        val plain = capture { assertEquals(0, runCli(arrayOf("-s", smt.absolutePath))) }
-        val deferred = capture {
+        val plain = captureStdout { assertEquals(0, runCli(arrayOf("-s", smt.absolutePath))) }
+        val deferred = captureStdout {
             assertEquals(0, runCli(arrayOf("-s", "--param", "open-hint-flips=1000", smt.absolutePath)))
         }
-        val hinted = capture {
+        val hinted = captureStdout {
             val args = arrayOf(
                 "-s",
                 "--param",
@@ -279,7 +277,7 @@ class CliModeOpenTheoryTest {
         }
 
         var code = -1
-        val out = capture {
+        val out = captureStdout {
             code = runCli(arrayOf("-s", "-e", "backtrack", "--param", "max-decisions=0", smt.absolutePath))
         }
 
@@ -306,7 +304,7 @@ class CliModeOpenTheoryTest {
             deleteOnExit()
         }
         var code = -1
-        val out = capture { code = runCli(arrayOf("-e", "ls", "--param", "node-limit=100", smt.absolutePath)) }
+        val out = captureStdout { code = runCli(arrayOf("-e", "ls", "--param", "node-limit=100", smt.absolutePath)) }
 
         assertEquals(0, code, out)
         assertTrue("sat" in out.lines(), out)
@@ -325,7 +323,7 @@ class CliModeOpenTheoryTest {
             }
             var code = -1
 
-            val out = capture { code = runCli(arrayOf("-e", "alns", smt.absolutePath)) }
+            val out = captureStdout { code = runCli(arrayOf("-e", "alns", smt.absolutePath)) }
 
             assertEquals(0, code, out)
             assertEquals(expected, out.lines().first(), out)
@@ -335,7 +333,9 @@ class CliModeOpenTheoryTest {
     @Test
     fun `alns should search an open model with exact source completion`() {
         var code = -1
-        val out = capture { code = runCli(arrayOf("-e", "alns", "--param", "max-flips=30", openSmt().absolutePath)) }
+        val out = captureStdout {
+            code = runCli(arrayOf("-e", "alns", "--param", "max-flips=30", openSmt().absolutePath))
+        }
 
         assertEquals(0, code, out)
         assertEquals("sat", out.lines().first(), out)
@@ -358,7 +358,7 @@ class CliModeOpenTheoryTest {
         }
 
         var code = -1
-        val out = capture { code = runCli(arrayOf(smt.absolutePath)) }
+        val out = captureStdout { code = runCli(arrayOf(smt.absolutePath)) }
 
         assertEquals(0, code, out)
         assertTrue(out.lines().firstOrNull() == "sat", out)
@@ -379,7 +379,7 @@ class CliModeOpenTheoryTest {
             deleteOnExit()
         }
 
-        val out = capture { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
+        val out = captureStdout { assertEquals(0, runCli(arrayOf(smt.absolutePath))) }
 
         assertEquals("sat", out.lines().firstOrNull(), out)
         assertTrue("(define-fun y () Int 2)" in out, out)
@@ -397,29 +397,5 @@ class CliModeOpenTheoryTest {
             """.trimIndent(),
         )
         deleteOnExit()
-    }
-
-    private fun capture(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.out
-        System.setOut(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setOut(old)
-        }
-        return buf.toString()
-    }
-
-    private fun captureErr(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.err
-        System.setErr(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setErr(old)
-        }
-        return buf.toString()
     }
 }

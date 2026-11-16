@@ -1,8 +1,6 @@
 package com.eignex.klause.cli
 
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -35,7 +33,7 @@ class CliModeMpsTest {
         }
 
         var code = -1
-        val out = capture { code = runCli(arrayOf(mps.absolutePath)) }
+        val out = captureStdout { code = runCli(arrayOf(mps.absolutePath)) }
 
         assertEquals(0, code, out)
         assertTrue("o 1.5" in out, out)
@@ -59,7 +57,7 @@ class CliModeMpsTest {
             )
             deleteOnExit()
         }
-        val out = capture {
+        val out = captureStdout {
             assertEquals(0, runCli(arrayOf("-e", "cp", "-p", "1", mps.absolutePath)))
         }
 
@@ -96,7 +94,7 @@ class CliModeMpsTest {
             deleteOnExit()
         }
 
-        val out = capture { main(arrayOf(mps.absolutePath)) }
+        val out = captureStdout { main(arrayOf(mps.absolutePath)) }
 
         assertTrue("s OPTIMUM FOUND" in out, out)
         assertTrue("o 7" in out.lines(), out)
@@ -107,7 +105,7 @@ class CliModeMpsTest {
     fun `an MPS objective with a continuous contribution should be reported whole`() {
         val output = MpsOutput()
 
-        val out = capture { output.onSolution("v x=60.0", objective = 0L, continuousObjective = 60.0) }
+        val out = captureStdout { output.onSolution("v x=60.0", objective = 0L, continuousObjective = 60.0) }
 
         assertTrue("o 60" in out, out)
         assertTrue("o 0" !in out, "the discrete part alone must not be reported: $out")
@@ -117,7 +115,7 @@ class CliModeMpsTest {
     fun `portfolio telemetry should carry exact discrete and whole continuous objectives`() {
         val output = MpsOutput()
 
-        val out = capture {
+        val out = captureStdout {
             output.onImprovement("integer", 9_007_199_254_740_993L, elapsedMs = 10)
             output.onImprovement("continuous", 0L, continuousObjective = 60.0, elapsedMs = 20)
             output.onImprovement("mixed-min", -3L, continuousObjective = -63.5, elapsedMs = 30)
@@ -146,8 +144,8 @@ class CliModeMpsTest {
         for (exact in listOf(false, true)) {
             val policy = if (exact) arrayOf("--exact") else emptyArray()
             val flags = arrayOf("-s", "-e", "cp", "-p", "1", "-t", "10000")
-            val kept = capture { assertEquals(0, runCli(flags + policy + mps.absolutePath)) }
-            val declined = capture {
+            val kept = captureStdout { assertEquals(0, runCli(flags + policy + mps.absolutePath)) }
+            val declined = captureStdout {
                 assertEquals(
                     0,
                     runCli(
@@ -166,17 +164,5 @@ class CliModeMpsTest {
             assertTrue("v x=5" in declined, declined)
             assertFalse("cancelled" in declined, declined)
         }
-    }
-
-    private fun capture(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.out
-        System.setOut(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setOut(old)
-        }
-        return buf.toString()
     }
 }

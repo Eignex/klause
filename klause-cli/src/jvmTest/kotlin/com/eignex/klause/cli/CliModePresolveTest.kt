@@ -11,9 +11,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.util.Cancellation
-import java.io.ByteArrayOutputStream
 import java.io.File
-import java.io.PrintStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -38,7 +36,7 @@ class CliModePresolveTest {
         }
 
         val output = try {
-            capture {
+            captureStdout {
                 assertEquals(0, runCli(arrayOf("--presolve", "conservative", "-r", "3", "-p", "1", fzn.absolutePath)))
             }
         } finally {
@@ -68,7 +66,7 @@ class CliModePresolveTest {
             impliedFactorMask = booleanArrayOf(true, false, false),
         )
 
-        val text = captureErr { printFiniteLinearSourcePreparation(problem) }
+        val text = captureStderr { printFiniteLinearSourcePreparation(problem) }
 
         assertTrue("source preparation: factors 3, ints 1, reals 0" in text, text)
         assertTrue("source preparation factor ExactLinear: total=1, implied=0" in text, text)
@@ -81,8 +79,8 @@ class CliModePresolveTest {
         val mps = listOf(File(relative), File("../$relative")).first { it.isFile }
         var output = ""
 
-        val text = captureErr {
-            output = capture {
+        val text = captureStderr {
+            output = captureStdout {
                 assertEquals(0, runCli(arrayOf("--presolve", "none", "--param", "dry-run-presolve=true",
                     mps.absolutePath)))
             }
@@ -111,7 +109,7 @@ class CliModePresolveTest {
             deleteOnExit()
         }
 
-        val out = capture { assertEquals(0, runCli(arrayOf("-s", smt.absolutePath))) }
+        val out = captureStdout { assertEquals(0, runCli(arrayOf("-s", smt.absolutePath))) }
 
         assertTrue("presolvePasses=" in out, out)
     }
@@ -127,7 +125,9 @@ class CliModePresolveTest {
         }
 
         var out = ""
-        val err = captureErr { out = capture { runCli(arrayOf("--param", "dry-run-presolve=true", smt.absolutePath)) } }
+        val err = captureStderr {
+            out = captureStdout { runCli(arrayOf("--param", "dry-run-presolve=true", smt.absolutePath)) }
+        }
 
         assertTrue("presolve dry-run:" in err, err)
         assertTrue("open columns: 2 of 2" in err, err)
@@ -142,7 +142,7 @@ class CliModePresolveTest {
             writeText("var 1..3: x;\nconstraint int_lt(x, 3);\nsolve satisfy;\n")
             deleteOnExit()
         }
-        val out = captureErr { main(arrayOf("--param", "dry-run-presolve=on", fzn.absolutePath)) }
+        val out = captureStderr { main(arrayOf("--param", "dry-run-presolve=on", fzn.absolutePath)) }
         assertTrue("presolve dry-run:" in out, out)
         assertTrue("factors:" in out, out)
         assertTrue("presolveStage_FINITE_ROOT_BAKE_COMPLETE_Calls=" in out, out)
@@ -157,7 +157,7 @@ class CliModePresolveTest {
             deleteOnExit()
         }
 
-        val out = capture { main(arrayOf("-s", fzn.absolutePath)) }
+        val out = captureStdout { main(arrayOf("-s", fzn.absolutePath)) }
 
         assertTrue("%%%mzn-stat: presolvePasses=" in out, out)
     }
@@ -178,9 +178,9 @@ class CliModePresolveTest {
             )
             deleteOnExit()
         }
-        val off = captureErr { main(arrayOf("--param", "dry-run-presolve=on", fzn.absolutePath)) }
+        val off = captureStderr { main(arrayOf("--param", "dry-run-presolve=on", fzn.absolutePath)) }
         assertTrue("lp-harvest:" !in off, off)
-        val on = captureErr {
+        val on = captureStderr {
             main(arrayOf("--presolve", "default,+lp-harvest", "--param", "dry-run-presolve=on", fzn.absolutePath))
         }
         assertTrue("lp-harvest:" in on, on)
@@ -418,29 +418,5 @@ class CliModePresolveTest {
     @Test
     fun `a presolve allowance too large to count should saturate rather than wrap`() {
         assertEquals(Long.MAX_VALUE, presolveWorkFor(Long.MAX_VALUE / 2))
-    }
-
-    private fun capture(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.out
-        System.setOut(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setOut(old)
-        }
-        return buf.toString()
-    }
-
-    private fun captureErr(block: () -> Unit): String {
-        val buf = ByteArrayOutputStream()
-        val old = System.err
-        System.setErr(PrintStream(buf))
-        try {
-            block()
-        } finally {
-            System.setErr(old)
-        }
-        return buf.toString()
     }
 }

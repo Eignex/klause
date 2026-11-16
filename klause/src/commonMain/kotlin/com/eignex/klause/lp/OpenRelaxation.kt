@@ -1,7 +1,6 @@
 package com.eignex.klause.lp
 
 import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.lp.engine.LpBuilder
 import com.eignex.klause.lp.engine.Relation
 import com.eignex.util.arrays.emptyDoubleArray
@@ -58,24 +57,9 @@ internal fun openRelaxation(
         }
     }
     for (f in constraints) {
-        val rel = relationOfRow(f) ?: continue
+        val rel = relationOfLinear(f) ?: continue
         val row = f.integerConstants ?: continue
-        var extra = 0
-        for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
-        val cols = IntArray(f.vars.size + extra)
-        val vals = LongArray(cols.size)
-        var w = 0
-        for (k in f.vars.indices) {
-            val v = f.vars[k]
-            cols[w] = posCol[v]
-            vals[w] = row.coeff(k)
-            w++
-            if (negCol[v] >= 0) {
-                cols[w] = negCol[v]
-                vals[w] = -row.coeff(k)
-                w++
-            }
-        }
+        val (cols, vals) = splitTerms(f, posCol, negCol) ?: continue
         builder.addRow(cols, vals, rel, row.bound)
     }
     // Mixed integer/real rows join through LP-only continuous columns, so a variable whose only definition
@@ -84,14 +68,14 @@ internal fun openRelaxation(
     val realPos = HashMap<Int, Int>()
     val realNeg = HashMap<Int, Int>()
     for (f in realConstraints) {
-        val rel = relationOfRow(f) ?: continue
+        val rel = relationOfLinear(f) ?: continue
         val row = f.realConstants ?: continue
         var extra = 0
         for (k in f.vars.indices) if (negCol[f.vars[k]] >= 0) extra++
         for (j in f.realVars.indices) {
             val rv = f.realVars[j]
             if (rv !in realPos) {
-                addRealRelaxationColumns(builder, rv, realLower, realUpper, realPos, realNeg)
+                addRealColumns(builder, rv, realLower, realUpper, realPos, realNeg)
             }
             if (realNeg.containsKey(rv)) extra++
         }
@@ -124,37 +108,4 @@ internal fun openRelaxation(
         builder.addRealRow(cols, vals, rel, row.bound)
     }
     return OpenRelaxation(builder, posCol, negCol, realPos, realNeg)
-}
-
-/** A real variable's column, split into a non-negative pair when it is open below. */
-private fun addRealRelaxationColumns(
-    builder: LpBuilder,
-    rv: Int,
-    realLower: DoubleArray,
-    realUpper: DoubleArray,
-    realPos: HashMap<Int, Int>,
-    realNeg: HashMap<Int, Int>,
-) {
-    val lo = realLower.getOrNull(rv)?.takeIf { it.isFinite() }
-    val hi = realUpper.getOrNull(rv)?.takeIf { it.isFinite() }
-    if (lo != null) {
-        realPos[rv] = builder.addRealVar(lo, hi)
-        return
-    }
-    val pos = if (hi != null && hi >= 0.0) builder.addRealVar(0.0, hi) else builder.addRealVar(0.0, null)
-    val neg = builder.addRealVar(0.0, null)
-    realPos[rv] = pos
-    realNeg[rv] = neg
-    if (hi != null && hi < 0.0) {
-        // The positive half is pinned to 0 above; the finite negative upper bound survives as a row.
-        builder.addRealRow(intArrayOf(pos, neg), doubleArrayOf(1.0, -1.0), Relation.LE, hi)
-    }
-}
-
-/** The builder relation of a linear row, or null for an operator the relaxation cannot express. */
-private fun relationOfRow(f: Linear): Relation? = when (f.op) {
-    LinearOp.LE -> Relation.LE
-    LinearOp.GE -> Relation.GE
-    LinearOp.EQ -> Relation.EQ
-    else -> null
 }
