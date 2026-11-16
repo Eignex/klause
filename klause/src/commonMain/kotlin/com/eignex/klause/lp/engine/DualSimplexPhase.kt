@@ -634,4 +634,3 @@ private sealed interface EnteringChoice {
 
     data object ResourceStopped : EnteringChoice
 }
-
