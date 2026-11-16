@@ -27,13 +27,17 @@ internal class SmtPolymorphicModel(
             values.checkpoint()
             polynomialSymbol(it.declaration.name) == polynomialSymbol(name) && it.definition == null
         } ?: return null
-        if (instantiateSmtRank(symbol.declaration.parameters, symbol.declaration.result, source.sortParameters,
-                parameters, result, values.cancellation) == null) return null
-        val declaration = symbol.declaration.copy(parameters = parameters, result = result)
+        val rank = instantiateSmtRank(symbol.declaration.parameters, symbol.declaration.result,
+            source.sortParameters, parameters, result, values.cancellation) ?: return null
+        val declaration = symbol.declaration.copy(parameters = rank.first, result = rank.second)
         instanceKeys[declaration]?.let { return values.value(it) }
         val archetype = archetypes[symbol.identity]
         if (constructive && archetype != null) {
-            return SmtPolymorphicTransport(archetype, declaration, externalPoint).reconstruct(values)
+            return try {
+                SmtPolymorphicTransport(archetype, declaration) { sort, second ->
+                    modelPoint(sort, second, values, externalPoint)
+                }.reconstruct(values)
+            } catch (_: SmtSourceCheckingUnavailable) { null }
         }
         val point = modelPoint(result, false, values, externalPoint) ?: return null
         return if (parameters.isEmpty()) point else SmtValue.Function(parameters, emptyList(), point)
@@ -159,13 +163,23 @@ private class SmtPolymorphicTransport(private val archetype: String,
 private fun smtPolymorphicPoint(sort: SmtSort, second: Boolean, values: SmtModelValues,
     externalPoint: ((SmtSort, Boolean) -> SmtValue?)? = null): SmtValue {
     values.checkpoint()
-    externalPoint?.invoke(sort, second)?.let { return it }
+    if (externalPoint != null) return externalPoint(sort, second) ?: throw SmtSourceCheckingUnavailable()
     return when (sort) {
         SmtSort.Bool -> SmtValue.Boolean(second)
         SmtSort.Int -> SmtValue.Integer(if (second) "1" else "0")
         SmtSort.Real -> SmtValue.Real(if (second) "1.0" else "0.0")
         is SmtSort.BitVector -> SmtValue.BitVector("0".repeat(sort.width - 1) + if (second) "1" else "0")
-        is SmtSort.Uninterpreted -> SmtValue.Uninterpreted(sort, "@klause.poly.point.${if (second) 1 else 0}")
+        is SmtSort.Uninterpreted -> {
+            val identity = buildString {
+                append("@klause.poly.point.")
+                for (character in sort.toSmtLib()) {
+                    values.checkpoint()
+                    append(character.code.toString(16).padStart(4, '0'))
+                }
+                append(if (second) ".1" else ".0")
+            }
+            SmtValue.Uninterpreted(sort, identity)
+        }
         is SmtSort.Array -> SmtValue.Application("(as const ${sort.toSmtLib()})",
             listOf(smtPolymorphicPoint(sort.element, second, values, externalPoint)))
     }

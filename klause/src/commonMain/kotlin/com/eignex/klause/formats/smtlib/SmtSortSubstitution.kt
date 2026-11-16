@@ -59,35 +59,69 @@ internal fun instantiateSmtRank(parameters: List<SmtSort>, result: SmtSort, type
     arguments: List<SmtSort>, qualification: SmtSort?, cancellation: ExecutionControl,
 ): Pair<List<SmtSort>, SmtSort>? {
     if (parameters.size != arguments.size) return null
-    val substitutions = HashMap<String, SmtSort>()
-    val pending = ArrayDeque<Pair<SmtSort, SmtSort>>()
-    if (qualification != null) pending.addLast(result to qualification)
-    for (index in parameters.indices.reversed()) pending.addLast(parameters[index] to arguments[index])
+    val constraints = HashMap<String, MutableList<Pair<SmtSort, Boolean>>>()
+    val pending = ArrayDeque<Triple<SmtSort, SmtSort, Boolean>>()
+    if (qualification != null) pending.addLast(Triple(result, qualification, false))
+    for (index in parameters.indices.reversed()) {
+        pending.addLast(Triple(parameters[index], arguments[index], true))
+    }
     while (pending.isNotEmpty()) {
         cancellation.polynomialSourceCheckpoint(1)
-        val (expected, actual) = pending.removeLast()
+        val (expected, actual, coercible) = pending.removeLast()
         if (expected is SmtSort.Uninterpreted && expected.arguments.isEmpty() &&
             polynomialSymbol(expected.name) in typeParameters) {
-            val name = polynomialSymbol(expected.name)
-            val previous = substitutions[name]
-            if (previous == null) substitutions[name] = actual else if (previous != actual) return null
+            constraints.getOrPut(polynomialSymbol(expected.name)) { ArrayList() } += actual to coercible
         } else when {
-            expected == actual || (expected == SmtSort.Real && actual == SmtSort.Int) -> Unit
+            expected == actual || (coercible && expected == SmtSort.Real && actual == SmtSort.Int) -> Unit
             expected is SmtSort.Array && actual is SmtSort.Array -> {
-                pending.addLast(expected.index to actual.index)
-                pending.addLast(expected.element to actual.element)
+                pending.addLast(Triple(expected.index, actual.index, false))
+                pending.addLast(Triple(expected.element, actual.element, false))
             }
             expected is SmtSort.Uninterpreted && actual is SmtSort.Uninterpreted &&
                 polynomialSymbol(expected.name) == polynomialSymbol(actual.name) &&
                 expected.arguments.size == actual.arguments.size -> {
                 for (index in expected.arguments.indices) {
-                    pending.addLast(expected.arguments[index] to actual.arguments[index])
+                    pending.addLast(Triple(expected.arguments[index], actual.arguments[index], false))
                 }
             }
             else -> return null
         }
     }
+    val substitutions = HashMap<String, SmtSort>()
+    for ((name, bounds) in constraints) {
+        cancellation.polynomialSourceCheckpoint(bounds.size.toLong())
+        val first = bounds.first().first
+        val chosen = if (bounds.all { it.first == first }) first
+        else if (bounds.all { (it.first == SmtSort.Int && it.second) || it.first == SmtSort.Real }) SmtSort.Real
+        else return null
+        substitutions[name] = chosen
+    }
     val instantiated = substituteSmtSort(result, substitutions, cancellation)
     if (qualification != null && qualification != instantiated) return null
     return parameters.map { substituteSmtSort(it, substitutions, cancellation) } to instantiated
+}
+
+internal fun smtRankSubstitution(declaration: SmtSourceDeclaration, parameters: List<SmtSort>,
+    result: SmtSort, typeParameters: Set<String>, cancellation: ExecutionControl): Map<String, SmtSort> {
+    val found = HashMap<String, SmtSort>()
+    val work = ArrayDeque<Pair<SmtSort, SmtSort>>()
+    for (pair in (declaration.parameters + declaration.result).zip(parameters + result)) work.addLast(pair)
+    while (work.isNotEmpty()) {
+        cancellation.polynomialSourceCheckpoint(1)
+        val (template, actual) = work.removeLast()
+        when (template) {
+            is SmtSort.Uninterpreted -> if (template.arguments.isEmpty() &&
+                polynomialSymbol(template.name) in typeParameters) {
+                found[polynomialSymbol(template.name)] = actual
+            } else if (actual is SmtSort.Uninterpreted) {
+                for (pair in template.arguments.zip(actual.arguments)) work.addLast(pair)
+            }
+            is SmtSort.Array -> if (actual is SmtSort.Array) {
+                work.addLast(template.index to actual.index)
+                work.addLast(template.element to actual.element)
+            }
+            else -> Unit
+        }
+    }
+    return found
 }

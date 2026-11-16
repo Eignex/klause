@@ -11,6 +11,76 @@ import kotlin.test.assertTrue
 
 class SmtPolymorphismTest {
     @Test
+    fun `unused definitions preserve universal parameters absent from their ranks`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-const a A)
+            (declare-const b A)
+            (define-fun p () Bool (= a b))
+            (assert (= (as a Bool) (as b Bool)))
+            (assert (distinct (as a Int) (as b Int)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `unused universal definitions admit coherent shared Boolean results`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-const a A)
+            (declare-const b A)
+            (define-fun p () Bool (= a b))
+            (assert (= (as a Bool) (as b Bool)))
+            (assert (= (as a Int) (as b Int)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `concrete macro calls do not retain vacuous universal type obligations`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (define-fun id ((x A)) A x)
+            (assert (= (id 1) 1))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `polymorphic rank inference promotes scalar numeric arguments together`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-fun f (A A) A)
+            (assert (distinct (f 1 2.0) ((as f Real) 1.0 2)))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `numeric subtyping never coerces invariant array sorts`() {
+        val commands = SExprReader("""
+            (declare-const a (Array Int Int))
+            (declare-fun f ((Array Real Int)) Bool)
+            (assert (f a))
+        """.trimIndent()).readAll()
+
+        assertFailsWith<UnsupportedSmtException> { captureSmtSource(commands, ExecutionControl.Never) }
+    }
+
+
+    @Test
     fun `fixed polymorphic families instantiate unobserved wide bitvector ranks`() {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)

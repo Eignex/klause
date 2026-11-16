@@ -32,22 +32,24 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
             val list = command as? SExpr.SList ?: smtUnsupported("expected SMT command")
             val head = list.polynomialHead()
             collectNames(command)
-            if (head in setOf("declare-sort", "define-sort", "set-logic", "set-info", "set-option")) {
+            if (head in setOf("declare-sort", "define-sort", "declare-datatype", "declare-datatypes",
+                    "set-logic", "set-info", "set-option")) {
                 output += command
             }
         }
         val basis = groundSorts()
-        val substitutions = substitutions(basis)
         val obligations = ArrayList<SExpr>()
         var universallyCertified = source.terms.none { it.operator == "log" }
+        var hasSchemas = false
         for ((head, root) in source.obligations) {
             step()
             val parameters = termParameters(root)
+            if (parameters.isNotEmpty()) hasSchemas = true
             if (parameters.isNotEmpty() && (head != "assert" || !universalTautology(root))) {
                 universallyCertified = false
             }
             val used = HashSet<SExpr>()
-            for (substitution in if (parameters.isEmpty()) listOf(emptyMap()) else substitutions) {
+            for (substitution in substitutions(basis, parameters)) {
                 step()
                 val value = expand(root, substitution)
                 if (used.add(value.expression)) obligations += command(head, value.expression)
@@ -59,7 +61,9 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                     cancellation).isNotEmpty()) continue
             instance(symbol, symbol.declaration.parameters, symbol.declaration.result)
         }
-        val constructive = constructiveSchema()
+        val definitionSchemas = definitionObligations(basis, obligations)
+        if (definitionSchemas) universallyCertified = false
+        val constructive = (hasSchemas || definitionSchemas || source.obligations.isEmpty()) && constructiveSchema()
         val model = model(constructive)
         output += declarations
         output += obligations
@@ -78,6 +82,69 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
         return input.copy(commands = output, bindings = bindings, checks = checks, polymorphicModel = model)
     }
 
+    private fun definitionParameters(symbol: SmtTypedSymbol): Set<String> {
+        val definition = symbol.definition ?: return emptySet()
+        val rankParameters = (symbol.declaration.parameters + symbol.declaration.result).flatMapTo(HashSet()) {
+            smtSortParameters(it, source.sortParameters, cancellation)
+        }
+        return termParameters(definition.body) - rankParameters
+    }
+
+    private fun definitionObligations(basis: List<SmtSort>,
+        obligations: MutableList<SExpr>): Boolean {
+        if (source.terms.any { it.operator == "log" }) {
+            return source.symbols.any { definitionParameters(it).isNotEmpty() }
+        }
+        var universal = false
+        for (symbol in source.symbols) {
+            val definition = symbol.definition ?: continue
+            if (definitionParameters(symbol).isEmpty()) continue
+            universal = true
+            val witnesses = HashMap<Instance, List<List<Value>>>()
+            val bodies = HashMap<Pair<Instance, Int>, SExpr>()
+            val typeParameters = termParameters(definition.body) +
+                (symbol.declaration.parameters + symbol.declaration.result).flatMap {
+                    smtSortParameters(it, source.sortParameters, cancellation)
+                }
+            for (substitution in substitutions(basis, typeParameters)) {
+                step()
+                val parameters = symbol.declaration.parameters.map {
+                    substituteSmtSort(it, substitution, cancellation)
+                }
+                val result = substituteSmtSort(symbol.declaration.result, substitution, cancellation)
+                val rank = Instance(symbol.identity, parameters, result)
+                val tuples = witnesses.getOrPut(rank) {
+                    var tuples = listOf(emptyList<Value>())
+                    for (sort in parameters) {
+                        val values = if (sort == SmtSort.Bool) listOf(
+                            Value(SExpr.Atom("false"), sort), Value(SExpr.Atom("true"), sort))
+                        else {
+                            val name = freshName()
+                            declarations += command("declare-const", SExpr.Atom(name), sortExpression(sort))
+                            listOf(Value(SExpr.Atom(name), sort))
+                        }
+                        val next = ArrayList<List<Value>>()
+                        for (tuple in tuples) for (value in values) { step(); next += tuple + value }
+                        tuples = next
+                    }
+                    tuples
+                }
+                for ((index, tuple) in tuples.withIndex()) {
+                    step()
+                    val locals = definition.parameters.zip(tuple).toMap()
+                    val body = expand(definition.body, substitution, locals).expression
+                    val key = rank to index
+                    val previous = bodies[key]
+                    if (previous == null) bodies[key] = body
+                    if (previous != null && previous != body) {
+                        obligations += command("assert", command("=", previous, body))
+                    }
+                }
+            }
+        }
+        return universal
+    }
+
     private fun constructiveSchema(): Boolean {
         // A Boolean interpretation embeds in every available non-datatype sort. Ground terms stay in that image.
         if (source.terms.any { it.operator == "log" }) return false
@@ -89,6 +156,9 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
             if (head != "assert") return false
             work.addLast(root)
         }
+        for (symbol in source.symbols) symbol.definition?.let { definition ->
+            if (definitionParameters(symbol).isNotEmpty()) work.addLast(definition.body)
+        }
         fun supported(sort: SmtSort): Boolean = sort == SmtSort.Bool ||
             (sort is SmtSort.Uninterpreted && sort.arguments.isEmpty() &&
                 polynomialSymbol(sort.name) in source.sortParameters)
@@ -97,7 +167,6 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
             val index = work.removeLast()
             if (!seen.add(index)) continue
             val node = source.terms[index]
-            if (!supported(node.sort)) return false
             val symbol = symbol(node)
             if (symbol != null) {
                 if (!(symbol.declaration.parameters + symbol.declaration.result).all(::supported)) return false
@@ -139,10 +208,10 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
         return SmtPolymorphicModel(source, archetypes, transports, keys, constructive)
     }
 
-    private fun expand(root: Int, substitution: Map<String, SmtSort>): Value {
+    private fun expand(root: Int, substitution: Map<String, SmtSort>, locals: Map<Int, Value> = emptyMap()): Value {
         val work = ArrayDeque<Frame>()
         val values = ArrayDeque<Value>()
-        work.addLast(Frame.Evaluate(root, substitution, emptyMap()))
+        work.addLast(Frame.Evaluate(root, substitution, locals))
         while (work.isNotEmpty()) {
             step()
             when (val frame = work.removeLast()) {
@@ -174,9 +243,12 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                         val rank = instantiateSmtRank(symbol.declaration.parameters, symbol.declaration.result,
                             source.sortParameters, arguments.map { it.sort }, result, cancellation)
                             ?: smtUnsupported("polymorphic helper rank cannot be instantiated")
-                        val types = rankSubstitution(symbol.declaration, rank.first, rank.second)
+                        val types = smtRankSubstitution(symbol.declaration, rank.first, rank.second,
+                    source.sortParameters, cancellation)
                         val definition = symbol.definition
-                        val locals = definition.parameters.zip(arguments).toMap()
+                        val locals = definition.parameters.indices.associate { index ->
+                            definition.parameters[index] to arguments[index].copy(sort = rank.first[index])
+                        }
                         work.addLast(Frame.Evaluate(definition.body, frame.substitution + types, locals))
                     } else {
                         val rank = instantiateSmtRank(symbol.declaration.parameters, symbol.declaration.result,
@@ -208,34 +280,30 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
         }
     }
 
-    private fun rankSubstitution(declaration: SmtSourceDeclaration, parameters: List<SmtSort>,
-        result: SmtSort): Map<String, SmtSort> {
-        val found = HashMap<String, SmtSort>()
-        val work = ArrayDeque<Pair<SmtSort, SmtSort>>()
-        for (pair in (declaration.parameters + declaration.result).zip(parameters + result)) work.addLast(pair)
-        while (work.isNotEmpty()) {
-            step()
-            val (template, actual) = work.removeLast()
-            when (template) {
-                is SmtSort.Uninterpreted -> if (template.arguments.isEmpty() &&
-                    polynomialSymbol(template.name) in source.sortParameters) {
-                    found[polynomialSymbol(template.name)] = actual
-                } else if (actual is SmtSort.Uninterpreted) {
-                    for (pair in template.arguments.zip(actual.arguments)) work.addLast(pair)
-                }
-                is SmtSort.Array -> if (actual is SmtSort.Array) {
-                    work.addLast(template.index to actual.index)
-                    work.addLast(template.element to actual.element)
-                }
-                else -> Unit
-            }
-        }
-        return found
-    }
-
     private fun groundSorts(): List<SmtSort> {
         val sorts = linkedSetOf<SmtSort>(SmtSort.Bool, SmtSort.Int, SmtSort.Real)
         val work = ArrayDeque<SmtSort>()
+        for (raw in source.commands) {
+            step()
+            val command = raw as? SExpr.SList ?: continue
+            when (command.polynomialHead()) {
+                "declare-sort" -> if (command.polynomialAtom(2) == "0") {
+                    work.addLast(SmtSort.Uninterpreted((command.items[1] as SExpr.Atom).text))
+                }
+                "declare-datatype" -> {
+                    val body = command.items[2] as SExpr.SList
+                    if ((body.items.firstOrNull() as? SExpr.Atom)?.text != "par") {
+                        work.addLast(SmtSort.Uninterpreted((command.items[1] as SExpr.Atom).text))
+                    }
+                }
+                "declare-datatypes" -> for (declaration in (command.items[1] as SExpr.SList).items) {
+                    val pair = declaration as SExpr.SList
+                    if ((pair.items[1] as SExpr.Atom).text == "0") {
+                        work.addLast(SmtSort.Uninterpreted((pair.items[0] as SExpr.Atom).text))
+                    }
+                }
+            }
+        }
         for (term in source.terms) work.addLast(term.sort)
         for (symbol in source.symbols) {
             for (sort in symbol.declaration.parameters) work.addLast(sort)
@@ -254,9 +322,9 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
         return sorts.toList()
     }
 
-    private fun substitutions(sorts: List<SmtSort>): List<Map<String, SmtSort>> {
+    private fun substitutions(sorts: List<SmtSort>, parameters: Set<String>): List<Map<String, SmtSort>> {
         var result = listOf(emptyMap<String, SmtSort>())
-        for (parameter in source.sortParameters) {
+        for (parameter in parameters) {
             val next = ArrayList<Map<String, SmtSort>>()
             for (previous in result) for (sort in sorts) {
                 step()
@@ -269,17 +337,31 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
 
     private fun termParameters(root: Int): Set<String> {
         val found = HashSet<String>()
-        val seen = HashSet<Int>()
-        val work = ArrayDeque<Int>()
-        work.addLast(root)
+        val seen = HashSet<Pair<Int, Map<String, SmtSort>>>()
+        val work = ArrayDeque<Pair<Int, Map<String, SmtSort>>>()
+        work.addLast(root to emptyMap())
         while (work.isNotEmpty()) {
             step()
-            val index = work.removeLast()
-            if (!seen.add(index)) continue
+            val frame = work.removeLast()
+            if (!seen.add(frame)) continue
+            val (index, substitution) = frame
             val node = source.terms[index]
-            found += smtSortParameters(node.sort, source.sortParameters, cancellation)
-            for (argument in node.arguments) work.addLast(argument)
-            symbol(node)?.definition?.let { work.addLast(it.body) }
+            val result = substituteSmtSort(node.sort, substitution, cancellation)
+            found += smtSortParameters(result, source.sortParameters, cancellation)
+            for (argument in node.arguments) work.addLast(argument to substitution)
+            val symbol = symbol(node)
+            val definition = symbol?.definition
+            if (definition != null) {
+                val arguments = node.arguments.map {
+                    substituteSmtSort(source.terms[it].sort, substitution, cancellation)
+                }
+                val rank = instantiateSmtRank(symbol.declaration.parameters, symbol.declaration.result,
+                    source.sortParameters, arguments, result, cancellation)
+                    ?: smtUnsupported("polymorphic helper rank cannot be instantiated")
+                val types = smtRankSubstitution(symbol.declaration, rank.first, rank.second,
+                    source.sortParameters, cancellation)
+                work.addLast(definition.body to (substitution + types))
+            }
         }
         return found
     }

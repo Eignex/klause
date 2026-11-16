@@ -322,6 +322,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         step()
         var name: String
         do {
+            step()
             name = "@klause.uf.${nextName++}"
         } while (!usedNames.add(name))
         val encodedSort = if (encodeUninterpreted && sort is SmtSort.Uninterpreted) SmtSort.Int else sort
