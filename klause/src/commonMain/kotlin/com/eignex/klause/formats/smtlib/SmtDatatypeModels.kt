@@ -219,6 +219,7 @@ internal class SmtDatatypeCardinalities(private val registry: SmtDatatypes, limi
         while (pending.isNotEmpty()) {
             step()
             val (current, finish) = pending.removeLast()
+            current.checkpointStructure(step)
             if (current in cache) continue
             val instance = registry.instance(current)
             if (!finish) {
@@ -444,6 +445,7 @@ private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, priva
         while (pending.isNotEmpty()) {
             values.checkpoint()
             val (key, finish) = pending.removeLast()
+            key.first.checkpointStructure { values.checkpoint() }
             if (key in cache) continue
             val (current, level) = key
             val instance = registry.instance(current)

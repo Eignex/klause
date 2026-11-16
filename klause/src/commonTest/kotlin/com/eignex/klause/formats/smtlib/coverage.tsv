@@ -1,0 +1,176 @@
+area	entry	regression
+Core	Bool	SmtSourceModelTest; V01
+Core	true	V01; SmtLibTest; SmtLibDistinctTest
+Core	false	V01; SmtLibTest; SmtLibDistinctTest
+Core	not	V01; SmtLibTest; SmtLibDistinctTest
+Core	=>	V01; SmtLibTest; SmtLibDistinctTest
+Core	and	V01; SmtLibTest; SmtLibDistinctTest
+Core	or	V01; SmtLibTest; SmtLibDistinctTest
+Core	xor	V01; SmtLibTest; SmtLibDistinctTest
+Core	=	V01; SmtLibTest; SmtLibDistinctTest
+Core	distinct	V01; SmtLibTest; SmtLibDistinctTest
+Core	ite	V01; SmtLibTest; SmtLibDistinctTest
+Ints	Int	V02; SmtArithmeticReductionTest
+Ints	NUMERAL	V02; SmtArithmeticReductionTest
+Ints	+	V02; SmtArithmeticReductionTest
+Ints	-	V02; SmtArithmeticReductionTest
+Ints	*	V02; SmtArithmeticReductionTest
+Ints	abs	V02; SmtArithmeticReductionTest
+Ints	div	V02; SmtArithmeticReductionTest
+Ints	mod	V02; SmtArithmeticReductionTest
+Ints	<	V02; SmtArithmeticReductionTest
+Ints	<=	V02; SmtArithmeticReductionTest
+Ints	>	V02; SmtArithmeticReductionTest
+Ints	>=	V02; SmtArithmeticReductionTest
+Ints	**	V03; SmtArithmeticReductionTest#symbolic integer powers should have exact integer witnesses; SmtArithmeticReductionTest#symbolic integer powers should refute an incorrect value
+Ints	(_ divisible n)	V03; C11; SmtArithmeticReductionTest
+Reals	Real	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	NUMERAL	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	DECIMAL	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	+	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	-	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	*	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	/	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	<	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	<=	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	>	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals	>=	V04; SmtLibRealTest; SmtArithmeticReductionTest
+Reals_Ints	to_real	V04; SmtArithmeticReductionTest
+Reals_Ints	to_int	V04; SmtArithmeticReductionTest
+Reals_Ints	is_int	V04; SmtArithmeticReductionTest
+FixedSizeBitVectors	(_ BitVec m)	V05; SmtLibBitVectorTest; BitVectorCircuitTest
+FixedSizeBitVectors	#bX	V05; SmtLibBitVectorTest; BitVectorCircuitTest
+FixedSizeBitVectors	#xX	V05; SmtLibBitVectorTest; BitVectorCircuitTest
+QF_BV	(_ bvX m)	V05; SmtBitVectorReductionTest
+FixedSizeBitVectors	bvnot	V05; SmtBitVectorReductionTest; BitVectorCircuitTest
+FixedSizeBitVectors	bvand	V05; SmtBitVectorReductionTest; BitVectorCircuitTest
+FixedSizeBitVectors	bvor	V05; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvnand	V05; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvnor	V05; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvxor	V05; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvxnor	V05; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvcomp	V05; SmtBitVectorReductionTest; BitVectorCircuitTest
+FixedSizeBitVectors	bvneg	V06; SmtBitVectorReductionTest; BitVectorCircuitTest
+FixedSizeBitVectors	bvadd	V06; SmtBitVectorReductionTest; BitVectorCircuitTest
+FixedSizeBitVectors	bvmul	V06; SmtBitVectorReductionTest; BitVectorCircuitTest
+FixedSizeBitVectors	bvudiv	V06; SmtBitVectorReductionTest; BitVectorCircuitTest
+FixedSizeBitVectors	bvurem	V06; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvsub	V06; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvsdiv	V06; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvsrem	V06; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvsmod	V06; SmtBitVectorReductionTest; BitVectorCircuitTest
+FixedSizeBitVectors	concat	V07; C13; BitVectorCircuitTest
+FixedSizeBitVectors	(_ extract i j)	V07; C13; BitVectorCircuitTest
+FixedSizeBitVectors	bvshl	V07; C13; BitVectorCircuitTest
+FixedSizeBitVectors	bvlshr	V07; C13; BitVectorCircuitTest
+QF_BV	(_ repeat i)	V07; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	(_ zero_extend i)	V07; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	(_ sign_extend i)	V07; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	(_ rotate_left i)	V07; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	(_ rotate_right i)	V07; SmtBitVectorReductionTest; BitVectorCircuitTest
+QF_BV	bvashr	V07; SmtBitVectorReductionTest; BitVectorCircuitTest
+FixedSizeBitVectors	bvult	V08; BitVectorCircuitTest
+QF_BV	bvule	V08; BitVectorCircuitTest
+QF_BV	bvugt	V08; BitVectorCircuitTest
+QF_BV	bvuge	V08; BitVectorCircuitTest
+QF_BV	bvslt	V08; BitVectorCircuitTest
+QF_BV	bvsle	V08; BitVectorCircuitTest
+QF_BV	bvsgt	V08; BitVectorCircuitTest
+QF_BV	bvsge	V08; BitVectorCircuitTest
+FixedSizeBitVectors	bvnego	V09; BitVectorCircuitTest
+FixedSizeBitVectors	bvuaddo	V09; BitVectorCircuitTest
+FixedSizeBitVectors	bvsaddo	V09; BitVectorCircuitTest
+FixedSizeBitVectors	bvumulo	V09; BitVectorCircuitTest
+FixedSizeBitVectors	bvsmulo	V09; BitVectorCircuitTest
+QF_BV	bvusubo	V09; BitVectorCircuitTest
+QF_BV	bvssubo	V09; BitVectorCircuitTest
+QF_BV	bvsdivo	V09; BitVectorCircuitTest
+FixedSizeBitVectors	ubv_to_int	V10; C07; SmtLibBitVectorTest
+FixedSizeBitVectors	sbv_to_int	V10; C07; SmtLibBitVectorTest
+FixedSizeBitVectors	(_ int_to_bv m)	V10; C07; SmtLibBitVectorTest
+ArraysEx	Array	C01; C02; C04; C05; C08; SmtGroundArraysTest
+ArraysEx	select	C01; C02; C04; C05; C08; SmtGroundArraysTest
+ArraysEx	store	C01; C02; C04; C05; C08; SmtGroundArraysTest
+ArraysEx	extensional equality	SmtGroundArraysTest#array indexes should respect extensional equality; SmtGroundArraysTest#functions should agree on extensionally equal array arguments
+Datatypes	constructor	C03; C04; C05; C06; SmtGroundDatatypesTest#different enumeration constructors are distinct
+Datatypes	selector	C03; C20; SmtGroundDatatypesTest#testers and selectors constrain the original constructor
+Datatypes	(_ is constructor)	C13; SmtGroundDatatypesTest#polymorphic expansion preserves negative constructor testers
+Datatypes	match	SmtGroundDatatypesTest#match binds constructor fields lexically; SmtGroundDatatypesTest#polymorphic expansion preserves match constructor guards
+Datatypes	parametric datatype	C20; SmtGroundDatatypesTest#qualified parametric constructors retain their instantiation
+Datatypes	recursive datatype	SmtGroundDatatypesTest#recursive values cannot contain themselves; SmtGroundDatatypesTest#unconstrained recursive identities reconstruct distinct finite values
+Datatypes	mutually recursive datatypes	SmtGroundDatatypesTest#mutually recursive cycles are refuted
+Terms	simple symbol	C10; C13; C14; C15; SExprTest; SmtLibScopeTest
+Terms	quoted symbol	C10; C13; C14; C15; SExprTest; SmtLibScopeTest
+Terms	indexed identifier	C10; C13; C14; C15; SExprTest; SmtLibScopeTest
+Terms	qualified identifier	C10; C13; C14; C15; SExprTest; SmtLibScopeTest
+Terms	let	SmtGroundFunctionsTest#macro expansion and parallel lets preserve their lexical bindings; SmtAnnotationsTest#named terms can contain their own closed let bindings
+Terms	!	C21; SmtAnnotationsTest; SmtSessionValidationTest
+Terms	attribute	C21; SmtAnnotationsTest; SmtSessionValidationTest
+Terms	:named	C21; SmtAnnotationsTest; SmtSessionValidationTest
+Source model	native exact composite equality	C18; SmtSemanticEqualityTest; SmtArrayValuesTest
+Source model	retained native symbolic authority	C32; C33; SourceSamplesTest#exact native equality should retain algebraic and symbolic coordinate authority
+Source model	total arithmetic choices	C19; C34; SmtFixedModelTest; SmtArithmeticReductionTest
+Source model	total selector choices	C20; SmtGroundDatatypesTest
+Source model	abstract domain values	C24; SmtGroundFunctionsTest
+Source model	fresh model formals	C16; SmtSourceModelTest
+Source model	lazy polymorphic ranks	C17; C27; C28; C37; SmtPolymorphismTest; SmtFixedModelTest
+Source model	original publication checks	C22; SourceWitnessValidationTest
+Resource	deep array sort	R01
+Resource	deep applied sort	R02
+Resource	current structural allowance	R03
+Resource	borrowed sort arguments	R04
+Resource	deep lazy model ranks	C27; C28
+Resource	capped composite cardinality	R05; SmtGroundDatatypesTest#finite record cardinality includes boolean array fields
+Commands	assert	C23; SmtLibSessionTest; SmtSessionValidationTest
+Commands	check-sat	C23; SmtLibSessionTest; SmtSessionValidationTest
+Commands	check-sat-assuming	C23; SmtLibSessionTest; SmtSessionValidationTest
+Commands	get-model	C16; SmtLibSessionTest#model queries require enabled production and a current sat result
+Commands	get-value	C23; SmtLibSessionTest; SmtSessionValidationTest
+Commands	declare-const	SmtGroundFunctionsTest; SmtLibSessionTest
+Commands	declare-fun	SmtGroundFunctionsTest; SmtLibSessionTest
+Commands	declare-sort	SmtGroundFunctionsTest; SmtLibSessionTest
+Commands	define-sort	SmtGroundFunctionsTest; SmtLibSessionTest
+Commands	declare-sort-parameter	C09; C17; SmtPolymorphismTest
+Commands	define-const	SmtAnnotationsTest#define const is a nullary function definition
+Commands	define-fun	C15; C35; C36; C38; SmtAnnotationsTest; SmtSessionValidationTest
+Commands	define-fun-rec	SmtRecursiveSessionTest; SmtSessionValidationTest
+Commands	define-funs-rec	C29; C30
+Commands	declare-datatype	C03; C04; C05; SmtGroundDatatypesTest
+Commands	declare-datatypes	C20; SmtGroundDatatypesTest#mutually recursive cycles are refuted
+Commands	push	SmtLibSessionTest; SmtSessionChannelsTest
+Commands	pop	SmtLibSessionTest; SmtSessionChannelsTest
+Commands	reset	SmtLibSessionTest; SmtSessionChannelsTest
+Commands	reset-assertions	SmtLibSessionTest; SmtSessionChannelsTest
+Commands	get-assertions	P01; SmtSessionValidationTest
+Commands	get-assignment	C31; SmtSessionValidationTest#named Boolean and arithmetic terms keep their distinct assignment roles
+Commands	get-info	P03; P05; P06; SmtSessionValidationTest; SmtSessionChannelsTest; SmtLibSessionTest
+Commands	get-option	P04; P06; SmtSessionValidationTest; SmtSessionChannelsTest; SmtLibSessionTest
+Commands	set-info	SmtSessionValidationTest; SmtSessionChannelsTest; SmtLibSessionTest
+Commands	set-option	P04; P06; SmtSessionValidationTest; SmtSessionChannelsTest; SmtLibSessionTest
+Commands	get-proof	P04; SmtLibSessionTest (unsupported optional capability)
+Commands	get-unsat-core	P04; SmtLibSessionTest (unsupported optional capability)
+Commands	get-unsat-assumptions	P04; SmtLibSessionTest (unsupported optional capability)
+Commands	echo	P02; SmtLibSessionTest; SmtSessionChannelsTest
+Commands	exit	SmtLibSessionTest; SmtSessionChannelsTest
+Commands	set-logic	P05; SmtLibSessionTest; SmtSessionChannelsTest
+Required options	:print-success	SmtLibSessionTest; SmtSessionChannelsTest
+Required options	:regular-output-channel	SmtLibSessionTest; SmtSessionChannelsTest
+Required options	:diagnostic-output-channel	SmtLibSessionTest; SmtSessionChannelsTest
+Optional options	:global-declarations	SmtLibSessionTest; SmtSessionValidationTest
+Optional options	:interactive-mode	SmtLibSessionTest; SmtSessionValidationTest
+Optional options	:produce-assertions	SmtLibSessionTest; SmtSessionValidationTest
+Optional options	:produce-assignments	SmtLibSessionTest; SmtSessionValidationTest
+Optional options	:produce-models	SmtLibSessionTest; SmtSessionValidationTest
+Optional options	:produce-proofs	SmtLibSessionTest (unsupported enable; default false)
+Optional options	:produce-unsat-assumptions	SmtLibSessionTest (unsupported enable; default false)
+Optional options	:produce-unsat-cores	SmtLibSessionTest (unsupported enable; default false)
+Optional options	:random-seed	SmtSessionValidationTest (unsupported setting; standard query default where defined)
+Optional options	:reproducible-resource-limit	SmtSessionValidationTest (unsupported setting; standard query default where defined)
+Optional options	:verbosity	SmtSessionValidationTest (unsupported setting; standard query default where defined)
+Required solver information	:authors	SmtSessionValidationTest
+Required solver information	:error-behavior	P05; SmtSessionValidationTest
+Required solver information	:name	SmtSessionValidationTest
+Required solver information	:version	SmtSessionValidationTest
+Optional solver information	:all-statistics	SmtLibSessionTest; SmtSessionValidationTest
+Optional solver information	:assertion-stack-levels	P05; SmtLibSessionTest; SmtSessionValidationTest
+Optional solver information	:reason-unknown	P03; SmtLibSessionTest; SmtSessionValidationTest

@@ -187,12 +187,22 @@ gate and work budgets stop admission cleanly, including constant-folded operatio
 ### Ground functions and type parameters
 
 Free sort constructors, sort aliases and typed ground functions are resolved before
-scalar lowering. Each ground application receives a private result and captured
+scalar lowering. Builtin rewrites preserve selected numeric ranks through composite
+capture, including Real qualifications whose arguments are integer literals.
+Definition arguments and results retain declared Real ranks with explicit
+integer-to-real coercions, including later queries on the retained model.
+Retained query evaluation records source result ranks in one typed traversal per
+query or specialized definition body. Selected conditional and match branches
+retain their common rank before enclosing polymorphic function lookup; lookup
+selects the instantiated source rank before inspecting its fixed interpretation.
+Each ground application receives a private result and captured
 arguments. Pairwise congruence requires equal results whenever evaluated arguments
 are equal, including exact arithmetic arguments. Only free sort identities receive
 finite representative domains; interpreted arithmetic domains remain open. Model
 recipes restore original ranks, typed domain values, function entries and total
 defaults while public scalar maps retain original scalar sorts.
+Unobserved arguments share an observed result as the total default at the same
+function rank; functions without applications receive a fresh typed result.
 
 Array and datatype lowering expose ground helper bodies before scalar compilation.
 Admission skips early exposure when the source has no array or datatype structure
@@ -246,8 +256,9 @@ exclude cycles without a depth bound. Reconstruction follows the observed acycli
 constructor graph and assigns unused minimum-depth constructor terms to remaining
 identities, preserving disequalities. Source checks compare actual constructor
 fields and enforce consistent total selectors even on a different constructor.
-Each observed selector rank retains its checked function table and typed default;
-later ground queries use that interpretation for the underspecified branch.
+With multiple constructors, each observed selector rank retains its checked
+function table and typed default for later queries on the underspecified branch.
+Selectors of a sole constructor always return its fields and need no default.
 Reconstruction tables are cached within one witness for mutually dependent
 instantiated sorts; nested parameters can therefore cross array fields without
 sharing a recursive table with a different instantiation. The retained typed
@@ -326,6 +337,13 @@ coercions are rejected. Logic declarations do not choose a representation. Quote
 and bare spellings of a symbol share one identity, and a negative numeral must be
 written `(- n)`. A semicolon starts a line comment even when it directly follows a
 bare token.
+
+Structured sort equality, hashing and rendering use explicit work stacks. Frontend
+interning and composite sort-key operations charge their current execution control
+for structural work. A shared builtin result-sort helper keeps post-reduction
+bookkeeping consistent across arrays and datatypes, including qualified and indexed
+operators and mixed numeric conditionals. Lexical scope, user ranks and source
+well-sortedness remain owned by the typed admission walk.
 
 Parallel `let` values read the enclosing scope. Typed nonrecursive `define-fun`
 macros capture their definition scope and check argument sorts even for unused

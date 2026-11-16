@@ -33,7 +33,10 @@ sealed interface SmtSort {
         val index: SmtSort,
         /** Stored value sort. */
         val element: SmtSort,
-    ) : SmtSort
+    ) : SmtSort {
+        override fun equals(other: Any?): kotlin.Boolean = other is Array && smtSortsEqual(this, other)
+        override fun hashCode(): kotlin.Int = smtSortHashCode(this)
+    }
 
     /** A named source sort and its sort arguments. */
     data class Uninterpreted(
@@ -41,7 +44,10 @@ sealed interface SmtSort {
         val name: String,
         /** Applied sort arguments. */
         val arguments: List<SmtSort> = emptyList(),
-    ) : SmtSort
+    ) : SmtSort {
+        override fun equals(other: Any?): kotlin.Boolean = other is Uninterpreted && smtSortsEqual(this, other)
+        override fun hashCode(): kotlin.Int = smtSortHashCode(this)
+    }
 }
 
 /** An original declaration, including functions with nonempty [parameters]. */

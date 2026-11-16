@@ -115,16 +115,15 @@ private fun recursiveDeclaration(definition: List<SExpr>): SExpr.SList {
     return SExpr.SList(listOf(SExpr.Atom("declare-fun"), definition[0], SExpr.SList(sorts), definition[2]))
 }
 
-internal data class SmtSessionQueries(val terms: List<SExpr>, val definitions: List<SExpr.SList>)
+internal data class SmtSessionQueries(val terms: List<SExpr>, val definitions: List<SExpr.SList>,
+    val scope: SmtLibScope)
 
 internal fun smtSessionQuerySort(
     commands: List<SExpr>, term: SExpr, control: ExecutionControl,
     abstractValues: Map<String, SmtSort> = emptyMap(),
 ): SmtSort {
     val prepared = prepareSmtSessionQueries(commands, listOf(term), control, abstractValues)
-    val scope = smtSessionScope(commands + prepared.definitions, control)
-    abstractValues.forEach { (name, sort) -> scope.modelValue(name, sort) }
-    return scope.termSort(prepared.terms.single())
+    return prepared.scope.termSort(prepared.terms.single())
         ?: throw UnsupportedSmtException("query is not a closed well-sorted term")
 }
 
@@ -155,7 +154,7 @@ internal fun prepareSmtSessionQueries(
         val bindings = let.items[1] as SExpr.SList
         terms += (bindings.items[0] as SExpr.SList).items[1]
     }
-    return SmtSessionQueries(terms, definitions)
+    return SmtSessionQueries(terms, definitions, scope)
 }
 
 private fun sessionSymbols(expressions: List<SExpr>): MutableSet<String> {

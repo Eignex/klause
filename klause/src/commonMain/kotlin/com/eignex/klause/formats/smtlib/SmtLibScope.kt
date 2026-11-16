@@ -2,6 +2,12 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.platform.identityHash
+
+internal class SmtExpressionIdentity(val expression: SExpr) {
+    override fun equals(other: Any?): Boolean = other is SmtExpressionIdentity && expression === other.expression
+    override fun hashCode(): Int = identityHash(expression)
+}
 
 internal class SmtLibScope(private val cancellation: ExecutionControl,
     private val allowSolverSymbols: Boolean = false) {
@@ -24,6 +30,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
         class Let(val names: List<String>, val body: SExpr, val locals: Locals?) : Frame
         class Match(val cases: SExpr, val locals: Locals?) : Frame
         class MatchResult(val scrutinee: Int, val cases: List<SmtDatatypeCase>) : Frame
+        class Record(val expression: SExpr) : Frame
     }
     private val globals = HashMap<String, Signature>()
     private val globalSortParameters = LinkedHashSet<String>()
@@ -49,6 +56,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
 
     private fun term(operator: String, arguments: List<Int>, sort: SmtSort,
         datatype: SmtTypedDatatypeOperator? = null): Int {
+        sort.checkpointStructure(cancellation)
         val node = SmtTypedTerm(operator, arguments, sort, datatype)
         return interned.getOrPut(node) {
             cancellation.polynomialSourceCheckpoint(1)
@@ -255,6 +263,15 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
 
     internal fun termSort(expression: SExpr): SmtSort? = sort(expression, null)?.let { nodes[it].sort }
 
+    internal fun termSort(expression: SExpr, locals: Map<String, SmtSort>,
+        resultSorts: MutableMap<SmtExpressionIdentity, SmtSort>,
+        substitution: Map<String, SmtSort> = emptyMap()): SmtSort? {
+        val parameters = locals.mapValues { (_, type) ->
+            term("parameter:${symbolIdentity++}", emptyList(), type)
+        }
+        return sort(expression, Locals(parameters, null), resultSorts, substitution)?.let { nodes[it].sort }
+    }
+
     internal fun modelValue(name: String, sort: SmtSort) {
         require(name.startsWith('@'))
         globals[polynomialSymbol(name)] = Signature(emptyList(), sort, symbolIdentity++)
@@ -364,14 +381,19 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
 
     private fun theorySort(name: String): Boolean = name in setOf("Bool", "Int", "Real", "Array", "BitVec")
 
-    private fun sort(root: SExpr, locals: Locals?): Int? {
+    private fun sort(root: SExpr, locals: Locals?,
+        resultSorts: MutableMap<SmtExpressionIdentity, SmtSort>? = null,
+        substitution: Map<String, SmtSort> = emptyMap()): Int? {
         val work = ArrayDeque<Frame>()
         val values = ArrayDeque<Int>()
+        val specialized = HashMap<SmtSort, SmtSort>()
         work.addLast(Frame.Evaluate(root, locals))
         fun pop(count: Int): List<Int> = List(count) { values.removeLast() }.reversed()
         while (work.isNotEmpty()) {
             cancellation.polynomialSourceCheckpoint(1)
-            when (val frame = work.removeLast()) {
+            val frame = work.removeLast()
+            if (frame is Frame.Evaluate && resultSorts != null) work.addLast(Frame.Record(frame.expression))
+            when (frame) {
                 is Frame.Evaluate -> when (val node = frame.expression) {
                     is SExpr.Atom -> {
                         val name = polynomialSymbol(node.text)
@@ -474,6 +496,14 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                             }
                         }
                     }
+                }
+                is Frame.Record -> {
+                    val sourceSort = nodes[values.last()].sort
+                    val result = if (substitution.isEmpty()) sourceSort else {
+                        sourceSort.checkpointStructure(cancellation)
+                        specialized.getOrPut(sourceSort) { substituteSmtSort(sourceSort, substitution, cancellation) }
+                    }
+                    resultSorts!![SmtExpressionIdentity(frame.expression)] = result
                 }
                 is Frame.Let -> {
                     val bindings = frame.names.zip(pop(frame.names.size)).toMap()
