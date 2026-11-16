@@ -26,6 +26,17 @@ fun solveSmtRecursiveSession(
         else -> ordinary += command
     }
     if (definitions.isEmpty()) return solve(text)
+    val objective = ordinary.firstOrNull { it.recHead() in setOf("minimize", "maximize") }?.items?.get(1)
+    fun witnessed(result: SmtSessionResult): SmtSessionResult {
+        if (objective == null) return result
+        val observations = result.observations.filterNot {
+            it.startsWith("objective=") || it.startsWith("objectiveBound") || it.startsWith("optimizationStatus=")
+        }.toMutableList()
+        val value = try { result.model?.evaluate(objective) } catch (_: UnsupportedSmtException) { null }
+        if (value != null) observations += "objective=${smtRationalValue(value, cancellation)?.rational ?: value}"
+        observations += "optimizationStatus=best-found"
+        return result.copy(observations = observations)
+    }
     val names = definitions.map { it.name }.toSet()
     val used = HashSet<String>()
     fun collectSymbols(root: SExpr) {
@@ -150,7 +161,7 @@ fun solveSmtRecursiveSession(
                     assertions.all { checked.evaluate(it) == "true" }
                 } catch (_: UnsupportedSmtException) { false }
                 if (accepted) {
-                    return SmtSessionResult("sat", checked, observations = relaxation.observations)
+                    return witnessed(SmtSessionResult("sat", checked, observations = relaxation.observations))
                 }
             }
         }
@@ -189,7 +200,9 @@ fun solveSmtRecursiveSession(
         val candidate = if (wellSorted) solve(candidateSource) else SmtSessionResult("unknown")
         if (candidate.status == "sat" && candidate.model != null) {
             val validation = ArrayList<SExpr>()
-            validation += candidateCommands
+            validation += candidateCommands.filter {
+                (it as SExpr.SList).recHead() !in setOf("minimize", "maximize")
+            }
             val equalities = ArrayList<SExpr>()
             for (definition in definitions) {
                 val arguments = definition.parameters.map { (_, sort) ->
@@ -201,7 +214,7 @@ fun solveSmtRecursiveSession(
                     substitute(definition.body, definition.parameters.map { it.first }.zip(arguments).toMap()))
             }
             validation += recList("assert", recList("not", SExpr.SList(listOf(SExpr.Atom("and")) + equalities)))
-            if (solve(script(validation)).status == "unsat") return candidate
+            if (solve(script(validation)).status == "unsat") return witnessed(candidate)
         }
         var index = positions.lastIndex
         while (index >= 0) {

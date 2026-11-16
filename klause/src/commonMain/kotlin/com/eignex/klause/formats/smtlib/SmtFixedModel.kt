@@ -87,6 +87,12 @@ internal class SmtFixedModel(
     }
 
     override fun withRecursiveDefinitions(source: List<SExpr>): SmtSessionModel {
+        val declared = source.mapNotNull { expression ->
+            val command = expression as? SExpr.SList
+            if (command?.head() in setOf("declare-const", "declare-fun")) {
+                symbol((command!!.items[1] as SExpr.Atom).text)
+            } else null
+        }.toSet()
         val names = source.flatMap { expression ->
             val command = expression as? SExpr.SList
             when (command?.head()) {
@@ -97,7 +103,9 @@ internal class SmtFixedModel(
                 else -> emptyList()
             }
         }.toSet()
-        val ordinary = SmtSourceModel(model.values.filter { symbol(it.first.name) !in names })
+        val ordinary = SmtSourceModel(model.values.filter {
+            symbol(it.first.name) in declared && symbol(it.first.name) !in names
+        })
         return SmtFixedModel(source, ordinary, retained, control, originalSource)
     }
 
