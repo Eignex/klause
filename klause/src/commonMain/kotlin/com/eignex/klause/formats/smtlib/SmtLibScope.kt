@@ -234,6 +234,11 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
 
     internal fun termSort(expression: SExpr): SmtSort? = sort(expression, null)?.let { nodes[it].sort }
 
+    internal fun modelValue(name: String, sort: SmtSort) {
+        require(name.startsWith('@'))
+        globals[polynomialSymbol(name)] = Signature(emptyList(), sort, symbolIdentity++)
+    }
+
     internal fun sourceSort(expression: SExpr, localParameters: Set<String> = emptySet(),
         allowGlobalParameters: Boolean = true, localBindings: Map<String, SmtSort> = emptyMap()): SmtSort {
         val work = ArrayDeque<Pair<SExpr, Boolean>>()
