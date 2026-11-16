@@ -132,7 +132,7 @@ Commands	declare-sort	SmtGroundFunctionsTest; SmtLibSessionTest
 Commands	define-sort	SmtGroundFunctionsTest; SmtLibSessionTest
 Commands	declare-sort-parameter	C09; C17; SmtPolymorphismTest
 Commands	define-const	SmtAnnotationsTest#define const is a nullary function definition
-Commands	define-fun	C15; C35; C36; SmtAnnotationsTest; SmtSessionValidationTest
+Commands	define-fun	C15; C35; C36; C38; SmtAnnotationsTest; SmtSessionValidationTest
 Commands	define-fun-rec	SmtRecursiveSessionTest; SmtSessionValidationTest
 Commands	define-funs-rec	C29; C30
 Commands	declare-datatype	C03; C04; C05; SmtGroundDatatypesTest

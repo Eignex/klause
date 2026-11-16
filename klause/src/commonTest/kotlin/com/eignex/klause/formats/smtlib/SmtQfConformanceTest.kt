@@ -577,6 +577,27 @@ class SmtQfConformanceTest {
     }
 
     @Test
+    fun `specialized helpers retain the observed ranks of captured polymorphic globals`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (define-sort R () Real)
+            (declare-const a A)
+            (define-fun f ((x A)) A a)
+            (define-fun g ((x A)) A (f x))
+            (assert (= (as a R) 3.0))
+            (assert (as a Bool))
+        """.trimIndent())
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+        val model = parsed.reconstructSessionModel(assignment)
+
+        val values = listOf("(f 4.0)", "(g 4.0)", "(f false)").map {
+            model.evaluate(SExprReader(it).readAll().single())
+        }
+
+        assertEquals(listOf("3.0", "3.0", "true"), values)
+    }
+
+    @Test
     fun `retained polymorphic families construct deep array ranks without recursion`() {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)

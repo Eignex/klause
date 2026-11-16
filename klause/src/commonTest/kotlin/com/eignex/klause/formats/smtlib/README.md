@@ -186,6 +186,7 @@ exact authority explicitly, and rejection controls exercise publication gates.
 | C35 | `defined numeric ranks retain real array index values` | SAT; declared Real argument/result ranks survive definition expansion in plain, datatype and polymorphic contexts |
 | C36 | `retained defined real ranks select their fixed polymorphic interpretation` | SAT; definitions, conditionals, lets, matches and constructor fields retain Real ranks; Int/Real interpretation lookup is independent of instance order |
 | C37 | `qualified unobserved function families retain their selected result rank` | SAT; an unused result-polymorphic family supports coherent later Real/Array ranks and rejects an invalid argument rank |
+| C38 | `specialized helpers retain the observed ranks of captured polymorphic globals` | SAT; nested helper specialization reads the already fixed Real/Bool instances of a captured global |
 
 C32 and C33 cover retained representations of the existing real-function
 extensions. Their expected results use mathematical inverse/sign identities and
