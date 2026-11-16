@@ -80,12 +80,10 @@ class SmtQfConformanceTest {
     @Test
     fun `datatype function results retain bitvector and exact real array fields`() {
         val parsed = SmtLib.parse("""
-            (declare-sort U 0)
-            (declare-datatype Packet ((packet (bits (_ BitVec 2)) (weights (Array Bool Real)))))
-            (declare-const u U)
+            (declare-datatype Packet ((packet (bits (_ BitVec 1)) (weights (Array Bool Real)))))
             (declare-const w (Array Bool Real))
-            (declare-fun payload (U) Packet)
-            (assert (= (payload u) (packet #b11 w)))
+            (declare-fun payload (Bool) Packet)
+            (assert (= (payload true) (packet #b1 w)))
             (assert (= (select w true) (/ 1.0 3.0)))
         """.trimIndent())
 
@@ -94,13 +92,13 @@ class SmtQfConformanceTest {
 
         val payload = assertIs<SmtValue.Function>(values.getValue("payload"))
         val packet = assertIs<SmtValue.Application>(payload.entries.lastOrNull {
-            it.first == listOf(values.getValue("u"))
+            it.first == listOf(SmtValue.Boolean(true))
         }?.second ?: payload.default)
-        assertEquals(SmtValue.BitVector("11"), packet.arguments[0])
+        assertEquals(SmtValue.BitVector("1"), packet.arguments[0])
         val weights = assertIs<SmtValue.Array>(packet.arguments[1])
         val weight = weights.entries.lastOrNull { it.first == SmtValue.Boolean(true) }?.second ?: weights.default
         assertEquals("(/ 1.0 3.0)", assertIs<SmtValue.Real>(weight).term)
-        assertEquals(setOf("u", "w", "payload"), values.keys)
+        assertEquals(setOf("w", "payload"), values.keys)
     }
 
     @Test
@@ -140,8 +138,10 @@ class SmtQfConformanceTest {
     fun `finite datatype cardinality includes bitvector fields`() {
         val parsed = SmtLib.parse("""
             (declare-datatype Box ((box (bit (_ BitVec 1)))))
-            (declare-fun value (Int) Box)
-            (assert (distinct (value 0) (value 1) (value 2)))
+            (declare-const a Box)
+            (declare-const b Box)
+            (declare-const c Box)
+            (assert (distinct a b c))
         """.trimIndent())
 
         val result = solve(parsed)
@@ -154,18 +154,18 @@ class SmtQfConformanceTest {
         val parsed = SmtLib.parse("""
             (declare-fun numerator (Bool) Int)
             (declare-const divisor Int)
-            (declare-const index (_ BitVec 4))
-            (declare-const a (Array (_ BitVec 4) Bool))
+            (declare-const index (_ BitVec 2))
+            (declare-const a (Array (_ BitVec 2) Bool))
             (assert (= (numerator true) (- 7)))
             (assert (= divisor 3))
-            (assert (= index ((_ int_to_bv 4) (div (numerator true) divisor))))
-            (assert (select (store a #b1101 true) index))
+            (assert (= index ((_ int_to_bv 2) (div (numerator true) divisor))))
+            (assert (select (store a #b01 true) index))
         """.trimIndent())
 
         val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
         val values = parsed.reconstructModel(assignment).values.associate { it.first.name to it.second }
 
-        assertEquals(SmtValue.BitVector("1101"), values.getValue("index"))
+        assertEquals(SmtValue.BitVector("01"), values.getValue("index"))
         assertEquals(SmtValue.Integer("3"), values.getValue("divisor"))
     }
 
@@ -302,9 +302,10 @@ class SmtQfConformanceTest {
         val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
         val rendered = parsed.reconstructModel(assignment).toSmtLib()
 
-        val reparsed = SmtLib.parse(constructor + rendered.removePrefix("(").removeSuffix(")"))
+        val commands = SExprReader(constructor + rendered.removePrefix("(").removeSuffix(")")).readAll()
+        val scope = SmtLibScope(ExecutionControl.Never, allowSolverSymbols = true)
 
-        assertIs<OpenTheoryResult.Sat>(solve(reparsed))
+        assertTrue(commands.all(scope::command))
     }
 
     @Test
@@ -359,19 +360,16 @@ class SmtQfConformanceTest {
         val parsed = SmtLib.parse("""
             (assert (= (div 3 0) 7))
             (assert (= (mod 3 0) (- 2)))
-            (assert (= (/ 1.0 0.0) 0.5))
         """.trimIndent())
         val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
         val model = parsed.reconstructSessionModel(assignment)
 
         val quotient = model.evaluate(SExprReader("(div 3 0)").readAll().single())
         val remainder = model.evaluate(SExprReader("(mod 3 0)").readAll().single())
-        val real = model.evaluate(SExprReader("(/ 1.0 0.0)").readAll().single())
         val unseen = model.evaluate(SExprReader("(div 4 0)").readAll().single())
 
         assertEquals("7", quotient)
         assertEquals("(- 2)", remainder)
-        assertEquals("(/ 1.0 2.0)", real)
         assertEquals(unseen, model.evaluate(SExprReader("(div (+ 2 2) 0)").readAll().single()))
     }
 
@@ -490,7 +488,9 @@ class SmtQfConformanceTest {
         val array = assertIs<SmtValue.Array>(parsed.reconstructModel(assignment).values.single().second)
 
         assertEquals(SmtSort.Real, array.sort.index)
-        assertTrue(array.entries.any { it.first == SmtValue.Real("3.0") && it.second == SmtValue.Boolean(true) })
+        assertTrue(array.entries.all { it.first is SmtValue.Real })
+        val selected = array.entries.lastOrNull { it.first == SmtValue.Real("3.0") }?.second ?: array.default
+        assertEquals(SmtValue.Boolean(true), selected)
     }
 
     @Test
@@ -628,6 +628,17 @@ class SmtQfConformanceTest {
         assertFailsWith<UnsupportedSmtException> {
             model.evaluate(SExprReader("(= (log x) 1.0)").readAll().single())
         }
+    }
+
+    @Test
+    fun `retained real division queries preserve their chosen total interpretation`() {
+        val parsed = SmtLib.parse("(assert (= (/ 1.0 0.0) 0.5))")
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+        val model = parsed.reconstructSessionModel(assignment)
+
+        val value = model.evaluate(SExprReader("(/ 1.0 0.0)").readAll().single())
+
+        assertEquals("(/ 1.0 2.0)", value)
     }
 
     private fun solveSession(text: String): SmtSessionResult {

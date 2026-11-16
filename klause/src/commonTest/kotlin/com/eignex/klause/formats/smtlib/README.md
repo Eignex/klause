@@ -151,11 +151,11 @@ exact authority explicitly, and rejection controls exercise publication gates.
 | --- | --- | --- |
 | C01 | `function bitvector results address reconstructed arrays` | SAT; the function maps the source value to `#b10`, whose array read is true |
 | C02 | `array stores use interpreted bitvector equality for function indexes` | UNSAT; `#b01 + #b01` is the stored index `#b10` |
-| C03 | `datatype function results retain bitvector and exact real array fields` | SAT; an explicit source constructor witness gives the actual function-result Packet `#b11` and weight `1/3` |
+| C03 | `datatype function results retain bitvector and exact real array fields` | SAT; an explicit source constructor witness gives the actual function-result Packet `#b1` and weight `1/3` |
 | C04 | `datatype array indexes preserve function congruence` | UNSAT; the selected constructor equals the stored constructor |
 | C05 | `nested array models contain datatype values at bitvector indexes` | SAT; read `a[#b1][true]` is the green constructor |
 | C06 | `finite datatype cardinality includes bitvector fields` | UNSAT; a one-bit record has exactly two values |
-| C07 | `variable euclidean quotient converts into an array bitvector index` | SAT; `div(-7,3)=-3`, which becomes `#b1101` |
+| C07 | `variable euclidean quotient converts into an array bitvector index` | SAT; `div(-7,3)=-3`, which becomes the two-bit index `#b01` |
 | C08 | `exact rational array indexes agree through uninterpreted functions` | UNSAT; `1/3=2/6`, so both function applications address one array cell |
 | C09 | `polymorphic distinct constants respect the boolean instance` | UNSAT; the Bool instance cannot contain three distinct values |
 | C10 | `quoted source names survive composite model reconstruction` | SAT; quoted names and the original function interpretation are retained |
@@ -167,7 +167,7 @@ exact authority explicitly, and rejection controls exercise publication gates.
 | C16 | `function model formals cannot shadow source constructors` | SAT; emitted model definitions remain well sorted with constructor `x0` |
 | C17 | `retained polymorphic models instantiate new array and wide word ranks coherently` | SAT; new array and 129-bit ranks obey the already selected universal interpretation |
 | C18 | `native exact array keys compare across different defining polynomials` | Native sqrt(2) keys agree extensionally despite distinct root syntax |
-| C19 | `retained division queries preserve chosen total interpretations` | SAT; observed integer/real division-by-zero choices remain fixed, including congruent later inputs |
+| C19 | `retained division queries preserve chosen total interpretations` | SAT; observed integer division/remainder-by-zero choices remain fixed, including congruent later inputs |
 | C20 | `retained datatype selectors preserve observed and unobserved result sorts` | SAT; wrong-constructor selector choices remain fixed and correctly typed at each instantiation |
 | C21 | `direct library named terms remain visible to retained model queries` | SAT; direct-library named definitions remain queryable |
 | C22 | `rejected composite source checks withhold finite publications` | A source check which reads and rejects a reconstructed array suppresses all SAT publications |
@@ -182,6 +182,7 @@ exact authority explicitly, and rejection controls exercise publication gates.
 | C31 | `assignment queries evaluate true and false named terms in the checked model` | Actual SAT/assignment transcript reports both selected truth values |
 | C32 | `retained symbolic coordinates preserve native inverse identities` | A captured native exp(1) coordinate satisfies log(x)=1 and differs from its approximate placeholder zero without re-solving |
 | C33 | `symbolic query syntax cannot replace unavailable native authority` | A matching printed symbolic term without certified authority declines arithmetic evaluation |
+| C34 | `retained real division queries preserve their chosen total interpretation` | SAT; an observed real division-by-zero choice remains fixed in later queries |
 
 C32 and C33 cover retained representations of the existing real-function
 extensions. Their expected results use mathematical inverse/sign identities and
