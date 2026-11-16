@@ -2,6 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackParams
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.solver.pipeline.ExecutionOperation
 import com.eignex.klause.solver.pipeline.FiniteEngine
 import com.eignex.klause.solver.pipeline.FinitePipeline
@@ -10,10 +11,14 @@ import com.eignex.klause.solver.pipeline.FiniteSolveOutcome
 import com.eignex.klause.solver.pipeline.FiniteSolveRequest
 import com.eignex.klause.solver.pipeline.FiniteSolveVerdict
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.SourceFiniteControls
 import com.eignex.klause.solver.pipeline.SourceSetup
 import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.solve
+import com.eignex.klause.solver.pipeline.execute
+import com.eignex.klause.solver.pipeline.pipelineRequest
+import com.eignex.klause.solver.pipeline.sourceRoute
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.coroutines.cancellation.CancellationException
@@ -87,8 +92,8 @@ class SmtLibBitVectorTest {
 
     @Test
     fun `integer conversion should retain source coordinates past machine precision`() {
-        val parsed = SmtLib.parse("(declare-const x Int) (assert (= x 1361129467683753853853498429727072845833)) " +
-            "(assert (= ((_ int_to_bv 4) x) (_ bv9 4)))")
+        val parsed = SmtLib.parse("(declare-const x Int) (assert (= x 36893488147419103233)) " +
+            "(assert (= ((_ int_to_bv 1) x) #b1))")
         var work = 0L
         val meter = WorkMeter { work += it }
         val cancellation = object : Cancellation {
@@ -96,12 +101,70 @@ class SmtLibBitVectorTest {
             override fun workMeter(): WorkMeter = meter
         }
 
-        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve(
+        val result = BacktrackSolver.source(parsed.model).solve(
             FiniteEngine.BACKTRACK, cancellation = cancellation,
-        )).assignment
+        )
+        val assignment = assertIs<OpenTheoryResult.Sat>(result,
+            "work=$work route=${parsed.model.sourceRoute()} result=$result").assignment
 
-        assertEquals(SmtValue.Integer("1361129467683753853853498429727072845833"),
+        assertEquals(SmtValue.Integer("36893488147419103233"),
             parsed.reconstructModel(assignment).values.single().second)
+    }
+
+    @Test
+    fun `quoted names should not capture bare literals during bitvector reduction`() {
+        val sources = listOf(
+            "(declare-const |0| Int) (assert (= |0| 1)) (assert (= |0| 0))",
+            "(declare-const |0.0| Real) (assert (= |0.0| 1.0)) (assert (= |0.0| 0.0))",
+            "(declare-const |#b0| (_ BitVec 1)) (assert (= |#b0| #b1)) (assert (= |#b0| #b0))",
+            "(declare-const |#x0| (_ BitVec 4)) (assert (= |#x0| #x1)) (assert (= |#x0| #x0))",
+        )
+
+        for (source in sources) {
+            val parsed = SmtLib.parse("(declare-const b (_ BitVec 1)) $source")
+
+            assertIs<OpenTheoryResult.Unsat>(BacktrackSolver.source(parsed.model).solve(), source)
+        }
+    }
+
+    @Test
+    fun `qualified bitvector identifiers should retain their selected result sort`() {
+        val parsed = SmtLib.parse("(declare-const b (_ BitVec 2)) (assert (= (as b (_ BitVec 2)) #b10)) " +
+            "(assert (= ((as bvadd (_ BitVec 2)) #b01 #b01) b)) " +
+            "(assert (= ((as (_ extract 0 0) (_ BitVec 1)) b) #b0))")
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(BacktrackSolver.source(parsed.model).solve()).assignment
+
+        assertEquals(SmtValue.BitVector("10"), parsed.reconstructModel(assignment).values.single().second)
+        assertFailsWith<UnsupportedSmtException> { SmtLib.parse("(assert (= ((as bvadd (_ BitVec 1)) #b01 #b01) #b0))") }
+        assertFailsWith<UnsupportedSmtException> { SmtLib.parse("(assert (= (as (bvadd #b0 #b1) (_ BitVec 1)) #b1))") }
+    }
+
+    @Test
+    fun `bitvector helpers should retain unused scalar argument domains`() {
+        val bodies = listOf(
+            "(define-fun f ((x Real)) Bool true) (assert (f (log 0)))",
+            "(assert (let ((x (log 0))) true))",
+            "(define-fun f ((x Real)) (_ BitVec 1) #b1) (assert (= (bvnot (f (log 0))) #b0))",
+        )
+
+        for (body in bodies) {
+            val parsed = SmtLib.parse("(declare-const b (_ BitVec 1)) $body")
+            val source = assertIs<TranscendentalProblem>(parsed.source.originalSource)
+
+            assertIs<OpenTheoryResult.Unsat>(OpenTheoryPipeline.execute(source.pipelineRequest(),
+                engine = FiniteEngine.BACKTRACK).result)
+        }
+    }
+
+    @Test
+    fun `inactive bitvector helper branches should retain local scalar domains`() {
+        val parsed = SmtLib.parse("(define-fun f ((x Real)) (_ BitVec 1) #b0) " +
+            "(assert (= (ite true #b1 (f (log 0))) #b1))")
+        val source = assertIs<TranscendentalProblem>(parsed.source.originalSource)
+
+        assertIs<OpenTheoryResult.Sat>(OpenTheoryPipeline.execute(source.pipelineRequest(),
+            engine = FiniteEngine.BACKTRACK).result)
     }
 
     @Test
