@@ -32,9 +32,10 @@ internal fun parseSmtLibSource(
             commands
         }
         val polymorphic = reduceSmtPolymorphism(captureSmtSource(commands, cancellation), cancellation)
-        val exposed = exposeSmtGroundFunctions(polymorphic, cancellation)
+        val datatypes = exposeSmtGroundDatatypes(polymorphic, cancellation)
+        val exposed = exposeSmtGroundFunctions(datatypes, cancellation)
         val arrays = reduceSmtGroundArrays(exposed, cancellation)
-        val ground = reduceSmtGroundFunctions(arrays, cancellation)
+        val ground = reduceSmtGroundFunctions(finishSmtGroundDatatypes(arrays, cancellation), cancellation)
         val reduction = lowerSmtBitVectors(ground, cancellation)
         lowerSmtReduction(reduction, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics)
     } catch (_: PolynomialSourceInterrupted) {

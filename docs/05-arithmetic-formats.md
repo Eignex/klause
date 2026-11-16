@@ -210,6 +210,31 @@ can instantiate an unobserved rank from the same chosen interpretation; known
 ranks resolve their distinct private binding keys. Partial model output preserves
 the source function name and concrete rank of every returned instance.
 
+### Algebraic datatypes
+
+Datatype declarations retain instantiated constructor and selector sorts, including
+parametric and mutually recursive declarations. Typed `match` patterns bind fields
+in their branch scope and require exhaustive coverage. Ill-founded declarations and
+recursive occurrences below a field sort's head are rejected.
+
+Ground constructors, selectors and testers reduce to typed function consistency,
+constructor tags and strict integer depth comparisons. Exhaustiveness introduces
+one layer of constructor witnesses only; witness fields do not trigger recursive
+unfolding. Arrays and function applications retain opaque datatype sorts until
+their own reduction has introduced every relevant coordinate. Scalar erasure then
+maps datatype values to integer identities and supplies constructor recipes for
+original and private coordinates.
+
+Finite datatype domains constrain identities by their constructor cardinality,
+including finite word and extensional array fields. Cardinality arithmetic saturates
+at the number of datatype coordinates after array and function exposure:
+domains at least that large can always inject those identities. Recursive and other
+infinite datatype domains impose no integer interval. Strict depth comparisons
+exclude cycles without a depth bound. Reconstruction follows the observed acyclic
+constructor graph and assigns unused minimum-depth constructor terms to remaining
+identities, preserving disequalities. Source checks compare actual constructor
+fields and enforce consistent total selectors even on a different constructor.
+
 ### Declaration policy
 
 `smtLibSemantics` declares exact rational literals, continuous reals and open

@@ -31,6 +31,7 @@ internal data class SmtReduction(
     val original: SmtTypedSource? = null,
     val checks: List<SmtSourceCheck> = emptyList(),
     val polymorphicModel: SmtPolymorphicModel? = null,
+    val datatypes: SmtDatatypeReduction? = null,
 )
 
 internal fun captureSmtSource(commands: List<SExpr>, cancellation: ExecutionControl): SmtReduction {
