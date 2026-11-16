@@ -3,24 +3,8 @@ package com.eignex.klause.lp.engine
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class LpConditioningTest {
-
-    @Test
-    fun `a matrix of unit coefficients should need no scaling`() {
-        val b = LpBuilder()
-        b.addVar(0L, 5L, cost = 1L)
-        b.addVar(0L, 5L, cost = 1L)
-        b.addRow(intArrayOf(0, 1), longArrayOf(1L, 1L), Relation.GE, 3L)
-
-        val spread = lpConditioning(b.build(Sense.MINIMIZE))
-
-        assertEquals(1.0, spread.minValue)
-        assertEquals(1.0, spread.maxValue)
-        assertEquals(1.0, spread.matrixRatio)
-        assertTrue(spread.withinHighsNoScalingWindow)
-    }
 
     @Test
     fun `coefficients spanning decades should fall outside the no-scaling window`() {

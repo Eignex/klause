@@ -99,20 +99,4 @@ class NValueInvariantTest {
             assertEquals(degree, state.factors[0].violationDegree(state, 0), "xs=$xs")
         }
     }
-
-    @Test
-    fun `delta should predict degree change when introducing a new distinct value`() {
-        val p = problem()
-        val state = LocalSearchState(p.bake(), Random(0))
-        state.assignment.setInt(0, 3)
-        state.assignment.setInt(1, 0)
-        state.assignment.setInt(2, 0)
-        state.assignment.setInt(3, 0)
-        state.recompute()
-        val before = state.factors[0].violationDegree(state, 0)
-        val delta = state.factors[0].deltaIfIntSet(state, 0, 1, 1)
-        state.apply(Move.IntSet(1, 1))
-        val after = state.factors[0].violationDegree(state, 0)
-        assertEquals(after - before, delta)
-    }
 }

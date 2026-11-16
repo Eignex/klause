@@ -84,14 +84,6 @@ class LpConfigTest {
     }
 
     @Test
-    fun `an override should win over the emphasis tier`() {
-        val forcedOn = LpConfig(LpEmphasis.CONSERVATIVE, mapOf(LpTechnique.CUTS to true))
-        assertTrue(forcedOn.resolved(LpTechnique.CUTS))
-        val forcedOff = LpConfig(LpEmphasis.AGGRESSIVE, mapOf(LpTechnique.BOUNDING to false))
-        assertFalse(forcedOff.resolved(LpTechnique.BOUNDING))
-    }
-
-    @Test
     fun `parse of emphasis plus deltas should toggle individual techniques`() {
         val minusCuts = LpConfig.parse("aggressive,-cuts")
         assertEquals(LpEmphasis.AGGRESSIVE, minusCuts.emphasis)

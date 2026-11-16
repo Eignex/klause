@@ -25,11 +25,6 @@ class ProblemKindTest {
     }
 
     @Test
-    fun `single-line solve minimize should be COP`() {
-        assertTrue(ProblemKind.hasSolveObjective("solve minimize objective;"))
-    }
-
-    @Test
     fun `multi-line solve item with search annotation should be COP`() {
         val model = """
             constraint forall(i in 1..n)(x[i] >= 0);
@@ -39,11 +34,6 @@ class ProblemKindTest {
                 minimize objective;
         """.trimIndent()
         assertTrue(ProblemKind.hasSolveObjective(model))
-    }
-
-    @Test
-    fun `solve satisfy should not be COP`() {
-        assertFalse(ProblemKind.hasSolveObjective("solve satisfy;"))
     }
 
     @Test

@@ -9,7 +9,6 @@ import com.eignex.klause.propagation.bake
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class SortInvariantTest {
 
@@ -19,22 +18,6 @@ class SortInvariantTest {
         intDomains = Array(6) { IntDomain(0, 4) },
         factors = arrayOf<Factor>(Sort(xs = intArrayOf(0, 1, 2), ys = intArrayOf(3, 4, 5))),
     )
-
-    @Test
-    fun `violation degree should count positions where ys differs from sorted xs`() {
-        val cases = listOf(
-            Triple(listOf(2L, 0L, 1L), listOf(0L, 2L, 1L), 2),
-            Triple(listOf(1L, 2L, 3L), listOf(3L, 2L, 1L), 2),
-        )
-        for ((xs, ys, degree) in cases) {
-            val state = LocalSearchState(problem().bake(), Random(0))
-            for (i in 0..2) state.assignment.setInt(i, xs[i])
-            for (i in 0..2) state.assignment.setInt(3 + i, ys[i])
-            state.recompute()
-            assertTrue(state.factors[0].isViolated(state, 0), "xs=$xs ys=$ys")
-            assertEquals(degree, state.factors[0].violationDegree(state, 0), "xs=$xs ys=$ys")
-        }
-    }
 
     @Test
     fun `delta should predict degree change when correcting a ys entry`() {

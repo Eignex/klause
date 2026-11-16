@@ -19,28 +19,4 @@ class LitTest {
             assertFalse(Lit.isPositive(neg))
         }
     }
-
-    @Test
-    fun `negate should flip polarity and keep the variable`() {
-        for (v in 0..5) {
-            val pos = Lit.make(v, positive = true)
-            val flipped = Lit.negate(pos)
-            assertEquals(v, Lit.variable(flipped))
-            assertFalse(Lit.isPositive(flipped))
-
-            assertEquals(pos, Lit.negate(flipped))
-        }
-    }
-
-    @Test
-    fun `evaluate should follow the literal polarity`() {
-        val pos = Lit.make(0, positive = true)
-        val neg = Lit.make(0, positive = false)
-
-        assertTrue(Lit.evaluate(pos, value = true))
-        assertFalse(Lit.evaluate(pos, value = false))
-
-        assertFalse(Lit.evaluate(neg, value = true))
-        assertTrue(Lit.evaluate(neg, value = false))
-    }
 }

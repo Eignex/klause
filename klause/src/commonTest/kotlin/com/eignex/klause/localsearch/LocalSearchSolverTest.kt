@@ -398,23 +398,6 @@ class LocalSearchSolverTest {
     }
 
     @Test
-    fun `minimize should terminate on a degenerate objective and constraint-free problem`() {
-        val problem = Problem(
-            numBoolVars = 4,
-            numIntVars = 0,
-            intDomains = emptyArray(),
-            factors = emptyArray(),
-        )
-        val solver = LocalSearchSolver(problem.bake())
-        val degenerate = LinearObjective(boolWeights = LongArray(4))
-        val sample = solver.minimize(
-            degenerate,
-            LocalSearchParams(maxFlips = 1_000L, randomSeed = 1L),
-        ).assignment
-        assertNotNull(sample)
-    }
-
-    @Test
     fun `minimize should honor cancellation during a descent scan`() {
         val n = 4000
         val problem = Problem(

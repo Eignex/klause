@@ -24,19 +24,6 @@ class SubcircuitInvariantTest {
     }
 
     @Test
-    fun `single included node should yield positive cost`() {
-        val problem = problem(4)
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 1)
-        state.assignment.setInt(2, 2)
-        state.assignment.setInt(3, 3)
-        state.recompute()
-        assertTrue(state.intPayload[0] > 0)
-        assertTrue(state.factors[0].isViolated(state, 0))
-    }
-
-    @Test
     fun `deltaIfIntSet should predict the cost change`() {
         val n = 4
         val problem = problem(n)

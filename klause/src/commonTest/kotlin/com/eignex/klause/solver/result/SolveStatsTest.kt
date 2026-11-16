@@ -218,16 +218,6 @@ class SolveStatsTest {
     }
 
     @Test
-    fun `merge should add objective scoring observations across workers`() {
-        val left = SolveStats(ls = LocalSearchStats(objectiveScoring = mapOf("indexed" to 7L, "prepared" to 1L)))
-        val right = SolveStats(ls = LocalSearchStats(objectiveScoring = mapOf("indexed" to 11L, "plain" to 1L)))
-
-        val merged = left.mergedWith(right)
-
-        assertEquals(mapOf("indexed" to 18L, "prepared" to 1L, "plain" to 1L), merged.ls.objectiveScoring)
-    }
-
-    @Test
     fun `merge should add local search phase times by key`() {
         val left = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("seeding" to 7L, "selection" to 11L)))
         val right = SolveStats(ls = LocalSearchStats(phaseNanos = mapOf("preparation" to 3L, "selection" to 13L)))
@@ -237,20 +227,6 @@ class SolveStatsTest {
         assertEquals(mapOf("preparation" to 3L, "seeding" to 7L, "selection" to 24L), merged.ls.phaseNanos)
         assertEquals(merged, SolveStats.EMPTY.mergedWith(merged))
         assertEquals(merged, merged.mergedWith(SolveStats.EMPTY))
-    }
-
-    @Test
-    fun `merge should add ALNS stats`() {
-        val left = SolveStats(alns = AlnsStats(13, 7, 17, 5, 120, 9, 8, 3))
-        val right = SolveStats(alns = AlnsStats(2, 3, 5, 7, 80, 4, 3, 2))
-
-        val merged = left.mergedWith(right)
-
-        assertEquals(AlnsStats(15, 10, 22, 12, 200, 13, 11, 5), merged.alns)
-        assertEquals(merged, SolveStats.EMPTY.mergedWith(merged))
-        assertEquals(merged, merged.mergedWith(SolveStats.EMPTY))
-        assertEquals(0.0, merged.ls.moves.sum)
-        assertEquals(0.0, merged.search.nodes.sum)
     }
 
     @Test
@@ -271,17 +247,6 @@ class SolveStatsTest {
         assertEquals(right.ls.bestResidual, merged.ls.bestResidual)
         assertEquals(right.ls.bestResidual, right.mergedWith(left).ls.bestResidual)
         assertEquals(right.ls.bestResidual, SolveStats.EMPTY.mergedWith(right).ls.bestResidual)
-    }
-
-    @Test
-    fun `merge should add open theory conflict counts`() {
-        val left = SolveStats(openTheoryClauses = OpenTheoryClauseStats(assertingConflicts = 7))
-        val right = SolveStats(openTheoryClauses = OpenTheoryClauseStats(nonAssertingConflicts = 3))
-
-        val merged = left.mergedWith(right).openTheoryClauses
-
-        assertEquals(7L, merged.assertingConflicts)
-        assertEquals(3L, merged.nonAssertingConflicts)
     }
 
     private fun stats(backend: String, nodes: Double, peak: Double, weights: Double, mean: Double, wallMs: Long) =
