@@ -405,7 +405,14 @@ internal object Suites {
                     format = Format.WCNF,
                 )
             },
-        )
+        ) + ExternalCollections.smtlibGround.map { (logic, collection) ->
+            archiveSuite(
+                "smtlib-${logic.lowercase().replace("_", "")}",
+                "SMT-LIB $logic non-incremental set (fetched; 1/family by default)",
+                collection,
+                "non-incremental/$logic",
+            )
+        }
     }
 
     /**
@@ -998,6 +1005,22 @@ internal object ExternalCollections {
 
     /** Per-logic `.tar.zst` archives from SMT-LIB non-incremental Zenodo record 15493090. */
     private fun smtlibLogic(logic: String) = "https://zenodo.org/records/15493090/files/$logic.tar.zst?download=1"
+
+    val smtlibGround: Map<String, ExternalCollection> = listOf(
+        "QF_ABV", "QF_ALIA", "QF_ANIA", "QF_AUFBV", "QF_AUFLIA", "QF_AUFNIA", "QF_AX",
+        "QF_BV", "QF_DT", "QF_NIA", "QF_NIRA", "QF_UF", "QF_UFBV", "QF_UFBVDT",
+        "QF_UFDT", "QF_UFDTLIA", "QF_UFDTLIRA", "QF_UFDTNIA", "QF_UFIDL", "QF_UFLIA",
+        "QF_UFLRA", "QF_UFNIA", "QF_UFNRA",
+    ).associateWith { logic ->
+        ExternalCollection(
+            id = "smtlib-${logic.lowercase()}",
+            url = smtlibLogic(logic),
+            license = "SMT-LIB (per-family licenses; preserve source attribution)",
+            reason = "ground arithmetic, bitvector, array, datatype and free-function benchmarks; " +
+                "fetched rather than vendored",
+            fetch = FetchMethod.TarballZst,
+        )
+    }
 
     /** SMT-LIB QF_LIA non-incremental benchmark set, extracting to `.smt2` files under
      *  `non-incremental/QF_LIA/<family>/`. */
