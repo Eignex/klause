@@ -143,6 +143,8 @@ class SmtGroundDatatypesTest {
             (declare-datatype Nat ((zero) (succ (pred Nat))))
             (declare-const x Nat)
             (declare-const y Nat)
+            (assert (= x (succ zero)))
+            (assert (= y (succ (succ zero))))
             (assert (distinct x y))
             (assert (= ((_ is succ) x) ((_ is succ) y)))
         """.trimIndent())
