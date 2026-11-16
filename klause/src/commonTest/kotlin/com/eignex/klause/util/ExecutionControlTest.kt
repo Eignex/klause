@@ -1,5 +1,6 @@
 package com.eignex.klause.util
 
+import com.eignex.klause.presolve.PresolveBudget
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -15,6 +16,161 @@ import kotlin.time.TestTimeSource
 import kotlin.time.TimeSource
 
 class ExecutionControlTest {
+    @Test
+    fun `retaining a wrapped containing sequence should preserve its observation order once`() {
+        val observations = ArrayList<Int>()
+        val first = ExecutionControl { observations.add(1); false }
+        val second = ExecutionControl { observations.add(2); false }
+        val containing = (first or second).bindStopControl()
+
+        assertFalse(containing.includingStop(first or second)())
+
+        assertEquals(listOf(1, 2), observations)
+    }
+
+    @Test
+    fun `a scope join should retain a new deadline after its covered stop prefix`() {
+        val clock = TestTimeSource()
+        var observations = 0
+        val predicate = ExecutionControl { observations++; false }
+        val containing = object : ExecutionControl(predicate) {
+            override val containingStop get() = predicate
+        }
+        val joined = containing.includingStop(predicate or ExecutionControl.until(clock.markNow() + 1.seconds))
+
+        assertFalse(joined())
+        assertEquals(1, observations)
+        clock += 1.seconds
+
+        assertTrue(joined())
+    }
+
+    @Test
+    fun `a covered prefix should preserve explicit repetition in an attached scope`() {
+        val observations = ArrayList<Int>()
+        val predicate = ExecutionControl { observations.add(1); false }
+        val extra = ExecutionControl { observations.add(2); false }
+        val containing = object : ExecutionControl(predicate) {
+            override val containingStop get() = predicate
+        }
+
+        assertFalse(containing.includingStop(predicate or predicate or extra)())
+
+        assertEquals(listOf(1, 1, 2), observations)
+    }
+
+    @Test
+    fun `attaching a containing stop should preserve its predicate sequence once`() {
+        var observations = 0
+        val predicate = ExecutionControl { observations++; false }
+        val containing = object : ExecutionControl(predicate) {
+            override val containingStop get() = predicate
+        }
+
+        assertFalse(predicate.includingStop(containing)())
+
+        assertEquals(1, observations)
+    }
+
+    @Test
+    fun `attaching a containing stop should retain the selected accounting owner`() {
+        var work = 0L
+        val predicate = ExecutionControl { false }
+        val owner = predicate.withAccounting(ExecutionControl(accounting = WorkMeter { work += it }))
+        val containing = object : ExecutionControl(predicate) {
+            override val containingStop get() = predicate
+        }
+
+        owner.includingStop(containing).charge(7)
+
+        assertEquals(7L, work)
+    }
+
+    @Test
+    fun `retaining a known containing worker should observe its predicate once`() {
+        var observations = 0
+        val predicate = ExecutionControl { observations++; false }
+        val worker = predicate.bindStopControl()
+
+        assertFalse(worker.includingStop(predicate)())
+
+        assertEquals(1, observations)
+    }
+
+    @Test
+    fun `an adapted accounting owner should not imply stop containment`() {
+        val predicate = ExecutionControl { true }
+        val adapted = object : ExecutionControl(predicate) {
+            override fun isCancelled() = false
+        }
+
+        assertTrue(adapted.includingStop(predicate)())
+    }
+
+    @Test
+    fun `retaining a containing scope should observe its complete predicate sequence once`() {
+        val observed = ArrayList<Int>()
+        val first = ExecutionControl {
+            observed.add(1)
+            false
+        }
+        val second = ExecutionControl {
+            observed.add(2)
+            false
+        }
+        val retained = first or second
+        val combined = retained.includingStop(first or second)
+
+        assertFalse(combined())
+
+        assertEquals(listOf(1, 2), observed)
+    }
+
+    @Test
+    fun `retaining a scope should preserve explicit repetition inside its sequence`() {
+        var observations = 0
+        val predicate = ExecutionControl {
+            observations++
+            false
+        }
+        val repeated = predicate or predicate
+        val retained = repeated.includingStop(predicate)
+
+        assertFalse(retained())
+
+        assertEquals(2, observations)
+    }
+
+    @Test
+    fun `retaining a scope should keep the selected accounting owner`() {
+        var first = 0L
+        var second = 0L
+        val stop = ExecutionControl { false }
+        val owner = stop.withAccounting(ExecutionControl(accounting = WorkMeter { first += it }))
+        val other = stop.withAccounting(ExecutionControl(accounting = WorkMeter { second += it }))
+        val retained = owner.includingStop(other)
+
+        retained.charge(7)
+
+        assertEquals(7L, first)
+        assertEquals(0L, second)
+    }
+
+    @Test
+    fun `a containing scope should retain the tighter admission bound of an accounting view`() {
+        val budget = PresolveBudget(100)
+        val stop = ExecutionControl { false }
+        val containing = stop.withAccounting(budget.slice(80))
+        val bounded = stop.withAccounting(budget.slice(10))
+        val combined = containing.includingStop(bounded)
+
+        val granted = assertNotNull(assertNotNull(combined.admission).reserve(100))
+        granted.settle(granted.capacity)
+
+        assertEquals(10, granted.capacity)
+        assertEquals(10L, budget.spent())
+    }
+
     @Test
     fun `adding a metered stop should retain an unbound accounting owner`() {
         var work = 0L

@@ -2,6 +2,7 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.util.ArithmeticExecution
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -9,6 +10,29 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PresolveScanTest {
+    @Test
+    fun `nested scalar scans should share the phase checkpoint cadence`() {
+        var polls = 0
+        val control = ExecutionControl { polls++; false }.bindStopControl()
+
+        repeat(256) {
+            PresolveScan(control).use { scan -> assertFalse(scan.poll()) }
+        }
+
+        assertEquals(1, polls)
+    }
+
+    @Test
+    fun `a bound scalar scan should observe its exhausted slice immediately`() {
+        val budget = PresolveBudget(100)
+        val scan = PresolveScan(budget.slice(10).bindStopControl())
+        assertFalse(scan.poll())
+
+        scan.charge(10)
+
+        assertTrue(scan.poll())
+    }
+
     @Test
     fun `scalar polling should stop at the selected slice without waiting for another external poll`() {
         val budget = PresolveBudget(100)

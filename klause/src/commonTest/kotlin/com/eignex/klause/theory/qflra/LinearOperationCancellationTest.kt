@@ -11,6 +11,30 @@ import kotlin.time.TestTimeSource
 
 class LinearOperationCancellationTest {
     @Test
+    fun `a known stop should remain observable at every scalar checkpoint`() {
+        var cancelled = false
+        val token = LinearOperationCancellation({ ExecutionControl.Never }) { cancelled }
+        token.begin()
+        assertFalse(token.poll())
+        cancelled = true
+        assertTrue(token())
+
+        repeat(3) { assertTrue(token.poll()) }
+    }
+
+    @Test
+    fun `polls outside an operation should observe every source change`() {
+        var cancelled = false
+        val token = LinearOperationCancellation({ ExecutionControl { cancelled } }) { false }
+
+        assertFalse(token.poll())
+        cancelled = true
+        assertTrue(token.poll())
+        cancelled = false
+        assertFalse(token.poll())
+    }
+
+    @Test
     fun `unmetered numerical polls should observe a containing stop within one batch`() {
         var cancelled = false
         val token = LinearOperationCancellation({ ExecutionControl.Never }) { cancelled }

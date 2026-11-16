@@ -10,6 +10,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import kotlin.math.ceil
 import kotlin.random.Random
 
@@ -135,7 +136,7 @@ internal class ExactNeighborhood(
                     continue
                 }
                 while (nextCenterBoolean < boolCount) {
-                    if (cancellation() || charged >= end || charged >= maximumInstructions ||
+                    if (cancellation.pollStop() || charged >= end || charged >= maximumInstructions ||
                         nodeBudget?.exhausted() == true || completionExhausted()
                     ) {
                         return searchAllowanceSpent()
@@ -145,7 +146,7 @@ internal class ExactNeighborhood(
                     charge(1)
                 }
                 while (rootCoordinateValue != null && nextCenterCoordinate < centers.size) {
-                    if (cancellation() || charged >= end || charged >= maximumInstructions ||
+                    if (cancellation.pollStop() || charged >= end || charged >= maximumInstructions ||
                         nodeBudget?.exhausted() == true || completionExhausted()
                     ) {
                         return searchAllowanceSpent()

@@ -45,6 +45,7 @@ import com.eignex.klause.theory.qflra.ExactLiraSearchComponent
 import com.eignex.klause.theory.qflra.ExactLraAssignment
 import com.eignex.klause.theory.qfnra.ExactNraAssignment
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import com.eignex.kumulant.stat.summary.MaxResult
 import com.eignex.kumulant.stat.summary.SumResult
 import com.eignex.util.numbers.BigInt
@@ -298,7 +299,7 @@ class OpenTheoryEngine internal constructor(
                 cancellation = cancellation,
                 budget = presolveBudget,
                 projections = projections,
-                presolveCancellation = presolveCancellation.withAccounting(cancellation) or cancellation,
+                presolveCancellation = presolveCancellation.withAccounting(cancellation).includingStop(cancellation),
                 capturedPlan = capturedPlan,
             )
         },
@@ -368,7 +369,7 @@ class OpenTheoryEngine internal constructor(
         nodePolicy: SearchNodePolicy,
     ): OpenTheoryStart {
         val work = state.work
-        val cancellation = params.timeout.withAccounting(params.cancellation) or params.cancellation
+        val cancellation = params.timeout.withAccounting(params.cancellation).includingStop(params.cancellation)
         val stats = SolveStatsSink(backend = declaredRoute.backendName())
         stats.start()
         // Preparation reads the whole model, so a budget already spent is answered before that work
@@ -580,7 +581,7 @@ class OpenTheoryEngine internal constructor(
 
     /** The preparation allowance and the solve's own stop, whichever fires first. */
     private fun alsoStoppedBy(cancellation: ExecutionControl): ExecutionControl =
-        preparationCancellation or cancellation
+        preparationCancellation.includingStop(cancellation)
 
     private fun unknown(
         timedOut: Boolean,

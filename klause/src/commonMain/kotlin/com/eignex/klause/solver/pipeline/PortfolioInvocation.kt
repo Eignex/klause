@@ -23,6 +23,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.TimeSource
 
 internal data class PortfolioInvocationControls(
@@ -180,7 +181,7 @@ internal class PortfolioInvocation(
 
     override fun solve(cancellation: ExecutionControl): SolveResult {
         check(!closed) { "portfolio invocation is closed" }
-        return withPreparationStats(portfolio.solve(controls.cancellation or cancellation))
+        return withPreparationStats(portfolio.solve(controls.cancellation.includingStop(cancellation)))
     }
 
     override fun minimize(
@@ -190,9 +191,9 @@ internal class PortfolioInvocation(
         check(!closed) { "portfolio invocation is closed" }
         val incumbents = optimizationIncumbents
         val result = if (incumbents == null) {
-            portfolio.minimize(controls.cancellation or cancellation, onImprovement)
+            portfolio.minimize(controls.cancellation.includingStop(cancellation), onImprovement)
         } else {
-            portfolio.minimize(controls.cancellation or cancellation, onImprovement, incumbents)
+            portfolio.minimize(controls.cancellation.includingStop(cancellation), onImprovement, incumbents)
         }
         return withPreparationStats(result)
     }
@@ -206,7 +207,7 @@ internal class PortfolioInvocation(
     ): MinimizeResult {
         check(!closed) { "portfolio invocation is closed" }
         val result = portfolio.minimize(
-            controls.cancellation or cancellation,
+            controls.cancellation.includingStop(cancellation),
             onImprovement,
             incumbents,
             terminalCheck,

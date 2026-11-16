@@ -674,14 +674,13 @@ class ExactLiraSearchComponent private constructor(
         pointHintValues = null
         val rows = pointHintRows ?: return
         if (point.size != model.numRealVars + model.numIntVars || operationStop() || pointHintStop()) return
-        val poll = hintStop
         operationAccounting?.charge(model.numBoolVars.toLong() + point.size + 1L)
-        if (operationStop() || point.any { !hintScalar(it, poll) }) return
+        if (operationStop() || point.any { hintStop.poll() || !hintScalar(it) }) return
         if (operationStop() || pointHintStop()) return
         val values = IntArray(model.numBoolVars) { UNASSIGNED }
         for (prepared in rows) {
             operationAccounting?.charge(1)
-            if (hintStopped(poll)) return
+            if (hintStop.poll()) return
             val variable = prepared.row.activator
             if (values[variable] == DECLINED_HINT) continue
             val comparison = if (prepared.disjunction) {
@@ -689,11 +688,11 @@ class ExactLiraSearchComponent private constructor(
             } else {
                 prepared.form.hintComparison(
                     { variable -> bools[variable].takeIf { it != UNASSIGNED }?.let { it == TRUE } },
-                    { hintScalar(it, poll) },
-                    { left, right -> hintPreflight(left, right, poll) },
+                    { !hintStop.poll() && hintScalar(it) },
+                    ::hintPreflight,
                 )
             }
-            val preference = comparison?.let { hintTruth(it, point, poll) }
+            val preference = comparison?.let { hintTruth(it, point) }
             if (preference == null) {
                 values[variable] = DECLINED_HINT
                 continue
@@ -705,7 +704,7 @@ class ExactLiraSearchComponent private constructor(
                 values[variable] = value
             }
         }
-        if (poll() || operationStop() || pointHintStop()) return
+        if (hintStop() || operationStop() || pointHintStop()) return
         pointHintLevel = context.decisionLevel
         pointHintValues = values
         smtStats?.observePointHintCapture(graph)
@@ -715,27 +714,20 @@ class ExactLiraSearchComponent private constructor(
     private fun hintTruth(
         comparison: ExactComparison,
         point: List<BigFraction>,
-        poll: LinearOperationCancellation? = null,
-    ): Boolean? = hintTruth(comparison, poll) { point.getOrNull(it) }
+    ): Boolean? = hintTruth(comparison) { point.getOrNull(it) }
 
-    private inline fun hintTruth(comparison: ExactComparison, value: (Int) -> BigFraction?): Boolean? =
-        hintTruth(comparison, null, value)
-
-    private inline fun hintTruth(
-        comparison: ExactComparison,
-        poll: LinearOperationCancellation?,
-        value: (Int) -> BigFraction?,
-    ): Boolean? {
+    private inline fun hintTruth(comparison: ExactComparison, value: (Int) -> BigFraction?): Boolean? {
         var activity = BigFraction.ZERO
         for ((column, coefficient) in comparison.terms) {
+            if (hintStop.poll()) return null
             val coordinate = value(column) ?: return null
-            if (!hintPreflight(coefficient, coordinate, poll)) return null
+            if (!hintPreflight(coefficient, coordinate)) return null
             val product = coefficient * coordinate
-            if (!hintScalar(product, poll) || !hintPreflight(activity, product, poll)) return null
+            if (!hintScalar(product) || !hintPreflight(activity, product)) return null
             activity += product
-            if (!hintScalar(activity, poll)) return null
+            if (!hintScalar(activity)) return null
         }
-        if (!hintPreflight(activity, comparison.bound, poll)) return null
+        if (!hintPreflight(activity, comparison.bound)) return null
         return when (comparison.op) {
             LinearOp.LE -> if (comparison.strict) activity < comparison.bound else activity <= comparison.bound
             LinearOp.GE -> if (comparison.strict) activity > comparison.bound else activity >= comparison.bound
@@ -744,26 +736,20 @@ class ExactLiraSearchComponent private constructor(
         }
     }
 
-    private fun hintScalar(value: BigFraction): Boolean = hintScalar(value, null)
-
-    private fun hintScalar(value: BigFraction, poll: LinearOperationCancellation?): Boolean {
+    private fun hintScalar(value: BigFraction): Boolean {
         val bits = maxOf(value.num.magnitudeBitLength(), value.den.magnitudeBitLength())
         operationAccounting?.charge(1L + bits / Long.SIZE_BITS)
-        return bits <= MAX_POINT_HINT_BITS && !hintStopped(poll)
+        return bits <= MAX_POINT_HINT_BITS
     }
 
-    private fun hintPreflight(left: BigFraction, right: BigFraction): Boolean = hintPreflight(left, right, null)
-
-    private fun hintPreflight(left: BigFraction, right: BigFraction, poll: LinearOperationCancellation?): Boolean {
+    private fun hintPreflight(left: BigFraction, right: BigFraction): Boolean {
         val bits = maxOf(left.num.magnitudeBitLength(), left.den.magnitudeBitLength()).toLong() +
             maxOf(right.num.magnitudeBitLength(), right.den.magnitudeBitLength()) + 2L
         if (bits > MAX_POINT_HINT_BITS * 2L + 2L) return false
         val words = bits / Long.SIZE_BITS + 1L
         operationAccounting?.charge(bits + words * words)
-        return !hintStopped(poll)
+        return true
     }
-
-    private fun hintStopped(poll: LinearOperationCancellation?): Boolean = (poll ?: hintStop).poll()
 
     init {
         require(preparedSource.validated || model.supportsExactLira() || model.supportsExactLra()) {
@@ -1139,7 +1125,7 @@ class ExactLiraSearchComponent private constructor(
         operationAccounting?.charge(width * width + 3L * width)
         if (operationStop() || pointHintStop()) return null
         val terms = system.sourceTerms(atom) ?: return null
-        if (!hintScalar(atom.threshold) || terms.values.any { !hintScalar(it) }) return null
+        if (!hintScalar(atom.threshold) || terms.values.any { hintStop.poll() || !hintScalar(it) }) return null
         return ExactComparison(
             terms,
             atom.threshold,
@@ -1167,7 +1153,7 @@ class ExactLiraSearchComponent private constructor(
             coordinate?.takeIf(::hintScalar)
         }
         var preferred = first
-        if (hintScalar(comparison.bound) && comparison.terms.values.all(::hintScalar)) {
+        if (hintScalar(comparison.bound) && comparison.terms.values.all { !hintStop.poll() && hintScalar(it) }) {
             val different = hintTruth(comparison, value)
             if (different == false) observeCompleteStage("DISEQUALITY_POINT_ON_ROW")
             if (different == true) {
@@ -1329,7 +1315,7 @@ class ExactLiraSearchComponent private constructor(
     }
 
     private fun assertSourceWithin(context: SearchContext): Boolean {
-        if (!installSource() || !lp.atLevel(context.decisionLevel, operationStop)) return false
+        if (!installSource() || !lp.atLevel(context.decisionLevel, lpStop)) return false
         val rootFixings = if (incrementalSourceRows && context.decisionLevel == 0) {
             sourceRootFixings() ?: return false
         } else {

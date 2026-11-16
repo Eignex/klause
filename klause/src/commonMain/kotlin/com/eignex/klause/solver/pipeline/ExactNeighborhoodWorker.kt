@@ -10,6 +10,8 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.Duration.Companion.milliseconds
 
 internal fun exactNeighborhoodWorker(
@@ -23,12 +25,14 @@ internal fun exactNeighborhoodWorker(
     pendingIncumbentTrial: () -> Boolean = { false },
     open: () -> ExactNeighborhood,
 ): PortfolioWorker {
-    fun stop(global: ExecutionControl) = lifetime or global or ExecutionControl(exhausted)
-    fun slice(global: ExecutionControl, millis: Long) = stop(global) or
-        if (millis == Long.MAX_VALUE) ExecutionControl.Never else ExecutionControl.after(millis.milliseconds)
+    fun stop(global: ExecutionControl) = lifetime.includingStop(global) or ExecutionControl(exhausted)
+    fun slice(global: ExecutionControl, millis: Long) = (
+        stop(global) or
+            if (millis == Long.MAX_VALUE) ExecutionControl.Never else ExecutionControl.after(millis.milliseconds)
+        ).bindStopControl()
     fun reason(global: ExecutionControl) = if (timeout()) {
         TerminationReason.Timeout
-    } else if ((lifetime or global)()) {
+    } else if (lifetime.includingStop(global)()) {
         TerminationReason.Cancelled
     } else if (declined()) {
         TerminationReason.RepresentationDeclined
@@ -74,7 +78,7 @@ internal fun exactNeighborhoodWorker(
             },
             solve = { global, budget ->
                 open().use { search ->
-                    search.advance(stop(global), budget ?: Long.MAX_VALUE)
+                    search.advance(stop(global).bindStopControl(), budget ?: Long.MAX_VALUE)
                     search.solveResult(reason(global))
                 }
             },
@@ -134,7 +138,7 @@ internal fun exactNeighborhoodWorker(
         },
         improvements = { _, _, global, budget ->
             open().use { search ->
-                search.advance(stop(global), budget ?: Long.MAX_VALUE)
+                search.advance(stop(global).bindStopControl(), budget ?: Long.MAX_VALUE)
                 sequenceOf(search.minimizeResult(reason(global)))
             }
         },

@@ -1,22 +1,24 @@
 package com.eignex.klause.util
 
+import kotlin.jvm.JvmField
+
 // Clock cadence counts visits independently of their work prices. Native allowances admit credit before a scan
 // advances; other sinks accumulate completed debits. A boundary settles credit and observes the containing stop.
 internal class ScanMeter(private val cancellation: ExecutionControl) : AutoCloseable {
-    private var remaining = 0
+    @JvmField var remaining = 0
+    @JvmField val polling = cancellation.stopPolling
     private val meter = cancellation.accounting
     private val source = cancellation.admission
-    private val native = source?.takeIf { it.metered }
-    private var reservation: WorkReservation? = null
-    private var used = 0
-    private var pending = 0L
-    var stopped = false
-        private set
+    @JvmField val native = source?.takeIf { it.metered }
+    @JvmField var reservation: WorkReservation? = null
+    @JvmField var used = 0
+    @JvmField var pending = 0L
+    @JvmField var stopped = false
 
     @Suppress("NOTHING_TO_INLINE") // Scalar scans keep only their local counters in the loop.
     inline fun visit(units: Long): Boolean {
         if (stopped) return false
-        if (remaining-- <= 0 && !poll()) return false
+        if ((polling?.due(1) ?: (remaining-- <= 0)) && !poll()) return false
         if (native == null) {
             pending += minOf(units, Long.MAX_VALUE - pending)
             return true
@@ -59,7 +61,7 @@ internal class ScanMeter(private val cancellation: ExecutionControl) : AutoClose
 
     fun check(): Boolean {
         flush()
-        return poll()
+        return if (polling?.due(1) != false) poll() else !stopped
     }
 
     private fun poll(): Boolean {

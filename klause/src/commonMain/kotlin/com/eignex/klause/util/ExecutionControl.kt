@@ -11,13 +11,13 @@ open class ExecutionControl(
     /** Accounting owner; charging it never evaluates [cancellationPredicate]. */
     accounting: WorkMeter? = null,
 ) {
-    private val initialPredicate = cancellationPredicate
+    private val initialPredicate = if (cancellationPredicate === Cancellation.Never) null else cancellationPredicate
     private val initialAccounting = accounting
     private var accountingOwner: ExecutionControl? = null
 
     /** Stop predicate evaluated at execution checkpoints. */
     val cancellationPredicate: Cancellation get() {
-        val owner = accountingOwner ?: return initialPredicate
+        val owner = accountingOwner ?: return initialPredicate ?: Cancellation.Never
         return object : Cancellation {
             override fun isCancelled(): Boolean = owner()
             override fun deadline() = owner.deadline()
@@ -33,6 +33,8 @@ open class ExecutionControl(
 
     internal open val stopPolling: StopPolling? get() = accountingOwner?.stopPolling
 
+    internal open val containingStop: ExecutionControl? get() = null
+
     /** Retain an explicitly selected owner's accounting while adapting its stop predicate. */
     constructor(owner: ExecutionControl) : this() {
         accountingOwner = owner
@@ -42,14 +44,14 @@ open class ExecutionControl(
     fun withAccounting(owner: ExecutionControl): ExecutionControl = AccountingExecutionControl(this, owner)
 
     /** Observe the live stop predicate. */
-    open fun isCancelled(): Boolean = accountingOwner?.invoke() ?: initialPredicate.isCancelled()
+    open fun isCancelled(): Boolean = accountingOwner?.invoke() ?: initialPredicate?.isCancelled() ?: false
 
     /** Observe the live stop predicate. */
     @Suppress("NOTHING_TO_INLINE") // Keep callable forwarding out of bounded C1 inlining depth.
     inline operator fun invoke(): Boolean = this !== Never && isCancelled()
 
     /** Current containing deadline, when one is supplied. */
-    open fun deadline(): ComparableTimeMark? = accountingOwner?.deadline() ?: initialPredicate.deadline()
+    open fun deadline(): ComparableTimeMark? = accountingOwner?.deadline() ?: initialPredicate?.deadline()
 
     /** Record completed accounting without evaluating the stop predicate. */
     @Suppress("NOTHING_TO_INLINE") // Hot callers bind the sink without a forwarding method.
@@ -91,7 +93,10 @@ open class ExecutionControl(
         val Never = ExecutionControl()
 
         /** Execution stopped at [deadline]. */
-        fun until(deadline: ComparableTimeMark): ExecutionControl = DeadlineExecutionControl(deadline)
+        fun until(deadline: ComparableTimeMark): ExecutionControl = when (val predicate = Cancellation.until(deadline)) {
+            is MonotonicDeadline -> MonotonicDeadlineExecutionControl(deadline, predicate)
+            else -> GenericDeadlineExecutionControl(deadline, predicate)
+        }
 
         /** Execution stopped after [duration]. */
         fun after(duration: Duration): ExecutionControl = until(TimeSource.Monotonic.markNow() + duration)
@@ -127,6 +132,12 @@ private class OrExecutionControl(owner: ExecutionControl, private val other: Exe
         val identity = selected.quotaOwner ?: return selected
         var bound: ArithmeticWorkSource? = null
         var remaining = selected.quotaRemaining
+        val attached = other.admission
+        val attachedCredit = if (attached?.quotaOwner === identity) attached.quotaRemaining else null
+        if (attachedCredit != null && (remaining == null || attachedCredit < remaining)) {
+            remaining = attachedCredit
+            bound = attached
+        }
         for (predicate in predicates) {
             val observed = predicate.admission ?: continue
             if (observed.quotaOwner !== identity) continue
@@ -159,6 +170,61 @@ private fun stopRoot(control: ExecutionControl): ExecutionControl {
     var root = control
     while (root is AccountingExecutionControl) root = root.stop
     return root
+}
+
+// Scope plumbing can retain a containing stop without attaching its complete predicate sequence again.
+// Explicit repetition within either sequence is preserved, as are independent quota and polling owners.
+internal fun ExecutionControl.includingStop(other: ExecutionControl): ExecutionControl {
+    if (this === other || other === ExecutionControl.Never) return this
+    if (other.admission != null || (other.workScheduled && !workScheduled) ||
+        (other.stopPolling != null && other.stopPolling !== stopPolling)
+    ) {
+        return this or other
+    }
+    val end = deadline()
+    val otherEnd = other.deadline()
+    val deadlineCovered = otherEnd == null || (end != null && end <= otherEnd)
+    val own = stopRoot(this)
+    val containing = stopRoot(other)
+    if (deadlineCovered && containsStop(own, containing)) return this
+    if ((end == null || (otherEnd != null && otherEnd <= end)) &&
+        workScheduled == other.workScheduled && stopPolling === other.stopPolling && containsStop(containing, own)
+    ) {
+        return other.withAccounting(this)
+    }
+    val predicates = (own as? OrExecutionControl)?.predicates ?: arrayOf(own)
+    val required = (containing as? OrExecutionControl)?.predicates ?: arrayOf(containing)
+    val count = required.size
+    if (deadlineCovered) {
+        for (start in 0..predicates.size - count) {
+            if ((0 until count).all { containsStop(predicates[start + it], required[it]) }) return this
+        }
+    }
+    for (overlap in minOf(predicates.size, count) downTo 1) {
+        if (!(0 until overlap).all { containsStop(predicates[predicates.size - overlap + it], required[it]) }) continue
+        var joined = this
+        for (index in overlap until count) joined = joined or required[index]
+        val joinedEnd = joined.deadline()
+        if (otherEnd == null || (joinedEnd != null && joinedEnd <= otherEnd)) return joined
+    }
+    return this or other
+}
+
+private fun containsStop(control: ExecutionControl, required: ExecutionControl): Boolean {
+    var current = stopRoot(control)
+    while (current !== required) {
+        val predicates = (current as? OrExecutionControl)?.predicates
+        if (predicates != null) {
+            val sequence = (required as? OrExecutionControl)?.predicates
+                ?: return predicates.any { containsStop(it, required) }
+            for (start in 0..predicates.size - sequence.size) {
+                if (sequence.indices.all { containsStop(predicates[start + it], sequence[it]) }) return true
+            }
+            return false
+        }
+        current = current.containingStop?.let(::stopRoot) ?: return false
+    }
+    return true
 }
 
 private fun combineStops(owner: ExecutionControl, other: ExecutionControl): Array<ExecutionControl> {
@@ -204,6 +270,16 @@ private class PredicateExecutionControl(
     override val stopPolling get() = pollingOf()
 }
 
-private class DeadlineExecutionControl(val end: ComparableTimeMark) : ExecutionControl(Cancellation.until(end)) {
+private abstract class DeadlineExecutionControl(val end: ComparableTimeMark) : ExecutionControl() {
     override fun deadline(): ComparableTimeMark = end
+}
+
+private class MonotonicDeadlineExecutionControl(end: ComparableTimeMark, private val predicate: MonotonicDeadline) :
+    DeadlineExecutionControl(end) {
+    override fun isCancelled(): Boolean = predicate.isCancelled()
+}
+
+private class GenericDeadlineExecutionControl(end: ComparableTimeMark, private val predicate: Cancellation) :
+    DeadlineExecutionControl(end) {
+    override fun isCancelled(): Boolean = predicate.isCancelled()
 }

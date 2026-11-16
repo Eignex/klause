@@ -36,23 +36,30 @@ fun interface Cancellation {
         fun after(duration: Duration): Cancellation = until(TimeSource.Monotonic.markNow() + duration)
 
         /** Stop at [deadline]. */
-        fun until(deadline: ComparableTimeMark): Cancellation = if (deadline is TimeSource.Monotonic.ValueTimeMark) {
-            MonotonicDeadline(deadline)
-        } else {
-            object : Cancellation {
-                override fun isCancelled(): Boolean = deadline.hasPassedNow()
-                override fun deadline(): ComparableTimeMark = deadline
+        fun until(deadline: ComparableTimeMark): Cancellation {
+            if (deadline !is TimeSource.Monotonic.ValueTimeMark) {
+                return object : Cancellation {
+                    override fun isCancelled(): Boolean = deadline.hasPassedNow()
+                    override fun deadline(): ComparableTimeMark = deadline
+                }
+            }
+            val remaining = -deadline.elapsedNow()
+            return when {
+                remaining <= Duration.ZERO -> ConstantDeadline(deadline, true)
+                remaining == Duration.INFINITE -> ConstantDeadline(deadline, false)
+                else -> MonotonicDeadline(deadline, remaining.inWholeNanoseconds)
             }
         }
     }
 }
 
-private class MonotonicDeadline(private val end: ComparableTimeMark) : Cancellation {
-    private val remaining = -end.elapsedNow()
-    private val started = monotonicNanos()
-    private val nanos = remaining.inWholeNanoseconds
-    private val expired = remaining <= Duration.ZERO
-    private val unbounded = remaining == Duration.INFINITE
+internal class MonotonicDeadline(private val end: ComparableTimeMark, nanos: Long) : Cancellation {
+    private val atNanos = monotonicNanos() + nanos
     override fun deadline(): ComparableTimeMark = end
-    override fun isCancelled(): Boolean = expired || (!unbounded && monotonicNanos() - started >= nanos)
+    override fun isCancelled(): Boolean = monotonicNanos() - atNanos >= 0L
+}
+
+private class ConstantDeadline(private val end: ComparableTimeMark, private val stopped: Boolean) : Cancellation {
+    override fun deadline(): ComparableTimeMark = end
+    override fun isCancelled(): Boolean = stopped
 }

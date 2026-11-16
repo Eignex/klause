@@ -71,14 +71,10 @@ internal fun CommonOptions.invocationCancellation(): ExecutionControl {
     }.also { invocationStop = it }
 }
 
-internal class RoutingPreparationScope(private val containing: ExecutionControl, private var meter: WorkMeter?) :
-    ExecutionControl(),
-    AutoCloseable {
-    override fun isCancelled(): Boolean = containing()
-
-    override fun deadline() = containing.deadline()
-
-    override val accounting: WorkMeter? get() = meter
+internal class RoutingPreparationScope(containing: ExecutionControl, private var meter: WorkMeter?) : AutoCloseable {
+    val control = containing.withAccounting(object : ExecutionControl() {
+        override val accounting get() = meter
+    })
 
     override fun close() {
         // Retained source invocations keep the containing stop, not the preparation ledger.

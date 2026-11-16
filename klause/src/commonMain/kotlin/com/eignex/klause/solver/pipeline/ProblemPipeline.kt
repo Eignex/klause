@@ -13,6 +13,7 @@ import com.eignex.klause.solver.result.LpRoute
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.LpStatsSink
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.ScanMeter
 
 /** The solver pipeline selected once from a source [Problem]. */
 enum class ProblemPipeline {
@@ -382,16 +383,16 @@ private fun Problem.pipelineRouteObserved(
 }
 
 private fun Problem.nativeFiniteSource(projections: PreparedFactorProjections, stop: ExecutionControl): Boolean {
-    if (numRealVars != 0) return false
-    for (variable in 0 until numIntVars) {
-        stop.charge(1)
-        if (stop() || !intBounds.hasLower(variable) || !intBounds.hasUpper(variable)) return false
+    if (numRealVars != 0 || stop()) return false
+    ScanMeter(stop).use { scan ->
+        for (variable in 0 until numIntVars) {
+            if (!scan.visit(1) || !intBounds.hasLower(variable) || !intBounds.hasUpper(variable)) return false
+        }
+        for (index in factors.indices) {
+            if (!scan.visit(1) || !finiteRealFactorSupported(index, projections)) return false
+        }
+        return scan.check()
     }
-    for (index in factors.indices) {
-        stop.charge(1)
-        if (stop() || !finiteRealFactorSupported(index, projections)) return false
-    }
-    return !stop()
 }
 
 /**

@@ -104,12 +104,12 @@ internal object PresolveRoundEngine {
                 changedSince >= changeForCost.getValue(pass)
         }
 
-        while (round < maxRounds && !cancellation()) {
+        while (round < maxRounds && !cancellation.presolveStopped()) {
             budget?.recordRound()
             var ranAny = false
             var eligible = passes.count(::due)
             for (pass in passes) {
-                if (cancellation()) break
+                if (cancellation.presolveStopped()) break
                 if (!due(pass)) continue
                 ranAtVersion[pass] = version
                 ranAny = true

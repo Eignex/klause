@@ -19,6 +19,8 @@ import com.eignex.klause.solver.PreparedFactorProjections
 import com.eignex.klause.solver.SelectedEncoderRequest
 import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.numbers.BigInt
 
 internal class EncodedTheoryFactor private constructor(
@@ -74,7 +76,7 @@ internal fun PreparedFactorProjections.linearTheoryModel(
 ): Problem? {
     require(request.selection === this) { "encoder request belongs to a different canonical source" }
     require(request.target != EncodingTarget.POLYNOMIAL)
-    val stop = request.cancellation
+    val stop = request.cancellation.bindStopControl()
     if (stop()) {
         onDecline(EncoderDecline.RESOURCE)
         return null
@@ -147,7 +149,7 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
     completeFiniteConditions: Boolean,
     conditions: EncodingConditions = EncodingConditions(integerPins, booleanPins),
 ): List<EncodedTheoryFactor>? {
-    if (cancellation()) {
+    if (cancellation.pollStop()) {
         onDecline(EncoderDecline.RESOURCE)
         return null
     }
@@ -191,7 +193,7 @@ private fun PreparedFactorProjections.installSelectedLinearFactor(
         onDecline(EncoderDecline.RESOURCE)
         return null
     }
-    if (cancellation()) {
+    if (cancellation.pollStop()) {
         onDecline(EncoderDecline.RESOURCE)
         return null
     }

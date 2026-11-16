@@ -23,6 +23,43 @@ class ArithmeticExecutionTest {
     private val execution = ArithmeticExecution(token) { error("cancelled") }
 
     @Test
+    fun `settling partial credit should retain the containing checkpoint cadence`() {
+        assertFailsWith<IllegalStateException> {
+            execution.operation(8) {
+                repeat(3) { execution.step() }
+                execution.flush()
+                stopped = true
+                repeat(5) { execution.step() }
+            }
+        }
+
+        assertEquals(8L, pool.spent)
+    }
+
+    @Test
+    fun `weighted polling should share the admitted work cursor`() {
+        assertFailsWith<IllegalStateException> {
+            execution.operation(8) {
+                repeat(2) { execution.step() }
+                execution.pollingCost(4)
+                stopped = true
+                repeat(2) { execution.step() }
+            }
+        }
+
+        assertEquals(4L, pool.spent)
+    }
+
+    @Test
+    fun `bulk admission should preserve the containing work ceiling`() {
+        assertFailsWith<IllegalStateException> {
+            execution.operation(32) { execution.advance(101) {} }
+        }
+
+        assertEquals(100L, pool.spent)
+    }
+
+    @Test
     fun `copying an owner should retain its adapted admission allowance`() {
         val selected = WorkCreditPool(3)
         val adapted = object : ExecutionControl(token) {

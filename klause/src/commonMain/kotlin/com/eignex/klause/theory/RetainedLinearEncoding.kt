@@ -4,6 +4,8 @@ import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.RetainedFactors
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.pollStop
 
 internal class RetainedLinearEncoding(
     private val mapping: RetainedFactors,
@@ -18,9 +20,16 @@ internal class RetainedLinearEncoding(
         val factors = ArrayList<Factor>()
         val origins = ArrayList<Int>()
         val covered = BooleanArray(mapping.target.numFactors)
+        val stop = if (cancellation.stopPolling == null) cancellation.bindStopControl() else cancellation
+        val meter = stop.accounting
+        val sourceQuota = stop.admission
         for (factor in encoded.factors) {
-            cancellation.charge(1)
-            if (cancellation()) return null
+            meter?.charge(1)
+            if (sourceQuota?.exhausted == true) {
+                stop()
+                return null
+            }
+            if (stop.pollStop()) return null
             val row = factor as? EncodedTheoryFactor ?: return null
             val attribution = row.attribution
             val index = targetIds.getOrNull(attribution.sourceFactorIndex) ?: return null
@@ -36,7 +45,7 @@ internal class RetainedLinearEncoding(
             origins += index
             covered[index] = true
         }
-        if (indices.any { !covered[it] }) return null
+        if (stop() || indices.any { !covered[it] }) return null
         return EncodedTheoryModel(
             mapping.target,
             factors.toTypedArray(),

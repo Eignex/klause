@@ -3,8 +3,12 @@ package com.eignex.klause.lowering
 import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 
 internal class LinearFormulaLowering(private val cancellation: ExecutionControl) {
+    private val accounting = cancellation.accounting
+    private val admission = cancellation.admission
+
     fun relation(form: LinearForm): List<List<LinearRow>> {
         require(form !is LinearForm.Relaxation) { "a relaxation cannot enforce a source factor" }
         checkpoint(form.rows.size.toLong() + 1)
@@ -49,9 +53,9 @@ internal class LinearFormulaLowering(private val cancellation: ExecutionControl)
     }
 
     fun checkpoint(units: Long = 1) {
-        if (cancellation()) throw LinearEncodingInterrupted()
-        cancellation.charge(units)
-        if (cancellation()) throw LinearEncodingInterrupted()
+        if (cancellation.pollStop()) throw LinearEncodingInterrupted()
+        accounting?.charge(units)
+        if (admission?.exhausted == true || cancellation.pollStop()) throw LinearEncodingInterrupted()
     }
 }
 

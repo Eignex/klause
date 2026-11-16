@@ -6,6 +6,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Term
 import com.eignex.klause.lowering.PolynomialSourceInterrupted
+import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
@@ -271,11 +272,12 @@ internal class SmtLibAffineRealTables(cancellation: ExecutionControl, entryLimit
         }
 
         fun spend(units: Long = 1) {
-            poll()
-            if (units > remaining) throw Limit()
+            if (units > remaining) {
+                poll()
+                throw Limit()
+            }
             remaining -= units
-            cancellation.charge(units)
-            poll()
+            cancellation.polynomialSourceCheckpoint(units)
         }
 
         fun add(first: BigInt, second: BigInt): BigInt {

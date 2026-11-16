@@ -1,5 +1,7 @@
 package com.eignex.klause.util
 
+import kotlin.jvm.JvmField
+
 internal interface ArithmeticWorkSource {
     val metered: Boolean get() = true
     val quotaOwner: Any? get() = null
@@ -9,7 +11,7 @@ internal interface ArithmeticWorkSource {
     fun reserve(maximum: Int): WorkReservation?
 }
 
-internal class WorkReservation(val capacity: Int, private val settlement: (Int) -> Unit) {
+internal class WorkReservation(@JvmField val capacity: Int, private val settlement: (Int) -> Unit) {
     private var settled = false
 
     init {
@@ -94,19 +96,20 @@ internal fun serialArithmeticSource(
 // A cursor belongs to one arithmetic owner. Scope exit settles every admitted debit, including exceptional exits.
 @Suppress("TooGenericExceptionCaught") // settlement must preserve arbitrary primary and cleanup failures
 internal class ArithmeticExecution(
-    private val cancellation: ExecutionControl,
+    @JvmField val cancellation: ExecutionControl,
     private val interrupted: () -> Nothing,
 ) {
-    private var source: ArithmeticWorkSource? = null
-    private var accounting: WorkMeter? = null
-    private var metered = false
-    val unchecked: Boolean = cancellation === ExecutionControl.Never
-    private var depth = 0
-    private var quantum = 8192
-    private var untilPoll = quantum
-    private var reservation: WorkReservation? = null
-    private var used = 0
-    private var stopped = false
+    @JvmField var source: ArithmeticWorkSource? = null
+    @JvmField var accounting: WorkMeter? = null
+    @JvmField var metered = false
+    @JvmField val unchecked: Boolean = cancellation === ExecutionControl.Never
+    @JvmField var depth = 0
+    @JvmField var quantum = 8192
+    @JvmField var untilPoll = quantum
+    @JvmField var admittedUntil = 0
+    @JvmField var reservation: WorkReservation? = null
+    @JvmField var used = 0
+    @JvmField var stopped = false
 
     val batching: Boolean get() = depth != 0
     val admittedWork: Long get() = if (reservation == null) 0L else used.toLong()
@@ -130,6 +133,7 @@ internal class ArithmeticExecution(
             } else {
                 this.quantum = previousQuantum
                 untilPoll = minOf(untilPoll, previousQuantum)
+                reservation?.let { admittedUntil = minOf(admittedUntil, used + minOf(previousQuantum, it.capacity - used)) }
             }
         }
     }
@@ -207,20 +211,23 @@ internal class ArithmeticExecution(
             if (--untilPoll == 0) poll()
             return
         }
-        if (reservation == null) {
-            while (reservation == null) {
-                // A sibling can temporarily hold the remaining credit without having spent it.
-                reservation = source!!.reserve(32768)
-                if (reservation == null) checkpoint()
-            }
-        }
+        if (reservation == null) reserve()
         beforeDebit()
         used++
-        if (used == reservation!!.capacity) {
-            checkpoint()
-        } else if (--untilPoll == 0) {
-            poll()
+        if (used == admittedUntil) admittedBoundary()
+    }
+
+    private fun reserve() {
+        while (reservation == null) {
+            // A sibling can temporarily hold the remaining credit without having spent it.
+            reservation = source!!.reserve(32768)
+            if (reservation == null) checkpoint()
         }
+        admittedUntil = minOf(checkNotNull(reservation).capacity, untilPoll)
+    }
+
+    private fun admittedBoundary() {
+        if (used == checkNotNull(reservation).capacity) checkpoint() else poll()
     }
 
     private fun stepOutsideOperation(beforeDebit: () -> Unit) {
@@ -258,28 +265,28 @@ internal class ArithmeticExecution(
         var remaining = units
         while (remaining > 0) {
             if (stopped) interrupted()
-            if (metered && reservation == null) {
-                while (reservation == null) {
-                    reservation = source!!.reserve(32768)
-                    if (reservation == null) checkpoint()
-                }
-            }
-            val count = minOf(remaining, untilPoll, reservation?.let { it.capacity - used } ?: Int.MAX_VALUE)
+            if (metered && reservation == null) reserve()
+            val count = minOf(remaining, if (metered) admittedUntil - used else untilPoll)
             beforeDebit(count)
-            if (metered) used += count else accounting?.charge(count.toLong())
             remaining -= count
-            untilPoll -= count
-            if (reservation?.capacity == used) {
-                checkpoint()
-            } else if (untilPoll == 0) {
-                poll()
+            if (metered) {
+                used += count
+                if (used == admittedUntil) admittedBoundary()
+            } else {
+                accounting?.charge(count.toLong())
+                untilPoll -= count
+                if (untilPoll == 0) poll()
             }
         }
     }
 
     fun pollingCost(units: Int) {
         if (unchecked || depth == 0 || units == 0) return
-        if (units >= untilPoll) poll() else untilPoll -= units
+        if (metered && reservation != null) {
+            if (units >= admittedUntil - used) poll() else admittedUntil -= units
+        } else {
+            if (units >= untilPoll) poll() else untilPoll -= units
+        }
     }
 
     fun checkpoint() {
@@ -297,6 +304,7 @@ internal class ArithmeticExecution(
 
     private fun poll() {
         untilPoll = quantum
+        admittedUntil = reservation?.let { used + minOf(quantum, it.capacity - used) } ?: 0
         val cancelled = cancellation() || source?.exhausted == true
         if (depth != 0) stopped = stopped || cancelled
         if (cancelled || (depth != 0 && stopped)) interrupted()
@@ -322,6 +330,7 @@ internal class ArithmeticExecution(
     private fun settle() {
         val held = reservation
         val consumed = used
+        if (held != null) untilPoll = minOf(untilPoll, (admittedUntil - used).coerceAtLeast(1))
         reservation = null
         used = 0
         held?.settle(consumed)

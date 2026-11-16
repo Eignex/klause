@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.basis.BasisArithmeticException
 import com.eignex.klause.simplex.basis.BasisOperationWork
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
 import com.eignex.klause.util.workScheduled
 
 internal data class LpScopedMetrics(
@@ -603,7 +604,7 @@ internal class LpScopedSolver(
     ): Boolean {
         requireAvailable()
         editAttempts++
-        if (closed || token()) return false
+        if (closed || token.admission?.exhausted == true || token.pollStop()) return false
         val next = LpBoundTrail(state)
         if (!change(next)) return false
         if (next.state === state) {
@@ -620,11 +621,11 @@ internal class LpScopedSolver(
     }
 
     private fun adoptNumerical(next: LpExactState, token: ExecutionControl): Boolean {
-        val current = solver ?: return !token()
+        val current = solver ?: return !token.pollStop()
         if (next.canProjectWorkingModel(token)) return current.adopt(next, token)
-        if (token()) return false
+        if (token.pollStop()) return false
         retireNumerical()
-        return !token()
+        return !token.pollStop()
     }
 
     private fun retireNumerical() {

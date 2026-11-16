@@ -398,14 +398,14 @@ class CliModePresolveTest {
         val route = assertIs<SourceProblemRoute.OpenTheory>(pipeline.invocation.route)
         assertEquals(ProblemPipeline.EXACT_LIRA, route.request.route)
         assertTrue(common.routingCancellation()())
-        assertFalse(common.routingPreparationCancellation()())
+        assertFalse(common.routingPreparationCancellation().control())
     }
 
     @Test
     fun `required admission should retain routing charges after optional exhaustion`() {
         val common = CommonOptions().apply { engineParams += "presolve-work-limit=1" }
         val optional = common.routingCancellation()
-        val required = common.routingPreparationCancellation()
+        val required = common.routingPreparationCancellation().control
         val budget = checkNotNull(common.presolveBudget)
 
         required.charge(2)
@@ -423,7 +423,7 @@ class CliModePresolveTest {
             engineParams += "open-bound-proof=false"
         }
 
-        val stop = common.routingPreparationCancellation()
+        val stop = common.routingPreparationCancellation().control
 
         assertTrue(stop())
         assertFalse(common.presolveAllowanceInitialized)

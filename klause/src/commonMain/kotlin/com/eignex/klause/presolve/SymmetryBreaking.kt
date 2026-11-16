@@ -541,27 +541,30 @@ internal object SymmetryBreaking {
         fun heldBools(objective: Set<Int>): Set<Int> = objective + readBools.indices.filter { !readBools[it] }
     }
 
-    private fun activeColumns(problem: Problem, columns: ColumnValues, cancellation: ExecutionControl): ActiveColumns? {
+    private fun activeColumns(problem: Problem, columns: ColumnValues, cancellation: ExecutionControl): ActiveColumns? =
+        PresolveScan(cancellation).use { activeColumnsWithin(problem, columns, it) }
+
+    private fun activeColumnsWithin(problem: Problem, columns: ColumnValues, cancellation: PresolveScan): ActiveColumns? {
         cancellation.charge(problem.numIntVars.toLong() + problem.numBoolVars)
-        if (cancellation()) return null
+        if (cancellation.poll()) return null
         val readInts = BooleanArray(problem.numIntVars)
         val readBools = BooleanArray(problem.numBoolVars)
-        var visits = 0
         for (factor in problem.factors) {
             cancellation.charge(1L)
-            if (cancellation()) return null
+            if (cancellation.poll()) return null
             for (variable in factor.intVars) {
                 cancellation.charge(1L)
-                if (visits++ and 63 == 0 && cancellation()) return null
+                if (cancellation.poll()) return null
                 readInts[variable] = true
             }
             for (variable in factor.boolVars) {
                 cancellation.charge(1L)
-                if (visits++ and 63 == 0 && cancellation()) return null
+                if (cancellation.poll()) return null
                 readBools[variable] = true
             }
         }
         // Reconstructed columns have no remaining readers; posting a break would put them back into search.
+        if (cancellation()) return null
         return ActiveColumns(columns, readInts, readBools)
     }
 

@@ -52,7 +52,8 @@ internal object MpsMode : CliMode {
             outputState = MpsOutputState()
             val overrides = common.sourceOverrides(mpsSemantics)
             val parsed = openTextFile(path).useSource { Mps.parse(it) }
-            return common.routingPreparationCancellation().use { stop ->
+            return common.routingPreparationCancellation().use { scope ->
+                val stop = scope.control
                 val source = parsed.toLinearSourceProblem(overrides, stop) ?: return interruptedSolvable(
                     if (stop()) TerminationReason.Timeout else TerminationReason.Cancelled,
                     start.elapsedNow().inWholeMilliseconds,

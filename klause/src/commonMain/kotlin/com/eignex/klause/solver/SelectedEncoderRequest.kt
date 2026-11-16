@@ -8,6 +8,8 @@ import com.eignex.klause.theory.EncoderSupport
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.theory.conditionedLinearSupported
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.pollStop
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.compareTo
@@ -39,14 +41,17 @@ internal class SelectedEncoderRequest private constructor(
             onDecline: (EncoderDecline) -> Unit,
         ): SelectedEncoderRequest? {
             val stop = cancellation.encodingPreparationScope()
+            val polling = stop.bindStopControl()
+            val accounting = stop.accounting
+            val admission = stop.admission
             fun decline(reason: EncoderDecline): SelectedEncoderRequest? {
                 onDecline(reason)
                 return null
             }
             fun stopped(): Boolean {
-                if (stop()) return true
-                stop.charge(1)
-                return stop()
+                if (polling.pollStop()) return true
+                accounting?.charge(1)
+                return admission?.exhausted == true || polling.pollStop()
             }
             if (stop()) return decline(EncoderDecline.RESOURCE)
             val source = selection.problem
@@ -122,6 +127,7 @@ internal fun ExecutionControl.encodingPreparationScope(): ExecutionControl =
 
 @OptIn(ExperimentalAtomicApi::class)
 private class EncodingPreparationCancellation(private val parent: ExecutionControl) : ExecutionControl(parent) {
+    override val containingStop get() = parent
     private val stopped = AtomicBoolean(false)
 
     override fun isCancelled(): Boolean {

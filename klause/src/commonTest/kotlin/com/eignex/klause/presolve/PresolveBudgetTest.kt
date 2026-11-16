@@ -18,6 +18,17 @@ import kotlin.time.TimeSource
 
 class PresolveBudgetTest {
     @Test
+    fun `phase wrapping should enforce the cap when an outer predicate masks its slice`() {
+        val budget = PresolveBudget(10)
+        val masked = budget.slice(2) and ExecutionControl { false }
+        val stop = budget.orSpent(masked)
+
+        budget.charge(10)
+
+        assertTrue(stop())
+    }
+
+    @Test
     fun `nested budget stops should observe charges made by preceding predicates`() {
         val budget = PresolveBudget(100)
         val visited = ArrayList<Int>()

@@ -1,6 +1,8 @@
 package com.eignex.klause.ir
 
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
+import com.eignex.klause.util.pollStop
 
 internal class RetainedFactors private constructor(
     val source: Problem,
@@ -22,10 +24,17 @@ internal class RetainedFactors private constructor(
                 return null
             }
             val indices = IntArray(target.numFactors)
+            val stop = if (cancellation.stopPolling == null) cancellation.bindStopControl() else cancellation
+            val meter = stop.accounting
+            val sourceQuota = stop.admission
             var next = 0
             for (index in source.factors.indices) {
-                cancellation.charge(1)
-                if (cancellation()) return null
+                meter?.charge(1)
+                if (sourceQuota?.exhausted == true) {
+                    stop()
+                    return null
+                }
+                if (stop.pollStop()) return null
                 if (next < target.numFactors && source.factors[index] === target.factors[next]) {
                     if ((source.impliedFactorMask?.get(index) == true) !=
                         (target.impliedFactorMask?.get(next) == true)
@@ -35,6 +44,7 @@ internal class RetainedFactors private constructor(
                     indices[next++] = index
                 }
             }
+            if (stop()) return null
             return if (next == target.numFactors) RetainedFactors(source, target, indices) else null
         }
     }

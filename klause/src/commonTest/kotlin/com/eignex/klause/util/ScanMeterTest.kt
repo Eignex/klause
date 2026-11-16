@@ -8,6 +8,21 @@ import kotlin.test.assertTrue
 
 class ScanMeterTest {
     @Test
+    fun `nested scans should share their containing checkpoint cadence`() {
+        var polls = 0
+        val control = ExecutionControl { polls++; false }.bindStopControl()
+
+        repeat(256) {
+            ScanMeter(control).use { scan ->
+                assertTrue(scan.visit(1L))
+                assertTrue(scan.check())
+            }
+        }
+
+        assertEquals(1, polls)
+    }
+
+    @Test
     fun `scan prices should not multiply cancellation polls`() {
         var polls = 0
         val scan = ScanMeter(

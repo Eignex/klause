@@ -39,6 +39,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.selectedFactorProjections
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
@@ -81,7 +82,7 @@ internal class OpenPortfolio(
     private val completeOnly: Boolean = false,
 ) {
     private val descentVerdict = AtomicReference<OpenTheoryOptimum.Unbounded?>(null)
-    private val lifetime = theoryParams.cancellation or theoryParams.timeout
+    private val lifetime = theoryParams.cancellation.includingStop(theoryParams.timeout)
     private val preparedPlan = preparedSource ?: request?.preparedPlan
         ?: model.prepareExecutionPlan(cancellation = lifetime)
     private val sourceModel = preparedPlan.originalSource as? Problem ?: model
@@ -101,13 +102,13 @@ internal class OpenPortfolio(
         maxInstructions = theoryParams.maxInstructions?.let(slot::heuristicAllowance),
         sourceLpWorkLimit = slot.nativeAllowance(theoryParams.sourceLpWorkLimit),
         sourceLpAllocationLimit = slot.nativeAllowance(theoryParams.sourceLpAllocationLimit),
-        cancellation = theoryParams.cancellation or slot.cancellation,
+        cancellation = theoryParams.cancellation.includingStop(slot.cancellation),
         nodeBudget = slot.nodeBudget,
     )
 
     /** Run the portfolio until an arm settles the model or [cancellation] fires. */
     fun solve(cancellation: ExecutionControl): OpenTheoryResult {
-        val stop = lifetime or cancellation
+        val stop = lifetime.includingStop(cancellation)
         if (stop() || preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
             return OpenTheoryResult.Unknown(
                 if (stop()) theoryParams.preparationStopReason(stop) else TerminationReason.BudgetExhausted,
@@ -115,7 +116,7 @@ internal class OpenPortfolio(
             )
         }
         val firstLocalArm = if (request != null) 1 else 0
-        val localSearch = localSearchFactories(firstLocalArm, lifetime or cancellation, objective = null)
+        val localSearch = localSearchFactories(firstLocalArm, lifetime.includingStop(cancellation), objective = null)
         val factories = buildList {
             request?.let { source ->
                 add(
@@ -143,11 +144,11 @@ internal class OpenPortfolio(
             PortfolioInvocationControls(
                 parallelism = lanes,
                 seed = seed,
-                cancellation = lifetime or cancellation,
+                cancellation = lifetime.includingStop(cancellation),
                 nodeBudget = theoryParams.nodeBudget,
             ),
             PortfolioEvidence(identity, openWitnessVerifier(sourceModel, null, null, stop) { witnessProjection })
-                .bindInvocation(binding, lifetime or cancellation),
+                .bindInvocation(binding, lifetime.includingStop(cancellation)),
         ) { workers ->
             PortfolioInvocationPolicy(
                 ProblemProfile.of(model, optimizing = false),
@@ -172,7 +173,7 @@ internal class OpenPortfolio(
         minimizer: OpenTheoryMinimizer?,
         cancellation: ExecutionControl,
     ): OpenTheoryOptimum {
-        val stop = lifetime or cancellation
+        val stop = lifetime.includingStop(cancellation)
         if (stop() || preparedPlan.decline == PreparedPlanDecline.RESOURCE) {
             return OpenTheoryOptimum.Bounded(
                 null,
@@ -344,7 +345,7 @@ internal class OpenPortfolio(
                 decide(
                     request,
                     workerParams(slot).copy(
-                        cancellation = theoryParams.cancellation or slot.cancellation or slice,
+                        cancellation = theoryParams.cancellation.includingStop(slot.cancellation).includingStop(slice),
                     ),
                 ),
                 worker.evidenceInvocation,
@@ -536,7 +537,7 @@ internal class OpenPortfolio(
                     ) { stop, budget ->
                         engine.solve(
                             params.copy(
-                                cancellation = params.cancellation or stop,
+                                cancellation = params.cancellation.includingStop(stop),
                                 maxInstructions = budget?.let { minOf(it, params.maxInstructions ?: it) },
                             ),
                             warm = null,
@@ -553,7 +554,7 @@ internal class OpenPortfolio(
                         engine.improvements(
                             objective,
                             params.copy(
-                                cancellation = params.cancellation or stop,
+                                cancellation = params.cancellation.includingStop(stop),
                                 initialAssignment = from,
                                 maxInstructions = budget?.let { minOf(it, params.maxInstructions ?: it) },
                             ),

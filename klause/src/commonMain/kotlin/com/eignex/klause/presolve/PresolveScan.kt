@@ -2,19 +2,21 @@ package com.eignex.klause.presolve
 
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.withoutQuotaViews
+import kotlin.jvm.JvmField
 
 internal class PresolveScan(private val parent: ExecutionControl) :
-    ExecutionControl(),
+    ExecutionControl(parent),
     AutoCloseable {
     override val accounting = parent.accounting
     private val source = parent.admission
-    private val physical = source?.withoutQuotaViews()
-    private val budget = source?.quotaOwner as? PresolveBudget
-    private val end = (budget?.spent() ?: 0L).let { spent ->
+    @JvmField val physical = source?.withoutQuotaViews()
+    @JvmField val budget = source?.quotaOwner as? PresolveBudget
+    @JvmField val end = (budget?.spent() ?: 0L).let { spent ->
         spent + minOf(source?.quotaRemaining ?: Long.MAX_VALUE, Long.MAX_VALUE - spent)
     }
-    private var countdown = 0
-    private var stopped = false
+    @JvmField var countdown = 0
+    @JvmField val polling = parent.stopPolling
+    @JvmField var stopped = false
 
     override val admission get() = source
     override val workScheduled get() = parent.workScheduled
@@ -23,7 +25,7 @@ internal class PresolveScan(private val parent: ExecutionControl) :
     @Suppress("NOTHING_TO_INLINE") // Scalar scans keep their countdown and quota reads in the loop.
     inline fun poll(): Boolean {
         if (stopped) return true
-        if (quotaExpired() || countdown-- <= 0) return isCancelled()
+        if (quotaExpired() || (polling?.due(1) ?: (countdown-- <= 0))) return isCancelled()
         return false
     }
 
@@ -42,6 +44,6 @@ internal class PresolveScan(private val parent: ExecutionControl) :
     }
 
     override fun close() {
-        isCancelled()
+        if (polling == null) isCancelled() else poll()
     }
 }

@@ -16,6 +16,7 @@ import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.Duration
 
 /** Installed execution family, after source routing and operation admission. */
@@ -518,8 +519,7 @@ private fun executeCapturedSource(
                         } else {
                             route.request.presolveCancellation
                         },
-                    ) or request.presolveCancellation or
-                        invocation.cancellation,
+                    ).includingStop(request.presolveCancellation).includingStop(invocation.cancellation),
                     budget = request.presolveBudget ?: route.request.presolveBudget,
                 )
                 OpenTheoryPipeline.execute(prepared, params, engine, request.cores, callbacks.onLinearIncumbent)
@@ -541,8 +541,8 @@ private fun executeCapturedSource(
             val source = original.prepareSource(
                 request.presolveConfig ?: PresolveConfig.DEFAULT,
                 objective?.let { if (invocation.maximizeSourceObjective) it.negated() else it },
-                request.presolveCancellation or params.cancellation or params.timeout,
-                invocation.cancellation or params.cancellation or params.timeout,
+                request.presolveCancellation.includingStop(params.cancellation).includingStop(params.timeout),
+                invocation.cancellation.includingStop(params.cancellation).includingStop(params.timeout),
                 request.presolveBudget,
             )
             if (source.infeasible) {
@@ -550,7 +550,7 @@ private fun executeCapturedSource(
                     it.preparationStats = source.stats
                 }
             }
-            val prepared = original.afterSourcePreparation(source, params.cancellation or params.timeout)
+            val prepared = original.afterSourcePreparation(source, params.cancellation.includingStop(params.timeout))
                 ?: return SourceExecutionResult.Declined(invocation, TerminationReason.BudgetExhausted).also {
                     it.preparationStats = source.stats
                 }
@@ -608,19 +608,21 @@ private fun executeSourceHeuristic(
     callbacks.onLinearIncumbent,
 )
 
-private fun TheoryParams.boundTo(invocation: PreparedSourceInvocation): TheoryParams = copy(
+internal fun TheoryParams.boundTo(invocation: PreparedSourceInvocation): TheoryParams = copy(
     cancellation = cancellation.withAccounting(
         if (cancellation.accounting != null) cancellation else invocation.cancellation,
-    ) or invocation.cancellation,
-    timeout = timeout or invocation.containingDeadline(),
+    ).includingStop(invocation.cancellation),
+    timeout = timeout.includingStop(invocation.containingDeadline(timeout)),
 )
 
 private fun PolynomialTheoryParams.boundTo(invocation: PreparedSourceInvocation): PolynomialTheoryParams = copy(
     cancellation = cancellation.withAccounting(
         if (cancellation.accounting != null) cancellation else invocation.cancellation,
-    ) or invocation.cancellation,
-    timeout = timeout or invocation.containingDeadline(),
+    ).includingStop(invocation.cancellation),
+    timeout = timeout.includingStop(invocation.containingDeadline(timeout)),
 )
 
-private fun PreparedSourceInvocation.containingDeadline(): ExecutionControl =
-    cancellation.deadline()?.let { ExecutionControl.until(it) } ?: ExecutionControl.Never
+private fun PreparedSourceInvocation.containingDeadline(timeout: ExecutionControl): ExecutionControl {
+    val end = cancellation.deadline() ?: return ExecutionControl.Never
+    return if (timeout.deadline() == end) ExecutionControl.Never else ExecutionControl.until(end)
+}

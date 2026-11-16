@@ -22,6 +22,7 @@ import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.bindStopControl
 import com.eignex.util.collections.IntHashSet
 
 /**
@@ -164,7 +165,9 @@ object Presolver {
     ): SourcePresolved {
         val passes = problemPasses(problem, config, context, PresolvePass.Capability.SOURCE)
         if (passes.isEmpty() || config.maxRounds == 0) return SourcePresolved(problem)
-        var ctx = context.copy(preserveStructure = config.preserveStructure).withCancellation(cancellation)
+        if (cancellation()) return SourcePresolved(problem)
+        val stop = if (cancellation.stopPolling == null) cancellation.bindStopControl() else cancellation
+        var ctx = context.copy(preserveStructure = config.preserveStructure).withCancellation(stop)
             .withPresolveBudget(context.presolveBudget)
             .withSubsumeIncremental(SubsumeMemo())
             .withAffinePivotOrder(config.affinePivotOrder)
@@ -182,14 +185,14 @@ object Presolver {
             override fun inputRevision(pass: PresolvePass): Long? {
                 if (pass.tracksLinearInputs) {
                     val inputs = linearInputs.getOrPut(pass) {
-                        LinearInputRevision(current, pass, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation)
+                        LinearInputRevision(current, pass, ctx.presolveBudget?.orSpent(stop) ?: stop)
                     }
                     return inputs.current(current)
                 }
                 if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
                 val inputs = parityInputs ?: ParityInputRevision(
                     current,
-                    ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                    ctx.presolveBudget?.orSpent(stop) ?: stop,
                 ).also { parityInputs = it }
                 return inputs.current(current)
             }
@@ -207,7 +210,7 @@ object Presolver {
                     booleanPins.seed(entrySize.booleanPins)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
-                    if (token()) return@observeRoundPass PassOutcome.UNCHANGED
+                    if (token.presolveStopped()) return@observeRoundPass PassOutcome.UNCHANGED
                     val delta = pass.applySource(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) {
@@ -259,11 +262,12 @@ object Presolver {
         val rounds = PresolveRoundEngine.run(
             passes,
             config.maxRounds,
-            cancellation,
+            stop,
             ctx.presolveBudget,
             host,
             config.abortFraction,
         )
+        cancellation()
         return SourcePresolved(
             host.current,
             rounds.fired,
@@ -307,17 +311,18 @@ object Presolver {
     ): Presolved {
         val passes = problemPasses(problem, config, context, PresolvePass.Capability.FINITE)
         val maxRounds = config.maxRounds
-        if (passes.isEmpty() || maxRounds == 0) {
+        if (passes.isEmpty() || maxRounds == 0 || cancellation()) {
             return Presolved(problem, { it }, infeasible = problem.baked is PropagationResult.Unsat).also {
                 it.mapping = SourceMapping(problem, problem, TransformationGuarantees.IDENTITY)
             }
         }
+        val stop = if (cancellation.stopPolling == null) cancellation.bindStopControl() else cancellation
         // A gcd-indivisible equality (`Σ cᵢ·xᵢ = b`, `gcd(cᵢ) ∤ b`) is infeasible independent of the
         // variable bounds, so refuting it here in O(factors) reports the verdict without the session ever
         // seeding its state over the model. Only the infeasible case short-circuits; a feasible
         // strengthening is recomputed (idempotently) by the round engine below.
         val earlyRefutation = if (PresolvePass.STRENGTHEN_COEFFICIENTS in passes) {
-            val token = context.presolveBudget?.observeStops(cancellation) ?: cancellation
+            val token = context.presolveBudget?.observeStops(stop) ?: stop
             context.presolveBudget.observeRoundPass(
                 PresolvePass.STRENGTHEN_COEFFICIENTS,
                 PresolveLane.FINITE,
@@ -348,7 +353,7 @@ object Presolver {
         // shrink the factor set, so a per-round ratio would spuriously read as underdetermined.
         val underdetermined = problem.factors.isNotEmpty() &&
             problem.numIntVars.toLong() > problem.factors.size.toLong() * UNDERDETERMINED_RATIO
-        var ctx = context.copy(preserveStructure = config.preserveStructure).withCancellation(cancellation)
+        var ctx = context.copy(preserveStructure = config.preserveStructure).withCancellation(stop)
             .withAffineUnderdetermined(underdetermined)
             .withAffinePivotOrder(config.affinePivotOrder)
             .withPresolveBudget(context.presolveBudget)
@@ -362,10 +367,10 @@ object Presolver {
                 passes,
                 maxRounds,
                 ctx,
-                cancellation,
+                stop,
                 config.abortFraction,
                 config.structuralImpactLimit,
-            )
+            ).also { cancellation() }
         }
 
         val host = object : PresolveRoundEngine.RoundHost {
@@ -382,14 +387,14 @@ object Presolver {
             override fun inputRevision(pass: PresolvePass): Long? {
                 if (pass.tracksLinearInputs) {
                     val inputs = linearInputs.getOrPut(pass) {
-                        LinearInputRevision(current, pass, ctx.presolveBudget?.orSpent(cancellation) ?: cancellation)
+                        LinearInputRevision(current, pass, ctx.presolveBudget?.orSpent(stop) ?: stop)
                     }
                     return inputs.current(current)
                 }
                 if (pass != PresolvePass.DERIVE_XOR_UNITS) return null
                 val inputs = parityInputs ?: ParityInputRevision(
                     current,
-                    ctx.presolveBudget?.orSpent(cancellation) ?: cancellation,
+                    ctx.presolveBudget?.orSpent(stop) ?: stop,
                 ).also { parityInputs = it }
                 return inputs.current(current)
             }
@@ -406,7 +411,7 @@ object Presolver {
                     val units = entrySize.units(current, token)
                     invocation.recordEntries(units)
                     token.charge(pass.baseWorkWeight * units)
-                    if (token()) return@observeRoundPass PassOutcome.UNCHANGED
+                    if (token.presolveStopped()) return@observeRoundPass PassOutcome.UNCHANGED
                     val delta = pass.applyFinite(current, ctx.withCancellation(token))
                     if (delta.infeasible) return@observeRoundPass PassOutcome.INFEASIBLE
                     if (delta.isEmpty) {
@@ -447,11 +452,12 @@ object Presolver {
         val rounds = PresolveRoundEngine.run(
             passes,
             maxRounds,
-            cancellation,
+            stop,
             ctx.presolveBudget,
             host,
             config.abortFraction,
         )
+        cancellation()
         val mapping = SourceMapping(
             problem,
             host.current,

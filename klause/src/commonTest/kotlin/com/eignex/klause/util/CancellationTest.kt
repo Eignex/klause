@@ -5,9 +5,25 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 import kotlin.time.TestTimeSource
 
 class CancellationTest {
+    @Test
+    fun `an infinite monotonic deadline should remain open`() {
+        val stop = Cancellation.after(Duration.INFINITE)
+
+        assertFalse(stop())
+    }
+
+    @Test
+    fun `an expired monotonic deadline should request a stop`() {
+        val stop = Cancellation.until(TimeSource.Monotonic.markNow() - 1.seconds)
+
+        assertTrue(stop())
+    }
+
     @Test
     fun `predicate composition should preserve ordered short circuiting`() {
         val calls = ArrayList<Int>()

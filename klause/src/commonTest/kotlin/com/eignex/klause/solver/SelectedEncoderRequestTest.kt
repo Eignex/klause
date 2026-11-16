@@ -7,6 +7,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.ir.SourceBoolId
 import com.eignex.klause.ir.SourceIntId
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.theory.BuiltInEncoderProvider
 import com.eignex.klause.theory.EncodedTheoryFactor
 import com.eignex.klause.theory.Encoder
@@ -29,6 +30,52 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class SelectedEncoderRequestTest {
+    @Test
+    fun `batched preflight should stop at the exact containing work allowance`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            Array<Factor>(3) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2) },
+        )
+        val selected = FactorProjectionProviders.Default.prepare(source)
+        val budget = PresolveBudget(2)
+
+        val request = selected.requestEncoders(EncodingTarget.LINEAR, listOf(0, 1, 2), cancellation = budget.slice(2))
+
+        assertNull(request)
+        assertEquals(2L, budget.spent())
+    }
+
+    @Test
+    fun `cancellation during private installation should withhold the complete model`() {
+        val source = Problem(
+            0,
+            1,
+            arrayOf(IntDomain(0, 2)),
+            Array<Factor>(3) { Linear(intArrayOf(1), intArrayOf(0), LinearOp.LE, 2) },
+        )
+        var stopped = false
+        var decline: EncoderDecline? = null
+        val selected = FactorProjectionProviders(
+            encoder = EncoderProvider { factor, target ->
+                val builtin = BuiltInEncoderProvider.select(factor, target)
+                Encoder(EncoderSupport.EQUIVALENT) { view, encoding ->
+                    builtin.install(view, encoding).also { stopped = true }
+                }
+            },
+        ).prepare(source)
+
+        val model = selected.linearTheoryModel(
+            EncodingTarget.LINEAR,
+            cancellation = ExecutionControl { stopped },
+            onDecline = { decline = it },
+        )
+
+        assertNull(model)
+        assertEquals(EncoderDecline.RESOURCE, decline)
+    }
+
     @Test
     fun `editing returned conditions should not change installed relations`() {
         val source = Problem(

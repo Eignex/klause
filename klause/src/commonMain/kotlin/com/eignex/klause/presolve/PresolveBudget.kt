@@ -79,7 +79,7 @@ class PresolveBudget(
             return observeStops(outer)
         }
         val recording = PreparationWorkMeter(this, meter)
-        return observeStops(object : ExecutionControl() {
+        return observeStops(object : ExecutionControl(outer) {
             override fun isCancelled(): Boolean = outer()
             override fun deadline() = outer.deadline()
             override val accounting: WorkMeter? get() = if (activeInvocation != null) recording else outer.accounting
@@ -167,14 +167,18 @@ class PresolveBudget(
      * A cancellation that fires when [outer] does or the whole budget is spent. Work charged through it
      * lands here, whatever meter [outer] carries, and it keeps [outer]'s deadline.
      */
-    fun orSpent(outer: ExecutionControl): ExecutionControl = observeStops(
-        Metered(0L, outer),
-    )
+    fun orSpent(outer: ExecutionControl): ExecutionControl {
+        if (outer is StopObserver && outer.budget === this &&
+            (outer.token as? Metered)?.budget === this
+        ) return outer
+        return observeStops(Metered(0L, outer))
+    }
 
     internal fun observeStops(token: ExecutionControl): ExecutionControl =
         if (token is StopObserver && token.budget === this) token else StopObserver(this, token)
 
-    private class StopObserver(val budget: PresolveBudget, private val token: ExecutionControl) : ExecutionControl() {
+    private class StopObserver(val budget: PresolveBudget, val token: ExecutionControl) : ExecutionControl(token) {
+        override val containingStop get() = token
         override fun isCancelled(): Boolean = token().also { stopped ->
             if (stopped) budget.activeInvocation?.interrupted = true
         }
@@ -185,10 +189,11 @@ class PresolveBudget(
     }
 
     private inner class Metered(private val floor: Long, private val outer: ExecutionControl = ExecutionControl.Never) :
-        ExecutionControl() {
-        private val end = outer.deadline()
+        ExecutionControl(outer) {
+        val budget get() = this@PresolveBudget
+        override val containingStop get() = outer
         override fun isCancelled(): Boolean = remaining() <= floor || outer()
-        override fun deadline() = end
+        override fun deadline() = outer.deadline()
 
         override val accounting: WorkMeter get() = nativeMeter
         private val source: ArithmeticWorkSource = object : ArithmeticWorkSource {

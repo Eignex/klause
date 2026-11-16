@@ -2,8 +2,11 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.lp.bounding.LpPropagator
 import com.eignex.klause.lp.bounding.LpSearchPolicy
+import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.pollStop
+import com.eignex.klause.util.withBoundedPolling
 import com.eignex.util.numbers.BIG_ONE
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -17,6 +20,29 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 class LpBoundTrailTest {
+    @Test
+    fun `bounded cancellation should not delay an exhausted edit allowance`() {
+        val zero = ExactLpNumber.of(0L)
+        val model = ExactLpModel(
+            listOf(emptyList()),
+            emptyList(),
+            listOf(ExactLpColumn(ExactLpBounds())),
+            emptyList(),
+            ExactLpObjective(listOf(zero)),
+        )
+        val trail = LpBoundTrail(model)
+        val before = trail.state
+        val budget = PresolveBudget(1)
+        val token = budget.slice(1).withBoundedPolling()
+        assertFalse(token.pollStop())
+        token.charge(1)
+
+        val applied = trail.assertBound(0, false, ExactLpSide(zero), 1L, token)
+
+        assertFalse(applied)
+        assertSame(before, trail.state)
+    }
+
     @Test
     fun `weaker active witnesses should survive arbitrary backjumps`() {
         val zero = ExactLpNumber.of(0L)

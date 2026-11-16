@@ -1276,13 +1276,13 @@ internal class RevisedSimplex(
         observations.termination = null
         val current = model.exactState ?: return false
         if (current === state) {
-            if (token()) return false
+            if (token.pollStop()) return false
             stopToken = token
             return true
         }
-        if (!current.sameMatrix(state) || token()) return false
+        if (!current.sameMatrix(state) || token.pollStop()) return false
         val next = state.ownerWorkingModel(LpProjectionMeter(cancellation = token)) ?: return false
-        if (token()) return false
+        if (token.pollStop()) return false
         continuationAvailable = false
         stoppedContinuationBasis = null
         refreshNumerical(next)

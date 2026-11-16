@@ -6,6 +6,7 @@ import com.eignex.klause.localsearch.LocalSearchParams
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 
 internal class SourceExecutionControls(
     val theory: TheoryParams,
@@ -58,7 +59,7 @@ internal fun bindSourceExecutionControls(
     )
     val resolvedPresolve = preparation.config.takeIf { presolveConfig != null || preparation.requested }
     val owner = if (cancellation.accounting != null) cancellation else invocation.cancellation
-    val stop = cancellation.withAccounting(owner) or timeout or invocation.cancellation
+    val stop = invocation.cancellation.withAccounting(owner).includingStop(cancellation).includingStop(timeout)
     val companions = invocation.requestsFiniteNumericalCompanions
     val finiteOptions = options.withoutPresolve().without(
         "node-limit",
@@ -74,7 +75,7 @@ internal fun bindSourceExecutionControls(
             policy.finiteRequest(
                 shape, invocation.request.engine, resolvedPresolve ?: PresolveConfig.DEFAULT,
                 invocation.operation == ExecutionOperation.ENUMERATE,
-                cancellation = stop, presolveCancellation = presolveCancellation or stop,
+                cancellation = stop, presolveCancellation = presolveCancellation.includingStop(stop),
                 presolveBudget = presolveBudget, cores = cores, executionOptions = finiteOptions,
                 randomSeed = seed, nodeBudget = budget,
                 solveBudgetMillis = null, allSolutions = invocation.operation == ExecutionOperation.ENUMERATE,
@@ -101,7 +102,7 @@ internal fun bindSourceExecutionControls(
             nodeBudget = budget,
             randomSeed = seed,
             timeout = timeout,
-            cancellation = cancellation,
+            cancellation = stop,
         )
         val theory = if (companions) {
             defaults.copy(
@@ -200,11 +201,11 @@ internal fun bindSourceExecutionControls(
             openBranching = reader[ExecutionOption.openBranching] ?: defaults.openBranching,
             openLinearIncremental = reader[ExecutionOption.openLinearIncremental] ?: defaults.openLinearIncremental,
             openHintMinSplits = reader[ExecutionOption.openHintMinSplits] ?: defaults.openHintMinSplits,
-            timeout = timeout, cancellation = cancellation, nodeBudget = budget,
+            timeout = timeout, cancellation = stop, nodeBudget = budget,
             alnsIterations = iterations, randomSeed = seed, maxFlips = flips, maxInstructions = instructions,
         )
     } else {
-        TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = cancellation)
+        TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = stop)
     }
     val functionDefaults = TranscendentalTheoryParams()
     val polynomial = if (linear) {
@@ -235,7 +236,7 @@ internal fun bindSourceExecutionControls(
                 },
             ),
             timeout = timeout,
-            cancellation = cancellation,
+            cancellation = stop,
             strategy = strategy,
         )
     }
@@ -261,7 +262,7 @@ internal fun bindSourceExecutionControls(
             maximumDenseCoefficients = polynomial.maximumDenseCoefficients,
             maximumMatrixCells = polynomial.maximumMatrixCells,
             timeout = timeout,
-            cancellation = cancellation,
+            cancellation = stop,
             strategy = strategy,
             nodeBudget = budget,
         )
@@ -301,10 +302,10 @@ private fun FiniteSolveRequest.withSourceControls(
         explicitPresolveConfig || policy.explicitPresolve, solutionSetSensitive,
         cancellation = cancellation.withAccounting(
             if (cancellation.accounting != null) cancellation else stop,
-        ) or stop,
+        ).includingStop(stop),
         presolveCancellation = presolveCancellation.withAccounting(
             if (presolveCancellation.accounting != null) presolveCancellation else stop,
-        ) or stop,
+        ).includingStop(stop),
         presolveBudget = presolveBudget, cores = cores,
         executionOptions = policy.options(
             engine,

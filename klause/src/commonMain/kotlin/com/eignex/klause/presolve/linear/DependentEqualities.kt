@@ -13,6 +13,7 @@ import com.eignex.klause.lp.lattice.LATTICE_WORK_WEIGHT
 import com.eignex.klause.lp.lattice.SparseIntRow
 import com.eignex.klause.lp.lattice.bareissEchelon
 import com.eignex.klause.presolve.SourceDelta
+import com.eignex.klause.presolve.PresolveScan
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BIG_ONE
@@ -32,7 +33,10 @@ import com.eignex.util.numbers.times
 internal object DependentEqualities {
     private val limits = EchelonLimits(maxRowEntries = 4096, maxTotalEntries = 262144, maxBits = 4096)
 
-    fun dropImplied(problem: Problem, cancellation: ExecutionControl): SourceDelta {
+    fun dropImplied(problem: Problem, cancellation: ExecutionControl): SourceDelta =
+        PresolveScan(cancellation).use { dropImpliedWithin(problem, it) }
+
+    private fun dropImpliedWithin(problem: Problem, cancellation: PresolveScan): SourceDelta {
         if (problem.semantics.relaxesRows(problem.numRealVars)) return SourceDelta()
         val columns = LinkedHashMap<Int, Int>()
         val droppableFactorOf = ArrayList<Int>()
@@ -41,15 +45,15 @@ internal object DependentEqualities {
         val constantDrops = ArrayList<Int>()
         var entries = 0L
         problem.factors.forEachIndexed { i, factor ->
-            if (cancellation()) return SourceDelta()
+            if (cancellation.poll()) return SourceDelta()
             cancellation.charge(LATTICE_WORK_WEIGHT)
             val declared = factor.impliedLinearRows
             val droppable = factor.linearForm is LinearForm.Conjunction && declared.size == 1
             for (row in declared) {
-                if (cancellation()) return SourceDelta()
+                if (cancellation.poll()) return SourceDelta()
                 if (row.relation != LinearOp.EQ || row.activator != LinearRow.ALWAYS || row.strict) continue
                 val exact = exactRow(row, cancellation) ?: continue
-                if (cancellation()) return SourceDelta()
+                if (cancellation.poll()) return SourceDelta()
                 if (exact.first.isEmpty()) {
                     if (!exact.second.isZero()) return SourceDelta(infeasible = true)
                     if (droppable) constantDrops.add(i)
@@ -88,7 +92,7 @@ internal object DependentEqualities {
         return true
     }
 
-    private fun exactRow(row: LinearRow, cancellation: ExecutionControl): Pair<Map<Int, BigInt>, BigInt>? {
+    private fun exactRow(row: LinearRow, cancellation: PresolveScan): Pair<Map<Int, BigInt>, BigInt>? {
         if (row.size > limits.maxRowEntries) return null
         val constants = row.constants
         val realValues = if (constants is RealConstants) {
@@ -96,7 +100,7 @@ internal object DependentEqualities {
             values.add(BigFraction.ofDouble(constants.bound) ?: return null)
             for (k in 0 until row.size) {
                 cancellation.charge(LATTICE_WORK_WEIGHT)
-                if (cancellation()) return null
+                if (cancellation.poll()) return null
                 val value = if (k < constants.intCoefficients.size) {
                     constants.intCoefficients.at(k)
                 } else {
@@ -119,7 +123,7 @@ internal object DependentEqualities {
         val merged = HashMap<Int, BigInt>(row.size)
         for (k in 0 until row.size) {
             cancellation.charge(LATTICE_WORK_WEIGHT)
-            if (cancellation()) return null
+            if (cancellation.poll()) return null
             val ref = row.ref(k)
             if (!Term.isInt(ref) && !Term.isReal(ref)) return null
             val coefficient = if (constants is IntegralConstants) {

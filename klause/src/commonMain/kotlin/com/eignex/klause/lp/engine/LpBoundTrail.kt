@@ -2,6 +2,7 @@ package com.eignex.klause.lp.engine
 
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.PollStride
+import com.eignex.klause.util.pollStop
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.minus
@@ -35,7 +36,7 @@ internal class LpBoundTrail(initial: LpExactState) {
         witness: Long,
         token: ExecutionControl = ExecutionControl.Never,
     ): Boolean {
-        if (token() || column !in 0 until state.model.numVars ||
+        if (token.admission?.exhausted == true || token.pollStop() || column !in 0 until state.model.numVars ||
             (column >= state.model.n && !state.rows.row(column - state.model.n).active) || witness < 0L ||
             state.assertions.any { it.witness == witness } || state.boundRevision == Long.MAX_VALUE
         ) {
@@ -453,7 +454,7 @@ internal class LpBoundTrail(initial: LpExactState) {
     ).also { if (matrixRevision == state.matrixRevision) it.inheritProjection(state) }
 
     private fun commit(next: LpExactState, token: ExecutionControl): Boolean {
-        if (token()) return false
+        if (token.admission?.exhausted == true || token.pollStop()) return false
         state = next
         return true
     }

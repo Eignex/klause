@@ -569,10 +569,14 @@ owns one deterministic phase allowance across routing, passes, probes and rebuil
 Execution controls bind its work sink explicitly. Scans check remaining phase
 credit directly and observe external cancellation at bounded checkpoints; attaching
 accounting does not change the polling cadence.
-Structural scans bind their work sink and serial quota at entry. Scalar polling
-checks the quota directly and observes external stops within 256 polls; entry,
-rewrite publication and exit force observation. Nested arithmetic uses the full
-stop surface, so scalar and arithmetic cadences do not multiply.
+Structural scans bind their work sink and serial quota at entry. A presolve phase
+shares its containing worker's checkpoint cursor across passes and nested scans,
+observing external stops within 1,024 visits without restarting the cadence for
+each small scan. Quota checks remain immediate. Phase entry and exit observe the
+full stop surface. Standalone scalar scans observe external stops within 256 polls
+and force observation at exit. Nested arithmetic uses the full stop surface, so
+scalar and arithmetic cadences do not multiply.
+Source lattice elimination and support discovery share this cadence.
 Serial arithmetic admission reserves only available slice credit and returns its
 unused prefix at scope exit. Reserved credit does not count as spent. Source
 preparation carries this admission through its diagnostic work sink.
@@ -640,9 +644,9 @@ retains completed sound reductions and discards unfinished analysis. The followi
 families describe the premises and preservation guarantees of those reductions.
 Both lanes poll after entry charging and meter factor, column, term, signature
 and rewrite visits. Bound fusion, duplicate-column and subsumption scans accumulate
-those charges and poll the pass token every 1,024 visits,
-and immediately at entry and before publishing, so a stop overruns by at most one
-stride. Native allowance-backed scans reserve credit before advancing and settle
+those charges and poll the pass token every 1,024 visits through the phase cursor;
+standalone scans observe the stop immediately at entry and before publishing.
+A stop overruns by at most one stride. Native allowance-backed scans reserve credit before advancing and settle
 used credit at capacity, entry, publication and exit boundaries; cancellation polling
 retains their lease. Other work sinks flush completed debits at each poll without
 reservations. Work prices do not set the clock cadence.

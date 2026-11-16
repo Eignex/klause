@@ -54,6 +54,7 @@ import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.solver.validation.permitsToleranceOptimum
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -534,7 +535,7 @@ internal fun FinitePipeline.solve(
     }
     request.shape.sourceInvocation?.freezeExecution()
     val stop = request.shape.sourceInvocation?.let {
-        (request.cancellation or it.cancellation).encodingPreparationScope()
+        request.cancellation.includingStop(it.cancellation).encodingPreparationScope()
     } ?: request.cancellation
     val gridPublication = request.shape.sourceInvocation?.floatGrid?.let {
         FloatGridPublication(it, stop, request.toleranceCheck, callbacks)
@@ -769,7 +770,11 @@ private fun FiniteSolveRequest.preparationRequest(
     stop: ExecutionControl,
     protectObjective: Boolean = false,
 ): FinitePipelineRequest {
-    val preparationStop = if (shape.sourceInvocation == null) presolveCancellation else presolveCancellation or stop
+    val preparationStop = if (shape.sourceInvocation == null) {
+        presolveCancellation
+    } else {
+        presolveCancellation.includingStop(stop)
+    }
     val sourcePreparation = (sourceControls as? SourceFiniteControls.Backtrack)?.params?.let {
         it.lpConfig?.sourcePreparation ?: it.lpPlan.sourcePreparation
     } ?: lpConfig.sourcePreparation ?: LpSourcePreparation.ADMITTED
@@ -782,7 +787,7 @@ private fun FiniteSolveRequest.preparationRequest(
             (shape.sourceInvocation != null && operation == ExecutionOperation.ENUMERATE),
         cancellation = preparationStop,
         solveCancellation = if (protectObjective) {
-            presolveBudget?.orSpent(preparationStop or stop) ?: (preparationStop or stop)
+            presolveBudget?.orSpent(preparationStop.includingStop(stop)) ?: preparationStop.includingStop(stop)
         } else {
             stop
         },
@@ -933,13 +938,13 @@ private fun executeSourceFinite(
     val start = TimeSource.Monotonic.markNow()
     val solved = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).solve(
-            controls.params.copy(cancellation = controls.cancellation or request.cancellation),
+            controls.params.copy(cancellation = controls.cancellation.includingStop(request.cancellation)),
         )
 
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
             completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, null) else null,
-        ).solve(controls.params.copy(cancellation = controls.cancellation or request.cancellation))
+        ).solve(controls.params.copy(cancellation = controls.cancellation.includingStop(request.cancellation)))
     }
     val sample = (solved as? SolveResult.Sat)?.assignment
     if (sample != null) callbacks.onSample(sample)
@@ -966,13 +971,13 @@ private fun executeSourceMinimum(
     val result = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).minimize(
             objective,
-            controls.params.copy(cancellation = controls.cancellation or request.cancellation),
+            controls.params.copy(cancellation = controls.cancellation.includingStop(request.cancellation)),
         )
 
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
             completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, objective) else null,
-        ).minimize(objective, controls.params.copy(cancellation = controls.cancellation or request.cancellation))
+        ).minimize(objective, controls.params.copy(cancellation = controls.cancellation.includingStop(request.cancellation)))
     }
     val sample = result.assignment
     if (sample != null) callbacks.onSample(sample)

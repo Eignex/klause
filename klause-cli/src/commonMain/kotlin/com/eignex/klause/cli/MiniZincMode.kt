@@ -108,7 +108,8 @@ internal object MiniZincMode : CliMode {
             }
             val start = TimeSource.Monotonic.markNow()
             var lpStats = LpStats()
-            val invocation = common.routingPreparationCancellation().use { stop ->
+            val invocation = common.routingPreparationCancellation().use { scope ->
+                val stop = scope.control
                 program.prepareSourceExecution(
                     SourceSetupRequest(
                         program.sourceAttachment(),

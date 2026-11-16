@@ -11,6 +11,7 @@ import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.portfolio.EngineMix
 import com.eignex.klause.portfolio.Kind
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.util.ExecutionControl
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -20,8 +21,63 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
 class SourceExecutionControlsTest {
+    @Test
+    fun `source binding should retain a shared live deadline when it is rearmed`() {
+        val clock = TestTimeSource()
+        var current = ExecutionControl.until(clock.markNow() + 1.seconds)
+        val later = ExecutionControl.until(clock.markNow() + 3.seconds)
+        val stop = object : ExecutionControl() {
+            override fun isCancelled() = current()
+            override fun deadline() = current.deadline()
+        }
+        val source = SmtLib.parse("(declare-const x Real) (declare-const y Real) (assert (<= (+ x y) 1))").source
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = stop),
+        )
+        val params = TheoryParams(timeout = stop).boundTo(invocation)
+
+        current = later
+        clock += 2.seconds
+
+        assertFalse(params.timeout())
+    }
+
+    @Test
+    fun `source binding should retain an independent earlier timeout`() {
+        val clock = TestTimeSource()
+        val stop = ExecutionControl.until(clock.markNow() + 3.seconds)
+        val source = SmtLib.parse("(declare-const x Real) (declare-const y Real) (assert (<= (+ x y) 1))").source
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = stop),
+        )
+        val params = TheoryParams(timeout = ExecutionControl.until(clock.markNow() + 1.seconds)).boundTo(invocation)
+
+        clock += 2.seconds
+
+        assertTrue(params.timeout())
+    }
+
+    @Test
+    fun `resolved native controls should retain the captured invocation stop`() {
+        var stopped = false
+        val cancellation = ExecutionControl { stopped }
+        val source = SmtLib.parse("(declare-const x Real) (declare-const y Real) (assert (<= (+ x y) 1))").source
+        val invocation = SourceSetup.prepare(
+            SourceSetupRequest(
+                source, ExecutionOperation.SATISFY, FiniteEngine.MIXED, cancellation = cancellation,
+            ),
+        )
+        val request = SourceExecutionRequest(invocation, ExecutionOptions())
+
+        stopped = true
+
+        assertTrue(request.theory.cancellation())
+    }
+
     @Test
     fun `incremental linear control should bind to ordinary source execution`() {
         val parsed = SmtLib.parse(

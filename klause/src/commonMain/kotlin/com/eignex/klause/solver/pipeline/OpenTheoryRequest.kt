@@ -20,6 +20,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.hasActivity
 import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.includingStop
 import kotlin.time.TimeSource
 
 /**
@@ -242,7 +243,7 @@ object OpenTheoryPipeline {
             publication = publication,
             completeOnly = completeOnly,
         )
-        val stop = params.cancellation or params.timeout
+        val stop = params.cancellation.includingStop(params.timeout)
         val objective = request.minimizedObjective ?: return OpenTheoryExecution.Satisfy(portfolio.solve(stop))
         return OpenTheoryExecution.Optimize(portfolio.minimize(objective, integralMinimizer(request, objective), stop))
     }
@@ -280,7 +281,7 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val stop = params.cancellation or params.timeout
+        val stop = params.cancellation.includingStop(params.timeout)
         val prepared = preparedSource ?: model.prepareExecutionPlan(
             values?.original,
             values?.maximize ?: false,
@@ -441,7 +442,7 @@ object OpenTheoryPipeline {
         cores: Int,
         onAccepted: ((SourceIncumbentPublication) -> Unit)?,
     ): OpenTheoryExecution = observed(preparedSource.sourceSemantics, onAccepted) { publication ->
-        val stop = params.cancellation or params.timeout
+        val stop = params.cancellation.includingStop(params.timeout)
         if (stop() || preparedSource.decline == PreparedPlanDecline.RESOURCE) {
             incompleteOpenExecution(
                 objective,
@@ -464,7 +465,7 @@ object OpenTheoryPipeline {
         publication: SourcePublicationObserver,
         preparedSource: PreparedSourcePlan? = null,
     ): OpenTheoryExecution {
-        val stop = params.cancellation or params.timeout
+        val stop = params.cancellation.includingStop(params.timeout)
         if (stop()) return incompleteOpenExecution(objective, params.preparationStopReason(stop))
         val selected = if (preparedSource == null) model.componentPlan(cancellation = stop) else null
         if (stop() || selected?.encodingDecline == EncoderDecline.RESOURCE ||
@@ -556,7 +557,7 @@ object OpenTheoryPipeline {
                     OpenTheoryExecution.Optimize(
                         requireNotNull(
                             descent.runSlice(
-                                params.cancellation or params.timeout,
+                                params.cancellation.includingStop(params.timeout),
                                 Long.MAX_VALUE,
                                 -1,
                             ) { assignment, _ ->
@@ -579,7 +580,7 @@ object OpenTheoryPipeline {
         ).use { descent ->
             val result = requireNotNull(
                 descent.runSlice(
-                    params.cancellation or params.timeout,
+                    params.cancellation.includingStop(params.timeout),
                     Long.MAX_VALUE,
                     -1,
                 ) { incumbent -> values?.publish(incumbent.sample, publication) },
@@ -590,7 +591,7 @@ object OpenTheoryPipeline {
             } else {
                 requireNotNull(values).completed(
                     authority,
-                    params.cancellation or params.timeout,
+                    params.cancellation.includingStop(params.timeout),
                     if (params.timeout()) TerminationReason.Timeout else TerminationReason.Cancelled,
                 )
             }
@@ -604,8 +605,8 @@ object OpenTheoryPipeline {
                 requireNotNull(request.minimizedObjective),
                 original,
                 request.maximize,
-                request.linearAuthorityContext(params.cancellation or params.timeout),
-                params.cancellation or params.timeout,
+                request.linearAuthorityContext(params.cancellation.includingStop(params.timeout)),
+                params.cancellation.includingStop(params.timeout),
             )
         }
 

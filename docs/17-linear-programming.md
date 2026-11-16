@@ -87,6 +87,11 @@ Worker bound assembly and reduced-cost scans contribute to the worker's shared
 stop countdown. Unbound callers check directly. Scoped LP operations share their
 own countdown across projection, reconstruction and source scans; complete batch
 assertions remain atomic, and enclosing query publication checks the full stop.
+Scalar trail edits and numerical adoption contribute to the containing countdown;
+an unbound caller observes cancellation directly. Exact admission exhaustion is
+checked before an edit or trail commit independently of that countdown. Point-hint
+construction checks at coefficient and source-row boundaries while keeping scalar
+width and allocation guards immediate.
 Numerical pricing records completed work before checking its immediate numerical
 allowance. It advances the containing stop countdown by the estimated work since
 its preceding check; parent cancellation is observed when that countdown is due.
@@ -2064,8 +2069,12 @@ retries and nested operations share one invocation allowance, and setup, failed
 attempts and cleanup are charged. Cheap exact arithmetic charges operand
 word-length squared.
 
-Reconstruction and refinement poll execution stop predicates every 64 calls or 4096 work,
-while resource caps are checked on every charge. Cancelled evidence is discarded.
+Reconstruction schedules stop observations from its admitted work total, within
+4096 work units; wider integer inputs advance that checkpoint by their word count.
+The admitted limit is bounded by the resource ceiling, so each debit uses one
+limit check; reaching a checkpoint renews admission after observing cancellation.
+Refinement polls every 64 calls or 4096 work units. Both check resource caps on every
+charge and discard cancelled evidence.
 Work accounting does not increase the frequency of stop or clock observations.
 A completed continuous check that stays undecided is skipped without learning a nogood, and
 its incomplete flag prevents exhaustion or optimality publication. Numerical
