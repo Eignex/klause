@@ -287,9 +287,11 @@ control; an unavailable certificate or exhausted representation reports an expli
 query error without replacing the retained model.
 
 Recursive command-session definitions use necessary ground equations for
-refutation. A satisfying result requires either a total interpretation whose
-equations pass a counterexample check, or a checked integer ranking that proves
-all recursive calls decrease, followed by evaluation of the source assertions.
+refutation. Initial instances use false or zero literals for Boolean, integer,
+real and bit-vector arguments, and fresh constants for other sorts. A satisfying
+result requires either a total interpretation whose equations pass a counterexample
+check, or a checked integer ranking that proves all recursive calls decrease for
+arbitrary inputs, followed by evaluation of the source assertions.
 Call collection expands parallel lets and substitutes typed match fields and
 constructor guards throughout definition bodies.
 Ground evaluation uses an explicit work stack and a resource allowance; exhausted

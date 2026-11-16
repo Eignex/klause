@@ -105,7 +105,14 @@ fun solveSmtRecursiveSession(
     }
     for (definition in definitions) {
         val arguments = definition.parameters.map { (_, sort) ->
-            fresh().also {
+            val literal = when (val type = sourceScope.sourceSort(sort)) {
+                SmtSort.Bool -> SExpr.Atom("false")
+                SmtSort.Int -> SExpr.Atom("0")
+                SmtSort.Real -> SExpr.Atom("0.0")
+                is SmtSort.BitVector -> recList("_", SExpr.Atom("bv0"), SExpr.Atom(type.width.toString()))
+                else -> null
+            }
+            literal ?: fresh().also {
                 val declaration = recList("declare-const", it, sort)
                 necessary += declaration
                 sourceScope.command(declaration)

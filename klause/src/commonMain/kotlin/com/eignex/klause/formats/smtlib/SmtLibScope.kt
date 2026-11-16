@@ -405,7 +405,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                                 instantiateSmtRank(it.parameters, it.result, globalSortParameters, emptyList(),
                                     sourceSort(node.items[2]), cancellation)?.second
                             }
-                                ?: literalSort(name)?.takeIf { name in setOf("true", "false") }
+                                ?: literalSort(name)?.takeIf { name == "true" || name == "false" }
                                 ?: datatypes.resolve(name, emptyList(), sourceSort(node.items[2]))?.result
                                 ?: if (name == "pi") SmtSort.Real else return null
                             if (result != sourceSort(node.items[2])) return null
@@ -522,7 +522,8 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     }
 
     internal fun literalSort(text: String): SmtSort? {
-        if (polynomialSymbol(text) in setOf("true", "false")) return SmtSort.Bool
+        val name = polynomialSymbol(text)
+        if (name == "true" || name == "false") return SmtSort.Bool
         smtBitVectorLiteralSort(text)?.let { return it }
         if (text.isNotEmpty() && text.all { it in '0'..'9' }) return SmtSort.Int
         val dot = text.indexOf('.')
@@ -574,16 +575,18 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     private fun reservedName(name: String): Boolean = !allowSolverSymbols &&
         (name.startsWith('@') || name.startsWith('.'))
 
-    private fun theoryFunction(name: String): Boolean = name in setOf(
-        "true", "false", "not", "and", "or", "xor", "=>", "=", "distinct", "ite",
-        "+", "-", "*", "/", "div", "mod", "abs", "**", "<", "<=", ">", ">=", "to_real", "to_int", "is_int",
-        "select", "store", "concat", "bvnot", "bvneg", "bvand", "bvor", "bvxor", "bvxnor", "bvnand", "bvnor",
-        "bvcomp", "bvadd", "bvsub", "bvmul", "bvudiv", "bvurem", "bvsdiv", "bvsrem", "bvsmod", "bvshl",
-        "bvlshr", "bvashr", "bvult", "bvule", "bvugt", "bvuge", "bvslt", "bvsle", "bvsgt", "bvsge",
-        "ubv_to_int", "sbv_to_int", "bvnego", "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvusubo", "bvssubo",
-        "bvsdivo",
-    )
+    private fun theoryFunction(name: String): Boolean = name in smtReservedTheoryFunctions
 }
+
+private val smtReservedTheoryFunctions = setOf(
+    "true", "false", "not", "and", "or", "xor", "=>", "=", "distinct", "ite",
+    "+", "-", "*", "/", "div", "mod", "abs", "**", "<", "<=", ">", ">=", "to_real", "to_int", "is_int",
+    "select", "store", "concat", "bvnot", "bvneg", "bvand", "bvor", "bvxor", "bvxnor", "bvnand", "bvnor",
+    "bvcomp", "bvadd", "bvsub", "bvmul", "bvudiv", "bvurem", "bvsdiv", "bvsrem", "bvsmod", "bvshl",
+    "bvlshr", "bvashr", "bvult", "bvule", "bvugt", "bvuge", "bvslt", "bvsle", "bvsgt", "bvsge",
+    "ubv_to_int", "sbv_to_int", "bvnego", "bvuaddo", "bvsaddo", "bvumulo", "bvsmulo", "bvusubo", "bvssubo",
+    "bvsdivo",
+)
 
 internal fun SExpr.factorSourceSymbols(cancellation: ExecutionControl): SExpr {
     val work = ArrayDeque<Pair<SExpr, Boolean>>()
