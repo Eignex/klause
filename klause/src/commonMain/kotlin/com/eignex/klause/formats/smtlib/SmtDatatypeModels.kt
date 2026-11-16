@@ -79,8 +79,10 @@ internal fun finishSmtGroundDatatypes(input: SmtReduction, cancellation: Executi
                 form("<", SExpr.Atom(name), SExpr.Atom(cardinality.toString()))))
         }
     }
-    val query = commands.indexOfFirst { (it as? SExpr.SList)?.polynomialHead() in
-        setOf("check-sat", "check-sat-assuming", "get-model", "get-value", "exit") }
+    val query = commands.indexOfFirst {
+        (it as? SExpr.SList)?.polynomialHead() in
+            setOf("check-sat", "check-sat-assuming", "get-model", "get-value", "exit")
+    }
     commands.addAll(if (query < 0) commands.size else query, constraints)
     val groups = datatypeModelGroups(registry, coordinates, cancellation)
     val context = SmtDatatypeModelContext(state, coordinates.toList(), groups)
@@ -99,7 +101,9 @@ internal fun finishSmtGroundDatatypes(input: SmtReduction, cancellation: Executi
     var nextTable = 0
     for (group in coordinates.groupBy { groups.getValue(it.sort) }.values) {
         var name: String
-        do { name = "@klause.adt.model.${nextTable++}" } while (!usedNames.add(name))
+        do {
+            name = "@klause.adt.model.${nextTable++}"
+        } while (!usedNames.add(name))
         val tableName = name
         recipes[tableName] = SmtReconstruction { values ->
             val model = context.reconstruct(group.first().sort, values)
@@ -152,7 +156,10 @@ private fun datatypeModelGroups(registry: SmtDatatypes, coordinates: List<SmtDat
         while (pending.isNotEmpty()) {
             cancellation.polynomialSourceCheckpoint(1)
             when (val field = pending.removeLast()) {
-                is SmtSort.Array -> { pending.addLast(field.index); pending.addLast(field.element) }
+                is SmtSort.Array -> {
+                    pending.addLast(field.index)
+                    pending.addLast(field.element)
+                }
                 is SmtSort.Uninterpreted -> if (field in sorts) dependencies += field
                 else -> Unit
             }
@@ -222,8 +229,10 @@ internal class SmtDatatypeCardinalities(private val registry: SmtDatatypes, limi
                         cache[current] = null
                     } else {
                         pending.addLast(current to true)
-                        for (constructor in instance.constructors) for (field in constructor.fields) {
-                            pending.addLast(field.sort to false)
+                        for (constructor in instance.constructors) {
+                            for (field in constructor.fields) {
+                                pending.addLast(field.sort to false)
+                            }
                         }
                     }
                 }
@@ -241,7 +250,10 @@ internal class SmtDatatypeCardinalities(private val registry: SmtDatatypes, limi
                         var product = BIG_ONE
                         for (field in constructor.fields) {
                             val fieldCount = cache[field.sort]
-                            if (fieldCount == null) { infinite = true; break }
+                            if (fieldCount == null) {
+                                infinite = true
+                                break
+                            }
                             step()
                             product = multiply(product, fieldCount)
                         }
@@ -333,8 +345,8 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
                 }
                 val term = SmtValue.Application(registry.constructorName(instance, shape.constructor), arguments)
                 if (reconstructed.any { (key, value) ->
-                    key.sort == ready.sort && key != ready && values.equivalent(value, term)
-                }) rejectWitness()
+                        key.sort == ready.sort && key != ready && values.equivalent(value, term)
+                    }) rejectWitness()
                 reconstructed[ready] = term
                 pending.remove(ready)
             } else {
@@ -350,7 +362,10 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
                     }
                         ?: throw SmtSourceCheckingUnavailable()
                     val depth = datatypeValueDepth(term) { values.checkpoint() }
-                    if (depth < selectedDepth) { selected = key to term; selectedDepth = depth }
+                    if (depth < selectedDepth) {
+                        selected = key to term
+                        selectedDepth = depth
+                    }
                 }
                 val (key, term) = checkNotNull(selected)
                 reconstructed[key] = term
@@ -397,7 +412,6 @@ private class SmtDatatypeModelContext(private val state: SmtDatatypeReduction,
         }
         return true
     }
-
 }
 
 private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, private val limit: Int,
@@ -455,8 +469,10 @@ private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, priva
                         level == 0 -> cache[key] = emptyList()
                         else -> {
                             pending.addLast(key to true)
-                            for (constructor in instance.constructors) for (field in constructor.fields) {
-                                pending.addLast((field.sort to level - 1) to false)
+                            for (constructor in instance.constructors) {
+                                for (field in constructor.fields) {
+                                    pending.addLast((field.sort to level - 1) to false)
+                                }
                             }
                         }
                     }
@@ -485,9 +501,11 @@ private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, priva
     private fun arrays(sort: SmtSort.Array, elements: List<SmtValue>, indices: List<SmtValue>): List<SmtValue> {
         if (elements.isEmpty() || indices.isEmpty()) return emptyList()
         val default = elements.first()
-        val domains = indices.map { index -> elements.sortedBy { element ->
-            if (values.equivalent(element, default)) 0 else maxOf(termDepth(index), termDepth(element))
-        } }
+        val domains = indices.map { index ->
+            elements.sortedBy { element ->
+                if (values.equivalent(element, default)) 0 else maxOf(termDepth(index), termDepth(element))
+            }
+        }
         return tuples(domains) { position, value ->
             if (values.equivalent(value, default)) 0 else maxOf(termDepth(indices[position]), termDepth(value))
         }.map { tuple ->

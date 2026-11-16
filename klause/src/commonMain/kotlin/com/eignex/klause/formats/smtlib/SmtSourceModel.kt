@@ -377,26 +377,28 @@ fun SmtSort.toSmtLib(): String {
     return buildString {
         val work = ArrayDeque<Any>()
         work.addLast(root)
-        while (work.isNotEmpty()) when (val item = work.removeLast()) {
-            is String -> append(item)
-            SmtSort.Bool -> append("Bool")
-            SmtSort.Int -> append("Int")
-            SmtSort.Real -> append("Real")
-            is SmtSort.BitVector -> append("(_ BitVec ${item.width})")
-            is SmtSort.Array -> {
-                append("(Array ")
-                work.addLast(")")
-                work.addLast(item.element)
-                work.addLast(" ")
-                work.addLast(item.index)
-            }
-            is SmtSort.Uninterpreted -> {
-                if (item.arguments.isEmpty()) append(item.name) else {
-                    append('(').append(item.name)
+        while (work.isNotEmpty()) {
+            when (val item = work.removeLast()) {
+                is String -> append(item)
+                SmtSort.Bool -> append("Bool")
+                SmtSort.Int -> append("Int")
+                SmtSort.Real -> append("Real")
+                is SmtSort.BitVector -> append("(_ BitVec ${item.width})")
+                is SmtSort.Array -> {
+                    append("(Array ")
                     work.addLast(")")
-                    for (argument in item.arguments.asReversed()) {
-                        work.addLast(argument)
-                        work.addLast(" ")
+                    work.addLast(item.element)
+                    work.addLast(" ")
+                    work.addLast(item.index)
+                }
+                is SmtSort.Uninterpreted -> {
+                    if (item.arguments.isEmpty()) append(item.name) else {
+                        append('(').append(item.name)
+                        work.addLast(")")
+                        for (argument in item.arguments.asReversed()) {
+                            work.addLast(argument)
+                            work.addLast(" ")
+                        }
                     }
                 }
             }
@@ -410,35 +412,38 @@ fun SmtValue.toSmtLib(): String {
     return buildString {
         val work = ArrayDeque<Any>()
         work.addLast(root)
-        while (work.isNotEmpty()) when (val item = work.removeLast()) {
-            is String -> append(item)
-            is SmtValue.Boolean -> append(item.value)
-            is SmtValue.Integer -> append(if (item.value.startsWith('-')) "(- ${item.value.drop(1)})" else item.value)
-            is SmtValue.Real -> append(item.term)
-            is SmtValue.BitVector -> append("#b${item.bits}")
-            is SmtValue.Uninterpreted -> append("(as ${item.identity} ${item.sort.toSmtLib()})")
-            is SmtValue.Application -> if (item.arguments.isEmpty()) append(item.constructor) else {
-                append('(').append(item.constructor)
-                work.addLast(")")
-                for (argument in item.arguments.asReversed()) {
-                    work.addLast(argument)
-                    work.addLast(" ")
-                }
-            }
-            is SmtValue.Array -> {
-                repeat(item.entries.size) { append("(store ") }
-                append("((as const ${item.sort.toSmtLib()}) ")
-                for ((index, value) in item.entries.asReversed()) {
+        while (work.isNotEmpty()) {
+            when (val item = work.removeLast()) {
+                is String -> append(item)
+                is SmtValue.Boolean -> append(item.value)
+                is SmtValue.Integer ->
+                    append(if (item.value.startsWith('-')) "(- ${item.value.drop(1)})" else item.value)
+                is SmtValue.Real -> append(item.term)
+                is SmtValue.BitVector -> append("#b${item.bits}")
+                is SmtValue.Uninterpreted -> append("(as ${item.identity} ${item.sort.toSmtLib()})")
+                is SmtValue.Application -> if (item.arguments.isEmpty()) append(item.constructor) else {
+                    append('(').append(item.constructor)
                     work.addLast(")")
-                    work.addLast(value)
-                    work.addLast(" ")
-                    work.addLast(index)
-                    work.addLast(" ")
+                    for (argument in item.arguments.asReversed()) {
+                        work.addLast(argument)
+                        work.addLast(" ")
+                    }
                 }
-                work.addLast(")")
-                work.addLast(item.default)
+                is SmtValue.Array -> {
+                    repeat(item.entries.size) { append("(store ") }
+                    append("((as const ${item.sort.toSmtLib()}) ")
+                    for ((index, value) in item.entries.asReversed()) {
+                        work.addLast(")")
+                        work.addLast(value)
+                        work.addLast(" ")
+                        work.addLast(index)
+                        work.addLast(" ")
+                    }
+                    work.addLast(")")
+                    work.addLast(item.default)
+                }
+                is SmtValue.Function -> error("a function value requires its declaration")
             }
-            is SmtValue.Function -> error("a function value requires its declaration")
         }
     }
 }

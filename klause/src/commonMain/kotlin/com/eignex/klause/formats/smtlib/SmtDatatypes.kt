@@ -22,7 +22,7 @@ internal data class SmtDatatypeOperator(val instance: SmtDatatypeInstance,
         else -> instance.sort
     }
     val arguments: List<SmtSort> get() = if (tester || selector != null) listOf(instance.sort)
-        else instance.constructors[constructor].fields.map { it.sort }
+    else instance.constructors[constructor].fields.map { it.sort }
 }
 
 internal class SmtDatatypes(private val cancellation: ExecutionControl,
@@ -31,15 +31,16 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
     private val groups = HashMap<String, Set<String>>()
     val names: Set<String> get() = definitions.keys
     val operatorNames: Set<String> get() = definitions.values.flatMap { definition ->
-        definition.constructors.flatMap { constructor -> listOf(polynomialSymbol(constructor.name)) +
-            constructor.fields.map { polynomialSymbol(it.name) } }
+        definition.constructors.flatMap { constructor ->
+            listOf(polynomialSymbol(constructor.name)) + constructor.fields.map { polynomialSymbol(it.name) }
+        }
     }.toSet()
 
     fun snapshot(cancellation: ExecutionControl, checkpoint: ((Long) -> Unit)? = null): SmtDatatypes =
         SmtDatatypes(cancellation, checkpoint).also {
-        it.definitions.putAll(definitions)
-        it.groups.putAll(groups)
-    }
+            it.definitions.putAll(definitions)
+            it.groups.putAll(groups)
+        }
 
     fun headers(command: SExpr.SList): List<Pair<String, Int>> = when (command.polynomialHead()) {
         "declare-datatype" -> {
@@ -72,7 +73,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
     fun declare(command: SExpr.SList, parseSort: (SExpr, Map<String, SmtSort>) -> SmtSort) {
         val headers = headers(command)
         val bodies = if (command.polynomialHead() == "declare-datatype") listOf(command.items[2])
-            else (command.items[2] as? SExpr.SList)?.items ?: smtUnsupported("invalid datatype bodies")
+        else (command.items[2] as? SExpr.SList)?.items ?: smtUnsupported("invalid datatype bodies")
         if (headers.size != bodies.size) smtUnsupported("datatype header count differs from body count")
         val group = headers.map { polynomialSymbol(it.first) }.toSet()
         if (group.size != headers.size || group.any { it in definitions }) smtUnsupported("duplicate datatype sort")
@@ -85,8 +86,10 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
             val parameters = if (polymorphic) {
                 body.polynomialSize(3)
                 val params = body.items[1] as? SExpr.SList ?: smtUnsupported("invalid datatype parameters")
-                params.items.map { (it as? SExpr.Atom)?.text?.let(::polynomialSymbol)
-                    ?: smtUnsupported("invalid datatype parameter") }
+                params.items.map {
+                    (it as? SExpr.Atom)?.text?.let(::polynomialSymbol)
+                        ?: smtUnsupported("invalid datatype parameter")
+                }
             } else emptyList()
             if (parameters.size != header.second || parameters.toSet().size != parameters.size) {
                 smtUnsupported("datatype parameter arity or names are invalid")
@@ -161,11 +164,13 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
             val name = work.removeLast()
             if (!seen.add(name)) continue
             val definition = definitions[name] ?: continue
-            for (constructor in definition.constructors) for (field in constructor.fields) {
-                val child = (field.sort as? SmtSort.Uninterpreted)?.name?.let(::polynomialSymbol) ?: continue
-                if (child in definition.parameters) continue
-                if (child == start) return true
-                if (child in definitions) work.addLast(child)
+            for (constructor in definition.constructors) {
+                for (field in constructor.fields) {
+                    val child = (field.sort as? SmtSort.Uninterpreted)?.name?.let(::polynomialSymbol) ?: continue
+                    if (child in definition.parameters) continue
+                    if (child == start) return true
+                    if (child in definitions) work.addLast(child)
+                }
             }
         }
         return false
@@ -182,11 +187,11 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
         if (named.arguments.size != definition.parameters.size) smtUnsupported("invalid datatype instantiation")
         val substitutions = definition.parameters.zip(named.arguments).toMap()
         return SmtDatatypeInstance(named, definition.constructors.map { constructor ->
-                step()
-                constructor.copy(fields = constructor.fields.map { field ->
-                    field.copy(sort = substitute(field.sort, substitutions))
-                })
+            step()
+            constructor.copy(fields = constructor.fields.map { field ->
+                field.copy(sort = substitute(field.sort, substitutions))
             })
+        })
     }
 
     fun hasOperator(name: String): Boolean = definitions.values.any { definition ->
@@ -220,8 +225,10 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
                 if (!seen.add(constructor)) smtUnsupported("duplicate match constructor")
                 val fields = instance.constructors[constructor].fields
                 if (parts.size != fields.size + 1) smtUnsupported("match constructor arity differs")
-                val variables = parts.drop(1).map { (it as? SExpr.Atom)?.text?.let(::polynomialSymbol)
-                    ?: smtUnsupported("invalid match variable") }
+                val variables = parts.drop(1).map {
+                    (it as? SExpr.Atom)?.text?.let(::polynomialSymbol)
+                        ?: smtUnsupported("invalid match variable")
+                }
                 if (variables.toSet().size != variables.size) smtUnsupported("duplicate match variable")
                 if (variables.any { it in setOf("true", "false") }) smtUnsupported("invalid match variable")
                 SmtDatatypeCase(constructor, variables, case.items[1])
@@ -248,7 +255,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
                     val resultTemplate = SmtSort.Uninterpreted(definition.name,
                         definition.parameters.map { SmtSort.Uninterpreted(it) })
                     val parameterTemplates = if (tester || selector != null) listOf(resultTemplate)
-                        else constructor.fields.map { it.sort }
+                    else constructor.fields.map { it.sort }
                     if (parameterTemplates.size != arguments.size) continue
                     val outputTemplate = when {
                         tester -> SmtSort.Bool
@@ -257,8 +264,9 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
                     }
                     if (qualification != null && !unify(outputTemplate, qualification,
                             definition.parameters.toSet(), substitutions, false)) continue
-                    if (!parameterTemplates.indices.all { unify(parameterTemplates[it], arguments[it],
-                            definition.parameters.toSet(), substitutions) }) continue
+                    if (!parameterTemplates.indices.all {
+                            unify(parameterTemplates[it], arguments[it], definition.parameters.toSet(), substitutions)
+                        }) continue
                     if (definition.parameters.any { it !in substitutions }) continue
                     val sort = substitute(resultTemplate, substitutions)
                     val instance = instance(sort) ?: continue
@@ -341,7 +349,10 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
     private fun containsGroupBelowTop(root: SmtSort, group: Set<String>): Boolean {
         val work = ArrayDeque<SmtSort>()
         when (root) {
-            is SmtSort.Array -> { work.addLast(root.index); work.addLast(root.element) }
+            is SmtSort.Array -> {
+                work.addLast(root.index)
+                work.addLast(root.element)
+            }
             is SmtSort.Uninterpreted -> for (argument in root.arguments) work.addLast(argument)
             else -> Unit
         }
@@ -352,7 +363,10 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl,
                     if (polynomialSymbol(sort.name) in group) return true
                     for (argument in sort.arguments) work.addLast(argument)
                 }
-                is SmtSort.Array -> { work.addLast(sort.index); work.addLast(sort.element) }
+                is SmtSort.Array -> {
+                    work.addLast(sort.index)
+                    work.addLast(sort.element)
+                }
                 else -> Unit
             }
         }

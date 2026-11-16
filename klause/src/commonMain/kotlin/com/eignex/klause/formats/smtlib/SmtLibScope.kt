@@ -357,7 +357,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                             term("literal:${if (it == SmtSort.Bool) name else node.text}", emptyList(), it)
                         }
                             ?: frame.locals?.get(name) ?: globals[name]?.takeIf { it.parameters.isEmpty() }
-                                ?.let { term("symbol:${it.identity}:$name", emptyList(), it.result) }
+                            ?.let { term("symbol:${it.identity}:$name", emptyList(), it.result) }
                             ?: datatypes.resolve(name, emptyList())?.let {
                                 datatypeTerm(it, emptyList())
                             }
@@ -493,7 +493,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     val signature = frame.signature
                     val datatype = if (signature == null && frame.indexed == null)
                         datatypes.resolve(polynomialSymbol(frame.head), args, frame.qualification, frame.tester)
-                        else null
+                    else null
                     val result = if (frame.indexed != null) smtIndexedBitVectorSort(frame.indexed, args)
                     else if (signature == null) datatype?.result
                         ?: if (frame.tester) null else operator(polynomialSymbol(frame.head), args) else {

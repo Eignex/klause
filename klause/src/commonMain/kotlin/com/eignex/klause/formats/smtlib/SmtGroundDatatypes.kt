@@ -16,8 +16,9 @@ internal data class SmtDatatypeReduction(val registry: SmtDatatypes,
     val selectorDefinitions: List<SmtDatatypeSelectorDefinition>)
 
 internal fun exposeSmtGroundDatatypes(input: SmtReduction, cancellation: ExecutionControl): SmtReduction =
-    if (input.commands.any { (it as? SExpr.SList)?.polynomialHead() in
-            setOf("declare-datatype", "declare-datatypes") }) SmtGroundDatatypeReducer(input, cancellation).reduce()
+    if (input.commands.any {
+            (it as? SExpr.SList)?.polynomialHead() in setOf("declare-datatype", "declare-datatypes")
+        }) SmtGroundDatatypeReducer(input, cancellation).reduce()
     else input
 
 private class SmtGroundDatatypeReducer(private val input: SmtReduction, private val cancellation: ExecutionControl) {
@@ -67,7 +68,10 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                         output += form("declare-sort", SExpr.Atom(name), SExpr.Atom(arity.toString()))
                     }
                 }
-                "declare-sort", "define-sort" -> { scope.command(command); output += command }
+                "declare-sort", "define-sort" -> {
+                    scope.command(command)
+                    output += command
+                }
                 "declare-const", "declare-fun" -> {
                     val name = command.polynomialName(1)
                     val parameters = if (command.polynomialHead() == "declare-fun") {
@@ -97,11 +101,15 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                 else -> output += command
             }
         }
-        val declarations = output.filter { (it as? SExpr.SList)?.polynomialHead() in
-            setOf("declare-sort", "define-sort", "declare-const", "declare-fun") }
+        val declarations = output.filter {
+            (it as? SExpr.SList)?.polynomialHead() in
+                setOf("declare-sort", "define-sort", "declare-const", "declare-fun")
+        }
         val remaining = output.filter { it !in declarations }
-        val query = remaining.indexOfFirst { (it as? SExpr.SList)?.polynomialHead() in
-            setOf("check-sat", "check-sat-assuming", "get-model", "get-value", "exit") }
+        val query = remaining.indexOfFirst {
+            (it as? SExpr.SList)?.polynomialHead() in
+                setOf("check-sat", "check-sat-assuming", "get-model", "get-value", "exit")
+        }
         val body = remaining.toMutableList()
         body.addAll(if (query < 0) body.size else query, axioms)
         return input.copy(commands = declarations + generated + body, privateBindings = privateBindings.toMap(),
@@ -320,7 +328,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         val application = OperationApplication(name, args.map { it.name() })
         operationValues[application]?.let { return it }
         val expression = if (args.isEmpty()) SExpr.Atom(name)
-            else form(name, *args.map { it.expression }.toTypedArray())
+        else form(name, *args.map { it.expression }.toTypedArray())
         val captured = capture(Term(result, expression))
         operationValues[application] = captured
         if (operation.startsWith("selector:")) {
@@ -353,7 +361,10 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         while (pending.isNotEmpty()) {
             step()
             when (val sort = pending.removeLast()) {
-                is SmtSort.Array -> { pending.addLast(sort.index); pending.addLast(sort.element) }
+                is SmtSort.Array -> {
+                    pending.addLast(sort.index)
+                    pending.addLast(sort.element)
+                }
                 is SmtSort.Uninterpreted -> registry.instance(sort)?.let(::register)
                 else -> Unit
             }
@@ -373,7 +384,9 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
 
     private fun freshName(): String {
         var name: String
-        do { name = "@klause.adt.${nextName++}" } while (!usedNames.add(name))
+        do {
+            name = "@klause.adt.${nextName++}"
+        } while (!usedNames.add(name))
         return name
     }
 
@@ -393,8 +406,9 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private fun lexicalLiteral(text: String): Boolean = text in setOf("true", "false") ||
         text.startsWith("#b") || text.startsWith("#x") ||
         (text.isNotEmpty() && text.all { it in '0'..'9' }) ||
-        text.indexOf('.').let { dot -> dot > 0 && dot < text.lastIndex &&
-            text.indices.all { it == dot || text[it] in '0'..'9' } }
+        text.indexOf('.').let { dot ->
+            dot > 0 && dot < text.lastIndex && text.indices.all { it == dot || text[it] in '0'..'9' }
+        }
 
     private fun collectNames() {
         val work = ArrayDeque<SExpr>()

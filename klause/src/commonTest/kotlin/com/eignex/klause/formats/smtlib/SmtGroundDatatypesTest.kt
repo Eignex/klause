@@ -558,9 +558,11 @@ class SmtGroundDatatypesTest {
         """.trimIndent())
         val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
 
-        val tables = retained(parsed, assignment) { values -> listOf(SmtSort.Int, SmtSort.Bool).map { sort ->
-            values.value(smtSelectorInterpretationKey("field", SmtSort.Uninterpreted("Option", listOf(sort)), sort))
-        } }
+        val tables = retained(parsed, assignment) { values ->
+            listOf(SmtSort.Int, SmtSort.Bool).map { sort ->
+                values.value(smtSelectorInterpretationKey("field", SmtSort.Uninterpreted("Option", listOf(sort)), sort))
+            }
+        }
 
         assertIs<SmtValue.Integer>(assertIs<SmtValue.Function>(tables[0]).default)
         assertIs<SmtValue.Boolean>(assertIs<SmtValue.Function>(tables[1]).default)
