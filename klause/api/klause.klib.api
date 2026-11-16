@@ -2636,6 +2636,26 @@ sealed interface com.eignex.klause.formats.smtlib/SmtValue { // com.eignex.klaus
         final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtValue.Application.toString|toString(){}[0]
     }
 
+    final class Array : com.eignex.klause.formats.smtlib/SmtValue { // com.eignex.klause.formats.smtlib/SmtValue.Array|null[0]
+        constructor <init>(com.eignex.klause.formats.smtlib/SmtSort.Array, com.eignex.klause.formats.smtlib/SmtValue, kotlin.collections/List<kotlin/Pair<com.eignex.klause.formats.smtlib/SmtValue, com.eignex.klause.formats.smtlib/SmtValue>>) // com.eignex.klause.formats.smtlib/SmtValue.Array.<init>|<init>(com.eignex.klause.formats.smtlib.SmtSort.Array;com.eignex.klause.formats.smtlib.SmtValue;kotlin.collections.List<kotlin.Pair<com.eignex.klause.formats.smtlib.SmtValue,com.eignex.klause.formats.smtlib.SmtValue>>){}[0]
+
+        final val default // com.eignex.klause.formats.smtlib/SmtValue.Array.default|{}default[0]
+            final fun <get-default>(): com.eignex.klause.formats.smtlib/SmtValue // com.eignex.klause.formats.smtlib/SmtValue.Array.default.<get-default>|<get-default>(){}[0]
+        final val entries // com.eignex.klause.formats.smtlib/SmtValue.Array.entries|{}entries[0]
+            final fun <get-entries>(): kotlin.collections/List<kotlin/Pair<com.eignex.klause.formats.smtlib/SmtValue, com.eignex.klause.formats.smtlib/SmtValue>> // com.eignex.klause.formats.smtlib/SmtValue.Array.entries.<get-entries>|<get-entries>(){}[0]
+        final val sort // com.eignex.klause.formats.smtlib/SmtValue.Array.sort|{}sort[0]
+            final fun <get-sort>(): com.eignex.klause.formats.smtlib/SmtSort.Array // com.eignex.klause.formats.smtlib/SmtValue.Array.sort.<get-sort>|<get-sort>(){}[0]
+
+        final fun component1(): com.eignex.klause.formats.smtlib/SmtSort.Array // com.eignex.klause.formats.smtlib/SmtValue.Array.component1|component1(){}[0]
+        final fun component2(): com.eignex.klause.formats.smtlib/SmtValue // com.eignex.klause.formats.smtlib/SmtValue.Array.component2|component2(){}[0]
+        final fun component3(): kotlin.collections/List<kotlin/Pair<com.eignex.klause.formats.smtlib/SmtValue, com.eignex.klause.formats.smtlib/SmtValue>> // com.eignex.klause.formats.smtlib/SmtValue.Array.component3|component3(){}[0]
+        final fun copy(com.eignex.klause.formats.smtlib/SmtSort.Array = ..., com.eignex.klause.formats.smtlib/SmtValue = ..., kotlin.collections/List<kotlin/Pair<com.eignex.klause.formats.smtlib/SmtValue, com.eignex.klause.formats.smtlib/SmtValue>> = ...): com.eignex.klause.formats.smtlib/SmtValue.Array // com.eignex.klause.formats.smtlib/SmtValue.Array.copy|copy(com.eignex.klause.formats.smtlib.SmtSort.Array;com.eignex.klause.formats.smtlib.SmtValue;kotlin.collections.List<kotlin.Pair<com.eignex.klause.formats.smtlib.SmtValue,com.eignex.klause.formats.smtlib.SmtValue>>){}[0]
+        final fun equals(kotlin/Any?): kotlin/Boolean // com.eignex.klause.formats.smtlib/SmtValue.Array.equals|equals(kotlin.Any?){}[0]
+        final fun hashCode(): kotlin/Int // com.eignex.klause.formats.smtlib/SmtValue.Array.hashCode|hashCode(){}[0]
+        final fun semanticEquals(com.eignex.klause.formats.smtlib/SmtValue, com.eignex.klause.formats.smtlib/SmtModelValues): kotlin/Boolean? // com.eignex.klause.formats.smtlib/SmtValue.Array.semanticEquals|semanticEquals(com.eignex.klause.formats.smtlib.SmtValue;com.eignex.klause.formats.smtlib.SmtModelValues){}[0]
+        final fun toString(): kotlin/String // com.eignex.klause.formats.smtlib/SmtValue.Array.toString|toString(){}[0]
+    }
+
     final class BitVector : com.eignex.klause.formats.smtlib/SmtValue { // com.eignex.klause.formats.smtlib/SmtValue.BitVector|null[0]
         constructor <init>(kotlin/String) // com.eignex.klause.formats.smtlib/SmtValue.BitVector.<init>|<init>(kotlin.String){}[0]
 

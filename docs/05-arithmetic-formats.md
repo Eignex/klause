@@ -158,8 +158,10 @@ satisfaction with products and fixed nonnegative integral powers, and a real-fun
 extension with unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
 `check-sat` or `check-sat-assuming` query is accepted, with Boolean literal
 assumptions conjoined to the assertions; `get-model` and `get-objectives` are
-accepted requests. Arrays, strings, quantifiers, symbolic or zero division, negative
-or noninteger powers, nonlinear integer `div`/`mod`/`to_int`, multiple or nonquadratic objectives, incremental
+accepted requests. Ground extensional arrays compose with admitted scalar sorts,
+including nested arrays and arrays used as indexes or function arguments and results.
+Strings, quantifiers, symbolic or zero division, negative or noninteger powers, nonlinear
+integer `div`/`mod`/`to_int`, multiple or nonquadratic objectives, incremental
 commands, multiple queries and `get-value` decline explicitly, even inside a
 constant Boolean branch.
 
@@ -238,7 +240,7 @@ at their command. Compiler binding tables are discarded after lowering; the owne
 typed source and original declaration order and spellings remain attached.
 
 Reduction passes carry transformed commands, original declarations, named private
-recipes and original-source checks together. Every pass and fallback charges the
+recipes and original-source checks together. Every pass and fallback shares the
 same execution control, so representation changes do not reset an encoding
 budget. Caller endpoint overrides apply only to original scalar declarations;
 private reduction coordinates keep the bounds supplied by their encoding. Only
@@ -259,6 +261,27 @@ Source checks and rendering use the same exact-value formatter, including ration
 algebraic and symbolic coordinates carried by native assignments or samples.
 Different exact terms can denote the same real; their text does not establish
 mathematical equality or disequality.
+
+### Ground arrays
+
+After ground function exposure, arrays lower through read-over-write constraints,
+index congruence and reified extensional equality. Each compared array pair carries
+an index witnessing disequality; positive equality makes its reads agree. Closure
+includes store indexes, source reads and introduced witnesses, with a separate
+index pool for each complete array sort. Inner-array witnesses therefore do not
+create outer reads merely because both arrays use the same index sort. The
+encoding does not enumerate a bitvector address space or assume that a free sort
+is infinite. Scalar indexes and elements retain their source sorts and open bounds.
+
+Reconstruction gives every array a total finite-store interpretation, sharing one
+typed default coordinate per element sort. Nested defaults and private arrays
+introduced by other reductions participate in the same closure. Source checks
+validate reads, stores, conditionals and equality through certified semantic value
+comparison, including native algebraic real indexes. An unavailable comparison
+withholds the witness. Model rendering uses store/constant-array terms; the
+constant-array input extension is unsupported.
+Polymorphic family queries instantiate unobserved array ranks as typed total
+arrays, carrying the same semantic comparison and element-point interpretation.
 
 ### Linear and conditional lowering
 

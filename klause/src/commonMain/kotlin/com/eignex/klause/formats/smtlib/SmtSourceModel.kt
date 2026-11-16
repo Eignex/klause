@@ -96,6 +96,18 @@ sealed interface SmtValue {
         /** Constructor field values. */
         val arguments: List<SmtValue>,
     ) : SmtValue
+    /** A total extensional array represented by a default and finite updates. */
+    data class Array(
+        /** Index and element sorts. */
+        val sort: SmtSort.Array,
+        /** Value at indexes absent from [entries]. */
+        val default: SmtValue,
+        /** Finite updates in source store order. */
+        val entries: List<Pair<SmtValue, SmtValue>>,
+    ) : SmtValue {
+        override fun semanticEquals(other: SmtValue, values: SmtModelValues): kotlin.Boolean? =
+            if (other is Array) smtArraysEqual(this, other, values) else false
+    }
 }
 
 /** Named access to retained coordinates and composed reconstruction bindings. */
@@ -336,6 +348,11 @@ fun SmtValue.toSmtLib(): String = when (this) {
     is SmtValue.Uninterpreted -> "(as $identity ${sort.toSmtLib()})"
     is SmtValue.Application -> if (arguments.isEmpty()) constructor
         else "($constructor ${arguments.joinToString(" ") { it.toSmtLib() }})"
+    is SmtValue.Array -> {
+        var result = "((as const ${sort.toSmtLib()}) ${default.toSmtLib()})"
+        for ((index, value) in entries) result = "(store $result ${index.toSmtLib()} ${value.toSmtLib()})"
+        result
+    }
     is SmtValue.Function -> error("a function value requires its declaration")
 }
 

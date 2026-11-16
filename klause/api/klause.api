@@ -3430,6 +3430,22 @@ public final class com/eignex/klause/formats/smtlib/SmtValue$Application : com/e
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class com/eignex/klause/formats/smtlib/SmtValue$Array : com/eignex/klause/formats/smtlib/SmtValue {
+	public fun <init> (Lcom/eignex/klause/formats/smtlib/SmtSort$Array;Lcom/eignex/klause/formats/smtlib/SmtValue;Ljava/util/List;)V
+	public final fun component1 ()Lcom/eignex/klause/formats/smtlib/SmtSort$Array;
+	public final fun component2 ()Lcom/eignex/klause/formats/smtlib/SmtValue;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Lcom/eignex/klause/formats/smtlib/SmtSort$Array;Lcom/eignex/klause/formats/smtlib/SmtValue;Ljava/util/List;)Lcom/eignex/klause/formats/smtlib/SmtValue$Array;
+	public static synthetic fun copy$default (Lcom/eignex/klause/formats/smtlib/SmtValue$Array;Lcom/eignex/klause/formats/smtlib/SmtSort$Array;Lcom/eignex/klause/formats/smtlib/SmtValue;Ljava/util/List;ILjava/lang/Object;)Lcom/eignex/klause/formats/smtlib/SmtValue$Array;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDefault ()Lcom/eignex/klause/formats/smtlib/SmtValue;
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getSort ()Lcom/eignex/klause/formats/smtlib/SmtSort$Array;
+	public fun hashCode ()I
+	public fun semanticEquals (Lcom/eignex/klause/formats/smtlib/SmtValue;Lcom/eignex/klause/formats/smtlib/SmtModelValues;)Ljava/lang/Boolean;
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class com/eignex/klause/formats/smtlib/SmtValue$BitVector : com/eignex/klause/formats/smtlib/SmtValue {
 	public fun <init> (Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
