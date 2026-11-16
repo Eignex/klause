@@ -187,7 +187,9 @@ gate and work budgets stop admission cleanly, including constant-folded operatio
 ### Ground functions and type parameters
 
 Free sort constructors, sort aliases and typed ground functions are resolved before
-scalar lowering. Each ground application receives a private result and captured
+scalar lowering. Builtin rewrites preserve selected numeric ranks through composite
+capture, including Real qualifications whose arguments are integer literals.
+Each ground application receives a private result and captured
 arguments. Pairwise congruence requires equal results whenever evaluated arguments
 are equal, including exact arithmetic arguments. Only free sort identities receive
 finite representative domains; interpreted arithmetic domains remain open. Model

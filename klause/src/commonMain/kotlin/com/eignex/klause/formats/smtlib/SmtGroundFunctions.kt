@@ -230,8 +230,11 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                             values.addLast(intern(head, node.items.drop(1).map { literalTerm(it) }))
                         } else {
                             val binding = name?.let { binding(it, frame.environment) }
+                            val qualified = head is SExpr.SList && head.polynomialHead() == "as"
+                            val identifier = if (!encodeUninterpreted && binding == null && qualified) head
+                            else unqualifiedIdentifier(head)
                             if (binding?.macro != null) work.addLast(Frame.Call(binding.macro))
-                            else work.addLast(Frame.Combine(unqualifiedIdentifier(head), node.items.size - 1,
+                            else work.addLast(Frame.Combine(identifier, node.items.size - 1,
                                 binding?.function))
                             for (argument in node.items.drop(1).asReversed()) {
                                 work.addLast(Frame.Evaluate(argument, frame.environment))

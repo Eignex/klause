@@ -49,6 +49,11 @@ internal fun smtBuiltinResultSort(
         name in setOf("+", "-", "*", "abs", "^", "ite")) SmtSort.Real else inferred
 }
 
+internal fun smtBuiltinIdentifierAtRank(identifier: SExpr, arguments: List<SmtSort>, result: SmtSort): SExpr =
+    if (result == SmtSort.Real && smtBuiltinResultSort(identifier, arguments) == SmtSort.Int) {
+        SExpr.SList(listOf(SExpr.Atom("as"), identifier, SExpr.Atom("Real")))
+    } else identifier
+
 private fun numericSmtResult(arguments: List<SmtSort>): SmtSort? = when {
     arguments.any { it != SmtSort.Int && it != SmtSort.Real } -> null
     SmtSort.Real in arguments -> SmtSort.Real

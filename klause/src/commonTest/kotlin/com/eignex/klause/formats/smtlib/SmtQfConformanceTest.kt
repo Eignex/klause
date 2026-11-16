@@ -478,19 +478,22 @@ class SmtQfConformanceTest {
 
     @Test
     fun `qualified numeric aliases retain real array index values`() {
-        val parsed = SmtLib.parse("""
-            (define-sort R () Real)
-            (declare-const a (Array R Bool))
-            (assert (select a ((as + R) 1 2)))
-        """.trimIndent())
+        for (context in listOf("", "(declare-datatype Marker ((mark)))", "(declare-sort-parameter A)")) {
+            val parsed = SmtLib.parse("""
+                $context
+                (define-sort R () Real)
+                (declare-const a (Array R Bool))
+                (assert (select a ((as + R) 1 2)))
+            """.trimIndent())
 
-        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
-        val array = assertIs<SmtValue.Array>(parsed.reconstructModel(assignment).values.single().second)
+            val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed), context).assignment
+            val array = assertIs<SmtValue.Array>(parsed.reconstructModel(assignment).values.single().second)
 
-        assertEquals(SmtSort.Real, array.sort.index)
-        assertTrue(array.entries.all { it.first is SmtValue.Real })
-        val selected = array.entries.lastOrNull { it.first == SmtValue.Real("3.0") }?.second ?: array.default
-        assertEquals(SmtValue.Boolean(true), selected)
+            assertEquals(SmtSort.Real, array.sort.index, context)
+            assertTrue(array.entries.all { it.first is SmtValue.Real }, context)
+            val selected = array.entries.lastOrNull { it.first == SmtValue.Real("3.0") }?.second ?: array.default
+            assertEquals(SmtValue.Boolean(true), selected, context)
+        }
     }
 
     @Test

@@ -174,7 +174,7 @@ exact authority explicitly, and rejection controls exercise publication gates.
 | C23 | `sessions preserve composite models across query only assumptions` | Actual SAT/UNSAT/SAT session with fixed bitvector array reads and transient assumptions |
 | C24 | `retained queries accept their previously returned abstract domain values` | Qualified abstract values remain valid inputs to queries on the same fixed model |
 | C25 | `retained source constants take precedence over analytic extension names` | SAT; a source constant named `pi` retains its chosen value |
-| C26 | `qualified numeric aliases retain real array index values` | SAT; qualified builtin results preserve alias-resolved Real sorts during composite reconstruction |
+| C26 | `qualified numeric aliases retain real array index values` | SAT; qualified builtin results preserve alias-resolved Real sorts during composite reconstruction, including datatype exposure and polymorphic specialization |
 | C27 | `retained polymorphic families construct deep array ranks without recursion` | SAT; a later rank contains 4096 array layers and a correctly typed scalar default |
 | C28 | `retained deep rank construction observes its current witness allowance` | Later model-rank construction stops under its own current witness allowance |
 | C29 | `mutual recursive definitions retain total interpretations at new arguments` | SAT; mutually defined parity functions retain their total meaning on later inputs |

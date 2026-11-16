@@ -260,7 +260,8 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                             if (arguments.isEmpty()) identifier else SExpr.SList(listOf(identifier) +
                                 arguments.map { it.expression })
                         } else if (arguments.isEmpty()) SExpr.Atom(head)
-                        else command(head, *arguments.map { it.expression }.toTypedArray())
+                        else SExpr.SList(listOf(smtBuiltinIdentifierAtRank(SExpr.Atom(head),
+                            arguments.map { it.sort }, result)) + arguments.map { it.expression })
                         values.addLast(Value(expression, result))
                     } else if (symbol.definition != null) {
                         val rank = instantiateSmtRank(symbol.declaration.parameters, symbol.declaration.result,

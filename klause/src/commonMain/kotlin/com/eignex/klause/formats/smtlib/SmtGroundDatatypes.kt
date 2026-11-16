@@ -261,10 +261,13 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
             }
             else -> constructor(operator, arguments)
         }
-        val sort = frame.environment.functions[frame.name]?.result
+        val function = frame.environment.functions[frame.name]
+        val sort = function?.result
             ?: smtBuiltinResultSort(frame.identifier, arguments.map { it.sort }, frame.qualification)
             ?: smtUnsupported("unsupported datatype scalar expression")
-        return Term(sort, form(frame.identifier, *arguments.map { it.expression }.toTypedArray()))
+        val identifier = if (function == null)
+            smtBuiltinIdentifierAtRank(frame.identifier, arguments.map { it.sort }, sort) else frame.identifier
+        return Term(sort, form(identifier, *arguments.map { it.expression }.toTypedArray()))
     }
 
     private fun constructor(operator: SmtDatatypeOperator, arguments: List<Term>): Term {
