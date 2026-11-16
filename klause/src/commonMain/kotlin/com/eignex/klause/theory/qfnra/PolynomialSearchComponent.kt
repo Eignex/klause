@@ -14,6 +14,7 @@ import com.eignex.klause.solver.search.SearchModel
 import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.completedSearchSample
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class PolynomialSearchComponent(
     private val service: PolynomialTheoryService,

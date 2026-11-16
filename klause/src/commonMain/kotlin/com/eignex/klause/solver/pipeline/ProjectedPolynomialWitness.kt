@@ -18,6 +18,7 @@ import com.eignex.klause.theory.qfnra.QfNraParams
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.solveQfNra
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal fun checkProjectedPolynomialWitness(
     source: PolynomialRealProblem,

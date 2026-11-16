@@ -35,6 +35,7 @@ import com.eignex.klause.theory.qfnra.QfNraReason
 import com.eignex.klause.theory.qfnra.QfNraResult
 import com.eignex.klause.theory.qfnra.QfNraStats
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class PolynomialWorkerAdapter(
     private val model: SharedPolynomialModel,

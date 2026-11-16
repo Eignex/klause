@@ -24,6 +24,7 @@ import com.eignex.klause.solver.result.PresolveInvocationOutcome
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolveSizeStats
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

@@ -5,6 +5,7 @@ import com.eignex.klause.lp.optimization.LinearAuthorityCutViolation
 import com.eignex.klause.lp.optimization.LinearAuthorityFeedbackRequest
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.min

@@ -11,6 +11,7 @@ import com.eignex.klause.solver.evidence.SourceEvidence
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /** Caller choices for the numerical traversal and joint repair arms of a finite linear-source portfolio. */
 internal class FiniteCompanionControls(

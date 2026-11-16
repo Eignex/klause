@@ -10,6 +10,7 @@ import com.eignex.klause.lp.engine.certifyLpBoundOnly
 import com.eignex.klause.lp.engine.checkedLpWitness
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals

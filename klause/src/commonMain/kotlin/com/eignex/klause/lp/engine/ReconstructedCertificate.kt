@@ -7,6 +7,7 @@ import com.eignex.klause.simplex.exact.ExactSimplexBound
 import com.eignex.klause.simplex.exact.Frac128
 import com.eignex.klause.simplex.exact.Frac128Ops
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.abs
 import com.eignex.util.numbers.bigIntOf

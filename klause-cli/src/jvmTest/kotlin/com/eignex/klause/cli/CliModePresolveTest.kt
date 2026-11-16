@@ -10,6 +10,7 @@ import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.solver.pipeline.ProblemPipeline
 import com.eignex.klause.solver.pipeline.SourceProblemRoute
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

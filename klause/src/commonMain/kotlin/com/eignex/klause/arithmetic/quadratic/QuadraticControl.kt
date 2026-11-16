@@ -2,6 +2,7 @@ package com.eignex.klause.arithmetic.quadratic
 
 import com.eignex.klause.util.ArithmeticExecution
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal enum class QuadraticStop { CANCELLED, WORK_LIMIT, MATRIX_LIMIT }

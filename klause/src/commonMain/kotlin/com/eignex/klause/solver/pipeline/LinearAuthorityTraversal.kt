@@ -47,6 +47,7 @@ import com.eignex.klause.solver.search.SourceBoundPredicate
 import com.eignex.klause.solver.search.SourceBoundTerm
 import com.eignex.klause.solver.search.explainAtoms
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class LinearAuthorityTraversal(
     private val source: SourceProofContext,

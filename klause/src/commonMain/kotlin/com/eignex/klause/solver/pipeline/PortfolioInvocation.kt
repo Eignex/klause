@@ -23,6 +23,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.includingStop
+import com.eignex.util.numbers.BigFraction
 import kotlin.time.TimeSource
 
 internal data class PortfolioInvocationControls(

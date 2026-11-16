@@ -1,6 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.solver.Sample
+import com.eignex.util.numbers.BigFraction
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import java.io.BufferedOutputStream

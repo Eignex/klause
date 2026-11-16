@@ -9,6 +9,7 @@ import com.eignex.klause.ir.TranscendentalFunction
 import com.eignex.klause.ir.TranscendentalProblem
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs

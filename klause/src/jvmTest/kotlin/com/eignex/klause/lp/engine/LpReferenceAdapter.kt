@@ -6,6 +6,7 @@ import com.eignex.klause.simplex.exact.RationalFeasibility
 import com.eignex.klause.simplex.exact.bigRationalMinimum
 import com.eignex.klause.simplex.exact.bigRationalOutcome
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal sealed interface LpReferenceResult {
     class Feasible(val witness: List<BigFraction>, val objective: LpReferenceObjective) : LpReferenceResult

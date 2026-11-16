@@ -25,6 +25,7 @@ import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
 import com.eignex.klause.theory.qfnra.tryPolynomialIntegerRecession
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal sealed interface QuadraticRelaxationResult {
     data class Minimum(

@@ -17,6 +17,7 @@ import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.pipeline.TheoryParams
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray

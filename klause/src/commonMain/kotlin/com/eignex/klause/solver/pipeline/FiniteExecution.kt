@@ -56,6 +56,7 @@ import com.eignex.klause.solver.validation.toleranceSearch
 import com.eignex.klause.theory.SourceToleranceSearch
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.includingStop
+import com.eignex.util.numbers.BigFraction
 import kotlin.time.Duration
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource

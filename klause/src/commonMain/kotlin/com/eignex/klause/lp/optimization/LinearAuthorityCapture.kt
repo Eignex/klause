@@ -11,6 +11,7 @@ import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.SourceScope
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 // The fields a feedback consumer reads from a completed query; Full is the inspection archive's shape.

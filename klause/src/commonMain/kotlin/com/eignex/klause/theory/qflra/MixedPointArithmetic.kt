@@ -2,6 +2,7 @@ package com.eignex.klause.theory.qflra
 
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class MixedPointArithmetic(private val stop: ExecutionControl) {

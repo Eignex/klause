@@ -31,6 +31,7 @@ import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.toLongExact
 import kotlin.random.Random
 

@@ -13,6 +13,7 @@ import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.pipeline.PreparedSourcePlan
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact

@@ -20,6 +20,7 @@ import com.eignex.klause.solver.pipeline.ExactSearchRow
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.bindStopControl
 import com.eignex.klause.util.pollStop
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 
 internal class EncodedTheoryFactor private constructor(

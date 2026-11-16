@@ -28,6 +28,7 @@ import com.eignex.klause.solver.search.SearchRunEvent
 import com.eignex.klause.solver.search.SearchSolveParams
 import com.eignex.klause.solver.search.Vsids
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.time.ComparableTimeMark
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource

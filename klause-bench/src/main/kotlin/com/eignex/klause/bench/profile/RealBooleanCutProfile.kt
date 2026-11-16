@@ -40,6 +40,7 @@ import com.eignex.klause.solver.pipeline.SourceSetupRequest
 import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.pipeline.prepareExecutionPlan
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.sun.management.ThreadMXBean
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray

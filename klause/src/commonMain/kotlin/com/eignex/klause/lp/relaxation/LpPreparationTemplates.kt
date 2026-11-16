@@ -33,6 +33,7 @@ import com.eignex.klause.util.ArithmeticWorkSource
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
 import com.eignex.klause.util.reserveWork
+import com.eignex.util.numbers.BigFraction
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 

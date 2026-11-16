@@ -13,6 +13,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.LpStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class PreparedLinearSource(
     val view: LinearSourceView,

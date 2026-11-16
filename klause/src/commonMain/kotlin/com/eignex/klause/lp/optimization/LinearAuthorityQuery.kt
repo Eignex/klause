@@ -15,6 +15,7 @@ import com.eignex.klause.solver.evidence.SourceIntegerRowAssumption
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.solver.evidence.integerPinBounds
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 internal class LinearAuthorityQuery private constructor(
     private val source: SourceProofContext,
     val coordinates: List<SourceCoordinate>,

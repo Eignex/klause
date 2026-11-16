@@ -27,6 +27,7 @@ import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.evidence.quadraticEngineInvocation
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals

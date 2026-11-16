@@ -5,6 +5,7 @@ import com.eignex.klause.ir.LinearOp
 import com.eignex.klause.ir.Problem
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.util.numbers.BigFraction
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import kotlin.test.Test

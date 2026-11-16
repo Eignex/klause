@@ -21,6 +21,7 @@ import com.eignex.klause.solver.evidence.sourceCondition
 import com.eignex.klause.solver.objective.FunctionalObjective
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

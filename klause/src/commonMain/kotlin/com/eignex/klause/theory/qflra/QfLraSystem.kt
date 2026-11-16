@@ -34,6 +34,7 @@ import com.eignex.klause.solver.search.SearchRealValue
 import com.eignex.klause.solver.search.SourceBoundAtom
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.pollStop
+import com.eignex.util.numbers.BigFraction
 import kotlin.time.TimeSource
 
 internal class QfLraSystem(private val model: Problem) {

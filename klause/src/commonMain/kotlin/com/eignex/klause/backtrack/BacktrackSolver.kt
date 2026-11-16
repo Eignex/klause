@@ -34,6 +34,7 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.random.Random
 import kotlin.time.ComparableTimeMark
 

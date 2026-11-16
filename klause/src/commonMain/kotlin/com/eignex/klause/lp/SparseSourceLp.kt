@@ -10,6 +10,7 @@ import com.eignex.klause.lp.engine.ExactLpRow
 import com.eignex.klause.lp.engine.ExactLpSide
 import com.eignex.klause.simplex.exact.ExactRationalInequality
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class SparseSourceLpLimits(val work: Long, val allocation: Long, val scalarBits: Int = 4096) {

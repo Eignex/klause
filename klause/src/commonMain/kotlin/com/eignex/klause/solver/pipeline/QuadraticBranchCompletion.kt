@@ -28,6 +28,7 @@ import com.eignex.klause.theory.qfnra.solvePolynomialObjectiveImage
 import com.eignex.klause.theory.qfnra.tryConvexPolynomialOptimum
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.WorkMeter
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
 
 internal sealed interface QuadraticBranchResult {

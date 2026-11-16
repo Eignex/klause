@@ -11,6 +11,7 @@ import com.eignex.klause.simplex.exact.ExactContinuationInput
 import com.eignex.klause.simplex.exact.ExactContinuationLimits
 import com.eignex.klause.simplex.exact.ExactContinuationMetrics
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.TimeSource
 

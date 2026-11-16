@@ -3,6 +3,7 @@ package com.eignex.klause.solver.pipeline
 import com.eignex.klause.lp.optimization.floorSplit
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class LinearBranchHistory {
     private class Direction {

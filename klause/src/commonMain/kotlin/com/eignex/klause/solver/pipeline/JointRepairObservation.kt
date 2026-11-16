@@ -4,6 +4,7 @@ import com.eignex.klause.lp.SourceLpBudget
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.solver.evidence.SourceDerivation
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.time.TimeSource
 

@@ -14,6 +14,7 @@ import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.solver.validation.LinearSourceWitness
 import com.eignex.klause.solver.validation.checkLinearSourceWitness
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 /**
  * Capture original MPS numbers and effective declarations before constructing an engine view.

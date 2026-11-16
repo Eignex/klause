@@ -13,6 +13,7 @@ import com.eignex.klause.solver.search.SearchModelKey
 import com.eignex.klause.solver.search.SearchTheoryDecision
 import com.eignex.klause.theory.qfnra.PolynomialCondition
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal data class TranscendentalSplit(
     val coordinate: Int,

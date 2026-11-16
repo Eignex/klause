@@ -18,6 +18,7 @@ import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.validation.verifyOpenWitness
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.toLongExact
 

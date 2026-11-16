@@ -8,6 +8,7 @@ import com.eignex.klause.solver.evidence.SourceInequality
 import com.eignex.klause.solver.evidence.SourcePremise
 import com.eignex.klause.solver.evidence.SourceProofContext
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal data class LinearBooleanCutLimits(

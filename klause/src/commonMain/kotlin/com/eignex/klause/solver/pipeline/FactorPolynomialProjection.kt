@@ -15,6 +15,7 @@ import com.eignex.klause.theory.EncoderDecline
 import com.eignex.klause.theory.EncodingAttribution
 import com.eignex.klause.theory.EncodingTarget
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
 

@@ -12,6 +12,7 @@ import com.eignex.klause.theory.EncodingAffineExpression
 import com.eignex.klause.theory.EncodingLinearTerm
 import com.eignex.klause.theory.LinearEncodingFormula
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal fun allDifferentLinearFormula(
     factor: AllDifferent,

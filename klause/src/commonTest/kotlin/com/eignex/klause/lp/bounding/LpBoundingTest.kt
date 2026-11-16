@@ -37,6 +37,7 @@ import com.eignex.klause.solver.objective.toLinearObjective
 import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.math.nextDown
 import kotlin.math.nextUp
 import kotlin.random.Random

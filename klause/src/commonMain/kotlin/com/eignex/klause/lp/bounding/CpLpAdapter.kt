@@ -28,6 +28,7 @@ import com.eignex.klause.solver.search.SearchAtomPremise
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class CpLpAdapter(private val engine: LpEngine) : LpSearchPolicy {
     // CP decisions reach the LP in a bound batch; its scopes are synchronized when that batch is assembled.

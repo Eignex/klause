@@ -57,6 +57,7 @@ import com.eignex.klause.solver.search.SearchDecision
 import com.eignex.klause.solver.search.VarRef
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -2,6 +2,7 @@ package com.eignex.klause.arithmetic.transcendental
 
 import com.eignex.klause.util.ArithmeticExecution
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 
 internal class TranscendentalInterrupted : RuntimeException()

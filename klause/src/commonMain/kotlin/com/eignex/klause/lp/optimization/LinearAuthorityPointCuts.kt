@@ -6,6 +6,7 @@ import com.eignex.klause.lp.cut.selectNonparallelCuts
 import com.eignex.klause.lp.engine.CutFamily
 import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.magnitudeBitLength
 import kotlin.math.abs
 import kotlin.math.sqrt

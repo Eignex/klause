@@ -7,6 +7,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.validation.FinitePointCheck
 import com.eignex.klause.solver.validation.verifyProjectedSourceWitness
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal class FloatGridPublication(
     private val binding: SelectedFloatGridBinding,

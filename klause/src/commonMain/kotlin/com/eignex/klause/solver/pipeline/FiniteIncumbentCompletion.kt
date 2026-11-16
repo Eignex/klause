@@ -5,6 +5,7 @@ import com.eignex.klause.presolve.SourceMapping
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.validation.LinearSourceCheck
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 
 internal fun FiniteExecutionRequest.incumbentCompletionCheck(): ((Sample, BigFraction, ExecutionControl) -> Boolean)? {
     if (numericalCompanionParams?.sourceIncumbentCompletion != true) return null
