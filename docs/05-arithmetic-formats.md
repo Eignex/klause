@@ -369,6 +369,8 @@ with Euclidean parity controlling the sign. The logarithm's argument is positive
 on every branch. The `^` extension keeps fixed nonnegative powers. Original
 operation checks independently validate retained quotient, floor and power values
 before a witness is published.
+Arithmetic operands containing the partial logarithm extension retain their
+conditional activation, including the auxiliary equations and original checks.
 
 ### Polynomial source lowering
 

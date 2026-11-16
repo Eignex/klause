@@ -14,8 +14,14 @@ internal fun reduceSmtArithmetic(input: SmtReduction, cancellation: Cancellation
 
 private class SmtArithmeticReducer(private val input: SmtReduction, private val cancellation: Cancellation) {
     private data class Division(val numerator: SExpr, val denominator: SExpr, val quotient: SExpr,
-        val remainder: SExpr?)
-    private data class Key(val operator: String, val arguments: List<Int>)
+        val remainder: SExpr?, val activation: String?)
+    private data class Key(val operator: String, val arguments: List<Int>, val activation: String? = null)
+    private sealed interface Frame {
+        data class Evaluate(val expression: SExpr, val activation: String?) : Frame
+        data class Combine(val expression: SExpr.SList, val activation: String?) : Frame
+        data class IteCondition(val expression: SExpr.SList, val activation: String?) : Frame
+        data class IteCombine(val condition: SExpr, val conditionId: Int, val activation: String?) : Frame
+    }
     private val used = HashSet<String>()
     private val declarations = ArrayList<SExpr>()
     private val obligations = ArrayList<SExpr>()
@@ -26,12 +32,14 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
     private val integerDivisions = ArrayList<Division>()
     private val realDivisions = ArrayList<Division>()
     private val sourceChecks = ArrayList<SmtSourceCheck>()
-    private val integerChecks = ArrayList<List<String>>()
-    private val realChecks = ArrayList<List<String>>()
+    private val integerChecks = ArrayList<SmtArithmeticApplication>()
+    private val realChecks = ArrayList<SmtArithmeticApplication>()
     private val prelude = ArrayList<SExpr>()
     private var exponentialName: String? = null
     private var logarithmName: String? = null
     private var identity = 0
+    private var active: String? = null
+    private var guardPartials = false
 
     fun reduce(): SmtReduction {
         for (declaration in input.declarations) {
@@ -48,7 +56,12 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
             step()
             when (val node = work.removeLast()) {
                 is SExpr.Atom -> used += polynomialSymbol(node.text)
-                is SExpr.SList -> node.items.forEach(work::addLast)
+                is SExpr.SList -> {
+                    if ((node.items.firstOrNull() as? SExpr.Atom)?.text?.let(::polynomialSymbol) == "log") {
+                        guardPartials = true
+                    }
+                    node.items.forEach(work::addLast)
+                }
             }
         }
         val commands = input.commands.map { command ->
@@ -84,28 +97,58 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
     }
 
     private fun rewrite(root: SExpr): SExpr {
-        val work = ArrayDeque<Pair<SExpr, Boolean>>()
+        val work = ArrayDeque<Frame>()
         val values = ArrayDeque<SExpr>()
         val ids = ArrayDeque<Int>()
-        work.addLast(root to false)
+        work.addLast(Frame.Evaluate(root, null))
         while (work.isNotEmpty()) {
             step()
-            val (node, combine) = work.removeLast()
-            if (node is SExpr.Atom) {
-                values.addLast(node)
-                ids.addLast(atomIds.getOrPut(node.text) { nextNode++ })
-            }
-            else {
-                node as SExpr.SList
-                if (!combine) {
-                    work.addLast(node to true)
-                    node.items.drop(1).asReversed().forEach { work.addLast(it to false) }
-                } else {
+            when (val frame = work.removeLast()) {
+                is Frame.Evaluate -> when (val node = frame.expression) {
+                    is SExpr.Atom -> {
+                        values.addLast(node)
+                        ids.addLast(atomIds.getOrPut(node.text) { nextNode++ })
+                    }
+                    is SExpr.SList -> {
+                        if ((unqualified(node.items.first()) as? SExpr.Atom)?.text == "ite") {
+                            work.addLast(Frame.IteCondition(node, frame.activation))
+                            work.addLast(Frame.Evaluate(node.items[1], frame.activation))
+                        } else {
+                            work.addLast(Frame.Combine(node, frame.activation))
+                            node.items.drop(1).asReversed().forEach {
+                                work.addLast(Frame.Evaluate(it, frame.activation))
+                            }
+                        }
+                    }
+                }
+                is Frame.IteCondition -> {
+                    val condition = values.removeLast()
+                    val conditionId = ids.removeLast()
+                    val whenTrue = activation(frame.activation, condition)
+                    val whenFalse = activation(frame.activation, form("not", condition))
+                    work.addLast(Frame.IteCombine(condition, conditionId, frame.activation))
+                    work.addLast(Frame.Evaluate(frame.expression.items[3], whenFalse))
+                    work.addLast(Frame.Evaluate(frame.expression.items[2], whenTrue))
+                }
+                is Frame.IteCombine -> {
+                    val whenFalse = values.removeLast()
+                    val whenTrue = values.removeLast()
+                    val falseId = ids.removeLast()
+                    val trueId = ids.removeLast()
+                    values.addLast(form("ite", frame.condition, whenTrue, whenFalse))
+                    ids.addLast(nodeIds.getOrPut(Key("ite", listOf(frame.conditionId, trueId, falseId),
+                        frame.activation)) { nextNode++ })
+                }
+                is Frame.Combine -> {
+                    val node = frame.expression
                     val args = List(node.items.size - 1) { values.removeLast() }.reversed()
                     val arguments = List(node.items.size - 1) { ids.removeLast() }.reversed()
-                    val head = node.items.first()
-                    val name = (head as? SExpr.Atom)?.text
-                    val key = Key(name ?: head.toString(), arguments)
+                    val identifier = unqualified(node.items.first())
+                    val head = if (identifier is SExpr.Atom) SExpr.Atom(polynomialSymbol(identifier.text))
+                        else identifier
+                    val name = (head as? SExpr.Atom)?.text?.let(::polynomialSymbol)
+                    val key = Key(name ?: head.toString(), arguments, frame.activation)
+                    active = frame.activation
                     val value = cache.getOrPut(key) {
                         when (name) {
                             "div" -> args.reduce { a, b -> divide(a, b, remainder = false) }
@@ -130,22 +173,41 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
         return values.single()
     }
 
+    private fun activation(parent: String?, condition: SExpr): String? {
+        if (!guardPartials) return null
+        val guard = fresh("Bool")
+        val value = if (parent == null) condition else form("ite", SExpr.Atom(parent), condition, SExpr.Atom("false"))
+        obligations += form("=", guard, value)
+        return name(guard)
+    }
+
+    private fun oblige(expression: SExpr) {
+        obligations += active?.let { form("ite", SExpr.Atom(it), expression, SExpr.Atom("true")) } ?: expression
+    }
+
+    private fun check(source: SmtSourceCheck) {
+        val guard = active
+        sourceChecks += if (guard == null) source else SmtSourceCheck { values ->
+            !values.boolean(guard) || source.check(values)
+        }
+    }
+
     private fun divide(a: SExpr, b: SExpr, remainder: Boolean): SExpr {
         val q = fresh("Int")
         val r = fresh("Int")
         val nonzero = form("distinct", b, zero)
-        obligations += form("=>", nonzero, form("and", form("=", a, form("+", form("*", b, q), r)),
-            form("<=", zero, r), form("<", r, absolute(b))))
+        oblige(form("=>", nonzero, form("and", form("=", a, form("+", form("*", b, q), r)),
+            form("<=", zero, r), form("<", r, absolute(b)))))
         val operands = listOf(retain(a, "Int"), retain(b, "Int"), q, r)
         val names = operands.map(::name)
-        sourceChecks += SmtArithmeticCheck(SmtArithmeticOperation.DIV_MOD, names)
-        integerChecks += names
-        val division = Division(a, b, q, r)
+        check(SmtArithmeticCheck(SmtArithmeticOperation.DIV_MOD, names))
+        integerChecks += SmtArithmeticApplication(names, active)
+        val division = Division(a, b, q, r, active)
         for (other in integerDivisions) {
             step()
-            obligations += form("=>", form("and", form("=", a, other.numerator),
+            congruence(other, form("=>", form("and", form("=", a, other.numerator),
                 form("=", b, other.denominator)), form("and", form("=", q, other.quotient),
-                form("=", r, requireNotNull(other.remainder))))
+                form("=", r, requireNotNull(other.remainder)))))
         }
         integerDivisions += division
         return if (remainder) r else q
@@ -155,34 +217,34 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
         if (literalNonzero(b)) return form("/", a, b)
         val q = fresh("Real")
         val names = listOf(retain(a, "Real"), retain(b, "Real"), q).map(::name)
-        sourceChecks += SmtArithmeticCheck(SmtArithmeticOperation.REAL_DIV, names)
-        realChecks += names
-        obligations += form("=>", form("distinct", b, zero), form("=", form("*", b, q), a))
+        check(SmtArithmeticCheck(SmtArithmeticOperation.REAL_DIV, names))
+        realChecks += SmtArithmeticApplication(names, active)
+        oblige(form("=>", form("distinct", b, zero), form("=", form("*", b, q), a)))
         for (other in realDivisions) {
             step()
-            obligations += form("=>", form("and", form("=", a, other.numerator),
-                form("=", b, other.denominator)), form("=", q, other.quotient))
+            congruence(other, form("=>", form("and", form("=", a, other.numerator),
+                form("=", b, other.denominator)), form("=", q, other.quotient)))
         }
-        realDivisions += Division(a, b, q, null)
+        realDivisions += Division(a, b, q, null, active)
         return q
     }
 
     private fun floor(argument: SExpr): SExpr {
         val q = fresh("Int")
-        sourceChecks += SmtArithmeticCheck(SmtArithmeticOperation.FLOOR,
-            listOf(retain(argument, "Real"), q).map(::name))
-        obligations += form("and", form("<=", form("to_real", q), argument),
-            form("<", argument, form("+", form("to_real", q), one)))
+        check(SmtArithmeticCheck(SmtArithmeticOperation.FLOOR,
+            listOf(retain(argument, "Real"), q).map(::name)))
+        oblige(form("and", form("<=", form("to_real", q), argument),
+            form("<", argument, form("+", form("to_real", q), one))))
         return q
     }
 
     private fun power(base: SExpr, exponent: SExpr): SExpr {
         val result = fresh("Int")
-        sourceChecks += SmtArithmeticCheck(SmtArithmeticOperation.POWER,
-            listOf(retain(base, "Int"), retain(exponent, "Int"), result).map(::name))
+        check(SmtArithmeticCheck(SmtArithmeticOperation.POWER,
+            listOf(retain(base, "Int"), retain(exponent, "Int"), result).map(::name)))
         val fixed = integerLiteral(exponent)
         if (fixed != null && fixed >= BIG_ZERO && fixed <= bigIntOf(Int.MAX_VALUE)) {
-            obligations += form("=", result, form("^", base, SExpr.Atom(fixed.toLongExact().toString())))
+            oblige(form("=", result, form("^", base, SExpr.Atom(fixed.toLongExact().toString()))))
             return result
         }
         val magnitude = absolute(base)
@@ -196,7 +258,7 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
         val value = form("ite", form("=", exponent, zero), one,
             form("ite", form("=", magnitude, one), sign,
                 form("ite", form("or", form("<", exponent, zero), form("=", base, zero)), zero, general)))
-        obligations += form("=", form("to_real", result), value)
+        oblige(form("=", form("to_real", result), value))
         return result
     }
 
@@ -227,11 +289,20 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
 
     private fun retain(expression: SExpr, sort: String): SExpr {
         val coordinate = fresh(sort)
-        obligations += form("=", coordinate, expression)
+        oblige(form("=", coordinate, expression))
         return coordinate
     }
 
+    private fun congruence(other: Division, expression: SExpr) {
+        oblige(other.activation?.let { form("ite", SExpr.Atom(it), expression, SExpr.Atom("true")) } ?: expression)
+    }
+
     private fun name(expression: SExpr): String = (expression as SExpr.Atom).text
+
+    private fun unqualified(identifier: SExpr): SExpr = if (identifier is SExpr.SList &&
+        identifier.items.size == 3 && (identifier.items[0] as? SExpr.Atom)?.text == "as") {
+        identifier.items[1]
+    } else identifier
 
     private fun integerLiteral(expression: SExpr): com.eignex.util.numbers.BigInt? {
         var term = expression
