@@ -3,12 +3,12 @@ package com.eignex.klause.cli
 import com.eignex.klause.formats.smtlib.SmtSessionModel
 import com.eignex.klause.formats.smtlib.SmtSessionResult
 import com.eignex.klause.ir.ObjectiveSense
-import com.eignex.util.numbers.BigFraction
 import com.eignex.klause.solver.evidence.SourceClaim
 import com.eignex.klause.solver.evidence.SourceValue
 import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.util.numbers.BigFraction
 
 internal class SmtSessionOutput(
     private val interpretation: () -> SmtSessionModel?,
@@ -39,7 +39,7 @@ internal class SmtSessionOutput(
         if (optimize) comment("objective=${formatArithmeticObjective(objective)}")
         return true
     }
-    override fun formatArithmeticObjective(objective: SourceValue): String = when (objective) {
+    private fun formatArithmeticObjective(objective: SourceValue): String = when (objective) {
         is SourceValue.Algebraic -> smtAlgebraicValue(objective.value)
         else -> arithmeticObjectiveText(objective)
     }

@@ -386,7 +386,7 @@ class SmtLibSession(
         ?: fail("expected a keyword")
     private fun SExpr.SList.numeral(index: Int): Int {
         val text = atom(index)
-        if (text.isEmpty() || text.any { it !in '0'..'9' } || text.length > 1 && text[0] == '0') {
+        if (text.isEmpty() || text.any { it !in '0'..'9' } || (text.length > 1 && text[0] == '0')) {
             fail("expected a nonnegative numeral")
         }
         return text.toIntOrNull() ?: fail("stack count exceeds available resources")

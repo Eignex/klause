@@ -29,15 +29,7 @@ private fun prepareRecursiveCommand(
         return SExpr.Atom(name)
     }
     for (definition in fields) {
-        val parameters = definition[1] as? SExpr.SList ?: throw UnsupportedSmtException("invalid parameters")
-        val sorts = parameters.items.map {
-            val pair = it as? SExpr.SList ?: throw UnsupportedSmtException("invalid parameter")
-            if (pair.items.size != 2) throw UnsupportedSmtException("invalid parameter")
-            pair.items[1]
-        }
-        val declaration = SExpr.SList(listOf(SExpr.Atom("declare-fun"), definition[0],
-            SExpr.SList(sorts), definition[2]))
-        normalizeSmtSourceCommands(listOf(declaration), scope, control)
+        normalizeSmtSourceCommands(listOf(recursiveDeclaration(definition)), scope, control)
     }
     val labels = ArrayList<SExpr.SList>()
     val bodies = fields.map { definition ->
@@ -98,16 +90,7 @@ internal fun smtSessionScope(commands: List<SExpr>, control: ExecutionControl): 
             normalizeSmtSourceCommands(listOf(command), scope, control)
         } else {
             for (definition in definitions) {
-                val parameters = definition[1] as? SExpr.SList
-                    ?: throw UnsupportedSmtException("expected recursive parameters")
-                val sorts = parameters.items.map {
-                    val pair = it as? SExpr.SList ?: throw UnsupportedSmtException("invalid recursive parameter")
-                    if (pair.items.size != 2) throw UnsupportedSmtException("invalid recursive parameter")
-                    pair.items[1]
-                }
-                val declaration = SExpr.SList(listOf(SExpr.Atom("declare-fun"), definition[0],
-                    SExpr.SList(sorts), definition[2]))
-                normalizeSmtSourceCommands(listOf(declaration), scope, control)
+                normalizeSmtSourceCommands(listOf(recursiveDeclaration(definition)), scope, control)
             }
             for (definition in definitions) {
                 val check = SExpr.SList(listOf(SExpr.Atom("define-fun"), fresh()) + definition.drop(1))
@@ -116,6 +99,16 @@ internal fun smtSessionScope(commands: List<SExpr>, control: ExecutionControl): 
         }
     }
     return scope
+}
+
+private fun recursiveDeclaration(definition: List<SExpr>): SExpr.SList {
+    val parameters = definition[1] as? SExpr.SList ?: smtUnsupported("expected recursive parameters")
+    val sorts = parameters.items.map {
+        val pair = it as? SExpr.SList ?: smtUnsupported("invalid recursive parameter")
+        if (pair.items.size != 2) smtUnsupported("invalid recursive parameter")
+        pair.items[1]
+    }
+    return SExpr.SList(listOf(SExpr.Atom("declare-fun"), definition[0], SExpr.SList(sorts), definition[2]))
 }
 
 internal data class SmtSessionQueries(val terms: List<SExpr>, val definitions: List<SExpr.SList>)

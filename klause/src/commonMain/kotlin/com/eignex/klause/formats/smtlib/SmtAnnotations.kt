@@ -60,13 +60,8 @@ internal fun normalizeSmtSourceCommands(
                     val localNames = frame.pattern?.let {
                         smtPatternVariables(it, scope.datatypes.operatorNames)
                     } ?: when (head) {
-                        "let" -> (node.items.getOrNull(1) as? SExpr.SList)?.items.orEmpty().mapNotNull {
-                            ((it as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol)
-                        }.toSet()
-                        "define-fun", "define-fun-rec" ->
-                            (node.items.getOrNull(2) as? SExpr.SList)?.items.orEmpty().mapNotNull {
-                            ((it as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text?.let(::smtSessionSymbol)
-                        }.toSet()
+                        "let" -> annotationBindingNames(node.items.getOrNull(1))
+                        "define-fun", "define-fun-rec" -> annotationBindingNames(node.items.getOrNull(2))
                         else -> emptySet()
                     }
                     for (index in node.items.indices.reversed()) {
@@ -94,6 +89,12 @@ private data class AnnotationFrame(
     val node: SExpr, val combine: Boolean, val bound: Set<String>,
     val matchCases: Boolean = false, val pattern: SExpr? = null,
 )
+
+private fun annotationBindingNames(expression: SExpr?): Set<String> =
+    (expression as? SExpr.SList)?.items.orEmpty().mapNotNull {
+        val name = ((it as? SExpr.SList)?.items?.firstOrNull() as? SExpr.Atom)?.text
+        name?.let(::smtSessionSymbol)
+    }.toSet()
 
 private fun freeAnnotationSymbols(root: SExpr, constructors: Set<String>): Set<String> {
     val symbols = HashSet<String>()

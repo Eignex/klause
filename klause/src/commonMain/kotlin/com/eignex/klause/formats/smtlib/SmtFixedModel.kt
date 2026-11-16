@@ -416,7 +416,7 @@ internal class SmtFixedModel(
         val schema = snapshot?.typed?.symbols?.firstOrNull {
             symbol(it.declaration.name) == name && it.definition == null
         }?.declaration
-        if (schema != null && snapshot != null) {
+        if (schema != null) {
             val parameters = args.map(::valueSort)
             val rank = instantiateSmtRank(schema.parameters, schema.result,
                 snapshot.typed.sortParameters, parameters, result, control)
@@ -672,8 +672,8 @@ internal class SmtFixedModel(
         SmtSort.Real -> numeric(value)
         is SmtSort.BitVector -> value is SmtValue.BitVector && value.bits.length == sort.width
         is SmtSort.Array -> value is SmtValue.Array && value.sort == sort
-        is SmtSort.Uninterpreted -> value is SmtValue.Uninterpreted && value.sort == sort ||
-            value is SmtValue.Application && valueSort(value) == sort
+        is SmtSort.Uninterpreted -> (value is SmtValue.Uninterpreted && value.sort == sort) ||
+            (value is SmtValue.Application && valueSort(value) == sort)
     }
     private fun hex(text: String): SmtValue.BitVector = SmtValue.BitVector(buildString {
         for (digit in text) append(digit.digitToInt(16).toString(2).padStart(4, '0'))
