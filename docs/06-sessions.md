@@ -17,6 +17,10 @@ pins and per-call parameters; popping restores the previous scope. The source mo
 is unchanged. Parameters that cannot enforce assumptions reject non-empty pins
 explicitly, as do custom sessions for scoped operations they cannot implement.
 
+`Assumptions` owns the defensive snapshot of exact pins and derived restrictions
+used by ordinary and quadratic engine invocations. Each snapshot copies every
+primitive array, including set-restriction offsets and values.
+
 `satisfyUnderAssumptions` includes parameter pins in the operation's scope and in any
 returned assumption core. Bound and hole restrictions also qualify infeasibility;
 an empty exact-pin set does not make that refutation global.

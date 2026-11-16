@@ -70,7 +70,7 @@ internal class PolynomialAffineReduction private constructor(
             var current = region.atoms.map { (index, truth) ->
                 arithmetic.step()
                 val atom = formula.atoms[index]
-                if (truth) atom else PolynomialAtom(atom.polynomial, complement(atom.relation))
+                if (truth) atom else atom.complemented()
             }
             val signChecking = preparePolynomialSignRefutation(current, realCount, arithmetic)
             var signConflict: Boolean? = null
@@ -310,13 +310,4 @@ private fun affineCoordinate(atoms: List<PolynomialAtom>, realCount: Int, arithm
         }
     }
     return best
-}
-
-private fun complement(relation: PolynomialRelation): PolynomialRelation = when (relation) {
-    PolynomialRelation.EQ -> PolynomialRelation.NE
-    PolynomialRelation.NE -> PolynomialRelation.EQ
-    PolynomialRelation.LT -> PolynomialRelation.GE
-    PolynomialRelation.LE -> PolynomialRelation.GT
-    PolynomialRelation.GT -> PolynomialRelation.LE
-    PolynomialRelation.GE -> PolynomialRelation.LT
 }

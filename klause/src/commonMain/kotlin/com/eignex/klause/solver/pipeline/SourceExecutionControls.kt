@@ -88,25 +88,7 @@ internal fun bindSourceExecutionControls(
             maxDecisions = reader[ExecutionOption.maxDecisions] ?: defaults.maxDecisions,
             maxFlips = reader[ExecutionOption.maxFlips] ?: defaults.maxFlips,
             maxInstructions = reader[ExecutionOption.maxInstructions],
-            sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit,
-                defaults.sourceLpWorkLimit) ?: Long.MAX_VALUE,
-            sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
-                defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
-            sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
-            sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
-            sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
-            sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: defaults.sourceCutBranching,
-            sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
-            sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
-                ?: defaults.sourceIncumbentCompletion,
-            sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
-                ?: defaults.sourceRefutationCenterStep,
-            sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
-            sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
-                ?: defaults.sourceRefutationPropagation,
-            sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
-                ?: defaults.sourceRefutationResolution,
-        ) else defaults
+        ).withSourceCompanionControls(reader) else defaults
         return SourceExecutionControls(
             theory,
             PolynomialTheoryParams(),
@@ -145,24 +127,6 @@ internal fun bindSourceExecutionControls(
         val defaults = TheoryParams()
         TheoryParams(
             openWorkLimit = reader.defaulted(ExecutionOption.openWorkLimit, defaults.openWorkLimit) ?: Long.MAX_VALUE,
-            sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit, defaults.sourceLpWorkLimit)
-                ?: Long.MAX_VALUE,
-            sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
-                defaults.sourceLpAllocationLimit) ?: Long.MAX_VALUE,
-            sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: defaults.sourceLpOperations,
-            sourceCuts = reader[ExecutionOption.sourceCuts] ?: defaults.sourceCuts,
-            sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: defaults.sourcePointCuts,
-            sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: defaults.sourceCutBranching,
-            sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: defaults.sourceAggregateCuts,
-            sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
-                ?: defaults.sourceIncumbentCompletion,
-            sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
-                ?: defaults.sourceRefutationCenterStep,
-            sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: defaults.sourceRefutationReuse,
-            sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
-                ?: defaults.sourceRefutationPropagation,
-            sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
-                ?: defaults.sourceRefutationResolution,
             maxDecisions = decisions,
             sharedRestart = reader[ExecutionOption.sharedRestart],
             maxLearnedClauses = reader[ExecutionOption.maxLearned],
@@ -173,7 +137,7 @@ internal fun bindSourceExecutionControls(
             openHintMinSplits = reader[ExecutionOption.openHintMinSplits] ?: defaults.openHintMinSplits,
             timeout = timeout, cancellation = stop, nodeBudget = budget,
             alnsIterations = iterations, randomSeed = seed, maxFlips = flips, maxInstructions = instructions,
-        )
+        ).withSourceCompanionControls(reader)
     } else {
         TheoryParams(nodeBudget = budget, randomSeed = seed, timeout = timeout, cancellation = stop)
     }
@@ -244,6 +208,27 @@ internal fun bindSourceExecutionControls(
         theory, polynomial, integer, functions, finite, budget, resolvedPresolve, prepareOnly,
     )
 }
+
+private fun TheoryParams.withSourceCompanionControls(reader: ExecutionOptionReader): TheoryParams = copy(
+    sourceLpWorkLimit = reader.defaulted(ExecutionOption.sourceLpWorkLimit,
+        sourceLpWorkLimit) ?: Long.MAX_VALUE,
+    sourceLpAllocationLimit = reader.defaulted(ExecutionOption.sourceLpAllocationLimit,
+        sourceLpAllocationLimit) ?: Long.MAX_VALUE,
+    sourceLpOperations = reader[ExecutionOption.sourceLpOperations] ?: sourceLpOperations,
+    sourceCuts = reader[ExecutionOption.sourceCuts] ?: sourceCuts,
+    sourcePointCuts = reader[ExecutionOption.sourcePointCuts] ?: sourcePointCuts,
+    sourceCutBranching = reader[ExecutionOption.sourceCutBranching] ?: sourceCutBranching,
+    sourceAggregateCuts = reader[ExecutionOption.sourceAggregateCuts] ?: sourceAggregateCuts,
+    sourceIncumbentCompletion = reader[ExecutionOption.sourceIncumbentCompletion]
+        ?: sourceIncumbentCompletion,
+    sourceRefutationCenterStep = reader[ExecutionOption.sourceRefutationCenterStep]
+        ?: sourceRefutationCenterStep,
+    sourceRefutationReuse = reader[ExecutionOption.sourceRefutationReuse] ?: sourceRefutationReuse,
+    sourceRefutationPropagation = reader[ExecutionOption.sourceRefutationPropagation]
+        ?: sourceRefutationPropagation,
+    sourceRefutationResolution = reader[ExecutionOption.sourceRefutationResolution]
+        ?: sourceRefutationResolution,
+)
 
 private fun FiniteSolveRequest.withSourceControls(
     options: ExecutionOptions,

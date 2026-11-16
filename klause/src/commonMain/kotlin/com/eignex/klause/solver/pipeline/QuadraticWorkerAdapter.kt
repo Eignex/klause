@@ -11,7 +11,6 @@ import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.portfolio.PortfolioWorker
 import com.eignex.klause.portfolio.SourceWorkerBinding
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.DeducedRestrictions
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.QuadraticEngineDerivation
@@ -386,29 +385,9 @@ internal fun quadraticAssumptions(params: PolynomialTheoryParams, engine: Finite
     val cp = params.strategy.backtrack.assumptions.mergedWith(params.strategy.assumptions)
     val ls = params.strategy.localSearch.assumptions.mergedWith(params.strategy.assumptions)
     if (engine == FiniteEngine.MIXED) {
-        require(cp.bools == ls.bools && cp.ints == ls.ints && sameDeductions(cp.deductions, ls.deductions)) {
+        require(cp == ls) {
             "quadratic mixed workers require the same invocation assumptions"
         }
     }
-    return snapshot(if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) ls else cp)
-}
-
-private fun sameDeductions(left: DeducedRestrictions, right: DeducedRestrictions): Boolean =
-    left.intMinKeys.contentEquals(right.intMinKeys) && left.intMinValues.contentEquals(right.intMinValues) &&
-        left.intMaxKeys.contentEquals(right.intMaxKeys) && left.intMaxValues.contentEquals(right.intMaxValues) &&
-        left.intHoleVarIds.contentEquals(right.intHoleVarIds) &&
-        left.intHoleValues.contentEquals(right.intHoleValues) &&
-        left.intSetKeys.contentEquals(right.intSetKeys) && left.intSetOffsets.contentEquals(right.intSetOffsets) &&
-        left.intSetValues.contentEquals(right.intSetValues)
-
-private fun snapshot(value: Assumptions): Assumptions {
-    val d = value.deductions
-    return Assumptions(
-        value.boolKeys.copyOf(), value.boolValues.copyOf(), value.intKeys.copyOf(), value.intValues.copyOf(),
-        DeducedRestrictions(
-            d.intMinKeys.copyOf(), d.intMinValues.copyOf(), d.intMaxKeys.copyOf(), d.intMaxValues.copyOf(),
-            d.intHoleVarIds.copyOf(), d.intHoleValues.copyOf(), d.intSetKeys.copyOf(),
-            d.intSetOffsets.copyOf(), d.intSetValues.copyOf(),
-        ),
-    )
+    return (if (engine == FiniteEngine.LOCAL_SEARCH || engine == FiniteEngine.ALNS) ls else cp).snapshot()
 }

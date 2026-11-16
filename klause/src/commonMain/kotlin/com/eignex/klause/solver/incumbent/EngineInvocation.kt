@@ -2,7 +2,6 @@ package com.eignex.klause.solver.incumbent
 
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.propagation.Assumptions
-import com.eignex.klause.propagation.DeducedRestrictions
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceCondition
 import com.eignex.klause.solver.evidence.SourceCoordinate
@@ -27,8 +26,8 @@ internal class EngineInvocation(
     val scope: SourceScope? = null,
     condition: SourceCondition? = null,
 ) {
-    private val sourcePins = snapshot(sourceAssumptions)
-    private val executionPins = snapshot(executionAssumptions)
+    private val sourcePins = sourceAssumptions.snapshot()
+    private val executionPins = executionAssumptions.snapshot()
     val sourceCondition: SourceCondition = condition ?: sourcePins.sourceCondition()
     private val sourceWitnessCondition: SourceCondition = executionCondition(sourcePins)
     val executionCondition: SourceCondition = executionCondition(executionPins)
@@ -37,7 +36,7 @@ internal class EngineInvocation(
     val sense: ObjectiveSense get() = if (preparedPlan.maximize) ObjectiveSense.MAXIMIZE else ObjectiveSense.MINIMIZE
     val sourceModel: ModelIdentity = ModelIdentity.of(preparedPlan.originalSource, sourceObjective)
     val hasUncapturedSourceRestrictions: Boolean get() = !sourcePins.deductions.isEmpty
-    val assumptions: Assumptions get() = snapshot(executionPins)
+    val assumptions: Assumptions get() = executionPins.snapshot()
 
     init {
         require(preparedPlan.quadraticObjective == null) { "ordinary invocation cannot replace a quadratic objective" }
@@ -129,17 +128,5 @@ internal class EngineInvocation(
             upper[coordinate] = upper[coordinate]?.let { if (it < exact) it else exact } ?: exact
         }
         return SourceCondition(explicit.bools, lower, upper)
-    }
-
-    private fun snapshot(value: Assumptions): Assumptions {
-        val d = value.deductions
-        return Assumptions(
-            value.boolKeys.copyOf(), value.boolValues.copyOf(), value.intKeys.copyOf(), value.intValues.copyOf(),
-            DeducedRestrictions(
-                d.intMinKeys.copyOf(), d.intMinValues.copyOf(), d.intMaxKeys.copyOf(), d.intMaxValues.copyOf(),
-                d.intHoleVarIds.copyOf(), d.intHoleValues.copyOf(), d.intSetKeys.copyOf(),
-                d.intSetOffsets.copyOf(), d.intSetValues.copyOf(),
-            ),
-        )
     }
 }
