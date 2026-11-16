@@ -251,12 +251,13 @@ class FiniteExecutionTest {
     }
 
     @Test
-    fun `incomplete engines should accept a strict row gap of the absolute slack`() {
+    fun `incomplete engines should leave a strict row gap of the absolute slack unknown on the grid`() {
+        // The default grid step 1/1023 holds no gap of exactly 1/1024, and a grid result is no source verdict.
         val engines = listOf(FiniteEngine.LOCAL_SEARCH, FiniteEngine.ALNS)
 
         val verdicts = engines.associateWith { solveFlatZinc(dyadicSlack, it, source = strictRows("0.001953125")) }
 
-        assertEquals(engines.associateWith { FiniteSolveVerdict.SAT }, verdicts)
+        assertEquals(engines.associateWith { FiniteSolveVerdict.UNKNOWN }, verdicts)
     }
 
     @Test

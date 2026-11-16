@@ -1,5 +1,6 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.propagation.PropagationResult
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.incumbent.Verification
@@ -74,8 +75,11 @@ internal class FloatGridPublication(
         val qualified = if (native is FiniteSolveOutcome.Completed) {
             FiniteSolveOutcome.Completed(
                 when {
-                    accepted == 0L || binding.consumer.operation == ExecutionOperation.ENUMERATE ->
-                        FiniteSolveVerdict.UNKNOWN
+                    // The checker holds the source's exact integer and Boolean relations, so their root
+                    // refutation refutes the source whatever its reals.
+                    accepted == 0L && binding.sourceChecker.rootDeductions is PropagationResult.Unsat ->
+                        FiniteSolveVerdict.UNSAT
+                    accepted == 0L -> FiniteSolveVerdict.UNKNOWN
                     binding.objective != null -> FiniteSolveVerdict.BEST_FOUND
                     else -> FiniteSolveVerdict.SAT
                 },

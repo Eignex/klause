@@ -237,7 +237,8 @@ class MiniZincModeTest(private val direction: String) {
         val text = bytes.toString(Charsets.UTF_8.name())
         assertTrue("klause-grid-verdict: OPTIMAL" in text, text)
         assertFalse("==========" in text.lines(), text)
-        assertFalse("_objective = 0.5;" in text.lines(), text)
+        val lines = text.lines()
+        if (maximize) assertFalse("y = 0.5;" in lines, text) else assertTrue("_objective = 0.0;" in lines, text)
     }
 
     @Test

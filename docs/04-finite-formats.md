@@ -351,9 +351,11 @@ nor a relaxation of it. A grid point is published only when the original source
 accepts it, within the declared tolerance or exactly, so a found point is a source
 solution or incumbent. A grid refutation, a grid optimum and an exhausted grid
 enumeration decide nothing about the source: the source verdict is unknown, or
-satisfiable or best-found when a point was accepted. A pure local-search or ALNS
-engine has no complete arm, so it uses the grid whenever a component needs one and
-reports no refutation or optimum. Grid relations (`GridArrayMinMax`, `GridAbs`,
+satisfiable or best-found when a point was accepted, and an enumeration never
+claims that it listed every solution. The source's integer and Boolean relations
+hold exactly, so a root refutation of those relations alone is a source refutation.
+A pure local-search or ALNS engine has no complete arm, so it uses the grid whenever a
+component needs one, reports no optimum and refutes only that way. Grid relations (`GridArrayMinMax`, `GridAbs`,
 `GridProduct`, `GridPower`) keep their step, origin and nearest-bucket rounding.
 
 The original arm is numerical under the declared tolerance. Finite LP deductions are
@@ -412,8 +414,9 @@ linear theory when it states an open set over reals (a disequality, a reified ro
 whose false side is a strict complement, or a strict row without an absolute slack),
 since leaf completion attains no supremum, and when all solutions are requested. The
 finite lane, for sources with integer columns too, states each unconditional strict row
-as its closed row, so every engine decides the row acceptance reads and an optimum
-against it is attained. In a source with integer columns, a reified non-strict row
+as its closed row, so every engine on the original source decides the row acceptance
+reads, and a local-search or ALNS run on a grid publishes only grid points acceptance
+admits. An optimum against it is attained. In a source with integer columns, a reified non-strict row
 takes the finite lane and its false side holds exactly there. A source the finite lane
 cannot complete, such as one with an extremum or an open integer, routes to the linear
 theory and is decided exactly, its strict rows included. A real product without finite
@@ -462,7 +465,8 @@ Mixed exact/grid witnesses add
 `% klause-coordinate:` and `% klause-float-component:` comments with each grid
 point's binary64 value and approximation reason. With a selected finite grid,
 `==========` follows only a source-accepted satisfaction point, never a grid
-optimum, and the grid prints no `=====UNSATISFIABLE=====`. The
+optimum or a grid enumeration, and `=====UNSATISFIABLE=====` follows only a refutation
+of the integer and Boolean relations. The
 `% klause-float-claim:` comment marks the private grid, and
 `% klause-grid-verdict:` retains the native grid verdict as a comment. Optimization
 keeps its accepted incumbent without an optimum marker; a search without an

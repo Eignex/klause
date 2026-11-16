@@ -33,7 +33,7 @@ import kotlin.time.Duration
 
 class FloatGridPublicationTest {
     @Test
-    fun `grid enumeration should retain points without claiming a complete source enumeration`() {
+    fun `grid enumeration should report an accepted point as satisfiable whether or not the grid was exhausted`() {
         for (native in listOf(FiniteSolveVerdict.UNKNOWN, FiniteSolveVerdict.SAT)) {
             val source = Problem(0, 0, emptyArray<IntDomain>(), emptyArray(), numRealVars = 1,
                 realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0),
@@ -52,7 +52,7 @@ class FloatGridPublicationTest {
                 Duration.ZERO, FiniteSolveOutcome.Completed(native, SolveStats.EMPTY, 1, null, 0))
 
             val outcome = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
-            assertEquals(FiniteSolveVerdict.UNKNOWN, outcome.verdict, "$native")
+            assertEquals(FiniteSolveVerdict.SAT, outcome.verdict, "$native")
             assertEquals(BigFraction.ofDouble(0.5), assertNotNull(outcome.bestSample).exactReals?.single())
         }
     }

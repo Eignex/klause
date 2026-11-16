@@ -1027,9 +1027,10 @@ solver.
 `verifyProjectedSourceWitness` combines original relation checking with integer
 declarations and a private composed fixpoint over captured descriptors. A caller
 callback can add a restriction but cannot replace relation coverage. Exact policy
-uses the full original real graph. Nonzero tolerance has a complete adapter for
-unconditional non-strict linear comparisons and active indicator rows; strict or
-reified tolerance semantics stay indeterminate. A private-grid relation cannot
+uses the full original real graph. Nonzero tolerance reads every relation over a real
+coordinate as [FlatZinc floats](04-finite-formats.md#flatzinc-floats) describe: rows
+and residual readings hold within the slack, while strict rows, disequalities and rows
+whose reifying Boolean is false hold exactly. A private-grid relation cannot
 certify its own original real relation; see
 [private float projections](02-model.md#private-float-projections).
 
