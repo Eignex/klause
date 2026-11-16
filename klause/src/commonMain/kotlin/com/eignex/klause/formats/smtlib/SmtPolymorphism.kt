@@ -162,6 +162,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
         fun supported(sort: SmtSort): Boolean = sort == SmtSort.Bool ||
             (sort is SmtSort.Uninterpreted && sort.arguments.isEmpty() &&
                 polynomialSymbol(sort.name) in source.sortParameters)
+        val operators = setOf("literal:true", "literal:false", "and", "or", "not", "xor", "=>", "=", "distinct", "ite")
         while (work.isNotEmpty()) {
             step()
             val index = work.removeLast()
@@ -171,8 +172,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
             if (symbol != null) {
                 if (!(symbol.declaration.parameters + symbol.declaration.result).all(::supported)) return false
                 symbol.definition?.let { work.addLast(it.body) }
-            } else if (!node.operator.startsWith("parameter:") && node.operator !in setOf(
-                    "literal:true", "literal:false", "and", "or", "not", "xor", "=>", "=", "distinct", "ite")) {
+            } else if (!node.operator.startsWith("parameter:") && node.operator !in operators) {
                 return false
             }
             for (argument in node.arguments) work.addLast(argument)
