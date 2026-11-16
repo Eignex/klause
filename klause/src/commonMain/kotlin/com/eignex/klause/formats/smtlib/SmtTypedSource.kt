@@ -3,7 +3,12 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
 
-internal data class SmtTypedTerm(val operator: String, val arguments: List<Int>, val sort: SmtSort)
+internal enum class SmtTypedDatatypeKind { CONSTRUCTOR, SELECTOR, TESTER }
+
+internal data class SmtTypedDatatypeOperator(val name: String, val kind: SmtTypedDatatypeKind)
+
+internal data class SmtTypedTerm(val operator: String, val arguments: List<Int>, val sort: SmtSort,
+    val datatype: SmtTypedDatatypeOperator? = null)
 
 internal data class SmtTypedDefinition(val parameters: List<Int>, val body: Int)
 
@@ -21,6 +26,7 @@ internal class SmtTypedSource(
     val sortParameters: Set<String> = emptySet(),
     val symbols: List<SmtTypedSymbol> = emptyList(),
     val obligations: List<Pair<String, Int>> = emptyList(),
+    val datatypes: SmtDatatypes? = null,
 )
 
 internal data class SmtReduction(
@@ -31,6 +37,7 @@ internal data class SmtReduction(
     val original: SmtTypedSource? = null,
     val checks: List<SmtSourceCheck> = emptyList(),
     val polymorphicModel: SmtPolymorphicModel? = null,
+    val datatypes: SmtDatatypeReduction? = null,
 )
 
 internal fun captureSmtSource(commands: List<SExpr>, cancellation: ExecutionControl): SmtReduction {
@@ -41,7 +48,8 @@ internal fun captureSmtSource(commands: List<SExpr>, cancellation: ExecutionCont
     }
     val declarations = scope.declarations
     val original = SmtTypedSource(commands.toList(), declarations, scope.terms, scope.assertions,
-        scope.sortParameters, scope.symbols, scope.obligations)
+        scope.sortParameters, scope.symbols, scope.obligations,
+        scope.datatypes.takeIf { it.names.isNotEmpty() }?.snapshot(ExecutionControl.Never))
     val bindings = declarations.map {
         cancellation.polynomialSourceCheckpoint(1)
         SmtSourceBinding(it, SmtReconstruction.Scalar(it.name, it.result))

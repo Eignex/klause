@@ -56,7 +56,7 @@ private fun arrayIndexCardinality(sort: SmtSort, cap: Int, values: SmtModelValue
         SmtSort.Bool -> minOf(2, cap)
         SmtSort.Int, SmtSort.Real -> cap
         is SmtSort.BitVector -> if (sort.width >= 31) cap else minOf(1 shl sort.width, cap)
-        is SmtSort.Uninterpreted -> null
+        is SmtSort.Uninterpreted -> (values as? SmtSortCardinalities)?.cardinality(sort, cap)
         is SmtSort.Array -> {
             val element = arrayIndexCardinality(sort.element, cap, values) ?: return null
             if (element == 1) return 1

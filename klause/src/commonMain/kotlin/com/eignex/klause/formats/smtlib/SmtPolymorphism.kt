@@ -23,6 +23,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
     private val declarations = ArrayList<SExpr>()
     private val bindings = ArrayList<SmtSourceBinding>()
     private val names = HashSet<String>()
+    private val hasPartialLog = source.terms.any { it.datatype == null && it.operator == "log" }
     private var nextName = 0
 
     fun reduce(): SmtReduction {
@@ -39,7 +40,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
         }
         val basis = groundSorts()
         val obligations = ArrayList<SExpr>()
-        var universallyCertified = source.terms.none { it.operator == "log" }
+        var universallyCertified = !hasPartialLog
         var hasSchemas = false
         for ((head, root) in source.obligations) {
             step()
@@ -94,7 +95,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
 
     private fun definitionObligations(basis: List<SmtSort>,
         obligations: MutableList<SExpr>): Boolean {
-        if (source.terms.any { it.operator == "log" }) {
+        if (hasPartialLog) {
             return source.symbols.any { definitionParameters(it).isNotEmpty() }
         }
         var universal = false
@@ -154,7 +155,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
 
     private fun constructiveSchema(): Boolean {
         // A Boolean interpretation embeds in every available non-datatype sort. Ground terms stay in that image.
-        if (source.terms.any { it.operator == "log" }) return false
+        if (hasPartialLog) return false
         if (source.commands.any {
                 (it as? SExpr.SList)?.polynomialHead() in
                     setOf("declare-datatype", "declare-datatypes")
@@ -245,7 +246,15 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                     val symbol = symbol(node)
                     if (symbol == null) {
                         val head = node.operator.removePrefix("literal:")
-                        val expression = if (node.operator.startsWith("literal:")) SExpr.Atom(head)
+                        val expression = if (node.datatype != null) {
+                            val datatype = node.datatype
+                            val identifier = if (datatype.kind == SmtTypedDatatypeKind.TESTER)
+                                command("_", SExpr.Atom("is"), SExpr.Atom(datatype.name))
+                            else SExpr.Atom(datatype.name)
+                            val qualified = command("as", identifier, sortExpression(result))
+                            if (arguments.isEmpty()) qualified
+                            else SExpr.SList(listOf(qualified) + arguments.map { it.expression })
+                        } else if (node.operator.startsWith("literal:")) SExpr.Atom(head)
                         else if (head.startsWith('(')) {
                             val identifier = SExprReader(head).readAll().single()
                             if (arguments.isEmpty()) identifier else SExpr.SList(listOf(identifier) +
@@ -387,7 +396,8 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
 
     private fun universalTautology(root: Int): Boolean = smtUniversalTautology(source, root, cancellation)
 
-    private fun symbol(term: SmtTypedTerm): SmtTypedSymbol? = if (term.operator.startsWith("symbol:")) {
+    private fun symbol(term: SmtTypedTerm): SmtTypedSymbol? = if (term.datatype == null &&
+        term.operator.startsWith("symbol:")) {
         term.operator.substringAfter(':').substringBefore(':').toIntOrNull()?.let { symbols[it] }
     } else null
 

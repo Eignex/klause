@@ -19,8 +19,11 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     private sealed interface Frame {
         class Evaluate(val expression: SExpr, val locals: Locals?) : Frame
         class Combine(val head: String, val count: Int, val signature: Signature?,
-            val qualification: SmtSort? = null, val indexed: SExpr.SList? = null) : Frame
+            val qualification: SmtSort? = null, val indexed: SExpr.SList? = null,
+            val tester: Boolean = false) : Frame
         class Let(val names: List<String>, val body: SExpr, val locals: Locals?) : Frame
+        class Match(val cases: SExpr, val locals: Locals?) : Frame
+        class MatchResult(val scrutinee: Int, val cases: List<SmtDatatypeCase>) : Frame
     }
     private val globals = HashMap<String, Signature>()
     private val globalSortParameters = LinkedHashSet<String>()
@@ -31,6 +34,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     val obligations: List<Pair<String, Int>> get() = sourceObligations.toList()
     private val freeSorts = HashMap<String, Int>()
     private val freeSortNames = HashMap<String, String>()
+    val datatypes = SmtDatatypes(cancellation)
     private data class SortAlias(val parameters: List<String>, val body: SmtSort)
     private val sortAliases = HashMap<String, SortAlias>()
     private var sortParameterIdentity = 0
@@ -43,13 +47,26 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
     val terms: List<SmtTypedTerm> get() = nodes.toList()
     val assertions: List<Int> get() = assertionNodes.toList()
 
-    private fun term(operator: String, arguments: List<Int>, sort: SmtSort): Int {
-        val node = SmtTypedTerm(operator, arguments, sort)
+    private fun term(operator: String, arguments: List<Int>, sort: SmtSort,
+        datatype: SmtTypedDatatypeOperator? = null): Int {
+        val node = SmtTypedTerm(operator, arguments, sort, datatype)
         return interned.getOrPut(node) {
             cancellation.polynomialSourceCheckpoint(1)
             nodes.add(node)
             nodes.lastIndex
         }
+    }
+
+    private fun datatypeTerm(operator: SmtDatatypeOperator, arguments: List<Int>): Int {
+        val constructor = operator.instance.constructors[operator.constructor]
+        val name = operator.selector?.let { constructor.fields[it].name } ?: constructor.name
+        val head = if (arguments.isEmpty()) "datatype:${polynomialSymbol(name)}" else polynomialSymbol(name)
+        val kind = when {
+            operator.tester -> SmtTypedDatatypeKind.TESTER
+            operator.selector != null -> SmtTypedDatatypeKind.SELECTOR
+            else -> SmtTypedDatatypeKind.CONSTRUCTOR
+        }
+        return term(head, arguments, operator.result, SmtTypedDatatypeOperator(name, kind))
     }
     private var querySeen = false
     private var exited = false
@@ -61,6 +78,22 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
             return false
         }
         return when (head) {
+            "declare-datatype", "declare-datatypes" -> {
+                for ((spelling, arity) in datatypes.headers(command)) {
+                    val name = polynomialSymbol(spelling)
+                    if (name in freeSorts || name in sortAliases || name in globalSortParameters ||
+                        theorySort(name) || reservedName(name)) return false
+                    freeSorts[name] = arity
+                    freeSortNames[name] = spelling
+                }
+                datatypes.declare(command) { sort, parameters ->
+                    if (parameters.keys.any { theorySort(it) || reservedName(it) }) {
+                        smtUnsupported("invalid datatype sort parameter")
+                    }
+                    sourceSort(sort, allowGlobalParameters = false, localBindings = parameters)
+                }
+                datatypes.operatorNames.none { it in globals || theoryFunction(it) || reservedName(it) }
+            }
             "declare-sort-parameter" -> {
                 command.polynomialSize(2)
                 val name = command.polynomialName(1)
@@ -107,7 +140,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                 } else emptyList()
                 val name = command.polynomialName(1)
                 val result = sourceSort(command.items[if (head == "declare-const") 2 else 3])
-                if (name in globals || theoryFunction(name) || reservedName(name)) {
+                if (name in globals || datatypes.hasOperator(name) || theoryFunction(name) || reservedName(name)) {
                     smtUnsupported("duplicate declaration of '$name'")
                 } else {
                     globals[name] = Signature(parameters, result, symbolIdentity++)
@@ -121,7 +154,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
             "define-fun" -> {
                 command.polynomialSize(5)
                 val name = command.polynomialName(1)
-                if (name in globals || theoryFunction(name) || reservedName(name)) return false
+                if (name in globals || datatypes.hasOperator(name) || theoryFunction(name) || reservedName(name)) {
+                    return false
+                }
                 val parameters = command.items.getOrNull(2) as? SExpr.SList ?: return false
                 val names = ArrayList<String>()
                 val uniqueNames = HashSet<String>()
@@ -323,6 +358,9 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                         }
                             ?: frame.locals?.get(name) ?: globals[name]?.takeIf { it.parameters.isEmpty() }
                             ?.let { term("symbol:${it.identity}:$name", emptyList(), it.result) }
+                            ?: datatypes.resolve(name, emptyList())?.let {
+                                datatypeTerm(it, emptyList())
+                            }
                             ?: if (node.text == "pi") term("pi", emptyList(), SmtSort.Real) else return null
                         values.addLast(result)
                     }
@@ -337,7 +375,11 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                         val indexed = selected as? SExpr.SList
                         if (indexed != null) {
                             val key = indexed.items.map { (it as? SExpr.Atom)?.text ?: return null }.joinToString(" ")
-                            work.addLast(Frame.Combine("($key)", node.items.size - 1, null, qualification, indexed))
+                            val tester = indexed.items.size == 3 && indexed.polynomialHead() == "_" &&
+                                indexed.polynomialAtom(1) == "is"
+                            work.addLast(if (tester) Frame.Combine(indexed.polynomialName(2), node.items.size - 1,
+                                null, qualification, tester = true)
+                            else Frame.Combine("($key)", node.items.size - 1, null, qualification, indexed))
                             for (argument in node.items.drop(1).asReversed()) {
                                 work.addLast(Frame.Evaluate(argument, frame.locals))
                             }
@@ -363,16 +405,23 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                                     sourceSort(node.items[2]), cancellation)?.second
                             }
                                 ?: literal(name)?.takeIf { name in setOf("true", "false") }
+                                ?: datatypes.resolve(name, emptyList(), sourceSort(node.items[2]))?.result
                                 ?: if (name == "pi") SmtSort.Real else return null
                             if (result != sourceSort(node.items[2])) return null
-                            values.addLast(term(if (signature == null) name else "symbol:${signature.identity}:$name",
-                                emptyList(), result))
+                            val datatype = if (signature == null) datatypes.resolve(name, emptyList(), result) else null
+                            values.addLast(datatype?.let { datatypeTerm(it, emptyList()) }
+                                ?: term(if (signature == null) name else "symbol:${signature.identity}:$name",
+                                    emptyList(), result))
                         } else if (syntax == "_") {
                             val type = smtIndexedBitVectorSort(node, emptyList()) ?: return null
                             val key = node.items.map { (it as? SExpr.Atom)?.text ?: return null }.joinToString(" ")
                             values.addLast(term("($key)", emptyList(), type))
                         } else if (syntax == "!") {
                             if (node.items.size < 2) return null
+                            work.addLast(Frame.Evaluate(node.items[1], frame.locals))
+                        } else if (syntax == "match") {
+                            if (node.items.size != 3) return null
+                            work.addLast(Frame.Match(node.items[2], frame.locals))
                             work.addLast(Frame.Evaluate(node.items[1], frame.locals))
                         } else if (syntax == "let") {
                             if (node.items.size != 3) return null
@@ -408,12 +457,46 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     val bindings = frame.names.zip(pop(frame.names.size)).toMap()
                     work.addLast(Frame.Evaluate(frame.body, Locals(bindings, frame.locals)))
                 }
+                is Frame.Match -> {
+                    val scrutinee = values.removeLast()
+                    val type = nodes[scrutinee].sort
+                    val instance = datatypes.instance(type) ?: return null
+                    val cases = datatypes.cases(type, frame.cases)
+                    work.addLast(Frame.MatchResult(scrutinee, cases))
+                    for (case in cases.asReversed()) {
+                        if (case.variables.any { theoryFunction(it) || reservedName(it) }) return null
+                        val bindings = case.variables.indices.associate { index ->
+                            val node = if (case.constructor == null) scrutinee else datatypeTerm(
+                                SmtDatatypeOperator(instance, case.constructor, selector = index), listOf(scrutinee))
+                            case.variables[index] to node
+                        }
+                        work.addLast(Frame.Evaluate(case.body, Locals(bindings, frame.locals)))
+                    }
+                }
+                is Frame.MatchResult -> {
+                    val branches = pop(frame.cases.size)
+                    val sorts = branches.map { nodes[it].sort }
+                    val result = if (sorts.all { it == sorts[0] }) sorts[0] else numericResult(sorts) ?: return null
+                    val instance = datatypes.instance(nodes[frame.scrutinee].sort) ?: return null
+                    var branch = branches.last()
+                    for (index in branches.lastIndex - 1 downTo 0) {
+                        val constructor = frame.cases[index].constructor
+                        branch = if (constructor == null) branches[index] else term("ite", listOf(
+                            datatypeTerm(SmtDatatypeOperator(instance, constructor, tester = true),
+                                listOf(frame.scrutinee)), branches[index], branch), result)
+                    }
+                    values.addLast(branch)
+                }
                 is Frame.Combine -> {
                     val arguments = pop(frame.count)
                     val args = arguments.map { nodes[it].sort }
                     val signature = frame.signature
+                    val datatype = if (signature == null && frame.indexed == null)
+                        datatypes.resolve(polynomialSymbol(frame.head), args, frame.qualification, frame.tester)
+                    else null
                     val result = if (frame.indexed != null) smtIndexedBitVectorSort(frame.indexed, args)
-                    else if (signature == null) operator(polynomialSymbol(frame.head), args) else {
+                    else if (signature == null) datatype?.result
+                        ?: if (frame.tester) null else operator(polynomialSymbol(frame.head), args) else {
                         instantiateSmtRank(signature.parameters, signature.result, globalSortParameters, args,
                             frame.qualification, cancellation)?.second ?: return null
                     }
@@ -423,7 +506,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     ) SmtSort.Real else inferred
                     if (frame.qualification != null && frame.qualification != type) return null
                     val operator = if (signature == null) frame.head else "symbol:${signature.identity}:${frame.head}"
-                    values.addLast(term(operator, arguments, type))
+                    values.addLast(datatype?.let { datatypeTerm(it, arguments) } ?: term(operator, arguments, type))
                 }
             }
         }

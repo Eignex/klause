@@ -210,6 +210,45 @@ can instantiate an unobserved rank from the same chosen interpretation; known
 ranks resolve their distinct private binding keys. Partial model output preserves
 the source function name and concrete rank of every returned instance.
 
+### Algebraic datatypes
+
+Datatype declarations retain instantiated constructor and selector sorts, including
+parametric and mutually recursive declarations. Typed `match` patterns bind fields
+in their branch scope and require exhaustive coverage. Capture represents matches
+with tester, selector and conditional nodes; datatype operator metadata preserves
+raw symbol spelling, operator kind and instantiated rank through specialization.
+Ill-founded declarations and recursive occurrences below a field sort's head are
+rejected.
+
+Ground constructors, selectors and testers reduce to typed function consistency,
+constructor tags and strict integer depth comparisons. Exhaustiveness introduces
+one layer of constructor witnesses only; witness fields do not trigger recursive
+unfolding. Typed operation applications share scalar coordinates by their exact
+function rank and argument identities. Explicit constructor terms retain their
+known shape instead of allocating exhaustive alternatives. Testers on a known
+shape reduce to Boolean literals, and matching selectors return its captured fields.
+Arrays and function
+applications retain opaque datatype sorts until
+their own reduction has introduced every relevant coordinate. Scalar erasure then
+maps datatype values to integer identities and supplies constructor recipes for
+original and private coordinates.
+
+Finite datatype domains constrain identities by their constructor cardinality,
+including finite word and extensional array fields. Cardinality arithmetic saturates
+at the number of datatype coordinates after array and function exposure:
+domains at least that large can always inject those identities. Recursive and other
+infinite datatype domains impose no integer interval. Strict depth comparisons
+exclude cycles without a depth bound. Reconstruction follows the observed acyclic
+constructor graph and assigns unused minimum-depth constructor terms to remaining
+identities, preserving disequalities. Source checks compare actual constructor
+fields and enforce consistent total selectors even on a different constructor.
+Each observed selector rank retains its checked function table and typed default;
+later ground queries use that interpretation for the underspecified branch.
+Reconstruction tables are cached within one witness for mutually dependent
+instantiated sorts; nested parameters can therefore cross array fields without
+sharing a recursive table with a different instantiation. The retained typed
+registry supplies datatype cardinalities to extensional array value comparisons.
+
 ### Declaration policy
 
 `smtLibSemantics` declares exact rational literals, continuous reals and open

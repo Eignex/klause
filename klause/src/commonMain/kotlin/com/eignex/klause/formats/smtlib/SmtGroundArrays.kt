@@ -4,6 +4,7 @@ import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
 
 internal fun reduceSmtGroundArrays(input: SmtReduction, cancellation: ExecutionControl): SmtReduction {
+    if (input.datatypes != null) return SmtGroundArrayReducer(input, cancellation).reduce()
     val work = ArrayDeque<SExpr>()
     for (expression in input.commands) {
         cancellation.polynomialSourceCheckpoint(1)
