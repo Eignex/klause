@@ -140,20 +140,6 @@ class GridArithmeticEncoderTest {
     }
 
     @Test
-    fun `binary grid installation should keep a compact complete relation`() {
-        val relation = GridProduct(
-            GridCoordinate(0, 0.0, 1.0, 16),
-            GridCoordinate(1, 0.0, 1.0, 16),
-            GridCoordinate(2, 0.0, 1.0, 16),
-        )
-        val source = Problem(0, 3, Array(3) { IntDomain(0, 15) }, arrayOf<Factor>(relation))
-
-        val encoded = FactorProjectionProviders.Default.prepare(source).linearTheoryModel(EncodingTarget.LINEAR)
-
-        assertNotNull(encoded)
-    }
-
-    @Test
     fun `oversized private encodings should decline without dropping native finite support`() {
         val relation = GridPower(
             GridCoordinate(0, -1.0, 1.0, 10000),

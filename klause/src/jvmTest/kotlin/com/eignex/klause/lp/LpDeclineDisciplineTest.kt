@@ -442,7 +442,8 @@ class LpDeclineDisciplineTest {
         )
 
         assertEquals(LpVerdict.ATTAINED_OPTIMUM, accepted.verdict)
-        assertEquals(TerminationReason.Unsupported, assertIs<SolveResult.Unknown>(declined).reason)
+        val result = assertIs<SolveResult.Unknown>(declined)
+        assertEquals(TerminationReason.RepresentationDeclined, result.reason)
         assertTrue(harness.policy.observedSuccess(LpCertifier.EXACT_BASIS))
         assertEquals(
             harness.factory.calls.count { it == DeclineCall.GENERAL },

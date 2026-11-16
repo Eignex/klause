@@ -25,6 +25,7 @@ import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.result.PresolveStats
 import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.withPresolve
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.LinearSourceCheck
@@ -310,7 +311,14 @@ sealed class FiniteSolveOutcome {
          * variable id, along which [bestSample] stays feasible and the objective strictly decreases.
          */
         val unboundedDirection: List<BigFraction>? = null,
-    ) : FiniteSolveOutcome()
+    ) : FiniteSolveOutcome() {
+        private var recordedReason: TerminationReason? = null
+
+        /** Recorded cause of an incomplete result; absent for a definitive verdict. */
+        val terminationReason: TerminationReason? get() = recordedReason
+
+        internal fun withTerminationReason(reason: TerminationReason?): Completed = apply { recordedReason = reason }
+    }
 }
 
 /** Verdict vocabulary exposed by the finite solve facade. */
@@ -390,7 +398,8 @@ internal fun FinitePipeline.solve(
         return result(
             FinitePipelinePreparation(request.shape.problem, request.shape.linearObjective, { it }, null),
             Duration.ZERO,
-            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
+            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L)
+                .withTerminationReason(request.interruptedReason()),
         )
     }
     val preparationStart = TimeSource.Monotonic.markNow()
@@ -422,7 +431,8 @@ internal fun FinitePipeline.solve(
         return result(
             preparation,
             preparationElapsed,
-            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L),
+            FiniteSolveOutcome.Completed(FiniteSolveVerdict.UNKNOWN, SolveStats.EMPTY, 0L, null, 0L)
+                .withTerminationReason(request.interruptedReason()),
         )
     }
     val objectiveCoordinates = if (!stop() && !request.presolveCancellation() &&
@@ -643,7 +653,7 @@ private fun FiniteExecutionResult.toSolveOutcome(): FiniteSolveOutcome = when (t
         bestSample,
         elapsedMs,
         unboundedDirection,
-    )
+    ).withTerminationReason(terminationReason)
 }
 
 private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSolveOutcome = when (this) {
@@ -654,7 +664,7 @@ private fun FiniteSolveOutcome.withPresolve(presolve: PresolveStats?): FiniteSol
         bestSample,
         elapsedMs,
         unboundedDirection,
-    )
+    ).withTerminationReason(terminationReason)
 
     else -> this
 }
@@ -689,6 +699,7 @@ private fun FiniteExecutionResult.reconstructed(
             point,
             elapsedMs,
             direction,
+            terminationReason = terminationReason,
         )
     }
 }
@@ -715,4 +726,11 @@ private fun FiniteExecutionResult.Completed.liftedDirection(
     if (!stepped.bools.contentEquals(point.bools) || !stepped.ints.contentEquals(point.ints)) return null
     if (from.size != to.size) return null
     return List(from.size) { to[it] - from[it] }
+}
+
+private fun FiniteSolveRequest.interruptedReason(): TerminationReason = when {
+    deadlineExceeded() || cancellation.deadline()?.hasPassedNow() == true -> TerminationReason.Timeout
+    nodeBudget?.exhausted() == true -> TerminationReason.BudgetExhausted
+    cancellation() -> TerminationReason.Cancelled
+    else -> TerminationReason.BudgetExhausted
 }

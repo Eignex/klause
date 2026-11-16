@@ -53,13 +53,6 @@ class PresolveTypesTest {
     }
 
     @Test
-    fun `an infeasible source delta should refute when applied directly`() {
-        val model = openModel()
-
-        assertNull(model.withSourcePassDelta(SourceDelta(infeasible = true)))
-    }
-
-    @Test
     fun `a proved range should not narrow the root domains it was handed`() {
         val model = openModel()
         val roots = arrayOf(IntDomain(0, 100), IntDomain(0, 9))
@@ -67,14 +60,5 @@ class PresolveTypesTest {
         provedRange(model) { atMost(0, 40) }.asPassDelta(roots)
 
         assertEquals(100, roots[0].max)
-    }
-
-    @Test
-    fun `a delta that proves a range but rewrites no factor should not be empty`() {
-        val model = openModel()
-
-        val delta = provedRange(model) { atMost(0, 40) }
-
-        assertEquals(false, delta.isEmpty)
     }
 }

@@ -47,8 +47,8 @@ enum class TerminationReason {
  * "budget exhausted before any was found."
  *
  *  - [Found] — a satisfying assignment.
- *  - [Infeasible] — only returned by complete backends that proved no satisfying
- *    assignment exists.
+ *  - [Infeasible] — the backend proved no satisfying assignment exists, including
+ *    a root-propagation refutation under local search.
  *  - [Unknown] — incomplete result with its [TerminationReason], including resource
  *    stops, cancellation, unsupported features and representation declines.
  */
@@ -92,7 +92,8 @@ sealed interface SampleResult {
  * Result of [com.eignex.klause.solver.Optimizer.minimize], distinguishing feasible incumbents
  * from proven optimality.
  * Only complete backends (such as `BacktrackSolver`, `BruteForceSolver` and the open-theory route)
- * return [Optimal], [Infeasible] or [Unbounded]; the local-search backend returns [BestFound] or [Unknown].
+ * return [Optimal] or [Unbounded]. Local search returns [Infeasible] for a root-propagation refutation,
+ * otherwise [BestFound] or [Unknown].
  *
  *  - [Optimal] — sample and objective; search exhausted (or the bound is tight enough
  *    to prove optimality without exhausting).

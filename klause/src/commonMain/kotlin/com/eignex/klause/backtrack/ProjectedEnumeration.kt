@@ -30,7 +30,7 @@ internal fun BacktrackSolver.projectedOutcomes(
                         return@sequence
                     }
                 }
-                is SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> {
+                is SearchOutcome.Exhausted, is SearchOutcome.BudgetCapped -> {
                     yield(outcome)
                     return@sequence
                 }

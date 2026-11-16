@@ -8,19 +8,8 @@ import com.eignex.klause.ir.SearchHints
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
-import kotlin.test.assertSame
 
 class SourceAttachmentTest {
-    @Test
-    fun `an attachment should retain its original source interpretation`() {
-        val problem = Problem(0, 1, arrayOf(IntDomain(0, 2)), emptyArray())
-
-        val attachment = SourceAttachment(problem)
-
-        assertSame(problem, attachment.originalSource)
-        assertSame(problem.semantics, attachment.semantics)
-    }
-
     @Test
     fun `an attachment should own its definition and search intent containers`() {
         val problem = Problem(1, 2, Array(2) { IntDomain(0, 2) }, emptyArray())

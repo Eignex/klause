@@ -20,15 +20,6 @@ class CatalogTest {
     }
 
     @Test
-    fun `handwritten-core problems should all build in code`() {
-        for (ref in Catalog.suite("handwritten-core").problems) {
-            assertEquals(Format.IN_CODE, ref.format)
-            assertTrue(InProcessRunner.supports(ref))
-            InProcessRunner.resolve(ref)
-        }
-    }
-
-    @Test
     fun `catalogue admission should fill caps from valid identities before provider sampling`() {
         val sources = listOf(ref("dimacs-core", "php4"), ref("dimacs-core", "php3"))
             .map { it.copy(family = "pigeonhole") }

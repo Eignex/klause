@@ -72,7 +72,7 @@ internal class CellContext private constructor(
                     if (representatives.size > cap) break
                 }
                 is SearchOutcome.Exhausted -> complete = !outcome.indeterminate
-                SearchOutcome.BudgetCapped -> Unit
+                is SearchOutcome.BudgetCapped -> Unit
             }
         }
         return CellResult(representatives.size, representatives.size > cap, representatives, complete)

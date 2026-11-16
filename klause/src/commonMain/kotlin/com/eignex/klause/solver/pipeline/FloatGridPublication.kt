@@ -84,7 +84,7 @@ internal class FloatGridPublication(
                     else -> FiniteSolveVerdict.SAT
                 },
                 native.stats, accepted, best, native.elapsedMs,
-            )
+            ).withTerminationReason(native.terminationReason)
         } else native
         return FiniteSolveResult(preparation, elapsed, qualified, nativeSourceResult, nativeSourceMinimum).also {
             it.bindNativeGridOutcome(NativeGridOutcome(binding.metadata, native))

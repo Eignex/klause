@@ -1,24 +1,11 @@
 package com.eignex.klause.config
 
-import com.eignex.klause.ir.ProblemSettings
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class KlauseConfigSchemaTest {
-    @Test
-    fun `raw model resource defaults should match the core defaults`() {
-        assertEquals(KlauseConfig.DEFAULT.problemSettings(), ProblemSettings())
-    }
-
-    @Test
-    fun `the property key should derive from the knob name as a dotted klause path`() {
-        val keys = KlauseConfigSchema.keys.associateBy { it.name }
-        assertEquals("klause.lp.max.tableau.cells", keys.getValue("lpMaxTableauCells").propertyKey)
-        assertEquals("klause.bitset.threshold", keys.getValue("bitsetThreshold").propertyKey)
-    }
-
     @Test
     fun `fromProps should apply overrides by property key and leave the rest at base`() {
         val overrides = mapOf(

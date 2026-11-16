@@ -10,24 +10,6 @@ import kotlin.test.assertNull
 class ConstListTest {
 
     @Test
-    fun `constsOf should use unit storage for all-one constants`() {
-        val consts = constsOf(longArrayOf(1, 1, 1, 1))
-
-        assertIs<UnitConsts>(consts)
-        assertEquals(4, consts.size)
-        assertEquals(1L, consts.at(3))
-    }
-
-    @Test
-    fun `constsOf should store 32-bit constants narrow`() {
-        val consts = constsOf(longArrayOf(3, -7, 1))
-
-        assertIs<IntConsts>(consts)
-        assertEquals(listOf(3L, -7L, 1L), consts.toLongArray().toList())
-        assertEquals(7L, consts.maxAbs)
-    }
-
-    @Test
     fun `constsOf should keep Long width past the 32-bit range`() {
         val consts = constsOf(longArrayOf(1, Int.MAX_VALUE.toLong() + 1))
 

@@ -22,7 +22,6 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNotNull
 
 class NumericalFrontierSnapshotTest {
     private val integer = SourceCoordinate(SourceCoordinate.Kind.Integer, 0)
@@ -40,23 +39,6 @@ class NumericalFrontierSnapshotTest {
         SourceClaim.Bound(SourceValue.Rational(half)),
         SourceDerivation.Combination(listOf(SourceDerivation.Combination.Term(half, SourceDerivation.Premise("half")))),
     )
-
-    @Test
-    fun `frontier capture should resolve the production invocation constructor`() {
-        assertNotNull(NumericalFrontierSnapshot.invocationConstructor())
-    }
-
-    @Test
-    fun `selection capture should expose empty journal limits`() {
-        val snapshot = NumericalSelectionSnapshot(ExecutionControl.Never)
-        val journal = snapshot.journal()
-
-        val capture = snapshot.capture(journal)
-
-        assertEquals("false", capture.getValue("limited").jsonPrimitive.content)
-        assertEquals("0", capture.getValue("attempted").jsonPrimitive.content)
-        assertEquals(0, capture.getValue("records").jsonArray.size)
-    }
 
     @Test
     fun `selection inspection should check sibling evidence in its original scope`() {

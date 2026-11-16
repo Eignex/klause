@@ -31,6 +31,7 @@ import com.eignex.klause.solver.result.SampleResult
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.result.terminationReason
 import com.eignex.klause.solver.withLifetime
 import com.eignex.klause.solver.withSourceSemantics
 import com.eignex.klause.util.ExecutionControl
@@ -299,7 +300,7 @@ class BacktrackSolver internal constructor(
                 if (outcome.indeterminate) {
                     // A leaf's continuous LP could not be certified either way, so the tree is not
                     // provably all-infeasible — report `unknown` rather than an unsound UNSAT.
-                    SolveResult.Unknown(TerminationReason.Unsupported, stats)
+                    SolveResult.Unknown(outcome.stopCause.terminationReason(), stats)
                 } else {
                     SolveResult.Unsat(
                         core = outcome.core,
@@ -309,9 +310,10 @@ class BacktrackSolver internal constructor(
                     )
                 }
 
-            SearchOutcome.BudgetCapped -> {
+            is SearchOutcome.BudgetCapped -> {
                 sink.timedOut = true
-                SolveResult.Unknown(TerminationReason.BudgetExhausted, sink.snapshot())
+                SolveResult.Unknown(outcome.stopCause?.terminationReason() ?: TerminationReason.BudgetExhausted,
+                    sink.snapshot())
             }
         }.withSourceSemantics(problem.semantics)
     }
@@ -363,12 +365,13 @@ class BacktrackSolver internal constructor(
 
                 // An undecided leaf cannot establish exhaustion of the source.
                 is SearchOutcome.Exhausted -> if (outcome.indeterminate) {
-                    SolveResult.Unknown(TerminationReason.Unsupported)
+                    SolveResult.Unknown(outcome.stopCause.terminationReason())
                 } else {
                     SolveResult.Unsat(outcome.core)
                 }
 
-                SearchOutcome.BudgetCapped -> SolveResult.Unknown(TerminationReason.BudgetExhausted)
+                is SearchOutcome.BudgetCapped -> SolveResult.Unknown(
+                    outcome.stopCause?.terminationReason() ?: TerminationReason.BudgetExhausted)
             }
         }.withSourceSemantics(problem.semantics)
 
@@ -462,7 +465,7 @@ class BacktrackSolver internal constructor(
                     }
                 }
 
-                is SearchOutcome.Exhausted, SearchOutcome.BudgetCapped -> {
+                is SearchOutcome.Exhausted, is SearchOutcome.BudgetCapped -> {
                     yield(outcome)
                     return@sequence
                 }

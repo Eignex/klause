@@ -10,12 +10,15 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.ResumableSolve
 import com.eignex.klause.solver.SearchInitializationCancelled
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.result.TerminationReason
+import com.eignex.klause.solver.search.ComponentCheck
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.PreparingSearchComponent
 import com.eignex.klause.solver.search.SearchBranchAttemptObserver
 import com.eignex.klause.solver.search.SearchComponent
 import com.eignex.klause.solver.search.SearchContext
 import com.eignex.klause.solver.search.SearchDecision
+import com.eignex.klause.solver.search.SearchStopCause
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryStatus
 import kotlin.test.Test
@@ -28,6 +31,33 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ResumableSatisfactionTest {
+    @Test
+    fun `an undecided satisfaction component should retain its recorded stop cause`() {
+        for ((cause, reason) in listOf(
+            SearchStopCause.RepresentationDecline to TerminationReason.RepresentationDeclined,
+            SearchStopCause.OperationAllowance to TerminationReason.BudgetExhausted,
+            SearchStopCause.WorkAllowance to TerminationReason.BudgetExhausted,
+            SearchStopCause.CheckAllowance to TerminationReason.BudgetExhausted,
+            SearchStopCause.DecisionAllowance to TerminationReason.BudgetExhausted,
+            SearchStopCause.Timeout to TerminationReason.Timeout,
+            SearchStopCause.Cancelled to TerminationReason.Cancelled,
+        )) {
+            val solver = BacktrackSolver(Problem(1, 0, emptyArray(), emptyArray()).bake())
+            val params = BacktrackParams(componentFactory = {
+                listOf(object : SearchComponent {
+                    override fun check(context: SearchContext): ComponentCheck {
+                        context.executionControls.reportStop(cause)
+                        return ComponentCheck.Indeterminate
+                    }
+                })
+            })
+
+            val result = solver.solve(params)
+
+            assertEquals(reason, assertIs<SolveResult.Unknown>(result).reason, "$cause")
+        }
+    }
+
     @Test
     fun `a native cap reaching its quota should finish its pending pass before branching`() {
         val problem = Problem(4, 0, emptyArray(), arrayOf<Factor>(Clause(intArrayOf(4, 6)))).bake()

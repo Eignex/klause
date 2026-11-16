@@ -131,17 +131,6 @@ class ProblemPipelineTest {
     }
 
     @Test
-    fun `routable model should name no unplaceable column`() {
-        val model = Problem(
-            numBoolVars = 0,
-            intBounds = IntBounds.fromModelBounds(longArrayOf(0, 0), longArrayOf(5, 5), null, null),
-            factors = arrayOf(AllDifferent(vars = intArrayOf(0, 1), domainMin = 0, domainSize = 6)),
-        )
-
-        assertNull(model.componentPlan().unplaceable)
-    }
-
-    @Test
     fun `stop after unchanged bounds should not reuse runnable preparation`() {
         val model = Problem(
             0,

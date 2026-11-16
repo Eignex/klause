@@ -48,6 +48,7 @@ import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.SolveStatsSink
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.result.UnsatCore
+import com.eignex.klause.solver.result.terminationReason
 import com.eignex.klause.solver.search.BooleanBranching
 import com.eignex.klause.solver.search.ComponentResult
 import com.eignex.klause.solver.search.FiniteFactorEnforcer
@@ -936,15 +937,16 @@ internal class ResumableMinimize(
     }
 
     private fun terminalExhausted(core: UnsatCore?): MinimizeResult {
+        val reason = (run.componentStop?.stopCause ?: searchSession.executionControls.stopCause).terminationReason()
         if (sawIndeterminateLeaf) observeIncomplete(SearchEvent.BacktrackIncomplete.Path.UnresolvedLeaf)
         sink.stop()
         val stats = sink.snapshot()
         val b = incumbents.current()
         return when {
             b != null && sawIndeterminateLeaf ->
-                MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.Unsupported, stats)
+                MinimizeResult.BestFound(b.assignment, b.objective.display, reason, stats)
 
-            sawIndeterminateLeaf -> MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
+            sawIndeterminateLeaf -> MinimizeResult.Unknown(reason, stats)
 
             externalShared && b != null ->
                 MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.SearchExhausted, stats)
@@ -964,14 +966,15 @@ internal class ResumableMinimize(
     }
 
     private fun terminalUndecided(): MinimizeResult {
+        val reason = (run.componentStop?.stopCause ?: searchSession.executionControls.stopCause).terminationReason()
         observeIncomplete(SearchEvent.BacktrackIncomplete.Path.Component)
         sink.stop()
         val stats = sink.snapshot()
         val b = incumbents.current()
         return if (b != null) {
-            MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.Unsupported, stats)
+            MinimizeResult.BestFound(b.assignment, b.objective.display, reason, stats)
         } else {
-            MinimizeResult.Unknown(TerminationReason.Unsupported, stats)
+            MinimizeResult.Unknown(reason, stats)
         }
     }
 
@@ -983,14 +986,15 @@ internal class ResumableMinimize(
     }
 
     private fun terminalBudget(): MinimizeResult {
+        val reason = searchSession.executionControls.stopCause?.terminationReason() ?: TerminationReason.BudgetExhausted
         sink.stop()
         sink.timedOut = true
         val stats = sink.snapshot()
         val b = incumbents.current()
         return if (b != null) {
-            MinimizeResult.BestFound(b.assignment, b.objective.display, TerminationReason.BudgetExhausted, stats)
+            MinimizeResult.BestFound(b.assignment, b.objective.display, reason, stats)
         } else {
-            MinimizeResult.Unknown(TerminationReason.BudgetExhausted, stats)
+            MinimizeResult.Unknown(reason, stats)
         }
     }
 

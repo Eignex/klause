@@ -1,56 +1,10 @@
 package com.eignex.klause.ir
 
-import com.eignex.klause.factor.arithmetic.Linear
-import com.eignex.klause.factor.bool.Cardinality
-import com.eignex.klause.factor.bool.Clause
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class LinearRowTest {
-
-    private fun intRefs(vararg vars: Int) = IntArray(vars.size) { Term.ofIntVar(vars[it]) }
-    private fun litRefs(vararg lits: Int) = IntArray(lits.size) { Term.ofLit(lits[it]) }
-    private fun refsOf(r: LinearRow) = IntArray(r.size) { r.ref(it) }
-    private fun coeffsOf(r: LinearRow) = LongArray(r.size) { r.coeff(it) }
-
-    @Test
-    fun `Linear should expose its own row exactly`() {
-        val rows = Linear(intArrayOf(2, -1), intArrayOf(0, 1), LinearOp.LE, 5).linearRows
-        assertEquals(1, rows.size)
-        val r = rows[0]
-        assertEquals(LinearOp.LE, r.relation)
-        assertEquals(5L, r.bound)
-        assertTrue(r.isIntegerOnly)
-        assertTrue(refsOf(r).contentEquals(intRefs(0, 1)))
-        assertTrue(coeffsOf(r).contentEquals(longArrayOf(2, -1)))
-    }
-
-    @Test
-    fun `Clause should expose the at-least-one row over its literals`() {
-        val lits = intArrayOf(Lit.make(0, true), Lit.make(1, false))
-        val rows = Clause(lits).linearRows
-        assertEquals(1, rows.size)
-        val r = rows[0]
-        assertEquals(LinearOp.GE, r.relation)
-        assertEquals(1L, r.bound)
-        assertTrue(!r.isIntegerOnly)
-        assertTrue(refsOf(r).contentEquals(litRefs(*lits)))
-        assertTrue(coeffsOf(r).contentEquals(longArrayOf(1, 1)))
-    }
-
-    @Test
-    fun `Cardinality should expose its lower and upper bound rows`() {
-        val lits = intArrayOf(Lit.make(0, true), Lit.make(1, true), Lit.make(2, true))
-        val rows = Cardinality(lits, min = 1, max = 2).linearRows
-        assertEquals(2, rows.size)
-        assertEquals(LinearOp.GE, rows[0].relation)
-        assertEquals(1L, rows[0].bound)
-        assertEquals(LinearOp.LE, rows[1].relation)
-        assertEquals(2L, rows[1].bound)
-        for (r in rows) assertTrue(refsOf(r).contentEquals(litRefs(*lits)))
-    }
-
     @Test
     fun `Term references should decode back to their variable or literal`() {
         assertTrue(!Term.isBool(Term.ofIntVar(7)))

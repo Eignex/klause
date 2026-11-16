@@ -38,6 +38,27 @@ import kotlin.test.assertTrue
 
 class CliModeVerdictTest {
     @Test
+    fun `local search should publish root refutations with presolve disabled`() {
+        for (operation in listOf("satisfy", "minimize x")) {
+            val out = solveFlatZinc("var 0..1: x; constraint int_eq(x,0); constraint int_eq(x,1); solve $operation;",
+                "-e", "localsearch", "--presolve", "off", "--lp", "off")
+
+            assertTrue("=====UNSATISFIABLE=====" in out.lines(), out)
+        }
+    }
+
+    @Test
+    fun `finite unknown output should name its fixed work stop`() {
+        for (engine in listOf("fixed", "backtrack", "localsearch")) {
+            val out = solveFlatZinc("var 0..1: x; var 0..1: y; constraint int_ne(x,y); solve satisfy;",
+                "-e", engine, "--presolve", "off", "--lp", "off", "--param", "node-limit=0")
+
+            assertTrue("=====UNKNOWN=====" in out.lines(), out)
+            assertTrue("fixed work exhausted" in out, out)
+        }
+    }
+
+    @Test
     fun `source-qualified output should retain rational policy and the selected protocol terminal`() {
         val semantics = smtLibSemantics.resolve(SemanticOverrides(undeclaredReals = BoundsOverride(
             upper = BoundOverride.Value(SemanticRational.of(bigIntOf(1), bigIntOf(3))),

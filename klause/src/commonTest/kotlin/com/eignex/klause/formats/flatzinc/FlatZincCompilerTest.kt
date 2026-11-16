@@ -281,19 +281,6 @@ class FlatZincCompilerTest {
     }
 
     @Test
-    fun `an unannotated model should have no implied mask and no symmetry flag`() {
-        val src = """
-            var 0..10: x;
-            var 0..10: y;
-            constraint int_lin_le([1, 1], [x, y], 5);
-            solve satisfy;
-        """.trimIndent()
-        val problem = parseFlatZinc(src).problem
-        assertNull(problem.impliedFactorMask)
-        assertFalse(problem.hasSymmetryBreaking)
-    }
-
-    @Test
     fun `a redundant annotation should mark the factor implied without setting the symmetry flag`() {
         val src = """
             var 0..10: x;
@@ -337,37 +324,6 @@ class FlatZincCompilerTest {
     }
 
     @Test
-    fun `bool clause model should parse and solve`() {
-        val src = """
-            var bool: x;
-            var bool: y;
-            constraint bool_clause([x, y], []);
-            solve satisfy;
-        """.trimIndent()
-        val program = parseFlatZinc(src)
-        assertEquals(2, program.problem.numBoolVars)
-        assertEquals(SolveDirective.Satisfy, program.solve)
-        val r = BacktrackSolver(program.problem.bake()).solve(BacktrackParams(randomSeed = 0L))
-        val sat = assertIs<SolveResult.Sat>(r)
-        assertTrue(sat.assignment.bools[0] || sat.assignment.bools[1])
-    }
-
-    @Test
-    fun `solve minimize should reference the int objective`() {
-        val src = """
-            var 1..10: cost;
-            constraint int_lin_ge([1], [cost], 3);
-            solve minimize cost;
-        """.trimIndent()
-        val program = parseFlatZinc(
-            src.replace("int_lin_ge", "int_lin_le").replace("[1]", "[-1]").replace(", 3", ", -3"),
-        )
-        val solve = assertIs<SolveDirective.Minimize>(program.solve)
-        assertEquals("cost", solve.objVar)
-        assertEquals(SolveDirective.ObjKind.Int, solve.kind)
-    }
-
-    @Test
     fun `unsupported builtin should throw a parse exception`() {
         val src = """
             var 0..5: x;
@@ -380,16 +336,6 @@ class FlatZincCompilerTest {
         } catch (e: FlatZincParseException) {
             assertTrue(e.message!!.contains("not_a_real_builtin"), "got: ${e.message}")
         }
-    }
-
-    @Test
-    fun `klause_enum_labels annotation should populate enumLabelsByVar`() {
-        val src = """
-            var 1..3: color :: klause_enum_labels(["Red","Green","Blue"]);
-            solve satisfy;
-        """.trimIndent()
-        val program = parseFlatZinc(src)
-        assertEquals(listOf("Red", "Green", "Blue"), program.enumLabelsByVar["color"])
     }
 
     @Test

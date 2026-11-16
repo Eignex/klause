@@ -545,7 +545,7 @@ class PreparedFactorProjectionsTest {
 
         val result = BacktrackSolver(source.bake(providers)).solve(BacktrackParams())
 
-        assertEquals(TerminationReason.Unsupported, assertIs<SolveResult.Unknown>(result).reason)
+        assertEquals(TerminationReason.RepresentationDeclined, assertIs<SolveResult.Unknown>(result).reason)
     }
 
     @Test

@@ -326,9 +326,11 @@ retained queries.
 operation allowance and representation decline. A local operation stop clears when
 the next operation begins, without renewing containing allowances. Timeout takes
 precedence over allowances, which take precedence over external cancellation and
-local decline. Open routing maps representation decline to `RepresentationDeclined` and
+local decline. Finite and open routing map representation decline to `RepresentationDeclined` and
 operation, check, decision and work stops to `BudgetExhausted`. Slice pauses are
 lifecycle events, never refutations.
+Finite result reconstruction, presolve statistics attachment and portfolio
+reduction retain the recorded reason through CLI rendering.
 
 The optional `SearchEvent.BacktrackIncomplete` observation distinguishes finite
 optimization returning with an unresolved objective leaf from an undecided

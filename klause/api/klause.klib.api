@@ -19312,6 +19312,8 @@ sealed class com.eignex.klause.solver.pipeline/FiniteSolveOutcome { // com.eigne
             final fun <get-solutions>(): kotlin/Long // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.solutions.<get-solutions>|<get-solutions>(){}[0]
         final val stats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats|{}stats[0]
             final fun <get-stats>(): com.eignex.klause.solver.result/SolveStats // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.stats.<get-stats>|<get-stats>(){}[0]
+        final val terminationReason // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.terminationReason|{}terminationReason[0]
+            final fun <get-terminationReason>(): com.eignex.klause.solver.result/TerminationReason? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.terminationReason.<get-terminationReason>|<get-terminationReason>(){}[0]
         final val unboundedDirection // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.unboundedDirection|{}unboundedDirection[0]
             final fun <get-unboundedDirection>(): kotlin.collections/List<com.eignex.util.numbers/BigFraction>? // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.unboundedDirection.<get-unboundedDirection>|<get-unboundedDirection>(){}[0]
         final val verdict // com.eignex.klause.solver.pipeline/FiniteSolveOutcome.Completed.verdict|{}verdict[0]

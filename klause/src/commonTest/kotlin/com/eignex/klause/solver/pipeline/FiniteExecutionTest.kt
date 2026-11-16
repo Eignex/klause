@@ -17,9 +17,14 @@ import com.eignex.klause.ir.SemanticOverrides
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.lp.bounding.LpConfig
+import com.eignex.klause.portfolio.EngineMix
+import com.eignex.klause.portfolio.Kind
+import com.eignex.klause.portfolio.PortfolioScenario
 import com.eignex.klause.presolve.PresolveConfig
+import com.eignex.klause.propagation.bake
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.solver.validation.FiniteSourceAcceptance
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.theory.SourceToleranceSearch
@@ -34,6 +39,62 @@ import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 
 class FiniteExecutionTest {
+    @Test
+    fun `finite portfolio conversion should preserve a local search root proof`() {
+        for (optimize in listOf(false, true)) {
+            val problem = Problem.of(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
+            val objective = if (optimize) LinearObjective(boolWeights = longArrayOf(1)) else null
+            val scenario = PortfolioScenario(1, 1, if (optimize) Kind.COP else Kind.CSP,
+                EngineMix.LOCAL_SEARCH, seed = 17L, lpCeiling = LpConfig.OFF)
+
+            val verdict = FinitePipeline.portfolioExecutor(problem.bake(), scenario, objective, null, null, null)
+                .use { executor ->
+                    if (optimize) executor.minimize().finitePortfolioVerdict()
+                    else executor.solve().finitePortfolioVerdict()
+                }
+
+            assertEquals(FiniteExecutionVerdict.UNSAT, verdict, "optimize=$optimize")
+        }
+    }
+
+    @Test
+    fun `a local search portfolio should preserve a root refutation without presolve`() {
+        for (optimize in listOf(false, true)) {
+            val problem = Problem.of(1, 0, emptyArray(), arrayOf(Clause(intArrayOf(0)), Clause(intArrayOf(1))))
+            val shape = FiniteSolveShape(problem, optimize, false, null,
+                if (optimize) LinearObjective(boolWeights = longArrayOf(1)) else null, null, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioArms = 1).finiteRequest(
+                shape, FiniteEngine.LOCAL_SEARCH, presolveConfig = PresolveConfig.NONE,
+                randomSeed = 17L,
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.UNSAT, completed.verdict, "optimize=$optimize")
+            assertEquals(0.0, completed.stats.ls.moves.sum)
+            assertNull(completed.terminationReason)
+        }
+    }
+
+    @Test
+    fun `an unfinished finite search should retain its fixed work stop`() {
+        for (engine in listOf(FiniteEngine.FIXED, FiniteEngine.BACKTRACK, FiniteEngine.LOCAL_SEARCH)) {
+            val shape = FiniteSolveShape(Problem.of(2, 0, emptyArray(),
+                arrayOf(Clause(intArrayOf(0, 2)))), false, false, null, null, null, null)
+            val request = SourceExecutionPolicy(lpCeiling = LpConfig.OFF, portfolioArms = 1).finiteRequest(
+                shape, engine, presolveConfig = PresolveConfig.NONE,
+                randomSeed = 17L, nodeBudget = NodeBudget(0L),
+            )
+
+            val result = FinitePipeline.solve(request, FiniteSolveCallbacks({}, {}))
+
+            val completed = assertIs<FiniteSolveOutcome.Completed>(result.outcome)
+            assertEquals(FiniteSolveVerdict.UNKNOWN, completed.verdict, "$engine")
+            assertEquals(TerminationReason.BudgetExhausted, completed.terminationReason, "$engine")
+        }
+    }
+
     // Binary64 `0.01 * 200` exceeds the declared bound `2.0` by `3/72057594037927936`.
     private fun roundedBound(declarations: String, constraints: String) = """
         var 0.0..2.0: y;
