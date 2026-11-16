@@ -172,8 +172,7 @@ class SmtArithmeticReductionTest {
 
     @Test
     fun `negative integer powers should use the specified integer convention`() {
-        val input = SmtLib.parse("(declare-const b Int) (declare-const e Int) " +
-            "(assert (= b (- 1))) (assert (= e (- 3))) (assert (= (** b e) (- 1)))")
+        val input = SmtLib.parse("(assert (= (** (- 1) (- 3)) (- 1)))")
 
         val result = solve(input)
 
