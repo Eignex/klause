@@ -10,21 +10,25 @@ fun solveSmtRecursiveSession(
     cancellation: ExecutionControl = ExecutionControl.Never,
     candidateLimit: Int = 256,
 ): SmtSessionResult {
-    val commands = SExprReader(text).readAll().map { it as? SExpr.SList
-        ?: throw UnsupportedSmtException("expected a command") }
+    val commands = SExprReader(text).readAll().map {
+        it as? SExpr.SList
+            ?: throw UnsupportedSmtException("expected a command")
+    }
     val definitions = ArrayList<RecursiveDefinition>()
     val ordinary = ArrayList<SExpr.SList>()
-    for (command in commands) when (command.recHead()) {
-        "define-fun-rec" -> definitions += RecursiveDefinition(command.items.drop(1))
-        "define-funs-rec" -> {
-            val signatures = command.items[1] as SExpr.SList
-            val bodies = command.items[2] as SExpr.SList
-            for ((index, signature) in signatures.items.withIndex()) {
-                definitions += RecursiveDefinition((signature as SExpr.SList).items + bodies.items[index])
+    for (command in commands) {
+        when (command.recHead()) {
+            "define-fun-rec" -> definitions += RecursiveDefinition(command.items.drop(1))
+            "define-funs-rec" -> {
+                val signatures = command.items[1] as SExpr.SList
+                val bodies = command.items[2] as SExpr.SList
+                for ((index, signature) in signatures.items.withIndex()) {
+                    definitions += RecursiveDefinition((signature as SExpr.SList).items + bodies.items[index])
+                }
             }
+            "check-sat", "get-model", "get-value" -> Unit
+            else -> ordinary += command
         }
-        "check-sat", "get-model", "get-value" -> Unit
-        else -> ordinary += command
     }
     if (definitions.isEmpty()) return solve(text)
     val objective = ordinary.firstOrNull { it.recHead() in setOf("minimize", "maximize") }?.items?.get(1)
@@ -33,7 +37,11 @@ fun solveSmtRecursiveSession(
         val observations = result.observations.filterNot {
             it.startsWith("objective=") || it.startsWith("objectiveBound") || it.startsWith("optimizationStatus=")
         }.toMutableList()
-        val value = try { result.model?.evaluate(objective) } catch (_: UnsupportedSmtException) { null }
+        val value = try {
+            result.model?.evaluate(objective)
+        } catch (_: UnsupportedSmtException) {
+            null
+        }
         if (value != null) observations += "objective=${smtRationalValue(value, cancellation)?.rational ?: value}"
         observations += "optimizationStatus=best-found"
         return result.copy(observations = observations)
@@ -43,9 +51,11 @@ fun solveSmtRecursiveSession(
     fun collectSymbols(root: SExpr) {
         val pending = ArrayDeque<SExpr>()
         pending += root
-        while (pending.isNotEmpty()) when (val node = pending.removeLast()) {
-            is SExpr.Atom -> used += smtSessionSymbol(node.text)
-            is SExpr.SList -> pending.addAll(node.items)
+        while (pending.isNotEmpty()) {
+            when (val node = pending.removeLast()) {
+                is SExpr.Atom -> used += smtSessionSymbol(node.text)
+                is SExpr.SList -> pending.addAll(node.items)
+            }
         }
     }
     commands.forEach(::collectSymbols)
@@ -60,16 +70,18 @@ fun solveSmtRecursiveSession(
     fun replaceDefinitions(replacements: List<SExpr>): List<SExpr> {
         val forms = ArrayList<SExpr>()
         val byName = definitions.mapIndexed { index, definition -> definition.name to replacements[index] }.toMap()
-        for (command in commands) when (command.recHead()) {
-            "define-fun-rec" -> forms += byName.getValue(smtSessionSymbol((command.items[1] as SExpr.Atom).text))
-            "define-funs-rec" -> {
-                for (signature in (command.items[1] as SExpr.SList).items) {
-                    val name = ((signature as SExpr.SList).items[0] as SExpr.Atom).text
-                    forms += byName.getValue(smtSessionSymbol(name))
+        for (command in commands) {
+            when (command.recHead()) {
+                "define-fun-rec" -> forms += byName.getValue(smtSessionSymbol((command.items[1] as SExpr.Atom).text))
+                "define-funs-rec" -> {
+                    for (signature in (command.items[1] as SExpr.SList).items) {
+                        val name = ((signature as SExpr.SList).items[0] as SExpr.Atom).text
+                        forms += byName.getValue(smtSessionSymbol(name))
+                    }
                 }
+                "check-sat", "get-model", "get-value" -> Unit
+                else -> forms += command
             }
-            "check-sat", "get-model", "get-value" -> Unit
-            else -> forms += command
         }
         return forms
     }
@@ -110,7 +122,7 @@ fun solveSmtRecursiveSession(
             throw UnsupportedSmtException("wrong recursive function arity")
         }
         val application = if (arguments.isEmpty()) definition.rawName
-            else SExpr.SList(listOf(definition.rawName) + arguments)
+        else SExpr.SList(listOf(definition.rawName) + arguments)
         if (sourceScope.termSort(application) == null) continue
         necessary += recList("assert", recList("=", application,
             substitute(definition.body, definition.parameters.map { it.first }.zip(arguments).toMap())))
@@ -121,8 +133,10 @@ fun solveSmtRecursiveSession(
         val prelude = replaceDefinitions(declarations).filter { command ->
             (command as SExpr.SList).recHead() !in setOf("assert", "minimize", "maximize")
         }
-        val ranking = definitions.associate { definition -> definition.name to
-            definition.parameters.indexOfFirst { it.second == SExpr.Atom("Int") } }
+        val ranking = definitions.associate { definition ->
+            definition.name to
+                definition.parameters.indexOfFirst { it.second == SExpr.Atom("Int") }
+        }
         if (ranking.values.all { it >= 0 }) {
             val proof = ArrayList<SExpr>()
             proof += prelude
@@ -154,13 +168,17 @@ fun solveSmtRecursiveSession(
             val wellSorted = try {
                 validateSmtSessionSource(proof, cancellation)
                 true
-            } catch (_: UnsupportedSmtException) { false }
+            } catch (_: UnsupportedSmtException) {
+                false
+            }
             if (suitable && wellSorted && solve(script(proof)).status == "unsat") {
                 val checked = relaxation.model.withRecursiveDefinitions(commands)
                 val assertions = ordinary.filter { it.recHead() == "assert" }.map { it.items[1] }
                 val accepted = checked != null && try {
                     assertions.all { checked.evaluate(it) == "true" }
-                } catch (_: UnsupportedSmtException) { false }
+                } catch (_: UnsupportedSmtException) {
+                    false
+                }
                 if (accepted) {
                     return witnessed(SmtSessionResult("sat", checked, observations = relaxation.observations))
                 }
@@ -197,7 +215,9 @@ fun solveSmtRecursiveSession(
         val wellSorted = try {
             validateSmtSessionSource(candidateCommands, cancellation)
             true
-        } catch (_: UnsupportedSmtException) { false }
+        } catch (_: UnsupportedSmtException) {
+            false
+        }
         val candidate = if (wellSorted) solve(candidateSource) else SmtSessionResult("unknown")
         if (candidate.status == "sat" && candidate.model != null) {
             val validation = ArrayList<SExpr>()
@@ -210,7 +230,7 @@ fun solveSmtRecursiveSession(
                     fresh().also { validation += recList("declare-const", it, sort) }
                 }
                 val application = if (arguments.isEmpty()) definition.rawName
-                    else SExpr.SList(listOf(definition.rawName) + arguments)
+                else SExpr.SList(listOf(definition.rawName) + arguments)
                 equalities += recList("=", application,
                     substitute(definition.body, definition.parameters.map { it.first }.zip(arguments).toMap()))
             }
@@ -283,8 +303,8 @@ private fun recursiveCalls(
                     else -> {
                         val identifier = term.items.firstOrNull()
                         val qualified = identifier as? SExpr.SList
-                        val rawName = if (head == "as") (term.items[1] as? SExpr.Atom)?.text else
-                            if (qualified?.recHead() == "as") (qualified.items[1] as? SExpr.Atom)?.text else head
+                        val rawName = if (head == "as") (term.items[1] as? SExpr.Atom)?.text
+                        else if (qualified?.recHead() == "as") (qualified.items[1] as? SExpr.Atom)?.text else head
                         val name = rawName?.let(::smtSessionSymbol)
                         if (name != null && name in names) {
                             val arguments = if (head == "as") emptyList() else term.items.drop(1)
@@ -302,9 +322,11 @@ private fun recursiveCalls(
 private fun containsRecName(term: SExpr, names: Set<String>): Boolean {
     val work = ArrayDeque<SExpr>()
     work += term
-    while (work.isNotEmpty()) when (val node = work.removeLast()) {
-        is SExpr.Atom -> if (smtSessionSymbol(node.text) in names) return true
-        is SExpr.SList -> work.addAll(node.items)
+    while (work.isNotEmpty()) {
+        when (val node = work.removeLast()) {
+            is SExpr.Atom -> if (smtSessionSymbol(node.text) in names) return true
+            is SExpr.SList -> work.addAll(node.items)
+        }
     }
     return false
 }
@@ -353,9 +375,11 @@ private data class RecursiveDefinition(val fields: List<SExpr>) {
         fun containsRecursive(term: SExpr): Boolean {
             val pending = ArrayDeque<SExpr>()
             pending += term
-            while (pending.isNotEmpty()) when (val node = pending.removeLast()) {
-                is SExpr.Atom -> if (smtSessionSymbol(node.text) in recursiveNames) return true
-                is SExpr.SList -> pending.addAll(node.items)
+            while (pending.isNotEmpty()) {
+                when (val node = pending.removeLast()) {
+                    is SExpr.Atom -> if (smtSessionSymbol(node.text) in recursiveNames) return true
+                    is SExpr.SList -> pending.addAll(node.items)
+                }
             }
             return false
         }

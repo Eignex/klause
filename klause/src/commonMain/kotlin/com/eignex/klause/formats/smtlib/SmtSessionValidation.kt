@@ -25,7 +25,9 @@ private fun prepareRecursiveCommand(
     var next = 0
     fun fresh(): SExpr.Atom {
         var name: String
-        do { name = "klause-session-recursive-${next++}" } while (!used.add(name))
+        do {
+            name = "klause-session-recursive-${next++}"
+        } while (!used.add(name))
         return SExpr.Atom(name)
     }
     for (definition in fields) {
@@ -77,7 +79,9 @@ internal fun smtSessionScope(commands: List<SExpr>, control: ExecutionControl): 
     var next = 0
     fun fresh(): SExpr.Atom {
         var name: String
-        do { name = "klause-session-check-${next++}" } while (!used.add(name))
+        do {
+            name = "klause-session-check-${next++}"
+        } while (!used.add(name))
         return SExpr.Atom(name)
     }
     for (expression in commands) {
@@ -138,7 +142,9 @@ internal fun prepareSmtSessionQueries(
     var next = 0
     for (query in queries) {
         var name: String
-        do { name = "klause-session-query-${next++}" } while (!used.add(name))
+        do {
+            name = "klause-session-query-${next++}"
+        } while (!used.add(name))
         val binding = SExpr.SList(listOf(SExpr.Atom(name), query))
         val wrapper = SExpr.SList(listOf(SExpr.Atom("assert"), SExpr.SList(listOf(SExpr.Atom("let"),
             SExpr.SList(listOf(binding)), SExpr.Atom("true")))))
@@ -156,9 +162,11 @@ private fun sessionSymbols(expressions: List<SExpr>): MutableSet<String> {
     val names = HashSet<String>()
     val pending = ArrayDeque<SExpr>()
     pending.addAll(expressions)
-    while (pending.isNotEmpty()) when (val term = pending.removeLast()) {
-        is SExpr.Atom -> names += smtSessionSymbol(term.text)
-        is SExpr.SList -> pending.addAll(term.items)
+    while (pending.isNotEmpty()) {
+        when (val term = pending.removeLast()) {
+            is SExpr.Atom -> names += smtSessionSymbol(term.text)
+            is SExpr.SList -> pending.addAll(term.items)
+        }
     }
     return names
 }

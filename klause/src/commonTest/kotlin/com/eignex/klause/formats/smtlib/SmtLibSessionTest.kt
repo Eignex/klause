@@ -10,7 +10,10 @@ class SmtLibSessionTest {
     fun `each query solves the active assertion stack`() {
         val snapshots = ArrayList<String>()
         val replies = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, replies::add)
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("sat")
+        }, replies::add)
 
         session.execute(SExprReader("""
             (set-option :print-success false)
@@ -32,7 +35,10 @@ class SmtLibSessionTest {
     @Test
     fun `assumptions apply to only their query`() {
         val snapshots = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("unsat") }, {})
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("unsat")
+        }, {})
 
         session.execute(SExprReader("""
             (declare-const p Bool)
@@ -48,7 +54,10 @@ class SmtLibSessionTest {
     fun `popped declarations can be redeclared`() {
         val snapshots = ArrayList<String>()
         val replies = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, replies::add)
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("sat")
+        }, replies::add)
 
         session.execute(SExprReader("""
             (set-option :print-success false)
@@ -67,7 +76,10 @@ class SmtLibSessionTest {
     @Test
     fun `global declarations survive pop and reset assertions`() {
         val snapshots = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, {})
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("sat")
+        }, {})
 
         session.execute(SExprReader("""
             (set-option :global-declarations true)
@@ -86,7 +98,10 @@ class SmtLibSessionTest {
     fun `global declarations preserve dependencies across nested pops`() {
         val snapshots = ArrayList<String>()
         val replies = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, replies::add)
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("sat")
+        }, replies::add)
 
         session.execute(SExprReader("""
             (set-option :global-declarations true)
@@ -153,7 +168,10 @@ class SmtLibSessionTest {
     fun `stack underflow preserves active assertions`() {
         val snapshots = ArrayList<String>()
         val replies = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("unsat") }, replies::add)
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("unsat")
+        }, replies::add)
 
         session.execute(SExprReader("""
             (set-option :print-success false)
@@ -215,7 +233,10 @@ class SmtLibSessionTest {
     @Test
     fun `reset assertions removes base declarations unless global`() {
         val snapshots = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, {})
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("sat")
+        }, {})
 
         session.execute(SExprReader("(declare-const p Bool) (reset-assertions) (declare-const p Int) (check-sat)"))
 
@@ -238,7 +259,10 @@ class SmtLibSessionTest {
     @Test
     fun `query assumptions preserve arbitrary Boolean formulas`() {
         val snapshots = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, {})
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("sat")
+        }, {})
 
         session.execute(SExprReader("(declare-const x Int) (check-sat-assuming ((> x 2) (or true false)))"))
 

@@ -7,10 +7,13 @@ import kotlin.coroutines.cancellation.CancellationException
 interface SmtSessionModel {
     /** Render the model response. */
     fun render(): String
+
     /** Evaluate a well-sorted source term in this same interpretation. */
     fun evaluate(term: SExpr): String
+
     /** Abstract domain elements available to later queries on this interpretation. */
     fun abstractValues(): Map<String, SmtSort> = emptyMap()
+
     /** Reuse this fixed interpretation with a universally certified recursive source definition. */
     fun withRecursiveDefinitions(source: List<SExpr>): SmtSessionModel? = null
 }
@@ -26,7 +29,9 @@ data class SmtSessionResult(
     /** Solver observations emitted after the status response. */
     val observations: List<String> = emptyList(),
 ) {
-    init { require(status in setOf("sat", "unsat", "unknown")) }
+    init {
+        require(status in setOf("sat", "unsat", "unknown"))
+    }
 }
 
 /** Stateful SMT-LIB command processing over an injected, mode-neutral snapshot solver. */
@@ -64,7 +69,9 @@ class SmtLibSession(
     fun execute(reader: SExprReader) {
         while (!exited) {
             checkpoint()
-            val command = try { reader.readCommandOrNull() ?: break } catch (error: UnsupportedSmtException) {
+            val command = try {
+                reader.readCommandOrNull() ?: break
+            } catch (error: UnsupportedSmtException) {
                 channels.regular(smtSessionError(error.message.orEmpty()))
                 break
             }
@@ -127,7 +134,10 @@ class SmtLibSession(
                     command.size(2)
                     val count = command.numeral(1)
                     if (count > 1_000_000 - scopes.size) fail("assertion stack resource limit")
-                    repeat(count) { checkpoint(); scopes += Scope() }
+                    repeat(count) {
+                        checkpoint()
+                        scopes += Scope()
+                    }
                     if (count > 0) invalidate()
                     started = true
                     success()
@@ -137,7 +147,10 @@ class SmtLibSession(
                     val count = command.numeral(1)
                     if (count >= scopes.size) fail("pop exceeds the assertion stack")
                     repeat(count) { scopes.removeAt(scopes.lastIndex) }
-                    if (count > 0) { invalidate(); validateCurrent() }
+                    if (count > 0) {
+                        invalidate()
+                        validateCurrent()
+                    }
                     success()
                 }
                 "reset-assertions" -> {
@@ -187,7 +200,11 @@ class SmtLibSession(
                     command.size(2)
                     channels.regular(smtSessionString(smtSessionStringValue(command.items[1])))
                 }
-                "exit" -> { command.size(1); success(); exited = true }
+                "exit" -> {
+                    command.size(1)
+                    success()
+                    exited = true
+                }
                 else -> channels.regular("unsupported")
             }
         } catch (error: UnsupportedSmtException) {
@@ -337,8 +354,13 @@ class SmtLibSession(
         ":random-seed", ":reproducible-resource-limit", ":verbosity" -> SExpr.Atom("0")
         else -> null
     }
-    private fun success() { if (enabled(":print-success")) channels.regular("success") }
-    private fun invalidate() { result = null; queryDefinitions.clear() }
+    private fun success() {
+        if (enabled(":print-success")) channels.regular("success")
+    }
+    private fun invalidate() {
+        result = null
+        queryDefinitions.clear()
+    }
     private fun withQueryDefinitions(term: SExpr, definitions: List<SExpr.SList>): SExpr {
         var wrapped = term
         for (definition in definitions.asReversed()) {
@@ -354,13 +376,20 @@ class SmtLibSession(
     private fun save(): State = State(scopes.map { Scope(it.entries.toMutableList()) }, options.toMap(),
         information.toMap(), logic, result, started, queryDefinitions.toList())
     private fun restore(saved: State) {
-        scopes.clear(); scopes.addAll(saved.scopes)
-        options.clear(); options.putAll(saved.options)
-        information.clear(); information.putAll(saved.information)
-        logic = saved.logic; result = saved.result; started = saved.started
-        queryDefinitions.clear(); queryDefinitions.addAll(saved.queryDefinitions)
+        scopes.clear()
+        scopes.addAll(saved.scopes)
+        options.clear()
+        options.putAll(saved.options)
+        information.clear()
+        information.putAll(saved.information)
+        logic = saved.logic
+        result = saved.result
+        started = saved.started
+        queryDefinitions.clear()
+        queryDefinitions.addAll(saved.queryDefinitions)
     }
     override fun close() = channels.close()
+
     /** End an interrupted invocation while preserving any status already returned for the current context. */
     fun interrupt(reason: String) {
         if (result == null) {
@@ -370,10 +399,12 @@ class SmtLibSession(
         comment(reason)
         exited = true
     }
+
     /** Emit a solver observation on the current regular channel without adding a protocol response. */
     fun comment(text: String) {
         text.lineSequence().forEach { channels.regular(if (it.startsWith(';')) it else "; $it") }
     }
+
     /** Emit an invocation diagnostic on the currently selected diagnostic channel. */
     fun diagnose(text: String) = channels.diagnostic(text)
     private fun fail(message: String): Nothing = throw UnsupportedSmtException(message)
@@ -406,15 +437,17 @@ internal fun smtSessionError(message: String): String = "(error ${smtSessionStri
 fun SExpr.smtText(): String = buildString {
     val work = ArrayDeque<Any>()
     work.addLast(this@smtText)
-    while (work.isNotEmpty()) when (val item = work.removeLast()) {
-        is String -> append(item)
-        is SExpr.Atom -> append(item.text)
-        is SExpr.SList -> {
-            append('(')
-            work.addLast(")")
-            for (index in item.items.indices.reversed()) {
-                work.addLast(item.items[index])
-                if (index > 0) work.addLast(" ")
+    while (work.isNotEmpty()) {
+        when (val item = work.removeLast()) {
+            is String -> append(item)
+            is SExpr.Atom -> append(item.text)
+            is SExpr.SList -> {
+                append('(')
+                work.addLast(")")
+                for (index in item.items.indices.reversed()) {
+                    work.addLast(item.items[index])
+                    if (index > 0) work.addLast(" ")
+                }
             }
         }
     }

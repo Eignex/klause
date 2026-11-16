@@ -9,7 +9,10 @@ class SmtSessionValidationTest {
     fun `named assumption terms introduce definitions without retaining the assumption`() {
         val snapshots = ArrayList<String>()
         val replies = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, replies::add)
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("sat")
+        }, replies::add)
 
         session.execute(SExprReader("""
             (check-sat-assuming ((! true :named label)))
@@ -78,7 +81,10 @@ class SmtSessionValidationTest {
     fun `later declarations cannot repair an earlier undefined assertion`() {
         val replies = ArrayList<String>()
         val snapshots = ArrayList<String>()
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat") }, replies::add)
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("sat")
+        }, replies::add)
 
         session.execute(SExprReader("(assert p) (declare-const p Bool) (check-sat)"))
 
@@ -117,7 +123,10 @@ class SmtSessionValidationTest {
             override fun render(): String = "()"
             override fun evaluate(term: SExpr): String = "true"
         }
-        val session = SmtLibSession({ snapshots += it; SmtSessionResult("sat", model) }, replies::add)
+        val session = SmtLibSession({
+            snapshots += it
+            SmtSessionResult("sat", model)
+        }, replies::add)
 
         session.execute(SExprReader("""
             (set-option :global-declarations true)

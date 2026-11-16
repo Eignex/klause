@@ -22,7 +22,9 @@ internal class SmtSessionOutput(
     private var quadraticResult: QuadraticOptimizationResult? = null
     private var linearResult: LinearOptimizationResult? = null
 
-    override fun begin(optimize: Boolean, maximize: Boolean) { this.optimize = optimize }
+    override fun begin(optimize: Boolean, maximize: Boolean) {
+        this.optimize = optimize
+    }
     override fun onSolution(rendered: String, objective: Long?, continuousObjective: Double?) {
         witnessed = true
         this.objective()?.let { comment("objective=$it") } ?: run {
@@ -77,7 +79,9 @@ internal class SmtSessionOutput(
         comment("objectiveBound=${formatArithmeticObjective(bound.value)}")
         comment("objectiveBoundStrict=${bound.strict}")
     }
-    override fun onVerdictContext(context: VerdictContext) { reason = context.softVerdictCause() }
+    override fun onVerdictContext(context: VerdictContext) {
+        reason = context.softVerdictCause()
+    }
     override fun onComplete(verdict: Verdict) {
         status = when (verdict) {
             Verdict.UNSATISFIABLE -> "unsat"

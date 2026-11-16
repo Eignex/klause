@@ -1,15 +1,14 @@
 package com.eignex.klause.cli
 
-import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SExprReader
+import com.eignex.klause.formats.smtlib.SmtLib
 import com.eignex.klause.formats.smtlib.SmtLibSession
 import com.eignex.klause.formats.smtlib.SmtSessionModel
 import com.eignex.klause.formats.smtlib.reconstructSessionModel
-import com.eignex.klause.formats.smtlib.solveSmtRecursiveSession
 import com.eignex.klause.formats.smtlib.smtLibSemantics
 import com.eignex.klause.formats.smtlib.smtRealTerm
 import com.eignex.klause.formats.smtlib.smtRealValue
-import com.eignex.klause.formats.smtlib.toSmtLib
+import com.eignex.klause.formats.smtlib.solveSmtRecursiveSession
 import com.eignex.klause.ir.ObjectiveSense
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.evidence.SourceClaim
@@ -20,10 +19,10 @@ import com.eignex.klause.solver.result.LinearOptimizationResult
 import com.eignex.klause.solver.result.QuadraticOptimizationResult
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.withBoundedPolling
-import com.eignex.util.io.openTextFile
-import com.eignex.util.numbers.BigFraction
 import com.eignex.util.io.CharSource
 import com.eignex.util.io.StringCharSource
+import com.eignex.util.io.openTextFile
+import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.compareTo
 import com.eignex.util.numbers.plus
 import com.eignex.util.numbers.times
@@ -32,7 +31,7 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.TimeSource
 
 /**
- * SMT-LIB command sessions (`.smt2` / `.smt`). Models require an explicit query;
+ * SMT-LIB command sessions (`.smt2` / `.smt`). Models require an explicit query
  * solver statistics and objective observations use SMT-LIB comments.
  */
 internal object SmtLibMode : CliMode {
@@ -54,19 +53,21 @@ internal object SmtLibMode : CliMode {
             val previousDiagnostic = common.diagnostic
             try {
                 session = SmtLibSession(
-                    solve = { text -> solveSmtRecursiveSession(text, solve = { snapshot ->
-                        common.resetInvocationStatistics()
-                        common.sourceSemantics = null
-                        val started = nowMillis()
-                        val solvable = loadSource({ StringCharSource(snapshot) }, path, common)
-                        common.loadElapsedMs = nowMillis() - started
-                        val observations = ArrayList<String>()
-                        val captured = SmtSessionOutput({ latestInterpretation }, observations::add,
-                            { latestSourceObjective })
-                        SolveCore.solve(solvable, common,
-                            captured.sourceQualified(common.sourceSemantics, ";", observations::add))
-                        captured.result().copy(observations = observations)
-                    }, cancellation = stop) },
+                    solve = { text ->
+                        solveSmtRecursiveSession(text, solve = { snapshot ->
+                            common.resetInvocationStatistics()
+                            common.sourceSemantics = null
+                            val started = nowMillis()
+                            val solvable = loadSource({ StringCharSource(snapshot) }, path, common)
+                            common.loadElapsedMs = nowMillis() - started
+                            val observations = ArrayList<String>()
+                            val captured = SmtSessionOutput({ latestInterpretation }, observations::add,
+                                { latestSourceObjective })
+                            SolveCore.solve(solvable, common,
+                                captured.sourceQualified(common.sourceSemantics, ";", observations::add))
+                            captured.result().copy(observations = observations)
+                        }, cancellation = stop)
+                    },
                     respond = ::println,
                     cancellation = stop,
                     diagnostic = previousDiagnostic,
@@ -77,8 +78,9 @@ internal object SmtLibMode : CliMode {
                 common.diagnostic = session::diagnose
                 session.execute(SExprReader(source))
             } catch (_: CancellationException) {
-                if (initialized) session.interrupt(if (common.timeLimitMs != null && stop()) "wall timeout"
-                    else "session interrupted")
+                if (initialized) session.interrupt(
+                    if (common.timeLimitMs != null && stop()) "wall timeout" else "session interrupted",
+                )
             } finally {
                 common.diagnostic = previousDiagnostic
                 if (initialized) session.close()

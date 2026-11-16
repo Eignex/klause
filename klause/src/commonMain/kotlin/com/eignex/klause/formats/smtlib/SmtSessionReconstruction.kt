@@ -46,11 +46,17 @@ private fun retainSmtSessionModel(
                 is SmtValue.Application -> work.addAll(item.arguments)
                 is SmtValue.Function -> {
                     work += item.default
-                    item.entries.forEach { (arguments, result) -> work.addAll(arguments); work += result }
+                    item.entries.forEach { (arguments, result) ->
+                        work.addAll(arguments)
+                        work += result
+                    }
                 }
                 is SmtValue.Array -> {
                     work += item.default
-                    item.entries.forEach { (index, element) -> work += index; work += element }
+                    item.entries.forEach { (index, element) ->
+                        work += index
+                        work += element
+                    }
                 }
                 else -> Unit
             }

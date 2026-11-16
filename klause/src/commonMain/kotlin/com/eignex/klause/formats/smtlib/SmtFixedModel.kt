@@ -131,9 +131,11 @@ internal class SmtFixedModel(
                 pending += definition.items[3]
             }
             var polymorphic = false
-            while (pending.isNotEmpty()) when (val term = pending.removeLast()) {
-                is SExpr.Atom -> if (symbol(term.text) in parameters) polymorphic = true
-                is SExpr.SList -> pending.addAll(term.items)
+            while (pending.isNotEmpty()) {
+                when (val term = pending.removeLast()) {
+                    is SExpr.Atom -> if (symbol(term.text) in parameters) polymorphic = true
+                    is SExpr.SList -> pending.addAll(term.items)
+                }
             }
             definition.takeUnless { polymorphic }
         }
@@ -144,18 +146,26 @@ internal class SmtFixedModel(
         val work = ArrayDeque<SmtValue>()
         model.values.forEach { work += it.second }
         work.addAll(queryValues)
-        while (work.isNotEmpty()) when (val value = work.removeLast()) {
-            is SmtValue.Uninterpreted -> put(symbol(value.identity), value.sort)
-            is SmtValue.Application -> work.addAll(value.arguments)
-            is SmtValue.Array -> {
-                work += value.default
-                value.entries.forEach { (index, element) -> work += index; work += element }
+        while (work.isNotEmpty()) {
+            when (val value = work.removeLast()) {
+                is SmtValue.Uninterpreted -> put(symbol(value.identity), value.sort)
+                is SmtValue.Application -> work.addAll(value.arguments)
+                is SmtValue.Array -> {
+                    work += value.default
+                    value.entries.forEach { (index, element) ->
+                        work += index
+                        work += element
+                    }
+                }
+                is SmtValue.Function -> {
+                    work += value.default
+                    value.entries.forEach { (arguments, result) ->
+                        work.addAll(arguments)
+                        work += result
+                    }
+                }
+                else -> Unit
             }
-            is SmtValue.Function -> {
-                work += value.default
-                value.entries.forEach { (arguments, result) -> work.addAll(arguments); work += result }
-            }
-            else -> Unit
         }
     }
 
@@ -262,7 +272,7 @@ internal class SmtFixedModel(
                         val pair = case as SExpr.SList
                         val pattern = pair.items[0]
                         val constructor = if (pattern is SExpr.Atom) symbol(pattern.text)
-                            else (pattern as SExpr.SList).head()
+                        else (pattern as SExpr.SList).head()
                         val locals = when {
                             constructor == constructorSymbol(value.constructor) -> {
                                 val names = (pattern as? SExpr.SList)?.items?.drop(1).orEmpty().map {
@@ -296,9 +306,9 @@ internal class SmtFixedModel(
                 if (name in constructors) return constructorValue(name, args, qualification)
                 if (name in selectors) return selectorValue(name, args.single(), qualification)
                 return if (model.values.any { symbol(it.first.name) == name }) function(name, args, qualification)
-                    else operation(selected, args).let {
-                        if (qualification == SmtSort.Real && it is SmtValue.Integer) real(exact(it)) else it
-                    }
+                else operation(selected, args).let {
+                    if (qualification == SmtSort.Real && it is SmtValue.Integer) real(exact(it)) else it
+                }
             }
             unavailable("invalid qualified operator")
         }
@@ -316,9 +326,11 @@ internal class SmtFixedModel(
             "xor" -> bool(args.count(::boolean) % 2 == 1)
             "=>" -> bool(args.dropLast(1).any { !boolean(it) } || boolean(args.last()))
             "=" -> bool(args.zipWithNext().all { equality(it.first, it.second) })
-            "distinct" -> bool(args.indices.all { i -> (i + 1 until args.size).all { j ->
-                !equality(args[i], args[j])
-            } })
+            "distinct" -> bool(args.indices.all { i ->
+                (i + 1 until args.size).all { j ->
+                    !equality(args[i], args[j])
+                }
+            })
             "+" -> arithmetic(args, { xs -> xs.fold(BigFraction.ZERO) { a, b -> a + b } }) {
                 arithmetic.add(it)
             }
@@ -327,8 +339,10 @@ internal class SmtFixedModel(
             }
             "-" -> arithmetic(args, { xs ->
                 if (xs.size == 1) xs[0].negated() else xs.drop(1).fold(xs[0]) { a, b -> a - b }
-            }) { xs -> if (xs.size == 1) arithmetic.negate(xs[0]) else
-                arithmetic.add(listOf(xs[0]) + xs.drop(1).map(arithmetic::negate)) }
+            }) { xs ->
+                if (xs.size == 1) arithmetic.negate(xs[0])
+                else arithmetic.add(listOf(xs[0]) + xs.drop(1).map(arithmetic::negate))
+            }
             "/" -> args.drop(1).fold(args[0]) { left, right ->
                 if (compare(right, SmtValue.Integer("0")) == 0) underspecified("/", listOf(left, right))
                 else real(arithmetic.multiply(listOf(exact(left), reciprocal(exact(right)))))
@@ -336,14 +350,19 @@ internal class SmtFixedModel(
             "div" -> args.drop(1).fold(args[0]) { a, b -> integerDivision(name, a, b) }
             "mod" -> integerDivision(name, args[0], args[1])
             "abs" -> if (compare(args.single(), SmtValue.Integer("0")) >= 0) args.single()
-                else operation(SExpr.Atom("-"), args)
+            else operation(SExpr.Atom("-"), args)
             "to_real" -> real(exact(args.single()))
             "to_int" -> SmtValue.Integer(floor(exact(args.single())).toString())
             "is_int" -> bool(compare(args.single(), SmtValue.Integer(floor(exact(args.single())).toString())) == 0)
             "^", "**" -> power(name, args)
             "<", "<=", ">", ">=" -> bool(args.zipWithNext().all { (a, b) ->
                 val relation = compare(a, b)
-                when (name) { "<" -> relation < 0; "<=" -> relation <= 0; ">" -> relation > 0; else -> relation >= 0 }
+                when (name) {
+                    "<" -> relation < 0
+                    "<=" -> relation <= 0
+                    ">" -> relation > 0
+                    else -> relation >= 0
+                }
             })
             "exp", "log", "sin", "cos" -> real(arithmetic.function(
                 ExactRealFunction.valueOf(name.uppercase()), exact(args.single())))
@@ -492,7 +511,10 @@ internal class SmtFixedModel(
             for (index in arguments.indices) {
                 val same = values.equal(arguments[index], args[index])
                     ?: unavailable("function argument equality is not certified")
-                if (!same) { matches = false; break }
+                if (!same) {
+                    matches = false
+                    break
+                }
             }
             if (matches) return result
         }
@@ -507,7 +529,9 @@ internal class SmtFixedModel(
 
     private fun retainedFunction(key: String): SmtValue.Function? = try {
         retained.value(key) as? SmtValue.Function
-    } catch (_: IllegalStateException) { null }
+    } catch (_: IllegalStateException) {
+        null
+    }
 
     private fun select(array: SmtValue.Array, index: SmtValue): SmtValue {
         for ((key, value) in array.entries.asReversed()) {
@@ -562,12 +586,14 @@ internal class SmtFixedModel(
     }
 
     private fun bitVector(name: String, indices: List<Int>, args: List<SmtValue>): SmtValue {
-        val converted = args.map { value -> when (value) {
-            is SmtValue.BitVector -> SmtBitVectorValue.Bits(value.bits.reversed().map { it == '1' })
-            is SmtValue.Boolean -> SmtBitVectorValue.Boolean(value.value)
-            is SmtValue.Integer -> SmtBitVectorValue.Integer(parseBigInt(value.value))
-            else -> unavailable("bitvector operand has the wrong sort")
-        } }
+        val converted = args.map { value ->
+            when (value) {
+                is SmtValue.BitVector -> SmtBitVectorValue.Bits(value.bits.reversed().map { it == '1' })
+                is SmtValue.Boolean -> SmtBitVectorValue.Boolean(value.value)
+                is SmtValue.Integer -> SmtBitVectorValue.Integer(parseBigInt(value.value))
+                else -> unavailable("bitvector operand has the wrong sort")
+            }
+        }
         return when (val value = evaluateSmtBitVector(name, indices, converted, ::checkpoint)) {
             is SmtBitVectorValue.Bits -> SmtValue.BitVector(value.bits.asReversed().joinToString("") {
                 if (it) "1" else "0"

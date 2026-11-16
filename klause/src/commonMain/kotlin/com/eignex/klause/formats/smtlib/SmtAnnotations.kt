@@ -76,7 +76,11 @@ internal fun normalizeSmtSourceCommands(
                         else -> emptySet()
                     }
                     for (index in node.items.indices.reversed()) {
-                        val bodyIndex = when { frame.pattern != null -> 1; head == "let" -> 2; else -> 4 }
+                        val bodyIndex = when {
+                            frame.pattern != null -> 1
+                            head == "let" -> 2
+                            else -> 4
+                        }
                         val child = node.items[index]
                         val pattern = if (frame.matchCases) (child as? SExpr.SList)?.items?.firstOrNull() else null
                         work += AnnotationFrame(child, false, if (index == bodyIndex) localNames else emptySet(),

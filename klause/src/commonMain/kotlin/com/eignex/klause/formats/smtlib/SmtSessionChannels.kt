@@ -26,7 +26,11 @@ internal class SmtSessionChannels(
     fun diagnostic(text: String) = diagnostic.write(text)
     fun name(diagnostic: Boolean): String = if (diagnostic) diagnosticName else regularName
     fun select(name: String, diagnostic: Boolean) {
-        val selected = when (name) { "stdout" -> stdout; "stderr" -> stderr; else -> openAppend(name) }
+        val selected = when (name) {
+            "stdout" -> stdout
+            "stderr" -> stderr
+            else -> openAppend(name)
+        }
         val previous = if (diagnostic) this.diagnostic else regular
         if (diagnostic) {
             this.diagnostic = selected

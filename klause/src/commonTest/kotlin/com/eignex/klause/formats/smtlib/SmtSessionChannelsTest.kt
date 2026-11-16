@@ -10,10 +10,14 @@ class SmtSessionChannelsTest {
         val diagnostics = ArrayList<String>()
         val appended = ArrayList<String>()
         val session = SmtLibSession({ SmtSessionResult("sat") }, {}, diagnostic = diagnostics::add,
-            openAppend = { destination -> object : SmtSessionSink {
-                override fun write(text: String) { appended += "$destination:$text" }
-                override fun close() = Unit
-            } })
+            openAppend = { destination ->
+                object : SmtSessionSink {
+                    override fun write(text: String) {
+                        appended += "$destination:$text"
+                    }
+                    override fun close() = Unit
+                }
+            })
 
         session.execute(SExprReader("(set-option :diagnostic-output-channel \"trace.log\")"))
         session.diagnose("first")
@@ -32,8 +36,12 @@ class SmtSessionChannelsTest {
         val closed = ArrayList<String>()
         val session = SmtLibSession({ SmtSessionResult("sat") }, standard::add, openAppend = { path ->
             object : SmtSessionSink {
-                override fun write(text: String) { appended += "$path:$text" }
-                override fun close() { closed += path }
+                override fun write(text: String) {
+                    appended += "$path:$text"
+                }
+                override fun close() {
+                    closed += path
+                }
             }
         })
 
@@ -60,7 +68,9 @@ class SmtSessionChannelsTest {
             diagnostic = diagnostic::add, openAppend = { path ->
                 object : SmtSessionSink {
                     override fun write(text: String) = Unit
-                    override fun close() { closed += path }
+                    override fun close() {
+                        closed += path
+                    }
                 }
             })
 
