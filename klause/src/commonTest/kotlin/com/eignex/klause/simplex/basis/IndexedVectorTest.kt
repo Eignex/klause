@@ -1,6 +1,7 @@
 package com.eignex.klause.simplex.basis
 
-import com.eignex.koblas.engine.BuiltinEngines
+import com.eignex.koblas.DenseVector
+import com.eignex.koblas.KoblasEngine
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
@@ -16,7 +17,7 @@ class IndexedVectorTest {
                 val vector = IndexedVector(count * 2 + 3)
                 val packed = DoubleArray(count) { (it % 11 - 5) * scale }
                 for (k in 0 until count) vector.store((count - k) * 2, packed[k])
-                val expected = BuiltinEngines.scalar.nrm2(packed, 0, count)
+                val expected = KoblasEngine.scalar.nrm2(DenseVector.wrap(packed))
 
                 val actual = vector.nrm2()
 
