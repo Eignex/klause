@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -70,6 +71,60 @@ class RevisedSimplexArtificialBoundsTest {
             assertEquals(0, solver.lastNumericalMetrics.artificialHandoffs)
             assertEquals(LpVerdict.ATTAINED_OPTIMUM, certified.verdict)
             assertEquals(BigFraction.ofLong(-5_000_000L), certified.lowerBound)
+        }
+    }
+
+    @Test
+    fun `suspending boxed dual iteration should preserve widening and handoff paths`() {
+        val models = listOf(
+            working(
+                listOf(listOf(0 to 1L), listOf(0 to -10_000L, 1 to 2L)),
+                listOf(0L, 1000L),
+                List(4) { nonnegative },
+                listOf(-1L, 0L, 0L, 0L),
+            ),
+            working(
+                listOf(listOf(0 to 10_000L), listOf(0 to 1L)),
+                listOf(0L),
+                listOf(
+                    ExactLpBounds(lower = ExactLpSide(ExactLpNumber.of(500L))),
+                    ExactLpBounds(),
+                    ExactLpBounds(ExactLpSide(zero), ExactLpSide(ExactLpNumber.of(1L))),
+                ),
+                listOf(20_000L, 1L, 0L),
+            ),
+        )
+        for (model in models) {
+            RevisedSimplex(model, scalingOptions = LpScalingOptions(enabled = false)).use { uninterrupted ->
+                val expected = assertNotNull(uninterrupted.solve())
+                RevisedSimplex(model, scalingOptions = LpScalingOptions(enabled = false)).use { sliced ->
+                    sliced.enableProgressTrace()
+                    sliced.openSolve().use { cursor ->
+                        var step = cursor.advance(1L)
+                        var pauses = 0
+                        while (step is LpSolveStep.Paused && pauses < 64) {
+                            pauses++
+                            assertNull(sliced.solvedExactState)
+                            assertNull(sliced.infeasibleRay)
+                            step = cursor.advance(1L)
+                        }
+                        val result = assertNotNull(assertIs<LpSolveStep.Completed<FloatLpResult?>>(step).value)
+
+                        assertTrue(pauses > 0)
+                        val phases = assertNotNull(sliced.progressTrace).samples.map { it.phase }
+                        assertTrue(SimplexPhase.BOXED_DUAL in phases)
+                        assertEquals(expected.objective, result.objective)
+                        assertEquals(expected.primal.toList(), result.primal.toList())
+                        assertEquals(uninterrupted.lastMetrics.pivots, sliced.lastMetrics.pivots)
+                        assertEquals(uninterrupted.lastMetrics.workOps, sliced.lastMetrics.workOps)
+                        assertEquals(uninterrupted.lastNumericalMetrics.artificialWidenings,
+                            sliced.lastNumericalMetrics.artificialWidenings)
+                        assertEquals(uninterrupted.lastNumericalMetrics.artificialHandoffs,
+                            sliced.lastNumericalMetrics.artificialHandoffs)
+                        assertEquals(uninterrupted.lastTermination, sliced.lastTermination)
+                    }
+                }
+            }
         }
     }
 

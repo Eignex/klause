@@ -1,6 +1,7 @@
 package com.eignex.klause.lp.engine
 
 import com.eignex.klause.simplex.basis.BasisArithmeticException
+import com.eignex.klause.simplex.basis.IndexedVector
 import kotlin.math.abs
 
 internal class PrimalSimplexPhases(
@@ -17,7 +18,6 @@ internal class PrimalSimplexPhases(
     private val phaseOneGradient = workspace.phaseOneGradient
     private val phaseOneDuals = workspace.phaseOneDuals
     private val alphaValues = workspace.alphaValues
-    private val spikeVec = workspace.spikeVec
     private val work = control.work
     private val progressTrace: SimplexProgressTrace? get() = monitor.trace
     private var phaseOneRatio: PrimalPhaseOneRatio? = null
@@ -134,7 +134,8 @@ internal class PrimalSimplexPhases(
             }
 
             progressTrace?.lastEnteringGain = best
-            val alpha = operations.spikeDense(q, alphaBuf)
+            val spike = operations.spike(q)
+            val alpha = spike.gather(alphaBuf)
             val dir = if (qAtLower) 1.0 else -1.0
             var tMax = numerical.boundRangeD(q)
             var leaving = -1
@@ -191,7 +192,7 @@ internal class PrimalSimplexPhases(
             if (tMax >= Double.MAX_VALUE) return PrimalPhaseResult.FAILED // no blocker
             progressTrace?.step(SimplexPhase.PRIMAL_FEASIBILITY, tMax, tolerance, flip = leaving == -1)
             if (leaving == -1) {
-                if (phaseOneIncrementalValues) advancePhaseOneValues(beta, dir * tMax)
+                if (phaseOneIncrementalValues) advancePhaseOneValues(spike, beta, dir * tMax)
                 status[q] = if (qAtLower) VarStatus.AT_UPPER else VarStatus.AT_LOWER
                 if (!phaseOneIncrementalValues || ++valueUpdates >= PRIMAL_VALUE_REFRESH_INTERVAL) {
                     operations.basicValues(beta)
@@ -205,7 +206,7 @@ internal class PrimalSimplexPhases(
             }
             if (phaseOneIncrementalValues) {
                 val enteringValue = seat(numerical, status[q], q) + dir * tMax
-                advancePhaseOneValues(beta, dir * tMax, leaving, enteringValue)
+                advancePhaseOneValues(spike, beta, dir * tMax, leaving, enteringValue)
             }
             val evicted = basicVar[leaving]
             status[evicted] = sideStatus(model, evicted, leavingToUpper)
@@ -259,6 +260,7 @@ internal class PrimalSimplexPhases(
         }
 
     private fun advancePhaseOneValues(
+        spike: IndexedVector,
         beta: DoubleArray,
         delta: Double,
         leaving: Int = -1,
@@ -268,7 +270,7 @@ internal class PrimalSimplexPhases(
             val m = beta.size
             // A dimension charge keeps the allowance independent of the backend's indexed storage.
             work.add(2L * m)
-            spikeVec.forEachStored { row, value ->
+            spike.forEachStored { row, value ->
                 if (row != leaving) {
                     beta[row] -= value * delta
                     if (!beta[row].isFinite()) throw BasisArithmeticException("nonfinite primal value")
@@ -347,7 +349,8 @@ internal class PrimalSimplexPhases(
             if (q == -1) return PrimalPhaseResult.COMPLETE // no improving column ⇒ optimal
 
             progressTrace?.lastEnteringGain = best
-            val alpha = operations.spikeDense(q, alphaBuf) // α = B⁻¹ A_q
+            val spike = operations.spike(q)
+            val alpha = spike.gather(alphaBuf) // α = B⁻¹ A_q
             val dir = if (qAtLower) 1.0 else -1.0 // x_q moves by dir·t, t ≥ 0
             // Ratio test with the entering variable's own bound flip as a candidate blocker.
             var tMax = numerical.boundRangeD(q)

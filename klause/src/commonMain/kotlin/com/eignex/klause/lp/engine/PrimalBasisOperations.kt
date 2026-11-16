@@ -1,5 +1,7 @@
 package com.eignex.klause.lp.engine
 
+import com.eignex.klause.simplex.basis.IndexedVector
+
 internal interface SimplexPhasePricing {
     fun objectiveDuals(): DoubleArray
     fun dotColumn(values: DoubleArray, column: Int): Double
@@ -8,7 +10,7 @@ internal interface SimplexPhasePricing {
 internal interface PrimalBasisOperations : SimplexPhasePricing {
     fun basicValues(out: DoubleArray): DoubleArray
     fun transposeGradient(gradient: DoubleArray, out: DoubleArray)
-    fun spikeDense(column: Int, out: DoubleArray): DoubleArray
+    fun spike(column: Int): IndexedVector
     fun refactorAtSafePoint(): PrimalPhaseRefactor?
     fun foldPivot(row: Int, entering: Int, leaving: Int): PivotFold
 }

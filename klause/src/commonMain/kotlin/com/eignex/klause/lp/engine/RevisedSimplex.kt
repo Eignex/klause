@@ -16,12 +16,9 @@ import com.eignex.klause.simplex.basis.MAX_SCALAR_COLUMN_ENTRIES
 import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.SymbolicLu
 import com.eignex.klause.util.Cancellation
-import com.eignex.klause.util.SparseSlices
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
 import com.eignex.koblas.sparse.dotColumn
-import com.eignex.util.arrays.argsortBy
-import com.eignex.util.collections.IntArrayList
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -86,7 +83,8 @@ internal const val DEFAULT_REFACTOR_UPDATE_LIMIT: Int = 64
  * singular basis). Its candidates require independent certification against original source data.
  *
  * The basis itself is held by a [BasisSolver], which owns the factors, the pivot order and
- * the updates while this owns pricing, the ratio tests and the refactorization policy. A basis is named
+ * the updates while phase owners execute pricing and ratio tests through its numerical operations.
+ * This coordinates refactorization, recovery and publication. A basis is named
  * by index into `columns`, whose columns are fixed for the solver's lifetime, so a pivot hands the solver the
  * spike it already computed for the ratio test rather than a rebuilt square matrix. The default is klause's
  * Kotlin factorization on every platform; an injected factory can supply another implementation.
@@ -222,8 +220,6 @@ internal class RevisedSimplex(
     private var numericalFailure = false
     private val tolerance = TOL
     private val feasibilityTolerance = FEAS_TOL
-    private val harrisTolerance: Double get() = 0.5 * tolerance
-    private val minimumDelta: Double get() = 0.01 * tolerance
     private fun cost(column: Int): Double = numerical.costD(column)
     private val solveControl = SimplexSolveControl(model.m, model.numVars, iterationLimit, workLimit, cancellation)
     private val m = model.m
@@ -237,9 +233,6 @@ internal class RevisedSimplex(
     private var stoppedContinuationBasis: Basis? = null
 
     private val pricingState = SimplexPricingState(m, numVars)
-    private val gamma = pricingState.gamma
-    private val pricingOrder = pricingState.order
-    private val pricingScratch = pricingState.scratch
     private val workspace = SimplexWorkspace(m, numVars)
     private val dualRhs = workspace.dualRhs
     private val dualValues = workspace.dualValues
@@ -248,13 +241,6 @@ internal class RevisedSimplex(
     private val dualBeta = workspace.dualBeta
     private val primalBeta = workspace.primalBeta
     private val alphaValues = workspace.alphaValues
-    private val pivotRowEntries = workspace.pivotRowEntries
-    private val enteringRatios = workspace.enteringRatios
-    private val eligibleColumns = workspace.eligibleColumns
-    private val eligibleOrdered = workspace.eligibleOrdered
-    private val theoryColumns = workspace.theoryColumns
-    private val touchedColumns = workspace.touchedColumns
-    private val columnEpochs = workspace.columnEpochs
     private val reconcileQueue = workspace.reconcileQueue
 
     /**
@@ -305,20 +291,22 @@ internal class RevisedSimplex(
         }
         override fun objectiveDuals(): DoubleArray = duals()
         override fun dotColumn(values: DoubleArray, column: Int): Double = this@RevisedSimplex.dotColumn(values, column)
-        override fun spikeDense(column: Int, out: DoubleArray): DoubleArray =
-            this@RevisedSimplex.spikeDense(column, out)
+        override fun spike(column: Int): IndexedVector {
+            this@RevisedSimplex.spike(column)
+            return spikeVec
+        }
         override fun foldPivot(row: Int, entering: Int, leaving: Int): PivotFold =
             this@RevisedSimplex.foldPivot(row, entering, leaving, withPivotEta = false)
 
         override fun refactorAtSafePoint(): PrimalPhaseRefactor? = when (refactorAtQualitySafePoint()) {
             null -> null
-            RefactorResult.UNCHANGED -> if (routineRefactor) {
+            SimplexBasisRefactor.UNCHANGED -> if (routineRefactor) {
                 PrimalPhaseRefactor.UNCHANGED
             } else {
                 PrimalPhaseRefactor.RESTART
             }
-            RefactorResult.BASIS_CHANGED -> PrimalPhaseRefactor.BASIS_CHANGED
-            RefactorResult.FAILED -> PrimalPhaseRefactor.FAILED
+            SimplexBasisRefactor.BASIS_CHANGED -> PrimalPhaseRefactor.BASIS_CHANGED
+            SimplexBasisRefactor.FAILED -> PrimalPhaseRefactor.FAILED
         }
     }
     private val primalPhases = PrimalSimplexPhases(
@@ -326,6 +314,32 @@ internal class RevisedSimplex(
     )
 
     private val artificialBounds = SimplexArtificialBounds(status, observations)
+    private val dualOperations = object : DualBasisOperations {
+        override val updateCount: Int get() = solver().updateCount
+        override fun basicValues(out: DoubleArray): DoubleArray = this@RevisedSimplex.basicValues(out)
+        override fun objectiveDuals(): DoubleArray = duals()
+        override fun dotColumn(values: DoubleArray, column: Int): Double = this@RevisedSimplex.dotColumn(values, column)
+        override fun pivotalRow(row: Int): IndexedVector {
+            this@RevisedSimplex.pivotalRow(row)
+            return pivotEtaVec
+        }
+        override fun spike(column: Int): IndexedVector {
+            this@RevisedSimplex.spike(column)
+            return spikeVec
+        }
+        override fun refactorAtSafePoint(): SimplexBasisRefactor? = refactorAtQualitySafePoint()
+        override fun recoverNumerically(): SimplexBasisRefactor = refactorize(LpRefactorReason.NUMERICAL_RECOVERY)
+        override fun foldPivot(row: Int, entering: Int, leaving: Int): PivotFold =
+            this@RevisedSimplex.foldPivot(row, entering, leaving, withPivotEta = true)
+        override fun columnNnz(column: Int): Int = this@RevisedSimplex.columnNnz(column)
+        override fun sampleBoundSupport(column: Int, leavingRow: Int, enforced: BooleanArray?): TheoryProbe =
+            probeTheorySupport(column, leavingRow, enforced)
+    }
+    private val dualPhase = DualSimplexPhase(
+        basisLifecycle, workspace, pricingState, artificialBounds, solveControl, observations,
+        dualOperations, phaseMonitor, pricing,
+    )
+
     private val basicValueCache = SimplexBasicValues()
     private var pendingProbeValues = false
 
@@ -666,14 +680,14 @@ internal class RevisedSimplex(
 
     /**
      * Refactorize the seated basis — the columns of `columns` that `basicVar` names — and drop any updates
-     * folded into it. A singular factorization goes to basis repair: [RefactorResult.BASIS_CHANGED] when
-     * repair seated a different basis, [RefactorResult.FAILED] when it could not, which leaves this engine
+     * folded into it. A singular factorization goes to basis repair: [SimplexBasisRefactor.BASIS_CHANGED] when
+     * repair seated a different basis, [SimplexBasisRefactor.FAILED] when it could not, which leaves this engine
      * unable to solve until a later call succeeds.
      */
-    private fun refactorize(reason: LpRefactorReason): RefactorResult = profiled(SimplexProfilePhase.REFACTOR) {
+    private fun refactorize(reason: LpRefactorReason): SimplexBasisRefactor = profiled(SimplexProfilePhase.REFACTOR) {
         if (repairStop != null) {
             observations.termination = repairTermination()
-            return@profiled RefactorResult.FAILED
+            return@profiled SimplexBasisRefactor.FAILED
         }
         val copied = initialFactorCopy
         initialFactorCopy = null
@@ -689,12 +703,12 @@ internal class RevisedSimplex(
                 factorCopyFailed = true
                 observations.termination = if (cancellation()) LpFloatTermination.CANCELLED
                     else LpFloatTermination.NUMERICAL
-                return@profiled RefactorResult.FAILED
+                return@profiled SimplexBasisRefactor.FAILED
             }
             hasImportedFactors = true
             importedFactorEntries = checkNotNull(basisLifecycle.current).nnz.toLong()
             recordFactorization(checkNotNull(basisLifecycle.current), basisChanged = false)
-            return@profiled RefactorResult.UNCHANGED
+            return@profiled SimplexBasisRefactor.UNCHANGED
         }
         observations.refactorizations++
         when (reason) {
@@ -753,20 +767,20 @@ internal class RevisedSimplex(
                             observations.termination = LpFloatTermination.CANCELLED
                         }
                         invalidateBasisDependentState()
-                        RefactorResult.FAILED
+                        SimplexBasisRefactor.FAILED
                     }
 
                     is BasisRecoveryResult.Recovered -> {
                         installRecoveredBasis(recovery.state)
                         recordFactorization(solver, basisChanged = true)
-                        RefactorResult.BASIS_CHANGED
+                        SimplexBasisRefactor.BASIS_CHANGED
                     }
                 }
             }
             basisLifecycle.columns = basicVar.copyOf()
             basisLifecycle.unitRows = IntArray(m) { -1 }
             recordFactorization(solver, basisChanged = false)
-            return@profiled RefactorResult.UNCHANGED
+            return@profiled SimplexBasisRefactor.UNCHANGED
         } finally {
             val buildAfter = operationWork(solver)
             val measured = if (buildBefore == null || buildAfter == null ||
@@ -1041,9 +1055,9 @@ internal class RevisedSimplex(
         if (trigger == null) return PivotFold.UPDATED
         val reason = trigger.refactorReason()
         return when (refactorize(reason)) {
-            RefactorResult.UNCHANGED -> PivotFold.REBUILT
-            RefactorResult.BASIS_CHANGED -> PivotFold.BASIS_CHANGED
-            RefactorResult.FAILED -> PivotFold.FAILED
+            SimplexBasisRefactor.UNCHANGED -> PivotFold.REBUILT
+            SimplexBasisRefactor.BASIS_CHANGED -> PivotFold.BASIS_CHANGED
+            SimplexBasisRefactor.FAILED -> PivotFold.FAILED
         }
     }
 
@@ -1060,17 +1074,7 @@ internal class RevisedSimplex(
 
     /** Whether every objective coefficient is zero (pure feasibility): [duals] is then identically 0. */
     private val allZeroCost: Boolean get() = (0 until numVars).all { cost(it) == 0.0 }
-    private val originalZeroCost: Boolean get() = (0 until numVars).all { numerical.costD(it) == 0.0 }
-
     private fun resetGamma() = pricingState.resetReference()
-
-    private fun updateGamma(alpha: IndexedVector, r: Int) = pricingState.update(alpha, r)
-
-    /** Squared Euclidean norm of the pivotal row, with a stable norm before the final square. */
-    private fun pivotalRowSquaredNorm(): Double {
-        val norm = pivotEtaVec.nrm2()
-        return norm * norm
-    }
 
     /**
      * Solve the relaxation, optionally warm-started from [warm] — a prior **optimal** basis of the same
@@ -1186,13 +1190,13 @@ internal class RevisedSimplex(
             val imported = warm != null && tryWarmStart(warm)
             if (!imported) coldStart()
             var prepared = refactorize(if (imported) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL)
-            if (prepared == RefactorResult.FAILED && imported && repairStop == null && !token() &&
+            if (prepared == SimplexBasisRefactor.FAILED && imported && repairStop == null && !token() &&
                 (workLimit == 0L || work.ops < workLimit)
             ) {
                 coldStart()
                 prepared = refactorize(LpRefactorReason.SINGULAR_RECOVERY)
             }
-            if (prepared == RefactorResult.FAILED || token() ||
+            if (prepared == SimplexBasisRefactor.FAILED || token() ||
                 (workLimit > 0L && work.ops > workLimit)
             ) {
                 null
@@ -1612,13 +1616,13 @@ internal class RevisedSimplex(
             }
             if (refactorize(
                     if (observations.warmStarted) LpRefactorReason.WARM_START else LpRefactorReason.INITIAL,
-                ) == RefactorResult.FAILED
+                ) == SimplexBasisRefactor.FAILED
             ) {
                 if (repairStop != null || factorCopyFailed) return null
                 // The warm basis factorized singular, so the solve runs from the slack start after all.
                 coldStart()
                 observations.warmStarted = false
-                if (refactorize(LpRefactorReason.SINGULAR_RECOVERY) == RefactorResult.FAILED) return null
+                if (refactorize(LpRefactorReason.SINGULAR_RECOVERY) == SimplexBasisRefactor.FAILED) return null
             }
         }
         val seeded = pendingProbeValues && hasImportedFactors
@@ -1637,7 +1641,7 @@ internal class RevisedSimplex(
                 IterationResult.FAILED -> {
                     if (repairStop != null) return null
                     coldStart()
-                    if (refactorize(LpRefactorReason.RECONCILE_RECOVERY) == RefactorResult.FAILED) return null
+                    if (refactorize(LpRefactorReason.RECONCILE_RECOVERY) == SimplexBasisRefactor.FAILED) return null
                 }
             }
         }
@@ -1692,334 +1696,37 @@ internal class RevisedSimplex(
         } else {
             null
         }
-        val rhsAdj = basicRhs
         val beta = dualBeta
         // Cached basic values were seated on the real bounds, which an artificial seat does not match.
-        var useCached = kept && model.exactState != null && !artificialBounds.active && basicValueCache.restore(
+        val useCached = kept && model.exactState != null && !artificialBounds.active && basicValueCache.restore(
             model, numerical, status, beta, workspace, work, colPtr,
             accumulate = { rhs, delta, column -> sparseAxpy(rhs, delta, column) },
             solve = { rhs, change -> ftranDense(rhs, change, rhsVec, boundUpdateFtran = true) },
         )
         hasImportedParentValues = seeded && useCached
-        val pivotRowEntry = pivotRowEntries // ρ·A_j per nonbasic, reused by the bound-flip ratio test
-        val ratioBuf = enteringRatios // |d_j / a_j| per eligible nonbasic
-        val elig = eligibleColumns
-        val eligOrdered = eligibleOrdered // scratch for the ratio-ordered permutation of [elig]
-        val theoryCandidates = theoryColumns
-        workspace.beginDualPass()
-        var epoch = 0
-        // Whether an iterate's basic values are in [beta], so a solve that stops short can still hand
-        // back its bound. The buffer is reused, and holds the last iterate the loop completed.
-        var haveBeta = false
-        iterations@ while (solveControl.iterationsRemain(progress)) {
-            if (activeSolve != null) pauseAtIteration(progress)
-            val iteration = progress.dualIterations++
-            // Cooperative deadline, phased off the first iteration so a spent budget never starts.
-            if (iteration % CANCEL_POLL == 0 && cancellation()) {
-                return stopped(
-                    LpFloatTermination.CANCELLED,
-                    if (haveBeta && model.exactState == null) boundOnly(beta) else null,
-                )
+        return when (dualPhase.run(
+            model, numerical, enforced, progress, finiteLower, finiteUpper, rowCols, rowVals, useCached,
+        )) {
+            DualPhaseResult.OPTIMAL -> optimal(beta)
+            DualPhaseResult.RESTART -> restartDual(enforced, progress)
+            DualPhaseResult.PRIMAL_HANDOFF -> handArtificialBasisToPrimal(progress)
+            DualPhaseResult.NUMERICAL_FAILURE -> {
+                numericalFailure = true
+                null
             }
-            // Work budget, checked before the iteration that would exceed it.
-            if (solveControl.workExhausted()) {
-                return stopped(LpFloatTermination.WORK, if (haveBeta) boundOnly(beta) else null)
-            }
-            // β = B⁻¹ (b − Σ_{j nonbasic at upper} A_j·u_j)
-            if (!useCached) {
-                adjustedRhs(rhsAdj)
-                ftranDense(rhsAdj, beta, rhsVec)
-            }
-            useCached = false
-            when (refactorAtQualitySafePoint()) {
-                null -> Unit
-
-                RefactorResult.UNCHANGED -> {
-                    resetGamma()
-                    progress.dualIterations--
-                    continue
-                }
-
-                RefactorResult.BASIS_CHANGED -> return restartDual(enforced, progress)
-
-                RefactorResult.FAILED -> return null
-            }
-            haveBeta = true
-            traceProgress(if (!artificialBounds.active) SimplexPhase.DUAL else SimplexPhase.BOXED_DUAL, beta)
-            // Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate
-            // dual steepest edge). Verify the chosen weight against the pivotal row which this iteration
-            // needs anyway. Correcting an underestimate and reselecting is bounded by the row count:
-            // every retry makes at least one selected weight exact in this reference frame.
-            var r = -1
-            var worst = 0.0
-            var belowLower = false
-            while (true) {
-                r = mostInfeasibleRow(beta, enforced, finiteLower, finiteUpper)
-                if (r != -1) {
-                    worst = leavingViolation
-                    belowLower = leavingBelowLower
-                }
-                if (r == -1 && artificialBounds.active) {
-                    // Optimal for the boxed LP. With no nonbasic seated on an artificial side it is optimal
-                    // for the real LP as well: every basic value already meets the real bounds.
-                    when {
-                        artificialBounds.seats() == 0 -> artificialBounds.drop(model, finiteLower, finiteUpper)
-
-                        // The dual never moves a dual-degenerate nonbasic, so widening could not clear such a seat.
-                        artificialBounds.releaseDegenerate(
-                            model, numerical, primalOperations, tolerance,
-                        ) > 0 -> continue@iterations
-
-                        artificialBounds.widenings < MAX_ARTIFICIAL_WIDENINGS -> {
-                            // Widening moves only nonbasic seats, so the basis stays dual feasible.
-                            artificialBounds.widenSeated()
-                            progress.dualIterations--
-                            continue@iterations
-                        }
-
-                        else -> return handArtificialBasisToPrimal(progress)
-                    }
-                }
-                if (r == -1) {
-                    basisLifecycle.kept = true // terminated cleanly: [resolveBounds] may continue from here
-                    return optimal(beta) // primal feasible ⇒ optimal
-                }
-                // Pivot row ρ = e_r^T B⁻¹ = B⁻ᵀ e_r, kept indexed: it is the hypersparse vector of a
-                // simplex iteration, and its true norm verifies the chosen Devex weight at no extra solve.
-                pivotalRow(r)
-                val trueWeight = pivotalRowSquaredNorm()
-                if (!(gamma[r] < DEVEX_WEIGHT_THRESHOLD * trueWeight)) break
-                pricingState.correctWeight(r, trueWeight)
-                observations.lastDevexWeightCorrections++
-                if (cancellation()) {
-                    return stopped(
-                        LpFloatTermination.CANCELLED,
-                        if (model.exactState == null) boundOnly(beta) else null,
-                    )
-                }
-                if (solveControl.workExhausted()) {
-                    return stopped(LpFloatTermination.WORK, boundOnly(beta))
-                }
-            }
-
-            val y = duals()
-            when (refactorAtQualitySafePoint()) {
-                null -> Unit
-
-                RefactorResult.UNCHANGED -> {
-                    resetGamma()
-                    progress.dualIterations--
-                    continue
-                }
-
-                RefactorResult.BASIS_CHANGED -> return restartDual(enforced, progress)
-
-                RefactorResult.FAILED -> return null
-            }
-            epoch++
-            val touchedCount = formPivotRow(epoch)
-            collectEligibleEntering(touchedCount, y, belowLower, enforced)
-            val entering = if (elig.isEmpty()) {
-                EnteringChoice.Selected(null)
-            } else {
-                chooseEntering(
-                    elig,
-                    eligOrdered,
-                    theoryCandidates,
-                    ratioBuf,
-                    pivotRowEntry,
-                    worst,
-                    r,
-                    enforced,
-                )
-            }
-            if (entering == EnteringChoice.ResourceStopped) {
-                observations.lastTheoryPricingResourceStops++
-                val reason = if (cancellation()) LpFloatTermination.CANCELLED else LpFloatTermination.WORK
-                return stopped(reason, if (model.exactState == null) boundOnly(beta) else null)
-            }
-            val q = (entering as EnteringChoice.Selected).column
-            if (q == null) {
-                // An update chain can turn a tiny violation into a false infeasibility candidate even
-                // though β is recomputed every iteration. Rebuild the factors—not merely the RHS solve—
-                // and retry once per solve. A basis with no folded updates is already fresh.
-                if (!progress.dualNumericalRecoveryTried && worst <= feasibilityTolerance && solver().updateCount > 0) {
-                    progress.dualNumericalRecoveryTried = true
-                    if (cancellation()) {
-                        return stopped(
-                            LpFloatTermination.CANCELLED,
-                            if (model.exactState == null) boundOnly(beta) else null,
-                        )
-                    }
-                    if (solveControl.workExhausted()) {
-                        return stopped(LpFloatTermination.WORK, boundOnly(beta))
-                    }
-                    when (refactorize(LpRefactorReason.NUMERICAL_RECOVERY)) {
-                        RefactorResult.UNCHANGED -> Unit
-                        RefactorResult.BASIS_CHANGED -> return restartDual(enforced, progress)
-                        RefactorResult.FAILED -> return null
-                    }
-                    resetGamma()
-                    progress.dualIterations-- // recovery is not a pivot and must not consume [iterationLimit]
-                    continue
-                }
-                if (artificialBounds.active) {
-                    // The ray proves only the boxed LP infeasible: an artificial seat or range may be what
-                    // blocks every entering column. With no artificial seat the basis is dual feasible for the
-                    // real bounds, so the iteration is re-derived on them; otherwise the primal decides.
-                    if (artificialBounds.seats() > 0) {
-                        if (artificialBounds.releaseDegenerate(
-                                model, numerical, primalOperations, tolerance,
-                            ) > 0
-                        ) continue
-                        return handArtificialBasisToPrimal(progress)
-                    }
-                    artificialBounds.drop(model, finiteLower, finiteUpper)
-                    progress.dualIterations--
-                    continue
-                }
-                // Dual unbounded ⇒ primal infeasible. Record the basis + leaving row so the caller can
-                // certify infeasibility exactly (the float ray alone is not sound to prune on).
+            DualPhaseResult.FAILED -> null
+            DualPhaseResult.INFEASIBLE -> {
                 infeasibleBasis = Basis(basicVar.copyOf(), status.copyOf(), captureEligible = basisCaptureEligible)
-                infeasibleRow = r
-                // float ρ = B⁻ᵀeᵣ densely; integerFarkasRay rounds + certifies it.
+                infeasibleRow = dualPhase.infeasibleRow
                 infeasibleRay = DoubleArray(m) { numerical.sourceDual(it, pivotEtaVec[it]) }
-                basisLifecycle.kept = true // the seated basis stays dual-feasible for the next [resolveBounds]
+                basisLifecycle.kept = true
                 basicValueCache.retain(model, numerical, status, beta)
                 solvedExactState = model.exactState
-                return stopped(LpFloatTermination.INFEASIBLE_CANDIDATE)
+                stopped(LpFloatTermination.INFEASIBLE_CANDIDATE)
             }
-
-            spike(q) // spike η = B⁻¹ A_q in the pre-pivot factorization
-            if (abs(spikeVec[r]) < tolerance) {
-                // Numerically singular pivot. Counted before giving up: a solve lost here leaves no
-                // result to read, so this is the only place the loss is visible.
-                observations.smallPivotBails++
-                numericalFailure = true
-                return null
-            }
-            updateGamma(spikeVec, r)
-            progressTrace?.step(if (!artificialBounds.active) SimplexPhase.DUAL else SimplexPhase.BOXED_DUAL,
-                ratioBuf[q], tolerance)
-            val leaving = basicVar[r]
-            status[leaving] = sideStatus(leaving, upper = !belowLower)
-            basicVar[r] = q
-            status[q] = VarStatus.BASIC
-            observations.pivots++
-            // Hand the solver back the spike and the pivotal row it just produced, so folding the pivot
-            // in costs one FTRAN rather than a recomputation. A rebuild opens a fresh Devex reference
-            // frame; a failed one gives up soundly.
-            when (foldPivot(r, q, leaving, withPivotEta = true)) {
-                PivotFold.UPDATED -> Unit
-                PivotFold.REBUILT -> resetGamma()
-                PivotFold.BASIS_CHANGED -> return restartDual(enforced, progress)
-                PivotFold.FAILED -> return null
-            }
-        }
-        // Iteration budget spent. Same reasoning as the cancellation exit: the iterate bounds, so hand
-        // it back rather than discarding the work.
-        return stopped(LpFloatTermination.PIVOTS, if (haveBeta) boundOnly(beta) else null)
-    }
-
-    // The violation and side of the row [mostInfeasibleRow] chose; unset when it found none.
-    private var leavingViolation = 0.0
-    private var leavingBelowLower = false
-
-    // The per-iteration scans of [solveCore] are their own methods: inside its iteration loop they make C2 compile
-    // the whole solve again on-stack for each loop it enters.
-
-    /**
-     * Leaving: the most infeasible basic bound, scored by Devex — violation² / γ_i (approximate dual steepest
-     * edge); -1 when every basic value is within its bounds.
-     */
-    private fun mostInfeasibleRow(
-        beta: DoubleArray,
-        enforced: BooleanArray?,
-        finiteLower: BooleanArray?,
-        finiteUpper: BooleanArray?,
-    ): Int = profiled(SimplexProfilePhase.PRICING) {
-        var r = -1
-        var bestScore = 0.0
-        for (i in 0 until m) {
-            val v = basicVar[i]
-            // An unenforced row's basic slack is free: its value is never a violation.
-            if (enforced != null && v >= n && !enforced[v - n]) continue
-            val below = if (finiteLower?.get(v) ?: model.hasFiniteLower(v)) {
-                lowerAt(v) - beta[i]
-            } else {
-                Double.NEGATIVE_INFINITY
-            }
-            val above = if (finiteUpper?.get(v) ?: model.hasFiniteUpper(v)) {
-                beta[i] - upperAt(v)
-            } else {
-                Double.NEGATIVE_INFINITY
-            }
-            val isBelow = below >= above
-            val viol = if (isBelow) below else above
-            if (viol <= tolerance) continue
-            val score = viol * viol / gamma[i]
-            if (r == -1 || score > bestScore) {
-                bestScore = score
-                r = i
-                leavingViolation = viol
-                leavingBelowLower = isBelow
-            }
-        }
-        return@profiled r
-    }
-
-    /**
-     * ρ·A_j for every column ρ reaches, accumulated over the rows ρ stores, into [pivotRowEntries]; returns how
-     * many columns it reached, listed in [touchedColumns]. Costs those rows' entries instead of nnz(A), which is
-     * the whole point of ρ staying sparse. A column ρ misses has ρ·A_j = 0 exactly, so the eligibility pass loses
-     * no candidate by skipping it. Reached columns are stamped with [epoch] rather than cleared: zeroing
-     * [pivotRowEntries] between iterations would reintroduce the pass over every column this removes.
-     */
-    private fun formPivotRow(epoch: Int): Int = profiled(SimplexProfilePhase.PRICING) {
-        var touchedCount = 0
-        pivotEtaVec.forEachStored { i, rhoI ->
-            val cols = rowCols[i]
-            val vals = rowVals[i]
-            work.add(cols.size)
-            touchedCount = SparseSlices.scatterAxpy(
-                rhoI, cols, 0, vals, 0, cols.size,
-                pivotRowEntries, columnEpochs, epoch, touchedColumns, 0, touchedCount,
+            DualPhaseResult.STOPPED -> stopped(
+                checkNotNull(dualPhase.termination), if (dualPhase.publishStoppedBound) boundOnly(beta) else null,
             )
-        }
-        return@profiled touchedCount
-    }
-
-    /**
-     * Collect the dual-feasible entering candidates into [eligibleColumns] and their ratios into [enteringRatios];
-     * eligibility is the sign rule that keeps reduced costs feasible as the leaving variable moves to its bound.
-     */
-    private fun collectEligibleEntering(
-        touchedCount: Int,
-        y: DoubleArray,
-        belowLower: Boolean,
-        enforced: BooleanArray?,
-    ) = profiled(SimplexProfilePhase.PRICING) {
-        eligibleColumns.clear()
-        for (t in 0 until touchedCount) {
-            val j = touchedColumns[t]
-            if (status[j] == VarStatus.BASIC || model.fixed(j)) continue
-            // An unenforced row's slack never enters — it is conceptually basic forever (and the
-            // reconciliation above seats it, so a nonbasic one cannot appear mid-loop).
-            if (enforced != null && j >= n && !enforced[j - n]) continue
-            val a = pivotRowEntries[j]
-            if (abs(a) < tolerance) continue
-            val atLower = status[j] == VarStatus.AT_LOWER
-            val eligible = if (status[j] == VarStatus.FREE) {
-                true
-            } else if (belowLower) {
-                (atLower && a < 0) || (!atLower && a > 0)
-            } else {
-                (atLower && a > 0) || (!atLower && a < 0)
-            }
-            if (!eligible) continue
-            progressTrace?.let { it.pricedColumns++ }
-            enteringRatios[j] = abs((cost(j) - dotColumn(y, j)) / a)
-            eligibleColumns.add(j)
         }
     }
 
@@ -2037,7 +1744,7 @@ internal class RevisedSimplex(
         )
     }
 
-    private fun refactorAtQualitySafePoint(): RefactorResult? {
+    private fun refactorAtQualitySafePoint(): SimplexBasisRefactor? {
         val current = solver()
         val trigger = refactorPolicy.chooseAtSafePoint(
             current.updateCount,
@@ -2097,8 +1804,6 @@ internal class RevisedSimplex(
         VarStatus.AT_LOWER, VarStatus.FIXED -> lowerAt(column)
         VarStatus.FREE, VarStatus.BASIC -> 0.0
     }
-
-    private fun boundRange(column: Int): Double = artificialBounds.boundRange(model, numerical, column)
 
     private fun defaultStatus(column: Int): VarStatus = when {
         model.exactState != null && model.fixed(column) -> VarStatus.FIXED
@@ -2233,7 +1938,7 @@ internal class RevisedSimplex(
         observations.numericalMetrics.artificialHandoffs++
         artificialBounds.clear()
         coldStart()
-        if (refactorize(LpRefactorReason.PRIMAL) == RefactorResult.FAILED) return null
+        if (refactorize(LpRefactorReason.PRIMAL) == SimplexBasisRefactor.FAILED) return null
         return solvePrimalCore(null, reuse = true, reset = false, progress = progress)
     }
 
@@ -2302,171 +2007,6 @@ internal class RevisedSimplex(
         }
     }
 
-    /**
-     * Pick the dual entering variable from the eligible set [elig] (ratios in [ratioBuf], pivot-row
-     * coefficients in [pivotRowEntry]). The bound-flipping long step walks the eligible breakpoints in
-     * ratio order, flipping each bounded nonbasic whose breakpoint is passed — accumulating `|a_j|·u_j`
-     * toward the leaving variable's violation [delta] — until that capacity covers the violation or an
-     * unbounded column is reached; that column enters. Harris admits finishing columns below the running
-     * scaled bound `max(minimumDelta / |α|, ratio + harrisTolerance / |α|)` and takes the largest pivot.
-     * A boxed column whose remaining range cannot finish the step stays flip-only and cannot enter.
-     * Mutates [status] for the flips; sound regardless, since the basis is certified downstream.
-     */
-    private fun chooseEntering(
-        elig: IntArrayList,
-        ordered: IntArray,
-        theoryCandidates: IntArrayList,
-        ratioBuf: DoubleArray,
-        pivotRowEntry: DoubleArray,
-        delta: Double,
-        leavingRow: Int,
-        enforced: BooleanArray?,
-    ): EnteringChoice = profiled(SimplexProfilePhase.PRICING) {
-        sortByRatio(elig, ordered, ratioBuf)
-        var acc = 0.0
-        var flipCount = 0
-        for (idx in 0 until elig.size) {
-            val j = elig[idx]
-            val range = boundRange(j)
-            val cap = abs(pivotRowEntry[j]) * range
-            val last = idx == elig.size - 1
-            if (!last && range < Double.MAX_VALUE && acc + cap < delta - tolerance) {
-                acc += cap
-                flipCount++
-            } else {
-                val remaining = maxOf(delta - acc, 0.0)
-                val best = harrisFinishingColumn(elig, idx, remaining, theoryCandidates, ratioBuf, pivotRowEntry)
-                if (best != -1) {
-                    val minimizeBoundSupport =
-                        pricing.zeroObjective == LpZeroObjectivePricing.MIN_BOUND_SUPPORT && originalZeroCost
-                    val selected = if (minimizeBoundSupport) {
-                        when (val theory = chooseTheoryEntering(theoryCandidates, leavingRow, enforced)) {
-                            EnteringChoice.ResourceStopped -> return@profiled theory
-                            is EnteringChoice.Selected -> theory.column ?: best
-                        }
-                    } else {
-                        best
-                    }
-                    flipPassedBreakpoints(elig, flipCount)
-                    if (ratioBuf[selected] > ratioBuf[j] + harrisTolerance) observations.lastHarrisMinistepSelections++
-                    return@profiled EnteringChoice.Selected(selected)
-                }
-                return@profiled EnteringChoice.Selected(null)
-            }
-        }
-        return@profiled EnteringChoice.Selected(null) // defensive: the loop handles the last element
-    }
-
-    // Stable ascending order by ratio.
-    private fun sortByRatio(elig: IntArrayList, ordered: IntArray, ratioBuf: DoubleArray) {
-        val order = argsortBy(elig.size, pricingOrder, pricingScratch) { a, b ->
-            ratioBuf[elig[a]].compareTo(ratioBuf[elig[b]])
-        }
-        for (position in 0 until elig.size) ordered[position] = elig[order[position]]
-        for (position in 0 until elig.size) elig[position] = ordered[position]
-    }
-
-    // The largest-pivot column from [from] on that can finish the [remaining] step within the Harris bound, or -1;
-    // every finishing column with a usable pivot is listed in [theoryCandidates].
-    @Suppress("LongParameterList")
-    private fun harrisFinishingColumn(
-        elig: IntArrayList,
-        from: Int,
-        remaining: Double,
-        theoryCandidates: IntArrayList,
-        ratioBuf: DoubleArray,
-        pivotRowEntry: DoubleArray,
-    ): Int {
-        var harrisBound = Double.POSITIVE_INFINITY
-        var best = -1
-        var bestMag = -1.0
-        theoryCandidates.clear()
-        var k = from
-        while (k < elig.size && ratioBuf[elig[k]] <= harrisBound) {
-            val cand = elig[k]
-            val mag = abs(pivotRowEntry[cand])
-            val candRange = boundRange(cand)
-            val canFinish = candRange == Double.MAX_VALUE || mag * candRange >= remaining - tolerance
-            val relaxed = maxOf(minimumDelta / mag, ratioBuf[cand] + harrisTolerance / mag)
-            harrisBound = minOf(harrisBound, relaxed)
-            if (canFinish) {
-                if (mag > bestMag) {
-                    bestMag = mag
-                    best = cand
-                }
-                if (mag >= THEORY_PIVOT_MAGNITUDE_FLOOR) theoryCandidates.add(cand)
-            }
-            k++
-        }
-        return best
-    }
-
-    private fun flipPassedBreakpoints(elig: IntArrayList, flipCount: Int) {
-        for (f in 0 until flipCount) {
-            val flipped = elig[f]
-            status[flipped] = if (status[flipped] == VarStatus.AT_LOWER) VarStatus.AT_UPPER else VarStatus.AT_LOWER
-        }
-    }
-
-    private fun chooseTheoryEntering(
-        candidates: IntArrayList,
-        leavingRow: Int,
-        enforced: BooleanArray?,
-    ): EnteringChoice {
-        observations.lastTheoryPricingAttempts++
-        if (candidates.isEmpty()) {
-            observations.lastTheoryPricingDeclines++
-            return EnteringChoice.Selected(null)
-        }
-        addTheoryPricingWork(candidateOrderingWork(candidates.size))
-        if (pricingResourceStopped()) return EnteringChoice.ResourceStopped
-        val order = argsortBy(candidates.size, pricingOrder, pricingScratch) { a, b ->
-            val left = candidates[a]
-            val right = candidates[b]
-            val sparsity = columnNnz(left).compareTo(columnNnz(right))
-            if (sparsity != 0) sparsity else theoryTieRank(left).compareTo(theoryTieRank(right))
-        }
-        var best = -1
-        var bestSupport = Int.MAX_VALUE
-        var bestNnz = Int.MAX_VALUE
-        var bestTie = Long.MAX_VALUE
-        val samples = minOf(THEORY_SAMPLE_LIMIT, candidates.size)
-        for (position in 0 until samples) {
-            if (pricingResourceStopped()) return EnteringChoice.ResourceStopped
-            val candidate = candidates[order[position]]
-            val support = probeTheorySupport(candidate, leavingRow, enforced)
-            when (support) {
-                TheoryProbe.ArithmeticDeclined -> {
-                    observations.lastTheoryPricingDeclines++
-                    return EnteringChoice.Selected(null)
-                }
-
-                TheoryProbe.ResourceStopped -> return EnteringChoice.ResourceStopped
-
-                is TheoryProbe.Success -> {
-                    val nnz = columnNnz(candidate)
-                    val tie = theoryTieRank(candidate)
-                    if (support.nonFreeBasics < bestSupport ||
-                        (support.nonFreeBasics == bestSupport && nnz < bestNnz) ||
-                        (support.nonFreeBasics == bestSupport && nnz == bestNnz && tie < bestTie)
-                    ) {
-                        best = candidate
-                        bestSupport = support.nonFreeBasics
-                        bestNnz = nnz
-                        bestTie = tie
-                    }
-                }
-            }
-        }
-        if (best == -1) {
-            observations.lastTheoryPricingDeclines++
-            return EnteringChoice.Selected(null)
-        }
-        observations.lastTheoryPricingSelections++
-        observations.lastTheorySelectedColumn = best
-        return EnteringChoice.Selected(best)
-    }
-
     private fun probeTheorySupport(candidate: Int, leavingRow: Int, enforced: BooleanArray?): TheoryProbe {
         observations.lastTheoryPricingSamples++
         val solveCharge = nnzB.toLong() + (basisLifecycle.current?.updateCount ?: 0).toLong() * m
@@ -2515,25 +2055,6 @@ internal class RevisedSimplex(
 
     private fun pricingResourceStopped(): Boolean =
         cancellation() || solveControl.workExhausted()
-
-    private fun candidateOrderingWork(size: Int): Long {
-        var levels = 0
-        var remaining = size - 1
-        while (remaining > 0) {
-            remaining = remaining ushr 1
-            levels++
-        }
-        return size.toLong() * maxOf(levels, 1)
-    }
-
-    // SplitMix64 finalizer: G. L. Steele, D. Lea and C. H. Flood, "Fast splittable pseudorandom number
-    // generators", OOPSLA 2014, https://doi.org/10.1145/2660193.2660195.
-    private fun theoryTieRank(column: Int): Long {
-        var value = pricing.tieSeed + GOLDEN_GAMMA * (column.toLong() + 1L)
-        value = (value xor (value ushr 30)) * MIX_MULTIPLIER_1
-        value = (value xor (value ushr 27)) * MIX_MULTIPLIER_2
-        return value xor (value ushr 31)
-    }
 
     private fun optimal(beta: DoubleArray): FloatLpResult = profiled(SimplexProfilePhase.OUTPUT) {
         basisLifecycle.kept = true
@@ -3168,11 +2689,11 @@ internal class RevisedSimplex(
             } else {
                 observations.warmStarted = true
             }
-            if (refactorize(LpRefactorReason.PRIMAL) == RefactorResult.FAILED) {
+            if (refactorize(LpRefactorReason.PRIMAL) == SimplexBasisRefactor.FAILED) {
                 if (repairStop != null) return null
                 lowerStart()
                 observations.warmStarted = false
-                if (refactorize(LpRefactorReason.SINGULAR_RECOVERY) == RefactorResult.FAILED) return null
+                if (refactorize(LpRefactorReason.SINGULAR_RECOVERY) == SimplexBasisRefactor.FAILED) return null
             }
         }
         if (model.exactState != null) repairNonbasicStatuses()
@@ -3180,9 +2701,9 @@ internal class RevisedSimplex(
         if (solveControl.workExhausted()) return stopped(LpFloatTermination.WORK)
         when (refactorAtQualitySafePoint()) {
             null -> Unit
-            RefactorResult.UNCHANGED -> if (routineRefactor) basicValues(beta) else return restartPrimal(progress)
-            RefactorResult.BASIS_CHANGED -> return restartPrimal(progress)
-            RefactorResult.FAILED -> return null
+            SimplexBasisRefactor.UNCHANGED -> if (routineRefactor) basicValues(beta) else return restartPrimal(progress)
+            SimplexBasisRefactor.BASIS_CHANGED -> return restartPrimal(progress)
+            SimplexBasisRefactor.FAILED -> return null
         }
         if (!primalFeasible(beta)) {
             when (primalPhase1(progress)) {
@@ -3227,19 +2748,7 @@ internal class RevisedSimplex(
     private companion object {
         const val TOL: Double = 1e-7
 
-        /** A Devex weight below this fraction of the computed pivotal-row norm is corrected. */
-        const val DEVEX_WEIGHT_THRESHOLD: Double = 0.25
-
-        /** Theory pricing samples only pivots large enough to be meaningful at simplex tolerance. */
-        const val THEORY_PIVOT_MAGNITUDE_FLOOR: Double = 1e-6
-
         const val THEORY_SUPPORT_TOLERANCE: Double = 1e-7
-
-        const val THEORY_SAMPLE_LIMIT: Int = 8
-
-        const val GOLDEN_GAMMA: Long = -7046029254386353131L
-        const val MIX_MULTIPLIER_1: Long = -4658895280553007687L
-        const val MIX_MULTIPLIER_2: Long = -7723592293110705685L
 
         /** Primal feasibility tolerance on basic values. */
         const val FEAS_TOL: Double = 1e-6
@@ -3248,30 +2757,7 @@ internal class RevisedSimplex(
         const val CANCEL_POLL: Int = 32
 
         const val MAX_SOLVE_RESTARTS: Int = 4
-
-        /** Widening rounds before the basis goes to the primal: past 1e15 a seat swamps double precision. */
-        const val MAX_ARTIFICIAL_WIDENINGS: Int = 2
     }
-}
-
-private sealed interface EnteringChoice {
-    data class Selected(val column: Int?) : EnteringChoice
-
-    data object ResourceStopped : EnteringChoice
-}
-
-private sealed interface TheoryProbe {
-    data class Success(val nonFreeBasics: Int) : TheoryProbe
-
-    data object ArithmeticDeclined : TheoryProbe
-
-    data object ResourceStopped : TheoryProbe
-}
-
-private enum class RefactorResult {
-    UNCHANGED,
-    BASIS_CHANGED,
-    FAILED,
 }
 
 private enum class IterationResult {
