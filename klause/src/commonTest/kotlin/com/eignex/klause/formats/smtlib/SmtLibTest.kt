@@ -180,10 +180,9 @@ class SmtLibTest {
     }
 
     @Test
-    fun `a bitvector literal should be rejected`() {
+    fun `an integer should reject equality with a bitvector literal`() {
         val text = "(declare-const x Int) (assert (= x #xFF))"
-        val e = assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
-        assertTrue("bitvector literal" in e.message.orEmpty(), e.message.orEmpty())
+        assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
     }
 
     @Test

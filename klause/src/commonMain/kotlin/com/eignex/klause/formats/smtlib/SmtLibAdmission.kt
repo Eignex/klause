@@ -31,7 +31,7 @@ internal fun parseSmtLibSource(
             }
             commands
         }
-        val reduction = captureSmtSource(commands, cancellation)
+        val reduction = lowerSmtBitVectors(captureSmtSource(commands, cancellation), cancellation)
         lowerSmtReduction(reduction, unboundedIntLo, unboundedIntHi, settings, cancellation, semantics)
     } catch (_: PolynomialSourceInterrupted) {
         null

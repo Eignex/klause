@@ -17,8 +17,11 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
     }
     private sealed interface Frame {
         class Evaluate(val expression: SExpr, val locals: Locals?) : Frame
-        class Combine(val head: String, val count: Int, val signature: Signature?) : Frame
+        class Combine(
+            val head: String, val count: Int, val signature: Signature?, val indexed: SExpr.SList? = null,
+        ) : Frame
         class Let(val names: List<String>, val body: SExpr, val locals: Locals?) : Frame
+        class Qualified(val expected: SmtSort) : Frame
     }
     private val globals = HashMap<String, Signature>()
     private val freeSorts = HashMap<String, Int>()
@@ -214,8 +217,47 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
                         values.addLast(result)
                     }
                     is SExpr.SList -> {
+                        val indexed = node.items.firstOrNull() as? SExpr.SList
+                        if (indexed != null) {
+                            val identifier = if (indexed.polynomialHead() == "as") {
+                                if (indexed.items.size != 3) return null
+                                work.addLast(Frame.Qualified(sourceSort(indexed.items[2])))
+                                indexed.items[1]
+                            } else indexed
+                            when (identifier) {
+                                is SExpr.Atom -> {
+                                    val name = polynomialSymbol(identifier.text)
+                                    if (frame.locals?.get(name) != null) return null
+                                    work.addLast(Frame.Combine(identifier.text, node.items.size - 1, globals[name]))
+                                }
+                                is SExpr.SList -> {
+                                    if (identifier.polynomialHead() != "_") return null
+                                    val key = identifier.items.map {
+                                        (it as? SExpr.Atom)?.text ?: return null
+                                    }.joinToString(" ")
+                                    work.addLast(Frame.Combine("($key)", node.items.size - 1, null, identifier))
+                                }
+                            }
+                            for (argument in node.items.drop(1).asReversed()) {
+                                work.addLast(Frame.Evaluate(argument, frame.locals))
+                            }
+                            continue
+                        }
                         val head = node.polynomialHead()
-                        if (head == "let") {
+                        if (head == "_") {
+                            val type = smtIndexedBitVectorSort(node, emptyList()) ?: return null
+                            val key = node.items.map { (it as? SExpr.Atom)?.text ?: return null }.joinToString(" ")
+                            values.addLast(term("($key)", emptyList(), type))
+                        } else if (head == "as") {
+                            if (node.items.size != 3) return null
+                            val identifier = node.items[1]
+                            if (identifier is SExpr.SList && identifier.polynomialHead() != "_") return null
+                            work.addLast(Frame.Qualified(sourceSort(node.items[2])))
+                            work.addLast(Frame.Evaluate(identifier, frame.locals))
+                        } else if (head == "!") {
+                            if (node.items.size < 2) return null
+                            work.addLast(Frame.Evaluate(node.items[1], frame.locals))
+                        } else if (head == "let") {
                             if (node.items.size != 3) return null
                             val bindings = node.items[1] as? SExpr.SList ?: return null
                             val names = ArrayList<String>()
@@ -249,11 +291,13 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
                     val bindings = frame.names.zip(pop(frame.names.size)).toMap()
                     work.addLast(Frame.Evaluate(frame.body, Locals(bindings, frame.locals)))
                 }
+                is Frame.Qualified -> if (nodes[values.last()].sort != frame.expected) return null
                 is Frame.Combine -> {
                     val arguments = pop(frame.count)
                     val args = arguments.map { nodes[it].sort }
                     val signature = frame.signature
-                    val result = if (signature == null) operator(frame.head, args) else {
+                    val result = if (frame.indexed != null) smtIndexedBitVectorSort(frame.indexed, args)
+                    else if (signature == null) operator(polynomialSymbol(frame.head), args) else {
                         if (args.size != signature.parameters.size || args.indices.any {
                                 !accepts(signature.parameters[it], args[it])
                             }) return null
@@ -270,7 +314,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
 
     private fun literal(text: String): SmtSort? {
         if (text in setOf("true", "false")) return SmtSort.Bool
-        if (text.startsWith("#")) smtUnsupported("bitvector literal '$text'")
+        smtBitVectorLiteralSort(text)?.let { return it }
         if (text.isNotEmpty() && text.all { it in '0'..'9' }) return SmtSort.Int
         val dot = text.indexOf('.')
         return if (dot > 0 && dot < text.lastIndex && text.indices.all { it == dot || text[it] in '0'..'9' }) {
@@ -307,7 +351,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl) {
         "store" -> (args.firstOrNull() as? SmtSort.Array)?.let {
             if (args.size == 3 && args[1] == it.index && args[2] == it.element) it else null
         }
-        else -> null
+        else -> smtBitVectorOperatorSort(head, args)
     }
 
     private fun numeric(sort: SmtSort): Boolean = sort == SmtSort.Int || sort == SmtSort.Real

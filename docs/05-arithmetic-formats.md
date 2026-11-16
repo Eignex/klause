@@ -152,17 +152,37 @@ maps and the original objective and direction. Callers pass
 the frontend never classifies a source by the solver it will need. Interruption
 throws `CancellationException` before any source is published.
 
-The frontend admits quantifier-free linear integer and real arithmetic with Boolean
+The frontend admits quantifier-free bitvectors and linear integer and real arithmetic with Boolean
 structure and supported `minimize`/`maximize` objectives, polynomial Int/Real/Bool
 satisfaction with products and fixed nonnegative integral powers, and a real-function
 extension with unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
 `check-sat` or `check-sat-assuming` query is accepted, with Boolean literal
 assumptions conjoined to the assertions; `get-model` and `get-objectives` are
-accepted requests. Bitvectors, arrays, strings, quantifiers, uninterpreted
+accepted requests. Arrays, strings, quantifiers, uninterpreted
 functions, symbolic or zero division, negative or noninteger powers, nonlinear
 integer `div`/`mod`/`to_int`, multiple or nonquadratic objectives, incremental
 commands, multiple queries and `get-value` decline explicitly, even inside a
 constant Boolean branch.
+
+### Bitvector lowering
+
+Bitvector semantics follow SMT-LIB 2.7's
+[FixedSizeBitVectors revision of 2025-09-09](https://smt-lib.org/theories-FixedSizeBitVectors.shtml)
+and [QF_BV extensions revision of 2025-02-25](https://smt-lib.org/logics-all.shtml#QF_BV).
+Fixed-width bitvectors retain their declared positive width as Boolean coordinates,
+with no machine-word packing. Bitwise operators, modular arithmetic, comparisons,
+division, signed remainder and modulo, symbolic shifts and overflow predicates lower
+to shared Boolean circuits. Concatenation, extraction, extension, repetition and
+indexed rotations preserve the source bit order. Division by zero and shifts by at
+least the word width retain the SMT-LIB values.
+
+`ubv_to_int` and `sbv_to_int` use exact weighted Boolean sums; `int_to_bv` channels
+`x = unsigned(bits) + 2^width*k` with a fresh open integer quotient `k`. The source
+integer remains open.
+Private bits reconstruct width-correct source binary values, and an independent
+arbitrary-precision evaluator checks each original bitvector operation against its
+encoded inputs and output before a reconstructed model is published. Circuit width,
+gate and work budgets stop admission cleanly, including constant-folded operations.
 
 ### Declaration policy
 
