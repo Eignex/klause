@@ -18,7 +18,7 @@ internal interface SmtSortCardinalities {
     fun cardinality(sort: SmtSort, cap: Int): Int?
 }
 
-internal fun SmtDatatypes.cardinality(sort: SmtSort, cap: Int, cancellation: Cancellation): Int? {
+internal fun SmtDatatypes.cardinality(sort: SmtSort, cap: Int, cancellation: ExecutionControl): Int? {
     fun checkpoint(units: Long = 1) {
         cancellation.charge(units)
         if (cancellation()) throw CancellationException("datatype cardinality check interrupted")
@@ -26,7 +26,16 @@ internal fun SmtDatatypes.cardinality(sort: SmtSort, cap: Int, cancellation: Can
     val current = snapshot(cancellation, ::checkpoint)
     if (current.instance(sort) == null) return null
     val count = SmtDatatypeCardinalities(current, parseBigInt(cap.toString()), { checkpoint() }).of(sort) ?: return cap
-    return count.toLong().toInt()
+    return minOf(cap, count.toLong().toInt())
+}
+
+internal fun smtUnobservedSelectorInterpretation(registry: SmtDatatypes, name: String, argumentSort: SmtSort,
+    resultSort: SmtSort, values: SmtModelValues): SmtValue.Function? {
+    val current = registry.snapshot(values.cancellation, values::checkpoint)
+    val operator = current.resolve(polynomialSymbol(name), listOf(argumentSort), resultSort) ?: return null
+    if (operator.selector == null) return null
+    val default = SmtDatatypeTermGenerator(current, 1, values).values(resultSort).first()
+    return SmtValue.Function(listOf(argumentSort), emptyList(), default)
 }
 
 internal fun finishSmtGroundDatatypes(input: SmtReduction, cancellation: ExecutionControl): SmtReduction {
@@ -106,8 +115,25 @@ internal fun finishSmtGroundDatatypes(input: SmtReduction, cancellation: Executi
             }
         }
     }
+    for (definition in state.selectorDefinitions) {
+        cancellation.polynomialSourceCheckpoint(1)
+        val constructor = definition.instance.constructors[definition.constructor]
+        val field = constructor.fields[definition.field]
+        val applications = state.selectors.filter { selector ->
+            selector.coordinate.sort == definition.instance.sort && selector.constructor == definition.constructor &&
+                selector.field == definition.field
+        }.map { it.coordinate.name to it.result }
+        val key = smtSelectorInterpretationKey(field.name, definition.instance.sort, field.sort)
+        recipes[key] = SmtReconstruction { values ->
+            val entries = applications.map { (argument, result) ->
+                values.checkpoint()
+                listOf(values.value(argument)) to values.value(result)
+            }
+            SmtValue.Function(listOf(definition.instance.sort), entries, values.value(definition.default))
+        }
+    }
     val bindings = input.bindings.map { binding ->
-        recipes[binding.declaration.name]?.let { binding.copy(reconstruction = it) } ?: binding
+        recipes[binding.key]?.let { binding.copy(reconstruction = it) } ?: binding
     }
     val check = SmtSourceCheck { values -> context.check(values) }
     return input.copy(commands = commands.toList(), bindings = bindings,
@@ -115,7 +141,7 @@ internal fun finishSmtGroundDatatypes(input: SmtReduction, cancellation: Executi
 }
 
 private fun datatypeModelGroups(registry: SmtDatatypes, coordinates: List<SmtDatatypeCoordinate>,
-    cancellation: Cancellation): Map<SmtSort.Uninterpreted, Set<SmtSort.Uninterpreted>> {
+    cancellation: ExecutionControl): Map<SmtSort.Uninterpreted, Set<SmtSort.Uninterpreted>> {
     val sorts = coordinates.mapTo(LinkedHashSet()) { it.sort }
     val edges = sorts.associateWith { sort ->
         val dependencies = LinkedHashSet<SmtSort.Uninterpreted>()
@@ -169,32 +195,52 @@ private fun datatypeModelGroups(registry: SmtDatatypes, coordinates: List<SmtDat
     return groups.toMap()
 }
 
-internal class SmtDatatypeCardinalities(private val registry: SmtDatatypes, private val limit: BigInt? = null,
+internal class SmtDatatypeCardinalities(private val registry: SmtDatatypes, limit: BigInt? = null,
     private val step: () -> Unit) {
+    private val limit = limit?.let { if (it < parseBigInt("2")) parseBigInt("2") else it }
     private val cache = HashMap<SmtSort, BigInt?>()
     fun of(sort: SmtSort): BigInt? {
-        step()
-        if (sort in cache) return cache[sort]
-        val cardinality = when (sort) {
-            SmtSort.Bool -> parseBigInt("2")
-            SmtSort.Int, SmtSort.Real -> null
-            is SmtSort.BitVector -> power(parseBigInt("2"), parseBigInt(sort.width.toString()))
-            is SmtSort.Array -> {
-                val element = of(sort.element)
-                if (element == BIG_ONE) BIG_ONE else {
-                    val index = of(sort.index)
-                    if (element == null || index == null) null else power(element, index)
+        val pending = ArrayDeque<Pair<SmtSort, Boolean>>()
+        pending.addLast(sort to false)
+        while (pending.isNotEmpty()) {
+            step()
+            val (current, finish) = pending.removeLast()
+            if (current in cache) continue
+            val instance = registry.instance(current)
+            if (!finish) {
+                when (current) {
+                    SmtSort.Bool -> cache[current] = cap(parseBigInt("2"))
+                    SmtSort.Int, SmtSort.Real -> cache[current] = null
+                    is SmtSort.BitVector -> cache[current] = power(parseBigInt("2"),
+                        parseBigInt(current.width.toString()))
+                    is SmtSort.Array -> {
+                        pending.addLast(current to true)
+                        pending.addLast(current.index to false)
+                        pending.addLast(current.element to false)
+                    }
+                    is SmtSort.Uninterpreted -> if (instance == null || registry.recursive(current)) {
+                        cache[current] = null
+                    } else {
+                        pending.addLast(current to true)
+                        for (constructor in instance.constructors) for (field in constructor.fields) {
+                            pending.addLast(field.sort to false)
+                        }
+                    }
                 }
-            }
-            is SmtSort.Uninterpreted -> {
-                val instance = registry.instance(sort)
-                if (instance == null || registry.recursive(sort)) null else {
+            } else cache[current] = when (current) {
+                is SmtSort.Array -> {
+                    val element = cache[current.element]
+                    val index = cache[current.index]
+                    if (element == BIG_ONE) BIG_ONE
+                    else if (element == null || index == null) null else power(element, index)
+                }
+                is SmtSort.Uninterpreted -> {
                     var sum = BIG_ZERO
                     var infinite = false
-                    for (constructor in instance.constructors) {
+                    for (constructor in checkNotNull(instance).constructors) {
                         var product = BIG_ONE
                         for (field in constructor.fields) {
-                            val fieldCount = of(field.sort)
+                            val fieldCount = cache[field.sort]
                             if (fieldCount == null) { infinite = true; break }
                             step()
                             product = multiply(product, fieldCount)
@@ -204,10 +250,10 @@ internal class SmtDatatypeCardinalities(private val registry: SmtDatatypes, priv
                     }
                     if (infinite) null else sum
                 }
+                else -> error("a scalar cardinality is computed without dependencies")
             }
         }
-        cache[sort] = cardinality
-        return cardinality
+        return cache[sort]
     }
 
     private fun power(base: BigInt, exponent: BigInt): BigInt {
@@ -368,33 +414,59 @@ private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, priva
         }
     }
 
-    private fun atDepth(sort: SmtSort, depth: Int): List<SmtValue> = cache.getOrPut(sort to depth) {
-        values.checkpoint()
-        when (sort) {
-            SmtSort.Bool -> listOf(SmtValue.Boolean(false), SmtValue.Boolean(true)).take(limit)
-            SmtSort.Int -> List(limit) { SmtValue.Integer(it.toString()) }
-            SmtSort.Real -> List(limit) { SmtValue.Real("$it.0") }
-            is SmtSort.BitVector -> {
-                val result = ArrayList<SmtValue>()
-                var bits = "0".repeat(sort.width)
-                while (result.size < limit) {
-                    values.checkpoint()
-                    result += SmtValue.BitVector(bits)
-                    val lastZero = bits.lastIndexOf('0')
-                    if (lastZero < 0) break
-                    bits = bits.take(lastZero) + '1' + "0".repeat(bits.length - lastZero - 1)
+    private fun atDepth(sort: SmtSort, depth: Int): List<SmtValue> {
+        val root = sort to depth
+        val pending = ArrayDeque<Pair<Pair<SmtSort, Int>, Boolean>>()
+        pending.addLast(root to false)
+        while (pending.isNotEmpty()) {
+            values.checkpoint()
+            val (key, finish) = pending.removeLast()
+            if (key in cache) continue
+            val (current, level) = key
+            val instance = registry.instance(current)
+            if (!finish) {
+                when (current) {
+                    SmtSort.Bool -> cache[key] = listOf(SmtValue.Boolean(false), SmtValue.Boolean(true)).take(limit)
+                    SmtSort.Int -> cache[key] = List(limit) { SmtValue.Integer(it.toString()) }
+                    SmtSort.Real -> cache[key] = List(limit) { SmtValue.Real("$it.0") }
+                    is SmtSort.BitVector -> {
+                        val result = ArrayList<SmtValue>()
+                        var bits = "0".repeat(current.width)
+                        while (result.size < limit) {
+                            values.checkpoint()
+                            result += SmtValue.BitVector(bits)
+                            val lastZero = bits.lastIndexOf('0')
+                            if (lastZero < 0) break
+                            bits = bits.take(lastZero) + '1' + "0".repeat(bits.length - lastZero - 1)
+                        }
+                        cache[key] = result
+                    }
+                    is SmtSort.Array -> {
+                        pending.addLast(key to true)
+                        pending.addLast((current.index to level) to false)
+                        pending.addLast((current.element to level) to false)
+                    }
+                    is SmtSort.Uninterpreted -> when {
+                        instance == null -> cache[key] = List(limit) {
+                            SmtValue.Uninterpreted(current, "@klause.adt.free.$it")
+                        }
+                        level == 0 -> cache[key] = emptyList()
+                        else -> {
+                            pending.addLast(key to true)
+                            for (constructor in instance.constructors) for (field in constructor.fields) {
+                                pending.addLast((field.sort to level - 1) to false)
+                            }
+                        }
+                    }
                 }
-                result
-            }
-            is SmtSort.Array -> arrays(sort, depth)
-            is SmtSort.Uninterpreted -> {
-                val instance = registry.instance(sort)
-                if (instance == null) List(limit) { SmtValue.Uninterpreted(sort, "@klause.adt.free.$it") }
-                else if (depth == 0) emptyList() else {
+            } else cache[key] = when (current) {
+                is SmtSort.Array -> arrays(current, cache.getValue(current.element to level),
+                    cache.getValue(current.index to level))
+                is SmtSort.Uninterpreted -> {
                     val result = ArrayList<SmtValue>()
-                    for ((index, constructor) in instance.constructors.withIndex()) {
+                    for ((index, constructor) in checkNotNull(instance).constructors.withIndex()) {
                         values.checkpoint()
-                        val arguments = constructor.fields.map { atDepth(it.sort, depth - 1) }
+                        val arguments = constructor.fields.map { cache.getValue(it.sort to level - 1) }
                         for (tuple in tuples(arguments)) {
                             val term = SmtValue.Application(registry.constructorName(instance, index), tuple)
                             if (result.none { values.equivalent(it, term) }) result += term
@@ -402,13 +474,13 @@ private class SmtDatatypeTermGenerator(private val registry: SmtDatatypes, priva
                     }
                     result.sortedBy { termDepth(it) }.take(limit)
                 }
+                else -> error("a scalar term domain is computed without dependencies")
             }
         }
+        return cache.getValue(root)
     }
 
-    private fun arrays(sort: SmtSort.Array, depth: Int): List<SmtValue> {
-        val elements = atDepth(sort.element, depth)
-        val indices = atDepth(sort.index, depth)
+    private fun arrays(sort: SmtSort.Array, elements: List<SmtValue>, indices: List<SmtValue>): List<SmtValue> {
         if (elements.isEmpty() || indices.isEmpty()) return emptyList()
         val default = elements.first()
         val domains = indices.map { index -> elements.sortedBy { element ->

@@ -9,8 +9,11 @@ internal data class SmtDatatypeShape(val coordinate: SmtDatatypeCoordinate, val 
     val alternatives: List<SmtDatatypeAlternative>)
 internal data class SmtDatatypeSelector(val coordinate: SmtDatatypeCoordinate, val constructor: Int,
     val field: Int, val result: String)
+internal data class SmtDatatypeSelectorDefinition(val instance: SmtDatatypeInstance, val constructor: Int,
+    val field: Int, val default: String)
 internal data class SmtDatatypeReduction(val registry: SmtDatatypes,
-    val shapes: List<SmtDatatypeShape>, val selectors: List<SmtDatatypeSelector>)
+    val shapes: List<SmtDatatypeShape>, val selectors: List<SmtDatatypeSelector>,
+    val selectorDefinitions: List<SmtDatatypeSelectorDefinition>)
 
 internal fun exposeSmtGroundDatatypes(input: SmtReduction, cancellation: ExecutionControl): SmtReduction =
     if (input.commands.any { (it as? SExpr.SList)?.polynomialHead() in
@@ -45,6 +48,8 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private val defined = LinkedHashMap<Pair<SExpr, SmtSort>, SmtDatatypeShape>()
     private val explicit = ArrayList<SmtDatatypeShape>()
     private val selectors = LinkedHashSet<SmtDatatypeSelector>()
+    private val instances = HashSet<SmtSort>()
+    private val selectorDefinitions = ArrayList<SmtDatatypeSelectorDefinition>()
     private var nextName = 0
 
     fun reduce(): SmtReduction {
@@ -67,6 +72,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                     } else emptyList()
                     val result = scope.sourceSort(command.items.last())
                     scope.command(command)
+                    for (sort in parameters + result) registerSort(sort)
                     if (parameters.isEmpty()) symbols[name] = Term(result, command.items[1])
                     else functions[name] = Function(parameters, result)
                     output += command
@@ -96,8 +102,8 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         val body = remaining.toMutableList()
         body.addAll(if (query < 0) body.size else query, axioms)
         return input.copy(commands = declarations + generated + body, privateBindings = privateBindings.toMap(),
-            datatypes = SmtDatatypeReduction(registry.snapshot(ExecutionControl.Never), explicit.toList() + defined.values,
-                selectors.toList()))
+            datatypes = SmtDatatypeReduction(registry.snapshot(ExecutionControl.Never),
+                explicit.toList() + defined.values, selectors.toList(), selectorDefinitions.toList()))
     }
 
     private fun environment() = Environment(symbols.toMap(), functions.toMap(), macros.toMap())
@@ -292,6 +298,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
 
     private fun operation(instance: SmtDatatypeInstance, operation: String, args: List<Term>, result: SmtSort): Term {
         step()
+        register(instance)
         val name = operationNames.getOrPut(instance.sort to operation) {
             freshName().also { name ->
                 generated += form("declare-fun", SExpr.Atom(name), SExpr.SList(args.map { sortSyntax(it.sort) }),
@@ -325,6 +332,30 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         return term
     }
 
+    private fun registerSort(root: SmtSort) {
+        val pending = ArrayDeque<SmtSort>()
+        pending.addLast(root)
+        while (pending.isNotEmpty()) {
+            step()
+            when (val sort = pending.removeLast()) {
+                is SmtSort.Array -> { pending.addLast(sort.index); pending.addLast(sort.element) }
+                is SmtSort.Uninterpreted -> registry.instance(sort)?.let(::register)
+                else -> Unit
+            }
+        }
+    }
+
+    private fun register(instance: SmtDatatypeInstance) {
+        if (!instances.add(instance.sort)) return
+        for ((constructor, definition) in instance.constructors.withIndex()) {
+            for ((field, selector) in definition.fields.withIndex()) {
+                step()
+                selectorDefinitions += SmtDatatypeSelectorDefinition(instance, constructor, field,
+                    fresh(selector.sort).name())
+            }
+        }
+    }
+
     private fun freshName(): String {
         var name: String
         do { name = "@klause.adt.${nextName++}" } while (!usedNames.add(name))
@@ -344,7 +375,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         return Term(sort, expression)
     }
 
-    private fun lexicalLiteral(text: String): Boolean = text in setOf("true", "false", "pi") ||
+    private fun lexicalLiteral(text: String): Boolean = text in setOf("true", "false") ||
         text.startsWith("#b") || text.startsWith("#x") ||
         text.isNotEmpty() && text.all { it in '0'..'9' } ||
         text.indexOf('.').let { dot -> dot > 0 && dot < text.lastIndex &&

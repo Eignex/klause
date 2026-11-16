@@ -234,6 +234,8 @@ exclude cycles without a depth bound. Reconstruction follows the observed acycli
 constructor graph and assigns unused minimum-depth constructor terms to remaining
 identities, preserving disequalities. Source checks compare actual constructor
 fields and enforce consistent total selectors even on a different constructor.
+Each observed selector rank retains its checked function table and typed default;
+later ground queries use that interpretation for the underspecified branch.
 Reconstruction tables are cached within one witness for mutually dependent
 instantiated sorts; nested parameters can therefore cross array fields without
 sharing a recursive table with a different instantiation. The retained typed

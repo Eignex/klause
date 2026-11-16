@@ -3,6 +3,10 @@ package com.eignex.klause.formats.smtlib
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
 
+internal fun smtSelectorInterpretationKey(name: String, argumentSort: SmtSort, resultSort: SmtSort): String =
+    "@selector:" + listOf(polynomialSymbol(name), argumentSort.toSmtLib(), resultSort.toSmtLib())
+        .joinToString("") { "${it.length}:$it" }
+
 internal data class SmtDatatypeField(val name: String, val sort: SmtSort)
 internal data class SmtDatatypeConstructor(val name: String, val fields: List<SmtDatatypeField>)
 internal data class SmtDatatypeDefinition(val name: String, val parameters: List<String>,
@@ -21,7 +25,8 @@ internal data class SmtDatatypeOperator(val instance: SmtDatatypeInstance,
         else instance.constructors[constructor].fields.map { it.sort }
 }
 
-internal class SmtDatatypes(private val cancellation: ExecutionControl, private val checkpoint: ((Long) -> Unit)? = null) {
+internal class SmtDatatypes(private val cancellation: ExecutionControl,
+    private val checkpoint: ((Long) -> Unit)? = null) {
     private val definitions = LinkedHashMap<String, SmtDatatypeDefinition>()
     private val groups = HashMap<String, Set<String>>()
     val names: Set<String> get() = definitions.keys
@@ -64,7 +69,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl, private 
         else -> emptyList()
     }
 
-    fun declare(command: SExpr.SList, parseSort: (SExpr, List<String>) -> SmtSort) {
+    fun declare(command: SExpr.SList, parseSort: (SExpr, Map<String, SmtSort>) -> SmtSort) {
         val headers = headers(command)
         val bodies = if (command.polynomialHead() == "declare-datatype") listOf(command.items[2])
             else (command.items[2] as? SExpr.SList)?.items ?: smtUnsupported("invalid datatype bodies")
@@ -88,6 +93,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl, private 
             }
             val parameterIdentities = parameters.indices.map { "\u0000datatype:${polynomialSymbol(header.first)}:$it" }
             val parameterSubstitutions = parameters.zip(parameterIdentities.map { SmtSort.Uninterpreted(it) }).toMap()
+            for (parameter in parameters) parseSort(SExpr.Atom(parameter), parameterSubstitutions)
             val constructors = (if (polymorphic) body.items[2] as? SExpr.SList else body)
                 ?: smtUnsupported("invalid datatype constructors")
             if (constructors.items.isEmpty()) smtUnsupported("datatype has no constructors")
@@ -107,7 +113,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl, private 
                     val selector = (field.items[0] as? SExpr.Atom)?.text ?: smtUnsupported("invalid selector name")
                     if (!selectorNames.add(polynomialSymbol(selector))) smtUnsupported("duplicate constructor selector")
                     if (!operators.add(polynomialSymbol(selector))) smtUnsupported("duplicate datatype function symbol")
-                    val sort = substitute(parseSort(field.items[1], parameters), parameterSubstitutions)
+                    val sort = parseSort(field.items[1], parameterSubstitutions)
                     if (containsGroupBelowTop(sort, group)) {
                         smtUnsupported("recursive datatype occurs below a field sort head")
                     }

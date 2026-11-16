@@ -23,6 +23,7 @@ import com.eignex.klause.solver.pipeline.execute
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -249,6 +250,162 @@ class SmtGroundDatatypesTest {
     }
 
     @Test
+    fun `captured alias sorts are not replaced by datatype parameters`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort U 0)
+            (define-sort Captured () U)
+            (declare-datatype Box (par (U) ((box (field Captured)))))
+            (declare-const a (Box Bool))
+            (declare-const b (Box Bool))
+            (declare-const c (Box Bool))
+            (assert (distinct a b c))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `datatype fields reject unbound global type parameters`() {
+        assertFailsWith<UnsupportedSmtException> {
+            SmtLib.parse("(declare-sort-parameter A) (declare-datatype D ((ctor (field A))))")
+        }
+    }
+
+    @Test
+    fun `local datatype parameters may shadow global type parameters`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Box (par (A) ((box (field A)))))
+            (declare-const x (Box Bool))
+            (assert (= x (box true)))
+        """.trimIndent())
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+
+        assertEquals("((as box (Box Bool)) true)",
+            parsed.reconstructModel(assignment).values.single().second.toSmtLib())
+    }
+
+    @Test
+    fun `datatype parameters cannot shadow theory sorts or reserved names`() {
+        for (name in listOf("Int", "Bool", "Real", "Array", "BitVec", "@private", ".private")) {
+            assertFailsWith<UnsupportedSmtException> {
+                SmtLib.parse("(declare-datatype D (par ($name) ((ctor))))")
+            }
+        }
+    }
+
+    @Test
+    fun `pi declarations retain their lexical meaning in datatype fields`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Box ((box (field Int))))
+            (declare-const pi Int)
+            (assert (= pi 7))
+            (assert (= (field (box pi)) 7))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `wrong selector tables preserve the chosen observed value`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Option ((none) (some (field Int))))
+            (assert (= (field none) 19))
+        """.trimIndent())
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+
+        val interpretation = retained(parsed, assignment) { values ->
+            values.value(smtSelectorInterpretationKey("field", SmtSort.Uninterpreted("Option"), SmtSort.Int))
+        }
+
+        val table = assertIs<SmtValue.Function>(interpretation)
+        assertTrue(table.entries.any { (arguments, result) ->
+            arguments.single() == SmtValue.Application("none", emptyList()) && result == SmtValue.Integer("19")
+        })
+        assertIs<SmtValue.Integer>(table.default)
+    }
+
+    @Test
+    fun `polymorphic selector tables retain separate result ranks`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatypes ((Option 1)) ((par (T) ((none) (some (field T))))))
+            (assert (= (field (as none (Option Int))) 19))
+            (assert (not (field (as none (Option Bool)))))
+        """.trimIndent())
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+
+        val tables = retained(parsed, assignment) { values -> listOf(SmtSort.Int, SmtSort.Bool).map { sort ->
+            values.value(smtSelectorInterpretationKey("field", SmtSort.Uninterpreted("Option", listOf(sort)), sort))
+        } }
+
+        assertIs<SmtValue.Integer>(assertIs<SmtValue.Function>(tables[0]).default)
+        assertIs<SmtValue.Boolean>(assertIs<SmtValue.Function>(tables[1]).default)
+    }
+
+    @Test
+    fun `wrong constructor selectors may return their own argument`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Nat ((zero) (succ (pred Nat))))
+            (assert (= (pred zero) zero))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `large finite field domains do not enumerate their entire cardinality`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Record ((record (field (Array (_ BitVec 129) Bool)))))
+            (declare-const x Record)
+            (declare-const y Record)
+            (assert (distinct x y))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `unobserved selector ranks choose a stable typed interpretation`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatypes ((Option 1)) ((par (T) ((none) (some (field T))))))
+            (declare-const x (Option Bool))
+            (assert (= x (as none (Option Bool))))
+        """.trimIndent())
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+
+        val interpretation = retained(parsed, assignment) { values ->
+            smtUnobservedSelectorInterpretation(requireNotNull(parsed.originalSource?.typed?.datatypes), "field",
+                SmtSort.Uninterpreted("Option", listOf(SmtSort.Int)), SmtSort.Int, values)
+        }
+
+        assertEquals(SmtValue.Function(listOf(SmtSort.Uninterpreted("Option", listOf(SmtSort.Int))),
+            emptyList(), SmtValue.Integer("0")), interpretation)
+    }
+
+    @Test
+    fun `real constructor fields retain exact rational values`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Box ((box (field Real))))
+            (declare-const x Box)
+            (assert (= x (box (/ 1.0 2.0))))
+        """.trimIndent())
+
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+        val model = parsed.reconstructModel(assignment)
+
+        assertEquals("(box (/ 1.0 2.0))", model.values.single().second.toSmtLib())
+    }
+
+    @Test
     fun `non well founded datatype declarations are rejected`() {
         assertFailsWith<UnsupportedSmtException> {
             SmtLib.parse("(declare-datatype Empty ((loop (next Empty))))")
@@ -344,7 +501,7 @@ class SmtGroundDatatypesTest {
             ExecutionControl.Never)
 
         assertFailsWith<PolynomialSourceInterrupted> {
-            exposeSmtGroundDatatypes(input, ExecutionControl { true })
+            exposeSmtGroundDatatypes(input, ExecutionControl(Cancellation { true }))
         }
     }
 
@@ -374,4 +531,9 @@ class SmtGroundDatatypesTest {
             else -> error("unexpected datatype source result")
         }
     }
+
+    private fun <T> retained(parsed: SmtLibProblem, assignment: OpenTheoryAssignment,
+        action: (SmtModelValues) -> T): T = withSmtModelValues(parsed, assignment::boolValue, assignment::intValue,
+        { assignment.smtRealValue(it, ExecutionControl.Never) }, ExecutionControl.Never,
+        { assignment.smtExactRealValue(it, ExecutionControl.Never) }) { values, _ -> action(values) }
 }

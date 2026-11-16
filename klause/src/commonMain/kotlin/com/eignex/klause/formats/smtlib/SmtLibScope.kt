@@ -73,7 +73,12 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     freeSorts[name] = arity
                     freeSortNames[name] = spelling
                 }
-                datatypes.declare(command) { sort, parameters -> sourceSort(sort, parameters.toSet()) }
+                datatypes.declare(command) { sort, parameters ->
+                    if (parameters.keys.any { theorySort(it) || reservedName(it) }) {
+                        smtUnsupported("invalid datatype sort parameter")
+                    }
+                    sourceSort(sort, allowGlobalParameters = false, localBindings = parameters)
+                }
                 datatypes.operatorNames.none { it in globals || theoryFunction(it) || reservedName(it) }
             }
             "declare-sort-parameter" -> {
@@ -442,6 +447,7 @@ internal class SmtLibScope(private val cancellation: ExecutionControl,
                     val cases = datatypes.cases(type, frame.cases)
                     work.addLast(Frame.MatchResult(scrutinee, cases.size))
                     for (case in cases.asReversed()) {
+                        if (case.variables.any { theoryFunction(it) || reservedName(it) }) return null
                         val sorts = if (case.constructor == null) listOf(type)
                             else instance.constructors[case.constructor].fields.map { it.sort }
                         val bindings = case.variables.indices.associate { index ->
