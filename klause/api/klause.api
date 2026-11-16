@@ -11464,6 +11464,7 @@ public final class com/eignex/klause/solver/Sample {
 	public final fun hammingDistanceTo (Lcom/eignex/klause/solver/Sample;)I
 	public fun hashCode ()I
 	public final fun intValue (I)J
+	public final fun undeterminedReals ()Ljava/util/List;
 }
 
 public final class com/eignex/klause/solver/SampleExactRealsKt {

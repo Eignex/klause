@@ -12,6 +12,9 @@ internal class ArithmeticPublication(private val output: OutputProtocol) {
     var solutions: Long = 0
         private set
 
+    // Whether the accepted publication [acceptedVersion] was already printed, so it needs no second rendering.
+    fun published(acceptedVersion: Long?): Boolean = acceptedVersion != null && acceptedVersion == lastAcceptedVersion
+
     fun publish(rendered: String, objective: SourceValue, acceptedVersion: Long? = null): Boolean {
         val sourceValue = output.arithmeticSourceValue(objective) ?: return false
         if (acceptedVersion != null && acceptedVersion == lastAcceptedVersion) return true

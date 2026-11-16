@@ -457,8 +457,12 @@ Exact coordinates are emitted as `% klause-exact:` comments beside
 MiniZinc-compatible decimal assignments. Rational coordinates retain their fraction;
 irrational coordinates use `root(index;[c0,c1,...])`, naming the selected real root
 of the rational polynomial in ascending coefficient order. Decimal assignments are
-display approximations; an irrational display uses the midpoint of its captured
-isolating interval. The fraction or root description retains source authority.
+display approximations: each prints its nearest binary64 value, an algebraic one once
+its [narrowed interval](22-exact-arithmetic.md#binary64-values-of-algebraic-scalars)
+settles it. `% klause-float-rounding: x = undetermined` marks a coordinate whose
+narrowing ran out of allowance, printed as its interval's rounded midpoint, and
+`overflow` one past binary64, printed as the largest finite value of its sign. The
+fraction or root description retains source authority.
 A completion accepted within tolerance carries binary64 coordinates only, so its
 block has decimal assignments and no exact comments.
 Mixed exact/grid witnesses add

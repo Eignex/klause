@@ -6,11 +6,16 @@ import com.eignex.klause.solver.pipeline.OpenTheoryResult
 import com.eignex.klause.solver.pipeline.TranscendentalAssignment
 import com.eignex.klause.solver.pipeline.algebraicRealValue
 import com.eignex.klause.solver.pipeline.toSample
+import com.eignex.klause.solver.pipeline.withNearestReals
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.parseBigInt
 import com.eignex.util.numbers.toLongExact
 
-/** Solve a native source and retain its typed exact witness in the ordinary [Sample] result surface. */
+/**
+ * Solve a native source and retain its typed exact witness in the ordinary [Sample] result surface. An algebraic
+ * coordinate's approximate value is its nearest binary64 value when a bounded narrowing of its isolating interval
+ * settles it, and that interval's rounded midpoint otherwise.
+ */
 fun SourceStrategy.solveSample(
     params: BacktrackParams = BacktrackParams(),
 ): SolveResult = when (val result = solve(params)) {
@@ -35,10 +40,7 @@ fun SourceStrategy.solveSample(
                         } else {
                             longArrayOf()
                         },
-                        DoubleArray(reals.size) { id ->
-                            reals[id].rational?.toDouble()
-                                ?: (reals[id].lowerBound.toDouble() / 2 + reals[id].upperBound.toDouble() / 2)
-                        },
+                        DoubleArray(reals.size) { reals[it].guideDouble },
                         exactInts = integers,
                         algebraicReals = reals,
                     )
@@ -47,7 +49,7 @@ fun SourceStrategy.solveSample(
                 }
             }
         }
-        SolveResult.Sat(sample, result.stats, semantics = result.semantics)
+        SolveResult.Sat(sample.withNearestReals(), result.stats, semantics = result.semantics)
     }
 
     is OpenTheoryResult.Unsat -> SolveResult.Unsat(stats = result.stats, semantics = result.semantics)

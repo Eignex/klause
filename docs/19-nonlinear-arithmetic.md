@@ -324,6 +324,12 @@ The evidence is in-memory, not an exported CAD proof.
 captures Boolean buffers and exact real scalars, each represented by its rational
 defining polynomial and root index and never rounded for publication. The
 [API contract](23-api.md#exact-assignment-values) defines their public access.
+The theory publishes these scalars as captured, except that a widened witness is
+narrowed first, within the invocation's budget, because its nearest floats decide its
+acceptance. Consumers that print a binary64 value narrow afterwards, outside that
+budget, as
+[Binary64 values of algebraic scalars](22-exact-arithmetic.md#binary64-values-of-algebraic-scalars)
+describes.
 
 ### State and resources
 

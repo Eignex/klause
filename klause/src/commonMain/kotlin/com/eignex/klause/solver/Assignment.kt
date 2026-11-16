@@ -225,6 +225,18 @@ class Sample private constructor(
     /** Approximate real value at [id], without exporting the mutable array. */
     fun approximateRealValue(id: Int): Double = approximateReals[id]
 
+    /**
+     * Algebraic coordinates whose isolating interval still spans more than one binary64 rounding cell, so that
+     * [approximateRealValue] approximates the root in [algebraicReals] rather than giving its nearest binary64 value.
+     * A published solve or optimum narrows each interval within a bounded allowance; a coordinate listed here is one
+     * that allowance left unsettled.
+     */
+    fun undeterminedReals(): List<Int> {
+        val algebraic = algebraicReals ?: return emptyList()
+        val exact = exactReals
+        return algebraic.indices.filter { exact?.get(it) == null && algebraic[it].nearestDouble == null }
+    }
+
     init {
         this.exactInts?.let { values ->
             if (values.all { it.fitsLong() }) {
@@ -278,6 +290,16 @@ class Sample private constructor(
             it.capturedFrame = capturedFrame
         }
     }
+
+    // The same point with its algebraic coordinates restated over narrower isolating intervals and the approximations
+    // they round to. The exact values are unchanged, so the source and frame bindings carry over, and so does a witness
+    // certificate; one that names this sample as its witness is the caller's to rebind.
+    internal fun withNarrowedReals(reals: DoubleArray, algebraicReals: List<AlgebraicReal>): Sample =
+        fromOwned(booleanValues, integerValues, reals, exactReals, exactInts, algebraicReals, symbolicReals).also {
+            it.witnessCertificate = witnessCertificate
+            it.capturedSemantics = capturedSemantics
+            it.capturedFrame = capturedFrame
+        }
 
     /** Number of Boolean and integer values that differ from [other]. */
     fun hammingDistanceTo(other: Sample): Int {

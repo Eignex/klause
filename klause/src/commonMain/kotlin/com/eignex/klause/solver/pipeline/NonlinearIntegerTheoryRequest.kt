@@ -508,10 +508,7 @@ internal class NonlinearIntegerInvocation(
             } else {
                 longArrayOf()
             },
-            DoubleArray(reals.size) { id ->
-                val value = reals[id]
-                value.rational?.toDouble() ?: (value.lowerBound.toDouble() / 2 + value.upperBound.toDouble() / 2)
-            },
+            DoubleArray(reals.size) { reals[it].guideDouble },
             exactInts = integers,
             algebraicReals = reals,
         ).also { sample ->

@@ -130,6 +130,30 @@ common-root tests and interval separation, and sign evaluation refines intervals
 until a nonzero sign is certified. Equal values with different defining
 polynomials compare equal; object identity is not numerical equality.
 
+### Binary64 values of algebraic scalars
+
+A scalar's nearest binary64 value is settled once its isolating interval lies within
+one round-to-nearest-even cell: every point of the interval, the root included, then
+rounds to that cell's value. Cells are computed from exact neighbouring doubles, and a
+rational is rounded the same way, so neither depends on a platform's floating
+conversion. Narrowing splits the interval at the cell bound of its midpoint's rounding,
+or at zero first, since the root's sign picks between the two zeros. A split removes a
+bound from the interval and lands within one unit in the last place of the midpoint, so
+a wide interval halves per split and every root settles after finitely many splits; a
+root on a bound becomes a point. A root past the largest finite value settles to an
+infinity. A split that makes no progress ends the narrowing.
+
+Narrowing runs only where a binary64 value is published: the FlatZinc writer and
+`solveSample`, and the finished incumbent of every `SourceStrategy.optimize`. Theories
+publish their exact witnesses as captured, with the mean of the converted interval
+endpoints as a search guide for the approximate coordinate. Each publication narrows
+under a private allowance, apart from any search budget and from a token that has
+already stopped. The one exception is a tolerance-widened polynomial witness, whose
+floats decide its acceptance: it is narrowed under the verification token and withheld
+when a value stays unsettled. A stopped narrowing keeps the narrowest intervals reached
+and publishes their rounded midpoints; `Sample.undeterminedReals` lists such
+coordinates, and the exact scalar is unchanged.
+
 ### Algebraic arithmetic and lifting
 
 Addition and multiplication eliminate the operands' defining polynomials by

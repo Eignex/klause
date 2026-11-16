@@ -18803,6 +18803,7 @@ final class com.eignex.klause.solver/Sample { // com.eignex.klause.solver/Sample
     final fun hammingDistanceTo(com.eignex.klause.solver/Sample): kotlin/Int // com.eignex.klause.solver/Sample.hammingDistanceTo|hammingDistanceTo(com.eignex.klause.solver.Sample){}[0]
     final fun hashCode(): kotlin/Int // com.eignex.klause.solver/Sample.hashCode|hashCode(){}[0]
     final fun intValue(kotlin/Int): kotlin/Long // com.eignex.klause.solver/Sample.intValue|intValue(kotlin.Int){}[0]
+    final fun undeterminedReals(): kotlin.collections/List<kotlin/Int> // com.eignex.klause.solver/Sample.undeterminedReals|undeterminedReals(){}[0]
 }
 
 final class com.eignex.klause.solver/SourceStrategy { // com.eignex.klause.solver/SourceStrategy|null[0]
