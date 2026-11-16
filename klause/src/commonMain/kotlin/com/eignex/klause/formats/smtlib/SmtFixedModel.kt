@@ -366,16 +366,17 @@ internal class SmtFixedModel(
             if (value !is SmtValue.Function) return value
             return table(value, args)
         }
-        val schema = originalSource?.typed?.symbols?.firstOrNull {
+        val snapshot = originalSource
+        val schema = snapshot?.typed?.symbols?.firstOrNull {
             symbol(it.declaration.name) == name && it.definition == null
         }?.declaration
-        if (schema != null) {
+        if (schema != null && snapshot != null) {
             val parameters = args.map(::valueSort)
             val rank = instantiateSmtRank(schema.parameters, schema.result,
-                originalSource.typed.sortParameters, parameters, result, control)
+                snapshot.typed.sortParameters, parameters, result, control)
             if (rank != null) {
-                val value = originalSource.polymorphicModel?.instantiate(name, rank.first, rank.second, values) {
-                        sort, second -> originalSource.typed.datatypes?.modelPoint(sort, second, values)
+                val value = snapshot.polymorphicModel?.instantiate(name, rank.first, rank.second, values) {
+                        sort, second -> snapshot.typed.datatypes?.modelPoint(sort, second, values)
                 }
                 if (value != null) return if (value is SmtValue.Function) table(value, args) else value
             }
