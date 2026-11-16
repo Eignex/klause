@@ -40,7 +40,8 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl, private 
         "declare-datatype" -> {
             command.polynomialSize(3)
             val declaration = command.items[2] as? SExpr.SList ?: smtUnsupported("invalid datatype declaration")
-            val parameters = if (declaration.polynomialHead() == "par") {
+            val parameters = if ((declaration.items.firstOrNull() as? SExpr.Atom)?.text
+                    ?.let(::polynomialSymbol) == "par") {
                 (declaration.items.getOrNull(1) as? SExpr.SList)?.items?.size
                     ?: smtUnsupported("invalid datatype parameters")
             } else 0
@@ -75,7 +76,7 @@ internal class SmtDatatypes(private val cancellation: ExecutionControl, private 
         for ((index, header) in headers.withIndex()) {
             step()
             val body = bodies[index] as? SExpr.SList ?: smtUnsupported("invalid datatype body")
-            val polymorphic = body.polynomialHead() == "par"
+            val polymorphic = (body.items.firstOrNull() as? SExpr.Atom)?.text?.let(::polynomialSymbol) == "par"
             val parameters = if (polymorphic) {
                 body.polynomialSize(3)
                 val params = body.items[1] as? SExpr.SList ?: smtUnsupported("invalid datatype parameters")
