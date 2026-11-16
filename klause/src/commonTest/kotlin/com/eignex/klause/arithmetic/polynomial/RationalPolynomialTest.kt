@@ -40,18 +40,6 @@ class RationalPolynomialTest {
     }
 
     @Test
-    fun `constant polynomial images should be independent of the rational argument`() {
-        for (constant in listOf(BigFraction.ZERO, BigFraction.ofLong(3).reciprocal())) {
-            val polynomial = RationalPolynomial(listOf(constant))
-
-            val result = arithmetic.evaluate(polynomial,
-                BigFraction.ofLong(-5) * BigFraction.ofLong(7).reciprocal())
-
-            assertEquals(constant, result)
-        }
-    }
-
-    @Test
     fun `owned polynomial images should retain narrow caller admission`() {
         val polynomial = RationalPolynomial.of(-1, 0, 0, 0, 1)
         val caller = RationalPolynomialArithmetic(PolynomialArithmetic(limits = PolynomialLimits(

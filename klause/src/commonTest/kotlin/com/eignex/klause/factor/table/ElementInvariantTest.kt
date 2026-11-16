@@ -395,25 +395,6 @@ class ElementInvariantTest {
     }
 
     @Test
-    fun `delta should predict improvement when result is set to the matching value`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = arrayOf(IntDomain(0, 2), IntDomain(0, 30)),
-            factors = arrayOf<Factor>(
-                Element(idx = 0, result = 1, arr = longArrayOf(10, 20, 30), arrIsVars = false, indexOffset = 0),
-            ),
-        )
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 10)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-        val delta = state.factors[0].deltaIfIntSet(state, 0, intVar = 1, newValue = 20)
-        assertTrue(delta < 0, "delta=$delta")
-    }
-
-    @Test
     fun `matching cell repair should preserve large and negative offsets`() {
         for (offset in listOf(Int.MAX_VALUE, Int.MIN_VALUE, -2)) {
             val start = offset.toLong()

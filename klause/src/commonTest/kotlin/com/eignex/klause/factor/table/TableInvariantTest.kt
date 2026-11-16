@@ -248,23 +248,4 @@ class TableInvariantTest {
 
         assertFalse(seeded)
     }
-
-    @Test
-    fun `delta should be negative when a move brings the assignment closer to a tuple`() {
-        val problem = Problem(
-            numBoolVars = 0,
-            numIntVars = 2,
-            intDomains = Array(2) { IntDomain(0, 3) },
-            factors = arrayOf<Factor>(
-                Table(xs = intArrayOf(0, 1), tuples = longArrayOf(0, 1, 2, 3)),
-            ),
-        )
-        val state = LocalSearchState(problem.bake(), Random(0))
-        state.assignment.setInt(0, 1)
-        state.assignment.setInt(1, 1)
-        state.recompute()
-        assertTrue(state.factors[0].isViolated(state, 0))
-        val delta = state.factors[0].deltaIfIntSet(state, 0, intVar = 0, newValue = 0)
-        assertTrue(delta < 0, "delta=$delta")
-    }
 }

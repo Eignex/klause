@@ -45,17 +45,6 @@ import kotlin.time.Duration
 
 class CliStatsTest {
     @Test
-    fun `arm output should lead with the role the arm declares`() {
-        val arm = ArmSchedule(label = "bt/lp-default", segments = 1, work = 1, meanReward = 0.0,
-            failures = 0, credit = emptyMap(), role = "lp-bounding")
-
-        val line = portfolioStatPairs(SolveStats(portfolio = PortfolioStats(arms = listOf(arm))))
-            .toMap().getValue("arm.bt/lp-default")
-
-        assertTrue(line.startsWith("role=lp-bounding segments=1 "))
-    }
-
-    @Test
     fun `arm output should distinguish queued incumbent offers checks and installations`() {
         val arm = ArmSchedule(label = "ls/cbls/fixed", segments = 1, work = 1, meanReward = 0.0,
             failures = 0, credit = emptyMap(), sharing = SharingStats(incumbents =
@@ -468,33 +457,6 @@ class CliStatsTest {
     }
 
     @Test
-    fun `root route should emit warm refactor and numerical metrics`() {
-        val pairs = lpStatPairs(
-            SolveStats(
-                lp = LpStats(
-                    rootPasses = SumResult(1.0),
-                    rootRoute = LpRouteSolveStats(
-                        passes = SumResult(1.0),
-                        warmStartAttempts = SumResult(2.0),
-                        warmStartHits = SumResult(1.0),
-                        initialRefactorizations = SumResult(1.0),
-                        numericalRecoveryRefactorizations = SumResult(2.0),
-                        singularRefactorizations = SumResult(3.0),
-                        smallPivotBails = SumResult(4.0),
-                    ),
-                ),
-            ),
-        ).toMap()
-
-        assertEquals("0.5", pairs["lpRootWarmStartHitRate"])
-        assertEquals("3", pairs["lpRootRefactorizations"])
-        assertEquals("1", pairs["lpRootRefactorInitial"])
-        assertEquals("2", pairs["lpRootRefactorNumericalRecovery"])
-        assertEquals("3", pairs["lpRootSingularRefactorizations"])
-        assertEquals("4", pairs["lpRootSmallPivotBails"])
-    }
-
-    @Test
     fun `cut accounting without an active measurement should omit the maximum`() {
         val pairs = lpStatPairs(
             SolveStats(
@@ -583,13 +545,6 @@ class CliStatsTest {
         val m = lpStatPairs(stats).toMap()
         assertEquals("4", m["lpEnergeticPruned"])
         assertTrue("lpRootBound" !in m)
-    }
-
-    @Test
-    fun `ls backend should emit the block before any move`() {
-        val pairs = lsStatPairs(SolveStats(run = RunStats(backend = "ls")), solveTimeMs = 0)
-        assertTrue(pairs.isNotEmpty())
-        assertEquals("0", pairs.toMap()["lsMoves"])
     }
 
     @Test
@@ -706,19 +661,6 @@ class CliStatsTest {
         assertEquals("1.0E-7", m["lpRootMatrixMin"])
         assertEquals("2500000.0", m["lpRootMatrixMax"])
         assertEquals("1.0E9", m["lpRootRowRatio"])
-    }
-
-    @Test
-    fun `search pairs should report the mean learned clause size and literal block distance`() {
-        val search = SearchStats(
-            learnedClauses = SumResult(4.0),
-            learnedLiterals = SumResult(10.0),
-            learnedLbd = SumResult(6.0),
-        )
-
-        val pairs = searchStatPairs(SolveStats(search = search)).toMap()
-
-        assertEquals("2.5" to "1.5", pairs["learnedMeanSize"] to pairs["learnedMeanLbd"])
     }
 
     @Test

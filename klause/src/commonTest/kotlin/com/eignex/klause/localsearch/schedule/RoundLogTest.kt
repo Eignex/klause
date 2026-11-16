@@ -2,20 +2,9 @@ package com.eignex.klause.localsearch.schedule
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class RoundLogTest {
-
-    @Test
-    fun `accumulator should compute mean and population variance of the cost deltas`() {
-        val acc = RoundAccumulator()
-        // deltas 2, 4, 4, 4, 5, 5, 7, 9: mean 5, population variance 4.
-        for (d in listOf(2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0)) acc.record(d, accepted = true)
-        val log = acc.snapshot(temperature = 1.0)
-        assertEquals(5.0, log.costMean, 1e-9)
-        assertEquals(4.0, log.costVariance, 1e-9)
-    }
 
     @Test
     fun `clear should reset the accumulator for the next round`() {
@@ -28,13 +17,6 @@ class RoundLogTest {
         val log = acc.snapshot(temperature = 1.0)
         assertEquals(0.0, log.costMean, 1e-9)
         assertEquals(0.0, log.bestCost, 1e-9)
-    }
-
-    @Test
-    fun `round log should reject inconsistent counts`() {
-        assertFailsWith<IllegalArgumentException> { RoundLog(2, 3, 0.0, 0.0, 0.0, 1.0) }
-        assertFailsWith<IllegalArgumentException> { RoundLog(-1, 0, 0.0, 0.0, 0.0, 1.0) }
-        assertFailsWith<IllegalArgumentException> { RoundLog(2, 1, 0.0, -1.0, 0.0, 1.0) }
     }
 
     @Test

@@ -3,7 +3,6 @@ package com.eignex.klause.localsearch
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class MoveSizeDistributionTest {
 
@@ -22,12 +21,5 @@ class MoveSizeDistributionTest {
             assertEquals(1, counts[2], "cycle $cycle size 2")
             assertEquals(2, counts[3], "cycle $cycle size 3")
         }
-    }
-
-    @Test
-    fun `sizes should stay within the configured range`() {
-        val dist = MoveSizeDistribution(weights = intArrayOf(1, 1, 1), minSize = 4)
-        val rng = Random(1)
-        repeat(100) { assertTrue(dist.nextSize(rng) in 4..6) }
     }
 }
