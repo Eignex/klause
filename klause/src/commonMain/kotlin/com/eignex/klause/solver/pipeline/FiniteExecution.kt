@@ -896,17 +896,20 @@ private fun executeSourceFinite(
     request: FiniteExecutionRequest,
     callbacks: FiniteExecutionCallbacks,
 ): FiniteExecutionResult {
-    require(request.sourceInvocation != null && request.toleranceCheck == null)
+    require(request.sourceInvocation != null)
     if (request.optimize) return executeSourceMinimum(request, callbacks)
     val start = TimeSource.Monotonic.markNow()
     val solved = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).solve(
             controls.params.copy(cancellation = controls.cancellation.includingStop( request.cancellation),
+                toleranceCheck = request.toleranceCheck,
             )
         )
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
-            completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, null) else null,
+            completion = if (request.problem.numRealVars > 0) {
+                LeafRealCompletion(request.problem, null, request.toleranceCheck)
+            } else null,
         ).solve(controls.params.copy(cancellation = controls.cancellation.includingStop( request.cancellation)))
     }
     val sample = (solved as? SolveResult.Sat)?.assignment
@@ -934,11 +937,14 @@ private fun executeSourceMinimum(
     val result = when (val controls = requireNotNull(request.sourceControls)) {
         is SourceFiniteControls.Backtrack -> BacktrackSolver(request.problem, request.lpSolveContext).minimize(
             objective, controls.params.copy(cancellation = controls.cancellation.includingStop( request.cancellation),
+                toleranceCheck = request.toleranceCheck,
             )
         )
         is SourceFiniteControls.LocalSearch -> LocalSearchSolver(
             request.problem,
-            completion = if (request.problem.numRealVars > 0) LeafRealCompletion(request.problem, objective) else null,
+            completion = if (request.problem.numRealVars > 0) {
+                LeafRealCompletion(request.problem, objective, request.toleranceCheck)
+            } else null,
         ).minimize(objective, controls.params.copy(cancellation =
             controls.cancellation.includingStop( request.cancellation)))
     }

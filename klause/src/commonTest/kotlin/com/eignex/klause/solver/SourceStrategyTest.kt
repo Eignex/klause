@@ -13,6 +13,7 @@ import com.eignex.klause.factor.bool.Clause
 import com.eignex.klause.factor.global.AllDifferent
 import com.eignex.klause.factor.scheduling.Cumulative
 import com.eignex.klause.factor.table.Table
+import com.eignex.klause.formats.flatzinc.parseFlatZinc
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.LinearForm
@@ -58,6 +59,7 @@ import com.eignex.klause.util.ExecutionControl
 import com.eignex.skema.SchemaDef
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
+import com.eignex.util.numbers.bigIntOf
 import com.eignex.util.numbers.parseBigInt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -245,6 +247,46 @@ class SourceStrategyTest {
             assertEquals(BigFraction.ofLong(if (maximize) 13 else 7),
                 assertIs<SourceValue.Rational>(publication.value).value)
         }
+    }
+
+    // A FlatZinc source whose float rows read its default slack, so finite execution carries its tolerance acceptance.
+    private fun numericalSource() = parseFlatZinc("var 0.0..1.0: x; var 0.0..1.0: y; constraint float_le(x, y); " +
+        "constraint float_lin_eq([1.0], [y], 0.5); solve satisfy;").sourceProgram.problem
+
+    @Test
+    fun `finite source satisfaction should complete a numerical source within its tolerance`() {
+        val results = mapOf(
+            "backtrack" to BacktrackSolver.source(numericalSource()).solve(BacktrackParams(randomSeed = 17L)),
+            "local search" to LocalSearchSolver.source(numericalSource())
+                .solve(LocalSearchParams(randomSeed = 17L, maxFlips = 1000L)),
+        )
+
+        assertEquals(results.mapValues { true }, results.mapValues { (_, result) -> result is OpenTheoryResult.Sat })
+    }
+
+    @Test
+    fun `affine optimization should complete a numerical source within its tolerance`() {
+        val objective = LinearObjective(realCoefficients = doubleArrayOf(1.0, 0.0))
+        val budget = NodeBudget(100)
+        val localSearch = PolynomialTheoryParams(strategy = PolynomialStrategyParams(
+            localSearch = LocalSearchParams(maxFlips = 1, randomSeed = 17, nodeBudget = budget),
+        ))
+        val executions = mapOf(
+            "backtrack" to BacktrackSolver.source(numericalSource()).optimizeOpen(objective,
+                sense = ObjectiveSense.MAXIMIZE),
+            "local search" to LocalSearchSolver.source(numericalSource()).optimizeOpen(objective, localSearch,
+                TheoryParams(randomSeed = 17, nodeBudget = budget), ObjectiveSense.MAXIMIZE),
+        )
+
+        val values = executions.mapValues { (_, execution) ->
+            when (val result = assertIs<OpenTheoryExecution.Optimize>(execution).result) {
+                is OpenTheoryOptimum.Optimal -> result.value
+                is OpenTheoryOptimum.Bounded -> result.value
+                else -> null
+            }
+        }
+
+        assertEquals(executions.mapValues { BigFraction.of(bigIntOf(-1), bigIntOf(2)) }, values)
     }
 
     @Test
