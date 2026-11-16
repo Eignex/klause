@@ -157,22 +157,26 @@ class CliModeVerdictTest {
         }
     }
 
-    @Test
-    fun `the exact flag should accept a FlatZinc strict row gap below the absolute slack`() {
-        val rows = "var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; var 0.0..1.0: p; " +
-            "constraint float_lt(x,y); constraint float_lin_lt([1.0,-1.0],[y,x],0.00000015);"
-        val models = mapOf("rows" to "$rows solve satisfy;",
-            "with a product" to "$rows constraint float_times(x,y,p); solve satisfy;")
-        val modes = mapOf("default" to emptyArray<String>(), "exact" to arrayOf("--exact"))
+    private val strictGapRows = "var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; var 0.0..1.0: p; " +
+        "constraint float_lt(x,y); constraint float_lin_lt([1.0,-1.0],[y,x],0.00000015);"
 
-        val terminals = models.mapValues { (_, model) ->
-            modes.mapValues { (_, args) ->
-                solveFlatZinc(model, *args).lines().first { it == "==========" || it == "=====UNSATISFIABLE=====" }
-            }
+    private fun strictGapTerminals(model: String) =
+        mapOf("default" to emptyArray<String>(), "exact" to arrayOf("--exact")).mapValues { (_, args) ->
+            solveFlatZinc(model, *args).lines().first { it == "==========" || it == "=====UNSATISFIABLE=====" }
         }
 
-        assertEquals(models.mapValues { mapOf("default" to "=====UNSATISFIABLE=====", "exact" to "==========") },
-            terminals)
+    @Test
+    fun `the exact flag should accept a FlatZinc strict row gap below the absolute slack`() {
+        val terminals = strictGapTerminals("$strictGapRows solve satisfy;")
+
+        assertEquals(mapOf("default" to "=====UNSATISFIABLE=====", "exact" to "=========="), terminals)
+    }
+
+    @Test
+    fun `the exact flag should accept a strict row gap below the absolute slack beside a product`() {
+        val terminals = strictGapTerminals("$strictGapRows constraint float_times(x,y,p); solve satisfy;")
+
+        assertEquals(mapOf("default" to "=====UNSATISFIABLE=====", "exact" to "=========="), terminals)
     }
 
     @Test
