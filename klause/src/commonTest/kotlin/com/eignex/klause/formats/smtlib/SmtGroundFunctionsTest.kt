@@ -1,7 +1,12 @@
 package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.backtrack.BacktrackSolver
+import com.eignex.klause.ir.ProblemSettings
+import com.eignex.klause.ir.TranscendentalProblem
+import com.eignex.klause.solver.pipeline.FiniteEngine
+import com.eignex.klause.solver.pipeline.OpenTheoryPipeline
 import com.eignex.klause.solver.pipeline.OpenTheoryResult
+import com.eignex.klause.solver.pipeline.pipelineRequest
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import kotlin.coroutines.cancellation.CancellationException
@@ -173,19 +178,25 @@ class SmtGroundFunctionsTest {
     }
 
     @Test
-    fun `private function variables do not capture source symbols`() {
-        val parsed = SmtLib.parse("""
+    fun `function variables do not capture previously generated symbols`() {
+        val original = captureSmtSource(SExprReader("(declare-const n Int)").readAll(), Cancellation.Never)
+        val commands = SExprReader("""
+            (declare-const n Int)
             (declare-const @klause.uf.0 Int)
             (declare-fun f (Int) Int)
             (assert (= @klause.uf.0 1))
+            (assert (= n @klause.uf.0))
             (assert (= (f @klause.uf.0) 2))
-        """.trimIndent())
+        """.trimIndent()).readAll()
+        val reduced = reduceSmtGroundFunctions(original.copy(commands = commands), Cancellation.Never)
+        val parsed = lowerSmtReduction(reduced, Long.MIN_VALUE, Long.MAX_VALUE, ProblemSettings(),
+            Cancellation.Never, smtLibSemantics.resolve())
 
         val result = BacktrackSolver.source(parsed.model).solve()
 
         val assignment = assertIs<OpenTheoryResult.Sat>(result).assignment
         val model = parsed.reconstructModel(assignment::boolValue, assignment::intValue, assignment::realValue)
-        assertEquals(SmtValue.Integer("1"), model.values.single { it.first.name == "@klause.uf.0" }.second)
+        assertEquals(SmtValue.Integer("1"), model.values.single { it.first.name == "n" }.second)
     }
 
     @Test
@@ -298,6 +309,59 @@ class SmtGroundFunctionsTest {
         val result = BacktrackSolver.source(parsed.model).solve()
 
         assertIs<OpenTheoryResult.Unsat>(result)
+    }
+
+    @Test
+    fun `qualified interpreted operators and constants retain their selected rank`() {
+        val parsed = SmtLib.parse("""
+            (assert (= ((as + Int) 1 2) 3))
+            (assert (= ((as + Real) 1 2) 3.0))
+            (assert (as true Bool))
+        """.trimIndent())
+
+        val result = BacktrackSolver.source(parsed.model).solve()
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `qualifying a user function does not cast its result`() {
+        assertFailsWith<UnsupportedSmtException> {
+            SmtLib.parse("(declare-fun f (Int) Int) (assert (= ((as f Real) 1) 1.0))")
+        }
+    }
+
+    @Test
+    fun `ground exposure retains domains of unused helper arguments and let values`() {
+        val cases = listOf(
+            "(define-fun f ((x Real)) Real 1) (assert (= (f (log 0)) 1))",
+            "(assert (let ((x (log 0))) true))",
+            "(assert (let ((x (= (log 0) 1))) true))",
+        )
+
+        for (body in cases) {
+            val parsed = SmtLib.parse("(define-sort R () Real) $body")
+            val source = assertIs<TranscendentalProblem>(parsed.source.originalSource)
+
+            val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+            assertIs<OpenTheoryResult.Unsat>(result.result, body)
+        }
+    }
+
+    @Test
+    fun `ground exposure keeps unused binding domains inside their conditional branch`() {
+        val parsed = SmtLib.parse("""
+            (define-sort R () Real)
+            (declare-const b Bool)
+            (assert b)
+            (assert (ite b true (let ((x (log 0))) true)))
+        """.trimIndent())
+        val source = assertIs<TranscendentalProblem>(parsed.source.originalSource)
+
+        val result = OpenTheoryPipeline.execute(source.pipelineRequest(), engine = FiniteEngine.BACKTRACK)
+
+        assertIs<OpenTheoryResult.Sat>(result.result)
     }
 
     @Test

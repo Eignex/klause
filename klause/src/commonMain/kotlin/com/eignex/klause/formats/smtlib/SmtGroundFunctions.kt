@@ -4,11 +4,18 @@ import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.Cancellation
 
 internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: Cancellation): SmtReduction {
-    val needed = input.commands.any { command ->
+    val pending = ArrayDeque<SExpr>()
+    for (command in input.commands) pending.addLast(command)
+    var needed = false
+    while (pending.isNotEmpty() && !needed) {
         cancellation.polynomialSourceCheckpoint(1)
-        command is SExpr.SList && (command.polynomialHead() in setOf("declare-sort", "define-sort") ||
-            command.polynomialHead() == "declare-fun" &&
-            (command.items.getOrNull(2) as? SExpr.SList)?.items?.isNotEmpty() == true)
+        val expression = pending.removeLast()
+        if (expression is SExpr.SList) {
+            val head = (expression.items.firstOrNull() as? SExpr.Atom)?.text
+            needed = head in setOf("declare-sort", "define-sort", "as") || head == "declare-fun" &&
+                (expression.items.getOrNull(2) as? SExpr.SList)?.items?.isNotEmpty() == true
+            for (item in expression.items) pending.addLast(item)
+        }
     }
     return if (needed) SmtGroundFunctionReducer(input, cancellation, encodeUninterpreted = true).reduce() else input
 }
@@ -18,7 +25,7 @@ internal fun exposeSmtGroundFunctions(input: SmtReduction, cancellation: Cancell
 
 private class SmtGroundFunctionReducer(private val input: SmtReduction, private val cancellation: Cancellation,
     private val encodeUninterpreted: Boolean) {
-    private data class Term(val id: Int, val expression: SExpr)
+    private data class Term(val id: Int, val expression: SExpr, val partial: Boolean = false)
     private data class NodeKey(val head: SExpr, val arguments: List<Int>)
     private data class ApplicationKey(val function: Int, val arguments: List<Int>)
     private data class Application(val arguments: List<String>, val result: String)
@@ -44,9 +51,10 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         data class Combine(val head: SExpr, val count: Int, val function: Function?) : Frame
         data class Let(val names: List<String>, val body: SExpr, val environment: Environment) : Frame
         data class Call(val macro: Macro) : Frame
+        data class DefinedArguments(val arguments: List<Term>) : Frame
     }
 
-    private val sortScope = SmtLibScope(cancellation)
+    private val sortScope = SmtLibScope(cancellation, allowSolverSymbols = true)
     private val bindings = HashMap<String, Binding>()
     private val functions = LinkedHashMap<String, Function>()
     private val sourceBindings = input.bindings.associateByTo(LinkedHashMap()) { polynomialSymbol(it.declaration.name) }
@@ -203,15 +211,22 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                         } else if (name == "!") {
                             work.addLast(Frame.Evaluate(node.items[1], frame.environment))
                         } else if (name == "as") {
-                            val binding = identifierName(node)?.let { binding(it, frame.environment) }
-                            if (binding?.term != null) values.addLast(binding.term)
-                            else values.addLast(literalTerm(node))
+                            val selected = node.items[1]
+                            val binding = identifierName(selected)?.let { binding(it, frame.environment) }
+                            when {
+                                binding?.term != null -> values.addLast(binding.term)
+                                binding?.macro != null -> work.addLast(Frame.Evaluate(binding.macro.body,
+                                    binding.macro.environment))
+                                selected is SExpr.Atom -> values.addLast(atom(polynomialSymbol(selected.text)))
+                                else -> values.addLast(literalTerm(selected))
+                            }
                         } else if (name == "_") {
                             values.addLast(intern(head, node.items.drop(1).map { literalTerm(it) }))
                         } else {
                             val binding = name?.let { binding(it, frame.environment) }
                             if (binding?.macro != null) work.addLast(Frame.Call(binding.macro))
-                            else work.addLast(Frame.Combine(head, node.items.size - 1, binding?.function))
+                            else work.addLast(Frame.Combine(unqualifiedIdentifier(head), node.items.size - 1,
+                                binding?.function))
                             for (argument in node.items.drop(1).asReversed()) {
                                 work.addLast(Frame.Evaluate(argument, frame.environment))
                             }
@@ -219,13 +234,16 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                     }
                 }
                 is Frame.Let -> {
-                    val locals = frame.names.zip(pop(frame.names.size)).toMap()
+                    val args = pop(frame.names.size)
+                    val locals = frame.names.zip(args).toMap()
+                    work.addLast(Frame.DefinedArguments(args.filter { it.partial }))
                     work.addLast(Frame.Evaluate(frame.body, Environment(frame.environment.version, locals,
                         frame.environment)))
                 }
                 is Frame.Call -> {
                     val args = pop(frame.macro.parameters.size)
                     val locals = frame.macro.parameters.zip(args).toMap()
+                    work.addLast(Frame.DefinedArguments(args.filter { it.partial }))
                     work.addLast(Frame.Evaluate(frame.macro.body, Environment(frame.macro.environment.version,
                         locals, frame.macro.environment)))
                 }
@@ -233,6 +251,12 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                     val args = pop(frame.count)
                     values.addLast(if (frame.function == null) intern(frame.head, args)
                         else apply(frame.function, args))
+                }
+                is Frame.DefinedArguments -> if (frame.arguments.isNotEmpty()) {
+                    val value = values.removeLast()
+                    val domains = frame.arguments.map { intern(SExpr.Atom("="), listOf(it, it)) }
+                    val condition = intern(SExpr.Atom("and"), domains)
+                    values.addLast(intern(SExpr.Atom("ite"), listOf(condition, value, value)))
                 }
             }
         }
@@ -264,6 +288,9 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         bindings[name]?.takeIf { it.version < environment.version }
 
     private fun apply(function: Function, args: List<Term>): Term {
+        if (args.any { it.partial }) {
+            smtUnsupported("uninterpreted applications require total arguments outside the partial real extension")
+        }
         val key = ApplicationKey(function.id, args.map { it.id })
         applications[key]?.let { return it }
         val argumentNames = args.mapIndexed { index, argument ->
@@ -311,7 +338,8 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
     }
 
     private fun intern(head: SExpr, args: List<Term>): Term = nodes.getOrPut(NodeKey(head, args.map { it.id })) {
-        Term(nextTerm++, SExpr.SList(listOf(head) + args.map { it.expression }))
+        Term(nextTerm++, SExpr.SList(listOf(head) + args.map { it.expression }),
+            identifierName(head) == "log" || args.any { it.partial })
     }
 
     private fun step() = cancellation.polynomialSourceCheckpoint(1)
@@ -378,4 +406,11 @@ private fun identifierName(identifier: SExpr): String? = when (identifier) {
     is SExpr.SList -> if ((identifier.items.firstOrNull() as? SExpr.Atom)?.text == "as") {
         (identifier.items.getOrNull(1) as? SExpr.Atom)?.text?.let(::polynomialSymbol)
     } else null
+}
+
+private fun unqualifiedIdentifier(identifier: SExpr): SExpr = when (identifier) {
+    is SExpr.Atom -> SExpr.Atom(polynomialSymbol(identifier.text))
+    is SExpr.SList -> if ((identifier.items.firstOrNull() as? SExpr.Atom)?.text == "as") {
+        unqualifiedIdentifier(identifier.items[1])
+    } else identifier
 }
