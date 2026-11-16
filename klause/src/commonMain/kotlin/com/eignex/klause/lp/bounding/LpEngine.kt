@@ -1455,12 +1455,17 @@ internal class LpEngine(
      * [session] — the strict-aware decider with the
      * rows premise-cited, so an [LpVerdict.INFEASIBLE] leaf also derives a theory lemma over the
      * activating literals (a Farkas-ray clause when the certificate carries an integer ray, else the
-     * active rows' premises) and stashes it for [lastBackjump]. On [LpVerdict.FEASIBLE] and
+     * active rows' premises) and stashes it for [lastBackjump], unless [poolRefutation] is false: a caller that
+     * decides the leaf within a tolerance the exact rows do not read keeps no such lemma. On [LpVerdict.FEASIBLE] and
      * [LpVerdict.ATTAINED_OPTIMUM] the returned reals complete the assignment exactly; on
      * [LpVerdict.TOLERANCE_OPTIMUM] they are the float optimum [toleranceCheck] accepted. The float solve is
      * capped by work sized from the model; a leaf it stops short of a verdict is [LpVerdict.INDETERMINATE].
      */
-    fun leafCertify(session: PropagationSession, toleranceCheck: ((Sample) -> Boolean)? = null): LeafRealResult {
+    fun leafCertify(
+        session: PropagationSession,
+        toleranceCheck: ((Sample) -> Boolean)? = null,
+        poolRefutation: Boolean = true,
+    ): LeafRealResult {
         requireOpen()
         lpBackjump = null
         if (residualOversized) return LeafRealResult(LpVerdict.INDETERMINATE, emptyDoubleArray())
@@ -1501,7 +1506,7 @@ internal class LpEngine(
                     ?.let { LpExplanation.infeasibilityClause(relaxation, it, session) }
                     ?: certified.infeasibleRows?.let { LpExplanation.premiseClauseForRows(relaxation, it, session) }
                     ?: activePremiseClause(relaxation, session)
-                if (clause != null) lpNogoods?.add(clause)
+                if (clause != null && poolRefutation) lpNogoods?.add(clause)
                 LeafRealResult(LpVerdict.INFEASIBLE, emptyDoubleArray())
             }
 

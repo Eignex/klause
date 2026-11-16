@@ -14,6 +14,8 @@ import com.eignex.klause.ir.WideConsts
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigInt
+import com.eignex.util.numbers.div
+import com.eignex.util.numbers.gcd
 import com.eignex.util.numbers.times
 
 internal class ExactSearchRow private constructor(
@@ -60,7 +62,9 @@ internal class ExactSearchRow private constructor(
             strict: Boolean = false,
         ): ExactSearchRow {
             require(refs.size == coefficients.size)
-            val denominator = coefficients.fold(rhs.den) { product, value -> product * value.den }
+            val denominator = coefficients.fold(rhs.den) { multiple, value ->
+                if (value.den == BIG_ONE) multiple else multiple / multiple.gcd(value.den) * value.den
+            }
             return ExactSearchRow(
                 refs.copyOf(), Array(refs.size) { (coefficients[it] * BigFraction.of(denominator, BIG_ONE)).num },
                 (rhs * BigFraction.of(denominator, BIG_ONE)).num, relation, strict,

@@ -98,11 +98,15 @@ internal class RealToleranceScope private constructor(
     private val relations: IntArray,
     private val integerRows: IntArray,
     private val exact: BooleanArray,
+    private val roots: IntArray,
     // Whether some relation over a real coordinate reads the slack.
     val readsSlack: Boolean,
 ) {
     // Whether real coordinate [id] lies in a component that holds exactly.
     fun isExact(id: Int): Boolean = exact[id]
+
+    // The representative of the component real coordinate [id] lies in.
+    fun component(id: Int): Int = roots[id]
 
     fun verify(
         source: Problem,
@@ -170,12 +174,13 @@ internal class RealToleranceScope private constructor(
                 val factor = source.factors[id]
                 if (!factor.hasToleranceReading()) exactRoots[components.find(factor.variables.reals[0])] = true
             }
-            val exact = BooleanArray(source.numRealVars) { exactRoots[components.find(it)] }
+            val roots = IntArray(source.numRealVars) { components.find(it) }
+            val exact = BooleanArray(source.numRealVars) { exactRoots[roots[it]] }
             val readsSlack = checked.any { id ->
                 val factor = source.factors[id]
                 factor !is Distinct && !exact[factor.variables.reals[0]]
             }
-            return RealToleranceScope(checked, integerRows.toIntArray(), exact, readsSlack)
+            return RealToleranceScope(checked, integerRows.toIntArray(), exact, roots, readsSlack)
         }
     }
 }
@@ -323,8 +328,31 @@ private class ToleranceWitness(
         return when (factor.exponent) {
             0 -> constant(result, BigFraction.ONE)
             1 -> residual(result, base)
-            else -> residual(result, rationalPower(base, factor.exponent, cancellation) ?: return null)
+            else -> powerResidual(result, base, factor.exponent)
         }
+    }
+
+    // `result = base^exponent` read as a residual row. A power wider than [POWER_WIDTH] bits is never formed: a
+    // power far above the result, or far below the slack the result leaves, decides the row from bit lengths alone,
+    // and one of comparable magnitude decides nothing.
+    private fun powerResidual(result: BigFraction, base: BigFraction, exponent: Int): Boolean? {
+        val magnitude = base.magnitude()
+        if (magnitude.isZero || magnitude == BigFraction.ONE || base.width() * exponent <= POWER_WIDTH) {
+            return residual(result, rationalPower(base, exponent, cancellation) ?: return null)
+        }
+        val absolute = BigFraction.of(policy.absolute.numerator, policy.absolute.denominator)
+        val relative = BigFraction.of(policy.relative.numerator, policy.relative.denominator)
+        if (relative >= BigFraction.ONE) return true
+        val target = result.magnitude()
+        // `2^low <= abs(base^exponent) < 2^high`.
+        val low = exponent.toLong() * magnitude.log2Floor()
+        val high = exponent.toLong() * (magnitude.log2Floor() + 2)
+        val above = ((BigFraction.ONE + relative) * target + absolute) * (BigFraction.ONE - relative).reciprocal()
+        if (above.isZero || low >= above.log2Floor() + 2) return false
+        val alone = capturedSourceSlack(policy, BigFraction.ZERO, target)
+        if (target < alone && high <= (alone - target).log2Floor()) return true
+        if (target > alone && high + 1 <= (target - alone).log2Floor()) return false
+        return null
     }
 
     private fun slack(bound: BigFraction, exact: Boolean): BigFraction =
@@ -353,6 +381,12 @@ private fun rationalPower(value: BigFraction, exponent: Int, cancellation: Cance
 }
 
 private fun BigFraction.width(): Long = num.magnitudeBitLength().toLong() + den.magnitudeBitLength()
+
+// A lower bound on `log2(this)` for a positive fraction, which lies below `2^(log2Floor() + 2)`.
+private fun BigFraction.log2Floor(): Long = num.magnitudeBitLength().toLong() - den.magnitudeBitLength() - 1
+
+// Powers up to this many bits are formed exactly.
+private const val POWER_WIDTH = 1L shl 16
 
 private fun slackedRow(
     row: LinearRow,

@@ -359,8 +359,9 @@ disequalities and rows whose reifying Boolean is false hold exactly. A finite
 membership admits a value within the slack of a member, measured as a bound. Absolute
 value, minimum, maximum, selection, an integer times a real, a real product and a power
 state `r = f(x)` and read the slack as the row `r - f(x) = 0`: the residual
-`abs(r - f(x))` stays within `max(absolute, relative * (abs(r) + abs(f(x))))`, the
-violation a MIP solver measures on a nonlinear constraint. Selection from constants is
+`abs(r - f(x))` stays within `max(absolute, relative * (abs(r) + abs(f(x))))`. A power
+too wide to form is decided from bit lengths where its magnitude settles the row.
+Selection from constants is
 the row `r = c`. A product whose operand has finite choices selects one member: the
 operand lies within the slack of it and the product row holds within the slack, with
 choice guards naming the member. Relations over integers and Booleans alone never read
@@ -369,17 +370,24 @@ each reading. Real coordinates that share a relation form a component, and a com
 with a relation that has no reading, such as a disjunction of several equalities, holds
 exactly, its declarations included.
 
-A backtrack leaf offers its float completion first. A refused point on a model with an
-absolute value, finite membership or choice product completes through the exact search
-of the leaf; when that search refutes the point, it searches again with every relation
-of the tolerance components within the slack its bound alone admits:
+A backtrack leaf offers its float completion first. A refused point is decided by a
+search over the source relations at the leaf's discrete point, in which every relation
+of the tolerance components holds within the slack its bound alone admits:
 `max(absolute, relative * abs(bound))` for a row, declaration or member, and the
-absolute slack for a residual row. Such a witness lies within what acceptance admits,
-and a refutation shows that no point holds every relation within that slack, so the
-leaf verdict stays feasible or infeasible. Local-search and ALNS workers
-[complete candidates](11-neighborhoods.md#continuous-candidate-completion) the same way,
-float point first, so every engine accepts the same points. Projected grid witnesses
-are checked against the same readings. Sources routed to a
+absolute slack for a residual row. Components that hold exactly keep their exact
+encodings, and so does a component with a real product without finite choices or a
+power above one, which no linear model states. A witness of the search lies within
+what acceptance admits, and a refutation shows that no point holds every relation
+within that slack, so the leaf verdict stays feasible or infeasible. Where the leaf
+needs a search for an absolute value, finite membership or choice product, a witness
+gives way to an exact completion when one exists, which strains no relation. A leaf of
+linear rows reaches the search when its exact completion refutes it or decides
+nothing, and keeps no LP lemma from that refutation. Minimization completes its leaves the same way when the
+objective reads no real coordinate, and local-search and ALNS workers
+[complete candidates](11-neighborhoods.md#continuous-candidate-completion) the same way.
+A leaf whose objective reads a real coordinate completes through the leaf LP alone, so
+its refusals and refutations are those of the float point and the exact LP. Projected
+grid witnesses are checked against the same readings. Sources routed to a
 [linear theory](15-linear-arithmetic.md) are decided exactly. Completed search reports
 its optimum or refutation under this numerical policy.
 

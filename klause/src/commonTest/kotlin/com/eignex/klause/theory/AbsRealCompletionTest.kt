@@ -7,22 +7,30 @@ import com.eignex.klause.factor.arithmetic.RealAbs
 import com.eignex.klause.factor.arithmetic.RealArrayMinMax
 import com.eignex.klause.factor.arithmetic.RealFiniteDomain
 import com.eignex.klause.factor.arithmetic.RealProduct
+import com.eignex.klause.factor.arithmetic.ReifiedRealLinear
 import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
+import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
+import com.eignex.klause.ir.LinearRow
+import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
+import com.eignex.klause.ir.RealConstants
+import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
 import com.eignex.klause.ir.SourceTolerance
 import com.eignex.klause.localsearch.Completion
+import com.eignex.klause.lp.engine.LpSolveContext
 import com.eignex.klause.portfolio.LeafRealCompletion
 import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.solver.validation.capturedRealAcceptance
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
@@ -164,13 +172,33 @@ class AbsRealCompletionTest {
 
     private val tenth = SourceTolerance(SemanticRational.of(bigIntOf(1), bigIntOf(10)))
 
-    // Each real is declared at one value, and each integer at one value.
-    private fun fixed(factors: List<Factor>, reals: DoubleArray, ints: LongArray = longArrayOf()) = Problem(
-        0, ints.size, Array(ints.size) { IntDomain(ints[it], ints[it]) }, factors.toTypedArray(),
+    // Each real is declared at one value, each integer at one value, and every Boolean is true.
+    private fun fixed(
+        factors: List<Factor>,
+        reals: DoubleArray,
+        ints: LongArray = longArrayOf(),
+        bools: Int = 0,
+        tolerance: SourceTolerance = tenth,
+    ) = Problem(
+        bools, ints.size, Array(ints.size) { IntDomain(ints[it], ints[it]) }, factors.toTypedArray(),
         numRealVars = reals.size, realLower = reals.copyOf(), realUpper = reals.copyOf(),
         semantics = SourceSemantics(SourceFormat.IR, floats = FloatSemantics.Continuous,
-            feasibilityTolerance = tenth).resolve(),
+            feasibilityTolerance = tolerance).resolve(),
     )
+
+    private fun row(real: Int, op: LinearOp, bound: Double, strict: Boolean = false) =
+        Linear(intArrayOf(), doubleArrayOf(), intArrayOf(real), doubleArrayOf(1.0), op, bound, strict)
+
+    // `abs(x(a)) = abs(x(b))` as a disjunction of two equalities, which has no tolerance reading.
+    private fun unread(a: Int, b: Int): Factor = object : Factor by Linear(
+        intArrayOf(), doubleArrayOf(), intArrayOf(a, b), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0,
+    ) {
+        override val linearForm: LinearForm = LinearForm.Disjunction(listOf(1.0, -1.0).map { sign ->
+            LinearRow.ofColumns(intArrayOf(), intArrayOf(a, b),
+                RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0, sign)), 0.0, false),
+                LinearOp.EQ)
+        })
+    }
 
     private val unitSum =
         Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 1.0)
@@ -182,21 +210,30 @@ class AbsRealCompletionTest {
             "abs" to fixed(listOf(RealAbs(0, 1)), doubleArrayOf(0.5, pick(0.7, 1.0))),
             "max" to fixed(listOf(RealArrayMinMax(2, intArrayOf(0, 1), max = true)),
                 doubleArrayOf(0.5, 0.25, pick(0.7, 1.0))),
+            "min" to fixed(listOf(RealArrayMinMax(2, intArrayOf(0, 1), max = false)),
+                doubleArrayOf(0.5, 0.25, pick(0.45, 0.75))),
             "membership" to fixed(listOf(RealFiniteDomain(0, doubleArrayOf(0.25, 0.75))),
                 doubleArrayOf(pick(0.9, 1.2))),
             "choice product" to fixed(listOf(ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.5, 1.0))),
                 doubleArrayOf(0.5, 1.0, pick(0.6, 1.0))),
+            "guarded choice product" to fixed(listOf(ContinuousProduct(0, 1, 2, 0, doubleArrayOf(0.5, 1.0),
+                intArrayOf(Lit.make(0, true), Lit.make(0, false)))), doubleArrayOf(0.5, 1.0, pick(0.6, 1.0)),
+                bools = 1),
             "selection" to fixed(listOf(RealElement(0, 0, doubleArrayOf(0.5, 2.0))), doubleArrayOf(pick(0.65, 1.0)),
                 longArrayOf(1)),
+            "variable selection" to fixed(listOf(RealElement(0, 2, intArrayOf(0, 1))),
+                doubleArrayOf(0.5, 0.25, pick(0.7, 1.0)), longArrayOf(1)),
             "integer product" to fixed(listOf(RealProduct(0, 0, 1, 0.0, 1.0)), doubleArrayOf(0.25, pick(0.7, 1.2)),
                 longArrayOf(2)),
             "row" to fixed(listOf(unitSum), doubleArrayOf(0.6, pick(0.6, 0.8))),
         )
     }
 
-    private fun discrete(problem: Problem) = Sample(BooleanArray(0), LongArray(problem.numIntVars) {
-        problem.intBounds.lower(it)
-    })
+    private fun discrete(problem: Problem) = Sample(BooleanArray(problem.numBoolVars) { true },
+        LongArray(problem.numIntVars) { problem.intBounds.lower(it) })
+
+    private fun withinTolerance(problem: Problem) =
+        AbsRealCompletion(problem, tenth).complete(discrete(problem), Cancellation.Never).result
 
     @Test
     fun `tolerance completion should find a point the source accepts where the exact search refutes`() {
@@ -227,5 +264,55 @@ class AbsRealCompletionTest {
         }
 
         assertEquals(relations(within = true).mapValues { AbsRealCompletion.Result.Refuted }, results)
+    }
+
+    @Test
+    fun `tolerance completion should read a relative slack`() {
+        val relative = SourceTolerance(relative = SemanticRational.of(bigIntOf(1), bigIntOf(10)))
+        val problem = fixed(listOf(RealAbs(0, 1)), doubleArrayOf(5.0, 5.5), tolerance = relative)
+
+        val completed = AbsRealCompletion(problem, relative).complete(discrete(problem), Cancellation.Never).result
+
+        assertIs<AbsRealCompletion.Result.Witness>(completed)
+    }
+
+    @Test
+    fun `a strict row should hold exactly in the tolerance search`() {
+        val problem = Problem(0, 0, emptyArray(), arrayOf(row(0, LinearOp.GE, 0.5), row(0, LinearOp.LE, 0.375, true)),
+            numRealVars = 1, realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+
+        assertEquals(AbsRealCompletion.Result.Refuted, withinTolerance(problem))
+    }
+
+    @Test
+    fun `a row under a false activator should hold its complement exactly in the tolerance search`() {
+        val reified = ReifiedRealLinear(0, intArrayOf(), doubleArrayOf(), intArrayOf(0), doubleArrayOf(1.0),
+            LinearOp.LE, 0.4)
+        val problem = Problem(1, 0, emptyArray(), arrayOf(reified, row(0, LinearOp.LE, 0.3)), numRealVars = 1,
+            realLower = doubleArrayOf(0.0), realUpper = doubleArrayOf(1.0))
+
+        val completed = AbsRealCompletion(problem, tenth)
+            .complete(Sample(booleanArrayOf(false), longArrayOf()), Cancellation.Never).result
+
+        assertEquals(AbsRealCompletion.Result.Refuted, completed)
+    }
+
+    @Test
+    fun `an exact component should keep its declarations beside a relaxed one`() {
+        val problem = fixed(listOf(row(0, LinearOp.LE, 0.6), unread(1, 2)), doubleArrayOf(0.7, 0.5, 0.55))
+
+        assertEquals(AbsRealCompletion.Result.Refuted, withinTolerance(problem))
+    }
+
+    @Test
+    fun `a tolerance search should read the source at the discrete point its frame lifts to`() {
+        val source = fixed(listOf(RealElement(0, 0, doubleArrayOf(0.5, 2.0))), doubleArrayOf(0.65), longArrayOf(1))
+        val search = SourceToleranceSearch(source, tenth)
+            .reconstructedBy { it.copy(ints = longArrayOf(it.intValue(0) + 1)) }
+
+        val found = search.complete(Sample(booleanArrayOf(), longArrayOf(0)), Cancellation.Never, null,
+            LpSolveContext.Production)
+
+        assertIs<ToleranceSearchResult.Witness>(found)
     }
 }
