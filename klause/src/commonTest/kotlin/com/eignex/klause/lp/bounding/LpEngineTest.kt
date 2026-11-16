@@ -1279,6 +1279,29 @@ class LpEngineTest {
     }
 
     @Test
+    fun `leaf certification should accept numerical refutations only for tolerance requests`() {
+        val problem = Problem(
+            0, 0, emptyArray(),
+            arrayOf<Factor>(
+                Linear(longArrayOf(), intArrayOf(), doubleArrayOf(3.0), intArrayOf(0), LinearOp.GE, 4L),
+            ),
+            numRealVars = 1,
+            realLower = doubleArrayOf(0.0),
+            realUpper = doubleArrayOf(1.0),
+        )
+        for (numerical in listOf(false, true)) {
+            val context = LpSolveContext(certificationPolicy = decline, numericalDeductions = numerical)
+            LpEngine(problem, LinearObjective(realCoefficients = doubleArrayOf(0.0)),
+                LpParams(lpPlan = LpPlan(realResidual = true, componentSplit = false)),
+                SolveStatsSink("numerical-leaf-refutation"), context).use { engine ->
+                val result = engine.leafCertify(PropagationSession(problem), toleranceCheck = { true })
+
+                assertEquals(if (numerical) LpVerdict.INFEASIBLE else LpVerdict.INDETERMINATE, result.verdict)
+            }
+        }
+    }
+
+    @Test
     fun `leaf certification should report an accepted float optimum as a tolerance optimum`() {
         // 3x = 1 with x in [0, 2], minimizing x; every exact certifier is vetoed, so only float evidence can decide.
         val problem = Problem(
