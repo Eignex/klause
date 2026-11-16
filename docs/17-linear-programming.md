@@ -668,8 +668,19 @@ entering spikes, pivotal rows, RHS and dual solves so a basis backend can reuse 
 form it produced. [SimplexBasisLifecycle](../klause/src/commonMain/kotlin/com/eignex/klause/lp/engine/SimplexBasisLifecycle.kt)
 owns headings, statuses and the lazy basis backend, and invalidates them on
 retirement even when close fails. `SimplexPricingState` owns Devex weights and
-`SimplexObservations` per-solve counters; `RevisedSimplex` coordinates allowance
-charging, recovery and publication.
+`SimplexObservations` per-solve counters. `PrimalSimplexPhases` owns feasibility
+repair and objective iteration through a narrow basis-operations contract, sharing
+the workspace and seated basis. `DualSimplexPhase` owns dual iteration, leaving
+selection, Devex correction and bound-flipping entering selection. Basis operations
+return the retained indexed spike used by incremental values and pivot updates;
+dense ratio scans gather that same carrier in row order.
+`SimplexArtificialBounds` owns boxed-dual seats
+and widening state. `SimplexBasicValues` retains the coupled basic values, model,
+scaling view and nonbasic statuses, invalidating them together. Its restoration
+adjusts changed nonbasic seats through the retained factors.
+`SimplexSolveControl` owns allowance checks and work charging; every phase and
+recovery restart shares one cumulative `SolveProgress`. `RevisedSimplex` coordinates
+starts, recovery, cursor lifetime and result publication.
 
 A retained numerical owner can expose a private solve cursor that suspends between
 iterations, keeping phase, factors, artificial seats, pricing state and cumulative

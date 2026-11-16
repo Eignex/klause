@@ -4,6 +4,7 @@ import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.util.Cancellation
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -159,6 +160,45 @@ class RevisedSimplexObjectiveWarmStartTest {
             assertEquals(BigFraction.ofLong(-1L), result.lowerBound)
             assertEquals(1, owner.lastMetrics.objectiveWarmAttempts)
             assertEquals(1, owner.lastMetrics.objectiveWarmRepairs)
+        }
+    }
+
+    @Test
+    fun `suspending primal repair and objective iteration should retain the numerical path`() {
+        val source = state(ExactLpNumber.of(-1L))
+        val model = assertNotNull(source.toWorkingModel())
+        val trail = LpBoundTrail(source)
+        RevisedSimplex(model).use { uninterrupted ->
+            RevisedSimplex(model).use { sliced ->
+                assertNotNull(uninterrupted.solve())
+                assertNotNull(sliced.solve())
+                assertTrue(trail.replaceObjective(ExactLpObjective(listOf(one, zero))))
+                assertTrue(trail.assertBound(0, true, ExactLpSide(ExactLpNumber.ofIeee(0.5)), 0L))
+                assertTrue(uninterrupted.adopt(trail.state, Cancellation.Never))
+                assertTrue(sliced.adopt(trail.state, Cancellation.Never))
+                val expected = assertNotNull(uninterrupted.resolveBounds())
+                sliced.enableProgressTrace()
+
+                sliced.openSolve().use { cursor ->
+                    var step = cursor.advance(1L)
+                    var pauses = 0
+                    while (step is LpSolveStep.Paused && pauses < 64) {
+                        pauses++
+                        assertNull(sliced.solvedExactState)
+                        step = cursor.advance(1L)
+                    }
+                    val result = assertNotNull(assertIs<LpSolveStep.Completed<FloatLpResult?>>(step).value)
+
+                    assertTrue(pauses > 0)
+                    val phases = assertNotNull(sliced.progressTrace).samples.map { it.phase }
+                    assertTrue(SimplexPhase.PRIMAL_FEASIBILITY in phases)
+                    assertTrue(SimplexPhase.PRIMAL_OBJECTIVE in phases)
+                    assertEquals(expected.objective, result.objective)
+                    assertEquals(expected.primal.toList(), result.primal.toList())
+                    assertEquals(uninterrupted.lastMetrics.pivots, sliced.lastMetrics.pivots)
+                    assertEquals(uninterrupted.lastMetrics.workOps, sliced.lastMetrics.workOps)
+                }
+            }
         }
     }
 
