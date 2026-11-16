@@ -48,6 +48,16 @@ class Assumptions internal constructor(
     val deductions: DeducedRestrictions = DeducedRestrictions.None,
 ) {
 
+    internal fun snapshot(): Assumptions = Assumptions(
+        boolKeys.copyOf(), boolValues.copyOf(), intKeys.copyOf(), intValues.copyOf(),
+        DeducedRestrictions(
+            deductions.intMinKeys.copyOf(), deductions.intMinValues.copyOf(),
+            deductions.intMaxKeys.copyOf(), deductions.intMaxValues.copyOf(),
+            deductions.intHoleVarIds.copyOf(), deductions.intHoleValues.copyOf(),
+            deductions.intSetKeys.copyOf(), deductions.intSetOffsets.copyOf(), deductions.intSetValues.copyOf(),
+        ),
+    )
+
     /** True iff no bool or int variable is pinned. */
     val isEmpty: Boolean get() = boolKeys.isEmpty() && intKeys.isEmpty()
 

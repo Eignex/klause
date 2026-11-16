@@ -13,6 +13,15 @@ import com.eignex.util.collections.IntArrayDeque
 import com.eignex.util.numbers.BigFraction
 
 internal data class PolynomialAtom(val polynomial: Polynomial, val relation: PolynomialRelation) {
+    fun complemented(): PolynomialAtom = copy(relation = when (relation) {
+        PolynomialRelation.EQ -> PolynomialRelation.NE
+        PolynomialRelation.NE -> PolynomialRelation.EQ
+        PolynomialRelation.LT -> PolynomialRelation.GE
+        PolynomialRelation.LE -> PolynomialRelation.GT
+        PolynomialRelation.GT -> PolynomialRelation.LE
+        PolynomialRelation.GE -> PolynomialRelation.LT
+    })
+
     fun holds(sign: Int): Boolean = when (relation) {
         PolynomialRelation.EQ -> sign == 0
         PolynomialRelation.NE -> sign != 0
@@ -81,16 +90,7 @@ internal class PolynomialFormula private constructor(
             val value = state.value(index)
             if (value == UNASSIGNED) continue
             val atom = atoms[node.atom]
-            result.add(if (value == TRUE)
-                atom else
-                PolynomialAtom(atom.polynomial, when (atom.relation) {
-                    PolynomialRelation.EQ -> PolynomialRelation.NE
-                    PolynomialRelation.NE -> PolynomialRelation.EQ
-                    PolynomialRelation.LT -> PolynomialRelation.GE
-                    PolynomialRelation.LE -> PolynomialRelation.GT
-                    PolynomialRelation.GT -> PolynomialRelation.LE
-                    PolynomialRelation.GE -> PolynomialRelation.LT
-                }))
+            result.add(if (value == TRUE) atom else atom.complemented())
         }
         return result
     }
@@ -135,14 +135,7 @@ internal class PolynomialFormula private constructor(
                         arithmetic.step()
                         indices.add(child.atom)
                     }
-                    result.add(PolynomialAtom(atom.polynomial, when (atom.relation) {
-                        PolynomialRelation.EQ -> PolynomialRelation.NE
-                        PolynomialRelation.NE -> PolynomialRelation.EQ
-                        PolynomialRelation.LT -> PolynomialRelation.GE
-                        PolynomialRelation.LE -> PolynomialRelation.GT
-                        PolynomialRelation.GT -> PolynomialRelation.LE
-                        PolynomialRelation.GE -> PolynomialRelation.LT
-                    }))
+                    result.add(atom.complemented())
                 }
                 is FormulaNode.Junction -> {
                     if (!node.conjunction) return null
@@ -177,14 +170,7 @@ internal class PolynomialFormula private constructor(
                 is FormulaNode.Not -> {
                     val child = nodes[node.child] as? FormulaNode.Atom ?: continue
                     val atom = atoms[child.atom]
-                    result.add(PolynomialAtom(atom.polynomial, when (atom.relation) {
-                        PolynomialRelation.EQ -> PolynomialRelation.NE
-                        PolynomialRelation.NE -> PolynomialRelation.EQ
-                        PolynomialRelation.LT -> PolynomialRelation.GE
-                        PolynomialRelation.LE -> PolynomialRelation.GT
-                        PolynomialRelation.GT -> PolynomialRelation.LE
-                        PolynomialRelation.GE -> PolynomialRelation.LT
-                    }))
+                    result.add(atom.complemented())
                 }
                 is FormulaNode.Junction -> if (node.conjunction) {
                     for (child in node.children.indices.reversed()) {

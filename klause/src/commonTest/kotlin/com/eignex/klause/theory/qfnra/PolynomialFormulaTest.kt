@@ -1,5 +1,6 @@
 package com.eignex.klause.theory.qfnra
 
+import com.eignex.klause.arithmetic.polynomial.Polynomial
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
 import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.formats.smtlib.SmtLibPolynomial
@@ -21,6 +22,18 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class PolynomialFormulaTest {
+    @Test
+    fun `complemented atoms should reverse truth for every sign and relation`() {
+        for (relation in PolynomialRelation.entries) {
+            val atom = PolynomialAtom(Polynomial.variable(0), relation)
+
+            val complemented = atom.complemented()
+
+            for (sign in -1..1) assertEquals(!atom.holds(sign), complemented.holds(sign))
+            assertEquals(atom.polynomial, complemented.polynomial)
+        }
+    }
+
     @Test
     fun `rational scalar equivalent comparisons preserve shared Boolean truth`() {
         val relations = listOf("=" to "=", "distinct" to "distinct", "<" to ">", "<=" to ">=",

@@ -1,7 +1,6 @@
 package com.eignex.klause.theory.qfnra
 
 import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
-import com.eignex.klause.ir.PolynomialRelation
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.FALSE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.TRUE
 import com.eignex.klause.theory.qfnra.PolynomialFormula.Companion.UNASSIGNED
@@ -93,14 +92,7 @@ internal class PolynomialBooleanSigns(
             val value = state.value(index)
             if (value == UNASSIGNED) continue
             val atom = atoms[node.atom]
-            required.add(if (value == TRUE) atom else PolynomialAtom(atom.polynomial, when (atom.relation) {
-                PolynomialRelation.EQ -> PolynomialRelation.NE
-                PolynomialRelation.NE -> PolynomialRelation.EQ
-                PolynomialRelation.LT -> PolynomialRelation.GE
-                PolynomialRelation.LE -> PolynomialRelation.GT
-                PolynomialRelation.GT -> PolynomialRelation.LE
-                PolynomialRelation.GE -> PolynomialRelation.LT
-            }))
+            required.add(if (value == TRUE) atom else atom.complemented())
         }
         return required
     }
