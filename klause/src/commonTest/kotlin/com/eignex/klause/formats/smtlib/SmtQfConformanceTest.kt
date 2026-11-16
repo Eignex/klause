@@ -420,7 +420,8 @@ class SmtQfConformanceTest {
         val result = SourceSetup.execute(SourceExecutionRequest(invocation),
             SourceExecutionCallbacks(finite = FiniteSolveCallbacks({ publications++ }, { publications++ })))
 
-        val completed = assertIs<FiniteSolveOutcome.Completed>(assertIs<SourceExecutionResult.Finite>(result).result.outcome)
+        val finite = assertIs<SourceExecutionResult.Finite>(result)
+        val completed = assertIs<FiniteSolveOutcome.Completed>(finite.result.outcome)
         assertTrue(checkedComposite)
         assertEquals(FiniteSolveVerdict.UNKNOWN, completed.verdict)
         assertNull(completed.bestSample)

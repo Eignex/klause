@@ -16,7 +16,11 @@ internal fun smtBuiltinIdentifier(root: SExpr): SExpr {
     }
 }
 
-internal fun smtBuiltinResultSort(identifier: SExpr, arguments: List<SmtSort>, qualification: SmtSort? = null): SmtSort? {
+internal fun smtBuiltinResultSort(
+    identifier: SExpr,
+    arguments: List<SmtSort>,
+    qualification: SmtSort? = null,
+): SmtSort? {
     val resolved = smtBuiltinIdentifier(identifier)
     smtBitVectorBuiltinSort(resolved, arguments)?.let { return it }
     if (resolved is SExpr.SList) {
