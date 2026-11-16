@@ -4,6 +4,7 @@ import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
 import com.eignex.klause.arithmetic.polynomial.RationalPolynomial
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.util.ExecutionControl
+import com.eignex.util.numbers.BigFraction
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -12,7 +13,10 @@ class SmtFixedModelTest {
     @Test
     fun `declared pi keeps its retained value instead of the real-function constant`() {
         val parsed = SmtLib.parse("(declare-const pi Real)")
-        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf(), doubleArrayOf(0.0)))
+        val sample = Sample(BooleanArray(parsed.encodingBoolVarNames.size), LongArray(parsed.encodingIntVarNames.size),
+            DoubleArray(parsed.encodingRealVarNames.size),
+            exactReals = List(parsed.encodingRealVarNames.size) { BigFraction.ZERO })
+        val model = parsed.reconstructSessionModel(sample)
 
         val result = model.evaluate(SExpr.Atom("pi"))
 
@@ -22,11 +26,23 @@ class SmtFixedModelTest {
     @Test
     fun `declared exp keeps its total function table instead of the real-function extension`() {
         val parsed = SmtLib.parse("(declare-fun exp (Real) Real)")
-        val model = parsed.reconstructSessionModel(Sample(booleanArrayOf(), longArrayOf()))
+        val sample = Sample(BooleanArray(parsed.encodingBoolVarNames.size), LongArray(parsed.encodingIntVarNames.size),
+            DoubleArray(parsed.encodingRealVarNames.size),
+            exactReals = List(parsed.encodingRealVarNames.size) { BigFraction.ZERO })
+        val model = parsed.reconstructSessionModel(sample)
 
         val result = model.evaluate(SExprReader("(exp 1.0)").readAll().single())
 
         assertEquals("0.0", result)
+    }
+
+    @Test
+    fun `approximate real samples cannot become certified retained interpretations`() {
+        val parsed = SmtLib.parse("(declare-const x Real)")
+        val sample = Sample(BooleanArray(parsed.encodingBoolVarNames.size), LongArray(parsed.encodingIntVarNames.size),
+            DoubleArray(parsed.encodingRealVarNames.size))
+
+        assertFailsWith<IllegalArgumentException> { parsed.reconstructSessionModel(sample) }
     }
 
     @Test
@@ -181,7 +197,8 @@ class SmtFixedModelTest {
             (assert (= x x))
         """.trimIndent())
         val sample = Sample(BooleanArray(parsed.encodingBoolVarNames.size),
-            LongArray(parsed.encodingIntVarNames.size), DoubleArray(parsed.encodingRealVarNames.size))
+            LongArray(parsed.encodingIntVarNames.size), DoubleArray(parsed.encodingRealVarNames.size),
+            exactReals = List(parsed.encodingRealVarNames.size) { BigFraction.ZERO })
         val model = parsed.reconstructSessionModel(sample)
         val term = SExprReader("(as x (_ BitVec 129))").readAll().single()
 

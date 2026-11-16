@@ -34,12 +34,53 @@ class SmtAnnotationsTest {
     }
 
     @Test
+    fun `parallel binding values keep the enclosing symbol scope`() {
+        val commands = SExprReader("""
+            (declare-const x Int)
+            (assert (let ((x (! x :named global))) (= x global)))
+        """.trimIndent()).readAll()
+
+        val result = captureSmtSource(commands, ExecutionControl.Never)
+
+        assertEquals("(define-fun global () Int x)", result.commands[1].smtText())
+    }
+
+    @Test
+    fun `leaving a shadowed binder preserves the enclosing binding`() {
+        val commands = SExprReader("""
+            (declare-const x Int)
+            (assert (let ((x 1)) (= (let ((x 2)) x) (! x :named captured))))
+        """.trimIndent()).readAll()
+
+        assertFailsWith<UnsupportedSmtException> { captureSmtSource(commands, ExecutionControl.Never) }
+    }
+
+    @Test
     fun `named terms can contain their own closed let bindings`() {
         val commands = SExprReader("(assert (= (! (let ((x 1)) x) :named one) one))").readAll()
 
         val result = captureSmtSource(commands, ExecutionControl.Never)
 
         assertEquals("(define-fun one () Int (let ((x 1)) x))", result.commands.first().smtText())
+    }
+
+    @Test
+    fun `closed named terms support deep lexical binding chains`() {
+        val depth = 10_000
+        val body = buildString {
+            for (index in 0 until depth) {
+                val value = if (index == 0) "true" else "b${index - 1}"
+                append("(let ((b$index $value)) ")
+            }
+            append("b${depth - 1}")
+            repeat(depth) { append(')') }
+        }
+        val commands = SExprReader("(assert (! $body :named label))").readAll()
+
+        val result = captureSmtSource(commands, ExecutionControl.Never)
+
+        assertEquals(2, result.commands.size)
+        assertEquals("label", result.original?.symbols?.single()?.declaration?.name)
     }
 
     @Test
