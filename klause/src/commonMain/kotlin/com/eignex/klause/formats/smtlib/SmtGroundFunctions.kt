@@ -25,6 +25,30 @@ internal fun reduceSmtGroundFunctions(input: SmtReduction, cancellation: Executi
 internal fun exposeSmtGroundFunctions(input: SmtReduction, cancellation: ExecutionControl): SmtReduction =
     SmtGroundFunctionReducer(input, cancellation, encodeUninterpreted = false).reduce()
 
+internal fun needsSmtGroundExposure(input: SmtReduction, cancellation: ExecutionControl): Boolean {
+    if (input.datatypes != null) return true
+    val sorts = ArrayDeque<SmtSort>()
+    for (declaration in input.declarations) {
+        cancellation.polynomialSourceCheckpoint(1)
+        sorts.addLast(declaration.result)
+        for (parameter in declaration.parameters) sorts.addLast(parameter)
+    }
+    for (term in input.original?.terms.orEmpty()) {
+        cancellation.polynomialSourceCheckpoint(1)
+        if (term.datatype == null && term.operator == "log") return true
+        sorts.addLast(term.sort)
+    }
+    while (sorts.isNotEmpty()) {
+        cancellation.polynomialSourceCheckpoint(1)
+        when (val sort = sorts.removeLast()) {
+            is SmtSort.Array -> return true
+            is SmtSort.Uninterpreted -> for (argument in sort.arguments) sorts.addLast(argument)
+            else -> Unit
+        }
+    }
+    return false
+}
+
 private class SmtGroundFunctionReducer(private val input: SmtReduction, private val cancellation: ExecutionControl,
     private val encodeUninterpreted: Boolean) {
     private data class Term(val id: Int, val expression: SExpr, val partial: Boolean = false)

@@ -33,7 +33,9 @@ internal fun parseSmtLibSource(
         }
         val polymorphic = reduceSmtPolymorphism(captureSmtSource(commands, cancellation), cancellation)
         val datatypes = exposeSmtGroundDatatypes(polymorphic, cancellation)
-        val exposed = exposeSmtGroundFunctions(datatypes, cancellation)
+        val exposed = if (needsSmtGroundExposure(datatypes, cancellation)) {
+            exposeSmtGroundFunctions(datatypes, cancellation)
+        } else datatypes
         val arrays = reduceSmtGroundArrays(exposed, cancellation)
         val ground = reduceSmtGroundFunctions(finishSmtGroundDatatypes(arrays, cancellation), cancellation)
         val reduction = lowerSmtBitVectors(ground, cancellation)

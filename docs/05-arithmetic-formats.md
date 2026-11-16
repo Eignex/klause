@@ -195,6 +195,11 @@ finite representative domains; interpreted arithmetic domains remain open. Model
 recipes restore original ranks, typed domain values, function entries and total
 defaults while public scalar maps retain original scalar sorts.
 
+Array and datatype lowering expose ground helper bodies before scalar compilation.
+Admission skips early exposure when the source has no array or datatype structure
+and no partial logarithm checks. The direct scalar lowering route retains lexical
+`let` sharing.
+
 Global sort parameters retain their universal source obligations. Necessary ground
 instances can refute them; finite instance satisfaction alone supplies no SAT
 certificate. Boolean schema tautologies admit interpretation-independent checking.

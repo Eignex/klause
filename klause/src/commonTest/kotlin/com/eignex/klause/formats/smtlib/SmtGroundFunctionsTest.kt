@@ -466,7 +466,7 @@ class SmtGroundFunctionsTest {
         )
 
         for (body in cases) {
-            val parsed = SmtLib.parse("(define-sort R () Real) $body")
+            val parsed = SmtLib.parse(body)
             val invocation = SourceSetup.prepare(SourceSetupRequest(parsed.source,
                 ExecutionOperation.SATISFY, FiniteEngine.BACKTRACK))
 
