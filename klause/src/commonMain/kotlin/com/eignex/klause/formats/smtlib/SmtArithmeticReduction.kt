@@ -171,7 +171,7 @@ private class SmtArithmeticReducer(private val input: SmtReduction, private val 
                             "**" -> power(args[0], args[1])
                             else -> if (head is SExpr.SList && head.items.size == 3 &&
                                 (head.items[0] as? SExpr.Atom)?.text == "_" &&
-                                (head.items[1] as? SExpr.Atom)?.text == "divisible") {
+                                (head.items[1] as? SExpr.Atom)?.text?.let(::polynomialSymbol) == "divisible") {
                                 form("=", divide(args.single(), head.items[2], remainder = true), zero)
                             } else SExpr.SList(listOf(head) + args)
                         }

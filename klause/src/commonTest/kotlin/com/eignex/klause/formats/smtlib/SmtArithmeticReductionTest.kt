@@ -215,6 +215,28 @@ class SmtArithmeticReductionTest {
     }
 
     @Test
+    fun `quoted indexed divisibility should accept multiples`() {
+        for (operator in listOf("(_ |divisible| 3)", "(as (_ |divisible| 3) Bool)")) {
+            val input = SmtLib.parse("(assert ($operator 6))")
+
+            val result = solve(input)
+
+            assertEquals(FiniteSolveVerdict.SAT, result, diagnostic)
+        }
+    }
+
+    @Test
+    fun `quoted indexed divisibility should refute nonmultiples`() {
+        for (operator in listOf("(_ |divisible| 3)", "(as (_ |divisible| 3) Bool)")) {
+            val input = SmtLib.parse("(assert ($operator 7))")
+
+            val result = solve(input)
+
+            assertEquals(FiniteSolveVerdict.UNSAT, result, diagnostic)
+        }
+    }
+
+    @Test
     fun `qualified integer division should retain its integer result sort`() {
         val input = SmtLib.parse("(assert (= ((as div Int) 7 3) 2))")
 
