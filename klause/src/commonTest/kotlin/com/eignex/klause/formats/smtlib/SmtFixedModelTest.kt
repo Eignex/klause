@@ -51,6 +51,7 @@ class SmtFixedModelTest {
     @Test
     fun `division queries reuse the checked zero divisor interpretation`() {
         val values = object : SmtModelValues {
+            override fun checkpoint(units: Long) = Unit
             override fun boolean(name: String): Boolean = error(name)
             override fun integer(name: String): String = error(name)
             override fun real(name: String): String = error(name)
