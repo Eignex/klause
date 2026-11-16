@@ -17,9 +17,9 @@ import com.eignex.klause.simplex.basis.RationalBasisOrder
 import com.eignex.klause.simplex.basis.SymbolicLu
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.pollStop
+import com.eignex.koblas.DenseVector
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
-import com.eignex.koblas.sparse.dotColumn
 import kotlin.math.abs
 import kotlin.time.TimeSource
 
@@ -620,7 +620,7 @@ internal class RevisedSimplex(
             for (at in from until until) value += colVal[at] * y[rowIdx[at]]
             return value
         }
-        return koblas.dotColumn(columns, j, y)
+        return koblas.dotColumn(columns, j, DenseVector.wrap(y))
     }
 
     /** `y · A_j` for the dual vector [y], charged to the work meter. */
@@ -918,7 +918,7 @@ internal class RevisedSimplex(
         if (until - from <= MAX_SCALAR_COLUMN_ENTRIES) {
             for (at in from until until) dense[rowIdx[at]] = colVal[at]
         } else {
-            koblas.scatter(rowIdx, from, colVal, from, until - from, dense)
+            koblas.scatter(columns.columnView(column), DenseVector.wrap(dense))
         }
     }
 
@@ -928,7 +928,7 @@ internal class RevisedSimplex(
         if (until - from <= MAX_SCALAR_COLUMN_ENTRIES) {
             for (at in from until until) destination[rowIdx[at]] += alpha * colVal[at]
         } else {
-            koblas.axpy(rowIdx, from, colVal, from, until - from, alpha, destination)
+            koblas.axpy(alpha, columns.columnView(column), DenseVector.wrap(destination))
         }
     }
 

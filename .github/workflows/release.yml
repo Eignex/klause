@@ -165,7 +165,7 @@ jobs:
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.CENTRAL_PORTAL_PASSWORD }}
           ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
-        run: ./gradlew publishAllPublicationsToSonatypeSnapshotsRepository -PciVersion="$RELEASE_VERSION"
+        run: ./gradlew publishAllPublicationsToSonatypeSnapshotsRepository -Ptargets.full -PciVersion="$RELEASE_VERSION"
       - name: Build CLI release assets
         if: env.IS_SNAPSHOT == 'false'
         run: ./gradlew :klause-cli:releaseAssets -Ptargets.full -PciVersion="$RELEASE_VERSION"

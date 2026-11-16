@@ -4,6 +4,7 @@ import com.eignex.klause.factor.bool.ClausePropagator
 import com.eignex.klause.factor.bool.PseudoBooleanPropagator
 import com.eignex.klause.util.StopPolling
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.storage.borrowBackingArray
 
 internal enum class ReclamationStatus { WITHIN_LIMIT, RECLAIMED, PROTECTED_FLOOR, DEFERRED, CANCELLED }
 
@@ -135,7 +136,7 @@ internal fun PropagationState.prepareReclamation(
     for (lists in listOf(watches.byLit.asList(), watches.blockersByLit.asList(), atoms.watchersByLit)) {
         for (list in lists) {
             budget.visit()
-            budget.atomic(1L + (list?.backingData?.size ?: 0), (list?.backingData?.size?.toLong() ?: 0L) * 8L)
+            budget.atomic(1L + (list?.borrowBackingArray()?.size ?: 0), (list?.borrowBackingArray()?.size?.toLong() ?: 0L) * 8L)
         }
     }
     if (intEvents.overflow != null) {
@@ -143,14 +144,14 @@ internal fun PropagationState.prepareReclamation(
             budget.atomic(overflow.primitiveCapacityBytes + overflow.size.toLong() * overflow.size,
                 overflow.primitiveCapacityBytes * 2L + overflow.referenceCapacity.toLong() * Long.SIZE_BYTES * 2L)
             overflow.forEach({ budget.visit(it) }) { _, posting ->
-                val capacity = posting.backingData.size.toLong()
+                val capacity = posting.borrowBackingArray().size.toLong()
                 budget.atomic(capacity, capacity * Int.SIZE_BYTES)
             }
         }
     }
     learned.store.prepareRemap(budget)
     for (column in listOf(learned.units, learned.pendingAttach, learned.capCandidates)) {
-        budget.atomic(column.backingData.size.toLong(), column.backingData.size.toLong() * Int.SIZE_BYTES)
+        budget.atomic(column.borrowBackingArray().size.toLong(), column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES)
     }
     arithmeticLearningTrace?.let { trace ->
         val entries = trace.reclamationEntries.toLong()
@@ -191,7 +192,7 @@ internal fun PropagationState.ownLearned(sample: com.eignex.klause.util.SharingM
 }
 
 internal val IntArrayList.learnedTrimmingWork: Long
-    get() = if (backingData.size > size.coerceAtLeast(1)) 5L + size.coerceAtLeast(1) * 2L else 0L
+    get() = if (borrowBackingArray().size > size.coerceAtLeast(1)) 5L + size.coerceAtLeast(1) * 2L else 0L
 
 internal fun trimLearnedCandidates(candidates: IntArrayList, budget: ReclamationPreparation) {
     val count = candidates.size.coerceAtLeast(1).toLong()

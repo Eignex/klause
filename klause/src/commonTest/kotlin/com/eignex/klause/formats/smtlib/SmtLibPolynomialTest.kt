@@ -25,7 +25,11 @@ class SmtLibPolynomialTest {
     @Test
     fun `pre cancelled lowering should not read its source`() {
         val source = object : CharSource {
-            override fun next(): String? = error("cancelled source must not be read")
+            private var closed = false
+            override fun close() {
+                closed = true
+            }
+            override fun next(): String? = if (closed) null else error("cancelled source must not be read")
         }
 
         assertFailsWith<PolynomialSourceInterrupted> { SmtLibPolynomial.parse(source, ExecutionControl { true }) }

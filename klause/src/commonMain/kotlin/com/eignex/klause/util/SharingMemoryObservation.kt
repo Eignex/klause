@@ -3,7 +3,7 @@ package com.eignex.klause.util
 import com.eignex.util.numbers.minOf
 import com.eignex.util.numbers.shl
 import com.eignex.util.numbers.toLong
-import com.eignex.util.platform.identityHash
+import com.eignex.util.runtime.identityHash
 
 internal enum class SharingMemoryStatus { COMPLETE, PARTIAL, STALE }
 

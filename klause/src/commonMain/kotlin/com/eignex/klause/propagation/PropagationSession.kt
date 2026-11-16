@@ -1763,7 +1763,7 @@ class PropagationSession private constructor(
         }
         while (trail.size > level) {
             val e = trail[trail.size - 1]
-            trail.removeAt(trail.size - 1)
+            trail.removeAtSwap(trail.size - 1)
             if (trailIsBool(e)) {
                 boolPinned[e] = -1
             } else {

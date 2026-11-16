@@ -2,6 +2,7 @@ package com.eignex.klause.propagation
 
 import com.eignex.klause.util.MutableIntObjectIndex
 import com.eignex.util.collections.IntArrayList
+import com.eignex.util.collections.storage.borrowBackingArray
 
 internal class IntEventOverflow {
     private val entries = MutableIntObjectIndex<IntArrayList>()
@@ -25,7 +26,7 @@ internal class IntEventOverflow {
         val posting = entries.getOrPut(key) { IntArrayList(1) }
         var work = entries.lastWork + if (entries.size > before) 4L else 0L
         val count = posting.size
-        work += 2L + if (count == posting.backingData.size) count * 3L + 1L else 0L
+        work += 2L + if (count == posting.borrowBackingArray().size) count * 3L + 1L else 0L
         posting.add(factor)
         return work
     }
@@ -52,7 +53,7 @@ internal class IntEventOverflow {
             }
             posting.truncateTo(write)
             work++
-            if (posting.backingData.size > write.coerceAtLeast(1)) work += write.coerceAtLeast(1) * 2L + 1L
+            if (posting.borrowBackingArray().size > write.coerceAtLeast(1)) work += write.coerceAtLeast(1) * 2L + 1L
             posting.trim()
             if (write > 0) work += replacement.entries.put(key, posting)
         }
@@ -91,7 +92,7 @@ internal class IntEventOverflow {
                 if (isRetired(posting[position])) {
                     budget.visit(8L)
                     budget.visit(0L)
-                    posting.removeAt(position)
+                    posting.removeAtSwap(position)
                 } else position++
                 budget.advanced()
             } else if (posting.size == 0) {
@@ -105,7 +106,7 @@ internal class IntEventOverflow {
 
     private fun finishPosting(key: Int, posting: IntArrayList, budget: ReclamationPreparation) {
         val count = posting.size.toLong()
-        if (posting.backingData.size > count) {
+        if (posting.borrowBackingArray().size > count) {
             val work = 7L + count * 2L
             val scratch = count * Int.SIZE_BYTES
             if (budget.supports(work, scratch)) {

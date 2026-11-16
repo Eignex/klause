@@ -5,7 +5,20 @@ import com.eignex.util.io.CharSource
 /** A [CharSource] over pre-split [chunks], for exercising a consumer across arbitrary chunk boundaries. */
 class ChunkedCharSource(chunks: List<String>) : CharSource {
     private val chunk = chunks.iterator()
-    override fun next(): String? = if (chunk.hasNext()) chunk.next() else null
+    private var closed = false
+
+    override fun next(): String? {
+        if (closed) return null
+        while (chunk.hasNext()) {
+            val next = chunk.next()
+            if (next.isNotEmpty()) return next
+        }
+        return null
+    }
+
+    override fun close() {
+        closed = true
+    }
 }
 
 /** A [CharSource] that hands out [text] one character at a time — the tightest chunking, which lands a

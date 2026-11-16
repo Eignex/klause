@@ -5,7 +5,7 @@ import com.eignex.klause.ir.IntConsumer
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.defaultDomainStorageSettings
-import com.eignex.util.collections.Bits
+import com.eignex.util.collections.storage.PackedBits
 
 /** Bitset over a narrow span: bit `(value - bitsetLo)` is set iff `value` is present. The backing
  *  array keeps its construction-time length; a later bound move clears bits but never reallocates,
@@ -25,8 +25,8 @@ internal class BitsetDomain(
         require(min <= max) { "Empty domain: $min..$max" }
         // The endpoints must be members; a violation means a caller built the bit array wrong (e.g. a span
         // overflow), and catching it at construction names the culprit.
-        check(Bits.has(bitset, (min - bitsetLo).toInt())) { "min $min is not a member (lo=$bitsetLo)" }
-        check(Bits.has(bitset, (max - bitsetLo).toInt())) { "max $max is not a member (lo=$bitsetLo)" }
+        check(PackedBits.has(bitset, (min - bitsetLo).toInt())) { "min $min is not a member (lo=$bitsetLo)" }
+        check(PackedBits.has(bitset, (max - bitsetLo).toInt())) { "max $max is not a member (lo=$bitsetLo)" }
     }
 
     override fun spanOrNull(maxValues: Long): IntSpan? = if (size.toLong() <= maxValues) this else null
@@ -37,7 +37,7 @@ internal class BitsetDomain(
         s
     }
 
-    override fun contains(value: Long): Boolean = value in min..max && Bits.has(bitset, (value - bitsetLo).toInt())
+    override fun contains(value: Long): Boolean = value in min..max && PackedBits.has(bitset, (value - bitsetLo).toInt())
 
     override fun valueAt(i: Int): Long {
         var remaining = i
@@ -61,16 +61,16 @@ internal class BitsetDomain(
     override fun excludeValue(value: Long): IntDomain {
         if (!contains(value)) return this
         val newBits = bitset.copyOf()
-        Bits.clear(newBits, (value - bitsetLo).toInt())
+        PackedBits.clear(newBits, (value - bitsetLo).toInt())
         var newMin = min
         var newMax = max
         if (value == min) {
-            val firstSet = Bits.firstSet(newBits)
+            val firstSet = PackedBits.firstSet(newBits)
             check(firstSet >= 0) { "Empty domain after excludeValue($value)" }
             newMin = bitsetLo + firstSet
         }
         if (value == max) {
-            val lastSet = Bits.lastSet(newBits)
+            val lastSet = PackedBits.lastSet(newBits)
             check(lastSet >= 0) { "Empty domain after excludeValue($value)" }
             newMax = bitsetLo + lastSet
         }
@@ -81,8 +81,8 @@ internal class BitsetDomain(
         if (newMin <= min) return this
         check(newMin <= max) { "withMinAtLeast($newMin) empties domain [$min..$max]" }
         val newBits = bitset.copyOf()
-        Bits.clearBelow(newBits, (newMin - bitsetLo).toInt())
-        val firstSet = Bits.firstSet(newBits)
+        PackedBits.clearBelow(newBits, (newMin - bitsetLo).toInt())
+        val firstSet = PackedBits.firstSet(newBits)
         check(firstSet >= 0) { "withMinAtLeast($newMin) emptied bitset domain" }
         val m = bitsetLo + firstSet
         check(m <= max) { "withMinAtLeast($newMin): only zero bits remained" }
@@ -93,8 +93,8 @@ internal class BitsetDomain(
         if (newMax >= max) return this
         check(newMax >= min) { "withMaxAtMost($newMax) empties domain [$min..$max]" }
         val newBits = bitset.copyOf()
-        Bits.clearAbove(newBits, (newMax - bitsetLo).toInt())
-        val lastSet = Bits.lastSet(newBits)
+        PackedBits.clearAbove(newBits, (newMax - bitsetLo).toInt())
+        val lastSet = PackedBits.lastSet(newBits)
         check(lastSet >= 0) { "withMaxAtMost($newMax) emptied bitset domain" }
         val m = bitsetLo + lastSet
         check(m >= min) { "withMaxAtMost($newMax): only zero bits remained" }
@@ -104,7 +104,7 @@ internal class BitsetDomain(
     override fun includeInteriorValue(value: Long): IntDomain {
         require(value > min && value < max) { "includeInteriorValue($value) outside ($min, $max)" }
         val newBits = bitset.copyOf()
-        Bits.set(newBits, (value - bitsetLo).toInt())
+        PackedBits.set(newBits, (value - bitsetLo).toInt())
         return BitsetDomain(min, max, newBits, bitsetLo, storage)
     }
 
@@ -122,7 +122,7 @@ internal class BitsetDomain(
     override fun forEachHole(action: IntConsumer) {
         var v = min + 1
         while (v < max) {
-            if (!Bits.has(bitset, (v - bitsetLo).toInt())) action.accept(v)
+            if (!PackedBits.has(bitset, (v - bitsetLo).toInt())) action.accept(v)
             v++
         }
     }

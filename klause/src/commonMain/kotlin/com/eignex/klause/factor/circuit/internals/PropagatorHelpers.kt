@@ -46,7 +46,7 @@ internal inline fun PropagationState.circuitReachesAll(
     stack.add(root)
     while (!stack.isEmpty()) {
         val u = stack[stack.size - 1]
-        stack.removeAt(stack.size - 1)
+        stack.removeAtSwap(stack.size - 1)
         if (forward) {
             intDomains[succ[u]].values.forEach { vLong ->
                 val v = vLong.toInt()

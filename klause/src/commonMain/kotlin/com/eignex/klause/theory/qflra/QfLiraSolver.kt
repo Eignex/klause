@@ -97,6 +97,8 @@ import com.eignex.klause.util.WorkMeter
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.MutableIntIntMap
 import com.eignex.util.collections.MutableIntObjectMap
+import com.eignex.util.collections.removeKeysAbove
+import com.eignex.util.collections.valueAtMaxKey
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BIG_TWO
 import com.eignex.util.numbers.BigFraction

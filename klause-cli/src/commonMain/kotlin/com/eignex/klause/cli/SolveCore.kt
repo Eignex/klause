@@ -35,7 +35,7 @@ import com.eignex.klause.solver.result.SearchEvent
 import com.eignex.klause.solver.result.SolveStats
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.numbers.BigFraction
-import com.eignex.util.platform.sampleHeap
+import com.eignex.util.runtime.diagnostics.sampleHeap
 import com.eignex.util.process.printErrorLine
 import com.eignex.util.process.processProperty
 import kotlin.time.Duration

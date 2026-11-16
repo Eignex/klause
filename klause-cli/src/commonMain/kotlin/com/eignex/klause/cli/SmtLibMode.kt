@@ -84,7 +84,7 @@ internal object SmtLibMode : CliMode {
             } finally {
                 common.diagnostic = previousDiagnostic
                 if (initialized) session.close()
-                if (source is AutoCloseable) source.close()
+                source.close()
             }
             return true
         }

@@ -1,6 +1,7 @@
 package com.eignex.klause.simplex.basis
 
 import com.eignex.klause.util.SparseSlices
+import com.eignex.koblas.DenseVector
 import com.eignex.koblas.SparseMatrix
 import com.eignex.koblas.koblas
 import kotlin.math.abs
@@ -16,6 +17,7 @@ internal class IndexedVector(val size: Int) {
     }
 
     private val values = DoubleArray(size)
+    private val denseValues = DenseVector.wrap(values)
     private val indices = IntArray(size)
     private val stored = IntArray(size)
     var count: Int = 0
@@ -24,9 +26,7 @@ internal class IndexedVector(val size: Int) {
 
     operator fun get(i: Int): Double = values[i]
 
-    @Suppress("LongParameterList")
-    fun dot(indices: IntArray, indexOffset: Int, source: DoubleArray, valueOffset: Int, count: Int): Double =
-        koblas.dot(indices, indexOffset, source, valueOffset, count, values)
+    fun dotColumn(source: SparseMatrix, column: Int): Double = koblas.dotColumn(source, column, denseValues)
 
     fun nrm2(): Double {
         var squares = 0.0

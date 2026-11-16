@@ -120,7 +120,7 @@ object SmtLib {
                 unboundedIntLo, unboundedIntHi, settings, cancellation, semanticOverrides,
             )
         } finally {
-            if (!transferred && source is AutoCloseable) source.close()
+            if (!transferred) source.close()
         }
     }
 

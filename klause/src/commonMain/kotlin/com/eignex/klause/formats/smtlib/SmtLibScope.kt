@@ -2,7 +2,7 @@ package com.eignex.klause.formats.smtlib
 
 import com.eignex.klause.lowering.polynomialSourceCheckpoint
 import com.eignex.klause.util.ExecutionControl
-import com.eignex.util.platform.identityHash
+import com.eignex.util.runtime.identityHash
 
 internal class SmtExpressionIdentity(val expression: SExpr) {
     override fun equals(other: Any?): Boolean = other is SmtExpressionIdentity && expression === other.expression

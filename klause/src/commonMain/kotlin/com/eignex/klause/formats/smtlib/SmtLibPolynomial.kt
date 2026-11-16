@@ -362,8 +362,18 @@ private class PolynomialSourceInput(
 ) : CharSource {
     private var chunk = ""
     private var offset = 0
+    private var closed = false
+
+    override fun close() {
+        if (closed) return
+        closed = true
+        chunk = ""
+        offset = 0
+        source.close()
+    }
 
     override fun next(): String? {
+        if (closed) return null
         cancellation.polynomialSourceCheckpoint()
         if (offset == chunk.length) {
             chunk = source.next() ?: return null

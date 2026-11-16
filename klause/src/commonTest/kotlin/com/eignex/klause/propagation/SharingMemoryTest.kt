@@ -10,6 +10,7 @@ import com.eignex.klause.solver.search.SearchSession
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.klause.util.SharingMemoryObservation
 import com.eignex.klause.util.SharingMemoryStatus
+import com.eignex.util.collections.storage.borrowBackingArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -237,19 +238,19 @@ class SharingMemoryTest {
             session.addLearnedClause(Clause(intArrayOf(0, 2)), 2, permanent = permanent)
             val state = session.explanationState
             val columns = listOf(state.learned.units, state.learned.pendingAttach, state.learned.capCandidates)
-            var dependencies = columns.sumOf { it.backingData.size.toLong() * Int.SIZE_BYTES } +
+            var dependencies = columns.sumOf { it.borrowBackingArray().size.toLong() * Int.SIZE_BYTES } +
                 state.watches.pos.primitiveCapacityBytes + state.learned.capRanking.primitiveBytes +
                 state.learned.store.primitiveBytes + 44L
             for (literal in listOf(0, 2)) {
-                dependencies += (state.watches.byLit[literal].backingData.size.toLong() +
-                    state.watches.blockersByLit[literal].backingData.size) * Int.SIZE_BYTES
+                dependencies += (state.watches.byLit[literal].borrowBackingArray().size.toLong() +
+                    state.watches.blockersByLit[literal].borrowBackingArray().size) * Int.SIZE_BYTES
             }
             val sample = SharingMemoryObservation(1_000_000L, 4096, { false }, {})
             val before = assertNotNull(sample.snapshot { state.sharingMemory(sample) }.completeValues)
 
             val after = assertNotNull(sample.snapshot {
                 for (column in columns) {
-                    sample.owned(column.backingData, column.backingData.size.toLong() * Int.SIZE_BYTES, true)
+                    sample.owned(column.borrowBackingArray(), column.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, true)
                 }
                 state.learned.capRanking.sharingMemory(sample, true)
                 sample.owned(state.learned, 44L, true)
@@ -259,7 +260,7 @@ class SharingMemoryTest {
                 sample.ownedReferences(state.watches.pos, state.watches.pos.referenceCapacity, true)
                 for (literal in listOf(0, 2)) {
                     for (posting in listOf(state.watches.byLit[literal], state.watches.blockersByLit[literal])) {
-                        sample.owned(posting.backingData, posting.backingData.size.toLong() * Int.SIZE_BYTES, true)
+                        sample.owned(posting.borrowBackingArray(), posting.borrowBackingArray().size.toLong() * Int.SIZE_BYTES, true)
                     }
                 }
             }.completeValues)
@@ -313,8 +314,8 @@ class SharingMemoryTest {
         session.addLearnedClause(Clause(intArrayOf(0, 2)), 2, permanent = true)
         session.addLearnedClause(Clause(intArrayOf(4, 6)), 2)
         val state = session.explanationState
-        val posting = state.watches.byLit[4].backingData
-        val blockers = state.watches.blockersByLit[4].backingData
+        val posting = state.watches.byLit[4].borrowBackingArray()
+        val blockers = state.watches.blockersByLit[4].borrowBackingArray()
         val sample = SharingMemoryObservation(1_000_000L, 4096, { false }, {})
         val before = assertNotNull(sample.snapshot { state.sharingMemory(sample) }.completeValues)
 
@@ -343,7 +344,7 @@ class SharingMemoryTest {
             val overflow = assertNotNull(state.intEvents.overflow)
             var dependencies = overflow.primitiveCapacityBytes + rows.primitiveCapacityBytes
             overflow.forEach { _, posting ->
-                dependencies += posting.backingData.size.toLong() * Int.SIZE_BYTES
+                dependencies += posting.borrowBackingArray().size.toLong() * Int.SIZE_BYTES
             }
             val sample = SharingMemoryObservation(1_000_000L, 4096, { false }, {})
             val before = assertNotNull(sample.snapshot { state.sharingMemory(sample) }.completeValues)
@@ -353,7 +354,7 @@ class SharingMemoryTest {
                 sample.owned(overflow, overflow.primitiveCapacityBytes, true)
                 sample.ownedReferences(overflow, overflow.referenceCapacity.toLong(), true)
                 overflow.forEach({ units -> repeat(units.toInt()) { sample.step() } }) { _, posting ->
-                    val array = posting.backingData
+                    val array = posting.borrowBackingArray()
                     sample.owned(array, array.size.toLong() * Int.SIZE_BYTES, true)
                 }
             }.completeValues)

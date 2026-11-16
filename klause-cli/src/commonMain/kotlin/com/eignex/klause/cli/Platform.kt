@@ -1,7 +1,7 @@
 package com.eignex.klause.cli
 
 import com.eignex.klause.config.KlauseConfig
-import com.eignex.util.platform.compilationTimeMillis
+import com.eignex.util.runtime.diagnostics.compilationTimeMillis
 import com.eignex.util.process.processProperty
 import kotlin.time.TimeSource
 

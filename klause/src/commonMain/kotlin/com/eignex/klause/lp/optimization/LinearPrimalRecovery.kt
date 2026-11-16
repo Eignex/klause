@@ -6,6 +6,7 @@ import com.eignex.klause.solver.evidence.SourceCoordinate
 import com.eignex.klause.util.ExecutionControl
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntIndexedCollection
+import com.eignex.util.collections.storage.borrowBackingArray
 import com.eignex.util.numbers.BIG_ONE
 import com.eignex.util.numbers.BigFraction
 import com.eignex.util.numbers.bigIntOf
@@ -151,7 +152,7 @@ internal fun recoverLinearPrimal(
                 }
             }
             meter.reserve(members.size.toLong() * (Int.SIZE_BITS - members.size.countLeadingZeroBits()))
-            members.backingData.sort(0, members.size)
+            members.borrowBackingArray().sort(0, members.size)
             for (index in 0 until members.size) local[members[index]] = index
             val localRows = ArrayList<ExactRationalInequality>(componentRows.size)
             componentRows.forEach { id ->

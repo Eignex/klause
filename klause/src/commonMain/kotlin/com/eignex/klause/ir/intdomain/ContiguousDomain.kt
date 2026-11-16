@@ -5,7 +5,7 @@ import com.eignex.klause.ir.IntConsumer
 import com.eignex.klause.ir.IntDomain
 import com.eignex.klause.ir.IntSpan
 import com.eignex.klause.ir.defaultDomainStorageSettings
-import com.eignex.util.collections.Bits
+import com.eignex.util.collections.storage.PackedBits
 
 /** Contiguous `(min..max)`, no interior holes. */
 internal class ContiguousDomain(
@@ -58,8 +58,8 @@ internal class ContiguousDomain(
                 if (span in 1..storage.bitsetThreshold) {
                     val spanI = span.toInt()
                     val bits = LongArray((spanI + 63) ushr 6)
-                    Bits.fillRange(bits, 0, spanI)
-                    Bits.clear(bits, (value - min).toInt())
+                    PackedBits.fillRange(bits, 0, spanI)
+                    PackedBits.clear(bits, (value - min).toInt())
                     BitsetDomain(min, max, bits, min, storage)
                 } else {
                     RunsDomain(min, max, longArrayOf(min, value - 1, value + 1, max), storage)
