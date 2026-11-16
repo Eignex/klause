@@ -152,15 +152,14 @@ maps and the original objective and direction. Callers pass
 the frontend never classifies a source by the solver it will need. Interruption
 throws `CancellationException` before any source is published.
 
-The frontend admits quantifier-free bitvectors and linear integer and real arithmetic with Boolean
-structure and supported `minimize`/`maximize` objectives, polynomial Int/Real/Bool
+The frontend admits ground free sorts and functions, quantifier-free bitvectors,
+and linear integer and real arithmetic with Boolean structure and supported `minimize`/`maximize` objectives, polynomial Int/Real/Bool
 satisfaction with products and fixed nonnegative integral powers, and a real-function
 extension with unary `exp`, `log`, `sin`, `cos` and the constant `pi`. One
 `check-sat` or `check-sat-assuming` query is accepted, with Boolean literal
 assumptions conjoined to the assertions; `get-model` and `get-objectives` are
-accepted requests. Arrays, strings, quantifiers, uninterpreted
-functions, symbolic or zero division, negative or noninteger powers, nonlinear
-integer `div`/`mod`/`to_int`, multiple or nonquadratic objectives, incremental
+accepted requests. Arrays, strings, quantifiers, symbolic or zero division, negative
+or noninteger powers, nonlinear integer `div`/`mod`/`to_int`, multiple or nonquadratic objectives, incremental
 commands, multiple queries and `get-value` decline explicitly, even inside a
 constant Boolean branch.
 
@@ -183,6 +182,31 @@ Private bits reconstruct width-correct source binary values, and an independent
 arbitrary-precision evaluator checks each original bitvector operation against its
 encoded inputs and output before a reconstructed model is published. Circuit width,
 gate and work budgets stop admission cleanly, including constant-folded operations.
+
+### Ground functions and type parameters
+
+Free sort constructors, sort aliases and typed ground functions are resolved before
+scalar lowering. Each ground application receives a private result and captured
+arguments. Pairwise congruence requires equal results whenever evaluated arguments
+are equal, including exact arithmetic arguments. Only free sort identities receive
+finite representative domains; interpreted arithmetic domains remain open. Model
+recipes restore original ranks, typed domain values, function entries and total
+defaults while public scalar maps retain original scalar sorts.
+
+Global sort parameters retain their universal source obligations. Necessary ground
+instances can refute them; finite instance satisfaction alone supplies no SAT
+certificate. Boolean schema tautologies admit interpretation-independent checking.
+Pure free-function, equality and Boolean schemas also admit one shared Boolean
+archetype transported to two distinguished values of each instantiated sort.
+Datatype declarations disable that construction because their domains may be
+singletons. Definitions whose bodies contain type parameters absent from their
+ranks carry universal coherence obligations even when unused. Uncertified schema
+obligations withhold SAT and terminal claims through the source witness validator.
+
+Reconstructed polymorphic models retain immutable family recipes. A later query
+can instantiate an unobserved rank from the same chosen interpretation; known
+ranks resolve their distinct private binding keys. Partial model output preserves
+the source function name and concrete rank of every returned instance.
 
 ### Declaration policy
 
@@ -215,7 +239,7 @@ typed source and original declaration order and spellings remain attached.
 
 Reduction passes carry transformed commands, original declarations, named private
 recipes and original-source checks together. Every pass and fallback charges the
-same cancellation token, so representation changes do not reset an encoding
+same execution control, so representation changes do not reset an encoding
 budget. Caller endpoint overrides apply only to original scalar declarations;
 private reduction coordinates keep the bounds supplied by their encoding. Only
 original zero-arity numeric declarations receive caller endpoint overrides;

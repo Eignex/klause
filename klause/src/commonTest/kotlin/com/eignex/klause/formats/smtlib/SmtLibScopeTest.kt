@@ -15,6 +15,26 @@ import kotlin.test.assertIs
 
 class SmtLibScopeTest {
     @Test
+    fun `source declarations cannot use reserved solver names`() {
+        for (name in listOf("@value", ".private", "|@quoted|", "|.quoted|")) {
+            assertFailsWith<UnsupportedSmtException> { SmtLib.parse("(declare-const $name Int)") }
+        }
+    }
+
+    @Test
+    fun `declarations and local binders cannot shadow theory functions`() {
+        val cases = listOf(
+            "(declare-fun + (Int Int) Int)",
+            "(define-fun not ((x Bool)) Bool x)",
+            "(define-fun f ((and Bool)) Bool and)",
+            "(assert (let ((true false)) true))",
+            "(assert (let ((+ 1)) (= + 1)))",
+        )
+
+        for (text in cases) assertFailsWith<UnsupportedSmtException> { SmtLib.parse(text) }
+    }
+
+    @Test
     fun `unused helper result sorts should be checked independently of logic declarations`() {
         for (logic in listOf("", "(set-logic QF_LIA)", "(set-logic QF_NRA)", "(set-logic ALL)")) {
             val source = "$logic (define-fun invalid ((n Int)) Bool (+ n 1)) (assert true)"

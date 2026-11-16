@@ -1,5 +1,6 @@
 package com.eignex.klause.formats.smtlib
 
+import com.eignex.klause.arithmetic.real.ExactRealValue
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
 import com.eignex.klause.solver.pipeline.SourceWitnessValidator
 import com.eignex.klause.util.ExecutionControl
@@ -48,6 +49,8 @@ data class SmtSourceDeclaration(
 
 /** A reconstructed value in the source language. Real terms retain certified SMT syntax. */
 sealed interface SmtValue {
+    /** Compare composite values through their source semantics; null withholds an unavailable comparison. */
+    fun semanticEquals(other: SmtValue, values: SmtModelValues): kotlin.Boolean? = null
     /** A Boolean value. */
     data class Boolean(
         /** Mathematical truth value. */
@@ -97,6 +100,8 @@ sealed interface SmtValue {
 
 /** Named access to retained coordinates and composed reconstruction bindings. */
 interface SmtModelValues {
+    /** Current solve or reconstruction allowance, shared by all source checks. */
+    val cancellation: ExecutionControl get() = ExecutionControl.Never
     /** Charge and poll the current witness-check allowance, independent of admission. */
     fun checkpoint(units: Long = 1)
     /** Read a retained Boolean coordinate by its encoding name. */
@@ -107,6 +112,14 @@ interface SmtModelValues {
     fun real(name: String): String
     /** Reconstruct another named source or encoding binding. */
     fun value(name: String): SmtValue
+    /** Native certified real authority, or null when a callback supplies no exact representation. */
+    fun exactReal(name: String): ExactRealValue? = (value(name) as? SmtValue.Real)?.let { exactReal(it) }
+    /** Native authority for a reconstructed real, with exact rational syntax as a fallback. */
+    fun exactReal(value: SmtValue.Real): ExactRealValue? = smtRationalValue(value.term, cancellation)
+    /** Certified semantic equality; null withholds an undecided comparison. */
+    fun equal(left: String, right: String): Boolean? = equal(value(left), value(right))
+    /** Certified equality including reconstructed composite fields. */
+    fun equal(left: SmtValue, right: SmtValue): Boolean? = smtValuesEqual(this, left, right)
 }
 
 /** A source-owned recipe which never depends on a mutable compiler environment. */
@@ -147,6 +160,8 @@ data class SmtSourceBinding(
     val declaration: SmtSourceDeclaration,
     /** Owned encoding recipe. */
     val reconstruction: SmtReconstruction,
+    /** Encoding identity, distinct for each instantiated source signature. */
+    val key: String = declaration.name,
 )
 
 /** An original-source obligation with immutable captures, evaluated under each candidate's allowance. */
@@ -162,7 +177,10 @@ data class SmtSourceModel(
 )
 
 /** The original typed source, retained through all encoding passes and solving. */
-class SmtSourceSnapshot internal constructor(internal val typed: SmtTypedSource) {
+class SmtSourceSnapshot internal constructor(
+    internal val typed: SmtTypedSource,
+    internal val polymorphicModel: SmtPolymorphicModel? = null,
+) {
     /** Original declarations, in source order. */
     val declarations: List<SmtSourceDeclaration> get() = typed.declarations.toList()
 }
@@ -178,12 +196,13 @@ internal fun scalarSmtBindings(
     }
 }
 
-private fun <T> withSmtModelValues(
+internal fun <T> withSmtModelValues(
     problem: SmtLibProblem,
     boolean: (Int) -> Boolean,
     integer: (Int) -> String,
     real: (Int) -> String,
     cancellation: ExecutionControl,
+    exactReal: ((Int) -> ExactRealValue?)? = null,
     action: (SmtModelValues, () -> Unit) -> T,
 ): T {
     fun checkpoint(units: Long = 1) {
@@ -194,10 +213,14 @@ private fun <T> withSmtModelValues(
     val integers = problem.encodingIntVarNames.mapKeys { checkpoint(); polynomialSymbol(it.key) }
     val reals = problem.encodingRealVarNames.mapKeys { checkpoint(); polynomialSymbol(it.key) }
     val recipes = problem.privateBindings.mapKeys { polynomialSymbol(it.key) }.toMutableMap()
-    for (binding in problem.sourceBindings) recipes[polynomialSymbol(binding.declaration.name)] = binding.reconstruction
+    for (binding in problem.sourceBindings) recipes[polynomialSymbol(binding.key)] = binding.reconstruction
     val cache = HashMap<String, SmtValue>()
+    val realAuthorities = HashMap<String, ExactRealValue>()
     val active = HashSet<String>()
+    val sourceCancellation = cancellation
+    val nativeReal = exactReal
     val values = object : SmtModelValues {
+        override val cancellation: ExecutionControl = sourceCancellation
         override fun checkpoint(units: Long) {
             require(units >= 0)
             cancellation.charge(units)
@@ -213,8 +236,19 @@ private fun <T> withSmtModelValues(
         }
         override fun real(name: String): String {
             checkpoint()
-            return real(reals.getValue(polynomialSymbol(name)))
+            val id = reals.getValue(polynomialSymbol(name))
+            val term = real(id)
+            nativeReal?.invoke(id)?.let { realAuthorities[term] = it }
+            return term
         }
+        override fun exactReal(name: String): ExactRealValue? {
+            checkpoint()
+            val id = reals[polynomialSymbol(name)]
+            if (id != null) nativeReal?.invoke(id)?.let { return it }
+            return (value(name) as? SmtValue.Real)?.let { exactReal(it) }
+        }
+        override fun exactReal(value: SmtValue.Real): ExactRealValue? =
+            realAuthorities[value.term] ?: smtRationalValue(value.term, cancellation)
         override fun value(name: String): SmtValue {
             checkpoint()
             val canonical = polynomialSymbol(name)
@@ -241,10 +275,11 @@ internal fun reconstructSmtModel(
     integer: (Int) -> String,
     real: (Int) -> String,
     cancellation: ExecutionControl,
-): SmtSourceModel = withSmtModelValues(problem, boolean, integer, real, cancellation) { values, checkpoint ->
+    exactReal: ((Int) -> ExactRealValue?)? = null,
+): SmtSourceModel = withSmtModelValues(problem, boolean, integer, real, cancellation, exactReal) { values, checkpoint ->
     val model = SmtSourceModel(problem.sourceBindings.map { binding ->
         checkpoint()
-        binding.declaration to values.value(binding.declaration.name)
+        binding.declaration to values.value(binding.key)
     })
     checkSmtSource(problem, values, checkpoint)
     model
@@ -268,10 +303,14 @@ internal fun SmtLibProblem.withSourceWitnessValidation(): SmtLibProblem {
         try {
             withSmtModelValues(this, assignment::boolValue, assignment::intValue,
                 { assignment.smtRealValue(it, cancellation) },
-                cancellation) { values, checkpoint -> checkSmtSource(this, values, checkpoint) }
+                cancellation, { assignment.smtExactRealValue(it, cancellation) }) { values, checkpoint ->
+                    checkSmtSource(this, values, checkpoint)
+                }
             SourceEvidenceCheck.Checked
         } catch (_: SmtSourceWitnessRejected) {
             SourceEvidenceCheck.Rejected("SMT reconstructed value violates its original source")
+        } catch (_: SmtSourceCheckingUnavailable) {
+            SourceEvidenceCheck.Unavailable("SMT original-source comparison is not certified")
         }
     }
     return copy(source = source.withWitnessValidator(validator))
@@ -302,18 +341,47 @@ fun SmtValue.toSmtLib(): String = when (this) {
 
 /** Render original declarations without exposing private encoding names. */
 fun SmtSourceModel.toSmtLib(): String = buildString {
+    val usedNames = values.mapTo(HashSet()) { polynomialSymbol(it.first.name) }
+    val pending = ArrayDeque<SmtValue>()
+    for ((_, value) in values) pending.addLast(value)
+    while (pending.isNotEmpty()) {
+        val value = pending.removeLast()
+        if (value is SmtValue.Function) {
+            pending.addLast(value.default)
+            for ((arguments, result) in value.entries) {
+                pending.addLast(result)
+                for (argument in arguments) pending.addLast(argument)
+            }
+        } else {
+            val expressions = ArrayDeque<SExpr>()
+            for (expression in SExprReader(value.toSmtLib()).readAll()) expressions.addLast(expression)
+            while (expressions.isNotEmpty()) when (val expression = expressions.removeLast()) {
+                is SExpr.Atom -> usedNames += polynomialSymbol(expression.text)
+                is SExpr.SList -> for (item in expression.items) expressions.addLast(item)
+            }
+        }
+    }
+    var nextFormal = 0
+    fun formal(): String {
+        var name: String
+        do { name = ".klause.argument.${nextFormal++}" } while (!usedNames.add(name))
+        return name
+    }
     append("(\n")
     for ((declaration, value) in values) {
+        val formals = declaration.parameters.map { formal() }
         append("  (define-fun ${declaration.name} (")
         declaration.parameters.forEachIndexed { index, sort ->
             if (index > 0) append(' ')
-            append("(x$index ${sort.toSmtLib()})")
+            append("(${formals[index]} ${sort.toSmtLib()})")
         }
         append(") ${declaration.result.toSmtLib()} ")
         if (value is SmtValue.Function) {
             for ((arguments, result) in value.entries) {
                 append("(ite (and")
-                for ((index, argument) in arguments.withIndex()) append(" (= x$index ${argument.toSmtLib()})")
+                for ((index, argument) in arguments.withIndex()) {
+                    append(" (= ${formals[index]} ${argument.toSmtLib()})")
+                }
                 append(") ${result.toSmtLib()} ")
             }
             append(value.default.toSmtLib())

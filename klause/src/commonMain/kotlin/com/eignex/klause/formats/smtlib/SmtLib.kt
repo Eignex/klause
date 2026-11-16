@@ -64,13 +64,15 @@ data class SmtLibProblem(
     fun reconstructModel(
         assignment: OpenTheoryAssignment,
         cancellation: ExecutionControl = ExecutionControl.Never,
-    ): SmtSourceModel = reconstructModel(assignment::boolValue, assignment::intValue,
-        { assignment.smtRealValue(it, cancellation) }, cancellation)
+    ): SmtSourceModel = reconstructSmtModel(this, assignment::boolValue, assignment::intValue,
+        { assignment.smtRealValue(it, cancellation) }, cancellation,
+        { assignment.smtExactRealValue(it, cancellation) })
 
     /** Reconstruct a checked sample, retaining arbitrary integers and exact real authority. */
     fun reconstructModel(sample: Sample, cancellation: ExecutionControl = ExecutionControl.Never): SmtSourceModel =
-        reconstructModel(sample::boolValue, { sample.exactIntValue(it).toString() },
-            { sample.smtRealValue(it, cancellation) }, cancellation)
+        reconstructSmtModel(this, sample::boolValue, { sample.exactIntValue(it).toString() },
+            { sample.smtRealValue(it, cancellation) }, cancellation,
+            { sample.smtExactRealValue(it, cancellation) })
 
     internal val model: Problem get() = source.originalSource as? Problem
         ?: error("SMT source retains an exact formula")
