@@ -375,15 +375,18 @@ search over the source relations at the leaf's discrete point, in which every re
 of the tolerance components holds within the slack its bound alone admits:
 `max(absolute, relative * abs(bound))` for a row, declaration or member, and the
 absolute slack for a residual row. Components that hold exactly keep their exact
-encodings, and so does a component with a real product without finite choices or a
-power above one, which no linear model states. A witness of the search lies within
-what acceptance admits, and a refutation shows that no point holds every relation
-within that slack, so the leaf verdict stays feasible or infeasible. Where the leaf
+encodings. A witness of the search lies within what acceptance admits, and a refutation
+shows that no point holds every relation within that slack, so the leaf verdict stays
+feasible or infeasible. A source with a real product without finite choices, a power
+above one, or a kept relation no linear encoder enforces has no such search, and its
+leaves keep the verdicts of the float point and the exact completion. Where the leaf
 needs a search for an absolute value, finite membership or choice product, a witness
 gives way to an exact completion when one exists, which strains no relation. A leaf of
 linear rows reaches the search when its exact completion refutes it or decides
-nothing, and keeps no LP lemma from that refutation. Minimization completes its leaves the same way when the
-objective reads no real coordinate, and local-search and ALNS workers
+nothing, and keeps no LP lemma from that refutation. Minimization completes its leaves
+the same way when the objective reads no real coordinate; in every mode, a leaf with an
+absolute value, finite membership or choice product that the leaf LP leaves undecided
+is completed by the exact search. Local-search and ALNS workers
 [complete candidates](11-neighborhoods.md#continuous-candidate-completion) the same way.
 A leaf whose objective reads a real coordinate completes through the leaf LP alone, so
 its refusals and refutations are those of the float point and the exact LP. Projected

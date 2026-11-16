@@ -73,13 +73,19 @@ internal class LeafRealCompletion(
                 (floating as? Completion.Refuted)?.factors?.takeIf { it.isNotEmpty() } ?: realFactors, work,
             )
             is ToleranceSearchResult.Undecided -> Completion.Undecided(work)
+            // Without the search the candidate keeps the verdict of its floating and exact completions.
+            ToleranceSearchResult.Unavailable ->
+                absCompletion?.let { exactSearch(it, candidate, cancellation, work) } ?: floating
             is ToleranceSearchResult.Witness -> {
                 val tolerant = candidate.copy(reals = DoubleArray(found.reals.size) { found.reals[it].toDouble() },
                     exactReals = found.reals)
-                if (toleranceCheck?.invoke(tolerant) != true || cancellation()) return Completion.Undecided(work)
+                if (cancellation()) return Completion.Undecided(work)
+                if (toleranceCheck?.invoke(tolerant) != true) {
+                    return absCompletion?.let { exactSearch(it, candidate, cancellation, work) } ?: floating
+                }
                 // An exact completion strains no relation, so it is preferred where the search finds one.
-                (absCompletion?.let { exactSearch(it, candidate, cancellation, work) } as? Completion.Witness)
-                    ?: Completion.Witness(tolerant, work)
+                val exact = absCompletion?.let { exactSearch(it, candidate, cancellation, work) }
+                exact as? Completion.Witness ?: Completion.Witness(tolerant, exact?.work ?: work)
             }
         }
     }

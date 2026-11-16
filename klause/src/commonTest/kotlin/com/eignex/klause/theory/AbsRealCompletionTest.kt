@@ -12,13 +12,9 @@ import com.eignex.klause.factor.table.RealElement
 import com.eignex.klause.ir.Factor
 import com.eignex.klause.ir.FloatSemantics
 import com.eignex.klause.ir.IntDomain
-import com.eignex.klause.ir.LinearForm
 import com.eignex.klause.ir.LinearOp
-import com.eignex.klause.ir.LinearRow
 import com.eignex.klause.ir.Lit
 import com.eignex.klause.ir.Problem
-import com.eignex.klause.ir.RealConstants
-import com.eignex.klause.ir.RealConsts
 import com.eignex.klause.ir.SemanticRational
 import com.eignex.klause.ir.SourceFormat
 import com.eignex.klause.ir.SourceSemantics
@@ -30,8 +26,11 @@ import com.eignex.klause.propagation.bake
 import com.eignex.klause.simplex.exact.BigFraction
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
+import com.eignex.klause.solver.objective.LinearObjective
+import com.eignex.klause.solver.result.MinimizeResult
 import com.eignex.klause.solver.validation.ToleranceSearchResult
 import com.eignex.klause.solver.validation.capturedRealAcceptance
+import com.eignex.klause.solver.validation.unreadRelation
 import com.eignex.klause.util.Cancellation
 import com.eignex.klause.util.WorkMeter
 import com.eignex.util.numbers.bigIntOf
@@ -189,16 +188,6 @@ class AbsRealCompletionTest {
     private fun row(real: Int, op: LinearOp, bound: Double, strict: Boolean = false) =
         Linear(intArrayOf(), doubleArrayOf(), intArrayOf(real), doubleArrayOf(1.0), op, bound, strict)
 
-    // `abs(x(a)) = abs(x(b))` as a disjunction of two equalities, which has no tolerance reading.
-    private fun unread(a: Int, b: Int): Factor = object : Factor by Linear(
-        intArrayOf(), doubleArrayOf(), intArrayOf(a, b), doubleArrayOf(1.0, -1.0), LinearOp.EQ, 0.0,
-    ) {
-        override val linearForm: LinearForm = LinearForm.Disjunction(listOf(1.0, -1.0).map { sign ->
-            LinearRow.ofColumns(intArrayOf(), intArrayOf(a, b),
-                RealConstants(RealConsts(doubleArrayOf()), RealConsts(doubleArrayOf(1.0, sign)), 0.0, false),
-                LinearOp.EQ)
-        })
-    }
 
     private val unitSum =
         Linear(intArrayOf(), doubleArrayOf(), intArrayOf(0, 1), doubleArrayOf(1.0, 1.0), LinearOp.EQ, 1.0)
@@ -299,7 +288,7 @@ class AbsRealCompletionTest {
 
     @Test
     fun `an exact component should keep its declarations beside a relaxed one`() {
-        val problem = fixed(listOf(row(0, LinearOp.LE, 0.6), unread(1, 2)), doubleArrayOf(0.7, 0.5, 0.55))
+        val problem = fixed(listOf(row(0, LinearOp.LE, 0.6), unreadRelation(1, 2)), doubleArrayOf(0.7, 0.5, 0.55))
 
         assertEquals(AbsRealCompletion.Result.Refuted, withinTolerance(problem))
     }
@@ -314,5 +303,26 @@ class AbsRealCompletionTest {
             LpSolveContext.Production)
 
         assertIs<ToleranceSearchResult.Witness>(found)
+    }
+
+    @Test
+    fun `a tolerance search should be unavailable for a source with a free real product`() {
+        val source = fixed(listOf(ContinuousProduct(0, 0, 1)), doubleArrayOf(0.5, 0.3))
+
+        val found = SourceToleranceSearch(source, tenth).complete(Sample(booleanArrayOf(), longArrayOf()),
+            Cancellation.Never, null, LpSolveContext.Production)
+
+        assertEquals(ToleranceSearchResult.Unavailable, found)
+    }
+
+    @Test
+    fun `exact minimization should complete an absolute value its leaf relaxation leaves off the graph`() {
+        val source = Problem(0, 1, arrayOf(IntDomain(0, 3)), arrayOf(RealAbs(0, 1), row(0, LinearOp.EQ, 0.5)),
+            numRealVars = 2, realLower = doubleArrayOf(-1.0, 0.0), realUpper = doubleArrayOf(1.0, 3.0))
+
+        val result = BacktrackSolver(source.bake()).minimize(LinearObjective(intCoefficients = longArrayOf(1)))
+
+        val optimum = assertIs<MinimizeResult.Optimal>(result)
+        assertEquals(BigFraction.ofDouble(0.5), optimum.sample.exactReals?.get(1))
     }
 }

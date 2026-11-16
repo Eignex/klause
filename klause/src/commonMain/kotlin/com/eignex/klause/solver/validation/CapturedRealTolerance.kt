@@ -30,9 +30,14 @@ import com.eignex.klause.util.Cancellation
 import com.eignex.util.collections.IntArrayList
 import com.eignex.util.collections.IntDisjointSet
 import com.eignex.util.numbers.BIG_ONE
+import com.eignex.util.numbers.BigInt
 import com.eignex.util.numbers.bigIntOf
+import com.eignex.util.numbers.div
 import com.eignex.util.numbers.fitsLong
 import com.eignex.util.numbers.magnitudeBitLength
+import com.eignex.util.numbers.plus
+import com.eignex.util.numbers.shl
+import com.eignex.util.numbers.times
 import com.eignex.util.numbers.toLongExact
 
 internal fun Factor.hasCapturedLinearTolerance(): Boolean =
@@ -334,7 +339,8 @@ private class ToleranceWitness(
 
     // `result = base^exponent` read as a residual row. A power wider than [POWER_WIDTH] bits is never formed: a
     // power far above the result, or far below the slack the result leaves, decides the row from bit lengths alone,
-    // and one of comparable magnitude decides nothing.
+    // and one of comparable magnitude is bracketed by directed rounding, which decides every row but an exact tie
+    // with the slack.
     private fun powerResidual(result: BigFraction, base: BigFraction, exponent: Int): Boolean? {
         val magnitude = base.magnitude()
         if (magnitude.isZero || magnitude == BigFraction.ONE || base.width() * exponent <= POWER_WIDTH) {
@@ -352,6 +358,24 @@ private class ToleranceWitness(
         val alone = capturedSourceSlack(policy, BigFraction.ZERO, target)
         if (target < alone && high <= (alone - target).log2Floor()) return true
         if (target > alone && high + 1 <= (target - alone).log2Floor()) return false
+        var bits = POWER_BRACKET_BITS
+        while (bits <= POWER_WIDTH) {
+            val bracket = powerBracket(magnitude, exponent, bits, cancellation) ?: return null
+            val negative = base.signum() < 0 && exponent and 1 != 0
+            val lowest = if (negative) bracket.second.negated() else bracket.first
+            val highest = if (negative) bracket.first.negated() else bracket.second
+            val toLowest = (result - lowest).magnitude()
+            val toHighest = (result - highest).magnitude()
+            val farthest = if (toLowest > toHighest) toLowest else toHighest
+            if (farthest <= capturedSourceSlack(policy, BigFraction.ZERO, target + bracket.first)) return true
+            val nearest = when {
+                result >= lowest && result <= highest -> BigFraction.ZERO
+                toLowest < toHighest -> toLowest
+                else -> toHighest
+            }
+            if (nearest > capturedSourceSlack(policy, BigFraction.ZERO, target + bracket.second)) return false
+            bits *= 2
+        }
         return null
     }
 
@@ -382,11 +406,64 @@ private fun rationalPower(value: BigFraction, exponent: Int, cancellation: Cance
 
 private fun BigFraction.width(): Long = num.magnitudeBitLength().toLong() + den.magnitudeBitLength()
 
+// `[lower, upper]` around `magnitude^exponent` for a positive [magnitude], each product rounded outward to [bits]
+// significant bits; null when cancelled or when the bracket leaves the range a fraction can hold.
+private fun powerBracket(
+    magnitude: BigFraction,
+    exponent: Int,
+    bits: Int,
+    cancellation: Cancellation,
+): Pair<BigFraction, BigFraction>? {
+    fun round(value: Dyadic, up: Boolean): Dyadic {
+        val excess = value.mantissa.magnitudeBitLength() - bits
+        if (excess <= 0) return value
+        val divisor = BIG_ONE shl excess
+        val floor = value.mantissa / divisor
+        return Dyadic(if (up) floor + BIG_ONE else floor, value.exponent + excess)
+    }
+    fun times(left: Dyadic, right: Dyadic, up: Boolean): Dyadic? {
+        cancellation.charge(2L * bits)
+        if (cancellation()) return null
+        val product = Dyadic(left.mantissa * right.mantissa, left.exponent + right.exponent)
+        return round(product, up).takeIf { kotlin.math.abs(it.exponent) <= POWER_EXPONENT_RANGE }
+    }
+    val shift = magnitude.num.magnitudeBitLength() - magnitude.den.magnitudeBitLength() - bits
+    val floor = if (shift >= 0) magnitude.num / (magnitude.den shl shift)
+        else (magnitude.num shl -shift) / magnitude.den
+    var lowBase = Dyadic(floor, shift.toLong())
+    var highBase = Dyadic(floor + BIG_ONE, shift.toLong())
+    var low = Dyadic(BIG_ONE, 0L)
+    var high = Dyadic(BIG_ONE, 0L)
+    var remaining = exponent
+    while (remaining > 0) {
+        if (remaining and 1 != 0) {
+            low = times(low, lowBase, up = false) ?: return null
+            high = times(high, highBase, up = true) ?: return null
+        }
+        remaining = remaining ushr 1
+        if (remaining > 0) {
+            lowBase = times(lowBase, lowBase, up = false) ?: return null
+            highBase = times(highBase, highBase, up = true) ?: return null
+        }
+    }
+    return low.fraction() to high.fraction()
+}
+
+// `mantissa * 2^exponent`.
+private class Dyadic(val mantissa: BigInt, val exponent: Long) {
+    fun fraction(): BigFraction = if (exponent >= 0) BigFraction.of(mantissa shl exponent.toInt(), BIG_ONE)
+        else BigFraction.of(mantissa, BIG_ONE shl (-exponent).toInt())
+}
+
 // A lower bound on `log2(this)` for a positive fraction, which lies below `2^(log2Floor() + 2)`.
 private fun BigFraction.log2Floor(): Long = num.magnitudeBitLength().toLong() - den.magnitudeBitLength() - 1
 
-// Powers up to this many bits are formed exactly.
+// Powers up to this many bits are formed exactly; wider ones are bracketed from this many significant bits upward.
 private const val POWER_WIDTH = 1L shl 16
+private const val POWER_BRACKET_BITS = 128
+
+// The binary exponents a bracket may reach: a power this far from one is decided from bit lengths before bracketing.
+private const val POWER_EXPONENT_RANGE = 1L shl 20
 
 private fun slackedRow(
     row: LinearRow,

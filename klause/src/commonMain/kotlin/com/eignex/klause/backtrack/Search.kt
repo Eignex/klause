@@ -1129,6 +1129,7 @@ private class ResidualRealComponent(
                 when (val decided = withinTolerance(search, discrete, context)) {
                     ToleranceLeaf.Refuted -> return ComponentCheck.Infeasible()
                     ToleranceLeaf.Undecided -> return ComponentCheck.Indeterminate
+                    ToleranceLeaf.Unavailable -> null
                     is ToleranceLeaf.Completed -> decided.sample
                 }
             }
@@ -1169,12 +1170,13 @@ private class ResidualRealComponent(
 
             // A refused float point and an exact refutation leave the decision to the search within tolerance.
             LpVerdict.INFEASIBLE, LpVerdict.INDETERMINATE, LpVerdict.CERTIFIED_BOUND -> {
-                val search = toleranceSearch ?: return if (result.verdict == LpVerdict.INFEASIBLE) {
-                    ComponentCheck.Infeasible()
-                } else ComponentCheck.Indeterminate
+                val unsearched = if (result.verdict == LpVerdict.INFEASIBLE) ComponentCheck.Infeasible()
+                    else ComponentCheck.Indeterminate
+                val search = toleranceSearch ?: return unsearched
                 when (val decided = withinTolerance(search, discrete(), context)) {
                     ToleranceLeaf.Refuted -> ComponentCheck.Infeasible()
                     ToleranceLeaf.Undecided -> ComponentCheck.Indeterminate
+                    ToleranceLeaf.Unavailable -> unsearched
                     is ToleranceLeaf.Completed -> ComponentCheck.Feasible.also { completed = decided.sample }
                 }
             }
@@ -1184,10 +1186,12 @@ private class ResidualRealComponent(
     private sealed interface ToleranceLeaf {
         data object Refuted : ToleranceLeaf
         data object Undecided : ToleranceLeaf
+        data object Unavailable : ToleranceLeaf
         class Completed(val sample: Sample) : ToleranceLeaf
     }
 
-    // The leaf decided by the search within tolerance; a witness acceptance refuses decides nothing.
+    // The leaf decided by the search within tolerance. A source the search cannot state, or a witness acceptance
+    // refuses, leaves the leaf its verdict without the search.
     private fun withinTolerance(search: ToleranceRealSearch, discrete: Sample, context: SearchContext): ToleranceLeaf {
         val stop = context.executionControls.cancellation
         val found = search.complete(discrete, stop, context.executionControls, solveContext)
@@ -1195,10 +1199,11 @@ private class ResidualRealComponent(
         return when (found) {
             is ToleranceSearchResult.Refuted -> ToleranceLeaf.Refuted
             is ToleranceSearchResult.Undecided -> ToleranceLeaf.Undecided
+            ToleranceSearchResult.Unavailable -> ToleranceLeaf.Unavailable
             is ToleranceSearchResult.Witness -> discrete.copy(
                 reals = DoubleArray(found.reals.size) { found.reals[it].toDouble() }, exactReals = found.reals,
-            ).takeIf { toleranceCheck?.invoke(it) == true && !stop() }?.let(ToleranceLeaf::Completed)
-                ?: ToleranceLeaf.Undecided
+            ).takeIf { toleranceCheck?.invoke(it) == true }?.let(ToleranceLeaf::Completed)
+                ?: if (stop()) ToleranceLeaf.Undecided else ToleranceLeaf.Unavailable
         }
     }
 
