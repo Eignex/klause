@@ -1292,7 +1292,7 @@ class LpEngineTest {
         for (numerical in listOf(false, true)) {
             val context = LpSolveContext(certificationPolicy = decline, numericalDeductions = numerical)
             LpEngine(problem, LinearObjective(realCoefficients = doubleArrayOf(0.0)),
-                LpParams(lpPlan = LpPlan(realResidual = true, componentSplit = false)),
+                LpParams(lpPlan = LpPlan(bounding = true, realResidual = true, componentSplit = false)),
                 SolveStatsSink("numerical-leaf-refutation"), context).use { engine ->
                 val result = engine.leafCertify(PropagationSession(problem), toleranceCheck = { true })
 
