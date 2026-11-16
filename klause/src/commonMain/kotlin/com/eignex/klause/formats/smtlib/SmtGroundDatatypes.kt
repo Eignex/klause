@@ -132,18 +132,21 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                     }
                     is SExpr.SList -> {
                         val original = node.items.firstOrNull() ?: smtUnsupported("empty datatype expression")
-                        val qualified = (original as? SExpr.SList)?.takeIf { it.polynomialHead() == "as" }
+                        val qualified = (original as? SExpr.SList)?.takeIf {
+                            (it.items.firstOrNull() as? SExpr.Atom)?.text == "as"
+                        }
                         val identifier = qualified?.items?.get(1) ?: original
                         val indexed = identifier as? SExpr.SList
                         val tester = indexed?.let {
-                            it.polynomialHead() == "_" && it.items.size == 3 && it.polynomialAtom(1) == "is"
+                            (it.items.firstOrNull() as? SExpr.Atom)?.text == "_" && it.items.size == 3 &&
+                                (it.items[1] as? SExpr.Atom)?.text == "is"
                         } == true
                         val name = when {
                             tester -> indexed!!.polynomialName(2)
                             identifier is SExpr.Atom -> polynomialSymbol(identifier.text)
                             else -> null
                         }
-                        when (name) {
+                        when ((original as? SExpr.Atom)?.text) {
                             "let" -> {
                                 val bindings = (node.items[1] as SExpr.SList).items.map { it as SExpr.SList }
                                 work.addLast(Frame.Let(bindings.map { it.polynomialName(0) }, node.items[2],
@@ -243,10 +246,9 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
             }
             else -> constructor(operator, arguments)
         }
-        val identifier = if (frame.identifier is SExpr.Atom) SExpr.Atom(polynomialSymbol(frame.identifier.text))
-            else frame.identifier
-        val sort = frame.environment.functions[frame.name]?.result ?: resultSort(identifier, arguments.map { it.sort })
-        return Term(sort, form(identifier, *arguments.map { it.expression }.toTypedArray()))
+        val sort = frame.environment.functions[frame.name]?.result
+            ?: resultSort(frame.identifier, arguments.map { it.sort })
+        return Term(sort, form(frame.identifier, *arguments.map { it.expression }.toTypedArray()))
     }
 
     private fun constructor(operator: SmtDatatypeOperator, arguments: List<Term>): Term {

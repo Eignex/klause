@@ -23,6 +23,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
     private val declarations = ArrayList<SExpr>()
     private val bindings = ArrayList<SmtSourceBinding>()
     private val names = HashSet<String>()
+    private val hasPartialLog = source.terms.any { it.datatype == null && it.operator == "log" }
     private var nextName = 0
 
     fun reduce(): SmtReduction {
@@ -39,7 +40,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
         }
         val basis = groundSorts()
         val obligations = ArrayList<SExpr>()
-        var universallyCertified = source.terms.none { it.operator == "log" }
+        var universallyCertified = !hasPartialLog
         var hasSchemas = false
         for ((head, root) in source.obligations) {
             step()
@@ -94,7 +95,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
 
     private fun definitionObligations(basis: List<SmtSort>,
         obligations: MutableList<SExpr>): Boolean {
-        if (source.terms.any { it.operator == "log" }) {
+        if (hasPartialLog) {
             return source.symbols.any { definitionParameters(it).isNotEmpty() }
         }
         var universal = false
@@ -154,7 +155,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
 
     private fun constructiveSchema(): Boolean {
         // A Boolean interpretation embeds in every available non-datatype sort. Ground terms stay in that image.
-        if (source.terms.any { it.operator == "log" }) return false
+        if (hasPartialLog) return false
         if (source.commands.any {
                 (it as? SExpr.SList)?.polynomialHead() in
                     setOf("declare-datatype", "declare-datatypes")

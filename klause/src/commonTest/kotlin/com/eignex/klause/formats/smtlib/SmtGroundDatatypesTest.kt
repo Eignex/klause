@@ -32,6 +32,80 @@ import kotlin.test.assertTrue
 
 class SmtGroundDatatypesTest {
     @Test
+    fun `datatype constructors named log remain productive with global sort parameters`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype N ((z) (log (pred N))))
+            (assert (= (log z) (log z)))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `datatype selectors named log remain productive with global sort parameters`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (declare-datatype Box ((box (log Int))))
+            (assert (= (log (box 7)) 7))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `quoted grammar constructor names retain their symbol meaning`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Box ((|let| (a Int)) (|as| (b Int)) (|match| (c Int))
+                (|!| (d Int)) (|_| (e Int))))
+            (assert (= (a (|let| 1)) 1))
+            (assert (= (b (|as| 2)) 2))
+            (assert (= (c (|match| 3)) 3))
+            (assert (= (d (|!| 4)) 4))
+            (assert (= (e (|_| 5)) 5))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `quoted grammar selector names retain their symbol meaning`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Box ((box (|let| Int) (|as| Int) (|match| Int) (|!| Int) (|_| Int))))
+            (declare-const x Box)
+            (assert (= x (box 1 2 3 4 5)))
+            (assert (= (|let| x) 1))
+            (assert (= (|as| x) 2))
+            (assert (= (|match| x) 3))
+            (assert (= (|!| x) 4))
+            (assert (= (|_| x) 5))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
+    fun `quoted grammar functions retain their spelling through datatype exposure`() {
+        val parsed = SmtLib.parse("""
+            (declare-datatype Box ((box (field Int))))
+            (declare-fun |let| (Int) Int)
+            (assert (= (|let| (field (box 1))) 2))
+        """.trimIndent())
+
+        val result = solve(parsed)
+
+        assertIs<OpenTheoryResult.Sat>(result)
+    }
+
+    @Test
     fun `polymorphic expansion keeps nullary constructors distinct from source marker names`() {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)
