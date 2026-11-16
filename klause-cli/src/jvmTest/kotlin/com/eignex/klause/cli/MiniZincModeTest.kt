@@ -206,7 +206,7 @@ class MiniZincModeTest(private val direction: String) {
     }
 
     @Test
-    fun `declared nonlinear grid optimization should report its optimum in original units`() {
+    fun `a nonlinear grid optimum should stay a grid verdict without an optimum marker`() {
         val program = parseFlatZinc("var 0.0..1.0: x :: output_var; var 0.0..1.0: y :: output_var; " +
             "constraint float_le(x,0.75); constraint float_times(x,x,y); solve $direction y;", floatBuckets = 5)
         val maximize = direction == "maximize"
@@ -214,7 +214,7 @@ class MiniZincModeTest(private val direction: String) {
         val normalized = if (maximize) objective.negated() else objective
         val invocation = program.prepareFiniteCompatibility(SourceSetupRequest(program.sourceAttachment(),
             ExecutionOperation.OPTIMIZE, FiniteEngine.FIXED, normalized, maximize = maximize))
-        assertTrue(assertNotNull(invocation.floatProjection).declaredGridSemantics)
+        assertNotNull(invocation.floatProjection)
         val solvable = Solvable(invocation.finiteShape(), { writeFlatZincSolution(program.sourceProgram, it, true) },
             null, continuousObjectiveValue = { normalized.evaluateExact(it).toDouble() })
         val common = CommonOptions().apply {
@@ -235,12 +235,9 @@ class MiniZincModeTest(private val direction: String) {
         }
 
         val text = bytes.toString(Charsets.UTF_8.name())
-        val expected = if (maximize) "0.5" else "0.0"
-        assertTrue("_objective = $expected;" in text.lines(), text)
-        assertTrue("==========" in text.lines(), text)
         assertTrue("klause-grid-verdict: OPTIMAL" in text, text)
-        assertTrue("declared finite grid" in text, text)
-        assertFalse("=====UNKNOWN=====" in text.lines(), text)
+        assertFalse("==========" in text.lines(), text)
+        assertFalse("_objective = 0.5;" in text.lines(), text)
     }
 
     @Test
@@ -277,7 +274,7 @@ class MiniZincModeTest(private val direction: String) {
         assertTrue("y = 0.0625;" in text.lines(), text)
         assertTrue("==========" in text.lines(), text)
         assertFalse("klause-grid-verdict" in text, text)
-        assertFalse("declared finite grid" in text, text)
+        assertFalse("klause-float-claim" in text, text)
     }
 
     @Test

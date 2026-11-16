@@ -58,7 +58,7 @@ internal class FlatZincSourceState(
         val selection = SourceSetup.selectRoute(SourceSetupRequest(attachment(), ExecutionOperation.SATISFY,
             FiniteEngine.LOCAL_SEARCH))
         val prepared = SourceSetup.prepareSelectedFloatGrid(selection, variables,
-            FloatGridConsumerPurpose.FINITE_COMPATIBILITY, declaredGridSemantics = true)
+            FloatGridConsumerPurpose.FINITE_COMPATIBILITY)
         if (prepared !is SelectedFloatGridPreparation.Prepared) {
             return FlatZincGridGeometry(null, original.floatRepresentations)
         }
@@ -103,13 +103,10 @@ internal class FlatZincSourceState(
             original.semantics.effective.floats !is FloatSemantics.Grid
         ) return null
         if (geometryOwner.isInitialized()) {
-            return geometry.definition?.let {
-                SourceSetup.prepareSelectedFloatGrid(selection, it, purpose, declaredGridSemantics = true)
-            }
+            return geometry.definition?.let { SourceSetup.prepareSelectedFloatGrid(selection, it, purpose) }
         }
         val (_, variables) = gridVariables(stop) ?: return null
-        return if (variables.isEmpty()) null else SourceSetup.prepareSelectedFloatGrid(selection, variables, purpose,
-            declaredGridSemantics = true)
+        return if (variables.isEmpty()) null else SourceSetup.prepareSelectedFloatGrid(selection, variables, purpose)
     }
 
     fun executionProgram(invocation: PreparedSourceInvocation): FlatZincProgram {

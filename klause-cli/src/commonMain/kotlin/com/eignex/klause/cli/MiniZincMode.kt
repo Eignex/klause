@@ -256,7 +256,7 @@ internal class MiniZincOutput(
 
     override fun onComplete(verdict: Verdict) {
         if (floatApproximation) {
-            println("% klause-float-claim: declared finite grid; no global continuous-source proof")
+            println("% klause-float-claim: private finite grid; source-checked points, no grid refutation or optimum")
         }
         if (integerScopeChanged) {
             println("% klause-source-claim: caller integer bounds; no default-source proof")

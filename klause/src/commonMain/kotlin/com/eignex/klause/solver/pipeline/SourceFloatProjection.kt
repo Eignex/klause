@@ -31,9 +31,6 @@ class SourceFloatGridCoordinate internal constructor(
 
 /** Immutable correspondence for a selected approximation, without source proof authority. */
 class SourceFloatProjection internal constructor(binding: SelectedFloatGridBinding) {
-    /** Whether publication reports claims under the declared grid interpretation. */
-    val declaredGridSemantics: Boolean = binding.consumer.declaredGridSemantics
-
     /** Original source attachment, whose real declarations remain authoritative. */
     val source: SourceAttachment = binding.consumer.selection.source
 
