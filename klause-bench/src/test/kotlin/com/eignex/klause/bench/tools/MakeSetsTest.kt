@@ -84,6 +84,7 @@ class MakeSetsTest {
         assertTrue((drawn + pb).none { it.substringAfter("suite/").substringAfter("/p").toInt() >= 35 })
         val linear = "# linear: open-int, linear-real\n@open-int\n@linear-real\n"
         assertEquals(linear, sets.resolve("linear.txt").readText())
+        assertTrue("@smt-ground-v1" in sets.resolve("sweep.txt").readLines())
         assertTrue(Files.notExists(sets.resolve("mip.txt")))
         dir.toFile().deleteRecursively()
     }

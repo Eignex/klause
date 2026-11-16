@@ -15,7 +15,7 @@
     "sourceValidation": false,
     "request": {
       "parameters": {
-        "selections": "[{\"suite\":\"smtlib-qflia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qflra\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnra\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfidl\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfrdl\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qflira\",\"per-family\":\"1000000\"}]",
+        "selections": "[{\"suite\":\"smtlib-qflia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qflra\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnra\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfidl\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfrdl\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qflira\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfabv\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfalia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfania\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfaufbv\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfauflia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfaufnia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfax\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfbv\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfdt\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfnira\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfuf\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfufbv\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfufbvdt\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfufdt\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfufdtlia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfufdtlira\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfufdtnia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfufidl\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfuflia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfuflra\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfufnia\",\"per-family\":\"1000000\"},{\"suite\":\"smtlib-qfufnra\",\"per-family\":\"1000000\"}]",
         "timeout-ms": "60000"
       }
     },
@@ -25,7 +25,30 @@
       "smtlib-qfnra": "missing",
       "smtlib-qfidl": "missing",
       "smtlib-qfrdl": "missing",
-      "smtlib-qflira": "missing"
+      "smtlib-qflira": "missing",
+      "smtlib-qfabv": "missing",
+      "smtlib-qfalia": "missing",
+      "smtlib-qfania": "missing",
+      "smtlib-qfaufbv": "missing",
+      "smtlib-qfauflia": "missing",
+      "smtlib-qfaufnia": "missing",
+      "smtlib-qfax": "missing",
+      "smtlib-qfbv": "missing",
+      "smtlib-qfdt": "missing",
+      "smtlib-qfnia": "missing",
+      "smtlib-qfnira": "missing",
+      "smtlib-qfuf": "missing",
+      "smtlib-qfufbv": "missing",
+      "smtlib-qfufbvdt": "missing",
+      "smtlib-qfufdt": "missing",
+      "smtlib-qfufdtlia": "missing",
+      "smtlib-qfufdtlira": "missing",
+      "smtlib-qfufdtnia": "missing",
+      "smtlib-qfufidl": "missing",
+      "smtlib-qfuflia": "missing",
+      "smtlib-qfuflra": "missing",
+      "smtlib-qfufnia": "missing",
+      "smtlib-qfufnra": "missing"
     }
   }
 }

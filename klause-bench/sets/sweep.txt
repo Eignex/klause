@@ -1,4 +1,4 @@
-# sweep: open-int, linear-real, nonlinear-real, mip, scheduling, routing, packing, globals, sat, maxsat, pb
+# sweep: open-int, linear-real, nonlinear-real, mip, scheduling, routing, packing, globals, sat, maxsat, pb, smt-ground-v1
 @open-int
 @linear-real
 @nonlinear-real
@@ -10,3 +10,4 @@
 @sat
 @maxsat
 @pb
+@smt-ground-v1
