@@ -202,6 +202,38 @@ internal fun Factor.hasToleranceReading(): Boolean = when (this) {
     }
 }
 
+// The real coordinates a relation stated as `r = f(x)` reads within the slack, as [RealToleranceScope] defines it:
+// the result, and for a product with finite choices the operand that selects a member. Null for a relation read as
+// rows or held exactly, and for one whose read coordinate also states an operand.
+internal fun Factor.slackCoordinates(): IntArray? {
+    val (read, operands) = when (this) {
+        is RealAbs -> intArrayOf(result) to intArrayOf(operand)
+        is RealArrayMinMax -> intArrayOf(result) to xs
+        is RealElement -> intArrayOf(result) to if (arrIsVars) entries else intArrayOf()
+        is RealProduct -> intArrayOf(result) to intArrayOf(realOperand)
+        is ContinuousProduct -> finiteChoices?.let { choices ->
+            intArrayOf(result, choices.operand) to intArrayOf(if (choices.operand == a) b else a)
+        } ?: (intArrayOf(result) to intArrayOf(a, b))
+        is Power -> if (base !is Power.Coordinate.Real) return null else {
+            intArrayOf((result as Power.Coordinate.Real).id.index) to intArrayOf(base.id.index)
+        }
+        is RealFiniteDomain -> intArrayOf(variable) to intArrayOf()
+        else -> return null
+    }
+    return read.takeIf { read.distinct().size == read.size && read.none { it in operands } }
+}
+
+// Whether [RealToleranceScope] reads this relation as rows, rather than as a membership, a distinctness or a relation
+// stated as `r = f(x)`.
+internal val Factor.readsAsRows: Boolean get() = when (this) {
+    is Distinct, is RealFiniteDomain, is RealAbs, is RealArrayMinMax, is RealElement, is RealProduct,
+    is ContinuousProduct, is Power -> false
+    else -> true
+}
+
+// Whether an active row reads the slack: a strict row and a disequality hold exactly.
+internal val LinearRow.readsSlack: Boolean get() = !strict && relation != LinearOp.NE
+
 private class ToleranceWitness(
     private val exactPoint: ExactRealPoint,
     private val policy: SourceTolerance,
@@ -268,7 +300,7 @@ private class ToleranceWitness(
         cancellation.charge(row.size.toLong() + 1L)
         if (cancellation()) return false
         val active = row.activator == LinearRow.ALWAYS || exactPoint.truth(row.activator)
-        if (active && !row.strict && row.relation != LinearOp.NE) {
+        if (active && row.readsSlack) {
             slackedRow(row, point, policy, cancellation)?.let { return it }
         }
         return row.exactComparison(reals.size, active, exactPoint::truth).holdsAt(exactPoint)

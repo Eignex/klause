@@ -1,6 +1,10 @@
 package com.eignex.klause.solver.pipeline
 
+import com.eignex.klause.arithmetic.polynomial.AlgebraicArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialArithmetic
+import com.eignex.klause.arithmetic.polynomial.PolynomialInterrupted
 import com.eignex.klause.arithmetic.polynomial.PolynomialLimits
+import com.eignex.klause.arithmetic.polynomial.PolynomialResourceLimit
 import com.eignex.klause.presolve.PreparedSource
 import com.eignex.klause.presolve.PresolveBudget
 import com.eignex.klause.presolve.PresolveConfig
@@ -10,6 +14,7 @@ import com.eignex.klause.presolve.preparationInterrupted
 import com.eignex.klause.solver.Sample
 import com.eignex.klause.solver.SolveResult
 import com.eignex.klause.solver.evidence.SourceEvidenceCheck
+import com.eignex.klause.solver.incumbent.Verification
 import com.eignex.klause.solver.objective.LinearObjective
 import com.eignex.klause.solver.result.PresolveLane
 import com.eignex.klause.solver.result.PresolvePreparationStage
@@ -20,6 +25,8 @@ import com.eignex.klause.solver.result.TerminationReason
 import com.eignex.klause.util.ExecutionControl
 import kotlin.time.TimeSource
 
+// Presolve reduces its source exactly, so a source the polynomial encoding widens by its slack enters the theory
+// unreduced: an exact reduction would refute or tighten what the slack admits.
 internal fun PolynomialTheoryRequest.prepareSource(
     config: PresolveConfig,
     objective: LinearObjective?,
@@ -27,7 +34,9 @@ internal fun PolynomialTheoryRequest.prepareSource(
     containingStop: ExecutionControl,
     budget: PresolveBudget?,
     solutionSetSensitive: Boolean = false,
-): PreparedSource = PresolvePipeline.prepareSource(
+): PreparedSource = if (resolvedModel().tolerance != null) {
+    PreparedSource.unchanged(resolvedModel().source, budget)
+} else PresolvePipeline.prepareSource(
     resolvedModel().source, config, objective, solutionSetSensitive, preparationStop or containingStop,
     presolveBudget = budget,
 )
@@ -62,8 +71,10 @@ internal fun PolynomialTheoryRequest.reconstructSource(
     params: PolynomialTheoryParams,
     verification: ExecutionControl,
 ): QuadraticIncumbent? {
-    if (sourcePreparation?.changed != true) return incumbent
-    return reconstructSource(incumbent.sample, params, verification)?.let { incumbent.copy(sample = it) }
+    if (sourcePreparation?.changed != true && sourceTolerance == null) return incumbent
+    return reconstructSource(incumbent.sample, params, verification)?.let { point ->
+        if (point === incumbent.sample) incumbent else incumbent.copy(sample = point)
+    }
 }
 
 internal fun PolynomialTheoryRequest.publishSource(
@@ -71,7 +82,7 @@ internal fun PolynomialTheoryRequest.publishSource(
     params: PolynomialTheoryParams,
     verification: ExecutionControl,
 ): QuadraticOptimizationResult {
-    if (sourcePreparation == null) return result
+    if (sourcePreparation == null && sourceTolerance == null) return result
     val stats = preparationStats(result.stats)
     val point = (result as? QuadraticOptimizationResult.WithIncumbent)?.let {
         reconstructSource(it.incumbent, params, verification)
@@ -95,12 +106,68 @@ internal fun PolynomialTheoryRequest.reconstructSource(
     params: PolynomialTheoryParams,
     verification: ExecutionControl,
 ): Sample? {
-    val preparation = sourcePreparation?.takeIf { it.changed } ?: return sample
-    val lifted = preparation.mapping.reconstructFrom(preparation.problem, sample)
-    val checked = checkQuadraticSourceWitness(originalPlan, lifted, verification,
-        PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells))
-    return lifted.takeIf { checked == SourceEvidenceCheck.Checked }
+    val limits = PolynomialLimits(params.maximumDenseCoefficients, params.maximumMatrixCells)
+    val preparation = sourcePreparation?.takeIf { it.changed }
+    val lifted = if (preparation == null) sample else {
+        preparation.mapping.reconstructFrom(preparation.problem, sample).takeIf {
+            checkQuadraticSourceWitness(originalPlan, it, verification, limits) == SourceEvidenceCheck.Checked
+        } ?: return null
+    }
+    val tolerance = sourceTolerance ?: return lifted
+    // A rational point is judged by the source acceptance. An algebraic one is judged by the widened formula, whose
+    // region lies inside that acceptance relation by relation.
+    val rationals = lifted.exactReals ?: lifted.algebraicReals?.map { it.rational }
+    val accepted = if (rationals != null && rationals.none { it == null }) {
+        val exact = rationals.map { checkNotNull(it) }
+        val point = lifted.copy(reals = DoubleArray(exact.size) { exact[it].toDouble() }, exactReals = exact)
+        tolerance.accepts(point, verification) is Verification.Accepted
+    } else {
+        checkQuadraticSourceWitness(originalPlan, lifted, verification, limits) == SourceEvidenceCheck.Checked
+    }
+    return if (accepted) lifted.withNearestReals(verification, limits) else null
 }
+
+// This point with each algebraic real coordinate published as its nearest binary64 value. The isolating interval is
+// bisected until both endpoints round to one value, which the root between them then rounds to as well, and the
+// narrowed interval is kept so that every reader of the exact coordinate rounds it the same way. A stopped or
+// declined refinement keeps the captured approximation, since the exact coordinate remains the witness.
+private fun Sample.withNearestReals(cancellation: ExecutionControl, limits: PolynomialLimits): Sample {
+    val algebraic = algebraicReals?.toMutableList() ?: return this
+    if (algebraic.all { it.rational != null }) return this
+    val reals = DoubleArray(numRealVars) { approximateRealValue(it) }
+    try {
+        val arithmetic = AlgebraicArithmetic(PolynomialArithmetic(cancellation, limits))
+        for (id in algebraic.indices) {
+            var remaining = NEAREST_REAL_REFINEMENTS
+            while (remaining-- > 0) {
+                val current = algebraic[id]
+                val exact = current.rational
+                if (exact != null) {
+                    reals[id] = exact.toDouble()
+                    break
+                }
+                val lower = current.lowerBound.toDouble()
+                if (lower == current.upperBound.toDouble()) {
+                    reals[id] = lower
+                    break
+                }
+                algebraic[id] = arithmetic.refine(current)
+            }
+        }
+    } catch (_: PolynomialInterrupted) {
+        return this
+    } catch (_: PolynomialResourceLimit) {
+        return this
+    }
+    return copy(reals = reals, algebraicReals = algebraic)
+}
+
+// Bisections that bring an isolating interval within one binary64 rounding of any normal or subnormal value.
+private const val NEAREST_REAL_REFINEMENTS = 2_200
+
+// The slack the source's polynomial encoding states, or null when the theory decides the exact source.
+internal val PolynomialTheoryRequest.sourceTolerance: PolynomialTolerance?
+    get() = originalPlan.execution.polynomial?.completion?.tolerance
 
 internal fun PolynomialTheoryParams.sourceVerificationReason(verification: ExecutionControl): TerminationReason = when {
     timeout() -> TerminationReason.Timeout

@@ -245,6 +245,28 @@ Each strategy uses the plan in its own way:
 
 Rejected heuristic candidates never establish a global refutation.
 
+#### Tolerance-widened formulas
+
+A factor source that declares a positive absolute feasibility tolerance is lowered
+widened by `PolynomialTolerance`, following the readings of
+[source acceptance](04-finite-formats.md#flatzinc-floats). In each tolerance component,
+an active non-strict row becomes the band of the absolute slack around its right-hand
+side, while a false activator keeps the exact complement. A relation stated as
+`r = f(x)` keeps its exact encoding over a private `r'` and adds
+`abs(r - r') <= slack`; a product with finite choices also moves its selecting operand,
+and a membership its variable. Declarations widen by the same slack and leave the
+fixed-coordinate substitution. Strict rows, disequalities, distinctness, relations of
+exact components and a relation whose result is also an operand stay exact. SMT-LIB
+sources and a zero tolerance keep the exact formula.
+
+The procedure decides the widened formula exactly; its constants stay rational and its
+bands non-strict. Bands replace row equalities and fixed declarations by
+full-dimensional regions that equational reduction cannot eliminate, so projection and
+lifting grow, and optima lie on band boundaries. Presolve does not run on a widened
+source, because its reductions are exact. A witness with rational coordinates must pass
+the source acceptance; an algebraic witness must satisfy the widened formula, whose
+region lies inside that acceptance.
+
 #### Conditioned theory service
 
 `PolynomialTheoryService` captures one immutable neutral formula. Each
