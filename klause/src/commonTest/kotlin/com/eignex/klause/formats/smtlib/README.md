@@ -183,6 +183,8 @@ exact authority explicitly, and rejection controls exercise publication gates.
 | C32 | `retained symbolic coordinates preserve native inverse identities` | A captured native exp(1) coordinate satisfies log(x)=1 and differs from its approximate placeholder zero without re-solving |
 | C33 | `symbolic query syntax cannot replace unavailable native authority` | A matching printed symbolic term without certified authority declines arithmetic evaluation |
 | C34 | `retained real division queries preserve their chosen total interpretation` | SAT; an observed real division-by-zero choice remains fixed in later queries |
+| C35 | `defined numeric ranks retain real array index values` | SAT; declared Real argument/result ranks survive definition expansion in plain, datatype and polymorphic contexts |
+| C36 | `retained defined real ranks select their fixed polymorphic interpretation` | SAT; defined Real results choose the fixed Real function instance, whose result differs from the Int instance |
 
 C32 and C33 cover retained representations of the existing real-function
 extensions. Their expected results use mathematical inverse/sign identities and

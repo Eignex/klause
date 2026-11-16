@@ -27,7 +27,8 @@ internal fun exposeSmtGroundFunctions(input: SmtReduction, cancellation: Executi
 
 private class SmtGroundFunctionReducer(private val input: SmtReduction, private val cancellation: ExecutionControl,
     private val encodeUninterpreted: Boolean) {
-    private data class Term(val id: Int, val expression: SExpr, val partial: Boolean = false)
+    private data class Term(val id: Int, val expression: SExpr, val sort: SmtSort? = null,
+        val partial: Boolean = false)
     private data class NodeKey(val head: SExpr, val arguments: List<Int>)
     private data class ApplicationKey(val function: Int, val arguments: List<Int>)
     private data class Application(val arguments: List<String>, val result: String)
@@ -36,7 +37,8 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
     private class Function(val id: Int, val declaration: SmtSourceDeclaration, val default: String) {
         val applications = ArrayList<Application>()
     }
-    private data class Macro(val parameters: List<String>, val body: SExpr, val environment: Environment)
+    private data class Macro(val parameters: List<String>, val sorts: List<SmtSort>, val result: SmtSort,
+        val body: SExpr, val environment: Environment)
     private class Environment(val version: Int, val locals: Map<String, Term> = emptyMap(),
         val parent: Environment? = null) {
         fun local(name: String): Term? {
@@ -53,6 +55,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
         data class Combine(val head: SExpr, val count: Int, val function: Function?) : Frame
         data class Let(val names: List<String>, val body: SExpr, val environment: Environment) : Frame
         data class Call(val macro: Macro) : Frame
+        data class Coerce(val sort: SmtSort) : Frame
         data class DefinedArguments(val arguments: List<Term>) : Frame
     }
 
@@ -165,10 +168,10 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
             val recipe = FreeSortReconstruction(sort, declaration.name)
             privateBindings[declaration.name] = recipe
             sourceBindings[name]?.let { sourceBindings[name] = it.copy(reconstruction = recipe) }
-            atom(declaration.name)
+            atom(declaration.name, SmtSort.Int)
         } else {
             output += groundCommand("declare-const", SExpr.Atom(declaration.name), sortExpression(declaration.result))
-            atom(declaration.name)
+            atom(declaration.name, declaration.result)
         }
         bindings[name] = Binding(bindings.size, term = term)
     }
@@ -176,7 +179,9 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
     private fun define(command: SExpr.SList) {
         val parameters = command.items[2] as SExpr.SList
         val names = parameters.items.map { (it as SExpr.SList).polynomialName(0) }
-        val macro = Macro(names, command.items[4], Environment(bindings.size))
+        val sorts = parameters.items.map { sortScope.sourceSort((it as SExpr.SList).items[1]) }
+        val macro = Macro(names, sorts, sortScope.sourceSort(command.items[3]), command.items[4],
+            Environment(bindings.size))
         bindings[command.polynomialName(1)] = Binding(bindings.size, macro = macro)
     }
 
@@ -198,6 +203,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                             local != null -> values.addLast(local)
                             binding?.term != null -> values.addLast(binding.term)
                             binding?.macro != null -> {
+                                work.addLast(Frame.Coerce(binding.macro.result))
                                 work.addLast(Frame.Evaluate(binding.macro.body, binding.macro.environment))
                             }
                             else -> values.addLast(atom(node.text))
@@ -221,8 +227,10 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                             val binding = identifierName(selected)?.let { binding(it, frame.environment) }
                             when {
                                 binding?.term != null -> values.addLast(binding.term)
-                                binding?.macro != null -> work.addLast(Frame.Evaluate(binding.macro.body,
-                                    binding.macro.environment))
+                                binding?.macro != null -> {
+                                    work.addLast(Frame.Coerce(binding.macro.result))
+                                    work.addLast(Frame.Evaluate(binding.macro.body, binding.macro.environment))
+                                }
                                 selected is SExpr.Atom -> values.addLast(atom(polynomialSymbol(selected.text)))
                                 else -> values.addLast(literalTerm(selected))
                             }
@@ -231,8 +239,11 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                         } else {
                             val binding = name?.let { binding(it, frame.environment) }
                             val qualified = head is SExpr.SList && head.polynomialHead() == "as"
-                            val identifier = if (!encodeUninterpreted && binding == null && qualified) head
-                            else unqualifiedIdentifier(head)
+                            val selected = if (!encodeUninterpreted && binding == null && qualified)
+                                sortScope.sourceSort((head as SExpr.SList).items[2]) else null
+                            val unqualified = unqualifiedIdentifier(head)
+                            val identifier = if (selected == SmtSort.Real)
+                                expression("as", unqualified, SExpr.Atom("Real")) else unqualified
                             if (binding?.macro != null) work.addLast(Frame.Call(binding.macro))
                             else work.addLast(Frame.Combine(identifier, node.items.size - 1,
                                 binding?.function))
@@ -251,8 +262,10 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                 }
                 is Frame.Call -> {
                     val args = pop(frame.macro.parameters.size)
-                    val locals = frame.macro.parameters.zip(args).toMap()
+                    val selected = args.indices.map { coerce(args[it], frame.macro.sorts[it]) }
+                    val locals = frame.macro.parameters.zip(selected).toMap()
                     work.addLast(Frame.DefinedArguments(args.filter { it.partial }))
+                    work.addLast(Frame.Coerce(frame.macro.result))
                     work.addLast(Frame.Evaluate(frame.macro.body, Environment(frame.macro.environment.version,
                         locals, frame.macro.environment)))
                 }
@@ -261,6 +274,7 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
                     values.addLast(if (frame.function == null) intern(frame.head, args)
                     else apply(frame.function, args))
                 }
+                is Frame.Coerce -> values.addLast(coerce(values.removeLast(), frame.sort))
                 is Frame.DefinedArguments -> if (frame.arguments.isNotEmpty()) {
                     val value = values.removeLast()
                     val domains = frame.arguments.map { intern(SExpr.Atom("="), listOf(it, it)) }
@@ -339,19 +353,29 @@ private class SmtGroundFunctionReducer(private val input: SmtReduction, private 
             names += name
             FreeSortReconstruction(sort, name)
         } else SmtReconstruction.Scalar(name, sort)
-        return atom(name)
+        return atom(name, encodedSort)
     }
 
-    private fun atom(text: String): Term {
+    private fun atom(text: String, sort: SmtSort? = null): Term {
         val literal = lexicalLiteral(text)
         val key = if (literal) "literal:$text" else "symbol:${polynomialSymbol(text)}"
-        return atoms.getOrPut(key) { Term(nextTerm++, SExpr.Atom(text)) }
+        return atoms.getOrPut(key) {
+            Term(nextTerm++, SExpr.Atom(text), sort ?: sortScope.literalSort(text)
+                ?: smtBuiltinResultSort(SExpr.Atom(text), emptyList()))
+        }
     }
 
     private fun intern(head: SExpr, args: List<Term>): Term = nodes.getOrPut(NodeKey(head, args.map { it.id })) {
+        val qualified = (head as? SExpr.SList)?.takeIf { it.polynomialHead() == "as" }
+        for (argument in args) argument.sort?.checkpointStructure(cancellation)
+        val sort = if (args.all { it.sort != null }) smtBuiltinResultSort(head, args.map { it.sort!! },
+            qualified?.let { sortScope.sourceSort(it.items[2]) }) else null
         Term(nextTerm++, SExpr.SList(listOf(head) + args.map { it.expression }),
-            identifierName(head) == "log" || args.any { it.partial })
+            sort, identifierName(head) == "log" || args.any { it.partial })
     }
+
+    private fun coerce(term: Term, sort: SmtSort): Term =
+        if (term.sort == SmtSort.Int && sort == SmtSort.Real) intern(SExpr.Atom("to_real"), listOf(term)) else term
 
     private fun step() = cancellation.polynomialSourceCheckpoint(1)
 }

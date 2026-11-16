@@ -203,7 +203,9 @@ internal class SmtFixedModel(
                 val substitution = sourceScope.sortParameters.associateWith { SmtSort.Bool } +
                     smtRankSubstitution(declaration, rank.first, rank.second, sourceScope.sortParameters, control)
                 val body = specializeBody(definition.body, substitution)
-                work += FixedFrame.Evaluate(body, definition.parameters.zip(args).toMap())
+                val selected = args.indices.map { coerce(args[it], rank.first[it]) }
+                work += FixedFrame.Coerce(rank.second)
+                work += FixedFrame.Evaluate(body, definition.parameters.zip(selected).toMap())
             } else stack += operation(head, args)
         }
         work += FixedFrame.Evaluate(term, emptyMap())
@@ -265,6 +267,7 @@ internal class SmtFixedModel(
                 is FixedFrame.Choose -> work += FixedFrame.Evaluate(
                     if (boolean(stack.removeLast())) frame.yes else frame.no, frame.locals)
                 is FixedFrame.Apply -> apply(frame.head, take(frame.count))
+                is FixedFrame.Coerce -> stack.addLast(coerce(stack.removeLast(), frame.sort))
                 is FixedFrame.Match -> {
                     val value = stack.removeLast() as SmtValue.Application
                     var selected = false
@@ -294,6 +297,9 @@ internal class SmtFixedModel(
         }
         return stack.single()
     }
+
+    private fun coerce(value: SmtValue, sort: SmtSort): SmtValue =
+        if (value is SmtValue.Integer && sort == SmtSort.Real) real(exact(value)) else value
 
     private fun operation(head: SExpr, args: List<SmtValue>): SmtValue {
         if (head is SExpr.SList) {
@@ -734,4 +740,5 @@ private sealed interface FixedFrame {
     data class Choose(val yes: SExpr, val no: SExpr, val locals: Map<String, SmtValue>) : FixedFrame
     data class Let(val names: List<String>, val body: SExpr, val locals: Map<String, SmtValue>) : FixedFrame
     data class Match(val cases: SExpr.SList, val locals: Map<String, SmtValue>) : FixedFrame
+    data class Coerce(val sort: SmtSort) : FixedFrame
 }

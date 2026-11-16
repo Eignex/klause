@@ -497,6 +497,52 @@ class SmtQfConformanceTest {
     }
 
     @Test
+    fun `defined numeric ranks retain real array index values`() {
+        val indexes = listOf("result", "(as result R)", "(identity 3)")
+        for (context in listOf("", "(declare-datatype Marker ((mark)))", "(declare-sort-parameter A)")) {
+            for (index in indexes) {
+                val parsed = SmtLib.parse("""
+                    $context
+                    (define-sort R () Real)
+                    (define-fun result () R 3)
+                    (define-fun identity ((x R)) R x)
+                    (declare-const a (Array R Bool))
+                    (assert (select a $index))
+                """.trimIndent())
+
+                val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed), "$context $index").assignment
+                val array = assertIs<SmtValue.Array>(parsed.reconstructModel(assignment).values.single().second)
+
+                assertEquals(SmtSort.Real, array.sort.index)
+                assertTrue(array.entries.all { it.first is SmtValue.Real }, "$context $index")
+                val selected = array.entries.lastOrNull { it.first == SmtValue.Real("3.0") }?.second ?: array.default
+                assertEquals(SmtValue.Boolean(true), selected)
+            }
+        }
+    }
+
+    @Test
+    fun `retained defined real ranks select their fixed polymorphic interpretation`() {
+        val parsed = SmtLib.parse("""
+            (declare-sort-parameter A)
+            (define-sort R () Real)
+            (declare-fun p (A) Bool)
+            (define-fun result () R 3)
+            (define-fun identity ((x R)) R x)
+            (assert (p 3))
+            (assert (not (p 3.0)))
+        """.trimIndent())
+        val assignment = assertIs<OpenTheoryResult.Sat>(solve(parsed)).assignment
+        val model = parsed.reconstructSessionModel(assignment)
+
+        val results = listOf("(p result)", "(p (identity 3))").map { expression ->
+            model.evaluate(SExprReader(expression).readAll().single())
+        }
+
+        assertEquals(listOf("false", "false"), results)
+    }
+
+    @Test
     fun `retained polymorphic families construct deep array ranks without recursion`() {
         val parsed = SmtLib.parse("""
             (declare-sort-parameter A)

@@ -14,15 +14,17 @@ class SmtQfResourceConformanceTest {
     @Test
     fun `deep array sorts retain source identities during typed capture`() {
         val sort = "(Array Bool ".repeat(4096) + "Bool" + ")".repeat(4096)
-        val commands = SExprReader("(declare-const a $sort) (assert (= a a))").readAll()
+        val commands = SExprReader("(declare-const a $sort) (assert (= ((as ite $sort) true a a) a))").readAll()
 
         val first = captureSmtSource(commands, ExecutionControl.Never)
         val second = captureSmtSource(commands, ExecutionControl.Never)
+        val exposed = exposeSmtGroundFunctions(first, ExecutionControl.Never)
 
         assertEquals(sort, first.declarations.single().result.toSmtLib())
         assertEquals(first.declarations.single().result, second.declarations.single().result)
         assertEquals(first.declarations.single().result.hashCode(), second.declarations.single().result.hashCode())
         assertEquals(1, first.original!!.assertions.size)
+        assertEquals(2, exposed.commands.size)
     }
 
     @Test

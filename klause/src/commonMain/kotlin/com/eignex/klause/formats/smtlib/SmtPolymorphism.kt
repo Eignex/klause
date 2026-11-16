@@ -17,6 +17,7 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
         data class Evaluate(val node: Int, val substitution: Map<String, SmtSort>,
             val locals: Map<Int, Value>) : Frame
         data class Combine(val node: Int, val substitution: Map<String, SmtSort>, val locals: Map<Int, Value>) : Frame
+        data class Coerce(val sort: SmtSort) : Frame
     }
     private val symbols = source.symbols.associateBy { it.identity }
     private val instances = LinkedHashMap<Instance, String>()
@@ -271,8 +272,9 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                             source.sortParameters, cancellation)
                         val definition = symbol.definition
                         val locals = definition.parameters.indices.associate { index ->
-                            definition.parameters[index] to arguments[index].copy(sort = rank.first[index])
+                            definition.parameters[index] to coerce(arguments[index], rank.first[index])
                         }
+                        work.addLast(Frame.Coerce(rank.second))
                         work.addLast(Frame.Evaluate(definition.body, frame.substitution + types, locals))
                     } else {
                         val rank = instantiateSmtRank(symbol.declaration.parameters, symbol.declaration.result,
@@ -283,10 +285,15 @@ private class SmtPolymorphicReduction(private val input: SmtReduction, private v
                         else command(name, *arguments.map { it.expression }.toTypedArray()), rank.second))
                     }
                 }
+                is Frame.Coerce -> values.addLast(coerce(values.removeLast(), frame.sort))
             }
         }
         return values.single()
     }
+
+    private fun coerce(value: Value, sort: SmtSort): Value =
+        if (value.sort == SmtSort.Int && sort == SmtSort.Real)
+            Value(command("to_real", value.expression), sort) else value.copy(sort = sort)
 
     private fun instance(symbol: SmtTypedSymbol, parameters: List<SmtSort>, result: SmtSort): String {
         val key = Instance(symbol.identity, parameters, result)

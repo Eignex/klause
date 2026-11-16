@@ -25,7 +25,8 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
     private data class Term(val sort: SmtSort, val expression: SExpr)
     private data class Function(val parameters: List<SmtSort>, val result: SmtSort)
     private data class OperationApplication(val function: String, val arguments: List<String>)
-    private data class Macro(val parameters: List<String>, val body: SExpr, val environment: Environment)
+    private data class Macro(val parameters: List<String>, val sorts: List<SmtSort>, val result: SmtSort,
+        val body: SExpr, val environment: Environment)
     private data class Environment(val symbols: Map<String, Term>, val functions: Map<String, Function>,
         val macros: Map<String, Macro>)
     private sealed interface Frame {
@@ -35,6 +36,7 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         data class Let(val names: List<String>, val body: SExpr, val environment: Environment) : Frame
         data class Match(val cases: SExpr, val environment: Environment) : Frame
         data class Branches(val shape: SmtDatatypeShape, val cases: List<SmtDatatypeCase>) : Frame
+        data class Coerce(val sort: SmtSort) : Frame
     }
     private val scope = SmtLibScope(cancellation)
     private val registry get() = scope.datatypes
@@ -86,10 +88,13 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                 }
                 "define-fun" -> {
                     scope.command(command)
-                    val parameters = (command.items[2] as SExpr.SList).items.map {
+                    val arguments = (command.items[2] as SExpr.SList).items
+                    val parameters = arguments.map {
                         (it as SExpr.SList).polynomialName(0)
                     }
-                    macros[command.polynomialName(1)] = Macro(parameters, command.items[4], environment())
+                    val sorts = arguments.map { scope.sourceSort((it as SExpr.SList).items[1]) }
+                    macros[command.polynomialName(1)] = Macro(parameters, sorts, scope.sourceSort(command.items[3]),
+                        command.items[4], environment())
                 }
                 "assert", "minimize", "maximize" -> {
                     output += form(command.items[0], rewrite(command.items[1], environment()).expression)
@@ -135,7 +140,10 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                         when {
                             lexicalLiteral(node.text) -> values.addLast(literal(node))
                             bound != null -> values.addLast(bound)
-                            macro != null -> work.addLast(Frame.Evaluate(macro.body, macro.environment))
+                            macro != null -> {
+                                work.addLast(Frame.Coerce(macro.result))
+                                work.addLast(Frame.Evaluate(macro.body, macro.environment))
+                            }
                             else -> values.addLast(registry.resolve(name, emptyList())?.let {
                                 constructor(it, emptyList())
                             } ?: literal(node))
@@ -174,6 +182,12 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                             "as" -> {
                                 val constant = node.polynomialName(1)
                                 val sort = scope.sourceSort(node.items[2])
+                                val macro = frame.environment.macros[constant]
+                                if (macro != null) {
+                                    work.addLast(Frame.Coerce(macro.result))
+                                    work.addLast(Frame.Evaluate(macro.body, macro.environment))
+                                    continue
+                                }
                                 val term = frame.environment.symbols[constant] ?: registry.resolve(constant,
                                     emptyList(), sort)?.let { constructor(it, emptyList()) }
                                     ?: smtUnsupported("ambiguous qualified datatype constant")
@@ -204,10 +218,13 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
                     val arguments = pop(frame.count)
                     val macro = frame.environment.macros[frame.name]
                     if (macro != null) {
+                        val selected = arguments.indices.map { coerce(arguments[it], macro.sorts[it]) }
+                        work.addLast(Frame.Coerce(macro.result))
                         work.addLast(Frame.Evaluate(macro.body, macro.environment.copy(symbols =
-                            macro.environment.symbols + macro.parameters.zip(arguments))))
+                            macro.environment.symbols + macro.parameters.zip(selected))))
                     } else values.addLast(combine(frame, arguments))
                 }
+                is Frame.Coerce -> values.addLast(coerce(values.removeLast(), frame.sort))
                 is Frame.Match -> {
                     val scrutinee = capture(values.removeLast())
                     val instance = registry.instance(scrutinee.sort) ?: smtUnsupported("match expects datatype")
@@ -241,6 +258,9 @@ private class SmtGroundDatatypeReducer(private val input: SmtReduction, private 
         }
         return values.single()
     }
+
+    private fun coerce(term: Term, sort: SmtSort): Term = if (term.sort == SmtSort.Int && sort == SmtSort.Real)
+        Term(SmtSort.Real, form("to_real", term.expression)) else term
 
     private fun combine(frame: Frame.Combine, arguments: List<Term>): Term {
         val operator = registry.resolve(frame.name ?: "", arguments.map { it.sort }, frame.qualification, frame.tester)
